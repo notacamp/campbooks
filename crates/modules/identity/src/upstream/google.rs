@@ -19,8 +19,6 @@ use url::Url;
 
 use crate::deps::ClientSecret;
 
-/// Path of the callback Google redirects to, under the issuer.
-pub const CALLBACK_PATH: &str = "/auth/callback/google";
 /// Timeout of one request to Google.
 const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 /// Largest response read from Google.
@@ -146,12 +144,13 @@ impl std::fmt::Debug for Google {
 }
 
 impl Google {
-    /// A client `client_id` with `secret`, redirecting to the callback under
-    /// `issuer` (this instance's origin), talking to `endpoints`.
+    /// A client `client_id` with `secret`, sending `redirect_uri` (see
+    /// [`super::redirect_uri`]) in both the authorization request and the
+    /// code exchange, talking to `endpoints`.
     pub fn new(
         client_id: String,
         secret: ClientSecret,
-        issuer: &str,
+        redirect_uri: String,
         endpoints: GoogleEndpoints,
     ) -> Result<Self, String> {
         let http = reqwest::Client::builder()
@@ -168,9 +167,9 @@ impl Google {
         });
         Ok(Self {
             http,
-            redirect_uri: format!("{issuer}{CALLBACK_PATH}"),
             client_id,
             secret,
+            redirect_uri,
             endpoints,
             verifier,
         })
@@ -179,6 +178,11 @@ impl Google {
     /// Google's issuer (the ID tokens' `iss`).
     pub fn issuer(&self) -> &str {
         &self.endpoints.issuer
+    }
+
+    /// The `redirect_uri` sent to Google.
+    pub fn redirect_uri(&self) -> &str {
+        &self.redirect_uri
     }
 
     /// The URL the browser is sent to.
@@ -309,7 +313,7 @@ mod tests {
         Google::new(
             "g-client".to_owned(),
             ClientSecret::Inline(SecretString::from("g-secret")),
-            "https://app.example.com",
+            "https://app.example.com/auth/callback/google".to_owned(),
             GoogleEndpoints::google(),
         )
         .unwrap()

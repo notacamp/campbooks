@@ -22,7 +22,11 @@ use serde::Deserialize;
 
 use crate::{
     domain::{clients::Clients, keys::Keys},
-    upstream::google::{Google, GoogleEndpoints},
+    upstream::{
+        Provider,
+        google::{Google, GoogleEndpoints},
+        redirect_uri,
+    },
     web::Cookies,
 };
 
@@ -91,6 +95,9 @@ struct GoogleConfig {
     client_secret: Option<SecretString>,
     client_secret_file: Option<PathBuf>,
     base_url: Option<String>,
+    /// `CAMPBOOKS_GOOGLE__REDIRECT_PATH`: the callback path registered with
+    /// Google, when a proxy maps it to `/auth/callback/google`.
+    redirect_path: Option<String>,
 }
 
 /// Where a provider's client secret comes from.
@@ -208,7 +215,8 @@ fn google_client(
         Some(base) => GoogleEndpoints::under(base)
             .map_err(|e| format!("CAMPBOOKS_GOOGLE__BASE_URL={base}: {e}"))?,
     };
-    Google::new(client_id.to_owned(), secret, issuer, endpoints).map(Some)
+    let redirect_uri = redirect_uri(Provider::Google, issuer, google.redirect_path.as_deref())?;
+    Google::new(client_id.to_owned(), secret, redirect_uri, endpoints).map(Some)
 }
 
 /// `scheme://host[:port]` of the public URL and whether it is `https`. The
@@ -323,6 +331,47 @@ mod tests {
         )
         .unwrap_err();
         assert!(fake.contains("development only"), "{fake}");
+    }
+
+    #[test]
+    fn the_google_redirect_path_defaults_and_is_validated_at_load() {
+        let config = config("https://app.example.com", None);
+        let redirect = |path: serde_json::Value| {
+            deps(
+                &config,
+                KEY,
+                &serde_json::json!({ "client_id": "g", "client_secret": "s", "redirect_path": path }),
+            )
+            .map(|deps| deps.issuer.unwrap().google.as_ref().unwrap().redirect_uri().to_owned())
+        };
+        assert_eq!(
+            redirect(serde_json::Value::Null).unwrap(),
+            "https://app.example.com/auth/callback/google"
+        );
+        assert_eq!(
+            redirect(serde_json::json!("")).unwrap(),
+            "https://app.example.com/auth/callback/google"
+        );
+        assert_eq!(
+            redirect(serde_json::json!("/oauth/gmail/callback")).unwrap(),
+            "https://app.example.com/oauth/gmail/callback"
+        );
+        for bad in [
+            "oauth/gmail/callback",
+            "https://evil.example.com/cb",
+            "//evil.example.com/cb",
+            "/cb?x=1",
+            "/cb#frag",
+            "/a/../cb",
+            "/a b",
+            "/a\\b",
+        ] {
+            let err = redirect(serde_json::json!(bad)).unwrap_err();
+            assert!(
+                err.contains("CAMPBOOKS_GOOGLE__REDIRECT_PATH"),
+                "{bad}: {err}"
+            );
+        }
     }
 
     #[test]

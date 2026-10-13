@@ -1,3 +1,4 @@
+import { Navigate, useRouterState } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -5,12 +6,12 @@ import { useSession } from "~/lib/api";
 import { isTauri } from "~/lib/platform";
 import { Brand, Button, FocusPage, Visor } from "~/lib/ui";
 
-import { Landing } from "./Landing";
+import { SignedOut } from "./SignedOut";
 
 /**
- * Renders the app only for a signed-in browser. Signed out, it shows the
- * landing at the requested URL (so signing in comes back to it); if a live
- * session ends while the app is open, the landing says so. The native shell
+ * Renders the app only for a signed-in browser. Signed out on load, it goes
+ * to the sign-in screen, which comes back to the requested URL; if a live
+ * session ends while the app is open, it says so in place. The native shell
  * owns its own sign-in, so the gate is web only.
  */
 export function SessionGate({ children }: { children: ReactNode }) {
@@ -20,6 +21,11 @@ export function SessionGate({ children }: { children: ReactNode }) {
 function WebSessionGate({ children }: { children: ReactNode }) {
   const { t } = useTranslation();
   const session = useSession();
+  // The page this gate guards: while a navigation is pending, the router's
+  // latest location is already the next page, not this one.
+  const href = useRouterState({
+    select: (state) => (state.resolvedLocation ?? state.location).href,
+  });
   const [wasSignedIn, setWasSignedIn] = useState(false);
   const signedIn = session.data?.authenticated === true;
   if (signedIn && !wasSignedIn) {
@@ -57,7 +63,11 @@ function WebSessionGate({ children }: { children: ReactNode }) {
     );
   }
   if (!signedIn) {
-    return <Landing ended={wasSignedIn} />;
+    return wasSignedIn ? (
+      <SignedOut />
+    ) : (
+      <Navigate to="/sign-in" search={{ return_to: href }} replace />
+    );
   }
   return children;
 }

@@ -1,5 +1,7 @@
-import { fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+import { DEFAULT_SHORTCUTS, ShortcutRegistry } from "~/lib/shortcuts";
 
 import { renderUi } from "../../../../../test/render";
 
@@ -17,6 +19,20 @@ describe("ShortcutSheet", () => {
     expect(within(dialog).getByText("Search or ask").closest("div")).toHaveTextContent(
       "Shortcut: Ctrl K",
     );
+  });
+
+  it("lists a focus page's shortcut only while that page binds it", () => {
+    const registry = new ShortcutRegistry([
+      ...DEFAULT_SHORTCUTS,
+      { id: "page.go", keys: "3", scope: "focus", group: "general", label: "shortcuts:undo" },
+    ]);
+    renderUi(<ShortcutSheet open onClose={vi.fn()} />, { registry });
+    expect(screen.getAllByText("Undo")).toHaveLength(1);
+
+    act(() => {
+      registry.bind("page.go", vi.fn());
+    });
+    expect(screen.getAllByText("Undo")).toHaveLength(2);
   });
 
   it("is translated", () => {

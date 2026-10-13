@@ -1,4 +1,13 @@
 {
   "title": "Connected accounts",
-  "summary": "This module has no screens yet."
+  "summary": "This module has no screens yet.",
+  "mail": {
+    "title": "Your mail",
+    "health": {
+      "ok": "Connected",
+      "needs_reauth": "Needs you to sign in again",
+      "throttled": "Paused for a moment",
+      "failing": "Not syncing"
+    }
+  }
 }

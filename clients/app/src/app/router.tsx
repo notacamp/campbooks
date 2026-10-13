@@ -3,18 +3,18 @@ import { createRoute, createRouter, Navigate, type RouterHistory } from "@tansta
 
 import { buildModuleRoutes } from "./modules";
 import { EmptyHome } from "./routes/home";
-import { rootRoute } from "./routes/root";
+import { gatedRoute, rootRoute } from "./routes/root";
 import { Start } from "./routes/start";
 import { WorkspaceLayout } from "./routes/workspace";
 
 const startRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => gatedRoute,
   path: "/",
   component: Start,
 });
 
 const workspaceRoute = createRoute({
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => gatedRoute,
   path: "/w/$workspaceId",
   component: WorkspaceLayout,
 });
@@ -35,12 +35,19 @@ const settingsRoute = createRoute({
   },
 });
 
-const moduleRoutes = buildModuleRoutes({ root: rootRoute, workspace: workspaceRoute });
+const moduleRoutes = buildModuleRoutes({
+  public: rootRoute,
+  root: gatedRoute,
+  workspace: workspaceRoute,
+});
 
 const routeTree = rootRoute.addChildren([
-  startRoute,
-  workspaceRoute.addChildren([homeRoute, settingsRoute, ...moduleRoutes.workspace]),
-  ...moduleRoutes.root,
+  gatedRoute.addChildren([
+    startRoute,
+    workspaceRoute.addChildren([homeRoute, settingsRoute, ...moduleRoutes.workspace]),
+    ...moduleRoutes.root,
+  ]),
+  ...moduleRoutes.public,
 ]);
 
 /** The app's one router (`history` defaults to the browser's; tests pass a memory one). */

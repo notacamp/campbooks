@@ -57,6 +57,7 @@ export {
   ConversationRow,
   type ConversationRowProps,
 } from "./components/ConversationRow/ConversationRow";
+export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
 export { Dot, type DotProps } from "./components/Dot/Dot";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
 export {
@@ -141,6 +142,7 @@ export {
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
+export { Steps, type StepsProps } from "./components/Steps/Steps";
 export { TabBar, type TabBarItem, type TabBarProps } from "./components/TabBar/TabBar";
 export { Tag, type TagProps } from "./components/Tag/Tag";
 export {
