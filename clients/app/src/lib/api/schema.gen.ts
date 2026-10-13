@@ -4382,6 +4382,11 @@ export interface operations {
             query?: {
                 /** @description Where to land after signing in: a path on this site (default `/`). */
                 return_to?: string | null;
+                /**
+                 * @description Sign in again unless the person did within this many seconds: the
+                 *     step-up an operation asks for with `step_up_required`.
+                 */
+                max_age?: number | null;
             };
             header?: never;
             path?: never;
