@@ -161,6 +161,10 @@ pub struct AttachmentRef {
     /// Shown inside the body (an inline image) rather than attached.
     #[serde(default)]
     pub inline: bool,
+    /// Its `Content-ID`, without angle brackets: what the HTML body's
+    /// `cid:` images name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
 }
 
 /// Where a message is at the provider.

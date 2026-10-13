@@ -34,7 +34,8 @@
     "goneBody": "Foi removida ou já não tem acesso a ela.",
     "body": "Não foi possível carregar esta mensagem.",
     "retry": "Tentar de novo",
-    "action": "Não foi possível alterar «{{subject}}». Tente de novo."
+    "action": "Não foi possível alterar «{{subject}}». Tente de novo.",
+    "attachment": "Não foi possível abrir {{name}}. Tente novamente."
   },
   "reader": {
     "label": "Conversa",
@@ -152,7 +153,8 @@
     "move": "Mover para um fluxo",
     "replyAll": "Responder a todos",
     "forward": "Reencaminhar",
-    "showImages": "Mostrar imagens"
+    "showImages": "Mostrar imagens",
+    "nextAttachment": "Anexo seguinte"
   },
   "compose": {
     "title": {

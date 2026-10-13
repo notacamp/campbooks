@@ -55,9 +55,10 @@ pub const CACHE_REVALIDATE: &str = "no-cache";
 /// `style-src-attr 'unsafe-inline'` for its inline `style` attributes (style
 /// sheets stay blocked, and the server strips them anyway) and `https:`
 /// images for "Show images" (the frame's own policy blocks remote images
-/// until the member asks for them).
+/// until the member asks for them). `blob:` images are an attachment's
+/// preview: bytes fetched through the API, shown only as an `<img>`.
 pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; \
-     style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: https:; \
+     style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https:; \
      connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; \
      form-action 'self'";
 

@@ -3,7 +3,7 @@
 
 use serde::Deserialize;
 
-use crate::model::{ConversationId, DraftId, LabelId, MessageId};
+use crate::model::{AttachmentId, ConversationId, DraftId, LabelId, MessageId};
 
 /// `/api/v1/w/{workspace_id}/conversations/{conversation_id}…`
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -19,6 +19,20 @@ pub struct MessagePath {
     pub conversation_id: ConversationId,
     /// The message.
     pub message_id: MessageId,
+}
+
+/// `…/messages/{message_id}/attachments/{attachment_id}`
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct AttachmentPath {
+    /// The conversation.
+    #[serde(rename = "conversation_id")]
+    pub conversation: ConversationId,
+    /// The message.
+    #[serde(rename = "message_id")]
+    pub message: MessageId,
+    /// The attachment.
+    #[serde(rename = "attachment_id")]
+    pub attachment: AttachmentId,
 }
 
 /// `…/conversations/{conversation_id}/labels/{label_id}`

@@ -468,3 +468,45 @@ async fn workspaces_never_see_each_other(db: PgPool) {
         }
     }
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_over_long_content_id_is_dropped_not_cut(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox) = setup(&kit, "sam@example.com").await;
+    let longest = format!("{}@example.com", "a".repeat(255 - "@example.com".len()));
+    let too_long = format!("{}@example.com", "b".repeat(256 - "@example.com".len()));
+    let attachment = |name: &str, id: &str| {
+        serde_json::json!({"filename": name, "content_type": "image/png", "content": "PNG",
+                           "inline": true, "content_id": id})
+    };
+    let recorded = serde_json::json!({"changes": [{"op": "upsert", "message": {
+        "provider_message_id": "cid-long",
+        "from": {"address": "ana@brightloop.example"},
+        "to": [{"address": "sam@example.com"}],
+        "subject": "Logos",
+        "sent_at": "2026-10-06T08:30:00Z",
+        "direction": "inbound",
+        "text": "Logos.",
+        "attachments": [attachment("kept.png", &longest), attachment("dropped.png", &too_long)],
+        "mailbox": {"in_inbox": true},
+        "read": false, "starred": false
+    }}]});
+    let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+        .await
+        .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+    let stored: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT filename, content_id FROM conversations.attachments ORDER BY position",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        stored,
+        [
+            ("kept.png".to_owned(), Some(longest)),
+            ("dropped.png".to_owned(), None)
+        ]
+    );
+}
