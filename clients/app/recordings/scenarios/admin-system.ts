@@ -35,6 +35,7 @@ async function caption(page: Page, text: string): Promise<void> {
       zIndex: "2147483647", padding: "10px 14px", borderRadius: "10px",
       background: "rgba(20, 20, 24, 0.88)", color: "#fff",
       font: "500 15px/1.4 system-ui, sans-serif", whiteSpace: "pre-wrap",
+      pointerEvents: "none",
     });
     document.body.append(box);
   })()`);
@@ -52,26 +53,19 @@ async function hideCaption(page: Page): Promise<void> {
  */
 async function signInAsNewPerson(page: Page): Promise<void> {
   await page.goto("/");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await page.waitForURL(/\/sign-in\?request=/u);
-  const request = new URL(page.url()).searchParams.get("request") ?? "";
-  await page.goto(`/auth/start/google?request=${encodeURIComponent(request)}`);
+  await page.getByText("Continue with Google").waitFor();
+  await page.keyboard.press("1");
   await page.getByRole("link", { name: "Allow" }).click();
-  await page.waitForURL(/\/sign-in\/new/u);
-  const created = await page.evaluate<{ redirect: string }>(`fetch("/auth/new-account", {
-    method: "POST",
-    headers: { "x-campbooks-csrf": "1", "content-type": "application/json" },
-  }).then((response) => response.json())`);
-  await page.goto(created.redirect);
+  await page.getByRole("button", { name: /Create account/u }).click();
   const name = page.getByRole("textbox", { name: "Workspace name" });
   await name.waitFor();
   await name.fill("Home");
   await page.keyboard.press("Enter");
   await page.getByRole("radio", { name: "Personal" }).click();
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await page.getByRole("heading", { name: "Home is ready" }).waitFor();
-  await page.getByRole("button", { name: "Open Home" }).click();
-  await page.getByRole("heading", { name: "Nothing needs you yet" }).waitFor();
+  // The mailbox held from sign-up: not now (this video is about admin).
+  await page.getByRole("button", { name: "Not now" }).click();
+  await page.waitForURL(/\/w\/[^/]+\/?$/u);
 }
 
 /** The account menu's button: the avatar in the phone header, or the sidebar's. */
@@ -106,6 +100,7 @@ export default async function adminSystem({ page }: ScenarioContext): Promise<vo
   await openAccountMenu(page);
   await page.getByRole("button", { name: "Sign out" }).waitFor();
   await caption(page, "The account menu: no Administration entry for a member");
+  await pause(2500);
   await page.keyboard.press("Escape");
   await hideCaption(page);
 
@@ -123,7 +118,7 @@ export default async function adminSystem({ page }: ScenarioContext): Promise<vo
 
   // Now an administrator: Administration → System.
   await page.reload();
-  await page.getByRole("heading", { name: "Nothing needs you yet" }).waitFor();
+  await page.getByRole("heading", { level: 1 }).first().waitFor();
   await openAccountMenu(page);
   const entry = page.getByRole("link", { name: "Administration" });
   await entry.waitFor();

@@ -34,11 +34,11 @@
 
 ## 7. Client
 
-- [ ] 7.1 `admin.gen.ts` + `adminClient`; `api:check` covers it
-- [ ] 7.2 `app/admin` shell + route + account-menu entry (`useAdminAccess`), re-auth notice; System panel from `modules/system`; i18n ×4; Storybook stories
-- [ ] 7.3 Playwright: member sees no entry; super admin sees System; recordings 375 px + desktop
+- [x] 7.1 `admin.gen.ts` + `adminClient`; `api:check` covers it
+- [x] 7.2 `app/admin` shell + route + account-menu entry (`useAdminAccess`), re-auth notice; System panel from `modules/system`; i18n ×4; Storybook stories
+- [x] 7.3 Playwright: member sees no entry; super admin sees System; recordings 375 px + desktop
 
 ## 8. Wrap-up
 
-- [ ] 8.1 Docs: `deploy/README.md` "Administrators" (granting the first super admin), `docs/architecture.md` admin section, ADR index
-- [ ] 8.2 OpenAPI regenerated (both), client types regenerated, CHANGELOG updated, gates green, UI verified at 375 px and desktop
+- [x] 8.1 Docs: `deploy/README.md` "Administrators" (granting the first super admin), `docs/architecture.md` admin section, ADR index
+- [x] 8.2 OpenAPI regenerated (both), client types regenerated, CHANGELOG updated, gates green, UI verified at 375 px and desktop
