@@ -38,10 +38,188 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bff/api/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read from the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        get: operations["bff_api_get"];
+        /**
+         * PUT to the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        put: operations["bff_api_put"];
+        /**
+         * POST to the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        post: operations["bff_api_post"];
+        /**
+         * DELETE in the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        delete: operations["bff_api_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        patch: operations["bff_api_patch"];
+        trace?: never;
+    };
+    "/bff/backchannel-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Back-channel logout (OIDC Back-Channel Logout 1.0).
+         * @description Called by the identity provider, not browsers, when a user's IdP session
+         *     ends: ends the web sessions the signed logout token names (by IdP session
+         *     id, or every session of the user).
+         */
+        post: operations["bff_backchannel_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bff/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finish signing in.
+         * @description The identity provider redirects here. Checks that `state` names a sign-in
+         *     this browser started (single use), exchanges the code with the PKCE
+         *     verifier, validates the ID token (issuer, audience, nonce, expiry,
+         *     signature), starts a session and sets the `SameSite=Strict` session
+         *     cookie. Answers with a small same-origin page that moves on to
+         *     `return_to`: a browser treats the whole redirect chain from the IdP as
+         *     cross-site and would not send the new cookie on a plain redirect.
+         */
+        get: operations["bff_callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bff/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start signing in.
+         * @description Creates a short-lived sign-in (state, nonce, PKCE verifier) bound to this
+         *     browser by a `SameSite=Lax` login cookie, and redirects to the identity
+         *     provider's authorization endpoint.
+         */
+        get: operations["bff_login"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bff/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out.
+         * @description Ends the session, revokes its refresh token at the identity provider and
+         *     clears the cookie. Navigate to `logout_url` to end the identity
+         *     provider's session too.
+         */
+        post: operations["bff_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bff/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The current session.
+         * @description For the web app to bootstrap: whether someone is signed in, and who.
+         *     Never returns a token.
+         */
+        get: operations["bff_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        BackchannelLogout: {
+            /** @description The identity provider's signed logout token. */
+            logout_token: string;
+        };
         /** @description The instance is healthy. */
         HealthResponse: {
             /**
@@ -54,6 +232,14 @@ export interface components {
              * @example ok
              */
             status: string;
+        };
+        /** @description Where to send the browser to sign out of the identity provider too. */
+        LogoutResponse: {
+            /**
+             * @description The identity provider's end-session URL (RP-initiated logout), which
+             *     comes back to the app's root; `null` when it has none.
+             */
+            logout_url?: string | null;
         };
         /**
          * @description RFC 9457 problem details.
@@ -78,6 +264,26 @@ export interface components {
              *     says it all.
              */
             type: string;
+        };
+        /** @description Who is signed in. Never contains a token. */
+        SessionInfo: {
+            /** @description Whether the request carries a live session. */
+            authenticated: boolean;
+            /**
+             * Format: date-time
+             * @description When the session ends at the latest (it ends sooner if left unused).
+             */
+            expires_at?: string | null;
+            user?: components["schemas"]["SessionUser"] | null;
+        };
+        /** @description The signed-in user, as the identity provider describes them. */
+        SessionUser: {
+            /** @description Email address. */
+            email?: string | null;
+            /** @description Display name. */
+            name?: string | null;
+            /** @description Stable user id at the identity provider. */
+            sub: string;
         };
         /** @description The running build. */
         VersionResponse: {
@@ -146,6 +352,437 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+        };
+    };
+    bff_api_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_api_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_api_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_api_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_api_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_backchannel_logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["BackchannelLogout"];
+            };
+        };
+        responses: {
+            /** @description The sessions named by the token are ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_logout_token` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider's keys are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_callback: {
+        parameters: {
+            query?: {
+                /** @description The authorization code. */
+                code?: string | null;
+                /** @description The `state` sent with the authorization request. */
+                state?: string | null;
+                /** @description The issuer that answered (RFC 9207). */
+                iss?: string | null;
+                /** @description An error code instead of a code. */
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in; the page moves on to `return_to`. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": unknown;
+                };
+            };
+            /** @description `invalid_state`, `login_failed`, `code_rejected` or `invalid_id_token`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_login: {
+        parameters: {
+            query?: {
+                /** @description Where to land after signing in: a path on this site (default `/`). */
+                return_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the identity provider. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_return_to` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_logout: {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out (also when there was no session). */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    bff_session: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session, or `authenticated: false`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
                 };
             };
         };

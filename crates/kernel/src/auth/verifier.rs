@@ -4,7 +4,7 @@ use std::{collections::BTreeSet, sync::Arc};
 
 use axum::extract::FromRef;
 use jsonwebtoken::{Algorithm, Validation, errors::ErrorKind};
-use serde::Deserialize;
+use serde::{Deserialize, de::DeserializeOwned};
 
 use super::{AuthFailure, Principal, PrincipalKind, Scope, jwks::Jwks};
 use crate::{
@@ -25,10 +25,10 @@ const ALLOWED_TYPES: [&str; 2] = ["jwt", "at+jwt"];
 /// clone; clones share the signing-key cache.
 #[derive(Clone)]
 pub struct TokenVerifier {
-    inner: Option<Arc<Inner>>,
+    pub(super) inner: Option<Arc<Inner>>,
 }
 
-struct Inner {
+pub(super) struct Inner {
     issuer: String,
     audience: String,
     leeway_seconds: u64,
@@ -99,6 +99,27 @@ impl FromRef<AppState> for TokenVerifier {
 
 impl Inner {
     async fn verify(&self, token: &str) -> Result<Principal, Error> {
+        let claims: Claims = self
+            .decode(token, &self.audience, &ALLOWED_TYPES, false)
+            .await?;
+        claims
+            .into_principal()
+            .ok_or(Error::Unauthorized(AuthFailure::InvalidToken))
+    }
+
+    /// Decode `token` signed by one of the IdP's keys, issued by the
+    /// configured issuer for `audience`, with header `typ` (when present) one
+    /// of `allowed_types`, unexpired (`exp` required), and not issued in the
+    /// future (`iat` required when `require_iat`). Errors are
+    /// [`Error::Unauthorized`], or [`Error::Unavailable`] when the signing
+    /// keys could never be fetched.
+    pub(super) async fn decode<T: DeserializeOwned>(
+        &self,
+        token: &str,
+        audience: &str,
+        allowed_types: &[&str],
+        require_iat: bool,
+    ) -> Result<T, Error> {
         let invalid = || Error::Unauthorized(AuthFailure::InvalidToken);
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
@@ -106,7 +127,7 @@ impl Inner {
             return Err(invalid());
         }
         if let Some(typ) = &header.typ
-            && !is_allowed_type(typ)
+            && !is_allowed_type(typ, allowed_types)
         {
             return Err(invalid());
         }
@@ -115,32 +136,43 @@ impl Inner {
 
         let mut validation = Validation::new(header.alg);
         validation.set_issuer(&[&self.issuer]);
-        validation.set_audience(&[&self.audience]);
+        validation.set_audience(&[audience]);
         validation.set_required_spec_claims(&["exp", "iss", "aud"]);
         validation.validate_nbf = true;
         validation.leeway = self.leeway_seconds;
 
-        let claims = jsonwebtoken::decode::<Claims>(token, &key, &validation)
+        let claims = jsonwebtoken::decode::<IssuedAt<T>>(token, &key, &validation)
             .map_err(|err| match err.kind() {
                 ErrorKind::ExpiredSignature => Error::Unauthorized(AuthFailure::ExpiredToken),
                 _ => invalid(),
             })?
             .claims;
 
-        if claims
-            .iat
-            .is_some_and(|iat| iat > jsonwebtoken::get_current_timestamp() + self.leeway_seconds)
-        {
-            return Err(invalid());
+        match claims.iat {
+            Some(iat) if iat > jsonwebtoken::get_current_timestamp() + self.leeway_seconds => {
+                Err(invalid())
+            }
+            None if require_iat => Err(invalid()),
+            _ => Ok(claims.rest),
         }
-        claims.into_principal().ok_or_else(invalid)
     }
 }
 
-fn is_allowed_type(typ: &str) -> bool {
+/// Every token's `iat`, checked against the clock, next to the claims the
+/// caller reads.
+#[derive(Debug, Deserialize)]
+struct IssuedAt<T> {
+    iat: Option<u64>,
+    #[serde(flatten)]
+    rest: T,
+}
+
+/// Whether header `typ` is one of `allowed` (compared without regard to case,
+/// with or without the `application/` prefix).
+pub(super) fn is_allowed_type(typ: &str, allowed: &[&str]) -> bool {
     let typ = typ.to_ascii_lowercase();
     let typ = typ.strip_prefix("application/").unwrap_or(&typ);
-    ALLOWED_TYPES.contains(&typ)
+    allowed.contains(&typ)
 }
 
 /// The claims Campbooks reads; `exp`, `nbf`, `iss` and `aud` are checked by
@@ -150,7 +182,6 @@ struct Claims {
     sub: Option<String>,
     azp: Option<String>,
     scope: Option<String>,
-    iat: Option<u64>,
     workspace_id: Option<String>,
     custom: Option<CustomClaims>,
 }
@@ -295,10 +326,10 @@ mod tests {
     #[test]
     fn token_types() {
         for typ in ["JWT", "jwt", "at+jwt", "AT+JWT", "application/at+jwt"] {
-            assert!(is_allowed_type(typ), "{typ}");
+            assert!(is_allowed_type(typ, &ALLOWED_TYPES), "{typ}");
         }
         for typ in ["", "JOSE", "id_token+jwt", "application/json"] {
-            assert!(!is_allowed_type(typ), "{typ}");
+            assert!(!is_allowed_type(typ, &ALLOWED_TYPES), "{typ}");
         }
     }
 

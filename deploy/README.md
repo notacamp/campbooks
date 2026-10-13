@@ -7,10 +7,12 @@
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
 4. Optional local AI: `docker compose --profile ai up -d`, then pull the models once:
    `docker compose exec ollama ollama pull qwen3:8b` (TEI downloads `BAAI/bge-m3` itself).
-5. Sign-in: the identity provider (Rauthy) starts with everything else, and the
+5. Sign-in: the identity provider (Rauthy) starts with everything else, the
    API trusts its access tokens out of the box (issuer derived from
-   `CAMPBOOKS_IDP_URL`). See "Identity provider" below; to use another IdP,
-   edit the two `CAMPBOOKS_AUTH__*` lines of the `server` service in `compose.yaml`.
+   `CAMPBOOKS_IDP_URL`), and the web app signs you in through it. See
+   "Identity provider" and "Web sign-in" below; to use another IdP, edit the
+   `CAMPBOOKS_AUTH__*` and `CAMPBOOKS_BFF__*` lines of the `server` service in
+   `compose.yaml`.
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
    (the server's and the identity provider's).
 7. Background work (maintenance today; mail sync and the AI pass as they land)
@@ -35,9 +37,10 @@ It needs no setup: three compose services take care of it.
 | --- | --- | --- |
 | `idp-init` | before `idp`, every `up` | Generates the secrets once (first boot), rewrites the config from `.env` |
 | `idp` | always | The IdP. Issuer `${CAMPBOOKS_IDP_URL}/auth/v1/`, data in the `idp-data` volume |
-| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once |
+| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once, and saves the web client's secret for the server |
 
-The API does not check tokens yet; that lands with the resource-server work.
+A fourth one-shot, `server-init`, prepares the `server-secrets` volume for the
+Campbooks server (see "Web sign-in").
 
 ### First sign-in to the admin UI
 
@@ -84,7 +87,6 @@ variables to the `idp` service.
 | `secrets.toml` | Encryption key and cluster secrets. Without it the database cannot be read |
 | `config.toml` | Generated from `.env` on every start. Do not edit |
 | `campbooks/api-key` | Admin API key used by `idp-provision` (clients, scopes, client secrets) |
-| `campbooks/campbooks-web.client-secret` | Secret of the web app's OIDC client |
 | `campbooks/initial-admin-password` | The first admin password |
 | `campbooks/provisioned/<client>` | Markers: the client was set up, never touch it again |
 | everything else | Rauthy's embedded database, with a nightly local backup in `state_machine/backups/` |
@@ -100,8 +102,9 @@ docker run --rm -v campbooks_idp-data:/data -v "$PWD":/backup busybox:1.37.0-mus
 
 - **Admin password:** change it in the account page.
 - **Web client secret:** admin UI → **Clients** → `campbooks-web` → generate a new secret, then
-  `docker compose run --rm idp-init rm /app/data/campbooks/campbooks-web.client-secret` and
-  `docker compose up -d`: `idp-provision` saves the new one.
+  `docker compose run --rm server-init rm /secrets/campbooks-web.client-secret` and
+  `docker compose up -d`: `idp-provision` saves the new one, and the server reads it again
+  the next time the IdP refuses the old one (no restart).
 - **Admin API key:** admin UI → **API Keys** → `campbooks` → new secret, then write the new
   token (`campbooks$<secret>`) to `campbooks/api-key` in the volume.
 - **Encryption key:** generate one with `docker compose run --rm --no-deps idp generate-enc-key`,
@@ -115,6 +118,42 @@ To re-apply Campbooks' default settings to a client, delete it in the admin UI, 
 `docker compose run --rm idp-init rm /app/data/campbooks/provisioned/<client-id>` and
 `docker compose up -d`.
 
+## Web sign-in
+
+The server signs browsers in itself (a backend-for-frontend, ADR 0004): open the app, and
+if you are not signed in it sends you to the identity provider and back. The browser only
+ever gets one `HttpOnly`, `SameSite=Strict` session cookie; the tokens stay on the server,
+encrypted, in Postgres (schema `bff`). Any account of the identity provider can sign in,
+including the first admin; create more under **Users** in its admin UI.
+
+Sessions end after 48 hours unused or 30 days at most, when you sign out, or when your
+identity-provider session ends (back-channel logout). The cookie is `Secure` and
+`__Host-`-prefixed when `CAMPBOOKS_PUBLIC_URL` is `https://`; over plain `http://` (fine on
+`localhost` only) it is neither, and the server logs a warning.
+
+| `server-secrets` volume | What |
+| --- | --- |
+| `secret-key` | `CAMPBOOKS_SECRET_KEY`: encrypts the web sessions' tokens. Generated on first boot |
+| `campbooks-web.client-secret` | Secret of the web app's OIDC client, written by `idp-provision` |
+
+The server mounts this volume read-only (through group 10001); it never sees the
+`idp-data` volume. Both files are regenerated if missing, so the volume needs no backup:
+losing it only signs everyone out.
+
+- **Instance secret key:** `docker compose run --rm server-init rm /secrets/secret-key`,
+  then `docker compose up -d && docker compose restart server`. Everyone has to sign in to
+  the web app again; nothing else is lost. (Without compose, set `CAMPBOOKS_SECRET_KEY` to
+  `openssl rand -base64 32`.)
+- **Back-channel logout** needs an `https://` `CAMPBOOKS_PUBLIC_URL` that the `idp`
+  container can reach: Rauthy only calls https URLs. `idp-provision` registers
+  `${CAMPBOOKS_PUBLIC_URL}/bff/backchannel-logout` for new installs; override it with
+  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL`. On plain http there is none, and sessions end by
+  sign-out or timeout.
+- **Signing out** of the web app ends its session and revokes its refresh token, then sends
+  you to the identity provider to end that session too (Rauthy asks you to confirm).
+
+Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
+
 ### Developing against the IdP
 
 The API runs on the host in development (`compose.dev.yaml` only starts Postgres). To get
@@ -125,4 +164,12 @@ cp deploy/.env.example deploy/.env      # the defaults are fine for this
 docker compose -f deploy/compose.yaml up -d idp-provision
 ```
 
-That starts only `idp-init`, `idp` and `idp-provision`, at `http://localhost:8081`.
+That starts only `server-init`, `idp-init`, `idp` and `idp-provision`, at
+`http://localhost:8081`. Set `CAMPBOOKS_PUBLIC_URL` in `deploy/.env` to where you open the
+app (`http://localhost:8080` for `cargo run`, `http://localhost:5173` for the Vite dev
+server) before the first `up`: it becomes the web client's redirect URI. Then run the server
+with `CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/`, the same
+`CAMPBOOKS_PUBLIC_URL`, `CAMPBOOKS_SECRET_KEY` (any `openssl rand -base64 32`) and
+`CAMPBOOKS_BFF__CLIENT_SECRET` (read it with
+`docker compose -f deploy/compose.yaml run --rm --no-deps server-init cat /secrets/campbooks-web.client-secret`);
+`clients/README.md` has the full recipe.

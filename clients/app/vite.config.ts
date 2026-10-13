@@ -24,15 +24,12 @@ export default defineConfig({
       : { hmr: { protocol: "ws", host: tauriDevHost, port: 5174 } }),
     watch: { ignored: ["**/src-tauri/**"] },
     proxy: {
-      // LOCAL DEVELOPMENT ONLY. Stands in for the server's BFF so the web
-      // client can be developed against `cargo run` without a session layer:
-      // `/bff/api/v1/...` is forwarded to the API's `/api/v1/...` with no
-      // credentials attached. The real BFF (httpOnly session cookie + OIDC,
-      // ADR 0004) is served by campbooks-server and lands in a later task.
+      // The server's web BFF (ADR 0004) on the dev server's origin, so the
+      // session cookie and the same-origin checks work as in production.
+      // Sign-in redirects back to CAMPBOOKS_PUBLIC_URL: run the server with
+      // CAMPBOOKS_PUBLIC_URL=http://localhost:5173 (see clients/README.md).
       "/bff": {
         target: process.env["CAMPBOOKS_API_URL"] ?? "http://localhost:8080",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/bff\/api\//, "/api/"),
       },
     },
   },

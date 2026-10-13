@@ -27,11 +27,28 @@ cargo run -p campbooks-server        # the API on http://localhost:8080 (repo ro
 pnpm --dir clients dev               # the UI on http://localhost:5173
 ```
 
-The web client only ever calls same-origin `/bff/api/v1/...` with `credentials: "same-origin"`;
-it never sees a token. In local development the Vite dev server stands in for the BFF: it
-proxies `/bff/api/...` to `http://localhost:8080/api/...` (override with `CAMPBOOKS_API_URL`)
-**without any session layer**. The real BFF (httpOnly `SameSite=Strict` session cookie + OIDC
-code flow, ADR 0004) is served by `campbooks-server` and lands in a later task.
+The web client only ever calls same-origin `/bff/...` with `credentials: "same-origin"`; it
+never sees a token. `campbooks-server`'s BFF (ADR 0004) signs the browser in through the
+identity provider and keeps the tokens; the browser holds an httpOnly `SameSite=Strict`
+session cookie. The Vite dev server proxies `/bff/*` to the server unchanged (override the
+target with `CAMPBOOKS_API_URL`), so `/bff/api/...` needs a session like in production.
+
+To sign in during development, run the identity provider
+(`docker compose -f deploy/compose.yaml up -d idp-provision`, see `deploy/README.md`) with
+`CAMPBOOKS_PUBLIC_URL=http://localhost:5173` in `deploy/.env`, and start the server with the
+same public URL plus the BFF settings:
+
+```sh
+export CAMPBOOKS_PUBLIC_URL=http://localhost:5173
+export CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/
+export CAMPBOOKS_SECRET_KEY="$(openssl rand -base64 32)"   # sessions end when it changes
+export CAMPBOOKS_BFF__CLIENT_SECRET="$(docker compose -f deploy/compose.yaml run --rm --no-deps \
+  server-init cat /secrets/campbooks-web.client-secret)"
+cargo run -p campbooks-server
+```
+
+Any API call without a session answers `401 session_required`, and the web transport sends
+the browser to `/bff/login`, coming back to the same page afterwards.
 
 Without a running API the home page shows a "can't reach the API" state instead of crashing.
 

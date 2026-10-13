@@ -16,16 +16,38 @@ services:
       # Built from POSTGRES_PASSWORD so the two never drift apart.
       CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
       # Trust the bundled IdP's access tokens (ADR 0004). To use another IdP,
-      # change these two lines (and drop the idp services).
+      # change these lines (and drop the idp services).
       CAMPBOOKS_AUTH__ISSUER: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}/auth/v1/
       CAMPBOOKS_AUTH__JWKS_URL: http://idp:8080/auth/v1/oidc/certs
+      # Web sign-in (the BFF): the server reaches the IdP inside the compose
+      # network; browsers use CAMPBOOKS_IDP_URL. Both secrets are files in the
+      # `server-secrets` volume, never environment variables.
+      CAMPBOOKS_BFF__IDP_INTERNAL_URL: http://idp:8080/auth/v1/
+      CAMPBOOKS_BFF__CLIENT_SECRET_FILE: /run/campbooks/campbooks-web.client-secret
+      CAMPBOOKS_SECRET_KEY_FILE: /run/campbooks/secret-key
+    volumes:
+      - server-secrets:/run/campbooks:ro
+    # The secrets are group 10001 and 0440 (see server/init.sh).
+    group_add: ["10001"]
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
       - "${CAMPBOOKS_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
+      server-init:
+        condition: service_completed_successfully
     # The image's HEALTHCHECK runs `campbooks-server healthcheck`.
+
+  # One-shot: generates the instance secret key (CAMPBOOKS_SECRET_KEY) on first
+  # boot into the `server-secrets` volume. See server/init.sh.
+  server-init:
+    image: busybox:1.37.0-musl
+    restart: "no"
+    command: ["sh", "/server/init.sh"]
+    volumes:
+      - ./server:/server:ro
+      - server-secrets:/secrets
 
   postgres:
     image: pgvector/pgvector:pg17
@@ -92,12 +114,19 @@ services:
     entrypoint: ["sh", "/idp/provision.sh"]
     environment:
       CAMPBOOKS_PUBLIC_URL: ${CAMPBOOKS_PUBLIC_URL:-http://localhost:8080}
+      # Where Rauthy delivers back-channel logouts; empty means the public URL
+      # (https only: Rauthy refuses plain http). See README.md.
+      CAMPBOOKS_BACKCHANNEL_LOGOUT_URL: ${CAMPBOOKS_BACKCHANNEL_LOGOUT_URL:-}
     volumes:
       - ./idp:/idp:ro
       - idp-data:/app/data
+      # Writes the web client's secret here for the server.
+      - server-secrets:/secrets
     depends_on:
       idp:
         condition: service_healthy
+      server-init:
+        condition: service_completed_successfully
 
   # --- Local AI (open-weight models) --------------------------------------------
   # CPU inference works but is slow; see README.md.
@@ -127,5 +156,7 @@ services:
 volumes:
   postgres-data:
   idp-data:
+  # The instance secret key and the web client's OIDC secret (read-only for the server).
+  server-secrets:
   ollama-data:
   embeddings-data:

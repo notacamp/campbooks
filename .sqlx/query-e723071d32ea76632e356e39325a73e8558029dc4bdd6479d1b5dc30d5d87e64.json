@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM bff.sessions WHERE least(idle_expires_at, expires_at) <= $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e723071d32ea76632e356e39325a73e8558029dc4bdd6479d1b5dc30d5d87e64"
+}

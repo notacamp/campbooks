@@ -242,9 +242,20 @@ impl Registry {
     /// module and unique; queues lower-case snake case; attempts at least
     /// one; schedules at least a second apart.
     pub fn build(modules: &[Module]) -> Result<Self, RegistryError> {
+        Self::build_with(modules, &[])
+    }
+
+    /// Like [`build`](Self::build), plus the background work of parts of the
+    /// server that are not modules, each `(owner, work)` named
+    /// `<owner>.<name>` (e.g. the web BFF's `bff.prune_sessions`).
+    pub fn build_with(
+        modules: &[Module],
+        others: &[(&'static str, &Background)],
+    ) -> Result<Self, RegistryError> {
         let kernel = Background::new().schedule::<PruneJobs>(PRUNE_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
-            .chain(modules.iter().map(|m| (m.name, &m.background)));
+            .chain(modules.iter().map(|m| (m.name, &m.background)))
+            .chain(others.iter().copied());
 
         let mut registry = Self::default();
         let mut errors = Vec::new();

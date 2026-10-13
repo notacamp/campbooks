@@ -17,6 +17,7 @@ use tower::ServiceExt as _;
 
 use super::*;
 use crate::{
+    Error,
     clock::FixedClock,
     config::AuthConfig,
     testing::{self, TestIdp},
@@ -566,4 +567,200 @@ async fn discovery_must_name_the_configured_issuer() {
         reply.json
     );
     assert_eq!(idp.jwks_fetches(), 0);
+}
+
+// --- ID tokens and logout tokens (the web BFF is the relying party) ----------
+
+const CLIENT: &str = testing::WEB_CLIENT_ID;
+
+fn invalid(result: &Result<impl std::fmt::Debug, Error>) {
+    assert!(
+        matches!(result, Err(Error::Unauthorized(AuthFailure::InvalidToken))),
+        "{result:?}"
+    );
+}
+
+#[tokio::test]
+async fn id_token_yields_the_user() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let mut claims = idp.id_token_claims("user-1", "n-1", "sid-1");
+    claims["given_name"] = "Ada".into();
+    claims["family_name"] = "Lovelace".into();
+    claims["email"] = "ada@example.com".into();
+    let id = verifier
+        .verify_id_token(&idp.id_token(&claims), CLIENT, "n-1")
+        .await
+        .unwrap();
+    assert_eq!(
+        id,
+        IdToken {
+            subject: "user-1".into(),
+            session_id: Some("sid-1".into()),
+            name: Some("Ada Lovelace".into()),
+            email: Some("ada@example.com".into()),
+        }
+    );
+
+    claims["name"] = "Countess".into();
+    let id = verifier
+        .verify_id_token(&idp.id_token(&claims), CLIENT, "n-1")
+        .await
+        .unwrap();
+    assert_eq!(id.name.as_deref(), Some("Countess"));
+}
+
+#[tokio::test]
+async fn id_token_must_carry_the_sign_ins_nonce() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let claims = idp.id_token_claims("user-1", "n-1", "sid-1");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&claims), CLIENT, "n-2")
+            .await,
+    );
+    let mut no_nonce = claims.clone();
+    no_nonce.as_object_mut().unwrap().remove("nonce");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&no_nonce), CLIENT, "n-1")
+            .await,
+    );
+}
+
+#[tokio::test]
+async fn id_token_must_be_for_this_client() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let claims = idp.id_token_claims("user-1", "n", "s");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&claims), "other-client", "n")
+            .await,
+    );
+
+    let mut foreign_azp = claims.clone();
+    foreign_azp["azp"] = "other-client".into();
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&foreign_azp), CLIENT, "n")
+            .await,
+    );
+
+    // Several audiences need `azp` to say which one asked.
+    let mut many = claims.clone();
+    many["aud"] = json!([CLIENT, "campbooks-api"]);
+    many.as_object_mut().unwrap().remove("azp");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&many), CLIENT, "n")
+            .await,
+    );
+    many["azp"] = CLIENT.into();
+    assert!(
+        verifier
+            .verify_id_token(&idp.id_token(&many), CLIENT, "n")
+            .await
+            .is_ok()
+    );
+
+    // An access token is not an ID token: no nonce, and its `typ` is wrong.
+    let access = idp.token(&idp.claims("test:read"));
+    invalid(&verifier.verify_id_token(&access, CLIENT, "n").await);
+}
+
+#[tokio::test]
+async fn id_token_must_be_current_and_name_a_subject() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let mut expired = idp.id_token_claims("user-1", "n", "s");
+    expired["exp"] = (Utc::now() - TimeDelta::hours(1)).timestamp().into();
+    assert!(matches!(
+        verifier
+            .verify_id_token(&idp.id_token(&expired), CLIENT, "n")
+            .await,
+        Err(Error::Unauthorized(AuthFailure::ExpiredToken))
+    ));
+
+    let mut no_iat = idp.id_token_claims("user-1", "n", "s");
+    no_iat.as_object_mut().unwrap().remove("iat");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&no_iat), CLIENT, "n")
+            .await,
+    );
+
+    let blank = idp.id_token_claims(" ", "n", "s");
+    invalid(
+        &verifier
+            .verify_id_token(&idp.id_token(&blank), CLIENT, "n")
+            .await,
+    );
+
+    let unpublished = idp.unpublished_token(&idp.id_token_claims("user-1", "n", "s"));
+    invalid(&verifier.verify_id_token(&unpublished, CLIENT, "n").await);
+}
+
+#[tokio::test]
+async fn logout_token_names_the_sessions_to_end() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let both = idp.logout_token(&idp.logout_token_claims(Some("user-1"), Some("sid-1")));
+    assert_eq!(
+        verifier.verify_logout_token(&both, CLIENT).await.unwrap(),
+        LogoutToken {
+            subject: Some("user-1".into()),
+            session_id: Some("sid-1".into()),
+        }
+    );
+    let sid_only = idp.logout_token(&idp.logout_token_claims(None, Some("sid-1")));
+    assert_eq!(
+        verifier
+            .verify_logout_token(&sid_only, CLIENT)
+            .await
+            .unwrap()
+            .subject,
+        None
+    );
+}
+
+#[tokio::test]
+async fn malformed_logout_tokens_are_rejected() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let good = idp.logout_token_claims(Some("user-1"), Some("sid-1"));
+
+    let neither = idp.logout_token_claims(None, None);
+    let mut with_nonce = good.clone();
+    with_nonce["nonce"] = "n".into();
+    let mut no_event = good.clone();
+    no_event["events"] = json!({});
+    let mut no_iat = good.clone();
+    no_iat.as_object_mut().unwrap().remove("iat");
+    let mut other_client = good.clone();
+    other_client["aud"] = "other-client".into();
+    for claims in [neither, with_nonce, no_event, no_iat, other_client] {
+        invalid(
+            &verifier
+                .verify_logout_token(&idp.logout_token(&claims), CLIENT)
+                .await,
+        );
+    }
+    // An ID token is not a logout token.
+    let id = idp.id_token(&idp.id_token_claims("user-1", "n", "s"));
+    invalid(&verifier.verify_logout_token(&id, CLIENT).await);
+}
+
+#[tokio::test]
+async fn oidc_tokens_need_a_configured_issuer() {
+    let verifier = TokenVerifier::new(&AuthConfig::default());
+    assert!(matches!(
+        verifier.verify_id_token("a.b.c", CLIENT, "n").await,
+        Err(Error::Unauthorized(AuthFailure::NotConfigured))
+    ));
+    assert!(matches!(
+        verifier.verify_logout_token("a.b.c", CLIENT).await,
+        Err(Error::Unauthorized(AuthFailure::NotConfigured))
+    ));
 }

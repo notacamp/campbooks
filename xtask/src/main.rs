@@ -117,8 +117,11 @@ fn run_arch(root: &Path) -> Result<String> {
     let catalogue: BTreeSet<String> = scopes.iter().map(|s| s.name.clone()).collect();
     let spec = serde_json::to_value(campbooks_server::openapi())
         .context("serializing the OpenAPI document")?;
-    let operations =
-        arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
+    let schemes = arch::Schemes {
+        bearer: campbooks_server::SECURITY_SCHEME,
+        session: campbooks_server::bff::SESSION_SCHEME,
+    };
+    let operations = arch::check_operation_security(&spec, schemes, &catalogue);
     violations.extend(operations);
 
     if violations.is_empty() {
