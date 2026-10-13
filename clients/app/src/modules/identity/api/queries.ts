@@ -143,3 +143,146 @@ export function useStartLink() {
       unwrap(await api.POST("/api/v1/identity/links", { body })).url,
   });
 }
+
+export type ConsentRequest = Schema<"ConsentRequest">;
+export type Answer = Schema<"Answer">;
+
+/**
+ * `identity.get_consent_request`: what the consent screen shows for the
+ * waiting request — the app, what it asks for, the workspaces it may use.
+ * 404 when it expired, was answered, or is someone else's.
+ */
+export function useConsentRequest(id: string) {
+  return useQuery({
+    queryKey: operationKey("identity.get_consent_request", { id }),
+    queryFn: async ({ signal }) =>
+      unwrap(await webRoutes().GET("/auth/consent/{id}", { params: { path: { id } }, signal })),
+    staleTime: Infinity,
+    retry: false,
+  });
+}
+
+/** `identity.answer_consent`: allow (in a workspace) or deny; resolves to where to go next. */
+export function useAnswerConsent(id: string) {
+  return useMutation({
+    mutationFn: async (body: Answer) =>
+      unwrap(
+        await webRoutes().POST("/auth/consent/{id}", {
+          // The issuer refuses screen actions without the CSRF header.
+          params: { path: { id }, header: { "x-campbooks-csrf": "1" } },
+          body,
+        }),
+      ).redirect,
+  });
+}
+
+export type ConnectedApp = Schema<"ConnectedApp">;
+
+const consentsKey = operationKey("identity.list_consents");
+
+/** `identity.list_consents`: the apps you let in. */
+export function useConnectedApps() {
+  return useQuery({
+    queryKey: consentsKey,
+    queryFn: async ({ signal }) =>
+      unwrap(await api.GET("/api/v1/identity/consents", { signal })).items,
+  });
+}
+
+/** `identity.revoke_consent`: takes an app's access away; its tokens stop working. */
+export function useRevokeConsent() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      unwrapEmpty(await api.DELETE("/api/v1/identity/consents/{id}", { params: { path: { id } } }));
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<ConnectedApp[]>(consentsKey, (apps) =>
+        apps?.filter((app) => app.id !== id),
+      );
+    },
+  });
+}
+
+export type WorkspaceClient = Schema<"WorkspaceClient">;
+export type RegisterClient = Schema<"RegisterClient">;
+export type RegisteredClient = Schema<"RegisteredClient">;
+
+const clientsKey = (workspaceId: string) =>
+  operationKey("identity.list_clients", { workspace_id: workspaceId });
+
+/** `identity.list_clients`: the workspace's own apps (owners and admins). */
+export function useWorkspaceClients(workspaceId: string) {
+  return useQuery({
+    queryKey: clientsKey(workspaceId),
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/identity/clients", {
+          params: { path: { workspace_id: workspaceId } },
+          signal,
+        }),
+      ).items,
+    retry: false,
+  });
+}
+
+/** `identity.register_client`: a new app; a confidential one's secret is in the answer only. */
+export function useRegisterClient(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: RegisterClient) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/identity/clients", {
+          params: { path: { workspace_id: workspaceId } },
+          body,
+        }),
+      ),
+    onSuccess: (registered) => {
+      queryClient.setQueryData<WorkspaceClient[]>(clientsKey(workspaceId), (clients) => [
+        ...(clients ?? []),
+        registered.client,
+      ]);
+    },
+  });
+}
+
+/** `identity.rotate_client_secret`: a new secret, shown once; the old one stops at once. */
+export function useRotateClientSecret(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (clientId: string) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/identity/clients/{client_id}/secret", {
+          params: { path: { workspace_id: workspaceId, client_id: clientId } },
+        }),
+      ),
+    onSuccess: (rotated) => {
+      queryClient.setQueryData<WorkspaceClient[]>(clientsKey(workspaceId), (clients) =>
+        clients?.map((client) =>
+          client.client_id === rotated.client.client_id ? rotated.client : client,
+        ),
+      );
+    },
+  });
+}
+
+/** `identity.remove_client`: removes an app; its tokens stop working. */
+export function useRemoveClient(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (clientId: string) => {
+      unwrapEmpty(
+        await api.DELETE("/api/v1/w/{workspace_id}/identity/clients/{client_id}", {
+          params: { path: { workspace_id: workspaceId, client_id: clientId } },
+        }),
+      );
+      return clientId;
+    },
+    onSuccess: (clientId) => {
+      queryClient.setQueryData<WorkspaceClient[]>(clientsKey(workspaceId), (clients) =>
+        clients?.filter((client) => client.client_id !== clientId),
+      );
+    },
+  });
+}

@@ -31,10 +31,15 @@ export interface AccountMenuProps {
   compact?: boolean | undefined;
   /** Settings → Ways to sign in, as an in-app link. */
   waysIn?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
+  /** Settings → Apps and integrations, as an in-app link. */
+  apps?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
 }
 
-/** Who is signed in, their theme, density and language, how they sign in, and Sign out. */
-export function AccountMenu({ compact = false, waysIn }: AccountMenuProps) {
+/**
+ * Who is signed in, their theme, density and language, how they sign in, the
+ * apps they let in, and Sign out.
+ */
+export function AccountMenu({ compact = false, waysIn, apps }: AccountMenuProps) {
   const { t, i18n } = useTranslation();
   const session = useSession();
   const theme = useTheme();
@@ -122,6 +127,21 @@ export function AccountMenu({ compact = false, waysIn }: AccountMenuProps) {
                 }}
               >
                 {t("account.waysIn")}
+              </ButtonLink>
+            </PopoverSection>
+          )}
+          {apps === undefined ? null : (
+            <PopoverSection>
+              <ButtonLink
+                variant="ghost"
+                icon="settings"
+                href={apps.href}
+                onClick={(event) => {
+                  apps.onClick(event);
+                  close();
+                }}
+              >
+                {t("account.apps")}
               </ButtonLink>
             </PopoverSection>
           )}

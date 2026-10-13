@@ -9,7 +9,9 @@
     "choice2": "Sign in the second way listed",
     "choice3": "Sign in the third way listed",
     "passkey": "Sign in with a passkey",
-    "addWayIn": "Add a way to sign in"
+    "addWayIn": "Add a way to sign in",
+    "allow": "Allow the app",
+    "newApp": "New app"
   },
   "signIn": {
     "title": "Sign in to Campbooks",
@@ -245,6 +247,174 @@
       "unknown": {
         "title": "Something went wrong.",
         "lead": "Nothing changed. Try again."
+      }
+    }
+  },
+  "consent": {
+    "loading": "Loading what the app asks for…",
+    "eyebrow": "Allow access",
+    "title": "{{app}} wants to use your Campbooks account",
+    "lead": "You’re signed in as {{email}}.",
+    "leadNoEmail": "You’re signed in to Campbooks.",
+    "form": "Allow or deny {{app}}",
+    "app": "The app",
+    "verified": "Verified",
+    "unverified": "Unverified",
+    "kind": {
+      "first_party": "Campbooks’ own app.",
+      "workspace": "Registered by an admin of your workspace.",
+      "dynamic": "Registered itself. Nobody has checked who made it.",
+      "metadata_document": "Described by {{host}}. Nobody has checked who made it."
+    },
+    "can": "It will be able to",
+    "workspace": "Which workspace may it use?",
+    "workspaceLead": "It sees and changes only that workspace.",
+    "allWorkspaces": "It will work in all your workspaces, like Campbooks on the web.",
+    "role": {
+      "owner": "Owner",
+      "admin": "Admin",
+      "member": "Member"
+    },
+    "noWorkspace": {
+      "title": "Join a workspace first",
+      "lead": "This app works inside a workspace, and you aren’t in one yet."
+    },
+    "goesTo": "Next, you’ll go to {{host}}.",
+    "goesToDevice": "Next, you’ll go back to an app on this device.",
+    "device": {
+      "title": "Only if you just started this",
+      "lead": "An app on this device asked for this. Allow it only if you started signing in from that app yourself, just now: any app on this device can ask, and it would act as you."
+    },
+    "unverifiedNote": {
+      "title": "Anyone can register an app with any name",
+      "lead": "Allow it only if you trust where you came from."
+    },
+    "remembered": "You won’t be asked again for this app. Revoke it any time in Settings → Apps and integrations.",
+    "everyTime": "You’ll be asked each time this app signs in. Revoke it any time in Settings → Apps and integrations.",
+    "allow": "Allow",
+    "allowing": "Allowing…",
+    "deny": "Deny",
+    "stepUp": {
+      "title": "Sign in again first",
+      "lead": "Letting an app in needs a sign-in from the last ten minutes.",
+      "action": "Sign in again"
+    },
+    "gone": {
+      "title": "This request is no longer waiting",
+      "lead": "It expired, was already answered, or was meant for someone else. Start again from the app."
+    },
+    "home": "Go to Campbooks",
+    "failed": {
+      "title": "Couldn’t load this request",
+      "lead": "Campbooks didn’t answer. Check your connection, then try again."
+    },
+    "retry": "Try again",
+    "answerFailed": {
+      "title": "That didn’t go through",
+      "lead": "Nothing was allowed. Try again."
+    }
+  },
+  "scopes": {
+    "openid": "Know who you are on Campbooks",
+    "profile": "See your name",
+    "email": "See your email address",
+    "offline_access": "Stay connected when you’re away, until you revoke it",
+    "system_read": "See whether this Campbooks is working",
+    "workspaces_read": "See your workspaces and their members",
+    "workspaces_write": "Create workspaces and change their settings",
+    "workspaces_admin": "Manage members and invitations",
+    "connectors_read": "See the mailboxes connected to a workspace",
+    "connectors_write": "Connect, sync and disconnect mailboxes",
+    "conversations_read": "Read your conversations and messages",
+    "conversations_write": "Reply, send, archive and sort your conversations",
+    "identity_read": "See your account and how you sign in",
+    "identity_write": "Change how you sign in",
+    "identity_clients": "Manage a workspace’s own apps"
+  },
+  "apps": {
+    "title": "Apps and integrations",
+    "lead": "Apps you let into your account, and this workspace’s own apps.",
+    "loading": "Loading apps…",
+    "loadError": {
+      "title": "Couldn’t load your apps",
+      "lead": "Campbooks didn’t answer. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "connected": {
+      "title": "Connected apps",
+      "lead": "Apps that can act as you. Revoking one stops it at once.",
+      "list": "Apps you let in",
+      "empty": "No app can act as you.",
+      "allWorkspaces": "All your workspaces",
+      "in": "In {{workspace}}",
+      "elsewhere": "In a workspace you’ve left",
+      "granted": "Allowed {{date}}",
+      "lastUsed": "last used {{date}}",
+      "removedApp": "An app that was removed",
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke {{app}}",
+      "confirmRevoke": "{{app}} stops working at once, until you allow it again.",
+      "cancel": "Cancel",
+      "revokeFailed": "Couldn’t revoke it. Try again."
+    },
+    "workspace": {
+      "title": "This workspace’s apps",
+      "lead": "Integrations of {{workspace}}: server-to-server apps with a secret, and sign-in apps that people allow.",
+      "list": "Apps of {{workspace}}",
+      "notAdmin": "Only owners and admins can manage this workspace’s apps.",
+      "empty": "No apps yet.",
+      "new": "New app",
+      "name": "Name",
+      "namePlaceholder": "Nightly export",
+      "type": "What kind of app",
+      "types": {
+        "confidential": "Server to server",
+        "public": "Sign-in app"
+      },
+      "typeLeads": {
+        "confidential": "Runs on a server with a secret, acting for the workspace (client credentials).",
+        "public": "People sign in through it and allow it, one by one."
+      },
+      "access": "What it may do",
+      "accessOptions": {
+        "read": "Read",
+        "write": "Read and change"
+      },
+      "accessLeads": {
+        "read": "See the workspace’s mail and settings.",
+        "write": "Also reply, send, sort and connect mailboxes."
+      },
+      "redirect": "Return address",
+      "redirectHint": "Where people come back after allowing it: https://… or http://127.0.0.1:port/…",
+      "create": "Create app",
+      "creating": "Creating…",
+      "cancel": "Cancel",
+      "created": "Created {{date}}",
+      "lastUsed": "last used {{date}}",
+      "neverUsed": "never used",
+      "secretTitle": "Copy the secret now",
+      "secretLead": "It’s shown only this once. Keep it somewhere safe; if it’s lost, rotate it.",
+      "clientId": "Client ID",
+      "secret": "Client secret",
+      "copy": "Copy",
+      "copied": "Copied",
+      "copyFailed": "Select it and copy",
+      "done": "Done",
+      "rotate": "Rotate secret",
+      "rotateLabel": "Rotate the secret of {{app}}",
+      "confirmRotate": "The current secret of {{app}} stops working at once.",
+      "remove": "Remove",
+      "removeLabel": "Remove {{app}}",
+      "confirmRemove": "{{app}} and every token it holds stop working.",
+      "errors": {
+        "name": "Give it a name.",
+        "redirect": "Use an https address, or http://127.0.0.1 with a port.",
+        "failed": "That didn’t work. Try again."
+      },
+      "stepUp": {
+        "title": "Sign in again first",
+        "lead": "Creating or rotating a secret needs a sign-in from the last ten minutes.",
+        "action": "Sign in again"
       }
     }
   }

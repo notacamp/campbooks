@@ -38,6 +38,21 @@ export const IDENTITY_SHORTCUTS = [
     label: "identity:shortcuts.passkey",
   },
   {
+    id: "identity.answer_consent",
+    keys: "mod+enter",
+    scope: "focus",
+    group: "general",
+    label: "identity:shortcuts.allow",
+    allowInInputs: true,
+  },
+  {
+    id: "identity.register_client",
+    keys: "shift+n",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.newApp",
+  },
+  {
     id: "identity.start_link",
     keys: "a",
     scope: "list",
