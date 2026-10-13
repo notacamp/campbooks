@@ -188,21 +188,8 @@ pub async fn token(
     else {
         return Ok(oauth_error(StatusCode::UNAUTHORIZED, "invalid_client"));
     };
-    if let Some(grant_type) = form.grant_type.as_deref()
-        && matches!(
-            grant_type,
-            "authorization_code" | "refresh_token" | "client_credentials"
-        )
-        && !client.may_use(grant_type)
-    {
-        return Ok(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
-    }
-    if form
-        .resource
-        .as_deref()
-        .is_some_and(|resource| resource != issuer.resource)
-    {
-        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_target"));
+    if let Some(refused) = refuse_early(issuer, &client, &form) {
+        return Ok(refused);
     }
     let now = issuer.now();
     if form.grant_type.as_deref() == Some("client_credentials") {
@@ -260,6 +247,36 @@ pub async fn token(
         }
         None => return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request")),
     };
+    let exchanged = Issued {
+        grant,
+        refresh_token,
+        nonce,
+    };
+    respond(&ctx, issuer, &client, tx, exchanged, now).await
+}
+
+/// What a code or refresh token was exchanged for, before signing.
+struct Issued {
+    grant: Grant,
+    refresh_token: Option<String>,
+    nonce: Option<String>,
+}
+
+/// Commit `tx` and answer the tokens `exchanged` stands for, with an ID token
+/// (carrying its nonce) when `openid` was granted.
+async fn respond(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    client: &Client,
+    tx: sqlx::Transaction<'static, sqlx::Postgres>,
+    exchanged: Issued,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<Response> {
+    let Issued {
+        grant,
+        refresh_token,
+        nonce,
+    } = exchanged;
     let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     };
@@ -289,6 +306,24 @@ pub async fn token(
         scope: grant.scope.clone(),
     };
     Ok(no_store(Json(body).into_response()))
+}
+
+/// `unauthorized_client` for a grant type the client may not use, and
+/// `invalid_target` for a resource other than the API's.
+fn refuse_early(issuer: &Issuer, client: &Client, form: &TokenForm) -> Option<Response> {
+    if let Some(grant_type) = form.grant_type.as_deref()
+        && matches!(
+            grant_type,
+            "authorization_code" | "refresh_token" | "client_credentials"
+        )
+        && !client.may_use(grant_type)
+    {
+        return Some(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
+    }
+    form.resource
+        .as_deref()
+        .is_some_and(|resource| resource != issuer.resource)
+        .then(|| oauth_error(StatusCode::BAD_REQUEST, "invalid_target"))
 }
 
 /// RFC 6749 §4.4: a workspace's own confidential client, acting on its own

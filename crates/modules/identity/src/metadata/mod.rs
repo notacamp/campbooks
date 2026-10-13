@@ -225,21 +225,21 @@ pub async fn client(
             return Ok(row.into_client());
         }
     }
-    let fetched = match fetcher.fetch(url).await {
-        Ok(fetched) => fetched,
+    let document = match fetcher.fetch(url).await {
+        Ok(document) => document,
         Err(refused) => {
             tracing::info!(reason = %refused, "a client metadata document was not fetched");
             return Ok(None);
         }
     };
-    let described = match validate(url, &fetched.body, catalogue) {
+    let described = match validate(url, &document.body, catalogue) {
         Ok(described) => described,
         Err(invalid) => {
             tracing::info!(reason = %invalid, "a client metadata document was refused");
             return Ok(None);
         }
     };
-    let cache = fetched
+    let cache = document
         .max_age
         .unwrap_or(MIN_CACHE)
         .clamp(MIN_CACHE, MAX_CACHE);
