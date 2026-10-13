@@ -1565,8 +1565,12 @@ fn quoted_sentence(fresh: &str, reason: &Reason) -> Option<String> {
     }
     let needle = reason.evidence.to_lowercase().replace('\u{2019}', "'");
     let mut start = 0;
-    for (i, c) in fresh.char_indices() {
-        let ends = matches!(c, '.' | '!' | '?' | '\n');
+    let mut chars = fresh.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        // A full stop ends a sentence only before a space or the end, so
+        // "€148.00" and "v3.2" stay whole.
+        let next_is_space = chars.peek().is_none_or(|(_, next)| next.is_whitespace());
+        let ends = matches!(c, '!' | '?' | '\n') || (c == '.' && next_is_space);
         if !ends {
             continue;
         }
@@ -1663,6 +1667,20 @@ mod tests {
         assert_eq!(
             d.reasons[0].sentence.as_deref(),
             Some("Could you confirm Thursday\u{2019}s walkthrough?")
+        );
+    }
+
+    #[test]
+    fn amounts_do_not_split_a_sentence() {
+        let env = mail(
+            "billing@cloudhost.example",
+            "Invoice",
+            "Your invoice CH-20418 for €148.00 is due on 16 October. Thank you.",
+        );
+        let d = ask(&env, triage::ASKS_ACTION).unwrap();
+        assert_eq!(
+            d.reasons[0].sentence.as_deref(),
+            Some("Your invoice CH-20418 for €148.00 is due on 16 October.")
         );
     }
 

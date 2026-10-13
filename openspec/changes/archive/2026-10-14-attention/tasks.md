@@ -26,7 +26,7 @@
 - [x] 3.4 `attention.snooze` / `attention.unsnooze` (`invalid_until`, 404 for unseen items); tests
 - [x] 3.5 `attention.item_changed` within the container; feed test (a member outside the inbox gets nothing)
 - [x] 3.6 `workspace_deleting` and `member_left` purges; tests
-- [ ] 3.7 Terminal recording (vhs): a demo message raises a need, list, Done, reopen, snooze
+- [x] 3.7 Terminal recording (vhs): a demo message raises a need, list, Done, reopen, snooze
 
 ## 4. Client: inbox
 
@@ -46,6 +46,6 @@
 - [x] 6.1 OpenAPI regenerated, `openapi/events.json` regenerated, client types regenerated
 - [x] 6.2 `docs/domain-map.md` attention section: "need", "Later", what items hold
 - [x] 6.3 CHANGELOG updated
-- [ ] 6.4 Gates green
-- [ ] 6.5 UI verified at 375px and desktop
-- [ ] 6.6 Archive the change
+- [x] 6.4 Gates green
+- [x] 6.5 UI verified at 375px and desktop
+- [x] 6.6 Archive the change

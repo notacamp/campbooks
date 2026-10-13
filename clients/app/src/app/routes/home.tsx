@@ -64,6 +64,10 @@ function MailSection({ workspaceId }: { workspaceId: string }) {
 export function Home() {
   const { workspaceId } = useParams({ strict: false });
   const inboxes = useInboxes(workspaceId ?? "");
+  if (inboxes.isPending) {
+    // A moment, so neither Home flashes before the other.
+    return null;
+  }
   if (inboxes.data !== undefined && inboxes.data.length > 0) {
     return <WhatNeedsYou workspaceId={workspaceId ?? ""} />;
   }

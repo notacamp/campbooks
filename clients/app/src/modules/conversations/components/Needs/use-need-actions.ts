@@ -16,13 +16,24 @@ const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
   confirm: "needs.toast.confirmed",
 };
 
+export interface NeedActionOptions {
+  /** After each request settles (Home refetches its list). */
+  onChanged?: () => void;
+  /** When a verdict is undone (Home shows the item again at once). */
+  onUndo?: (conversation: ConversationSummary) => void;
+  /** When an undone verdict is redone. */
+  onRedo?: (conversation: ConversationSummary) => void;
+}
+
 /**
  * A member's verdicts on what a conversation needs (Done, Not needed or
  * "It's safe", Yes to a question), each pushed to the undo stack: Z or the
- * toast's Undo reopens it. `onChanged` runs after each request settles (Home
- * refetches its list).
+ * toast's Undo reopens it.
  */
-export function useNeedActions(workspaceId: string, onChanged?: () => void) {
+export function useNeedActions(
+  workspaceId: string,
+  { onChanged, onUndo, onRedo }: NeedActionOptions = {},
+) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
   const mutation = useConversationAction(workspaceId);
@@ -50,9 +61,11 @@ export function useNeedActions(workspaceId: string, onChanged?: () => void) {
     undo.push({
       label: t(safe ? "needs.toast.safe" : TOASTS[verdict], { name }),
       undo: () => {
+        onUndo?.(conversation);
         run(conversation, "reopen");
       },
       redo: () => {
+        onRedo?.(conversation);
         run(conversation, verdict);
       },
     });

@@ -88,12 +88,11 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const open = useAttention(workspaceId, "open");
   const cleared = useAttention(workspaceId, "cleared");
   const refresh = useRefreshAttention(workspaceId);
-  const needActions = useNeedActions(workspaceId, refresh);
   const snooze = useSnooze(workspaceId);
 
   // Items acted on, hidden at once while the projection catches up; keyed
   // by their cause, so a follow-up from the sender shows again.
-  const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
+  const [gone, setGone] = useState<ReadonlyMap<string, Row>>(new Map());
   const openItems = open.data?.items ?? [];
 
   const clearedItems = cleared.data?.items ?? [];
@@ -132,7 +131,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const selected = order.find((row) => row.item.id === selectedId) ?? order[0];
 
   const hide = (row: Row) => {
-    setGone((current) => new Set([...current, goneKey(row.item)]));
+    setGone((current) => new Map([...current, [goneKey(row.item), row]]));
     const index = order.findIndex((r) => r.item.id === row.item.id);
     const next = order[index + 1] ?? order[index - 1];
     setSelectedId(next?.item.id);
@@ -140,9 +139,28 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
     setLaterId(undefined);
   };
   const show = (row: Row) => {
-    setGone((current) => new Set([...current].filter((key) => key !== goneKey(row.item))));
+    setGone((current) => new Map([...current].filter(([key]) => key !== goneKey(row.item))));
     setSelectedId(row.item.id);
   };
+  // A hidden row is found among the hidden ones: its summary may already say
+  // it needs nothing.
+  const rowOf = (conversation: ConversationSummary) =>
+    [...rows, ...gone.values()].find((row) => row.conversation.id === conversation.id);
+  const needActions = useNeedActions(workspaceId, {
+    onChanged: refresh,
+    onUndo: (conversation) => {
+      const row = rowOf(conversation);
+      if (row !== undefined) {
+        show(row);
+      }
+    },
+    onRedo: (conversation) => {
+      const row = rowOf(conversation);
+      if (row !== undefined) {
+        hide(row);
+      }
+    },
+  });
   const isQuestion = (row: Row) => row.need.trust === "check";
 
   const done = (row: Row) => {
@@ -346,7 +364,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
       <PageHero
         visor={loading ? "reading" : count === 0 ? "happy" : review ? "alert" : "idle"}
         dateLine={dateLine}
-        title={count === 0 && !loading ? t("hero.clear") : t("hero.count", { count })}
+        title={loading ? t("title") : count === 0 ? t("hero.clear") : t("hero.count", { count })}
         subline={count === 0 && !loading ? t("hero.clearSubline") : t("hero.subline")}
       />
       {loading ? <SkeletonList rows={4} /> : null}

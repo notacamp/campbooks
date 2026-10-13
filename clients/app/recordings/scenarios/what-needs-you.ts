@@ -30,6 +30,19 @@ async function homeFilled(page: Page, workspace: string): Promise<void> {
 }
 
 export default async function whatNeedsYou({ page }: ScenarioContext): Promise<void> {
+  const shots = process.env["INBOX_SHOTS"];
+  try {
+    await record(page);
+  } catch (error) {
+    // Where it stopped, for whoever runs it.
+    if (shots !== undefined) {
+      await page.screenshot({ path: `${shots}/what-needs-you-failed.png` });
+    }
+    throw error;
+  }
+}
+
+async function record(page: Page): Promise<void> {
   const workspace = await signedIn(page);
   const phone = isPhone(page);
   await homeFilled(page, workspace);
@@ -76,12 +89,11 @@ export default async function whatNeedsYou({ page }: ScenarioContext): Promise<v
 
   // E done, Z undo.
   await caption(page, phone ? "Done takes it off your list" : "E marks it done");
-  if (phone) {
-    await page.getByText("Marta Ferreira is waiting for your reply").click();
-    await page.getByRole("button", { name: /^Done/u }).first().click();
-  } else {
-    await page.keyboard.press("e");
-  }
+  await page.getByText("Marta Ferreira is waiting for your reply").click();
+  await pause(600);
+  await (phone
+    ? page.getByRole("button", { name: /^Done/u }).first().click()
+    : page.keyboard.press("e"));
   await pause(1200);
   await caption(page, phone ? "Undo brings it back" : "Z brings it back");
   await (phone

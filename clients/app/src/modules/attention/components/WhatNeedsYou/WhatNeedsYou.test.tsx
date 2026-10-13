@@ -108,6 +108,8 @@ describe("What needs you", () => {
         `POST ${W}/conversations/${PHISH.id}/need/reopen`,
       );
     });
+    // Back on the list at once.
+    expect(await screen.findByText("This may be phishing. Don’t use its links.")).toBeVisible();
   });
 
   it("opens an item with Enter: its tells and how Campbooks decided", async () => {
