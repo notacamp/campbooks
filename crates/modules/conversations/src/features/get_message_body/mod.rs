@@ -1,9 +1,11 @@
 //! `GET /api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body`
 //! — one message's text and HTML bodies, as JSON.
 //!
-//! The HTML is untrusted and never served as `text/html`: it reaches the
-//! client as a string that the client renders only in its sandboxed frame
-//! (`lib/ui/safe-html`, AGENTS.md).
+//! The HTML is untrusted and never served as `text/html`: it is sanitised
+//! here (`domain::sanitize`: no scripts, style sheets, forms or frames; links
+//! open in a new tab; remote images held back unless asked for; tracking
+//! pixels removed), then reaches the client as a string that the client
+//! renders only in its sandboxed frame (`lib/ui/safe-html`, AGENTS.md).
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -14,11 +16,11 @@ use campbooks_kernel::{
     tenancy::{Workspace, WorkspaceId},
 };
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::paths::MessagePath,
-    domain::{access::visible_inboxes, blobs::read_text},
+    domain::{access::visible_inboxes, blobs::read_text, sanitize::sanitize},
     features::get_conversation::Bodies,
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
@@ -27,15 +29,30 @@ use crate::{
 /// Longest body returned, in bytes, per part.
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
 
+/// How to render the HTML part.
+#[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct BodyQuery {
+    /// `true` to keep remote images (the member chose "Show images");
+    /// tracking pixels are removed either way.
+    #[serde(default)]
+    pub show_images: bool,
+}
+
 /// A message's bodies.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct MessageBody {
     /// The plain-text part.
     pub text: Option<String>,
-    /// The HTML part: untrusted, to be shown only in a sandboxed frame.
+    /// The HTML part, sanitised; still to be shown only in a sandboxed frame.
     pub html: Option<String>,
     /// Whether either part was cut short.
     pub truncated: bool,
+    /// Remote images in the HTML part: held back (their `src` removed)
+    /// unless `show_images` was asked for.
+    pub remote_images: u32,
+    /// Whether the remote images were kept.
+    pub images_shown: bool,
 }
 
 /// Read one message's text and HTML bodies.
@@ -50,6 +67,7 @@ pub struct MessageBody {
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
         ("message_id" = MessageId, Path, description = "The message."),
+        BodyQuery,
     ),
     responses(
         (status = OK, description = "The bodies.", body = MessageBody),
@@ -65,6 +83,7 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<MessagePath>,
+    extract::Query(query): extract::Query<BodyQuery>,
 ) -> Result<Json<MessageBody>> {
     let (conversation, message) = (path.conversation_id, path.message_id);
     let access = &workspace.access;
@@ -87,9 +106,14 @@ pub async fn handler(
     let (text, text_cut) = read(&state, &ws, bodies.text.as_ref()).await?;
     let (html, html_cut) = read(&state, &ws, bodies.html.as_ref()).await?;
     let truncated = text_cut || html_cut;
+    let sanitized = html
+        .as_deref()
+        .map(|html| sanitize(html, query.show_images));
     Ok(Json(MessageBody {
         text,
-        html,
+        remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
+        images_shown: query.show_images,
+        html: sanitized.map(|s| s.html),
         truncated,
     }))
 }
@@ -144,6 +168,24 @@ mod tests {
                 .contains("calmer mornings")
         );
         assert_eq!(response.json["truncated"], false);
+        // Sanitised: the remote image is held back and counted.
+        assert!(
+            !response.json["html"]
+                .as_str()
+                .unwrap()
+                .contains("paperkite.example")
+        );
+        assert_eq!(response.json["remote_images"], 1);
+        assert_eq!(response.json["images_shown"], false);
+        let shown = kit.get(&sam, &format!("{uri}?show_images=true")).await;
+        assert_eq!(shown.status, StatusCode::OK);
+        assert!(
+            shown.json["html"]
+                .as_str()
+                .unwrap()
+                .contains(r#"src="https://paperkite.example/pixel.gif""#)
+        );
+        assert_eq!(shown.json["images_shown"], true);
 
         let other = kit.conversation_of("en-1").await;
         let mismatched =

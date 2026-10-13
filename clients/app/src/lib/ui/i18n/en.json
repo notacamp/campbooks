@@ -55,5 +55,10 @@
   },
   "navigation": {
     "main": "Main"
+  },
+  "conversation": {
+    "unread": "Unread",
+    "starred": "Starred",
+    "attachment": "Has attachments"
   }
 }

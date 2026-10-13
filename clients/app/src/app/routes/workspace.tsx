@@ -23,6 +23,7 @@ import {
   WorkspaceMenu,
   WorkspaceSwitcher,
 } from "~/lib/ui";
+import { StreamNav, streamPath } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
 import { AccountMenu } from "../account/AccountMenu";
@@ -132,13 +133,20 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const membersPath = `${base}/settings/members`;
   const waysInPath = `${base}/settings/sign-in`;
   const inSettings = pathname.startsWith(`${base}/settings`);
-  const atHome = !inSettings;
+  const inInbox = pathname.startsWith(`${base}/inbox`);
+  const atHome = !inSettings && !inInbox;
+  const inboxPath = streamPath(workspace.id, "primary");
+  const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
+    "primary" | "updates" | "receipts" | "newsletters" | undefined;
 
   useShortcut("workspace.switch", () => {
     setSwitching((open) => !open);
   });
   useShortcut("nav.home", () => {
     void navigate({ to: base });
+  });
+  useShortcut("nav.inbox", () => {
+    void navigate({ to: inboxPath });
   });
   useShortcut("nav.settings", () => {
     void navigate({ to: membersPath });
@@ -182,6 +190,14 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             {...link(base)}
           />
           <NavItem
+            label={tNav("nav.inbox")}
+            icon="inbox"
+            shortcut="nav.inbox"
+            current={inInbox && openStream === undefined}
+            {...link(inboxPath)}
+          />
+          <StreamNav workspaceId={workspace.id} current={openStream} />
+          <NavItem
             label={tNav("nav.settings")}
             icon="settings"
             shortcut="nav.settings"
@@ -208,6 +224,13 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
         phoneOnly
         items={[
           { id: "home", label: tNav("nav.home"), icon: "home", current: atHome, ...link(base) },
+          {
+            id: "inbox",
+            label: tNav("nav.inbox"),
+            icon: "inbox",
+            current: inInbox,
+            ...link(inboxPath),
+          },
           {
             id: "settings",
             label: tNav("nav.settings"),

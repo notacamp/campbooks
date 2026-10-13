@@ -9,3 +9,5 @@ pub mod flags;
 pub mod paths;
 pub mod policy;
 pub mod redact;
+pub mod sanitize;
+pub mod suggestions;

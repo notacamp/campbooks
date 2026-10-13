@@ -59,3 +59,21 @@ export const LongContent: Story = {
     snippet: "Segue em anexo a versão revista com as alterações acordadas na reunião",
   },
 };
+
+/** Starred, with attachments, several messages and the assistant's suggestion. */
+export const WithSuggestion: Story = {
+  args: {
+    unread: true,
+    starred: true,
+    count: 3,
+    attachment: true,
+    from: "The Weekly Ledger",
+    avatar: { kind: "service" },
+    subject: "Five tax dates before year end",
+    snippet: "Plus what changes for freelancers in 2027.",
+    suggestion: "Suggests Newsletters",
+  },
+};
+
+/** The keyboard cursor (J/K) on a row that is not open. */
+export const Selected: Story = { args: { selected: true } };

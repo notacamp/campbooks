@@ -55,5 +55,10 @@
   },
   "navigation": {
     "main": "Principal"
+  },
+  "conversation": {
+    "unread": "No leída",
+    "starred": "Destacada",
+    "attachment": "Tiene adjuntos"
   }
 }

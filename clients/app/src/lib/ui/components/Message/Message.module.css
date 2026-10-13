@@ -34,6 +34,66 @@
   color: var(--text-secondary);
 }
 
+.recipients {
+  margin-top: var(--space-0-5);
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rich {
+  margin-top: var(--space-3);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.files .attachment {
+  margin-top: 0;
+}
+
+.folded {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-3) var(--space-2);
+  border: 0;
+  border-top: var(--border-width) solid var(--border-subtle);
+  background: none;
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.folded:hover {
+  background: var(--surface-hover);
+}
+
+.foldedSnippet {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .attachment {
   display: inline-flex;
   align-items: center;

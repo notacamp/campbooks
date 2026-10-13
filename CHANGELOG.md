@@ -23,6 +23,19 @@ All notable changes to Campbooks Next are documented here. The format follows
   touched. Labels you create in
   Campbooks and the Receipts stream stay in Campbooks for now. New table
   `connectors.outbound_changes` (migration applied on start).
+- The inbox: the four streams (Primary, Updates, Receipts, Newsletters) under
+  Inbox with their unread counts, each stream's conversations newest first,
+  and a reader with the thread (older messages folded, attachments listed).
+  Campbooks' sorting shows only as a suggestion ("Suggests Newsletters"),
+  with "Why?" listing the stored reasons and "Move to …" one key away; Done,
+  star, read/unread and move all have shortcuts and Undo. On phones the list
+  and the reader are separate screens. New read operation
+  `conversations.list_streams`; conversation summaries carry `suggestion`
+  and details carry `decisions`.
+- Email bodies are sanitised on the server before they reach the app
+  (scripts, style sheets, forms, frames and tracking pixels removed, links
+  open in a new tab), shown only in a sandboxed frame, and remote images stay
+  blocked until you choose "Show images" for a message.
 - The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
   and French. Opening the app signed out goes straight to "Sign in to
   Campbooks" (and back to the page you opened afterwards), with one button
@@ -334,6 +347,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- The web app's Content-Security-Policy now allows inline `style` attributes
+  (`style-src-attr 'unsafe-inline'`) and `https:` images, which sanitised
+  email bodies need inside their sandboxed frame; scripts, style sheets and
+  connections stay same-origin. Reverse proxies that set their own CSP need
+  the same two additions.
 - Connecting a mailbox goes through the built-in sign-in: Google redirects to
   `/auth/callback/google`, and `/connections/google/callback` is no longer used
   (remove it from your Google OAuth client). `connectors.complete_connection` is

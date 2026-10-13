@@ -9,6 +9,8 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+# Sanitising email HTML bodies (`domain::sanitize`).
+ammonia.workspace = true
 axum.workspace = true
 # Opaque list cursors.
 base64.workspace = true
@@ -19,6 +21,8 @@ chrono.workspace = true
 figment.workspace = true
 # Reading blob streams.
 futures-util.workspace = true
+# The image policy over ammonia's canonical output (`domain::sanitize`).
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
