@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rolname::text AS \"name!\" FROM pg_roles WHERE rolsuper AND rolcanlogin LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "name!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4a574ff88ee1b1587328c296b343f09b96f40b07a1b60e35d62c7f566102831e"
+}

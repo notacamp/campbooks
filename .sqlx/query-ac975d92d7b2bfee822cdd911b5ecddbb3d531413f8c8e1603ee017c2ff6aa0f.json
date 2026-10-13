@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO bff.sessions\n            (id, token_hash, rotated_at, subject, idp_session_id, name, email,\n             access_token, access_expires_at, refresh_token, id_token, user_agent,\n             created_at, last_seen_at, idle_expires_at, expires_at)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $3, $3, $13, $14)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea",
+        "Timestamptz",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Bytea",
+        "Timestamptz",
+        "Bytea",
+        "Bytea",
+        "Text",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ac975d92d7b2bfee822cdd911b5ecddbb3d531413f8c8e1603ee017c2ff6aa0f"
+}

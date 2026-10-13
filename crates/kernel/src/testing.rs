@@ -4,7 +4,7 @@
 
 mod idp;
 
-pub use idp::TestIdp;
+pub use idp::{TestIdp, TestUser, WEB_CLIENT_ID, WEB_CLIENT_SECRET};
 
 use std::time::Duration;
 
@@ -30,6 +30,9 @@ use crate::{
 pub fn config(database_url: &str) -> Config {
     Config {
         database_url: SecretString::from(database_url),
+        database_migration_url: None,
+        database_password_file: None,
+        database_allow_rls_bypass: false,
         database_max_connections: 5,
         database_role: db::DEFAULT_RUNTIME_ROLE.to_owned(),
         env: Environment::Production,
@@ -61,6 +64,96 @@ pub async fn app_role_pool(db: &PgPool) -> PgPool {
         .connect_with((*db.connect_options()).clone())
         .await
         .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
+}
+
+/// Run `sql` on `db`, panicking on failure (test setup).
+async fn exec(db: &PgPool, sql: String) {
+    sqlx::query(sqlx::AssertSqlSafe(sql))
+        .execute(db)
+        .await
+        .unwrap_or_else(|e| panic!("test setup failed: {e}"));
+}
+
+const TEST_LOGIN_PASSWORD: &str = "test-login-password";
+
+/// The name of the test login for `db`'s database: roles belong to the
+/// cluster, so each `#[sqlx::test]` database gets its own.
+async fn test_login_name(db: &PgPool) -> String {
+    let database = sqlx::query_scalar!(r#"SELECT current_database()::text AS "name!""#)
+        .fetch_one(db)
+        .await
+        .unwrap_or_else(|e| panic!("reading the database name: {e}"));
+    let safe: String = database
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    format!("cb_login{safe}")
+}
+
+/// A pool on `db`'s database logged in as a **dedicated runtime login**, as
+/// a split deployment configures: `LOGIN`, not a superuser, no `BYPASSRLS`,
+/// a member of the runtime role, owning nothing. Unlike [`app_role_pool`]
+/// no `SET ROLE` is involved, so there is nothing to `RESET ROLE` back to.
+/// Pair with [`drop_runtime_login`] at the end of the test.
+///
+/// # Panics
+/// If `db`'s user cannot create roles or the kernel migration has not run.
+pub async fn runtime_login_pool(db: &PgPool) -> PgPool {
+    let name = create_login(db).await;
+    exec(db, format!("GRANT {} TO {name}", db::DEFAULT_RUNTIME_ROLE)).await;
+    login_pool(db, &name).await
+}
+
+/// A pool logged in as the existing role `name` (password
+/// [`runtime_login_pool`] uses), for tests that shape a role themselves.
+///
+/// # Panics
+/// If the login is refused.
+pub async fn login_pool(db: &PgPool, name: &str) -> PgPool {
+    PgPoolOptions::new()
+        .max_connections(5)
+        .connect_with(
+            (*db.connect_options())
+                .clone()
+                .username(name)
+                .password(TEST_LOGIN_PASSWORD),
+        )
+        .await
+        .unwrap_or_else(|e| panic!("connecting as {name}: {e}"))
+}
+
+/// Create a role that can sign in with the test password, for
+/// [`login_pool`]; returns its name. Drop it with [`drop_runtime_login`].
+///
+/// # Panics
+/// If `db`'s user cannot create roles.
+pub async fn create_login(db: &PgPool) -> String {
+    let name = test_login_name(db).await;
+    exec(
+        db,
+        format!(
+            "CREATE ROLE {name} LOGIN PASSWORD '{TEST_LOGIN_PASSWORD}' NOSUPERUSER NOBYPASSRLS"
+        ),
+    )
+    .await;
+    name
+}
+
+/// Drop the login of [`runtime_login_pool`] / [`create_login`] (and what it
+/// owns or was granted), once its pool is closed.
+///
+/// # Panics
+/// If the role cannot be dropped.
+pub async fn drop_runtime_login(db: &PgPool) {
+    let name = test_login_name(db).await;
+    exec(db, format!("DROP OWNED BY {name}")).await;
+    exec(db, format!("DROP ROLE {name}")).await;
 }
 
 /// App state over `db` (e.g. the pool `#[sqlx::test]` hands you), storing

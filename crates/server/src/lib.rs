@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod bff;
 pub mod web;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
@@ -39,6 +40,10 @@ use utoipa::{
 };
 use utoipa_axum::router::OpenApiRouter;
 
+/// The server's own messages (`i18n/<locale>.json`): the reasons of the web
+/// BFF's errors.
+pub static MESSAGES: i18n::Catalogue = campbooks_kernel::catalogue!("server");
+
 /// Longest a request may take before the server answers 503.
 pub const REQUEST_TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -48,10 +53,9 @@ pub const OPENAPI_PATH: &str = "/openapi.json";
 /// Header carrying the request id, generated when the client sends none.
 pub const REQUEST_ID_HEADER: &str = "x-request-id";
 
-/// Prefix the web client sends API calls under (same origin, ADR 0004).
-pub const BFF_PREFIX: &str = "/bff";
-
-/// Security headers set on every response, API and web client alike.
+/// Security headers set on every response, API and web client alike. A
+/// response may only make `Referrer-Policy` stricter (the BFF's sign-in
+/// landing page sends `no-referrer`); the others are always these.
 pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
     (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
     (header::REFERRER_POLICY, "strict-origin-when-cross-origin"),
@@ -81,10 +85,10 @@ pub fn with_ports(state: AppState) -> AppState {
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
-/// kernel's maintenance. Fails when a registration breaks a naming rule or
-/// is duplicated (also checked by `cargo xtask arch`).
+/// kernel's maintenance and the web BFF's. Fails when a registration breaks
+/// a naming rule or is duplicated (also checked by `cargo xtask arch`).
 pub fn registry() -> Result<Registry, RegistryError> {
-    Registry::build(&modules())
+    Registry::build_with(&modules(), &[(bff::OWNER, &bff::background())])
 }
 
 /// Every event the modules publish, with its payload schema: what
@@ -133,7 +137,9 @@ fn security_scheme() -> SecurityScheme {
         title = "Campbooks API",
         description = "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. \
             Operations require an OAuth 2.1 bearer token with the scope they list \
-            (401 without a valid token, 403 without the scope) unless they are public.",
+            (401 without a valid token, 403 without the scope) unless they are public. \
+            The `/bff/*` operations serve the web app only: they authenticate with its \
+            session cookie instead of a token.",
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
     ),
     components(schemas(Problem)),
@@ -160,46 +166,66 @@ fn api() -> OpenApiRouter<AppState> {
         })
 }
 
-/// The OpenAPI document for every module's routes.
+/// The OpenAPI document: every module's routes and the web BFF's.
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    api().into_openapi()
+    let mut doc = api().into_openapi();
+    doc.merge(bff::openapi());
+    doc
 }
 
 /// The full HTTP application: module routes (behind the idempotency and
-/// localization layers), `/openapi.json`, the interim `/bff/api/*`
-/// passthrough, the web client (when `CAMPBOOKS_WEB_DIR` is set) or else a
-/// problem+json 404 fallback, and the middleware stack (security headers,
-/// request id, tracing, timeout, compression, and problem+json rendered in
-/// the request's locale).
+/// localization layers), `/openapi.json`, the web BFF (`/bff/*`; `bff` is
+/// `None` when web sign-in is off), the web client (when `CAMPBOOKS_WEB_DIR`
+/// is set) or else a problem+json 404 fallback, and the middleware stack
+/// (security headers, request id, tracing, timeout, compression, and
+/// problem+json rendered in the request's locale).
 ///
 /// The same module routes are installed in the state's
-/// [`Operations`](operations::Operations), so automation and the assistant invoke operations by id
-/// through exactly what HTTP requests reach.
-pub fn router(state: AppState) -> Router {
+/// [`Operations`](operations::Operations), so automation and the assistant
+/// invoke operations by id through exactly what HTTP requests reach. The
+/// BFF's own operations are not in that catalogue: they serve browsers only.
+pub fn router(state: AppState, bff: Option<bff::Settings>) -> Router {
     let operations::Composed {
         routes,
-        spec,
+        mut spec,
         state,
     } = operations::compose(api(), state);
+    spec.merge(bff::openapi());
     let spec = Arc::new(spec);
+
+    // What `/bff/api/*` runs requests through: the composed module routes
+    // (idempotency included), without the middleware below (the outer
+    // request already passed it).
+    let api_only: Router = routes
+        .clone()
+        .fallback(|| async { Error::NotFound })
+        .with_state(state.clone());
+    let bff = bff::Bff::new(bff, &state, api_only);
+
+    compose(state, routes, spec, &bff)
+}
+
+/// Assemble the application from the API routes, the OpenAPI document and
+/// the BFF.
+fn compose(
+    state: AppState,
+    routes: Router<AppState>,
+    spec: Arc<utoipa::openapi::OpenApi>,
+    bff: &bff::Bff,
+) -> Router {
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
     let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
-
-    // INTERIM, NO AUTH SEMANTICS. Until the BFF of ADR 0004 exists (session
-    // cookie, OIDC code flow, token attachment — tracked in
-    // https://github.com/notacamp/campbooks-cloud/issues/16), `/bff/api/*` is
-    // the very same module routes with `/bff` stripped. It adds no session and
-    // no credentials, so it can never do more than calling `/api/*` directly.
-    // Its own fallback keeps `/bff/*` misses problem+json 404s. The Vite dev
-    // proxy mirrors this rewrite.
-    let bff_passthrough = routes.clone().fallback(|| async { Error::NotFound });
+    // Innermost of the stack below, so fallback 404s (and the BFF's own
+    // problems) are localized before compression wraps the body.
+    let localize = axum::middleware::from_fn_with_state(state.clone(), i18n::localize);
 
     let routes = routes
         .route(
             OPENAPI_PATH,
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
-        .nest(BFF_PREFIX, bff_passthrough);
+        .with_state(state)
+        .merge(bff.router());
     let routes = match web_client {
         Some(client) => {
             routes.fallback(move |request: AxumRequest| client.clone().respond(request))
@@ -208,13 +234,15 @@ pub fn router(state: AppState) -> Router {
     };
 
     let [nosniff, referrer, frame] = SECURITY_HEADERS.map(|(name, value)| {
-        SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value))
+        let value = HeaderValue::from_static(value);
+        if name == header::REFERRER_POLICY {
+            SetResponseHeaderLayer::if_not_present(name, value)
+        } else {
+            SetResponseHeaderLayer::overriding(name, value)
+        }
     });
 
-    // Innermost, so fallback 404s are localized before compression wraps
-    // the body.
-    let localize = axum::middleware::from_fn_with_state(state.clone(), i18n::localize);
-    routes.with_state(state).layer(
+    routes.layer(
         ServiceBuilder::new()
             .layer(nosniff)
             .layer(referrer)
@@ -228,10 +256,13 @@ pub fn router(state: AppState) -> Router {
                             .get::<RequestId>()
                             .and_then(|id| id.header_value().to_str().ok())
                             .unwrap_or_default();
+                        // The path only: query strings can carry secrets
+                        // (the authorization code on `/bff/callback`) and
+                        // user content (search terms).
                         tracing::info_span!(
                             "http",
                             method = %request.method(),
-                            uri = %request.uri(),
+                            path = %request.uri().path(),
                             request_id = %id,
                         )
                     })
@@ -257,7 +288,7 @@ mod tests {
     use super::*;
 
     fn app() -> Router {
-        router(testing::state(testing::unreachable_pool()))
+        router(testing::state(testing::unreachable_pool()), None)
     }
 
     #[test]
@@ -522,6 +553,11 @@ mod tests {
     }
 
     #[test]
+    fn catalogue_is_at_parity() {
+        assert_eq!(MESSAGES.check(), Vec::<String>::new());
+    }
+
+    #[test]
     fn module_names_are_unique() {
         let mut names: Vec<_> = modules().iter().map(|m| m.name).collect();
         names.sort_unstable();
@@ -569,13 +605,22 @@ mod tests {
 
     #[tokio::test]
     async fn fallback_404s_speak_the_callers_language() {
-        for uri in ["/api/v1/nope", "/bff/api/v1/nope"] {
+        for uri in ["/api/v1/nope", "/nope"] {
             let (status, language, body) = localized(uri, "es-MX,es;q=0.9").await;
             assert_eq!(status, StatusCode::NOT_FOUND);
             assert_eq!(language.as_deref(), Some("es-ES"));
             assert_eq!(body["code"], "not_found");
             assert_eq!(body["title"], "No encontrado");
         }
+    }
+
+    #[tokio::test]
+    async fn bff_problems_speak_the_callers_language() {
+        let (status, language, body) = localized("/bff/login", "pt-BR").await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(language.as_deref(), Some("pt-PT"));
+        assert_eq!(body["code"], "bff_not_configured");
+        assert_eq!(body["title"], "Serviço indisponível");
     }
 
     #[tokio::test]
@@ -633,7 +678,7 @@ mod tests {
     fn web_app(dir: &WebDir) -> Router {
         let mut config = testing::config("postgres://test@localhost/test");
         config.web_dir = Some(dir.0.clone());
-        router(AppState::new(testing::unreachable_pool(), config))
+        router(AppState::new(testing::unreachable_pool(), config), None)
     }
 
     struct Raw {
@@ -755,7 +800,7 @@ mod tests {
             "/api/v1/nope",
             "/api",
             "/bff/nope",
-            "/bff/api/v1/nope",
+            "/bff/api",
             "/bff/openapi.json",
         ] {
             assert_problem_404(&fetch(&app, uri, HTML).await);
@@ -765,14 +810,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn bff_passthrough_mirrors_the_api() {
+    async fn bff_routes_are_served_next_to_the_web_client() {
         for app in [app(), web_app(&WebDir::new())] {
-            let direct = fetch(&app, "/api/v1/system/version", None).await;
-            let via_bff = fetch(&app, "/bff/api/v1/system/version", None).await;
-            assert_eq!(direct.status, StatusCode::OK);
-            assert_eq!(via_bff.status, direct.status);
-            assert_eq!(via_bff.body, direct.body);
-            assert_problem_404(&fetch(&app, "/bff/api/v1/nope", None).await);
+            // Web sign-in is off in these apps: the BFF says so, as problem+json.
+            let raw = fetch(&app, "/bff/api/v1/system/version", HTML).await;
+            assert_eq!(raw.status, StatusCode::SERVICE_UNAVAILABLE, "{}", raw.body);
+            assert_eq!(
+                header(&raw, &header::CONTENT_TYPE),
+                Some("application/problem+json")
+            );
+            let session = fetch(&app, "/bff/session", None).await;
+            assert_eq!(session.status, StatusCode::OK);
+            assert_eq!(session.body, r#"{"authenticated":false}"#);
         }
     }
 

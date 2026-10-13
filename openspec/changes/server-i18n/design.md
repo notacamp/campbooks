@@ -98,7 +98,8 @@ recipient). Payloads hold ids and a locale tag, never rendered text.
   idempotency layer (inner: handler errors are localized before an
   idempotent response is stored, so a replay answers in the first request's
   language; outer: the idempotency layer's own problems), and the server
-  adds it outermost for fallback 404s. In-process `invoke` goes through the
+  adds it to its whole stack (inside compression) for fallback 404s and the
+  web BFF's problems, whose reasons live in the server crate's catalogue. In-process `invoke` goes through the
   composed routes, so its problems are localized for the invoking principal.
 - Extractor rejections become codes: `missing_json_content_type`,
   `invalid_json`, `invalid_body`, `invalid_query`; the parser's own English

@@ -53,15 +53,18 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/25.
 
 ### Modified Capabilities
 
-None in the baseline. The in-flight `api-auth` and `workspaces` deltas now
-name reason codes as the problem's `code` instead of its `detail`.
+None in the baseline. The in-flight `api-auth`, `workspaces` and `web-bff`
+deltas now name reason codes as the problem's `code` instead of its
+`detail`.
 
 ## Impact
 
 - Crates: `campbooks-kernel` (new `i18n` module and kernel catalogue;
   `Error`/`Problem` reshaped; `localize` middleware installed by
   `operations::compose`; `AppState.locales`), `campbooks-server` (registers
-  the port, outermost `localize` layer for fallbacks), `campbooks-system`
+  the port, `localize` layer for fallbacks and the web BFF, its own
+  catalogue for the BFF's problems), `campbooks-ai` (catalogue for
+  `ai_role_not_configured`), `campbooks-system`
   and `campbooks-workspaces` (catalogues, reasons; `workspaces` implements
   `LocalePreference`), `xtask` (`i18n` command).
 - Dependencies: `icu_plurals` 2.3.0 and `icu_locale_core` 2.3.0 (Unicode-3.0,

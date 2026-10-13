@@ -36,8 +36,9 @@ crates/
                            protocol). Depends on kernel only.
   server/                  campbooks-server — the binary. Loads config, runs migrations,
                            composes modules into one router and one job registry,
-                           serves OpenAPI and, when CAMPBOOKS_WEB_DIR is set, the
-                           built web client; runs as `all`, `api` or `worker`.
+                           serves OpenAPI, the web BFF (`/bff/*`, sessions in schema
+                           `bff`) and, when CAMPBOOKS_WEB_DIR is set, the built web
+                           client; runs as `all`, `api` or `worker`.
   modules/
     system/                campbooks-system — health, version. The reference slice:
                            copy its shape for every new module.
@@ -45,7 +46,8 @@ crates/
                            and roles, invitations, signup policy, security log;
                            implements the kernel's `Membership` port.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
-                           <ts>_kernel__<desc>.sql for the kernel's `kernel` schema
+                           <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
+                           <ts>_bff__<desc>.sql for the web BFF's `bff` schema
 openapi/openapi.json       generated, committed; the operation catalogue and the
                            contract for every client (ADR 0013)
 openapi/events.json        generated, committed; the events catalogue
@@ -94,9 +96,9 @@ through the kernel (types, events) — `cargo xtask arch` enforces it.
 
 Every module owns a Postgres schema of its own name and touches nothing else.
 Other modules' records are referenced by ID only (no cross-schema foreign
-keys or joins). The one schema that belongs to no module is `kernel`: the
-event log and the job queue (ADR 0012), written only through the kernel's
-API. `cargo xtask arch` checks that each migration touches only its owner's
+keys or joins). Two schemas belong to no module: `kernel`, the event log
+and the job queue (ADR 0012), written only through the kernel's API; and
+`bff`, the web BFF's sessions, owned by `campbooks-server`. `cargo xtask arch` checks that each migration touches only its owner's
 schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
@@ -336,9 +338,25 @@ themselves. See [`design-system.md`](design-system.md).
 
 The web target is served by `campbooks-server` itself (ADR 0006): the release
 image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share
-one origin and port. Until the BFF lands, `/bff/api/*` is an interim
-passthrough to the same API routes with no session or credentials of its own
-(`openspec/changes/serve-web-client/`).
+one origin and port.
+
+### The web BFF
+
+`campbooks-server` signs browsers in itself (ADR 0004,
+`openspec/changes/web-bff/`). `/bff/login` runs the OIDC authorization-code
+flow with PKCE as the confidential client `campbooks-web`; `/bff/callback`
+validates the ID token (with the kernel's JWKS cache) and starts a session.
+Sessions live in Postgres schema `bff`: the cookie value only as a hash, the
+access, refresh and ID tokens encrypted (AES-256-GCM, key derived from
+`CAMPBOOKS_SECRET_KEY`). The browser gets one `HttpOnly`, `SameSite=Strict`
+`__Host-campbooks_session` cookie and nothing else. `/bff/api/*` attaches the
+session's access token (refreshed just before it expires, once per session
+however many requests race) and runs the request through the API router in
+the same process; the API validates it like any client's token. Unsafe
+methods need the `X-Campbooks-CSRF` header and a same-origin request.
+`/bff/session` tells the client who is signed in; `/bff/logout` and the IdP's
+back-channel logout end sessions; `bff.prune_sessions` deletes ended ones.
+Settings are `CAMPBOOKS_BFF__*` (see `deploy/.env.example`).
 
 ## Domains and scaling
 

@@ -10,6 +10,8 @@ import { TransportError } from "./errors";
  *
  * - web:   same-origin `fetch` to the server's BFF (`/bff/api/v1/...`). The
  *          browser attaches the httpOnly session cookie; JS never sees a token.
+ *          Every request carries the BFF's CSRF header, and a `session_required`
+ *          answer sends the browser to sign in, coming back to the same page.
  * - tauri: the request is handed to the Rust `api_request` command, which
  *          attaches the token from the OS keychain (ADR 0004).
  */
@@ -22,25 +24,75 @@ export interface Transport {
 
 const BFF_PREFIX = "/bff";
 
+/**
+ * Header the BFF requires on unsafe requests (with a same-origin request),
+ * so a cross-site page cannot forge one. Sent on every request for simplicity.
+ */
+export const CSRF_HEADER = "X-Campbooks-CSRF";
+
+/** The BFF's problem `detail` when a request has no live session. */
+const SESSION_REQUIRED = "session_required";
+
+/** Where to start signing in, coming back to `returnTo` (a path on this site). */
+export function loginUrl(returnTo: string): string {
+  return `${BFF_PREFIX}/login?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+function currentPage(): string {
+  const { pathname, search, hash } = globalThis.location;
+  return pathname + search + hash;
+}
+
+async function isSessionRequired(response: Response): Promise<boolean> {
+  if (response.status !== 401) {
+    return false;
+  }
+  try {
+    const problem: unknown = await response.clone().json();
+    return (
+      typeof problem === "object" &&
+      problem !== null &&
+      "detail" in problem &&
+      problem.detail === SESSION_REQUIRED
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function createWebTransport(
   origin: string = globalThis.location.origin,
   send: (request: Request) => Promise<Response> = (request) => globalThis.fetch(request),
+  signIn: (url: string) => void = (url) => {
+    globalThis.location.assign(url);
+  },
 ): Transport {
   const baseUrl = origin + BFF_PREFIX;
+  // Parallel requests can all find the session gone; navigate once.
+  let signingIn = false;
   return {
     kind: "web",
     baseUrl,
-    fetch: (request) => {
+    fetch: async (request) => {
       const url = new URL(request.url);
       if (url.origin !== origin || !url.pathname.startsWith(`${BFF_PREFIX}/`)) {
-        return Promise.reject(new TransportError(`Refusing to send an API request to ${url.href}`));
+        throw new TransportError(`Refusing to send an API request to ${url.href}`);
       }
       // Defense in depth: credentials travel only as the BFF's httpOnly cookie.
       const headers = new Headers(request.headers);
       headers.delete("authorization");
-      return send(
+      headers.set(CSRF_HEADER, "1");
+      const response = await send(
         new Request(request, { headers, credentials: "same-origin", mode: "same-origin" }),
       );
+      // The session ended (or never began): sign in and come back here. A 401
+      // from the API itself (a token it refused) is left to the caller, so a
+      // misconfigured server cannot cause a sign-in loop.
+      if (!signingIn && (await isSessionRequired(response))) {
+        signingIn = true;
+        signIn(loginUrl(currentPage()));
+      }
+      return response;
     },
   };
 }

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Campbooks API",
-    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. Operations require an OAuth 2.1 bearer token with the scope they list (401 without a valid token, 403 without the scope) unless they are public.",
+    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. Operations require an OAuth 2.1 bearer token with the scope they list (401 without a valid token, 403 without the scope) unless they are public. The `/bff/*` operations serve the web app only: they authenticate with its session cookie instead of a token.",
     "license": {
       "name": "Sustainable Use License",
       "identifier": "LicenseRef-Sustainable-Use"
@@ -1209,6 +1209,687 @@
           "risk": "low"
         }
       }
+    },
+    "/bff/api/{path}": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Read from the API as the signed-in user.",
+        "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.api_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The API path after `/api/`, e.g. `v1/system/version`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "PUT to the API as the signed-in user.",
+        "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.api_put",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The API path after `/api/`, e.g. `v1/system/version`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "POST to the API as the signed-in user.",
+        "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.api_post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The API path after `/api/`, e.g. `v1/system/version`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "DELETE in the API as the signed-in user.",
+        "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.api_delete",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The API path after `/api/`, e.g. `v1/system/version`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      },
+      "patch": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "PATCH the API as the signed-in user.",
+        "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.api_patch",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The API path after `/api/`, e.g. `v1/system/version`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/bff/backchannel-logout": {
+      "post": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Back-channel logout (OIDC Back-Channel Logout 1.0).",
+        "description": "Called by the identity provider, not browsers, when a user's IdP session\nends: ends the web sessions the signed logout token names (by IdP session\nid, or every session of the user).",
+        "operationId": "bff.backchannel_logout",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/BackchannelLogout"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The sessions named by the token are ended."
+          },
+          "400": {
+            "description": "`invalid_logout_token`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider's keys are unavailable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/bff/callback": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Finish signing in.",
+        "description": "The identity provider redirects here. Checks that `state` names a sign-in\nthis browser started (single use), exchanges the code with the PKCE\nverifier, validates the ID token (issuer, audience, nonce, expiry,\nsignature), starts a session and sets the `SameSite=Strict` session\ncookie. Answers with a small same-origin page that moves on to\n`return_to`: a browser treats the whole redirect chain from the IdP as\ncross-site and would not send the new cookie on a plain redirect.",
+        "operationId": "bff.callback",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "description": "The authorization code.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "The `state` sent with the authorization request.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "iss",
+            "in": "query",
+            "description": "The issuer that answered (RFC 9207).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "An error code instead of a code.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed in; the page moves on to `return_to`.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "text/html": {}
+            }
+          },
+          "400": {
+            "description": "`invalid_state`, `login_failed`, `code_rejected` or `invalid_id_token`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unreachable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.login_transaction",
+            "bff.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/bff/login": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Start signing in.",
+        "description": "Creates a short-lived sign-in (state, nonce, PKCE verifier) bound to this\nbrowser by a `SameSite=Lax` login cookie, and redirects to the identity\nprovider's authorization endpoint.",
+        "operationId": "bff.login",
+        "parameters": [
+          {
+            "name": "return_to",
+            "in": "query",
+            "description": "Where to land after signing in: a path on this site (default `/`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Redirect to the identity provider.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_return_to`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unreachable.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.login_transaction"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/bff/logout": {
+      "post": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Sign out.",
+        "description": "Ends the session, revokes its refresh token at the identity provider and\nclears the cookie. Navigate to `logout_url` to end the identity\nprovider's session too.",
+        "operationId": "bff.logout",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed out (also when there was no session).",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogoutResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/bff/session": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "The current session.",
+        "description": "For the web app to bootstrap: whether someone is signed in, and who.\nNever returns a token.",
+        "operationId": "bff.session",
+        "responses": {
+          "200": {
+            "description": "The session, or `authenticated: false`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionInfo"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {},
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
+      }
     }
   },
   "components": {
@@ -1235,6 +1916,18 @@
           }
         },
         "additionalProperties": false
+      },
+      "BackchannelLogout": {
+        "type": "object",
+        "required": [
+          "logout_token"
+        ],
+        "properties": {
+          "logout_token": {
+            "type": "string",
+            "description": "The identity provider's signed logout token."
+          }
+        }
       },
       "ChangeRole": {
         "type": "object",
@@ -1396,6 +2089,19 @@
           "business",
           "personal"
         ]
+      },
+      "LogoutResponse": {
+        "type": "object",
+        "description": "Where to send the browser to sign out of the identity provider too.",
+        "properties": {
+          "logout_url": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The identity provider's end-session URL (RP-initiated logout), which\ncomes back to the app's root; `null` when it has none."
+          }
+        }
       },
       "MemberList": {
         "type": "object",
@@ -1563,6 +2269,65 @@
           }
         }
       },
+      "SessionInfo": {
+        "type": "object",
+        "description": "Who is signed in. Never contains a token.",
+        "required": [
+          "authenticated"
+        ],
+        "properties": {
+          "authenticated": {
+            "type": "boolean",
+            "description": "Whether the request carries a live session."
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the session ends at the latest (it ends sooner if left unused)."
+          },
+          "user": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/SessionUser",
+                "description": "The signed-in user, when authenticated."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "SessionUser": {
+        "type": "object",
+        "description": "The signed-in user, as the identity provider describes them.",
+        "required": [
+          "sub"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Email address."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Display name."
+          },
+          "sub": {
+            "type": "string",
+            "description": "Stable user id at the identity provider."
+          }
+        }
+      },
       "UpdateWorkspace": {
         "type": "object",
         "description": "The settings to change; absent fields stay as they are.",
@@ -1708,6 +2473,12 @@
         "scheme": "bearer",
         "bearerFormat": "JWT",
         "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+      },
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-campbooks_session",
+        "description": "The web app's session cookie, set by `/bff/callback` (`HttpOnly`, `Secure`, `SameSite=Strict`; named `campbooks_session` when the instance's public URL is plain http). Unsafe methods also need the `X-Campbooks-CSRF: 1` header and a same-origin request."
       }
     }
   },
@@ -1719,6 +2490,10 @@
     {
       "name": "workspaces",
       "description": "Workspaces, members and roles, invitations and the security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a caller who is not a member (or a client token bound to another workspace) gets 404."
+    },
+    {
+      "name": "bff",
+      "description": "The web app's backend-for-frontend: sign-in, the session cookie and same-origin API access. Browsers only; other clients call `/api/*` with their own OAuth token."
     }
   ]
 }

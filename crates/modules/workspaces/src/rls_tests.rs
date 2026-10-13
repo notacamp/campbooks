@@ -2,7 +2,7 @@
 //! sees only the rows of the workspace it sets, whatever its query says.
 
 use campbooks_kernel::{
-    db::{self, BeginFor as _},
+    db::{self, BeginFor as _, RoleVerdict},
     tenancy::WorkspaceId,
     testing,
 };
@@ -116,10 +116,101 @@ async fn a_user_transaction_sees_only_their_own_memberships(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_runtime_role_does_not_bypass_row_security(db: PgPool) {
-    assert!(
-        db::bypasses_row_security(&db).await.unwrap(),
-        "the test owner is a superuser"
-    );
+    let owner = db::inspect_role(&db).await.unwrap();
+    assert!(owner.bypasses_row_security, "the test owner is a superuser");
     let app = testing::app_role_pool(&db).await;
-    assert!(!db::bypasses_row_security(&app).await.unwrap());
+    assert!(!db::inspect_role(&app).await.unwrap().bypasses_row_security);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_dedicated_runtime_login_is_sound_and_set_role_is_escapable(db: PgPool) {
+    let owner = db::inspect_role(&db).await.unwrap();
+    assert!(matches!(owner.verdict(false), RoleVerdict::Unsafe(_)));
+    assert!(matches!(owner.verdict(true), RoleVerdict::Unsafe(_)));
+
+    // The single-URL setup: a superuser login that switches role.
+    let switched = db::inspect_role(&testing::app_role_pool(&db).await)
+        .await
+        .unwrap();
+    assert!(matches!(switched.verdict(false), RoleVerdict::Escapable(_)));
+    assert!(matches!(switched.verdict(true), RoleVerdict::Unsafe(_)));
+
+    let login = testing::runtime_login_pool(&db).await;
+    let report = db::inspect_role(&login).await.unwrap();
+    assert_eq!(report.verdict(true), RoleVerdict::Sound);
+    assert_eq!(report.verdict(false), RoleVerdict::Sound);
+    assert_eq!(report.user, report.login, "no SET ROLE involved");
+    login.close().await;
+    testing::drop_runtime_login(&db).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_role_that_owns_policy_tables_is_unsafe(db: PgPool) {
+    let name = testing::create_login(&db).await;
+    sqlx::query(sqlx::AssertSqlSafe(format!(
+        "ALTER TABLE workspaces.members OWNER TO {name}"
+    )))
+    .execute(&db)
+    .await
+    .unwrap();
+    let pool = testing::login_pool(&db, &name).await;
+    let report = db::inspect_role(&pool).await.unwrap();
+    assert!(report.owns_policy_tables && !report.bypasses_row_security);
+    assert!(matches!(report.verdict(true), RoleVerdict::Unsafe(_)));
+    pool.close().await;
+    // Hand the table back so the role can go.
+    sqlx::query("ALTER TABLE workspaces.members OWNER TO CURRENT_USER")
+        .execute(&db)
+        .await
+        .unwrap();
+    testing::drop_runtime_login(&db).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_runtime_login_cannot_escape_row_security(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let a = kit.create_workspace(&kit.user("ana"), "A").await;
+    let b = kit.create_workspace(&kit.user("bea"), "B").await;
+    let login = testing::runtime_login_pool(&kit.db).await;
+
+    // No way to become a privileged role, nor back to one.
+    let mut conn = login.acquire().await.unwrap();
+    let superuser = sqlx::query_scalar!(
+        r#"SELECT rolname::text AS "name!" FROM pg_roles WHERE rolsuper AND rolcanlogin LIMIT 1"#
+    )
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    let denied = sqlx::query(sqlx::AssertSqlSafe(format!("SET ROLE \"{superuser}\"")))
+        .execute(&mut *conn)
+        .await;
+    assert!(denied.is_err(), "SET ROLE to a superuser must be refused");
+    sqlx::query("RESET ROLE").execute(&mut *conn).await.unwrap();
+    let still = sqlx::query_scalar!(r#"SELECT current_user::text AS "u!""#)
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert!(!still.is_empty() && still != superuser);
+    drop(conn);
+
+    // And it sees only the workspace it works in, however it asks.
+    let mut tx = login.begin_for(b).await.unwrap();
+    assert_eq!(visible(&mut tx).await.0, [b]);
+    let a_members = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM workspaces.members WHERE workspace_id = $1"#,
+        a as WorkspaceId
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    assert_eq!(a_members, 0);
+    // It cannot change the policies either: it owns nothing.
+    let alter = sqlx::query("ALTER TABLE workspaces.members DISABLE ROW LEVEL SECURITY")
+        .execute(&mut *tx)
+        .await;
+    assert!(alter.is_err());
+    tx.rollback().await.unwrap();
+
+    login.close().await;
+    testing::drop_runtime_login(&kit.db).await;
 }
