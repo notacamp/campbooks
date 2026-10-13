@@ -76,6 +76,7 @@ const ICONS = {
   ],
   mail: [<rect key="r" x="3.5" y="5.5" width="17" height="13" rx="2" />, path("m4 7 8 6 8-6")],
   "chevron-right": [path("m9 6 6 6-6 6")],
+  close: [path("M6 6l12 12M18 6 6 18")],
   "chevron-up-down": [path("m8 9.5 4-4 4 4M8 14.5l4 4 4-4")],
 } satisfies Record<string, ReactElement[]>;
 

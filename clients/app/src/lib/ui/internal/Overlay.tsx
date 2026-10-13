@@ -65,9 +65,7 @@ export function Overlay({ open, onClose, label, children }: OverlayProps) {
         role="dialog"
         aria-modal="true"
         aria-label={label}
-        // Focusable so keyboard users can scroll a long dialog (the shortcut
-        // sheet) even when it holds no control.
-        tabIndex={0}
+        tabIndex={-1}
       >
         {children}
       </div>
