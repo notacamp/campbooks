@@ -1,5 +1,7 @@
 # laya-serve: the `decide` role's default model server (ADR 0009). Optional,
 # used by the compose `ai` profile; Campbooks itself does not need it.
+# Published by the release pipeline as ghcr.io/notacamp/campbooks-laya, with
+# the same tags as the server image (.github/workflows/image.yml).
 #
 #   docker build -t campbooks-laya deploy/laya
 #
@@ -29,6 +31,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     LAYA_MODELS=multilingual \
     # Download the checkpoint commit the laya package lists as reviewed.
     LAYA_REVISION=reviewed
+
+# Debian security fixes released after the base image was built (the release
+# pipeline's Trivy gate fails on fixable HIGH/CRITICAL findings).
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --gid 10001 laya \
     && useradd --uid 10001 --gid laya --no-create-home --shell /usr/sbin/nologin laya \

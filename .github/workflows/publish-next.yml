@@ -6,6 +6,10 @@ name: Publish next
 #   ghcr.io/notacamp/campbooks:next and :next-<sha> → Trivy → dispatch
 #   `campbooks-next-staging` to the private cloud repo, which pulls the tag.
 #
+# The Laya model server (the `decide` role, deploy/laya) is published next to
+# it as ghcr.io/notacamp/campbooks-laya with the same tags, so a deploy pins
+# both images with one tag. The dispatch waits for both.
+#
 # Tags stay in the `next*` namespace until cutover so they never collide with
 # the Rails releases (`X.Y.Z`, `latest`) published from `main`. The build,
 # scan and attestation live in `image.yml`; versioned releases of next are
@@ -63,8 +67,24 @@ jobs:
       id-token: write
       attestations: write
 
+  laya-image:
+    needs: plan
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ needs.plan.outputs.ref }}
+      image: campbooks-laya
+      context: deploy/laya
+      tags: |
+        ${{ needs.plan.outputs.sha_tag }}
+        next
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
   deploy-staging:
-    needs: [plan, image]
+    needs: [plan, image, laya-image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

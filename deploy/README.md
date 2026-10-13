@@ -103,7 +103,7 @@ isolation then rests on the queries alone.
 
 | Service | Role | Model | Notes |
 | --- | --- | --- | --- |
-| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | Built from `deploy/laya`; ~680 MB download on first start; about 2 GB of RAM |
+| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | `ghcr.io/notacamp/campbooks-laya`; ~680 MB download on first start; about 2 GB of RAM |
 | `ollama` | `complete` (and `vision`) | `qwen3:8b` | Pull models with `docker compose exec ollama ollama pull …` |
 | `embeddings` | `embed` | `BAAI/bge-m3` | linux/amd64 only; on arm64 use Ollama's `bge-m3` |
 
@@ -118,13 +118,17 @@ recent laptop).
   key, so the `laya` service refuses to start until `CAMPBOOKS_AI__DECIDE__API_KEY` is
   set in `.env`. The server sends the same value. The service has no published port:
   only containers on the compose network reach it.
-- **The image.** There is no official image, so compose builds one from
-  `deploy/laya/Dockerfile`: Python slim, CPU-only PyTorch, `laya[serve]` and its
-  libraries at pinned versions, running as a non-root user. On first start it
-  downloads the multilingual checkpoint (at the commit the `laya` package lists as
-  reviewed) into the `laya-models` volume; later starts load it from there. Build it
-  again after an upgrade with `docker compose --profile ai build laya`. The image is
-  optional and is not scanned by the release pipeline (only the Campbooks image is).
+- **The image.** Laya has no official image, so the release pipeline publishes one
+  next to the Campbooks image: `ghcr.io/notacamp/campbooks-laya`, built from
+  `deploy/laya/Dockerfile` for linux/amd64 and linux/arm64, scanned and attested
+  like the server image and published under the same tags (`next`, `next-<sha>`,
+  `next-vX.Y.Z`), so pin both to the same tag. It is Python slim, CPU-only
+  PyTorch, `laya[serve]` and its libraries at pinned versions, running as a
+  non-root user. The checkpoint is not in the image: on first start it downloads
+  the multilingual checkpoint (at the commit the `laya` package lists as reviewed)
+  into the `laya-models` volume; later starts load it from there. To build the
+  image yourself, swap `image:` for the commented `build: ./laya` line in
+  `compose.yaml` and run `docker compose --profile ai build laya`.
 - **CPU threads.** Inference uses every core by default; set `LAYA_THREADS` on the
   `laya` service to cap it.
 - **Another model.** `CAMPBOOKS_AI__DECIDE__MODEL` also accepts
