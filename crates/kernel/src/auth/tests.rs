@@ -712,7 +712,11 @@ async fn id_token_must_be_current_and_name_a_subject() {
     );
 
     let unpublished = idp.unpublished_token(&idp.id_token_claims("user-1", nonce(), "s"));
-    invalid(&verifier.verify_id_token(&unpublished, CLIENT, nonce()).await);
+    invalid(
+        &verifier
+            .verify_id_token(&unpublished, CLIENT, nonce())
+            .await,
+    );
 }
 
 #[tokio::test]

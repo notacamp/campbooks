@@ -954,9 +954,11 @@ async fn backchannel_logout_refuses_bad_tokens(db: PgPool) {
     let h = harness(db).await;
     let mut browser = Browser::new(&h.app);
     browser.sign_in(&h.idp, "/").await;
-    let id_token = h
-        .idp
-        .id_token(&h.idp.id_token_claims("test-user", &random_token(), "test-sid-1"));
+    let id_token = h.idp.id_token(&h.idp.id_token_claims(
+        "test-user",
+        &super::crypto::random_token(),
+        "test-sid-1",
+    ));
     let unsigned = h
         .idp
         .unpublished_token(&h.idp.logout_token_claims(Some("test-user"), None));
