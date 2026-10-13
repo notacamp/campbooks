@@ -75,7 +75,9 @@ None.
 
 - Real screens wired to the API: the Home and Inbox patterns are stories with
   fictional demo data; the mail, schedule and money modules build them later.
-- Declared actions (ADR 0008) registering their shortcuts: the registry is
+- Shortcuts for server operations: the registry accepts ids that are OpenAPI
+  operationIds (ADR 0013); module screens define them when they land. The
+  registry is
   shaped for it, the declarations come with those modules.
 - User-editable key bindings and a workspace accent picker UI.
 - Swipe gestures on touch screens (the swiped row is shown, not gestured).

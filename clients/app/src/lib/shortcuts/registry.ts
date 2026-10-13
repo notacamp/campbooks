@@ -14,9 +14,11 @@ export type ShortcutGroup = "navigation" | "general" | "list" | "item" | "compos
 
 export interface ShortcutDefinition {
   /**
-   * The action this shortcut runs. Declared actions (ADR 0008) register with
-   * their action name, so one id names the action everywhere: the shortcut,
-   * the command menu, and later the API, MCP and assistant tools.
+   * What this shortcut runs (ADR 0013). For a server operation, its OpenAPI
+   * `operationId` (`<module>.<verb>[_<noun>]`, e.g. `conversations.archive`);
+   * for a client-only command, an id whose prefix is not a module name
+   * (`nav.inbox`, `item.done`). Keys and labels are the client's concern:
+   * the server never declares them.
    */
   id: string;
   /** Default binding (see keys.ts for the grammar). */

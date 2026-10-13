@@ -3,7 +3,8 @@ import type { ShortcutDefinition } from "./registry";
 /**
  * The default shortcuts, declared once. Screens bind handlers to these ids
  * with `useShortcut`; hints, the `?` sheet and the ⌘K menu read the keys from
- * here. Declared actions (ADR 0008) will add their own definitions through
+ * here. These are client-only commands; screens that call a server
+ * operation add shortcuts keyed by its OpenAPI operationId (ADR 0013) through
  * `ShortcutRegistry.define`, and the conflict check covers them too.
  */
 export const DEFAULT_SHORTCUTS = [

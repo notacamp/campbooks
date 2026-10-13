@@ -133,9 +133,23 @@ handler, plus the screen's own commands.
 
 The defaults are in `lib/shortcuts/catalog.ts`: G then H/I/S/T/D/M to go
 places, J/K/↵ in lists, R/E/L/H/P/1/2 on the selected item, ⌘J/⌘↵ while
-writing, ⌘K, Z (undo), ⌘⇧W (switch workspace), ? and Esc. Declared actions
-(ADR 0008) will register their defaults with `registry.define([...])` using
-their action name as the id.
+writing, ⌘K, Z (undo), ⌘⇧W (switch workspace), ? and Esc.
+
+**Ids (ADR 0013).** The registry is entirely client-side: the server never
+declares keys or labels. A shortcut's id is either
+
+- the **OpenAPI `operationId`** of the server operation it runs,
+  `<module>.<verb>[_<noun>]` (e.g. `conversations.archive` → `e`), so one id
+  names the operation in the API, the command menu and the hint; or
+- a **client-only command id** for things that are not server operations
+  (`nav.inbox` → `g i`, `item.done`, `undo`). Its prefix must not be a module
+  name, so the two kinds never collide (`registry.test.ts` checks the
+  defaults against the modules in `docs/domain-map.md`).
+
+A module's screen defines its operation shortcuts with
+`registry.define([...])` (with labels in its own i18n namespace) and binds
+them with `useShortcut`. Nothing waits for, or reads, a server-side
+declarations file.
 
 ## Storybook
 

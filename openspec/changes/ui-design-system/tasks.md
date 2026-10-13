@@ -37,5 +37,5 @@
 ## 6. Follow-ups (not in this change)
 
 - [ ] 6.1 Scheduled, advisory visual regression run over the pattern stories
-- [ ] 6.2 Declared actions (ADR 0008) register their default shortcuts through `ShortcutRegistry.define`
+- [ ] 6.2 Module screens define shortcuts for their server operations, keyed by OpenAPI operationId (ADR 0013), through `ShortcutRegistry.define`
 - [ ] 6.3 Workspace accent picker and user-editable bindings

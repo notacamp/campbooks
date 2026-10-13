@@ -20,6 +20,43 @@ describe("the default shortcuts", () => {
     expect(findConflicts(DEFAULT_SHORTCUTS)).toEqual([]);
   });
 
+  it("are client-only commands, outside the operationId namespace (ADR 0013)", () => {
+    // Module names from docs/domain-map.md: an id starting with one of these
+    // is reserved for that module's OpenAPI operationIds.
+    const modules = new Set([
+      "system",
+      "workspaces",
+      "connectors",
+      "conversations",
+      "parties",
+      "attention",
+      "search",
+      "notifications",
+      "schedule",
+      "tasks",
+      "automation",
+      "documents",
+      "money",
+      "assistant",
+      "records",
+      "views",
+    ]);
+    const clashing = DEFAULT_SHORTCUTS.filter((definition) =>
+      modules.has(definition.id.split(".", 1)[0] ?? ""),
+    );
+
+    expect(clashing).toEqual([]);
+  });
+
+  it("accept a server operation keyed by its operationId", () => {
+    const registry = new ShortcutRegistry(DEFAULT_SHORTCUTS);
+
+    expect(() => {
+      registry.define([define("conversations.archive", "a", "item")]);
+    }).not.toThrow();
+    expect(registry.get("conversations.archive")?.keys).toBe("a");
+  });
+
   it("have unique ids and namespaced labels", () => {
     const ids = DEFAULT_SHORTCUTS.map((definition) => definition.id);
 

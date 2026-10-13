@@ -80,7 +80,10 @@ ignores text fields unless `allowInInputs`, and maps `mod` to ⌘ on Apple
 platforms and Ctrl elsewhere. Labels are namespaced i18n keys
 (`shortcuts:nav.inbox`) so modules can register their own; `KbdHint`,
 `aria-keyshortcuts`, the sheet and the menu all format from the registry.
-Ids are action names, so ADR 0008 declarations can later call `define()`.
+Ids follow ADR 0013: a server operation's shortcut is keyed by its OpenAPI
+`operationId` (`conversations.archive`), a client-only command by an id whose
+prefix is not a module name (`nav.inbox`). The registry stays client-side;
+the server declares no keys.
 
 The prototype's Inbox hinted 1–5 on the streams while the same screen offers
 1/2 for a low-confidence choice; the conflict check rejects that pairing, so
