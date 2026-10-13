@@ -1,0 +1,159 @@
+{
+  "kind": {
+    "business": "Professionnel",
+    "personal": "Personnel"
+  },
+  "role": {
+    "owner": "Propriétaire",
+    "admin": "Administrateur",
+    "member": "Membre"
+  },
+  "shortcuts": {
+    "create": "Créer un espace de travail",
+    "invite": "Inviter quelqu’un",
+    "copyLink": "Copier le lien d’invitation"
+  },
+  "create": {
+    "step": "Étape {{step}} sur {{total}}",
+    "defaultName": "Mon espace de travail",
+    "continue": "Continuer",
+    "skip": "Passer",
+    "back": "Retour",
+    "cancel": "Annuler",
+    "signOut": "Se déconnecter",
+    "required": "Campbooks a besoin d’un espace de travail pour ranger vos e-mails, vos contacts et vos documents. Tout le reste peut attendre.",
+    "name": {
+      "title": "Comment appeler votre espace de travail ?",
+      "titleAnother": "Comment appeler le nouvel espace de travail ?",
+      "lead": "Le nom de votre entreprise convient bien, ou quelque chose comme « Maison » pour les affaires personnelles.",
+      "label": "Nom de l’espace de travail",
+      "placeholder": "Duarte & Pessoa",
+      "skipHint": "Si vous passez, il s’appellera « {{name}} ».",
+      "tooLong": "Utilisez 100 caractères au maximum."
+    },
+    "kind": {
+      "title": "À quoi sert-il ?",
+      "lead": "Cela choisit sa couleur, pour distinguer vos espaces de travail d’un coup d’œil. Si vous passez, ce sera un espace professionnel.",
+      "label": "À quoi sert l’espace de travail",
+      "business": "Clients, fournisseurs, factures et une équipe.",
+      "personal": "Votre foyer, vos factures et vos rendez-vous.",
+      "submit": "Créer l’espace de travail",
+      "creating": "Création…"
+    },
+    "done": {
+      "title": "{{name}} est prêt",
+      "lead": "Rien n’a encore besoin de vous. Invitez les personnes avec qui vous travaillez, ou faites le tour.",
+      "open": "Ouvrir {{name}}",
+      "invite": "Inviter des personnes"
+    },
+    "code": {
+      "title": "Avez-vous un code d’inscription ?",
+      "lead": "Ce Campbooks demande un code avant que quelqu’un crée son premier espace de travail. La personne qui le gère peut vous en donner un.",
+      "label": "Code d’inscription",
+      "invalid": "Ce code n’a pas fonctionné. Vérifiez-le et réessayez.",
+      "submit": "Créer l’espace de travail"
+    },
+    "inviteOnly": {
+      "title": "Il vous faut une invitation",
+      "lead": "Ce Campbooks n’accepte que des personnes invitées. Demandez à quelqu’un qui l’utilise de vous inviter, puis ouvrez le lien qu’on vous donnera."
+    },
+    "approval": {
+      "title": "Votre demande est en attente",
+      "lead": "La personne qui gère ce Campbooks approuve les nouveaux comptes. Elle a votre demande ; revenez vérifier plus tard.",
+      "retry": "Vérifier à nouveau"
+    },
+    "failed": {
+      "title": "Impossible de créer l’espace de travail",
+      "lead": "Campbooks n’a pas répondu. Rien n’a été créé.",
+      "retry": "Réessayer"
+    }
+  },
+  "members": {
+    "title": "Membres",
+    "lead": "Toutes les personnes de {{workspace}} et ce qu’elles peuvent faire.",
+    "list": "Membres de {{workspace}}",
+    "you": "Vous",
+    "joined": "Arrivé le {{date}}",
+    "roleOf": "Rôle de {{name}}",
+    "remove": "Retirer",
+    "removeLabel": "Retirer {{name}}",
+    "confirmRemove": "Retirer {{name}} de {{workspace}} ? Son accès s’arrête tout de suite. Pour le faire revenir, invitez-le à nouveau.",
+    "cancel": "Annuler",
+    "roleChanged": "{{name}} : {{role}}",
+    "readOnly": "Seuls les propriétaires et les administrateurs peuvent inviter des personnes ou changer les rôles.",
+    "loading": "Chargement des membres",
+    "errors": {
+      "lastOwner": "Un espace de travail a besoin d’au moins un propriétaire. Nommez d’abord quelqu’un d’autre propriétaire.",
+      "forbidden": "Seuls les propriétaires peuvent modifier ou retirer un propriétaire.",
+      "generic": "Cela n’a pas fonctionné et rien n’a changé. Réessayez."
+    },
+    "loadError": {
+      "title": "Impossible de charger les membres",
+      "lead": "Campbooks n’a pas répondu. Rien n’a été perdu.",
+      "retry": "Réessayer"
+    }
+  },
+  "invite": {
+    "title": "Inviter quelqu’un",
+    "lead": "Une invitation dure 7 jours et ne fonctionne que pour l’adresse que vous invitez.",
+    "email": "E-mail",
+    "placeholder": "nom@example.com",
+    "role": "Rôle",
+    "submit": "Inviter",
+    "sending": "Invitation…",
+    "sent": "{{email}} est invité comme {{role}}.",
+    "errors": {
+      "email": "Saisissez une adresse e-mail complète, comme nom@example.com.",
+      "alreadyMember": "{{email}} est déjà membre.",
+      "generic": "L’invitation n’a pas été créée. Réessayez."
+    },
+    "pending": "Invitations en attente",
+    "none": "Aucune invitation en attente.",
+    "expires": "{{role}} · expire le {{date}}",
+    "expired": "{{role}} · expirée le {{date}}",
+    "resend": "Inviter à nouveau",
+    "resendLabel": "Inviter {{email}} à nouveau",
+    "loadError": "Impossible de charger les invitations en attente.",
+    "passOn": "Campbooks n’envoie pas encore les invitations par e-mail. Copiez ce lien et envoyez-le vous-même.",
+    "linkLabel": "Lien d’invitation pour {{email}}",
+    "copy": "Copier le lien",
+    "copied": "Lien copié. Collez-le dans un message à {{email}}.",
+    "copyFailed": "Impossible de copier. Sélectionnez le lien et copiez-le.",
+    "onceOnly": "Ce lien n’est affiché que maintenant. Si vous le perdez, invitez à nouveau la personne pour en obtenir un nouveau."
+  },
+  "accept": {
+    "joining": "Vous rejoignez l’espace de travail…",
+    "joined": {
+      "title": "Vous avez rejoint {{name}}",
+      "lead": "Vous l’avez rejoint en tant que {{role}}.",
+      "open": "Ouvrir {{name}}"
+    },
+    "home": "Aller à mes espaces de travail",
+    "signOut": "Se déconnecter",
+    "retry": "Réessayer",
+    "used": {
+      "title": "Cette invitation a déjà été utilisée",
+      "lead": "Si c’est vous qui l’avez acceptée, l’espace de travail est déjà dans votre liste."
+    },
+    "expired": {
+      "title": "Cette invitation a expiré",
+      "lead": "Demandez à la personne qui vous a invité de vous inviter à nouveau."
+    },
+    "alreadyMember": {
+      "title": "Vous êtes déjà membre",
+      "lead": "Cet espace de travail est déjà dans votre liste."
+    },
+    "mismatch": {
+      "title": "Cette invitation est pour une autre adresse e-mail",
+      "lead": "Vous êtes connecté en tant que {{email}}. Déconnectez-vous, puis connectez-vous avec l’adresse à laquelle l’invitation a été envoyée."
+    },
+    "notFound": {
+      "title": "Ce lien d’invitation ne fonctionne pas",
+      "lead": "Vérifiez que vous avez copié le lien en entier, ou demandez une nouvelle invitation."
+    },
+    "failed": {
+      "title": "Impossible d’accepter l’invitation",
+      "lead": "Campbooks n’a pas répondu. Rien n’a changé."
+    }
+  }
+}

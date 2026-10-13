@@ -11,6 +11,9 @@ export default mergeConfig(
       include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
       exclude: ["test/fixtures/**"],
       restoreMocks: true,
+      // Above Testing Library's async timeout (test/setup.ts): screens load
+      // their i18n namespaces lazily on first render.
+      testTimeout: 15_000,
       // Process CSS so component class names are real and token files can be
       // read with `?raw` (tokens.test.ts).
       css: true,

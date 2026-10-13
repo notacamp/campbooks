@@ -8,6 +8,7 @@ import { Segmented } from "../Segmented/Segmented";
 import { Heading } from "../Typography/Typography";
 
 import {
+  AccountButton,
   ListPane,
   PaneHeader,
   ReaderPane,
@@ -15,8 +16,10 @@ import {
   Shell,
   Sidebar,
   SidebarFooter,
+  PhoneHeader,
   Spacer,
   StatusLine,
+  WorkspaceMark,
   WorkspaceSwitcher,
 } from "./Shell";
 
@@ -113,5 +116,49 @@ export const Statuses: Story = {
         Mail still arrives in the Inbox, unsorted. Nothing is read by AI.
       </StatusLine>
     </div>
+  ),
+};
+
+/** Who is signed in: the sidebar's account button and the phone's avatar. */
+export const Account: Story = {
+  args: { children: null },
+  render: () => (
+    <div className="flex w-sidebar flex-col gap-2">
+      <AccountButton name="Ana Duarte" email="ana@example.com" onClick={fn()} />
+      <AccountButton compact label="Account" name="Ana Duarte" onClick={fn()} />
+    </div>
+  ),
+};
+
+/** Each workspace's mark carries its own accent. */
+export const Marks: Story = {
+  args: { children: null },
+  render: () => (
+    <div className="flex gap-2">
+      <WorkspaceMark mark="DP" accent="business" />
+      <WorkspaceMark mark="HO" accent="personal" />
+      <WorkspaceMark mark="QV" accent="forest" />
+      <WorkspaceMark mark="HO" accent="personal" size="lg" />
+    </div>
+  ),
+};
+
+/** Below 48rem the sidebar gives way to this header (view it at a phone width). */
+export const Phone: Story = {
+  args: { children: null },
+  render: () => (
+    <Shell>
+      <PhoneHeader>
+        <WorkspaceSwitcher
+          compact
+          mark="DP"
+          name="Duarte & Pessoa"
+          kind="Business"
+          onClick={fn()}
+        />
+        <Spacer />
+        <AccountButton compact label="Account" name="Ana Duarte" onClick={fn()} />
+      </PhoneHeader>
+    </Shell>
   ),
 };

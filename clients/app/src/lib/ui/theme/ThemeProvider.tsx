@@ -45,7 +45,7 @@ const systemIsDark = () => darkQuery()?.matches ?? false;
 export interface ThemeProviderProps {
   children: ReactNode;
   /** The open workspace; its accent is remembered separately. */
-  workspaceId?: string;
+  workspaceId?: string | undefined;
   /** The element that carries the data attributes. Defaults to <html>. */
   target?: HTMLElement;
 }

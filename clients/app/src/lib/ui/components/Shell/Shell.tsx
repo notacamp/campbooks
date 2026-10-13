@@ -1,8 +1,12 @@
-import type { ReactNode } from "react";
+import type { ComponentPropsWithRef, ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { ariaKeyShortcut, useShortcutDefinition, useShortcuts } from "~/lib/shortcuts";
 
+import { cx } from "../../internal/cx";
+import type { Accent } from "../../tokens/tokens";
+import { Avatar } from "../Avatar/Avatar";
+import { Icon } from "../Icon/Icon";
 import { KbdHint } from "../Kbd/Kbd";
 import { Visor, type VisorState } from "../Visor/Visor";
 
@@ -148,4 +152,71 @@ export function PaneHeader({ children }: { children: ReactNode }) {
 /** Fills the free space in a row (pushes what follows to the end). */
 export function Spacer() {
   return <span className={styles["spacer"]} />;
+}
+
+/** The phone's top bar (below 48rem only): the workspace and the account. */
+export function PhoneHeader({ children }: { children: ReactNode }) {
+  return <header className={styles["phoneHeader"]}>{children}</header>;
+}
+
+export interface AccountButtonProps extends Omit<ComponentPropsWithRef<"button">, "children"> {
+  /** The signed-in person's name (falls back to the email). */
+  name: string;
+  email?: string | undefined;
+  /** Just the avatar (phone header); the name becomes its label. */
+  compact?: boolean | undefined;
+  /** Accessible name of the compact button ("Account"). */
+  label?: string | undefined;
+}
+
+/** Who is signed in, as the button that opens the account menu. */
+export function AccountButton({
+  name,
+  email,
+  compact = false,
+  label,
+  className,
+  type = "button",
+  ...rest
+}: AccountButtonProps) {
+  return (
+    <button
+      {...rest}
+      type={type}
+      className={cx(styles["account"], className)}
+      data-compact={compact || undefined}
+      aria-label={compact ? (label ?? name) : undefined}
+    >
+      <Avatar name={name} size={compact ? "md" : "sm"} />
+      {compact ? null : (
+        <>
+          <span className={styles["accountText"]}>
+            <span className={styles["accountName"]}>{name}</span>
+            {email === undefined || email === name ? null : (
+              <span className={styles["accountEmail"]}>{email}</span>
+            )}
+          </span>
+          <Icon name="chevron-up-down" />
+        </>
+      )}
+    </button>
+  );
+}
+
+/** A workspace's colour mark with its initials, in that workspace's accent. */
+export function WorkspaceMark({
+  mark,
+  accent,
+  size = "md",
+}: {
+  mark: string;
+  /** The workspace's accent preset; defaults to the accent in effect. */
+  accent?: Accent | undefined;
+  size?: "md" | "lg" | undefined;
+}) {
+  return (
+    <span className={styles["mark"]} data-accent={accent} data-size={size} aria-hidden="true">
+      {mark}
+    </span>
+  );
 }

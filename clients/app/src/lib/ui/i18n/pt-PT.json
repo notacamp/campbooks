@@ -33,7 +33,8 @@
   },
   "workspace": {
     "switch": "Mudar de espaço de trabalho",
-    "current": "Mudar de espaço de trabalho (atual: {{name}})"
+    "current": "Mudar de espaço de trabalho (atual: {{name}})",
+    "create": "Criar um espaço de trabalho"
   },
   "visor": {
     "idle": "Campbooks",

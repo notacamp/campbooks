@@ -30,10 +30,11 @@
    in the `blobs-data` volume by default. See "Blob storage" below to use an
    S3-compatible bucket instead.
 9. Workspaces: the first person to sign in creates the first workspace and
-   invites the others (`POST /api/v1/w/{id}/invitations`; screens come later).
-   Who else may create a workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by
-   default; `invite_only`, `approval`, `code`). Invitations are not emailed
-   yet: with `CAMPBOOKS_ENV=development` the server logs the link. The new
+   invites the others from Settings → Members. Who else may create a
+   workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by default; `invite_only`,
+   `approval`, `code`). Invitations are not emailed yet: the inviter gets the
+   link once, right after inviting, to send on; it is built from
+   `CAMPBOOKS_PUBLIC_URL`, so set that to the address people use. The new
    `workspaces:*` scopes are registered by `idp-provision` on the next `up`;
    sign-in clients provisioned before this release keep their old scope list
    until you add the scopes to them in the IdP admin UI (or re-provision them,

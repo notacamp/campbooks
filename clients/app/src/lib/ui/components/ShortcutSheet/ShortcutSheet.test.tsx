@@ -44,4 +44,13 @@ describe("ShortcutSheet", () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(screen.getByRole("button", { name: "outside" })).not.toHaveFocus();
   });
+
+  it("closes from its close button", () => {
+    const onClose = vi.fn();
+    renderUi(<ShortcutSheet open onClose={onClose} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+
+    expect(onClose).toHaveBeenCalledOnce();
+  });
 });

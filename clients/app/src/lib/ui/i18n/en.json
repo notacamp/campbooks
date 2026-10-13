@@ -33,7 +33,8 @@
   },
   "workspace": {
     "switch": "Switch workspace",
-    "current": "Switch workspace (current: {{name}})"
+    "current": "Switch workspace (current: {{name}})",
+    "create": "Create a workspace"
   },
   "visor": {
     "idle": "Campbooks",

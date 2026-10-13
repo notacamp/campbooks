@@ -3,10 +3,11 @@ import { RouterProvider } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { I18nextProvider } from "react-i18next";
 
-import { ShortcutProvider } from "~/lib/shortcuts";
-import { ThemeProvider, UndoProvider } from "~/lib/ui";
+import { DEFAULT_SHORTCUTS, ShortcutProvider, ShortcutRegistry } from "~/lib/shortcuts";
+import { UndoProvider } from "~/lib/ui";
 
 import { i18n } from "./i18n";
+import { MODULE_SHORTCUTS } from "./modules";
 import { createAppRouter } from "./router";
 
 const queryClient = new QueryClient({
@@ -21,19 +22,21 @@ const queryClient = new QueryClient({
 
 const router = createAppRouter(queryClient);
 
+// One registry for the app: the defaults plus every module's operation
+// shortcuts, conflict-checked once at startup.
+const shortcuts = new ShortcutRegistry([...DEFAULT_SHORTCUTS, ...MODULE_SHORTCUTS]);
+
 export function App() {
   return (
     <StrictMode>
       <I18nextProvider i18n={i18n}>
-        <ThemeProvider>
-          <ShortcutProvider>
-            <UndoProvider>
-              <QueryClientProvider client={queryClient}>
-                <RouterProvider router={router} />
-              </QueryClientProvider>
-            </UndoProvider>
-          </ShortcutProvider>
-        </ThemeProvider>
+        <ShortcutProvider registry={shortcuts}>
+          <UndoProvider>
+            <QueryClientProvider client={queryClient}>
+              <RouterProvider router={router} />
+            </QueryClientProvider>
+          </UndoProvider>
+        </ShortcutProvider>
       </I18nextProvider>
     </StrictMode>
   );

@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { renderUi } from "../../../../../test/render";
 
 import {
+  AccountButton,
   ListPane,
   PaneHeader,
   ReaderBody,
@@ -12,8 +13,10 @@ import {
   Shell,
   Sidebar,
   SidebarFooter,
+  PhoneHeader,
   Spacer,
   StatusLine,
+  WorkspaceMark,
   WorkspaceSwitcher,
 } from "./Shell";
 
@@ -74,5 +77,27 @@ describe("Shell", () => {
 
     expect(button).toHaveTextContent("AD");
     expect(button).toHaveAttribute("aria-keyshortcuts", "Control+Shift+W");
+  });
+});
+
+describe("PhoneHeader, AccountButton and WorkspaceMark", () => {
+  it("shows who is signed in, in full or as an avatar", () => {
+    renderUi(
+      <>
+        <PhoneHeader>
+          <WorkspaceMark mark="HO" accent="personal" size="lg" />
+        </PhoneHeader>
+        <AccountButton name="Ana Duarte" email="ana@example.com" />
+        <AccountButton compact label="Account" name="Ana Duarte" />
+        <AccountButton name="ana@example.com" email="ana@example.com" />
+      </>,
+    );
+
+    // Hidden from the medium breakpoint up (jsdom's window is desktop-wide).
+    expect(screen.getByRole("banner", { hidden: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Ana Duarte/u })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Account" })).toBeInTheDocument();
+    expect(screen.getAllByText("ana@example.com")).toHaveLength(2);
+    expect(screen.getByText("HO")).toHaveAttribute("data-accent", "personal");
   });
 });

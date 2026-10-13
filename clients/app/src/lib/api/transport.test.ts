@@ -35,12 +35,27 @@ describe("createWebTransport", () => {
     expect(sent?.headers.get(CSRF_HEADER)).toBe("1");
   });
 
+  it("asks for problems in the UI's language", async () => {
+    const send = vi.fn<(request: Request) => Promise<Response>>(() =>
+      Promise.resolve(new Response("{}")),
+    );
+    document.documentElement.lang = "pt-PT";
+    const transport = createWebTransport(ORIGIN, send);
+
+    await transport.fetch(new Request(`${transport.baseUrl}/api/v1/system/health`));
+    document.documentElement.lang = "";
+    await transport.fetch(new Request(`${transport.baseUrl}/api/v1/system/health`));
+
+    expect(send.mock.calls[0]?.[0].headers.get("accept-language")).toBe("pt-PT");
+    expect(send.mock.calls[1]?.[0].headers.get("accept-language")).toBeNull();
+  });
+
   it("sends the browser to sign in when the BFF says the session is required", async () => {
     const problem = { type: "about:blank", title: "Unauthorized", status: 401 };
     const send = vi.fn(() =>
       Promise.resolve(
         Response.json(
-          { ...problem, detail: "session_required" },
+          { ...problem, code: "session_required" },
           { status: 401, headers: { "content-type": "application/problem+json" } },
         ),
       ),
@@ -56,7 +71,7 @@ describe("createWebTransport", () => {
     );
     // The caller still gets the answer, body unread.
     expect(response.status).toBe(401);
-    expect(await response.json()).toMatchObject({ detail: "session_required" });
+    expect(await response.json()).toMatchObject({ code: "session_required" });
 
     // Other requests failing the same way do not navigate again.
     await transport.fetch(new Request(`${transport.baseUrl}/api/v1/other`));
@@ -64,9 +79,9 @@ describe("createWebTransport", () => {
   });
 
   it.each([
-    ["the API refused the token", 401, { detail: "invalid_token" }],
+    ["the API refused the token", 401, { code: "invalid_token" }],
     ["a non-problem body", 401, "nope"],
-    ["another status", 403, { detail: "session_required" }],
+    ["another status", 403, { code: "session_required" }],
   ])("does not sign in when %s", async (_, status, body) => {
     const send = vi.fn(() => Promise.resolve(Response.json(body, { status })));
     const signIn = vi.fn<(url: string) => void>();
@@ -86,7 +101,7 @@ describe("createWebTransport", () => {
       hash: "",
     });
     const transport = createWebTransport(ORIGIN, () =>
-      Promise.resolve(Response.json({ detail: "session_required" }, { status: 401 })),
+      Promise.resolve(Response.json({ code: "session_required" }, { status: 401 })),
     );
 
     await transport.fetch(new Request(`${transport.baseUrl}/api/v1/things`));

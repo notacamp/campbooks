@@ -13,7 +13,7 @@ import { renderWithProviders, stubApi } from "../../../test/render";
 import { buildSystemRoutes } from "./index";
 
 describe("buildSystemRoutes", () => {
-  it("mounts the system status page at the root path", async () => {
+  it("mounts the system status page at /system", async () => {
     stubApi({
       "/bff/api/v1/system/version": { body: { version: "0.1.0", commit: null } },
       "/bff/api/v1/system/health": { body: { status: "ok", database: "ok" } },
@@ -21,7 +21,7 @@ describe("buildSystemRoutes", () => {
     const root = createRootRoute({ component: Outlet });
     const router = createRouter({
       routeTree: root.addChildren(buildSystemRoutes(root)),
-      history: createMemoryHistory({ initialEntries: ["/"] }),
+      history: createMemoryHistory({ initialEntries: ["/system"] }),
     });
 
     renderWithProviders(<RouterProvider router={router} />);

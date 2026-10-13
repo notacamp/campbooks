@@ -1,15 +1,17 @@
 import { useTranslation } from "react-i18next";
 
+import { Heading, Text } from "~/lib/ui";
+
 /** Placeholder home page of the `{{name}}` module. */
 export function {{pascal}}Home() {
   const { t } = useTranslation("{{kebab}}");
 
   return (
-    <section aria-labelledby="{{kebab}}-home-title" className="max-w-xl space-y-4">
-      <h1 id="{{kebab}}-home-title" className="text-2xl font-semibold">
+    <section aria-labelledby="{{kebab}}-home-title" className="flex max-w-measure flex-col gap-4 p-6">
+      <Heading level={1} size="page" id="{{kebab}}-home-title">
         {t("title")}
-      </h1>
-      <p className="text-muted">{t("summary")}</p>
+      </Heading>
+      <Text tone="secondary">{t("summary")}</Text>
     </section>
   );
 }

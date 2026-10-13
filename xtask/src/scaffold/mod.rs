@@ -344,7 +344,8 @@ fn register_module(file: &str, text: &str, name: &str) -> Result<String> {
                 "from \"~/modules/",
                 &format!("import {{ build{pascal}Routes }} from \"~/modules/{kebab}\";"),
             )?;
-            edits::insert_before_marker(&text, file, &format!("...build{pascal}Routes(root),"))
+            // Domain modules mount inside the workspace frame (`/w/$workspaceId/...`).
+            edits::insert_before_marker(&text, file, &format!("...build{pascal}Routes(workspace),"))
         }
         CLIENT_I18N_TYPES => {
             let text = edits::insert_after_last(
@@ -591,7 +592,11 @@ mod tests {
         assert!(
             server.contains("(name = \"demo_notes\", description = \"The demo notes module.\"),")
         );
-        assert!(plan.update[3].1.contains("...buildDemoNotesRoutes(root),"));
+        assert!(
+            plan.update[3]
+                .1
+                .contains("...buildDemoNotesRoutes(workspace),")
+        );
         assert!(
             plan.update[4]
                 .1

@@ -5,7 +5,8 @@
     "schedule": "Agenda",
     "tasks": "Tâches",
     "documents": "Documents",
-    "money": "Argent"
+    "money": "Argent",
+    "settings": "Paramètres"
   },
   "list": {
     "next": "Élément suivant",

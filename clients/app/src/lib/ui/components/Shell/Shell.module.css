@@ -64,6 +64,13 @@
   font: var(--weight-bold) var(--text-xs) / var(--leading-none) var(--font-sans);
 }
 
+.mark[data-size="lg"] {
+  width: var(--size-hit);
+  height: var(--size-hit);
+  border-radius: var(--radius-md);
+  font-size: var(--text-md);
+}
+
 .workspaceText {
   display: flex;
   flex: 1 1 0;
@@ -161,6 +168,66 @@
   flex: 1 1 0;
 }
 
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  height: var(--size-control-lg);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account:hover,
+.account[aria-expanded="true"] {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.account[data-compact] {
+  justify-content: center;
+  width: var(--size-hit);
+  height: var(--size-hit);
+  padding: 0;
+  border-radius: var(--radius-full);
+}
+
+.accountText {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-width: 0;
+  line-height: var(--leading-tight);
+}
+
+.accountName,
+.accountEmail {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountName {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.accountEmail {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.phoneHeader {
+  display: none;
+}
+
 /* Below the large breakpoint panes stack and take the full width. */
 @media (width < 64rem) {
   .listPane {
@@ -178,5 +245,18 @@
 @media (width < 48rem) {
   .sidebar {
     display: none;
+  }
+
+  .phoneHeader {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    display: flex;
+    flex: 1 1 100%;
+    align-items: center;
+    gap: var(--space-1);
+    min-width: 0;
+    padding: var(--space-2) var(--space-2) var(--space-1);
+    background: var(--surface-base);
   }
 }

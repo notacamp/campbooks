@@ -51,6 +51,13 @@ export const DEFAULT_SHORTCUTS = [
     group: "navigation",
     label: "shortcuts:nav.money",
   },
+  {
+    id: "nav.settings",
+    keys: "g ,",
+    scope: "global",
+    group: "navigation",
+    label: "shortcuts:nav.settings",
+  },
 
   // Lists and the selected item
   { id: "list.next", keys: "j", scope: "list", group: "list", label: "shortcuts:list.next" },
