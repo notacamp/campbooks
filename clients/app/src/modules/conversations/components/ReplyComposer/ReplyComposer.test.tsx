@@ -84,7 +84,9 @@ describe("ReplyComposer", () => {
     });
     renderWithProviders(slot(null));
     expect(
-      await screen.findByText("Gmail refused this message. Check the addresses and try again."),
+      await screen.findByText(
+        "Your mail provider refused this message. Check the addresses and try again.",
+      ),
     ).toBeVisible();
     // Esc closes it, and the saved draft stays a click away.
     const box = screen.getByRole("textbox", { name: "Message" });

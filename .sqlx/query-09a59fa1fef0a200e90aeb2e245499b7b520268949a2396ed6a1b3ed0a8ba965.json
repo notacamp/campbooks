@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM connectors.skipped_messages\n                        WHERE stream_id = $1 AND provider_message_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "09a59fa1fef0a200e90aeb2e245499b7b520268949a2396ed6a1b3ed0a8ba965"
+}

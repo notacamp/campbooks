@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(*) FROM connectors.connections) AS \"c!\",\n                  (SELECT count(*) FROM connectors.credentials) AS \"k!\",\n                  (SELECT count(*) FROM connectors.streams) AS \"s!\",\n                  (SELECT count(*) FROM connectors.messages) AS \"m!\",\n                  (SELECT count(*) FROM connectors.gmail_labels) AS \"l!\",\n                  (SELECT count(*) FROM connectors.batches) AS \"b!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "c!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "k!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "s!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 3,
+        "name": "m!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "l!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "b!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "9c8ceff1990aa13e01eef19db8ab6c27d7d1e453f1698576a9b7858a6023f38a"
+}
