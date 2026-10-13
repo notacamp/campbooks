@@ -12,9 +12,11 @@
 
 use std::{sync::Arc, time::Duration};
 
+use campbooks_kernel::telemetry;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use tokio::sync::Mutex;
+use tracing::Instrument as _;
 
 use super::config::{ClientSecret, Settings};
 
@@ -33,6 +35,16 @@ pub enum OidcError {
     /// The IdP could not be reached or answered with an error of its own.
     #[error("the identity provider is unavailable: {0}")]
     Unavailable(String),
+}
+
+impl OidcError {
+    /// The `error.type` telemetry records.
+    const fn kind(&self) -> &'static str {
+        match self {
+            Self::Rejected(_) => "rejected",
+            Self::Unavailable(_) => "unavailable",
+        }
+    }
 }
 
 /// Tokens from the token endpoint.
@@ -255,6 +267,22 @@ impl Oidc {
     /// POST `params` plus the client credentials as a form; the body of a
     /// 2xx answer.
     async fn post(&self, endpoint: &str, params: &[(&str, &str)]) -> Result<Vec<u8>, OidcError> {
+        async {
+            let result = self.post_form(endpoint, params).await;
+            if let Err(e) = &result {
+                telemetry::record_error(e.kind());
+            }
+            result
+        }
+        .instrument(telemetry::client_span("POST idp", endpoint))
+        .await
+    }
+
+    async fn post_form(
+        &self,
+        endpoint: &str,
+        params: &[(&str, &str)],
+    ) -> Result<Vec<u8>, OidcError> {
         let secret = self.secret().await?;
         let form = url::form_urlencoded::Serializer::new(String::new())
             .extend_pairs(params.iter().copied())
@@ -269,11 +297,13 @@ impl Oidc {
                 "application/x-www-form-urlencoded",
             )
             .header(reqwest::header::ACCEPT, "application/json")
+            .headers(telemetry::trace_headers())
             .body(form)
             .send()
             .await
             .map_err(|e| OidcError::Unavailable(e.without_url().to_string()))?;
         let status = response.status();
+        telemetry::record_status(status.as_u16());
         let body = read_body(response).await?;
         if status.is_success() {
             return Ok(body);
@@ -335,7 +365,9 @@ impl Oidc {
             .http
             .get(&url)
             .header(reqwest::header::ACCEPT, "application/json")
+            .headers(telemetry::trace_headers())
             .send()
+            .instrument(telemetry::client_span("GET idp", &url))
             .await
             .and_then(reqwest::Response::error_for_status)
             .map_err(|e| OidcError::Unavailable(format!("discovery: {e}")))?;

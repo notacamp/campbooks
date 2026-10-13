@@ -21,7 +21,9 @@ use tower::ServiceExt;
 use crate::{
     AppState, Config, Module,
     blobs::BlobStore,
-    config::{AuthConfig, BlobsConfig, Environment, JobsConfig, LogFormat, SignupConfig},
+    config::{
+        AuthConfig, BlobsConfig, Environment, JobsConfig, LogFormat, SignupConfig, TelemetryConfig,
+    },
     db,
 };
 
@@ -45,6 +47,7 @@ pub fn config(database_url: &str) -> Config {
         jobs: JobsConfig::default(),
         signup: SignupConfig::default(),
         blobs: BlobsConfig::default(),
+        telemetry: TelemetryConfig::default(),
     }
 }
 
