@@ -20,6 +20,7 @@
     "missing_token": "Connectez-vous pour continuer : la requête ne contient aucun jeton d’accès.",
     "invalid_token": "Le jeton d’accès n’est pas valide. Reconnectez-vous.",
     "token_expired": "Votre session a expiré. Reconnectez-vous.",
+    "admin_reauth_required": "Par sécurité, l’administration exige une connexion récente. Reconnectez-vous pour continuer.",
     "idp_unavailable": "Le service de connexion est injoignable pour le moment. Réessayez dans un instant.",
     "missing_json_content_type": "Le corps de la requête doit être en JSON (Content-Type: application/json).",
     "invalid_json": "Le corps de la requête n’est pas du JSON valide : {{reason}}",

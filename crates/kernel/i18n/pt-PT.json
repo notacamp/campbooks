@@ -20,6 +20,7 @@
     "missing_token": "Inicie sessão para continuar: o pedido não traz nenhum token de acesso.",
     "invalid_token": "O token de acesso não é válido. Inicie sessão novamente.",
     "token_expired": "A sua sessão expirou. Inicie sessão novamente.",
+    "admin_reauth_required": "Por segurança, a administração exige um início de sessão recente. Inicie sessão novamente para continuar.",
     "idp_unavailable": "Não é possível contactar o serviço de início de sessão neste momento. Tente novamente daqui a pouco.",
     "missing_json_content_type": "O corpo do pedido tem de ser JSON (Content-Type: application/json).",
     "invalid_json": "O corpo do pedido não é JSON válido: {{reason}}",

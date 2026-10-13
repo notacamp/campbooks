@@ -5,6 +5,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod admin;
 pub mod auth;
 pub mod blobs;
 pub mod changes;

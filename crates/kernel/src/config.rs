@@ -9,7 +9,8 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use figment::{Figment, providers::Env};
 use secrecy::{ExposeSecret as _, SecretString};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 /// Environment variable prefix shared by every Campbooks setting.
 pub const ENV_PREFIX: &str = "CAMPBOOKS_";
@@ -166,6 +167,31 @@ impl Config {
         non_blank(Some(self.database_role.as_str()))
     }
 
+    /// What an instance administrator may see of this configuration: only
+    /// enumerated facts, never a secret, password, key, code or a URL's
+    /// credentials, path or query (ADR 0015).
+    pub fn summary(&self) -> ConfigSummary {
+        ConfigSummary {
+            environment: self.env,
+            public_origin: origin_of(&self.public_url),
+            signup_policy: self.signup.policy,
+            blob_store: self.blobs.backend,
+            database_logins: if self.split_database_logins() {
+                DatabaseLogins::Split
+            } else {
+                DatabaseLogins::Single
+            },
+            migrations: if self.run_migrations {
+                Migrations::OnStart
+            } else {
+                Migrations::Separately
+            },
+            serves_web_client: self.web_dir.is_some(),
+            exports_telemetry: self.telemetry.otlp_endpoint().is_some(),
+            metrics_endpoint: self.telemetry.metrics_addr.is_some(),
+        }
+    }
+
     /// Startup check of the settings the API and worker share: the runtime
     /// role is a plain identifier and the signup settings are usable. The
     /// message names the offending setting.
@@ -182,6 +208,69 @@ impl Config {
         self.changes.check()?;
         self.telemetry.check()
     }
+}
+
+/// The non-secret facts of a [`Config`] an administrator sees
+/// ([`Config::summary`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct ConfigSummary {
+    /// `CAMPBOOKS_ENV`.
+    pub environment: Environment,
+    /// The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`.
+    pub public_origin: Option<String>,
+    /// `CAMPBOOKS_SIGNUP__POLICY` (never the codes).
+    pub signup_policy: SignupPolicy,
+    /// `CAMPBOOKS_BLOBS__BACKEND`.
+    pub blob_store: BlobBackend,
+    /// Whether migrations use a login of their own.
+    pub database_logins: DatabaseLogins,
+    /// When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`).
+    pub migrations: Migrations,
+    /// Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`).
+    pub serves_web_client: bool,
+    /// Whether traces and metrics are exported over OTLP.
+    pub exports_telemetry: bool,
+    /// Whether a Prometheus endpoint is open.
+    pub metrics_endpoint: bool,
+}
+
+/// How the server signs in to the database (`deploy/README.md`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DatabaseLogins {
+    /// One login for requests and migrations (switching to the runtime
+    /// role with `SET ROLE`).
+    Single,
+    /// A dedicated runtime login, and the migration login
+    /// (`CAMPBOOKS_DATABASE_MIGRATION_URL`) for migrations only.
+    Split,
+}
+
+/// When schema migrations run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum Migrations {
+    /// The server applies them when it starts.
+    OnStart,
+    /// The operator runs them separately.
+    Separately,
+}
+
+/// `scheme://host[:port]` of `url`, without credentials, path, query or
+/// fragment; `None` when it is not an absolute URL with a host. For showing
+/// where a service is without showing anything secret.
+pub fn origin_of(url: &str) -> Option<String> {
+    let url = reqwest::Url::parse(url.trim()).ok()?;
+    let host = url.host_str()?;
+    let host = if host.contains(':') && !host.starts_with('[') {
+        format!("[{host}]")
+    } else {
+        host.to_owned()
+    };
+    Some(match url.port() {
+        Some(port) => format!("{}://{host}:{port}", url.scheme()),
+        None => format!("{}://{host}", url.scheme()),
+    })
 }
 
 /// Telemetry export settings (`CAMPBOOKS_TELEMETRY__*`). With neither
@@ -277,7 +366,7 @@ impl TelemetryConfig {
 }
 
 /// The kind of deployment (`CAMPBOOKS_ENV`).
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum Environment {
     /// A real deployment: no development conveniences.
@@ -288,7 +377,7 @@ pub enum Environment {
 }
 
 /// Who may create a workspace when they are not a member of any yet.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum SignupPolicy {
     /// Anyone who can sign in.
@@ -354,7 +443,7 @@ fn is_identifier(value: &str) -> bool {
 }
 
 /// Which object store holds the blobs.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BlobBackend {
     /// A directory on local disk (`CAMPBOOKS_BLOBS__PATH`); the self-host
@@ -778,6 +867,70 @@ mod tests {
             .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
             .collect();
         Figment::from(Serialized::defaults(map))
+    }
+
+    #[test]
+    fn the_summary_never_holds_a_secret() {
+        let mut config = Config::from_figment(&figment(&[(
+            "database_url",
+            "postgres://app:db-pass-1@db.example.com/campbooks",
+        )]))
+        .unwrap();
+        config.database_migration_url = Some(SecretString::from(
+            "postgres://owner:db-pass-2@db.example.com/campbooks",
+        ));
+        "https://user:url-pass-3@app.example.com:8443/x?k=url-key-4"
+            .clone_into(&mut config.public_url);
+        config.signup.policy = SignupPolicy::Code;
+        config.signup.codes = Some(SecretString::from("signup-code-5,signup-code-6"));
+        config.blobs.backend = BlobBackend::S3;
+        config.blobs.s3.access_key_id = Some("access-key-7".to_owned());
+        config.blobs.s3.secret_access_key = Some(SecretString::from("secret-key-8"));
+        config.telemetry.otlp_headers =
+            Some(SecretString::from("authorization=Bearer otlp-token-9"));
+        config.auth.issuer = Some("https://id.example.com".to_owned());
+        let summary = config.summary();
+        assert_eq!(
+            summary.public_origin.as_deref(),
+            Some("https://app.example.com:8443")
+        );
+        assert_eq!(summary.signup_policy, SignupPolicy::Code);
+        assert_eq!(summary.blob_store, BlobBackend::S3);
+        assert_eq!(summary.database_logins, DatabaseLogins::Split);
+        assert_eq!(summary.migrations, Migrations::OnStart);
+        let json = serde_json::to_string(&summary).unwrap();
+        for secret in [
+            "db-pass-1",
+            "db-pass-2",
+            "url-pass-3",
+            "url-key-4",
+            "signup-code-5",
+            "signup-code-6",
+            "access-key-7",
+            "secret-key-8",
+            "otlp-token-9",
+            "user",
+        ] {
+            assert!(!json.contains(secret), "{secret} leaked: {json}");
+        }
+    }
+
+    #[test]
+    fn origins_drop_credentials_paths_and_queries() {
+        assert_eq!(
+            origin_of("http://u:p@ollama:11434/v1?key=x").as_deref(),
+            Some("http://ollama:11434")
+        );
+        assert_eq!(
+            origin_of(" https://api.example.com/v1 ").as_deref(),
+            Some("https://api.example.com")
+        );
+        assert_eq!(
+            origin_of("http://[::1]:8000/").as_deref(),
+            Some("http://[::1]:8000")
+        );
+        assert_eq!(origin_of("not a url"), None);
+        assert_eq!(origin_of("mailto:a@example.com"), None);
     }
 
     #[test]

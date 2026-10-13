@@ -26,6 +26,7 @@ use crate::{
     MESSAGES,
     deps::Issuer,
     domain::{
+        clients::Client,
         sessions::{self, Session},
         tokens::{self, Grant},
     },
@@ -164,7 +165,7 @@ pub async fn authorize(
         }
         _ => return Ok(refuse(&request, "invalid_request")),
     }
-    let Some(scope) = allowed_scope(issuer, query.scope.as_deref()) else {
+    let Some(scope) = allowed_scope(&issuer.api_scopes, client, query.scope.as_deref()) else {
         return Ok(refuse(&request, "invalid_scope"));
     };
     request.scope = scope;
@@ -198,16 +199,22 @@ pub async fn authorize(
 }
 
 /// The requested scopes when every one is known (the OIDC scopes and the
-/// API's catalogue), deduplicated; `None` otherwise. Missing means `openid`.
-fn allowed_scope(issuer: &Issuer, requested: Option<&str>) -> Option<String> {
+/// API's catalogue), deduplicated, without those `client` may not get
+/// (`admin:access` unless it is first-party, ADR 0015); `None` when one is
+/// unknown. Missing means `openid`.
+fn allowed_scope(
+    api_scopes: &[String],
+    client: &Client,
+    requested: Option<&str>,
+) -> Option<String> {
     let requested = requested.unwrap_or("openid");
     let mut scopes: Vec<&str> = Vec::new();
     for scope in requested.split_whitespace() {
-        let known = OIDC_SCOPES.contains(&scope) || issuer.api_scopes.iter().any(|s| s == scope);
+        let known = OIDC_SCOPES.contains(&scope) || api_scopes.iter().any(|s| s == scope);
         if !known {
             return None;
         }
-        if !scopes.contains(&scope) {
+        if client.may_request(scope) && !scopes.contains(&scope) {
             scopes.push(scope);
         }
     }
@@ -321,6 +328,47 @@ mod tests {
         assert!(!is_s256_challenge(
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM"
         ));
+    }
+
+    #[test]
+    fn only_first_party_clients_are_granted_admin_access() {
+        use secrecy::SecretString;
+
+        use crate::domain::clients::{Authentication, Clients, WEB_CLIENT_ID};
+
+        let api = ["admin:access".to_owned(), "conversations:read".to_owned()];
+        let clients = Clients::first_party("https://app.example.com", SecretString::from("s"));
+        let web = clients.get(WEB_CLIENT_ID).unwrap();
+        let requested = Some("openid admin:access conversations:read admin:access");
+        assert_eq!(
+            allowed_scope(&api, web, requested).as_deref(),
+            Some("openid admin:access conversations:read")
+        );
+        let third_party = Client {
+            id: "acme-app",
+            first_party: false,
+            active: true,
+            authentication: Authentication::None,
+            redirect_uris: Vec::new(),
+            loopback_any_port: false,
+            post_logout_redirect_uris: Vec::new(),
+            refresh_idle: TimeDelta::days(1),
+            refresh_absolute: TimeDelta::days(1),
+        };
+        assert_eq!(
+            allowed_scope(&api, &third_party, requested).as_deref(),
+            Some("openid conversations:read"),
+            "dropped, not refused: the client still signs the person in"
+        );
+        assert_eq!(
+            allowed_scope(&api, &third_party, Some("admin:access")),
+            None,
+            "nothing left"
+        );
+        assert_eq!(
+            allowed_scope(&api, web, Some("openid mail:everything")),
+            None
+        );
     }
 
     #[test]

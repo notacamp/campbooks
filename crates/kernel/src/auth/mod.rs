@@ -161,6 +161,10 @@ pub struct Principal {
     /// authenticated in-process without a token. Long-lived responses (the
     /// change feed) end by then, so the caller is authorized again.
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// When the person last authenticated (`auth_time`), when the token says
+    /// so. Admin operations require a recent one
+    /// ([`Admin`](crate::admin::Admin)). Always `None` for clients.
+    pub auth_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl Principal {
@@ -196,6 +200,10 @@ pub enum AuthFailure {
     InvalidToken,
     /// The token was valid but has expired.
     ExpiredToken,
+    /// The token is valid, but the person signed in too long ago for an
+    /// admin operation ([`Admin`](crate::admin::Admin)): sign in again
+    /// (RFC 9470 step-up, `max_age` 12 hours).
+    AdminReauthRequired,
 }
 
 impl AuthFailure {
@@ -206,6 +214,7 @@ impl AuthFailure {
             Self::MissingToken => "missing_token",
             Self::InvalidToken => "invalid_token",
             Self::ExpiredToken => "token_expired",
+            Self::AdminReauthRequired => "admin_reauth_required",
         }
     }
 
@@ -215,6 +224,9 @@ impl AuthFailure {
         match self {
             Self::NotConfigured | Self::MissingToken => "Bearer",
             Self::InvalidToken | Self::ExpiredToken => r#"Bearer error="invalid_token""#,
+            Self::AdminReauthRequired => {
+                r#"Bearer error="insufficient_user_authentication", max_age=43200"#
+            }
         }
     }
 }

@@ -230,6 +230,7 @@ pub(super) fn is_allowed_type(typ: &str, allowed: &[&str]) -> bool {
 #[derive(Debug, Deserialize)]
 struct Claims {
     exp: Option<i64>,
+    auth_time: Option<i64>,
     sub: Option<String>,
     azp: Option<String>,
     scope: Option<String>,
@@ -304,6 +305,12 @@ impl Claims {
             expires_at: self
                 .exp
                 .and_then(|exp| chrono::DateTime::from_timestamp(exp, 0)),
+            auth_time: match kind {
+                PrincipalKind::User => self
+                    .auth_time
+                    .and_then(|at| chrono::DateTime::from_timestamp(at, 0)),
+                PrincipalKind::Client => None,
+            },
         })
     }
 }
@@ -330,6 +337,18 @@ mod tests {
         assert!(principal.has_scope("openid"));
         assert!(!principal.has_scope("mail:read"));
         assert_eq!(principal.workspace, None);
+    }
+
+    #[test]
+    fn auth_time_is_read_for_users_only() {
+        let user = claims(serde_json::json!({ "sub": "user-1", "auth_time": 1_760_000_000 }))
+            .into_principal()
+            .unwrap();
+        assert_eq!(user.auth_time.map(|at| at.timestamp()), Some(1_760_000_000));
+        let client = claims(serde_json::json!({ "azp": "c", "auth_time": 1_760_000_000 }))
+            .into_principal()
+            .unwrap();
+        assert_eq!(client.auth_time, None);
     }
 
     #[test]

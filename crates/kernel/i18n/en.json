@@ -20,6 +20,7 @@
     "missing_token": "Sign in to continue: the request carries no access token.",
     "invalid_token": "The access token is not valid. Sign in again.",
     "token_expired": "Your session has expired. Sign in again.",
+    "admin_reauth_required": "For your security, administration needs a recent sign-in. Sign in again to continue.",
     "idp_unavailable": "The sign-in service cannot be reached right now. Try again in a moment.",
     "missing_json_content_type": "The request body must be JSON (Content-Type: application/json).",
     "invalid_json": "The request body is not valid JSON: {{reason}}",

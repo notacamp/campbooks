@@ -53,6 +53,7 @@ pub fn module() -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router(),
+        admin_router: None,
         background: Background::new(),
     }
 }

@@ -55,6 +55,7 @@ mod code {
     paths(
         login, callback, session, logout, backchannel_logout,
         api_get, api_post, api_put, api_patch, api_delete,
+        admin_get, admin_post, admin_put, admin_patch, admin_delete,
     ),
     components(schemas(SessionInfo, SessionUser, LogoutResponse)),
     tags((name = "bff", description = "The web app's backend-for-frontend: sign-in, the \
@@ -99,6 +100,10 @@ fn oidc_failure(err: &OidcError) -> Response {
 pub struct LoginQuery {
     /// Where to land after signing in: a path on this site (default `/`).
     return_to: Option<String>,
+    /// Passed to the identity provider: the most seconds since the person
+    /// last signed in that the new session may carry. `0` makes them sign in
+    /// again, as the admin API asks after `admin_reauth_required`.
+    max_age: Option<u32>,
 }
 
 /// Start signing in.
@@ -130,7 +135,7 @@ pub async fn login(State(bff): State<Bff>, Query(query): Query<LoginQuery>) -> R
     let Some(return_to) = return_to(query.return_to.as_deref()) else {
         return problem(StatusCode::BAD_REQUEST, code::INVALID_RETURN_TO);
     };
-    no_store(inner.start_login(return_to).await)
+    no_store(inner.start_login(return_to, query.max_age).await)
 }
 
 /// A same-origin path to land on: `/`-rooted, not protocol-relative, no
@@ -154,7 +159,7 @@ pub(super) fn return_to(value: Option<&str>) -> Option<String> {
 }
 
 impl Inner {
-    async fn start_login(&self, return_to: String) -> Response {
+    async fn start_login(&self, return_to: String, max_age: Option<u32>) -> Response {
         let state = crypto::random_token();
         let nonce = crypto::random_token();
         let verifier = crypto::random_token();
@@ -166,6 +171,7 @@ impl Inner {
                 state: &state,
                 nonce: &nonce,
                 code_challenge: &challenge,
+                max_age,
             })
             .await
         {
@@ -693,8 +699,103 @@ api_operation!(
     "DELETE in the API as the signed-in user."
 );
 
+/// Documents `/bff/admin/{path}` for one HTTP method; every method is served
+/// by [`admin`].
+macro_rules! admin_operation {
+    ($name:ident, $method:ident, $id:literal, $meta:tt, $summary:literal) => {
+        #[doc = $summary]
+        ///
+        /// `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+        /// the session's access token attached, exactly like `/bff/api/*`. Its
+        /// answers are the admin API's own: 404 for anyone who is not an
+        /// administrator with the operation's permission, 401
+        /// `admin_reauth_required` when the last sign-in is more than 12 hours
+        /// old (sign in again at `/bff/login?max_age=0`). Without a live session
+        /// the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+        /// need the `X-Campbooks-CSRF: 1` header from the app's origin.
+        #[utoipa::path(
+            $method,
+            path = "/bff/admin/{path}",
+            tag = "bff",
+            operation_id = $id,
+            extensions(("x-campbooks" = json!($meta))),
+            security(("session" = [])),
+            params(
+                ("path" = String, Path, description = "The admin API path after `/admin/`, \
+                    e.g. `v1/system/overview`; may contain slashes."),
+            ),
+            responses(
+                (status = 200, description = "The admin API's response, whatever its status."),
+                (status = 401, description = "`session_required`: no live session.",
+                    body = Problem, content_type = "application/problem+json"),
+                (status = 403, description = "`csrf_check_failed`", body = Problem,
+                    content_type = "application/problem+json"),
+                (status = 503, description = "`bff_not_configured`, or the identity provider \
+                    is unavailable while the access token needs refreshing.", body = Problem,
+                    content_type = "application/problem+json"),
+            ),
+        )]
+        pub async fn $name(state: State<Bff>, request: Request) -> Result<Response, Error> {
+            admin(state, request).await
+        }
+    };
+}
+
+admin_operation!(
+    admin_get,
+    get,
+    "bff.admin_get",
+    (Operation::query()),
+    "Read from the admin API as the signed-in administrator."
+);
+admin_operation!(
+    admin_post,
+    post,
+    "bff.admin_post",
+    (Operation::command(Risk::High)),
+    "POST to the admin API as the signed-in administrator."
+);
+admin_operation!(
+    admin_put,
+    put,
+    "bff.admin_put",
+    (Operation::command(Risk::High)),
+    "PUT to the admin API as the signed-in administrator."
+);
+admin_operation!(
+    admin_patch,
+    patch,
+    "bff.admin_patch",
+    (Operation::command(Risk::High)),
+    "PATCH the admin API as the signed-in administrator."
+);
+admin_operation!(
+    admin_delete,
+    delete,
+    "bff.admin_delete",
+    (Operation::command(Risk::High)),
+    "DELETE in the admin API as the signed-in administrator."
+);
+
 /// `/bff/api/*`: the API, with the session's access token attached.
 async fn api(State(bff): State<Bff>, request: Request) -> Result<Response, Error> {
+    forward(&bff, request, Target::Api).await
+}
+
+/// `/bff/admin/*`: the admin API, with the session's access token attached.
+async fn admin(State(bff): State<Bff>, request: Request) -> Result<Response, Error> {
+    forward(&bff, request, Target::Admin).await
+}
+
+/// Which in-process router a BFF request runs through.
+#[derive(Clone, Copy)]
+enum Target {
+    Api,
+    Admin,
+}
+
+/// Run `request` through `target` as the session's user.
+async fn forward(bff: &Bff, request: Request, target: Target) -> Result<Response, Error> {
     let Some(inner) = &bff.inner else {
         return Ok(not_configured());
     };
@@ -713,7 +814,11 @@ async fn api(State(bff): State<Bff>, request: Request) -> Result<Response, Error
         Err(AccessError::Failed(err)) => return Err(err),
     };
     let request = to_api_request(request, &access_token)?;
-    let response = match inner.api.clone().oneshot(request).await {
+    let router = match target {
+        Target::Api => inner.api.clone(),
+        Target::Admin => inner.admin.clone(),
+    };
+    let response = match router.oneshot(request).await {
         Ok(response) => response,
         Err(never) => match never {},
     };
@@ -723,8 +828,9 @@ async fn api(State(bff): State<Bff>, request: Request) -> Result<Response, Error
     })
 }
 
-/// `/bff/api/<path>?<query>` → `/api/<path>?<query>`, with the browser's
-/// cookies and CSRF header removed and the access token attached.
+/// `/bff/<api|admin>/<path>?<query>` → `/<api|admin>/<path>?<query>`, with
+/// the browser's cookies and CSRF header removed and the access token
+/// attached.
 fn to_api_request(request: Request, access_token: &str) -> Result<Request, Error> {
     let (mut parts, body): (_, Body) = request.into_parts();
     // The API router is an app of its own, not nested under `/bff/api`:

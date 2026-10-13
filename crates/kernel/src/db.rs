@@ -39,7 +39,7 @@ use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
 };
 
-use crate::tenancy::WorkspaceId;
+use crate::{admin::AdminGrant, tenancy::WorkspaceId};
 
 /// The transaction-local Postgres setting that carries the current
 /// workspace: `current_setting('campbooks.workspace_id', true)`. Policies
@@ -85,6 +85,60 @@ impl BeginFor for PgPool {
         set_workspace(&mut tx, &workspace.to_string()).await?;
         Ok(tx)
     }
+}
+
+/// The transaction-local Postgres setting that lets an administrator's
+/// transaction read across workspaces, on the tables whose module added an
+/// admin-read policy (metadata only, never content; ADR 0015). Only the
+/// kernel names it: policies compare it with `'on'`, and
+/// [`begin_admin`] is the only way to set it (`cargo xtask arch` rejects
+/// the name anywhere else in Rust).
+pub const ADMIN_READS_SETTING: &str = "campbooks.admin_reads";
+
+/// Begin a transaction in which tables carrying an admin-read policy show
+/// every workspace's rows (`campbooks.admin_reads = on`, `SET LOCAL`).
+/// Requires the [`AdminGrant`] that only the
+/// [`Admin`](crate::admin::Admin) extractor builds. Tables without such a
+/// policy (content: messages, bodies, attachments, documents) stay
+/// workspace-isolated.
+pub async fn begin_admin(
+    pool: &PgPool,
+    grant: &AdminGrant,
+) -> Result<Transaction<'static, Postgres>, sqlx::Error> {
+    tracing::debug!(
+        permissions = ?grant.permissions().names(),
+        "admin transaction reading across workspaces"
+    );
+    let mut tx = pool.begin().await?;
+    sqlx::query_scalar!("SELECT set_config($1, 'on', true)", ADMIN_READS_SETTING)
+        .fetch_one(&mut *tx)
+        .await?;
+    Ok(tx)
+}
+
+/// The schema migrations applied to the database.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MigrationStatus {
+    /// How many migrations applied successfully.
+    pub applied: i64,
+    /// The newest one's version (`<timestamp>` of its file name).
+    pub latest_version: Option<i64>,
+    /// The newest one's description.
+    pub latest_description: Option<String>,
+}
+
+/// What `sqlx`'s migration table says was applied.
+pub async fn migration_status(pool: &PgPool) -> Result<MigrationStatus, sqlx::Error> {
+    sqlx::query_as!(
+        MigrationStatus,
+        r#"SELECT count(*) AS "applied!",
+                  max(version) AS latest_version,
+                  (SELECT description FROM _sqlx_migrations
+                    WHERE success ORDER BY version DESC LIMIT 1) AS latest_description
+             FROM _sqlx_migrations WHERE success"#
+    )
+    .fetch_one(pool)
+    .await
 }
 
 /// `options` whose every new connection switches to `role` (`SET ROLE`)
@@ -268,6 +322,41 @@ mod tests {
             owns_policy_tables: false,
             login_can_bypass: false,
         }
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn an_admin_transaction_reads_across_workspaces_until_it_ends(db: PgPool) {
+        use crate::admin::{AdminGrant, PermissionSet};
+
+        let pool = crate::testing::app_role_pool(&db).await;
+        let grant = AdminGrant::new("a-1".into(), PermissionSet::from_names(["super"]));
+        let setting = "SELECT coalesce(current_setting('campbooks.admin_reads', true), '')";
+        let mut tx = begin_admin(&pool, &grant).await.unwrap();
+        let on: String = sqlx::query_scalar(setting)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap();
+        assert_eq!(on, "on");
+        tx.commit().await.unwrap();
+        let mut conn = pool.acquire().await.unwrap();
+        let after: String = sqlx::query_scalar(setting)
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+        assert_eq!(after, "", "transaction-local");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_runtime_role_reads_the_migration_status(db: PgPool) {
+        let pool = crate::testing::app_role_pool(&db).await;
+        let status = migration_status(&pool).await.unwrap();
+        assert!(status.applied > 10, "{status:?}");
+        assert!(
+            status
+                .latest_version
+                .is_some_and(|v| v > 20_261_012_000_000)
+        );
+        assert!(status.latest_description.is_some());
     }
 
     #[test]

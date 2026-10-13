@@ -204,6 +204,7 @@ impl Kit {
             email_verified: true,
             name: None,
             expires_at: None,
+            auth_time: None,
         };
         let access = WorkspaceMembership
             .resolve(&self.state.db, &principal, workspace)

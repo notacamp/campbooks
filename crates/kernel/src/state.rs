@@ -5,6 +5,7 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::{
+    admin::{AdminAuditPort, AdminProfilesPort, NoAdmins, NoAudit},
     auth::TokenVerifier,
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
@@ -63,6 +64,13 @@ pub struct AppState {
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
+    /// Reads admin profiles, for [`Admin`](crate::admin::Admin) handlers.
+    /// The server registers the `admin` module's implementation; until then
+    /// nobody is an administrator.
+    pub admin_profiles: AdminProfilesPort,
+    /// Appends to the admin audit trail. The server registers the `admin`
+    /// module's implementation; until then no admin request is answered.
+    pub admin_audit: AdminAuditPort,
 }
 
 impl AppState {
@@ -85,7 +93,18 @@ impl AppState {
             locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
             operations: Operations::default(),
+            admin_profiles: Arc::new(NoAdmins),
+            admin_audit: Arc::new(NoAudit),
         }
+    }
+
+    /// The same state, reading admin profiles through `profiles` and
+    /// recording admin requests through `audit`.
+    #[must_use]
+    pub fn with_admin(mut self, profiles: AdminProfilesPort, audit: AdminAuditPort) -> Self {
+        self.admin_profiles = profiles;
+        self.admin_audit = audit;
+        self
     }
 
     /// The same state, resolving workspace membership through `membership`.

@@ -20,6 +20,11 @@ pub struct Module {
     pub scopes: &'static [ScopeInfo],
     /// The module's routes (under `/api/v1/<name>/…`) with their OpenAPI docs.
     pub router: OpenApiRouter<AppState>,
+    /// The module's admin operations (under `/admin/v1/<name>/…`, each
+    /// taking [`Admin<P>`](crate::admin::Admin)), if it has any. The server
+    /// serves them as a separate API with its own document
+    /// (`openapi/admin.json`), outside the operation catalogue (ADR 0015).
+    pub admin_router: Option<OpenApiRouter<AppState>>,
     /// The module's jobs, event handlers and schedules, each named
     /// `<name>.<…>`. The server builds the
     /// [`Registry`](crate::jobs::Registry) from these.
@@ -31,6 +36,7 @@ impl std::fmt::Debug for Module {
         f.debug_struct("Module")
             .field("name", &self.name)
             .field("scopes", &self.scopes)
+            .field("admin", &self.admin_router.is_some())
             .field("background", &self.background)
             .finish_non_exhaustive()
     }

@@ -125,6 +125,7 @@ fn module(background: Background) -> Module {
         name: "test",
         scopes: &[],
         router: OpenApiRouter::new(),
+        admin_router: None,
         background,
     }
 }

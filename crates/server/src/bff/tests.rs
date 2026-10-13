@@ -94,7 +94,7 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
         &config,
         bff,
         Some(campbooks_kernel::crypto::SecretKey::from_bytes([7; 32])),
-        &["test:read"],
+        &["test:read", "admin:access"],
     ) else {
         panic!("test BFF settings are valid");
     };
@@ -120,8 +120,19 @@ fn app(state: AppState, settings: Option<config::Settings>) -> Router {
         .clone()
         .fallback(|| async { campbooks_kernel::Error::NotFound })
         .with_state(state.clone());
-    let bff = Bff::new(settings, &state, api_only, Router::new());
-    crate::compose(state, routes, Arc::new(spec), &bff, Router::new())
+    let admin = crate::admin_routes(&state, &crate::Composition::default());
+    let admin_only: Router = admin
+        .clone()
+        .fallback(|| async { campbooks_kernel::Error::NotFound })
+        .with_state(state.clone());
+    let bff = Bff::new(settings, &state, api_only, admin_only, Router::new());
+    crate::compose(
+        state,
+        routes.merge(admin),
+        Arc::new(spec),
+        &bff,
+        Router::new(),
+    )
 }
 
 #[derive(Debug)]
@@ -292,7 +303,7 @@ async fn login_redirects_to_the_idp_with_pkce_state_and_nonce(db: PgPool) {
     assert_eq!(params["redirect_uri"], format!("{ORIGIN}/bff/callback"));
     assert_eq!(
         params["scope"],
-        "openid profile email offline_access test:read"
+        "openid profile email offline_access test:read admin:access"
     );
     assert_eq!(params["code_challenge_method"], "S256");
     assert_eq!(params["code_challenge"].len(), 43);
@@ -699,6 +710,85 @@ async fn api_calls_carry_the_sessions_token_in_process(db: PgPool) {
         missing.header(header::CONTENT_TYPE),
         Some("application/problem+json")
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser
+        .get("/bff/admin/v1/system/overview")
+        .await
+        .assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    browser.sign_in(&h.idp, "/").await;
+
+    // A member: the admin API does not exist for them.
+    browser
+        .get("/bff/admin/v1/system/overview")
+        .await
+        .assert_problem(StatusCode::NOT_FOUND, "not_found");
+
+    // The operator grants a profile from the CLI: the next request works.
+    let mut conn = h.db.acquire().await.unwrap();
+    campbooks_admin::cli::grant(
+        &mut conn,
+        "test-user",
+        &[campbooks_kernel::admin::Permission::Super],
+        None,
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
+    let reply = browser.get("/bff/admin/v1/system/overview").await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.json()["version"], env!("CARGO_PKG_VERSION"));
+    let audited = &campbooks_admin::cli::log(&mut conn, 1).await.unwrap()[0];
+    assert_eq!(
+        (
+            audited.actor.as_str(),
+            audited.via.as_str(),
+            audited.operation.as_str(),
+            audited.status
+        ),
+        ("test-user", "api", "system.admin_overview", Some(200))
+    );
+
+    // Unsafe methods need the CSRF header, as on `/bff/api/*`.
+    browser
+        .send(
+            Request::post("/bff/admin/v1/system/overview"),
+            Body::empty(),
+        )
+        .await
+        .assert_problem(StatusCode::FORBIDDEN, "csrf_check_failed");
+    // The admin API is not the API: nothing of it under `/bff/api/*`.
+    browser
+        .get("/bff/api/v1/system/overview")
+        .await
+        .assert_problem(StatusCode::NOT_FOUND, "not_found");
+
+    // Revoked: gone at once.
+    campbooks_admin::cli::revoke(&mut conn, "test-user", &[], chrono::Utc::now())
+        .await
+        .unwrap();
+    browser
+        .get("/bff/admin/v1/system/overview")
+        .await
+        .assert_problem(StatusCode::NOT_FOUND, "not_found");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signing_in_again_passes_max_age_to_the_identity_provider(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    let reply = browser
+        .get("/bff/login?return_to=%2Fadmin%2Fsystem&max_age=0")
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER, "{}", reply.body);
+    let params = query(reply.header(header::LOCATION).unwrap());
+    assert_eq!(params["max_age"], "0");
+    let plain = browser.get("/bff/login").await;
+    assert!(!query(plain.header(header::LOCATION).unwrap()).contains_key("max_age"));
 }
 
 /// `POST /bff/api/v1/workspaces` with a fixed `Idempotency-Key`.

@@ -139,6 +139,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router(),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()

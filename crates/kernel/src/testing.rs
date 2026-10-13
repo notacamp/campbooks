@@ -191,6 +191,27 @@ pub fn app(module: Module, state: AppState) -> Router {
         .with_state(state)
 }
 
+/// A module's admin routes (its [`admin_router`](Module::admin_router)) as
+/// the server serves them: behind the [`audit`](crate::admin::audit)
+/// middleware (so [`Admin`](crate::admin::Admin) answers) and the
+/// [`localize`](crate::i18n::localize) layer. Empty when it has none.
+pub fn admin_app(module: Module, state: AppState) -> Router {
+    let Some(admin) = module.admin_router else {
+        return Router::new();
+    };
+    let (routes, spec) = admin.split_for_parts();
+    routes
+        .route_layer(axum::middleware::from_fn_with_state(
+            crate::admin::AuditLayer::new(&state, &spec),
+            crate::admin::audit,
+        ))
+        .route_layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            crate::i18n::localize,
+        ))
+        .with_state(state)
+}
+
 /// A response, read to the end.
 #[derive(Debug)]
 pub struct TestResponse {
