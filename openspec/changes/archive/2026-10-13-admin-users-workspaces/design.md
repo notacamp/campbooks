@@ -90,9 +90,12 @@ now, and are now tested end to end):
   accounts);
 - refresh tokens → `invalid_grant` (families revoked, and `rotate` checks
   the account);
-- passkey sign-in and native sign-in are not built yet on this branch; both
-  will go through the same session and token code, which refuses suspended
-  accounts.
+- passkey sign-in → 403 `account_suspended`, but only after the assertion
+  verified (a signature that does not verify still answers
+  `passkey_not_accepted`, so a credential id alone reveals nothing); the
+  sign-in screen explains it;
+- native clients use the same codes and refresh tokens, so they are refused
+  the same way.
 
 The web BFF consumes the event (`bff.end_suspended_sessions`, queue
 `events`) and deletes the account's `bff.sessions`: the browser's next

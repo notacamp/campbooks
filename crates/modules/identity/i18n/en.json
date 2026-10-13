@@ -18,6 +18,7 @@
     "passkey_already_registered": "This passkey is already a way into Campbooks.",
     "display_name_required": "Say what we should call you.",
     "passkey_name_required": "Give the passkey a name of 1 to 64 characters.",
-    "account_is_admin": "This account is an administrator. Revoke its admin profile with the server's command line first (campbooks-server admin revoke), then suspend it."
+    "account_is_admin": "This account is an administrator. Revoke its admin profile with the server's command line first (campbooks-server admin revoke), then suspend it.",
+    "account_suspended": "An administrator of this Campbooks suspended this account. Ask them to unsuspend it."
   }
 }

@@ -77,6 +77,10 @@
       "failed": {
         "title": "No se ha podido iniciar sesión con una llave de acceso.",
         "lead": "Algo ha fallado. Inténtalo de nuevo o inicia sesión de otra forma."
+      },
+      "suspended": {
+        "title": "Esta cuenta está suspendida.",
+        "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
       }
     }
   },

@@ -77,6 +77,10 @@
       "failed": {
         "title": "Não foi possível iniciar sessão com uma chave de acesso.",
         "lead": "Algo correu mal. Tente novamente ou inicie sessão de outra forma."
+      },
+      "suspended": {
+        "title": "Esta conta está suspensa.",
+        "lead": "Quem gere este Campbooks suspendeu-a. Peça-lhe que a reponha."
       }
     }
   },

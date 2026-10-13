@@ -77,6 +77,10 @@
       "failed": {
         "title": "Couldn’t sign in with a passkey.",
         "lead": "Something went wrong. Try again, or sign in another way."
+      },
+      "suspended": {
+        "title": "This account is suspended.",
+        "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
       }
     }
   },

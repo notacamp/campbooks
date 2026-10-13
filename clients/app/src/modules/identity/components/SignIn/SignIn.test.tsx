@@ -169,6 +169,20 @@ describe("SignInChoices", () => {
     );
   });
 
+  it("says a passkey's account is suspended once the passkey verified", async () => {
+    stubWebAuthn();
+    mockApi({
+      [OPTIONS]: { body: REQUEST_OPTIONS },
+      [SIGN_IN]: problem(403, "account_suspended"),
+    });
+    renderWithProviders(
+      <SignInChoices request={REQUEST} providers={["google", "passkey"]} returnTo="/" />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Use a passkey/u }));
+    expect(await screen.findByText("This account is suspended.")).toBeVisible();
+  });
+
   it("explains a passkey that wasn't accepted, and one that was cancelled", async () => {
     const browser = stubWebAuthn();
     mockApi({

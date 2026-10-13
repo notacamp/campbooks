@@ -77,6 +77,10 @@
       "failed": {
         "title": "Impossible de se connecter avec une clé d’accès.",
         "lead": "Un problème est survenu. Réessayez, ou connectez-vous autrement."
+      },
+      "suspended": {
+        "title": "Ce compte est suspendu.",
+        "lead": "La personne qui gère ce Campbooks l’a suspendu. Demandez-lui de le rétablir."
       }
     }
   },

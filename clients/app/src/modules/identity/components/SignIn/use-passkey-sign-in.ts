@@ -6,7 +6,8 @@ import { signInWithPasskey } from "../../api/queries";
 import { autofillSupported, ceremonyFailure, getPasskey, passkeysSupported } from "../../webauthn";
 
 /** Why a passkey sign-in didn't go through, as the screen explains it. */
-type PasskeyProblem = "cancelled" | "not_accepted" | "expired" | "rate_limited" | "failed";
+type PasskeyProblem =
+  "cancelled" | "not_accepted" | "suspended" | "expired" | "rate_limited" | "failed";
 
 export interface PasskeySignIn {
   /** Whether this browser can use passkeys at all. */
@@ -25,6 +26,8 @@ function problemOf(error: unknown): PasskeyProblem {
   switch (problemCode(error)) {
     case "passkey_not_accepted":
       return "not_accepted";
+    case "account_suspended":
+      return "suspended";
     case "passkey_expired":
       return "expired";
     case "rate_limited":

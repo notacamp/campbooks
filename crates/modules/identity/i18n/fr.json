@@ -18,6 +18,7 @@
     "passkey_already_registered": "Cette clé d’accès permet déjà d’accéder à Campbooks.",
     "display_name_required": "Dites-nous comment vous appeler.",
     "passkey_name_required": "Donnez à la clé d’accès un nom de 1 à 64 caractères.",
-    "account_is_admin": "Ce compte est celui d’un administrateur. Révoquez d’abord son profil d’administrateur en ligne de commande sur le serveur (campbooks-server admin revoke), puis suspendez-le."
+    "account_is_admin": "Ce compte est celui d’un administrateur. Révoquez d’abord son profil d’administrateur en ligne de commande sur le serveur (campbooks-server admin revoke), puis suspendez-le.",
+    "account_suspended": "Un administrateur de ce Campbooks a suspendu ce compte. Demandez-lui de lever la suspension."
   }
 }
