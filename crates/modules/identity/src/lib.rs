@@ -72,4 +72,6 @@ fn router() -> OpenApiRouter<AppState> {
 }
 
 #[cfg(test)]
+mod testkit;
+#[cfg(test)]
 mod tests;

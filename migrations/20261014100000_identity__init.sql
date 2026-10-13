@@ -124,6 +124,7 @@ CREATE TABLE identity.held_grants (
         REFERENCES identity.provider_identities (id) ON DELETE CASCADE,
     provider text NOT NULL,
     address text NOT NULL,
+    address_verified boolean NOT NULL,
     display_name text,
     scopes text[] NOT NULL,
     grant_tokens bytea NOT NULL,

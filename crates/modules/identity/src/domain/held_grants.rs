@@ -82,6 +82,8 @@ pub struct NewHeldGrant<'a> {
     pub provider: &'a str,
     /// The mailbox address.
     pub address: &'a str,
+    /// Whether the provider verified it.
+    pub address_verified: bool,
     /// A display name.
     pub display_name: Option<&'a str>,
     /// The tokens.
@@ -98,15 +100,16 @@ pub async fn hold(
     let id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO identity.held_grants
-             (id, account_id, provider_identity_id, provider, address, display_name, scopes,
-              grant_tokens, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+             (id, account_id, provider_identity_id, provider, address, address_verified,
+              display_name, scopes, grant_tokens, created_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(id)
     .bind(grant.account_id)
     .bind(grant.identity_id)
     .bind(grant.provider)
     .bind(grant.address)
+    .bind(grant.address_verified)
     .bind(grant.display_name)
     .bind(&grant.tokens.scopes)
     .bind(grant.tokens.seal(cipher, "held_grants", id)?)
@@ -138,6 +141,8 @@ pub struct Taken {
     pub grant: HeldGrant,
     /// The provider account's subject.
     pub account_subject: String,
+    /// Whether the provider verified the address.
+    pub address_verified: bool,
     /// The tokens.
     pub tokens: ProviderTokens,
 }
@@ -157,13 +162,15 @@ pub async fn take(
         id: Uuid,
         provider: String,
         address: String,
+        address_verified: bool,
         display_name: Option<String>,
         expires_at: DateTime<Utc>,
         grant_tokens: Vec<u8>,
         subject: String,
     }
     let row: Option<Row> = sqlx::query_as(
-        "SELECT g.id, g.provider, g.address, g.display_name, g.expires_at, g.grant_tokens,
+        "SELECT g.id, g.provider, g.address, g.address_verified, g.display_name, g.expires_at,
+                g.grant_tokens,
                 p.subject
            FROM identity.held_grants g
            JOIN identity.provider_identities p ON p.id = g.provider_identity_id
@@ -186,6 +193,7 @@ pub async fn take(
                 expires_at: row.expires_at,
             },
             account_subject: row.subject,
+            address_verified: row.address_verified,
             tokens,
         })
     })

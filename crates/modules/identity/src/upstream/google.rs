@@ -245,7 +245,9 @@ impl Google {
         let response = self
             .http
             .post(self.endpoints.token.clone())
-            .form(&form)
+            .header(reqwest::header::CONTENT_TYPE, FORM)
+            .header(reqwest::header::ACCEPT, "application/json")
+            .body(encode(&form))
             .send()
             .await
             .map_err(|e| UpstreamError::Unavailable(e.without_url().to_string()))?;
@@ -281,7 +283,8 @@ impl Google {
         let result = self
             .http
             .post(self.endpoints.revoke.clone())
-            .form(&[("token", token)])
+            .header(reqwest::header::CONTENT_TYPE, FORM)
+            .body(encode(&[("token", token)]))
             .send()
             .await;
         match result {
@@ -290,6 +293,14 @@ impl Google {
             Err(e) => tracing::warn!(error = %e.without_url(), "could not reach Google to revoke a grant"),
         }
     }
+}
+
+const FORM: &str = "application/x-www-form-urlencoded";
+
+fn encode(pairs: &[(&str, &str)]) -> String {
+    url::form_urlencoded::Serializer::new(String::new())
+        .extend_pairs(pairs.iter().copied())
+        .finish()
 }
 
 async fn read_limited(response: reqwest::Response) -> Result<Vec<u8>, UpstreamError> {

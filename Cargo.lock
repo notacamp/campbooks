@@ -430,6 +430,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "campbooks-identity"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "axum",
+ "base64 0.22.1",
+ "campbooks-kernel",
+ "chrono",
+ "figment",
+ "http-body-util",
+ "jsonwebtoken",
+ "reqwest",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "tokio",
+ "tower",
+ "tracing",
+ "url",
+ "utoipa",
+ "utoipa-axum",
+ "uuid",
+]
+
+[[package]]
 name = "campbooks-kernel"
 version = "0.1.0"
 dependencies = [
@@ -470,6 +497,7 @@ dependencies = [
  "axum",
  "base64 0.22.1",
  "campbooks-connectors",
+ "campbooks-identity",
  "campbooks-kernel",
  "campbooks-system",
  "campbooks-workspaces",

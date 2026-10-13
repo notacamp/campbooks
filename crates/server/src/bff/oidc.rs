@@ -8,6 +8,10 @@
 //! end-session URLs are the public ones from discovery, while discovery,
 //! token and revocation requests go to the internal issuer.
 //!
+//! When the issuer runs in this process (ADR 0014), those requests go
+//! through its router instead of the network: same protocol, same checks, no
+//! hairpin through the reverse proxy.
+//!
 //! Errors never carry tokens, codes or secrets; only the IdP's `error` code.
 
 use std::{sync::Arc, time::Duration};
@@ -97,9 +101,93 @@ struct ErrorBody {
     error: Option<String>,
 }
 
+/// How the server reaches the issuer.
+enum Transport {
+    /// Over HTTP.
+    Http(reqwest::Client),
+    /// Through the in-process issuer's router.
+    InProcess(axum::Router),
+}
+
+/// An answer from the issuer: status and (bounded) body.
+struct Answer {
+    status: u16,
+    body: Vec<u8>,
+}
+
+impl Transport {
+    async fn send(
+        &self,
+        method: axum::http::Method,
+        url: &str,
+        form: Option<String>,
+    ) -> Result<Answer, OidcError> {
+        match self {
+            Self::Http(http) => {
+                let mut request = http
+                    .request(method, url)
+                    .header(reqwest::header::ACCEPT, "application/json")
+                    .headers(telemetry::trace_headers());
+                if let Some(form) = form {
+                    request = request
+                        .header(
+                            reqwest::header::CONTENT_TYPE,
+                            "application/x-www-form-urlencoded",
+                        )
+                        .body(form);
+                }
+                let response = request
+                    .send()
+                    .await
+                    .map_err(|e| OidcError::Unavailable(e.without_url().to_string()))?;
+                let status = response.status().as_u16();
+                Ok(Answer {
+                    status,
+                    body: read_body(response).await?,
+                })
+            }
+            Self::InProcess(router) => {
+                use tower::ServiceExt as _;
+                let url = url::Url::parse(url)
+                    .map_err(|e| OidcError::Unavailable(format!("bad issuer URL: {e}")))?;
+                let target = match url.query() {
+                    Some(query) => format!("{}?{query}", url.path()),
+                    None => url.path().to_owned(),
+                };
+                let mut request = axum::http::Request::builder()
+                    .method(method)
+                    .uri(target)
+                    .header(axum::http::header::ACCEPT, "application/json");
+                if form.is_some() {
+                    request = request.header(
+                        axum::http::header::CONTENT_TYPE,
+                        "application/x-www-form-urlencoded",
+                    );
+                }
+                let request = request
+                    .body(axum::body::Body::from(form.unwrap_or_default()))
+                    .map_err(|e| OidcError::Unavailable(e.to_string()))?;
+                let response = router
+                    .clone()
+                    .oneshot(request)
+                    .await
+                    .map_err(|e| OidcError::Unavailable(e.to_string()))?;
+                let status = response.status().as_u16();
+                let body = axum::body::to_bytes(response.into_body(), MAX_RESPONSE_BYTES)
+                    .await
+                    .map_err(|_| OidcError::Unavailable("response too large".into()))?;
+                Ok(Answer {
+                    status,
+                    body: body.to_vec(),
+                })
+            }
+        }
+    }
+}
+
 /// The OIDC client of one BFF.
 pub struct Oidc {
-    http: reqwest::Client,
+    http: Transport,
     issuer: String,
     internal_issuer: String,
     client_id: String,
@@ -133,10 +221,15 @@ pub struct AuthorizationRequest<'a> {
 }
 
 impl Oidc {
-    /// The client for `settings`.
-    pub fn new(settings: &Settings) -> Self {
+    /// The client for `settings`; `issuer` is the in-process issuer's
+    /// router, used when `settings.in_process`.
+    pub fn new(settings: &Settings, issuer: axum::Router) -> Self {
         Self {
-            http: settings.http.clone(),
+            http: if settings.in_process {
+                Transport::InProcess(issuer)
+            } else {
+                Transport::Http(settings.http.clone())
+            },
             issuer: settings.issuer.clone(),
             internal_issuer: settings.internal_issuer.clone(),
             client_id: settings.client_id.clone(),
@@ -289,22 +382,13 @@ impl Oidc {
             .append_pair("client_id", &self.client_id)
             .append_pair("client_secret", secret.expose_secret())
             .finish();
-        let response = self
+        let Answer { status, body } = self
             .http
-            .post(endpoint)
-            .header(
-                reqwest::header::CONTENT_TYPE,
-                "application/x-www-form-urlencoded",
-            )
-            .header(reqwest::header::ACCEPT, "application/json")
-            .headers(telemetry::trace_headers())
-            .body(form)
-            .send()
-            .await
-            .map_err(|e| OidcError::Unavailable(e.without_url().to_string()))?;
-        let status = response.status();
+            .send(axum::http::Method::POST, endpoint, Some(form))
+            .await?;
+        let status = reqwest::StatusCode::from_u16(status)
+            .map_err(|_| OidcError::Unavailable("invalid status".into()))?;
         telemetry::record_status(status.as_u16());
-        let body = read_body(response).await?;
         if status.is_success() {
             return Ok(body);
         }
@@ -361,17 +445,19 @@ impl Oidc {
             "{}/.well-known/openid-configuration",
             self.internal_issuer.trim_end_matches('/')
         );
-        let response = self
+        let answer = self
             .http
-            .get(&url)
-            .header(reqwest::header::ACCEPT, "application/json")
-            .headers(telemetry::trace_headers())
-            .send()
+            .send(axum::http::Method::GET, &url, None)
             .instrument(telemetry::client_span("GET idp", &url))
             .await
-            .and_then(reqwest::Response::error_for_status)
             .map_err(|e| OidcError::Unavailable(format!("discovery: {e}")))?;
-        let body = read_body(response).await?;
+        if !(200..300).contains(&answer.status) {
+            return Err(OidcError::Unavailable(format!(
+                "discovery: HTTP {}",
+                answer.status
+            )));
+        }
+        let body = answer.body;
         let discovery: Discovery = serde_json::from_slice(&body)
             .map_err(|e| OidcError::Unavailable(format!("discovery: {e}")))?;
         if discovery.issuer != self.issuer {
@@ -434,7 +520,7 @@ mod tests {
         ) else {
             panic!("valid settings");
         };
-        Oidc::new(&settings)
+        Oidc::new(&settings, axum::Router::new())
     }
 
     #[test]

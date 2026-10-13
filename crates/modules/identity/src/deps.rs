@@ -14,7 +14,7 @@ use campbooks_kernel::{
     Config,
     clock::{Clock, SystemClock},
     config::Environment,
-    crypto::{Cipher, SecretKey},
+    crypto::{Cipher, SecretKey, derive_secret},
 };
 use figment::Figment;
 use secrecy::SecretString;
@@ -141,7 +141,7 @@ impl Deps {
         let google = google_client(google, config, &url)?;
         let cipher = Cipher::new(&secret, SEALING_PURPOSE);
         let issuer = Issuer {
-            clients: Clients::first_party(&url, secret.derive(WEB_CLIENT_SECRET_PURPOSE)),
+            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE)),
             url,
             cookies: Cookies::new(secure),
             keys: Arc::new(Keys::new(

@@ -209,6 +209,17 @@ async fn run(
     } else {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
     }
+    match &composition.identity.issuer {
+        Some(issuer) => tracing::info!(
+            issuer = %issuer.url,
+            google = issuer.google.is_some(),
+            "this instance is its own identity provider (OAuth 2.1 issuer)"
+        ),
+        None => tracing::info!(
+            "the in-process identity provider is off: CAMPBOOKS_AUTH__ISSUER names another one, \
+             or CAMPBOOKS_SECRET_KEY is unset"
+        ),
+    }
     let registry = campbooks_server::registry_with(&composition)?;
     if config.run_migrations {
         migrate(&config).await?;
@@ -221,11 +232,12 @@ async fn run(
 
     let bind_addr = config.bind_addr;
     let metrics_addr = config.telemetry.metrics_addr;
-    let state = campbooks_server::with_ports(
+    let state = campbooks_server::with_composed_ports(
         AppState::new(db.clone(), config)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs),
+        &composition,
     );
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.

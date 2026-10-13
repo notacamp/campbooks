@@ -13,20 +13,11 @@ use campbooks_kernel::{
     tenancy::{Workspace, WorkspaceId},
 };
 use secrecy::SecretString;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite};
-
-/// The path.
-#[derive(Debug, Deserialize)]
-pub struct AdoptPath {
-    /// The workspace.
-    pub workspace_id: WorkspaceId,
-    /// The held grant.
-    pub id: Uuid,
-}
 
 /// The connection the mailbox became.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -64,12 +55,13 @@ pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
     workspace: Workspace<IdentityWrite>,
-    Path(path): Path<AdoptPath>,
+    Path(path): Path<(WorkspaceId, Uuid)>,
 ) -> Result<Json<Adopted>> {
+    let id = path.1;
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
     let now = issuer.now();
     let mut tx = state.db.begin().await?;
-    let taken = held_grants::take(&mut tx, &issuer.cipher, path.id, account, now)
+    let taken = held_grants::take(&mut tx, &issuer.cipher, id, account, now)
         .await?
         .ok_or(Error::NotFound)?;
     let grant = ProviderGrant {
@@ -78,6 +70,7 @@ pub async fn handler(
         provider: taken.grant.provider.clone(),
         account_subject: taken.account_subject,
         address: taken.grant.address.clone(),
+        address_verified: taken.address_verified,
         display_name: taken.grant.display_name.clone(),
         scopes: taken.tokens.scopes.clone(),
         access_token: SecretString::from(taken.tokens.access_token.clone()),
@@ -87,7 +80,7 @@ pub async fn handler(
     // The grant is deleted only once it is a connection: if the intake
     // refuses, the row stays (rolled back) and the person can retry.
     let connection = state.grants.adopt(&state, grant).await?;
-    held_grants::delete(&mut tx, path.id, account).await?;
+    held_grants::delete(&mut tx, id, account).await?;
     tx.commit().await?;
     Ok(Json(Adopted { connection }))
 }

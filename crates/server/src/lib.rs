@@ -76,14 +76,19 @@ pub struct Composition {
     /// The connectors module's settings, Google client and credentials
     /// cipher.
     pub connectors: campbooks_connectors::Deps,
+    /// The identity module's in-process issuer, when it serves this
+    /// instance (ADR 0014).
+    pub identity: campbooks_identity::Deps,
 }
 
 impl Composition {
     /// Read every module's dependencies from the environment. A broken
     /// setting is an error naming it.
     pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
+        let scopes: Vec<&str> = scope_catalogue().iter().map(|scope| scope.name).collect();
         Ok(Self {
             connectors: campbooks_connectors::Deps::from_env(config)?,
+            identity: campbooks_identity::Deps::from_env(config, &scopes)?,
         })
     }
 }
@@ -111,6 +116,31 @@ pub fn with_ports(state: AppState) -> AppState {
     state
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+}
+
+/// [`with_ports`], plus the ports of the modules composed with
+/// `composition`: the connectors module takes mailbox grants obtained at
+/// sign-in, and when the issuer runs in this process the API validates
+/// tokens with its keys, read in-process (ADR 0014).
+pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppState {
+    let state = with_ports(state).with_grant_intake(campbooks_connectors::grant_intake(
+        composition.connectors.clone(),
+    ));
+    match &composition.identity.issuer {
+        Some(issuer) => {
+            let keys = campbooks_identity::LocalKeys {
+                db: state.db.clone(),
+                keys: Arc::clone(&issuer.keys),
+            };
+            let verifier = campbooks_kernel::auth::TokenVerifier::in_process(
+                &state.config.auth,
+                &issuer.url,
+                Arc::new(keys),
+            );
+            state.with_auth(verifier)
+        }
+        None => state,
+    }
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
@@ -220,10 +250,12 @@ fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
         .merge(changes::router())
 }
 
-/// The OpenAPI document: every module's routes and the web BFF's.
+/// The OpenAPI document: every module's routes, the web BFF's and the
+/// identity issuer's protocol endpoints.
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut doc = api().into_openapi();
     doc.merge(bff::openapi());
+    doc.merge(campbooks_identity::protocol::openapi());
     doc
 }
 
@@ -255,7 +287,12 @@ pub fn router_with(
         state,
     } = operations::compose(api_with(composition), state);
     spec.merge(bff::openapi());
+    spec.merge(campbooks_identity::protocol::openapi());
     let spec = Arc::new(spec);
+
+    // The issuer's protocol endpoints (`/.well-known/*`, `/oauth2/*`,
+    // `/auth/*`); the BFF reaches them in-process when the issuer runs here.
+    let identity = campbooks_identity::protocol::router(state.clone(), composition.identity.clone());
 
     // What `/bff/api/*` runs requests through: the composed module routes
     // (idempotency included), without the middleware below (the outer
@@ -264,9 +301,9 @@ pub fn router_with(
         .clone()
         .fallback(|| async { Error::NotFound })
         .with_state(state.clone());
-    let bff = bff::Bff::new(bff, &state, api_only);
+    let bff = bff::Bff::new(bff, &state, api_only, identity.clone());
 
-    compose(state, routes, spec, &bff)
+    compose(state, routes, spec, &bff, identity)
 }
 
 /// Assemble the application from the API routes, the OpenAPI document and
@@ -276,6 +313,7 @@ fn compose(
     routes: Router<AppState>,
     spec: Arc<utoipa::openapi::OpenApi>,
     bff: &bff::Bff,
+    identity: Router,
 ) -> Router {
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
     let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
@@ -290,7 +328,8 @@ fn compose(
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
         .with_state(state)
-        .merge(bff.router());
+        .merge(bff.router())
+        .merge(identity);
     let routes = match web_client {
         Some(client) => {
             routes.fallback(move |request: AxumRequest| client.clone().respond(request))

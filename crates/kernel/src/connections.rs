@@ -28,6 +28,8 @@ pub struct ProviderGrant {
     pub account_subject: String,
     /// The account's email address, as the provider gave it.
     pub address: String,
+    /// Whether the provider says it verified the address.
+    pub address_verified: bool,
     /// The account's display name.
     pub display_name: Option<String>,
     /// The scopes the provider granted.

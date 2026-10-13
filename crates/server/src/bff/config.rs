@@ -113,6 +113,9 @@ pub struct Settings {
     pub issuer: String,
     /// Where the server reaches the issuer.
     pub internal_issuer: String,
+    /// The issuer runs in this process (ADR 0014): discovery, token and
+    /// revocation requests go through its router, not the network.
+    pub in_process: bool,
     /// The OIDC client id.
     pub client_id: String,
     /// The OIDC client secret.
@@ -154,45 +157,65 @@ pub fn settings(
     secret: Option<SecretKey>,
     api_scopes: &[&str],
 ) -> Result<Loaded, String> {
-    let Some(issuer) = config.auth.issuer() else {
-        return Ok(Loaded::Disabled(
-            "CAMPBOOKS_AUTH__ISSUER is unset: there is no identity provider to sign in with",
-        ));
-    };
     let timeouts = timeouts(&bff)?;
-    let client_secret = match (bff.client_secret_file, bff.client_secret) {
-        (Some(path), _) if !path.as_os_str().is_empty() => ClientSecret::File(path),
-        (_, Some(secret)) if !secret.expose_secret().trim().is_empty() => {
-            ClientSecret::Inline(secret)
-        }
-        _ => {
+    let (public_origin, secure_cookies) = public_origin(&config.public_url)?;
+    // The issuer runs here unless another identity provider is configured
+    // (Rauthy, until it is removed): then the browser signs in through it.
+    let external = config
+        .auth
+        .issuer()
+        .filter(|issuer| issuer.trim_end_matches('/') != public_origin);
+    let Some(secret) = secret else {
+        if external.is_none() {
             return Ok(Loaded::Disabled(
-                "neither CAMPBOOKS_BFF__CLIENT_SECRET_FILE nor CAMPBOOKS_BFF__CLIENT_SECRET is set",
+                "CAMPBOOKS_SECRET_KEY is unset: the in-process identity provider cannot run",
             ));
         }
-    };
-    let Some(secret) = secret else {
         return Err(
             "web sign-in needs CAMPBOOKS_SECRET_KEY_FILE or CAMPBOOKS_SECRET_KEY (32 random \
              bytes, base64; e.g. `openssl rand -base64 32`) to encrypt the tokens it keeps"
                 .to_owned(),
         );
     };
+    let (issuer, client_secret) = match external {
+        None => (
+            public_origin.clone(),
+            ClientSecret::Inline(campbooks_kernel::crypto::derive_secret(
+                &secret,
+                campbooks_identity::deps::WEB_CLIENT_SECRET_PURPOSE,
+            )),
+        ),
+        Some(issuer) => {
+            let client_secret = match (bff.client_secret_file, bff.client_secret) {
+                (Some(path), _) if !path.as_os_str().is_empty() => ClientSecret::File(path),
+                (_, Some(secret)) if !secret.expose_secret().trim().is_empty() => {
+                    ClientSecret::Inline(secret)
+                }
+                _ => {
+                    return Ok(Loaded::Disabled(
+                        "neither CAMPBOOKS_BFF__CLIENT_SECRET_FILE nor CAMPBOOKS_BFF__CLIENT_SECRET \
+                         is set",
+                    ));
+                }
+            };
+            (issuer.to_owned(), client_secret)
+        }
+    };
     if bff.client_id.trim().is_empty() {
         return Err("CAMPBOOKS_BFF__CLIENT_ID must not be blank".to_owned());
     }
-    let (public_origin, secure_cookies) = public_origin(&config.public_url)?;
+    let in_process = external.is_none();
     let internal_issuer = match bff
         .idp_internal_url
         .as_deref()
         .map(str::trim)
-        .filter(|url| !url.is_empty())
+        .filter(|url| !url.is_empty() && !in_process)
     {
         Some(url) => {
             check_http_url("CAMPBOOKS_BFF__IDP_INTERNAL_URL", url)?;
             format!("{}/", url.trim_end_matches('/'))
         }
-        None => issuer.to_owned(),
+        None => issuer.clone(),
     };
     let scopes = match bff.scopes.as_deref().map(str::trim) {
         Some(scopes) if !scopes.is_empty() => scopes.to_owned(),
@@ -215,8 +238,9 @@ pub fn settings(
     Ok(Loaded::Enabled(Box::new(Settings {
         public_origin,
         secure_cookies,
-        issuer: issuer.to_owned(),
+        issuer,
         internal_issuer,
+        in_process,
         client_id: bff.client_id.trim().to_owned(),
         client_secret,
         scopes,
@@ -346,14 +370,45 @@ mod tests {
     }
 
     #[test]
-    fn disabled_without_an_issuer_or_a_client_secret() {
-        let no_issuer = settings(
+    fn without_another_issuer_the_in_process_one_signs_browsers_in() {
+        let no_key = settings(
             &config(None, "http://localhost:8080"),
             with_secret(),
             None,
             &[],
         );
-        assert!(matches!(no_issuer, Ok(Loaded::Disabled(reason)) if reason.contains("ISSUER")));
+        assert!(
+            matches!(no_key, Ok(Loaded::Disabled(reason)) if reason.contains("CAMPBOOKS_SECRET_KEY"))
+        );
+        for issuer in [None, Some("http://localhost:8080/")] {
+            let here = enabled(settings(
+                &config(issuer, "http://localhost:8080"),
+                BffConfig {
+                    idp_internal_url: Some("http://idp:8080/auth/v1".into()),
+                    ..BffConfig::default()
+                },
+                Some(SecretKey::from_bytes([1; 32])),
+                &[],
+            ));
+            assert!(here.in_process);
+            assert_eq!(here.issuer, "http://localhost:8080");
+            assert_eq!(here.internal_issuer, "http://localhost:8080", "no hop through Rauthy");
+            let ClientSecret::Inline(secret) = &here.client_secret else {
+                panic!("a derived secret");
+            };
+            assert_eq!(
+                secret.expose_secret(),
+                campbooks_kernel::crypto::derive_secret(
+                    &SecretKey::from_bytes([1; 32]),
+                    campbooks_identity::deps::WEB_CLIENT_SECRET_PURPOSE
+                )
+                .expose_secret()
+            );
+        }
+    }
+
+    #[test]
+    fn disabled_without_a_client_secret_for_another_issuer() {
         let no_secret = settings(
             &config(Some(ISSUER), "http://localhost:8080"),
             BffConfig::default(),

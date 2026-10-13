@@ -344,9 +344,9 @@ pub async fn callback(
                     code_verifier: random_token(),
                     ..flow
                 };
+                // Its new round-trip cookie replaces this one.
                 return redirect_to_provider(&ctx, issuer, google, retry, Some(&identity.subject))
-                    .await
-                    .map(|response| with_cookie(response, clear_flow));
+                    .await;
             }
             let held = (mail_granted && tokens.refresh_token.is_some()).then(|| ProviderTokens {
                 access_token: tokens.access_token.clone(),
@@ -538,6 +538,7 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
                 identity_id: linked.identity_id,
                 provider: provider.as_str(),
                 address,
+                address_verified: pending.identity.email_verified,
                 display_name: pending.identity.name.as_deref(),
                 tokens,
             },
