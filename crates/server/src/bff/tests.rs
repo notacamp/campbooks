@@ -90,9 +90,12 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
         ..BffConfig::default()
     };
     tweak(&mut bff);
-    let Ok(Loaded::Enabled(settings)) =
-        config::settings(&config, bff, Some([7; 32]), &["test:read"])
-    else {
+    let Ok(Loaded::Enabled(settings)) = config::settings(
+        &config,
+        bff,
+        Some(campbooks_kernel::crypto::SecretKey::from_bytes([7; 32])),
+        &["test:read"],
+    ) else {
         panic!("test BFF settings are valid");
     };
     // The app runs as the runtime role, like the server (row-level security
@@ -402,7 +405,7 @@ async fn callback_starts_a_session_and_lands_with_a_same_origin_page(db: PgPool)
     .fetch_one(&h.db)
     .await
     .unwrap();
-    assert_eq!(row.0, super::crypto::hash(&token));
+    assert_eq!(row.0, campbooks_kernel::crypto::hash(&token));
     assert_eq!(row.1, "test-user");
     assert_eq!(row.2.as_deref(), Some("test-sid-1"));
     assert!(!String::from_utf8_lossy(&row.3).contains("eyJ"));
@@ -951,7 +954,12 @@ async fn a_changed_secret_key_ends_sessions_instead_of_failing(db: PgPool) {
         client_secret: Some(SecretString::from(WEB_CLIENT_SECRET)),
         ..BffConfig::default()
     };
-    let Ok(Loaded::Enabled(settings)) = config::settings(&config, bff, Some([9; 32]), &[]) else {
+    let Ok(Loaded::Enabled(settings)) = config::settings(
+        &config,
+        bff,
+        Some(campbooks_kernel::crypto::SecretKey::from_bytes([9; 32])),
+        &[],
+    ) else {
         panic!("valid settings");
     };
     browser.app = app(
@@ -1053,7 +1061,7 @@ async fn backchannel_logout_refuses_bad_tokens(db: PgPool) {
     browser.sign_in(&h.idp, "/").await;
     let id_token = h.idp.id_token(&h.idp.id_token_claims(
         "test-user",
-        &super::crypto::random_token(),
+        &campbooks_kernel::crypto::random_token(),
         "test-sid-1",
     ));
     let unsigned = h
@@ -1081,7 +1089,7 @@ async fn pruning_deletes_ended_sessions_and_stale_sign_ins(db: PgPool) {
     idle.sign_in(&h.idp, "/").await;
     let mut old = Browser::new(&h.app);
     old.sign_in(&h.idp, "/").await;
-    let hash = |b: &Browser| super::crypto::hash(b.cookie(SESSION).unwrap());
+    let hash = |b: &Browser| campbooks_kernel::crypto::hash(b.cookie(SESSION).unwrap());
     sqlx::query("UPDATE bff.sessions SET idle_expires_at = now() - interval '1 minute' WHERE token_hash = $1")
         .bind(hash(&idle))
         .execute(&h.db)
@@ -1156,7 +1164,12 @@ async fn the_server_reaches_the_idp_at_its_internal_address(db: PgPool) {
         idp_internal_url: Some(idp.issuer().to_owned()),
         ..BffConfig::default()
     };
-    let Ok(Loaded::Enabled(settings)) = config::settings(&config, bff, Some([7; 32]), &[]) else {
+    let Ok(Loaded::Enabled(settings)) = config::settings(
+        &config,
+        bff,
+        Some(campbooks_kernel::crypto::SecretKey::from_bytes([7; 32])),
+        &[],
+    ) else {
         panic!("valid settings");
     };
     let app = app(AppState::new(db, config), Some(*settings));

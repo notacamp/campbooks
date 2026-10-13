@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT to_jsonb(s) || jsonb_build_object('due_at', d.due_at) AS \"row!\"\n                 FROM connectors.streams s LEFT JOIN connectors.sync_due d ON d.stream_id = s.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "row!",
+        "type_info": "Jsonb",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a8f637c155fb42cb26ce10983fbc31d54285b369230349ece96ab75d3eb98517"
+}

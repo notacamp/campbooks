@@ -7,6 +7,21 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Connect a Gmail account (API only for now; the screen comes next): Campbooks
+  asks Google for consent, keeps the grant encrypted with the instance secret
+  key, reads the last 90 days of mail and then follows new mail and label
+  changes, every minute while the mailbox is busy and backing off to every few
+  hours when it is quiet. Each connection shows its health (ok, needs
+  reauthorisation, throttled, failing); disconnecting, leaving the workspace or
+  deleting it revokes the grant at Google. Off until you register a Google
+  OAuth client (`CAMPBOOKS_GOOGLE__CLIENT_ID`,
+  `CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`; see `deploy/README.md` → Connected
+  accounts); tuning is `CAMPBOOKS_CONNECTORS__*`, including the largest
+  message kept (`…__GMAIL__MAX_MESSAGE_BYTES`, 50 MiB) and the bytes one sync
+  run may download (`…__GMAIL__RUN_BUDGET_BYTES`, 64 MiB). The web app's
+  callback screen at `/connections/google/callback` is not built yet, so
+  connecting goes through the API for now. Note: replacing the instance
+  secret key now also asks members to connect their accounts again.
 - Live updates: the app learns what changed in a workspace (renamed, a
   member joined, left or changed role) as it happens and refreshes only what
   it shows, catching up after a lost connection or a sleeping laptop. API

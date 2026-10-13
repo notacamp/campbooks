@@ -21,6 +21,7 @@ campbooks-ai = { path = "crates/ai" }
 campbooks-server = { path = "crates/server" }
 campbooks-system = { path = "crates/modules/system" }
 campbooks-workspaces = { path = "crates/modules/workspaces" }
+campbooks-connectors = { path = "crates/modules/connectors" }
 campbooks-identity = { path = "crates/modules/identity" }
 
 # HTTP / async
@@ -90,8 +91,13 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 cargo_metadata = "0.23.1"
 regex = "1.13.1"
 
+# Email: MIME parsing of raw messages (connectors' email adapters).
+mail-parser = { version = "0.11.9", default-features = false }
+
 # Tests
 wiremock = "0.6.5"
+# JSON Schema (2020-12) validation in contract tests (`contracts/`).
+boon = "0.6.1"
 # Ed25519 keys for the test identity provider (`campbooks_kernel::testing::TestIdp`);
 # already in the graph as the rustls / jsonwebtoken crypto backend.
 aws-lc-rs = "1.18.1"

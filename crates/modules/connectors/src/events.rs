@@ -1,0 +1,231 @@
+//! The domain events this module publishes, each in the transaction of the
+//! change it describes, and the events of other modules it consumes.
+//!
+//! **No personal data in events** (`contracts/README.md`): the event log is
+//! retained, so payloads carry ids, blob references and non-personal facts.
+//! The account's address travels in a blob ([`AccountDocument`]); message
+//! content in `MessageChangeBatch` blobs. The payloads of
+//! [`MessagesChanged`] and [`CapabilityGranted`] are contracts with the
+//! conversations module (`contracts/*.schema.json`).
+
+use campbooks_kernel::{DomainEvent, RecordRef, blobs::BlobRef, changes::Change, tenancy::UserId};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+use crate::domain::model::{Capability, ConnectionId, InboxId, Provider};
+
+/// The record type of a connection in the client change feed.
+pub const CONNECTION_RECORD: &str = "connectors.connection";
+
+/// A connection, as the change feed names it (ids only).
+fn connection_record(connection: ConnectionId) -> RecordRef {
+    RecordRef::new(CONNECTION_RECORD, &connection)
+}
+
+/// How a [`BlobRef`] looks on the wire, for the events catalogue.
+#[derive(ToSchema)]
+#[schema(as = BlobRef)]
+#[allow(dead_code, reason = "a schema description only, never built")]
+pub struct BlobSchema {
+    /// SHA-256 of the bytes, 64 lower-case hex digits.
+    hash: String,
+    /// Length in bytes.
+    size: u64,
+    /// The media type given when it was stored.
+    content_type: String,
+}
+
+/// A member connected an outside account.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConnectionAdded {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The provider.
+    pub provider: Provider,
+    /// The member who granted it.
+    pub granted_by: UserId,
+}
+
+impl DomainEvent for ConnectionAdded {
+    const NAME: &'static str = "connectors.connection_added";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
+    }
+}
+
+/// A connection gained a capability: a new connection, or an incremental
+/// consent. For `messages` it names the inbox this module minted; the
+/// conversations module creates it, with `granted_by` as its manager
+/// (`contracts/connectors.capability_granted.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct CapabilityGranted {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The capability.
+    pub capability: Capability,
+    /// The member who granted it.
+    pub granted_by: UserId,
+    /// The inbox the stream feeds (`messages` only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inbox_id: Option<InboxId>,
+    /// The account's address and name: an [`AccountDocument`] blob.
+    #[schema(value_type = BlobSchema)]
+    pub account: BlobRef,
+}
+
+impl DomainEvent for CapabilityGranted {
+    const NAME: &'static str = "connectors.capability_granted";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
+    }
+}
+
+/// The account behind a connection, as the blob a [`CapabilityGranted`]
+/// points at (`contracts/connection-account.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountDocument {
+    /// The format version, 1.
+    pub version: u16,
+    /// The provider.
+    pub provider: Provider,
+    /// The account's email address, lower-cased.
+    pub address: String,
+    /// Whether the provider verified it.
+    pub address_verified: bool,
+    /// The account's display name, when the provider gives one.
+    pub display_name: Option<String>,
+}
+
+/// The media type of an [`AccountDocument`].
+pub const ACCOUNT_CONTENT_TYPE: &str =
+    "application/vnd.campbooks.connection-account+json; version=1";
+
+/// A connection's grant stopped working (revoked, expired, or its stored
+/// credentials can no longer be read): the member must connect again.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConnectionNeedsReauth {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The member who granted it, who can grant it again.
+    pub granted_by: UserId,
+    /// Why (`grant_revoked`, `credentials_unreadable`).
+    pub reason: String,
+}
+
+impl DomainEvent for ConnectionNeedsReauth {
+    const NAME: &'static str = "connectors.connection_needs_reauth";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(connection_record(self.connection))]
+    }
+}
+
+/// A connection was disconnected: its grant is revoked and its streams are
+/// gone. What becomes of the inboxes it fed is their owner's call.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The inboxes its streams fed.
+    pub inbox_ids: Vec<InboxId>,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::delete(connection_record(self.connection))]
+    }
+}
+
+/// A messages stream produced a `MessageChangeBatch` for an inbox
+/// (`contracts/connectors.messages_changed.v1.schema.json`). Published in
+/// the transaction that advances the stream's cursor.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MessagesChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The conversations inbox; equals the batch's `inbox`.
+    pub inbox_id: InboxId,
+    /// The `MessageChangeBatch` v1 document, a blob of the workspace.
+    #[schema(value_type = BlobSchema)]
+    pub batch: BlobRef,
+    /// The stream's cursor after this batch (opaque, never personal data).
+    pub cursor: String,
+}
+
+impl DomainEvent for MessagesChanged {
+    const NAME: &'static str = "connectors.messages_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_left` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberLeft {
+    /// The workspace.
+    pub workspace: String,
+    /// The former member.
+    pub user: UserId,
+}
+
+impl DomainEvent for MemberLeft {
+    const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.workspace_deleting` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspaceDeleting {
+    /// The workspace.
+    pub workspace: String,
+    /// When its records are hard-deleted.
+    pub purge_after: DateTime<Utc>,
+}
+
+impl DomainEvent for WorkspaceDeleting {
+    const NAME: &'static str = "workspaces.workspace_deleting";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}

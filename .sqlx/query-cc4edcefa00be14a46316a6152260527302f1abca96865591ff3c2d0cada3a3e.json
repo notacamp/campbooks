@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.gmail_oversized (workspace_id, stream_id, provider_message_id)\n                       VALUES ($1, $2, $3)\n                       ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cc4edcefa00be14a46316a6152260527302f1abca96865591ff3c2d0cada3a3e"
+}

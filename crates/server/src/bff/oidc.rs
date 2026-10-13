@@ -426,8 +426,12 @@ mod tests {
             idp_internal_url: internal.map(ToOwned::to_owned),
             ..BffConfig::default()
         };
-        let Ok(Loaded::Enabled(settings)) = config::settings(&config, bff, Some([1; 32]), &[])
-        else {
+        let Ok(Loaded::Enabled(settings)) = config::settings(
+            &config,
+            bff,
+            Some(campbooks_kernel::crypto::SecretKey::from_bytes([1; 32])),
+            &[],
+        ) else {
             panic!("valid settings");
         };
         Oidc::new(&settings)

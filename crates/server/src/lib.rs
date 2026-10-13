@@ -68,12 +68,38 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 /// `security(("bearer" = ["<scope>"]))`.
 pub const SECURITY_SCHEME: &str = "bearer";
 
-/// Every module, in mount order.
+/// What the modules are composed with (constructor injection), read from
+/// the environment at startup. `Default` is inert (no provider configured):
+/// what the catalogues (OpenAPI, events, scopes) are built from.
+#[derive(Debug, Clone, Default)]
+pub struct Composition {
+    /// The connectors module's settings, Google client and credentials
+    /// cipher.
+    pub connectors: campbooks_connectors::Deps,
+}
+
+impl Composition {
+    /// Read every module's dependencies from the environment. A broken
+    /// setting is an error naming it.
+    pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
+        Ok(Self {
+            connectors: campbooks_connectors::Deps::from_env(config)?,
+        })
+    }
+}
+
+/// Every module, in mount order, composed inertly (for catalogues).
 pub fn modules() -> Vec<Module> {
+    modules_with(&Composition::default())
+}
+
+/// Every module, in mount order, composed with `composition`.
+pub fn modules_with(composition: &Composition) -> Vec<Module> {
     vec![
         campbooks_system::module(),
         campbooks_workspaces::module(),
-        campbooks_identity::module(),
+        campbooks_connectors::module(composition.connectors.clone()),
+        campbooks_identity::module(composition.identity.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -91,7 +117,15 @@ pub fn with_ports(state: AppState) -> AppState {
 /// kernel's maintenance and the web BFF's. Fails when a registration breaks
 /// a naming rule or is duplicated (also checked by `cargo xtask arch`).
 pub fn registry() -> Result<Registry, RegistryError> {
-    Registry::build_with(&modules(), &[(bff::OWNER, &bff::background())])
+    registry_with(&Composition::default())
+}
+
+/// [`registry`] of the modules composed with `composition`.
+pub fn registry_with(composition: &Composition) -> Result<Registry, RegistryError> {
+    Registry::build_with(
+        &modules_with(composition),
+        &[(bff::OWNER, &bff::background())],
+    )
 }
 
 /// Every event the modules publish, with its payload schema: what
@@ -151,7 +185,15 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
-        (name = "identity", description = "The identity module."),
+        (name = "connectors", description = "Connections to outside accounts (Gmail first): \
+            connect with the provider's consent, see their health, sync now, disconnect. \
+            Credentials are never returned."),
+        (name = "identity", description = "Accounts and their ways in, and this instance's \
+            OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, \
+            sign-in with a provider, and the mailboxes a sign-up granted, waiting for a \
+            workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
+            browsers and OAuth clients; they answer 404 while another identity provider serves \
+            the instance."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -161,12 +203,16 @@ fn security_scheme() -> SecurityScheme {
 struct ApiDoc;
 
 fn api() -> OpenApiRouter<AppState> {
+    api_with(&Composition::default())
+}
+
+fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
     let mut doc = ApiDoc::openapi();
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(SECURITY_SCHEME, security_scheme());
-    modules()
+    modules_with(composition)
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
@@ -194,11 +240,20 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// invoke operations by id through exactly what HTTP requests reach. The
 /// BFF's own operations are not in that catalogue: they serve browsers only.
 pub fn router(state: AppState, bff: Option<bff::Settings>) -> Router {
+    router_with(state, bff, &Composition::default())
+}
+
+/// [`router`] over the modules composed with `composition`.
+pub fn router_with(
+    state: AppState,
+    bff: Option<bff::Settings>,
+    composition: &Composition,
+) -> Router {
     let operations::Composed {
         routes,
         mut spec,
         state,
-    } = operations::compose(api(), state);
+    } = operations::compose(api_with(composition), state);
     spec.merge(bff::openapi());
     let spec = Arc::new(spec);
 

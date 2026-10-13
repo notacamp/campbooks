@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id AS \"stream: StreamId\", s.connection_id AS \"connection: ConnectionId\",\n                  c.provider, c.granted_by AS \"granted_by: UserId\", c.health,\n                  s.inbox_id AS \"inbox: InboxId\", s.phase, s.cursor, s.interval_seconds,\n                  s.paused, s.consecutive_failures, s.throttled_until\n             FROM connectors.streams s\n             JOIN connectors.connections c ON c.id = s.connection_id\n            WHERE s.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "connection: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "connection_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "granted_by: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "granted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "health",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "phase",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "phase"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "cursor",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "cursor"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "interval_seconds",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "interval_seconds"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "consecutive_failures",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "consecutive_failures"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "throttled_until",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "throttled_until"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "2d2a2fea329c6a2fe9e57008179897b3fb87ba02793b1a827da7a780893dfd27"
+}

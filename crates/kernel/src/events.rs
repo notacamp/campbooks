@@ -128,6 +128,29 @@ pub trait EventHandler: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), JobError>> + Send;
 }
 
+/// A consumer of one event type that owns its dependencies (an AI gateway,
+/// settings): the module builds it from what it was composed with and
+/// registers it with [`Background::consumer`](crate::jobs::Background::consumer).
+/// Otherwise exactly an [`EventHandler`]: same naming, delivery and
+/// transaction rules.
+pub trait EventConsumer: Send + Sync + 'static {
+    /// The event this consumer handles.
+    type Event: DomainEvent;
+    /// Stable consumer name, `<module>.<handler>`.
+    const NAME: &'static str;
+    /// The queue its deliveries run on.
+    const QUEUE: &'static str;
+    /// Attempts before a delivery is marked failed (dead).
+    const MAX_ATTEMPTS: u32 = jobs::DEFAULT_MAX_ATTEMPTS;
+
+    /// Handle one event.
+    fn handle(
+        &self,
+        ctx: &mut JobContext,
+        event: Event<Self::Event>,
+    ) -> impl Future<Output = Result<(), JobError>> + Send;
+}
+
 /// Where a replay starts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplayFrom {

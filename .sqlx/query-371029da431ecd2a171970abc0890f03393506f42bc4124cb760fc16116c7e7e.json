@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT op FROM kernel.changes\n          WHERE record_type = 'connectors.connection' AND record_id = $1 ORDER BY published",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "op",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "op"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "371029da431ecd2a171970abc0890f03393506f42bc4124cb760fc16116c7e7e"
+}
