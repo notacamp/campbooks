@@ -1,0 +1,157 @@
+{
+  "provider": {
+    "google": "Google",
+    "microsoft": "Microsoft",
+    "zoho": "Zoho"
+  },
+  "shortcuts": {
+    "choice1": "Sign in the first way listed",
+    "choice2": "Sign in the second way listed",
+    "choice3": "Sign in the third way listed",
+    "passkey": "Sign in with a passkey"
+  },
+  "signIn": {
+    "title": "Sign in to Campbooks",
+    "lead": "What needs you, in one calm place. Campbooks reads your mail and brings you only what needs you.",
+    "invitedTitle": "Sign in to join the workspace",
+    "invitedLead": "Use the email address the invitation was sent to, and you’ll join straight away.",
+    "waysIn": "Ways to sign in",
+    "with": {
+      "google": "Continue with Google",
+      "microsoft": "Continue with Microsoft",
+      "zoho": "Continue with Zoho"
+    },
+    "passkey": "Use a passkey",
+    "gmail": {
+      "summary": "Google will also ask to let Campbooks use your Gmail, so your first mailbox is ready when you are.",
+      "details": "What Campbooks reads and keeps",
+      "keeps": "Campbooks keeps your name, your address and the permission Google gives it. It never sees your Google password.",
+      "reads": "That permission lets Campbooks read and organise the mail in this Gmail account. Nothing is connected to a workspace until you say so, and a permission you don’t use is deleted after 7 days.",
+      "optional": "You can untick mail access on Google’s screen. You’ll still be signed in, and your mail simply won’t be connected.",
+      "existing": "If you already have an account, signing in doesn’t change any mailbox you’ve connected."
+    },
+    "unverified": "Google may warn that it hasn’t verified this app. Google checks every app that can read Gmail, and that check isn’t finished yet. To carry on, choose “Advanced”, then continue to the app.",
+    "footer": "Open source. Your mail stays in your workspace.",
+    "starting": "Opening sign-in…",
+    "loading": "Loading the ways to sign in…",
+    "startAgain": "Start again",
+    "retry": "Try again",
+    "noWayIn": {
+      "title": "Signing in isn’t set up yet",
+      "lead": "This Campbooks has no way to sign in turned on. Ask whoever runs it to set up Google sign-in."
+    },
+    "expired": {
+      "title": "This sign-in page has expired",
+      "lead": "It waited too long. Start again; nothing was lost."
+    },
+    "failed": {
+      "title": "Couldn’t load the ways to sign in",
+      "lead": "Campbooks didn’t answer. Check your connection, then try again."
+    }
+  },
+  "errors": {
+    "cancelled_at_provider": {
+      "title": "You cancelled on the sign-in screen.",
+      "lead": "Nothing was created. Choose a way to sign in when you’re ready."
+    },
+    "invalid_state": {
+      "title": "That sign-in can’t be finished.",
+      "lead": "It took too long, or it was opened in another browser. Start again in this one."
+    },
+    "provider_unavailable": {
+      "title": "The sign-in provider didn’t answer.",
+      "lead": "Nothing changed. Wait a moment, then try again."
+    },
+    "login_failed": {
+      "title": "The sign-in provider couldn’t confirm who you are.",
+      "lead": "Try again, or sign in another way."
+    },
+    "account_disabled": {
+      "title": "This account is turned off.",
+      "lead": "Ask whoever runs this Campbooks to turn it back on."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "This account already signs in to another Campbooks account.",
+      "lead": "Sign in with it to use that account."
+    },
+    "unknown": {
+      "title": "Something went wrong while signing in.",
+      "lead": "Nothing changed. Start again."
+    }
+  },
+  "newAccount": {
+    "eyebrow": "New account",
+    "title": "Create your Campbooks account",
+    "lead": "No Campbooks account uses {{email}} yet.",
+    "leadNoEmail": "No Campbooks account uses this {{provider}} account yet.",
+    "identity": "Your new account",
+    "from": "{{provider}}",
+    "nameNote": "This is the name {{provider}} gave us. People in your workspaces will see it.",
+    "nextTitle": "What happens next",
+    "next1": "Your account is created, and you sign in with this {{provider}} account.",
+    "next2": "You name your first workspace.",
+    "next3": "If you let Campbooks use your mail, you choose whether to connect it to that workspace.",
+    "create": "Create account",
+    "creating": "Creating…",
+    "another": "Sign in another way",
+    "footer": "Already use Campbooks with another account? Sign in with that one instead.",
+    "loading": "Loading your new account…",
+    "retry": "Try again",
+    "signInAgain": "Sign in again",
+    "gone": {
+      "title": "This sign-up isn’t waiting any more",
+      "lead": "It took too long, or it was started in another browser. Sign in again to start over."
+    },
+    "failed": {
+      "title": "Couldn’t create the account.",
+      "lead": "Nothing was created. Try again."
+    },
+    "loadFailed": {
+      "title": "Couldn’t load your new account",
+      "lead": "Campbooks didn’t answer. Check your connection, then try again."
+    }
+  },
+  "mailbox": {
+    "loading": "Checking for your mailbox…",
+    "eyebrow": "{{workspace}} is ready",
+    "title": "Your Gmail {{address}} will be connected to this workspace",
+    "titleOther": "Your mailbox {{address}} will be connected to this workspace",
+    "lead": "Campbooks reads the mail in it, keeps a copy of what it reads so it can show it to you here, and keeps checking for new mail.",
+    "later": "Not now keeps it waiting on Home until {{date}}.",
+    "signIn": "Disconnecting it later doesn’t stop you signing in with this account.",
+    "formLabel": "Connect your mailbox",
+    "connect": "Connect",
+    "connecting": "Connecting…",
+    "notNow": "Not now",
+    "continue": "Continue to Home",
+    "errors": {
+      "gone": {
+        "title": "That mailbox isn’t waiting any more.",
+        "lead": "Its permission expired or was already used, so it can’t be connected from here."
+      },
+      "taken": {
+        "title": "Someone else here already connected it.",
+        "lead": "Another member of this workspace connected {{address}}."
+      },
+      "unsupported": {
+        "title": "Campbooks can’t read this mailbox yet.",
+        "lead": "Nothing was connected."
+      },
+      "failed": {
+        "title": "It didn’t connect.",
+        "lead": "Nothing changed. Try again."
+      }
+    }
+  },
+  "offer": {
+    "title": "Connect {{address}}",
+    "lead": "This mailbox has been waiting since you signed up. Connect it to {{workspace}} and Campbooks will bring what needs you here.",
+    "waits": "Waiting until {{date}}",
+    "connect": "Connect",
+    "forget": "Don’t connect it",
+    "confirmForget": "Forget {{address}}? Campbooks deletes the permission Google gave it. You can still sign in with this account.",
+    "confirm": "Forget it",
+    "cancel": "Keep it",
+    "forgetFailed": "Couldn’t forget it. Try again."
+  }
+}

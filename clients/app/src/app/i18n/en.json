@@ -7,13 +7,9 @@
     "home": "Go to the home page"
   },
   "landing": {
-    "title": "What needs you, in one calm place",
-    "lead": "Campbooks reads your mail and brings you only what needs you.",
-    "signIn": "Sign in",
-    "invitedTitle": "You’ve been invited to a workspace",
-    "invitedLead": "Sign in with the email address the invitation was sent to, and you’ll join straight away.",
     "ended": "You were signed out.",
     "endedDetail": "Sign in again to carry on where you were.",
+    "signInAgain": "Sign in again",
     "footer": "Open source. Your mail stays in your workspace."
   },
   "gate": {
@@ -50,7 +46,7 @@
     "title": "Nothing needs you yet",
     "subline": "When Campbooks has something for you, it shows up here.",
     "connectTitle": "Connect your mail",
-    "connectLead": "Campbooks will read your mail and bring what needs you to this page. Mail connections are still being built, so you can’t connect a mailbox yet.",
+    "connectLead": "Campbooks will read your mail and bring what needs you to this page. Connecting a mailbox from here is still being built.",
     "connect": "Connect your mail",
     "soon": "Coming soon",
     "context": "Getting started",

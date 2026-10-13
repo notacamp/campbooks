@@ -17,11 +17,15 @@ export interface ShortcutSheetProps {
   onClose: () => void;
 }
 
-/** `?`: every shortcut the registry knows, grouped, with its keys. */
+/** `?`: every shortcut the registry knows, grouped, with its keys (a focus page's only on it). */
 export function ShortcutSheet({ open, onClose }: ShortcutSheetProps) {
   const { t } = useTranslation("ui");
   const translate = useTranslateKey();
-  const { definitions } = useShortcutDefinitions();
+  const { definitions, isBound } = useShortcutDefinitions();
+  // A focus page's keys (signing in, a first-run step) mean nothing elsewhere.
+  const shown = definitions.filter(
+    (definition) => definition.scope !== "focus" || isBound(definition.id),
+  );
   return (
     <Overlay open={open} onClose={onClose} label={t("shortcutSheet.title")}>
       <div className={styles["head"]}>
@@ -34,7 +38,7 @@ export function ShortcutSheet({ open, onClose }: ShortcutSheetProps) {
       </div>
       <div className={styles["groups"]}>
         {GROUP_ORDER.map((group) => {
-          const inGroup = definitions.filter((definition) => definition.group === group);
+          const inGroup = shown.filter((definition) => definition.group === group);
           if (inGroup.length === 0) {
             return null;
           }
