@@ -24,18 +24,22 @@ use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{Postgres, Transaction};
 
 use crate::{
-    contract::{BATCH_CONTENT_TYPE, MessageChangeBatch},
+    contract::{BATCH_CONTENT_TYPE, MessageChange, MessageChangeBatch},
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
         emit, health,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
-        outbound,
+        outbound::{self, Backlog},
+        push::Push,
         removal::BATCH_OWNER,
-        schedule::{self, LEASE, SYNC_STREAM, SyncStreamPayload},
+        schedule::{self, LEASE, Rate, SYNC_STREAM, SyncStreamPayload},
     },
-    gmail::{self, Cursor, Page, Reader, write},
-    google::GoogleError,
+    gmail::{self, Reader},
+    google::LabelInfo,
+    mail::{IndexOp, ReadError},
+    provider::ProviderError,
+    zoho,
 };
 
 /// Runs `connectors.sync_stream`.
@@ -59,9 +63,11 @@ struct Target {
     provider: Provider,
     granted_by: UserId,
     health: Health,
+    provider_server: Option<String>,
+    mailbox_key: String,
     inbox: Option<InboxId>,
     phase: Phase,
-    cursor: Cursor,
+    cursor: serde_json::Value,
     interval_seconds: i32,
     paused: bool,
     consecutive_failures: i32,
@@ -90,7 +96,11 @@ impl JobHandler for SyncStream {
             schedule::set_due(ctx.tx().await?, workspace, target.stream, until).await?;
             return Ok(());
         }
-        let (Some(google), Some(inbox)) = (self.deps.google.clone(), target.inbox) else {
+        let configured = match target.provider {
+            Provider::Google => self.deps.google.is_some(),
+            Provider::Zoho => self.deps.zoho.is_some(),
+        };
+        let (true, Some(inbox)) = (configured, target.inbox) else {
             // The provider is no longer configured (or the stream has no
             // adapter yet): the leased schedule row brings it back later.
             tracing::debug!(stream = %target.stream, "no adapter for this stream");
@@ -103,18 +113,9 @@ impl JobHandler for SyncStream {
             {
                 Ok(token) => token,
                 Err(TokenError::NeedsReauth(reason)) => {
-                    let events = ctx.state().events.clone();
-                    health::needs_reauth(
-                        ctx.tx().await?,
-                        &events,
-                        &workspace.to_string(),
-                        target.connection,
-                        target.granted_by,
-                        reason,
-                        now,
-                    )
-                    .await?;
-                    return Ok(());
+                    return self
+                        .needs_reauth(ctx, workspace, &target, reason, now)
+                        .await;
                 }
                 Err(TokenError::Provider(err)) => {
                     return self.trouble(ctx, workspace, &target, &err, now).await;
@@ -127,46 +128,130 @@ impl JobHandler for SyncStream {
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
         outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
         let backlog = outbound::backlog(ctx.pool(), workspace, target.stream, now).await?;
-        let messages: std::collections::HashSet<&str> = backlog
+        let read = match target.provider {
+            Provider::Google => {
+                self.run_gmail(ctx, workspace, &target, &token, &backlog, now)
+                    .await?
+            }
+            Provider::Zoho => {
+                self.run_zoho(ctx, workspace, &target, &token, &backlog, now)
+                    .await?
+            }
+        };
+        let Some(read) = read else {
+            return Ok(());
+        };
+        self.apply(ctx, workspace, &target, inbox, read, backlog.last(), now)
+            .await
+    }
+}
+
+/// What a run read, whatever the provider: applied in the job's
+/// transaction.
+#[derive(Debug)]
+struct RunPage {
+    changes: Vec<MessageChange>,
+    index: Vec<IndexOp>,
+    /// A fresh Gmail `labels.list`.
+    labels: Option<Vec<LabelInfo>>,
+    /// The cursor after the page, as stored.
+    cursor: serde_json::Value,
+    /// The cursor as the event carries it.
+    token: String,
+    phase: Phase,
+    more: bool,
+    /// Gmail's history id the run read up to (closes open write windows).
+    read_up_to: Option<i64>,
+}
+
+impl SyncStream {
+    /// The number of distinct messages `backlog` touches.
+    fn messages(backlog: &Backlog) -> usize {
+        backlog
             .pending
             .iter()
             .map(|p| p.provider_message_id.as_str())
-            .collect();
+            .collect::<std::collections::HashSet<_>>()
+            .len()
+    }
+
+    /// Record a push's outcome on its own (the writes happened, whatever
+    /// the read does next). Returns the trouble that stopped it.
+    async fn record_push(
+        ctx: &JobContext,
+        workspace: WorkspaceId,
+        stream: StreamId,
+        pushed: Push,
+        now: DateTime<Utc>,
+    ) -> Result<Option<ProviderError>, JobError> {
+        let mut tx = ctx.pool().begin_for(workspace).await?;
+        outbound::record_outcome(&mut tx, stream, &pushed.outcome, now).await?;
+        tx.commit().await?;
+        Ok(pushed.trouble)
+    }
+
+    /// Wait for `wait` before the stream's next run.
+    async fn wait_for_budget(
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        stream: StreamId,
+        wait: std::time::Duration,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let at = now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::seconds(1));
+        schedule::set_due(ctx.tx().await?, workspace, stream, at).await?;
+        Ok(())
+    }
+
+    /// A Gmail run: budget, push, read. `None` once the run has ended
+    /// without a page (waiting, trouble recorded).
+    async fn run_gmail(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        token: &str,
+        backlog: &Backlog,
+        now: DateTime<Utc>,
+    ) -> Result<Option<RunPage>, JobError> {
+        let Some(google) = self.deps.google.clone() else {
+            return Ok(None);
+        };
+        let messages = Self::messages(backlog);
         let cost = gmail::UNITS_PER_RUN
-            + if messages.is_empty() {
+            + if messages == 0 {
                 0
             } else {
-                write::units(messages.len())
+                gmail::write::units(messages)
             };
         let rate = self.deps.config.google.units_per_second;
         if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {
-            let at = now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::seconds(1));
-            schedule::set_due(ctx.tx().await?, workspace, target.stream, at).await?;
-            return Ok(());
+            Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
+            return Ok(None);
         }
-
-        let pushed_up_to = backlog.last();
-        if pushed_up_to.is_some() {
-            let pushed = write::push(&google.gmail(&token), &backlog).await;
-            // Recorded on its own: the writes happened, whatever the read
-            // does next.
-            let mut tx = ctx.pool().begin_for(workspace).await?;
-            outbound::record_outcome(&mut tx, target.stream, &pushed.outcome, now).await?;
-            tx.commit().await?;
-            if let Some(err) = pushed.trouble {
-                return self.trouble(ctx, workspace, &target, &err, now).await;
+        if backlog.last().is_some() {
+            let pushed = gmail::write::push(&google.gmail(token), backlog).await;
+            if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
+            {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
             }
         }
-
+        let cursor: gmail::Cursor = serde_json::from_value(target.cursor.clone()).map_err(|e| {
+            JobError::fatal(format!(
+                "stream {} has an unreadable cursor: {e}",
+                target.stream
+            ))
+        })?;
         let state = ctx.state().clone();
         let reader = Reader {
-            gmail: google.gmail(&token),
+            gmail: google.gmail(token),
             pool: ctx.pool(),
             blobs: &state.blobs,
             workspace,
             stream: target.stream,
             phase: target.phase,
-            cursor: target.cursor.clone(),
+            cursor,
             now,
             backfill_days: self.deps.config.gmail.backfill_days,
             max_message_bytes: self.deps.config.gmail.max_message_bytes,
@@ -174,13 +259,131 @@ impl JobHandler for SyncStream {
         };
         let page = match reader.read().await {
             Ok(page) => page,
-            Err(gmail::ReadError::Google(err)) => {
-                return self.trouble(ctx, workspace, &target, &err, now).await;
+            Err(ReadError::Provider(err)) => {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
-        self.apply(ctx, workspace, &target, inbox, page, pushed_up_to, now)
-            .await
+        Ok(Some(RunPage {
+            cursor: serde_json::to_value(&page.cursor)
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+            token: page.cursor.token(),
+            read_up_to: page
+                .cursor
+                .history_id
+                .as_deref()
+                .and_then(|h| h.parse::<i64>().ok()),
+            changes: page.changes,
+            index: page.index,
+            labels: page.labels,
+            phase: page.phase,
+            more: page.more,
+        }))
+    }
+
+    /// A Zoho run: the data centre, the login's budget, push, read. `None`
+    /// once the run has ended without a page.
+    async fn run_zoho(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        token: &str,
+        backlog: &Backlog,
+        now: DateTime<Utc>,
+    ) -> Result<Option<RunPage>, JobError> {
+        let Some(zoho) = self.deps.zoho.clone() else {
+            return Ok(None);
+        };
+        let Some(centre) = target
+            .provider_server
+            .as_deref()
+            .and_then(|server| zoho.centre(server))
+        else {
+            self.needs_reauth(ctx, workspace, target, "unknown_data_centre", now)
+                .await?;
+            return Ok(None);
+        };
+        let cursor: zoho::read::Cursor =
+            serde_json::from_value(target.cursor.clone()).map_err(|e| {
+                JobError::fatal(format!(
+                    "stream {} has an unreadable cursor: {e}",
+                    target.stream
+                ))
+            })?;
+        let config = &self.deps.config.zoho;
+        let cost = zoho::read::requests_per_run(cursor.folders.len())
+            + zoho::write::requests(Self::messages(backlog));
+        let key = schedule::connection_budget(target.connection);
+        let rate = Rate::per_minute(config.requests_per_minute);
+        if let Err(wait) = schedule::take(ctx.pool(), &key, cost, rate).await? {
+            Self::wait_for_budget(ctx, workspace, target.stream, wait, now).await?;
+            return Ok(None);
+        }
+        let mail = zoho.mail(&centre, token, &target.mailbox_key);
+        if backlog.last().is_some() {
+            let pushed = zoho::write::push(&mail, backlog, cursor.inbox()).await;
+            if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
+            {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
+            }
+        }
+        let state = ctx.state().clone();
+        let reader = zoho::read::Reader {
+            mail,
+            pool: ctx.pool(),
+            blobs: &state.blobs,
+            workspace,
+            stream: target.stream,
+            phase: target.phase,
+            cursor,
+            now,
+            config,
+        };
+        let page = match reader.read().await {
+            Ok(page) => page,
+            Err(ReadError::Provider(err)) => {
+                self.trouble(ctx, workspace, target, &err, now).await?;
+                return Ok(None);
+            }
+            Err(other) => return Err(JobError::retry(other.to_string())),
+        };
+        Ok(Some(RunPage {
+            cursor: serde_json::to_value(&page.cursor)
+                .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?,
+            token: page.cursor.token(),
+            read_up_to: None,
+            changes: page.changes,
+            index: page.index,
+            labels: None,
+            phase: page.phase,
+            more: page.more,
+        }))
+    }
+
+    /// The grant stopped working (`reason`).
+    async fn needs_reauth(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        reason: &'static str,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let events = ctx.state().events.clone();
+        health::needs_reauth(
+            ctx.tx().await?,
+            &events,
+            &workspace.to_string(),
+            target.connection,
+            target.granted_by,
+            reason,
+            now,
+        )
+        .await?;
+        Ok(())
     }
 }
 
@@ -198,7 +401,7 @@ impl SyncStream {
         workspace: WorkspaceId,
         target: &Target,
         inbox: InboxId,
-        mut page: Page,
+        mut page: RunPage,
         pushed_up_to: Option<uuid::Uuid>,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
@@ -215,8 +418,7 @@ impl SyncStream {
         } else {
             None
         };
-        let cursor_json = serde_json::to_value(&page.cursor)
-            .map_err(|e| JobError::fatal(format!("encoding a cursor: {e}")))?;
+        let cursor_json = page.cursor;
         let interval =
             schedule::next_interval(target.interval_seconds, changed, &self.deps.config.poll);
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
@@ -234,7 +436,7 @@ impl SyncStream {
                 target.stream,
                 inbox,
                 batch,
-                &page.cursor.token(),
+                &page.token,
                 change_count,
                 now,
             )
@@ -264,7 +466,7 @@ impl SyncStream {
             target.stream,
             pushed_up_to,
             now - retention,
-            &page.cursor,
+            page.read_up_to,
         )
         .await?
         {
@@ -355,13 +557,13 @@ impl SyncStream {
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
-        err: &GoogleError,
+        err: &ProviderError,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let poll = &self.deps.config.poll;
         match err {
-            GoogleError::Unauthorized => self.refused(ctx, workspace, target, now).await,
-            GoogleError::InvalidGrant => {
+            ProviderError::Unauthorized => self.refused(ctx, workspace, target, now).await,
+            ProviderError::InvalidGrant => {
                 let events = ctx.state().events.clone();
                 health::needs_reauth(
                     ctx.tx().await?,
@@ -375,7 +577,7 @@ impl SyncStream {
                 .await?;
                 Ok(())
             }
-            GoogleError::RateLimited { retry_after } => {
+            ProviderError::RateLimited { retry_after } => {
                 let wait = retry_after
                     .and_then(|d| TimeDelta::from_std(d).ok())
                     .unwrap_or(TimeDelta::seconds(i64::from(poll.min_seconds)));
@@ -400,7 +602,9 @@ impl SyncStream {
                 tracing::info!(%workspace, stream = %target.stream, %until, "throttled by the provider");
                 Ok(())
             }
-            GoogleError::NotFound | GoogleError::Unavailable(_) | GoogleError::Unexpected(_) => {
+            ProviderError::NotFound
+            | ProviderError::Unavailable(_)
+            | ProviderError::Unexpected(_) => {
                 let failures = target.consecutive_failures.saturating_add(1);
                 // Back off from the minimum, doubling per failure, up to
                 // the maximum interval.
@@ -445,7 +649,7 @@ async fn replace_labels(
     tx: &mut Transaction<'static, Postgres>,
     workspace: WorkspaceId,
     stream: StreamId,
-    labels: &[crate::google::LabelInfo],
+    labels: &[LabelInfo],
 ) -> Result<(), JobError> {
     sqlx::query!(
         "DELETE FROM connectors.gmail_labels WHERE stream_id = $1",
@@ -479,12 +683,8 @@ async fn settle_outbound(
     stream: StreamId,
     pushed_up_to: Option<uuid::Uuid>,
     before: DateTime<Utc>,
-    cursor: &Cursor,
+    read_up_to: Option<i64>,
 ) -> Result<bool, JobError> {
-    let read_up_to = cursor
-        .history_id
-        .as_deref()
-        .and_then(|h| h.parse::<i64>().ok());
     outbound::prune(tx, stream, before, read_up_to).await?;
     Ok(outbound::more_pending(tx, stream, pushed_up_to).await?)
 }
@@ -498,8 +698,9 @@ async fn load(
     let mut tx = ctx.pool().begin_for(workspace).await?;
     let row = sqlx::query!(
         r#"SELECT s.id AS "stream: StreamId", s.connection_id AS "connection: ConnectionId",
-                  c.provider, c.granted_by AS "granted_by: UserId", c.health,
-                  s.inbox_id AS "inbox: InboxId", s.phase, s.cursor, s.interval_seconds,
+                  c.provider, c.provider_server, c.granted_by AS "granted_by: UserId", c.health,
+                  s.mailbox_key, s.inbox_id AS "inbox: InboxId", s.phase, s.cursor,
+                  s.interval_seconds,
                   s.paused, s.consecutive_failures, s.throttled_until
              FROM connectors.streams s
              JOIN connectors.connections c ON c.id = s.connection_id
@@ -512,17 +713,17 @@ async fn load(
     let Some(row) = row else {
         return Ok(None);
     };
-    let cursor: Cursor = serde_json::from_value(row.cursor)
-        .map_err(|e| JobError::fatal(format!("stream {stream} has an unreadable cursor: {e}")))?;
     Ok(Some(Target {
         stream: row.stream,
         connection: row.connection,
         provider: Provider::parse(&row.provider)?,
+        provider_server: row.provider_server,
+        mailbox_key: row.mailbox_key,
         granted_by: row.granted_by,
         health: Health::parse(&row.health)?,
         inbox: row.inbox,
         phase: Phase::parse(&row.phase)?,
-        cursor,
+        cursor: row.cursor,
         interval_seconds: row.interval_seconds,
         paused: row.paused,
         consecutive_failures: row.consecutive_failures,

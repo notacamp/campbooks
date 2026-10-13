@@ -1,6 +1,6 @@
 //! What the module is composed with (constructor injection): settings, the
-//! Google client (refresh, revoke, Gmail; the consent itself is the identity
-//! module's), the credentials cipher and the clock. Handlers reach it as
+//! Google and Zoho clients (refresh, revoke, mail; the consent itself is the
+//! identity module's), the credentials cipher and the clock. Handlers reach it as
 //! an axum extension; jobs and consumers own a copy.
 
 use std::sync::Arc;
@@ -14,8 +14,10 @@ use campbooks_kernel::{
 use figment::Figment;
 
 use crate::{
-    config::{ConnectorsConfig, GoogleConfig},
-    google::{ClientSecret, Endpoints, Google},
+    config::{ConnectorsConfig, OAuthClientConfig},
+    google::{Endpoints, Google},
+    provider::ClientSecret,
+    zoho::{Centres, Zoho},
 };
 
 /// The HKDF label of the credentials key. Never change it: every stored
@@ -30,6 +32,8 @@ pub struct Deps {
     pub config: Arc<ConnectorsConfig>,
     /// The Google client, when `CAMPBOOKS_GOOGLE__*` is set.
     pub google: Option<Arc<Google>>,
+    /// The Zoho client, when `CAMPBOOKS_ZOHO__*` is set.
+    pub zoho: Option<Arc<Zoho>>,
     /// Seals credentials; present whenever a provider is configured.
     pub cipher: Option<Arc<Cipher>>,
     /// The time.
@@ -41,6 +45,7 @@ impl std::fmt::Debug for Deps {
         f.debug_struct("Deps")
             .field("config", &self.config)
             .field("google", &self.google.is_some())
+            .field("zoho", &self.zoho.is_some())
             .finish_non_exhaustive()
     }
 }
@@ -50,6 +55,7 @@ impl Default for Deps {
         Self {
             config: Arc::new(ConnectorsConfig::default()),
             google: None,
+            zoho: None,
             cipher: None,
             clock: Arc::new(SystemClock),
         }
@@ -74,61 +80,90 @@ impl Deps {
         config: &Config,
         secret: Option<SecretKey>,
     ) -> Result<Self, String> {
-        let settings = ConnectorsConfig::from_figment(figment)?;
-        let google = GoogleConfig::from_figment(figment)?;
-        let client_id = google
-            .client_id
-            .as_deref()
-            .map(str::trim)
-            .filter(|id| !id.is_empty());
-        let client_secret = match (google.client_secret_file, google.client_secret) {
-            (Some(path), _) if !path.as_os_str().is_empty() => Some(ClientSecret::File(path)),
-            (_, Some(secret)) => Some(ClientSecret::Inline(secret)),
-            _ => None,
-        };
         let mut deps = Self {
-            config: Arc::new(settings),
+            config: Arc::new(ConnectorsConfig::from_figment(figment)?),
             ..Self::default()
         };
-        let (Some(client_id), Some(client_secret)) = (client_id, client_secret) else {
+        let development = config.env == Environment::Development;
+        if let Some((client_id, client_secret, base)) = client(
+            &OAuthClientConfig::from_figment(figment, "google")?,
+            "GOOGLE",
+            development,
+        )? {
+            let endpoints = match base {
+                None => Endpoints::google(),
+                Some(base) => Endpoints::under(&base),
+            };
+            deps.google = Some(Arc::new(Google::new(client_id, client_secret, endpoints)?));
+        }
+        if let Some((client_id, client_secret, base)) = client(
+            &OAuthClientConfig::from_figment(figment, "zoho")?,
+            "ZOHO",
+            development,
+        )? {
+            let centres = base.map_or(Centres::Zoho, Centres::Fake);
+            deps.zoho = Some(Arc::new(Zoho::new(client_id, client_secret, centres)?));
+        }
+        if deps.google.is_none() && deps.zoho.is_none() {
             return Ok(deps);
-        };
+        }
         let Some(secret) = secret else {
-            return Err(
-                "CAMPBOOKS_GOOGLE__CLIENT_ID is set, so connections need CAMPBOOKS_SECRET_KEY_FILE \
-                 or CAMPBOOKS_SECRET_KEY (32 random bytes, base64; e.g. `openssl rand -base64 32`) \
-                 to encrypt the credentials they keep"
-                    .to_owned(),
-            );
+            let provider = if deps.google.is_some() {
+                "GOOGLE"
+            } else {
+                "ZOHO"
+            };
+            return Err(format!(
+                "CAMPBOOKS_{provider}__CLIENT_ID is set, so connections need \
+                 CAMPBOOKS_SECRET_KEY_FILE or CAMPBOOKS_SECRET_KEY (32 random bytes, base64; \
+                 e.g. `openssl rand -base64 32`) to encrypt the credentials they keep"
+            ));
         };
-        let endpoints = match google
-            .base_url
-            .as_deref()
-            .map(str::trim)
-            .filter(|u| !u.is_empty())
-        {
-            None => Endpoints::google(),
-            Some(_) if config.env != Environment::Development => {
-                return Err(
-                    "CAMPBOOKS_GOOGLE__BASE_URL points Google at another server: it is for \
-                     development only (CAMPBOOKS_ENV=development)"
-                        .to_owned(),
-                );
-            }
-            Some(base) => {
-                let base = url::Url::parse(&format!("{}/", base.trim_end_matches('/')))
-                    .map_err(|e| format!("CAMPBOOKS_GOOGLE__BASE_URL={base}: {e}"))?;
-                Endpoints::under(&base)
-            }
-        };
-        deps.google = Some(Arc::new(Google::new(
-            client_id.to_owned(),
-            client_secret,
-            endpoints,
-        )?));
         deps.cipher = Some(Arc::new(Cipher::new(&secret, CREDENTIALS_PURPOSE)));
         Ok(deps)
     }
+}
+
+/// A provider's client id, secret and (development only) fake base, when
+/// its `CAMPBOOKS_<PREFIX>__CLIENT_ID` and a secret are set.
+fn client(
+    settings: &OAuthClientConfig,
+    prefix: &str,
+    development: bool,
+) -> Result<Option<(String, ClientSecret, Option<url::Url>)>, String> {
+    let client_id = settings
+        .client_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|id| !id.is_empty());
+    let client_secret = match (&settings.client_secret_file, &settings.client_secret) {
+        (Some(path), _) if !path.as_os_str().is_empty() => Some(ClientSecret::File(path.clone())),
+        (_, Some(secret)) => Some(ClientSecret::Inline(secret.clone())),
+        _ => None,
+    };
+    let (Some(client_id), Some(client_secret)) = (client_id, client_secret) else {
+        return Ok(None);
+    };
+    let base = match settings
+        .base_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|u| !u.is_empty())
+    {
+        None => None,
+        Some(_) if !development => {
+            return Err(format!(
+                "CAMPBOOKS_{prefix}__BASE_URL points {} at another server: it is for \
+                 development only (CAMPBOOKS_ENV=development)",
+                prefix.to_ascii_lowercase()
+            ));
+        }
+        Some(base) => Some(
+            url::Url::parse(&format!("{}/", base.trim_end_matches('/')))
+                .map_err(|e| format!("CAMPBOOKS_{prefix}__BASE_URL={base}: {e}"))?,
+        ),
+    };
+    Ok(Some((client_id.to_owned(), client_secret, base)))
 }
 
 #[cfg(test)]
@@ -162,6 +197,41 @@ mod tests {
         .unwrap();
         assert!(deps.google.is_some());
         assert!(deps.cipher.is_some());
+    }
+
+    #[test]
+    fn zoho_is_offered_with_its_client_and_the_instance_secret() {
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "zoho": {"client_id": "zoho-1", "client_secret": "s3cret",
+                     "redirect_path": "/oauth/zoho/callback"}
+        })));
+        let err = Deps::from_figment(&figment, &kernel_config(), None).unwrap_err();
+        assert!(err.contains("CAMPBOOKS_ZOHO__CLIENT_ID"), "{err}");
+        let deps = Deps::from_figment(
+            &figment,
+            &kernel_config(),
+            Some(SecretKey::from_bytes([1; 32])),
+        )
+        .unwrap();
+        let zoho = deps.zoho.unwrap();
+        assert!(deps.google.is_none() && deps.cipher.is_some());
+        assert!(zoho.centre("https://accounts.zoho.eu").is_some());
+        // A fake Zoho is for development only.
+        let fake = Figment::from(Serialized::defaults(serde_json::json!({
+            "zoho": {"client_id": "zoho-1", "client_secret": "s3cret",
+                     "base_url": "http://127.0.0.1:9052"}
+        })));
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let err = Deps::from_figment(&fake, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("development only"), "{err}");
+        let mut dev = kernel_config();
+        dev.env = Environment::Development;
+        let zoho = Deps::from_figment(&fake, &dev, key())
+            .unwrap()
+            .zoho
+            .unwrap();
+        assert!(zoho.centre("http://127.0.0.1:9052").is_some());
+        assert!(zoho.centre("https://accounts.zoho.eu").is_none());
     }
 
     #[test]

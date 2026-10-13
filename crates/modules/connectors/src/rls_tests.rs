@@ -20,7 +20,7 @@ async fn visible(conn: &mut sqlx::PgConnection) -> Vec<i64> {
         r#"SELECT (SELECT count(*) FROM connectors.connections) AS "c!",
                   (SELECT count(*) FROM connectors.credentials) AS "k!",
                   (SELECT count(*) FROM connectors.streams) AS "s!",
-                  (SELECT count(*) FROM connectors.gmail_messages) AS "m!",
+                  (SELECT count(*) FROM connectors.messages) AS "m!",
                   (SELECT count(*) FROM connectors.gmail_labels) AS "l!",
                   (SELECT count(*) FROM connectors.batches) AS "b!""#
     )

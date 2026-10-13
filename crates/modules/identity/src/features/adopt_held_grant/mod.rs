@@ -77,6 +77,7 @@ pub async fn handler(
         subject: workspace.principal.subject.clone(),
         provider: taken.grant.provider.clone(),
         account_subject: taken.account_subject,
+        issuer: taken.issuer,
         address: taken.grant.address.clone(),
         address_verified: taken.address_verified,
         display_name: taken.grant.display_name.clone(),

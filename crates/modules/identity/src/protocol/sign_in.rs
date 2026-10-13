@@ -233,10 +233,10 @@ pub(super) async fn redirect_to_provider(
     let browser = random_token();
     upstream::store_flow(&ctx.state.db, &issuer.cipher, &state, &browser, &flow, now).await?;
     let mut scopes: Vec<String> = IDENTITY_SCOPES.iter().map(|s| (*s).to_owned()).collect();
-    let mailbox = if flow.purpose == Purpose::Link {
-        Vec::new()
-    } else {
+    let mailbox = if asks_mailbox(&flow) {
         ctx.state.grants.mailbox_scopes(flow.provider.as_str())
+    } else {
+        Vec::new()
     };
     let offline = !mailbox.is_empty();
     scopes.extend(mailbox);
@@ -258,6 +258,35 @@ pub(super) async fn redirect_to_provider(
             SameSite::Lax,
         ),
     ))
+}
+
+/// Whether a round trip asks for the mailbox (and offline access): a
+/// connect or reconnect, and a sign-in, except a first Zoho sign-in: Zoho
+/// caps the refresh tokens a person holds per app, so one is asked for only
+/// once the account turns out to be new (a second round trip, below), never
+/// on each sign-in of a known account.
+pub(super) fn asks_mailbox(flow: &Flow) -> bool {
+    match flow.purpose {
+        Purpose::Link => false,
+        Purpose::SignIn => flow.provider != Provider::Zoho || flow.consent_retry,
+        Purpose::Connect | Purpose::Reconnect => true,
+    }
+}
+
+/// Revoke a refresh token Campbooks does not keep, where the provider
+/// revokes one token alone (Zoho). Best effort: a failure is logged, never
+/// the token.
+pub(super) async fn drop_refresh(upstream: &Upstream, issuer: &str, refresh: Option<&str>) {
+    let Some(refresh) = refresh else {
+        return;
+    };
+    if let Err(error) = upstream.revoke_unkept(issuer, refresh).await {
+        tracing::warn!(
+            provider = upstream.provider().as_str(),
+            %error,
+            "could not revoke a refresh token Campbooks does not keep"
+        );
+    }
 }
 
 /// What the provider sends back.
@@ -361,7 +390,7 @@ pub async fn callback(
         Err(code) => return Ok(with_cookie(fail(code), clear_flow)),
     };
     if flow.purpose != Purpose::SignIn {
-        let response = link::finish(&ctx, issuer, &headers, flow, signed_in, now).await?;
+        let response = link::finish(&ctx, issuer, upstream, &headers, flow, signed_in, now).await?;
         return Ok(with_cookie(response, clear_flow));
     }
     let Upstreamed { identity, tokens } = signed_in;
@@ -370,43 +399,104 @@ pub async fn callback(
         Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
         // the provider sent along is dropped, not stored.
-        Some(linked) => sign_in_known(&ctx, issuer, &headers, linked, &flow, provider, now).await?,
+        Some(linked) => {
+            drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+            sign_in_known(&ctx, issuer, &headers, linked, &flow, provider, now).await?
+        }
         None if !may_create_account(&ctx, &identity).await? => {
             // Nothing is kept: no pending sign-up, no tokens.
+            drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
             sign_in_error("signup_invite_only", request)
         }
         None => {
-            let mail = MailGrant::of(&ctx, provider, &tokens);
-            if mail.granted && tokens.refresh_token.is_none() && !flow.consent_retry {
-                // Google sends a refresh token only on a fresh consent; this
-                // person consented before. Ask once more, for this account.
-                let retry = Flow {
-                    consent_retry: true,
-                    nonce: random_token(),
-                    code_verifier: random_token(),
-                    ..flow
-                };
-                let hint = match provider {
-                    Provider::Google => Some(identity.subject.as_str()),
-                    Provider::Microsoft | Provider::Zoho => identity.email.as_deref(),
-                };
+            let new = Unknown {
+                identity,
+                tokens,
+                flow,
+                now,
+            };
+            return Ok(match unknown_identity(&ctx, issuer, upstream, new).await? {
                 // Its new round-trip cookie replaces this one.
-                return redirect_to_provider(
-                    &ctx,
-                    issuer,
-                    upstream,
-                    retry,
-                    Prompt {
-                        consent: true,
-                        login_hint: hint,
-                    },
-                )
-                .await;
-            }
-            pend_sign_up(&ctx, issuer, identity, &tokens, mail, &flow, now).await?
+                Next::AskAgain(response) => response,
+                Next::Pending(response) => with_cookie(response, clear_flow),
+            });
         }
     };
     Ok(with_cookie(response, clear_flow))
+}
+
+/// A round trip that ended with a provider identity Campbooks does not know.
+struct Unknown {
+    identity: ProviderIdentity,
+    tokens: Tokens,
+    flow: Flow,
+    now: DateTime<Utc>,
+}
+
+/// Where a new account's round trip goes.
+enum Next {
+    /// Back to the provider (with a round-trip cookie of its own).
+    AskAgain(Response),
+    /// To the new-account screen.
+    Pending(Response),
+}
+
+/// A new account's round trip: ask the provider again when the mailbox (or
+/// its refresh token) is still to be asked for, else keep the identity for
+/// the new-account screen.
+async fn unknown_identity(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    upstream: &Upstream,
+    new: Unknown,
+) -> Result<Next> {
+    let Unknown {
+        identity,
+        tokens,
+        flow,
+        now,
+    } = new;
+    let provider = flow.provider;
+    let asked = asks_mailbox(&flow);
+    let mail = MailGrant::of(ctx, provider, &tokens, asked);
+    // A new Zoho account: now ask for its mailbox (see
+    // `asks_mailbox`).
+    let mailbox_offered = !ctx
+        .state
+        .grants
+        .mailbox_scopes(provider.as_str())
+        .is_empty();
+    let ask_mailbox = !asked && mailbox_offered;
+    if (ask_mailbox || (mail.granted && tokens.refresh_token.is_none())) && !flow.consent_retry {
+        // Google sends a refresh token only on a fresh consent (this person
+        // consented before), and a Zoho sign-in asked for no mailbox yet.
+        // Ask once more, for this account.
+        let retry = Flow {
+            consent_retry: true,
+            nonce: random_token(),
+            code_verifier: random_token(),
+            ..flow
+        };
+        let hint = match provider {
+            Provider::Google => Some(identity.subject.as_str()),
+            Provider::Microsoft | Provider::Zoho => identity.email.as_deref(),
+        };
+        return redirect_to_provider(
+            ctx,
+            issuer,
+            upstream,
+            retry,
+            Prompt {
+                consent: true,
+                login_hint: hint,
+            },
+        )
+        .await
+        .map(Next::AskAgain);
+    }
+    pend_sign_up(ctx, issuer, upstream, identity, &tokens, mail, &flow, now)
+        .await
+        .map(Next::Pending)
 }
 
 /// Redeem the provider's code and validate its ID token; on failure, the
@@ -487,15 +577,31 @@ pub(super) struct MailGrant {
 }
 
 impl MailGrant {
-    pub(super) fn of(ctx: &Ctx, provider: Provider, tokens: &Tokens) -> Self {
-        let scopes: Vec<String> = tokens
-            .scope
-            .as_deref()
-            .unwrap_or_default()
-            .split_whitespace()
-            .map(ToOwned::to_owned)
-            .collect();
-        let wanted = ctx.state.grants.mailbox_scopes(provider.as_str());
+    /// What `tokens` granted of the mailbox scopes, when the round trip
+    /// `asked` for them (nothing otherwise).
+    pub(super) fn of(ctx: &Ctx, provider: Provider, tokens: &Tokens, asked: bool) -> Self {
+        let wanted = if asked {
+            ctx.state.grants.mailbox_scopes(provider.as_str())
+        } else {
+            Vec::new()
+        };
+        Self::from_answer(provider, tokens.scope.as_deref(), &wanted)
+    }
+
+    /// What a token answer's `scope` granted of the `wanted` mailbox scopes.
+    /// Scopes are split on spaces and commas (Zoho documents commas). Zoho
+    /// may leave `scope` out; its consent screen is all or nothing, so an
+    /// answer without it grants what was asked.
+    pub(super) fn from_answer(provider: Provider, scope: Option<&str>, wanted: &[String]) -> Self {
+        let scopes: Vec<String> = match scope {
+            None if provider == Provider::Zoho => wanted.to_vec(),
+            scope => scope
+                .unwrap_or_default()
+                .split(|c: char| c.is_whitespace() || c == ',')
+                .filter(|s| !s.is_empty())
+                .map(ToOwned::to_owned)
+                .collect(),
+        };
         let granted = !wanted.is_empty() && wanted.iter().all(|s| scopes.contains(s));
         Self { granted, scopes }
     }
@@ -503,15 +609,23 @@ impl MailGrant {
 
 /// Keep `identity` (and its mailbox grant, when there is one with offline
 /// access) for the new-account screen, bound to this browser.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one call site; the values are distinct"
+)]
 async fn pend_sign_up(
     ctx: &Ctx,
     issuer: &Issuer,
+    upstream: &Upstream,
     identity: ProviderIdentity,
     tokens: &Tokens,
     mail: MailGrant,
     flow: &Flow,
     now: DateTime<Utc>,
 ) -> Result<Response> {
+    if !mail.granted {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+    }
     let held = (mail.granted && tokens.refresh_token.is_some()).then(|| ProviderTokens {
         access_token: tokens.access_token.clone(),
         refresh_token: tokens.refresh_token.clone(),
@@ -765,4 +879,45 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
         response,
         issuer.cookies.clear(SIGN_UP_COOKIE, SameSite::Strict),
     ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{MailGrant, Provider};
+
+    fn wanted() -> Vec<String> {
+        ["ZohoMail.accounts.READ", "ZohoMail.messages.ALL"]
+            .map(str::to_owned)
+            .to_vec()
+    }
+
+    #[test]
+    fn granted_scopes_split_on_spaces_and_commas() {
+        let commas = MailGrant::from_answer(
+            Provider::Zoho,
+            Some("openid,ZohoMail.accounts.READ,ZohoMail.messages.ALL"),
+            &wanted(),
+        );
+        assert!(commas.granted);
+        let spaces = MailGrant::from_answer(
+            Provider::Google,
+            Some("openid ZohoMail.accounts.READ, ZohoMail.messages.ALL"),
+            &wanted(),
+        );
+        assert!(spaces.granted);
+        let partial =
+            MailGrant::from_answer(Provider::Zoho, Some("ZohoMail.accounts.READ"), &wanted());
+        assert!(!partial.granted);
+    }
+
+    #[test]
+    fn a_zoho_answer_without_scope_grants_what_was_asked() {
+        let zoho = MailGrant::from_answer(Provider::Zoho, None, &wanted());
+        assert!(zoho.granted);
+        assert_eq!(zoho.scopes, wanted());
+        // Google always says what it granted.
+        assert!(!MailGrant::from_answer(Provider::Google, None, &wanted()).granted);
+        // Nothing asked, nothing granted.
+        assert!(!MailGrant::from_answer(Provider::Zoho, None, &[]).granted);
+    }
 }

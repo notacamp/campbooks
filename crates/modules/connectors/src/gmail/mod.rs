@@ -17,14 +17,12 @@ pub mod normalize;
 mod read;
 pub mod write;
 
-use campbooks_kernel::blobs::BlobRef;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-pub use read::{ReadError, Reader, store_message};
+pub use read::{Reader, fetched};
 
-use crate::{contract::MessageChange, domain::model::Phase, google::LabelInfo};
+use crate::{contract::MessageChange, domain::model::Phase, google::LabelInfo, mail::IndexOp};
 
 /// Message ids listed per backfill or resync run.
 pub const LIST_PAGE: u32 = 50;
@@ -85,49 +83,4 @@ pub struct Page {
     /// Whether every new message of the page was fetched; `false` when the
     /// run's byte budget ran out (the cursor then stays put).
     pub complete: bool,
-}
-
-/// One update to the adapter's index (`connectors.gmail_messages`).
-#[derive(Debug, Clone)]
-pub enum IndexOp {
-    /// A newly emitted message: its row holds every blob it references.
-    Insert {
-        /// The new row's id (the blobs' owner).
-        row: Uuid,
-        /// Gmail's id.
-        provider_message_id: String,
-        /// Gmail's thread id.
-        thread_id: String,
-        /// Its labels.
-        label_ids: Vec<String>,
-        /// When Gmail received it.
-        internal_date: DateTime<Utc>,
-        /// The normalised message document.
-        document: BlobRef,
-        /// Every blob the message references (raw, bodies, attachments,
-        /// document).
-        blobs: Vec<BlobRef>,
-        /// The resync pass that listed it.
-        generation: i32,
-    },
-    /// A known message's labels changed (it was re-emitted) or it was seen
-    /// again by a resync pass.
-    Update {
-        /// The row.
-        row: Uuid,
-        /// Its labels now.
-        label_ids: Vec<String>,
-        /// The resync pass that listed it.
-        generation: i32,
-    },
-    /// The message is gone: delete the row and release its blobs.
-    Remove {
-        /// The row.
-        row: Uuid,
-    },
-    /// The message is over the size limit: record it, never fetch it again.
-    Oversized {
-        /// Gmail's id.
-        provider_message_id: String,
-    },
 }

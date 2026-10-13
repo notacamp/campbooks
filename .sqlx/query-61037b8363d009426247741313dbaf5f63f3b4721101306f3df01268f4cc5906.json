@@ -1,0 +1,37 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.streams\n                       (id, workspace_id, connection_id, capability, inbox_id, phase,\n                        interval_seconds, created_at, mailbox_key, address)\n                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)\n                   ON CONFLICT (connection_id, capability, mailbox_key) DO NOTHING\n                   RETURNING id AS \"id: StreamId\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Text",
+        "Int4",
+        "Timestamptz",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "61037b8363d009426247741313dbaf5f63f3b4721101306f3df01268f4cc5906"
+}

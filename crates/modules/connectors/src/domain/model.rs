@@ -41,6 +41,8 @@ campbooks_kernel::define_id!(
 pub enum Provider {
     /// Google: Gmail today; Calendar and Drive later.
     Google,
+    /// Zoho: Zoho Mail.
+    Zoho,
 }
 
 impl Provider {
@@ -48,6 +50,7 @@ impl Provider {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Google => "google",
+            Self::Zoho => "zoho",
         }
     }
 
@@ -55,6 +58,7 @@ impl Provider {
     pub fn parse(value: &str) -> Result<Self, Error> {
         match value {
             "google" => Ok(Self::Google),
+            "zoho" => Ok(Self::Zoho),
             other => Err(Error::internal(format!("unknown provider `{other}`"))),
         }
     }
@@ -206,6 +210,9 @@ pub struct StreamView {
     pub capability: Capability,
     /// The conversations inbox it feeds (`messages`).
     pub inbox_id: Option<InboxId>,
+    /// The mailbox it reads (`messages`): one connection can reach several
+    /// (a Zoho login's mail accounts).
+    pub address: Option<String>,
     /// Where it is in its reading.
     pub phase: Phase,
     /// Paused until the member connects again.

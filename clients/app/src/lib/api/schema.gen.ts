@@ -1857,7 +1857,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google";
+        Provider: "google" | "zoho";
         /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
@@ -2052,6 +2052,11 @@ export interface components {
         };
         /** @description A change stream as the API shows it. */
         StreamView: {
+            /**
+             * @description The mailbox it reads (`messages`): one connection can reach several
+             *     (a Zoho login's mail accounts).
+             */
+            address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
             inbox_id?: components["schemas"]["InboxId"] | null;
