@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider, provider_server FROM connectors.connections WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_server",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider_server"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "cb740daec99da78d3dda9e36e9393483e60e2cc3a2fb27281f8df4d3499e2e8f"
+}

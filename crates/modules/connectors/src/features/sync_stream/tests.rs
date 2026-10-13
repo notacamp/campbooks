@@ -230,11 +230,10 @@ async fn deletions_become_removals(db: PgPool) {
         all.last().unwrap(),
         &serde_json::json!({"op": "remove", "provider_message_id": id})
     );
-    let indexed: i64 =
-        sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.gmail_messages"#)
-            .fetch_one(&kit.db)
-            .await
-            .unwrap();
+    let indexed: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.messages"#)
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
     assert_eq!(indexed, 0);
     // Its blobs are released (the sweeper may delete them after the grace).
     let held: i64 = sqlx::query_scalar!(
@@ -515,7 +514,7 @@ async fn oversized_messages_are_skipped_and_never_fetched_again(db: PgPool) {
     assert_eq!(all.len(), 1);
     upsert_of(&all, &small);
     let recorded: Vec<String> =
-        sqlx::query_scalar!("SELECT provider_message_id FROM connectors.gmail_oversized")
+        sqlx::query_scalar!("SELECT provider_message_id FROM connectors.oversized")
             .fetch_all(&kit.db)
             .await
             .unwrap();

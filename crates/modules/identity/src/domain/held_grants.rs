@@ -141,6 +141,8 @@ pub struct Taken {
     pub grant: HeldGrant,
     /// The provider account's subject.
     pub account_subject: String,
+    /// The issuer that vouched for it (the ID token's `iss`).
+    pub issuer: String,
     /// Whether the provider verified the address.
     pub address_verified: bool,
     /// The tokens.
@@ -167,11 +169,12 @@ pub async fn take(
         expires_at: DateTime<Utc>,
         grant_tokens: Vec<u8>,
         subject: String,
+        issuer: String,
     }
     let row: Option<Row> = sqlx::query_as(
         "SELECT g.id, g.provider, g.address, g.address_verified, g.display_name, g.expires_at,
                 g.grant_tokens,
-                p.subject
+                p.subject, p.issuer
            FROM identity.held_grants g
            JOIN identity.provider_identities p ON p.id = g.provider_identity_id
           WHERE g.id = $1 AND g.account_id = $2 AND g.expires_at > $3
@@ -193,6 +196,7 @@ pub async fn take(
                 expires_at: row.expires_at,
             },
             account_subject: row.subject,
+            issuer: row.issuer,
             address_verified: row.address_verified,
             tokens,
         })

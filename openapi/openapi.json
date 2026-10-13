@@ -7850,7 +7850,8 @@
         "type": "string",
         "description": "An outside provider.",
         "enum": [
-          "google"
+          "google",
+          "zoho"
         ]
       },
       "ReasonView": {
@@ -8295,6 +8296,13 @@
           "paused"
         ],
         "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The mailbox it reads (`messages`): one connection can reach several\n(a Zoho login's mail accounts)."
+          },
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability it reads."
@@ -8696,7 +8704,7 @@
     },
     {
       "name": "connectors",
-      "description": "Connections to outside accounts (Gmail first): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
+      "description": "Connections to outside accounts (Gmail, Zoho Mail): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
     },
     {
       "name": "conversations",

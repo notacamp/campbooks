@@ -7,18 +7,19 @@
 
 mod gmail;
 
-use std::{path::PathBuf, time::Duration};
+use secrecy::ExposeSecret as _;
 
-use secrecy::{ExposeSecret as _, SecretString};
-
-use crate::domain::model::Capability;
+use crate::{
+    domain::model::Capability,
+    provider::{
+        ClientSecret, FORM, OAuthError, ProviderError, TokenGrant, form_body, http_client,
+        retry_after, transport,
+    },
+};
 use serde::Deserialize;
 use url::Url;
 
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
-
-/// The longest any call to Google may take.
-pub const HTTP_TIMEOUT: Duration = Duration::from_mins(1);
 
 /// The scope the `messages` capability needs: read mail and change labels,
 /// no permanent deletion.
@@ -89,15 +90,6 @@ impl Endpoints {
     }
 }
 
-/// Where the client secret comes from.
-#[derive(Debug, Clone)]
-pub enum ClientSecret {
-    /// Inline (`CAMPBOOKS_GOOGLE__CLIENT_SECRET`).
-    Inline(SecretString),
-    /// A file (`CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`), read per request.
-    File(PathBuf),
-}
-
 /// The Google OAuth client this instance is registered as.
 #[derive(Debug, Clone)]
 pub struct Google {
@@ -105,61 +97,6 @@ pub struct Google {
     client_id: String,
     client_secret: ClientSecret,
     endpoints: Endpoints,
-}
-
-/// What went wrong talking to Google. Never carries a token.
-#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum GoogleError {
-    /// The refresh token or code is no longer valid (`invalid_grant`).
-    #[error("the grant is no longer valid")]
-    InvalidGrant,
-    /// The access token was refused (401).
-    #[error("the access token was refused")]
-    Unauthorized,
-    /// Slow down: 429, or 403 `rateLimitExceeded`.
-    #[error("rate limited by Google")]
-    RateLimited {
-        /// Google's `Retry-After`, when given.
-        retry_after: Option<Duration>,
-    },
-    /// The resource is gone (404); for `history.list`, the history id is
-    /// too old.
-    #[error("not found at Google")]
-    NotFound,
-    /// A network failure or a 5xx: try again later.
-    #[error("Google is unavailable: {0}")]
-    Unavailable(String),
-    /// Anything else: a refused request or an unexpected answer.
-    #[error("unexpected answer from Google: {0}")]
-    Unexpected(String),
-}
-
-/// Tokens from the token endpoint.
-#[derive(Debug, Clone, Deserialize)]
-pub struct TokenGrant {
-    /// The access token.
-    pub access_token: String,
-    /// Its lifetime in seconds.
-    #[serde(default)]
-    pub expires_in: Option<i64>,
-    /// The refresh token: present on a consent with offline access.
-    #[serde(default)]
-    pub refresh_token: Option<String>,
-    /// The scopes granted, space-separated.
-    #[serde(default)]
-    pub scope: Option<String>,
-}
-
-impl TokenGrant {
-    /// The granted scopes.
-    pub fn scopes(&self) -> Vec<String> {
-        self.scope
-            .as_deref()
-            .unwrap_or_default()
-            .split_whitespace()
-            .map(ToOwned::to_owned)
-            .collect()
-    }
 }
 
 impl Google {
@@ -170,12 +107,7 @@ impl Google {
         client_secret: ClientSecret,
         endpoints: Endpoints,
     ) -> Result<Self, String> {
-        let http = reqwest::Client::builder()
-            .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
-            .timeout(HTTP_TIMEOUT)
-            .connect_timeout(Duration::from_secs(10))
-            .build()
-            .map_err(|e| format!("could not build the Google client: {e}"))?;
+        let http = http_client("Google")?;
         Ok(Self {
             http,
             client_id,
@@ -195,7 +127,7 @@ impl Google {
     }
 
     /// A fresh access token for `refresh_token`.
-    pub async fn refresh(&self, refresh_token: &str) -> Result<TokenGrant, GoogleError> {
+    pub async fn refresh(&self, refresh_token: &str) -> Result<TokenGrant, ProviderError> {
         let secret = self.secret()?;
         self.token_request(&[
             ("grant_type", "refresh_token"),
@@ -208,7 +140,7 @@ impl Google {
 
     /// Revoke `token` (a refresh token revokes the whole grant). A token
     /// Google no longer knows counts as revoked.
-    pub async fn revoke(&self, token: &str) -> Result<(), GoogleError> {
+    pub async fn revoke(&self, token: &str) -> Result<(), ProviderError> {
         let response = self
             .http
             .post(self.endpoints.revoke.clone())
@@ -225,7 +157,7 @@ impl Google {
         Err(classify(status, response.headers(), None))
     }
 
-    async fn token_request(&self, form: &[(&str, &str)]) -> Result<TokenGrant, GoogleError> {
+    async fn token_request(&self, form: &[(&str, &str)]) -> Result<TokenGrant, ProviderError> {
         let response = self
             .http
             .post(self.endpoints.token.clone())
@@ -239,69 +171,38 @@ impl Google {
             return response
                 .json()
                 .await
-                .map_err(|e| GoogleError::Unexpected(format!("token response: {e}")));
+                .map_err(|e| ProviderError::Unexpected(format!("token response: {e}")));
         }
         let headers = response.headers().clone();
         let error = response.json::<OAuthError>().await.ok().map(|e| e.error);
         if error.as_deref() == Some("invalid_grant") {
-            return Err(GoogleError::InvalidGrant);
+            return Err(ProviderError::InvalidGrant);
         }
         Err(classify(status, &headers, error.as_deref()))
     }
 
-    fn secret(&self) -> Result<SecretString, GoogleError> {
-        match &self.client_secret {
-            ClientSecret::Inline(secret) => Ok(secret.clone()),
-            // A few bytes from a local file (a mounted secret).
-            ClientSecret::File(path) => std::fs::read_to_string(path)
-                .map(|secret| SecretString::from(secret.trim().to_owned()))
-                .map_err(|e| {
-                    GoogleError::Unexpected(format!(
-                        "reading CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE: {e}"
-                    ))
-                }),
-        }
+    fn secret(&self) -> Result<secrecy::SecretString, ProviderError> {
+        self.client_secret
+            .read("CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE")
     }
-}
-
-/// An OAuth error answer (RFC 6749 §5.2).
-#[derive(Deserialize)]
-struct OAuthError {
-    error: String,
-}
-
-/// The media type of OAuth request bodies.
-const FORM: &str = "application/x-www-form-urlencoded";
-
-/// `pairs` as an `application/x-www-form-urlencoded` body.
-fn form_body(pairs: &[(&str, &str)]) -> String {
-    url::form_urlencoded::Serializer::new(String::new())
-        .extend_pairs(pairs)
-        .finish()
-}
-
-/// A request that did not reach Google or got no answer.
-fn transport(err: reqwest::Error) -> GoogleError {
-    // Never include the URL: it may carry a query with a token.
-    GoogleError::Unavailable(err.without_url().to_string())
 }
 
 /// Read a JSON answer, or classify the failure.
 async fn json<T: serde::de::DeserializeOwned>(
     response: reqwest::Response,
-) -> Result<T, GoogleError> {
+) -> Result<T, ProviderError> {
     let status = response.status();
     if status.is_success() {
         return response
             .json()
             .await
-            .map_err(|e| GoogleError::Unexpected(format!("response: {}", e.without_url())));
+            .map_err(|e| ProviderError::Unexpected(format!("response: {}", e.without_url())));
     }
     Err(failure(response).await)
 }
 
 /// What a non-success answer means.
-async fn failure(response: reqwest::Response) -> GoogleError {
+async fn failure(response: reqwest::Response) -> ProviderError {
     let status = response.status();
     let headers = response.headers().clone();
     let reason = error_reason(response).await;
@@ -339,7 +240,7 @@ fn classify(
     status: reqwest::StatusCode,
     headers: &reqwest::header::HeaderMap,
     reason: Option<&str>,
-) -> GoogleError {
+) -> ProviderError {
     let rate_limited_reason = matches!(
         reason,
         Some("rateLimitExceeded" | "userRateLimitExceeded" | "RESOURCE_EXHAUSTED")
@@ -347,18 +248,15 @@ fn classify(
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS
         || (status == reqwest::StatusCode::FORBIDDEN && rate_limited_reason)
     {
-        let retry_after = headers
-            .get(reqwest::header::RETRY_AFTER)
-            .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.trim().parse::<u64>().ok())
-            .map(Duration::from_secs);
-        return GoogleError::RateLimited { retry_after };
+        return ProviderError::RateLimited {
+            retry_after: retry_after(headers),
+        };
     }
     match status {
-        reqwest::StatusCode::UNAUTHORIZED => GoogleError::Unauthorized,
-        reqwest::StatusCode::NOT_FOUND => GoogleError::NotFound,
-        s if s.is_server_error() => GoogleError::Unavailable(format!("HTTP {}", s.as_u16())),
-        s => GoogleError::Unexpected(format!(
+        reqwest::StatusCode::UNAUTHORIZED => ProviderError::Unauthorized,
+        reqwest::StatusCode::NOT_FOUND => ProviderError::NotFound,
+        s if s.is_server_error() => ProviderError::Unavailable(format!("HTTP {}", s.as_u16())),
+        s => ProviderError::Unexpected(format!(
             "HTTP {}{}",
             s.as_u16(),
             reason.map(|r| format!(" ({r})")).unwrap_or_default()
@@ -368,6 +266,10 @@ fn classify(
 
 #[cfg(test)]
 mod tests {
+    use std::time::Duration;
+
+    use secrecy::SecretString;
+
     use super::*;
 
     /// Against a real Google account (staging, #53). Run with
@@ -401,7 +303,7 @@ mod tests {
         headers.insert(reqwest::header::RETRY_AFTER, "120".parse().unwrap());
         assert_eq!(
             classify(reqwest::StatusCode::TOO_MANY_REQUESTS, &headers, None),
-            GoogleError::RateLimited {
+            ProviderError::RateLimited {
                 retry_after: Some(Duration::from_mins(2))
             }
         );
@@ -412,19 +314,19 @@ mod tests {
                 &none,
                 Some("userRateLimitExceeded")
             ),
-            GoogleError::RateLimited { retry_after: None }
+            ProviderError::RateLimited { retry_after: None }
         );
         assert_eq!(
             classify(reqwest::StatusCode::UNAUTHORIZED, &none, None),
-            GoogleError::Unauthorized
+            ProviderError::Unauthorized
         );
         assert_eq!(
             classify(reqwest::StatusCode::NOT_FOUND, &none, None),
-            GoogleError::NotFound
+            ProviderError::NotFound
         );
         assert!(matches!(
             classify(reqwest::StatusCode::BAD_GATEWAY, &none, None),
-            GoogleError::Unavailable(_)
+            ProviderError::Unavailable(_)
         ));
         assert!(matches!(
             classify(
@@ -432,7 +334,7 @@ mod tests {
                 &none,
                 Some("insufficientPermissions")
             ),
-            GoogleError::Unexpected(_)
+            ProviderError::Unexpected(_)
         ));
     }
 }

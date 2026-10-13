@@ -17,10 +17,10 @@ use campbooks_kernel::{
 use secrecy::ExposeSecret as _;
 
 use super::{
-    grants::{ProviderGrant, create_or_refresh_connection},
+    grants::{Mailbox, ProviderGrant, create_or_refresh_connection},
     model::{Capability, ConnectionId, Health, Provider},
 };
-use crate::{MESSAGES, deps::Deps, google};
+use crate::{MESSAGES, deps::Deps, google, provider::TokenGrant, zoho};
 
 /// Takes sign-in grants into connections.
 #[derive(Debug, Clone)]
@@ -35,30 +35,58 @@ pub fn grant_intake(deps: Deps) -> GrantIntakePort {
 
 impl GrantIntake for Intake {
     fn mailbox_scopes(&self, provider: &str) -> Vec<String> {
-        match (provider, &self.deps.google) {
-            ("google", Some(_)) => google::capability_scope(Capability::Messages)
-                .into_iter()
-                .map(ToOwned::to_owned)
-                .collect(),
+        match provider {
+            "google" if self.deps.google.is_some() => {
+                google::capability_scope(Capability::Messages)
+                    .into_iter()
+                    .map(ToOwned::to_owned)
+                    .collect()
+            }
+            "zoho" if self.deps.zoho.is_some() => zoho::MAIL_SCOPES.map(ToOwned::to_owned).to_vec(),
             _ => Vec::new(),
         }
     }
 
     fn adopt<'a>(&'a self, state: &'a AppState, grant: Grant) -> AdoptFuture<'a> {
         Box::pin(async move {
-            let provider = match grant.provider.as_str() {
-                "google" if self.deps.google.is_some() => Provider::Google,
+            let access = member(state, &grant.subject, grant.workspace).await?;
+            let user = access.user.ok_or(Error::NotFound)?;
+            let address = grant.address.trim().to_lowercase();
+            let (provider, capabilities, provider_server, mailboxes) = match grant.provider.as_str()
+            {
+                "google" if self.deps.google.is_some() => {
+                    let capabilities: Vec<Capability> = google::granted_capabilities(&grant.scopes)
+                        .into_iter()
+                        .filter(|c| google::capability_scope(*c).is_some())
+                        .collect();
+                    let mailbox = Mailbox {
+                        key: String::new(),
+                        address: address.clone(),
+                        address_verified: grant.address_verified,
+                        display_name: grant.display_name.clone(),
+                    };
+                    (Provider::Google, capabilities, None, vec![mailbox])
+                }
+                "zoho" if self.deps.zoho.is_some() => {
+                    let granted = zoho::MAIL_SCOPES
+                        .iter()
+                        .all(|s| grant.scopes.iter().any(|g| g == s));
+                    if !granted {
+                        return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
+                    }
+                    let (server, mailboxes) = self.zoho_mailboxes(&grant, &address).await?;
+                    (
+                        Provider::Zoho,
+                        vec![Capability::Messages],
+                        Some(server),
+                        mailboxes,
+                    )
+                }
                 _ => return Err(Error::Conflict(MESSAGES.reason("provider_not_configured"))),
             };
-            let capabilities: Vec<Capability> = google::granted_capabilities(&grant.scopes)
-                .into_iter()
-                .filter(|c| google::capability_scope(*c).is_some())
-                .collect();
             if capabilities.is_empty() {
                 return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
             }
-            let access = member(state, &grant.subject, grant.workspace).await?;
-            let user = access.user.ok_or(Error::NotFound)?;
             let view = create_or_refresh_connection(
                 state,
                 &self.deps,
@@ -67,11 +95,11 @@ impl GrantIntake for Intake {
                     user,
                     provider,
                     account_subject: grant.account_subject,
-                    address: grant.address.trim().to_lowercase(),
+                    address,
                     address_verified: grant.address_verified,
                     display_name: grant.display_name,
                     capabilities,
-                    tokens: google::TokenGrant {
+                    tokens: TokenGrant {
                         access_token: grant.access_token.expose_secret().to_owned(),
                         expires_in: grant.expires_in.and_then(|s| i64::try_from(s).ok()),
                         refresh_token: grant
@@ -85,6 +113,8 @@ impl GrantIntake for Intake {
                         .as_deref()
                         .map(|id| id.parse::<ConnectionId>().map_err(|_| Error::NotFound))
                         .transpose()?,
+                    provider_server,
+                    mailboxes,
                 },
             )
             .await?;
@@ -124,6 +154,55 @@ impl GrantIntake for Intake {
                 needs_reauth: found.health == Health::NeedsReauth.as_str(),
             })
         })
+    }
+}
+
+impl Intake {
+    /// The data centre of a Zoho grant (its validated issuer) and the
+    /// login's mail accounts, read with the grant's access token.
+    async fn zoho_mailboxes(
+        &self,
+        grant: &Grant,
+        login: &str,
+    ) -> Result<(String, Vec<Mailbox>), Error> {
+        let zoho = self
+            .deps
+            .zoho
+            .as_ref()
+            .ok_or_else(|| Error::Conflict(MESSAGES.reason("provider_not_configured")))?;
+        let centre = zoho
+            .centre(&grant.issuer)
+            .ok_or_else(|| Error::Conflict(MESSAGES.reason("unknown_data_centre")))?;
+        let accounts = zoho
+            .mail(&centre, grant.access_token.expose_secret(), "")
+            .accounts()
+            .await
+            .map_err(|err| {
+                tracing::warn!(error = %err, "could not list a Zoho login's mail accounts");
+                Error::Unavailable(MESSAGES.reason("provider_unavailable"))
+            })?;
+        let mut mailboxes: Vec<Mailbox> = Vec::new();
+        for account in accounts {
+            let Some(address) = account.address() else {
+                continue;
+            };
+            if mailboxes.iter().any(|m| m.address == address) {
+                continue;
+            }
+            mailboxes.push(Mailbox {
+                // A Zoho-hosted mailbox is Zoho's to vouch for; an outside
+                // address fetched into Zoho only when it is the login's own.
+                address_verified: account.is_zoho_mailbox()
+                    || (address == login && grant.address_verified),
+                display_name: account.name().or_else(|| grant.display_name.clone()),
+                key: account.account_id,
+                address,
+            });
+        }
+        if mailboxes.is_empty() {
+            return Err(Error::Conflict(MESSAGES.reason("no_mailbox")));
+        }
+        Ok((centre.issuer, mailboxes))
     }
 }
 
@@ -168,6 +247,7 @@ mod tests {
             subject: subject.to_owned(),
             provider: provider.to_owned(),
             account_subject: ACCOUNT_SUB.to_owned(),
+            issuer: "https://accounts.google.com".to_owned(),
             address: "Sam@Example.com".to_owned(),
             address_verified: true,
             display_name: Some("Sam Rivera".to_owned()),
@@ -194,7 +274,8 @@ mod tests {
             intake.mailbox_scopes("google"),
             [crate::google::GMAIL_SCOPE]
         );
-        assert!(intake.mailbox_scopes("zoho").is_empty());
+        assert_eq!(intake.mailbox_scopes("zoho"), crate::zoho::MAIL_SCOPES);
+        assert!(intake.mailbox_scopes("microsoft").is_empty());
 
         let id = intake
             .adopt(&kit.state, grant(ws, "ana", "google"))
@@ -236,8 +317,15 @@ mod tests {
         let ana = kit.user("ana");
         kit.join(&ana, ws, Role::Owner);
         assert!(matches!(
-            intake.adopt(&kit.state, grant(ws, "ana", "zoho")).await,
+            intake
+                .adopt(&kit.state, grant(ws, "ana", "microsoft"))
+                .await,
             Err(Error::Conflict(_))
+        ));
+        // A Zoho grant without its mail scopes connects nothing.
+        assert!(matches!(
+            intake.adopt(&kit.state, grant(ws, "ana", "zoho")).await,
+            Err(Error::Denied(_))
         ));
         let mut no_mail = grant(ws, "ana", "google");
         no_mail.scopes.pop();

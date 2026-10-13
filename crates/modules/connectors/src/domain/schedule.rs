@@ -19,7 +19,7 @@ use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, PgPool, Postgres, Transaction};
 
-use super::model::{Provider, StreamId};
+use super::model::{ConnectionId, Provider, StreamId};
 use crate::config::PollConfig;
 
 /// How long a dispatched stream's row stays out of the dispatcher's way.
@@ -138,6 +138,38 @@ pub fn next_interval(current_seconds: i32, changed: bool, poll: &PollConfig) -> 
     }
 }
 
+/// The budget key of one connection's own requests (a Zoho login).
+pub fn connection_budget(connection: ConnectionId) -> String {
+    format!("zoho:{connection}")
+}
+
+/// What a budget refills by and holds.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Rate {
+    /// Units added per second.
+    pub per_second: f64,
+    /// Seconds' worth the bucket holds at most.
+    pub burst_seconds: f64,
+}
+
+impl Rate {
+    /// Google's quota: `units` per second, two seconds' worth.
+    pub fn per_second(units: u32) -> Self {
+        Self {
+            per_second: f64::from(units),
+            burst_seconds: 2.0,
+        }
+    }
+
+    /// A per-minute allowance, a minute's worth at once.
+    pub fn per_minute(requests: u32) -> Self {
+        Self {
+            per_second: f64::from(requests) / 60.0,
+            burst_seconds: 60.0,
+        }
+    }
+}
+
 /// Take `cost` units of `provider`'s budget (a token bucket refilled at
 /// `rate` per second, holding at most two seconds' worth). `Err` holds how
 /// long until there is enough.
@@ -147,15 +179,22 @@ pub async fn take_budget(
     cost: u32,
     rate: u32,
 ) -> Result<Result<(), Duration>> {
-    let rate = f64::from(rate);
-    let burst = rate * 2.0;
+    take(pool, provider.as_str(), cost, Rate::per_second(rate)).await
+}
+
+/// Take `cost` units of the budget `key` (a token bucket shared by every
+/// process, refilled at `rate`). `Err` holds how long until there is
+/// enough.
+pub async fn take(pool: &PgPool, key: &str, cost: u32, rate: Rate) -> Result<Result<(), Duration>> {
+    let burst = rate.per_second * rate.burst_seconds;
+    let rate = rate.per_second;
     let cost = f64::from(cost).min(burst);
     let mut tx = pool.begin().await?;
     sqlx::query!(
         r#"INSERT INTO connectors.provider_budgets (provider, tokens, refilled_at)
            VALUES ($1, $2, clock_timestamp())
            ON CONFLICT (provider) DO NOTHING"#,
-        provider.as_str(),
+        key,
         burst,
     )
     .execute(&mut *tx)
@@ -164,7 +203,7 @@ pub async fn take_budget(
         r#"SELECT least($2, tokens + extract(epoch FROM clock_timestamp() - refilled_at)::float8 * $3)
                   AS "available!"
              FROM connectors.provider_budgets WHERE provider = $1 FOR UPDATE"#,
-        provider.as_str(),
+        key,
         burst,
         rate,
     )
@@ -174,7 +213,7 @@ pub async fn take_budget(
     sqlx::query!(
         "UPDATE connectors.provider_budgets SET tokens = $2, refilled_at = clock_timestamp()
           WHERE provider = $1",
-        provider.as_str(),
+        key,
         if granted { available - cost } else { available },
     )
     .execute(&mut *tx)
@@ -187,6 +226,17 @@ pub async fn take_budget(
             ((cost - available) / rate).max(0.1),
         )))
     }
+}
+
+/// Drop the budget `key` (its connection is gone).
+pub async fn forget_budget(conn: &mut PgConnection, key: &str) -> Result<()> {
+    sqlx::query!(
+        "DELETE FROM connectors.provider_budgets WHERE provider = $1",
+        key
+    )
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -226,5 +276,21 @@ mod tests {
             wait > Duration::from_millis(500) && wait <= Duration::from_secs(2),
             "{wait:?}"
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn each_zoho_login_has_its_own_budget(db: PgPool) {
+        let pool = campbooks_kernel::testing::app_role_pool(&db).await;
+        let (one, two) = (
+            connection_budget(ConnectionId::new()),
+            connection_budget(ConnectionId::new()),
+        );
+        // 60 a minute: a minute's worth at once, then wait.
+        let rate = Rate::per_minute(60);
+        assert_eq!(take(&pool, &one, 60, rate).await.unwrap(), Ok(()));
+        let wait = take(&pool, &one, 30, rate).await.unwrap().unwrap_err();
+        assert!(wait > Duration::from_secs(20), "{wait:?}");
+        // Another login is untouched.
+        assert_eq!(take(&pool, &two, 60, rate).await.unwrap(), Ok(()));
     }
 }

@@ -1,0 +1,184 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.unclear, s.attempted_at,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  st.mailbox_key AS \"mailbox_key?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.provider_server,\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "document",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "document"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "unclear",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "unclear"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "attempted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "attempted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "stream?: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "paused?",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "cursor?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "cursor"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "mailbox_key?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "mailbox_key"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "connection?: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "provider?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "provider_server",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider_server"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "granted_by?: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "granted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "health?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "60bf47ef842b596e06ec93e0379884d578867d1ed228d670a1b4cfaa3c9883d7"
+}

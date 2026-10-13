@@ -5,10 +5,10 @@ use campbooks_kernel::{Result, crypto::Cipher, db::BeginFor as _, tenancy::Works
 use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{PgConnection, PgPool};
 
-use super::model::ConnectionId;
+use super::model::{ConnectionId, Provider};
 use crate::{
     deps::Deps,
-    google::{GoogleError, TokenGrant},
+    provider::{ProviderError, TokenGrant},
 };
 
 /// An access token is refreshed this long before it expires.
@@ -64,7 +64,7 @@ pub enum TokenError {
     /// The reason is `grant_revoked` or `credentials_unreadable`.
     NeedsReauth(&'static str),
     /// Talking to the provider failed.
-    Provider(GoogleError),
+    Provider(ProviderError),
     /// The database failed.
     Database(campbooks_kernel::Error),
 }
@@ -105,8 +105,8 @@ pub async fn access_token(
     workspace: WorkspaceId,
     id: ConnectionId,
 ) -> Result<String, TokenError> {
-    let (Some(cipher), Some(google)) = (&deps.cipher, &deps.google) else {
-        return Err(TokenError::Provider(GoogleError::Unexpected(
+    let Some(cipher) = &deps.cipher else {
+        return Err(TokenError::Provider(ProviderError::Unexpected(
             "the provider is not configured".into(),
         )));
     };
@@ -140,9 +140,9 @@ pub async fn access_token(
     let refresh = cipher
         .open(&sealed, &context("refresh_token", id))
         .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
-    let grant = match google.refresh(&refresh).await {
+    let grant = match refresh_at_provider(&mut tx, deps, id, &refresh).await? {
         Ok(grant) => grant,
-        Err(GoogleError::InvalidGrant) => return Err(TokenError::NeedsReauth("grant_revoked")),
+        Err(ProviderError::InvalidGrant) => return Err(TokenError::NeedsReauth("grant_revoked")),
         Err(other) => return Err(TokenError::Provider(other)),
     };
     store(
@@ -158,6 +158,43 @@ pub async fn access_token(
     .map_err(TokenError::Database)?;
     tx.commit().await?;
     Ok(grant.access_token)
+}
+
+/// Ask connection `id`'s provider for a fresh access token: Google, or the
+/// accounts server of the Zoho grant's data centre.
+async fn refresh_at_provider(
+    conn: &mut PgConnection,
+    deps: &Deps,
+    id: ConnectionId,
+    refresh: &str,
+) -> Result<Result<TokenGrant, ProviderError>, TokenError> {
+    let row = sqlx::query!(
+        "SELECT provider, provider_server FROM connectors.connections WHERE id = $1",
+        id as ConnectionId
+    )
+    .fetch_optional(conn)
+    .await?
+    .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
+    let not_configured = || {
+        TokenError::Provider(ProviderError::Unexpected(
+            "the provider is not configured".into(),
+        ))
+    };
+    match Provider::parse(&row.provider).map_err(TokenError::Database)? {
+        Provider::Google => {
+            let google = deps.google.as_ref().ok_or_else(not_configured)?;
+            Ok(google.refresh(refresh).await)
+        }
+        Provider::Zoho => {
+            let zoho = deps.zoho.as_ref().ok_or_else(not_configured)?;
+            let centre = row
+                .provider_server
+                .as_deref()
+                .and_then(|server| zoho.centre(server))
+                .ok_or(TokenError::NeedsReauth("unknown_data_centre"))?;
+            Ok(zoho.refresh(&centre, refresh).await)
+        }
+    }
 }
 
 /// The stored access token of connection `id`, while it is valid.

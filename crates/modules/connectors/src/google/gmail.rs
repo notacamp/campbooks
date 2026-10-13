@@ -4,7 +4,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Deserialize;
 use url::Url;
 
-use super::{GoogleError, failure, json, transport};
+use super::{ProviderError, failure, json, transport};
 
 /// The Gmail API for one access token.
 #[derive(Debug)]
@@ -164,17 +164,17 @@ impl<'a> Gmail<'a> {
         }
     }
 
-    fn url(&self, path: &str) -> Result<Url, GoogleError> {
+    fn url(&self, path: &str) -> Result<Url, ProviderError> {
         self.base
             .join(path)
-            .map_err(|e| GoogleError::Unexpected(format!("Gmail URL: {e}")))
+            .map_err(|e| ProviderError::Unexpected(format!("Gmail URL: {e}")))
     }
 
     async fn get<T: serde::de::DeserializeOwned>(
         &self,
         path: &str,
         query: &[(&str, &str)],
-    ) -> Result<T, GoogleError> {
+    ) -> Result<T, ProviderError> {
         let mut url = self.url(path)?;
         url.query_pairs_mut().extend_pairs(query);
         let response = self
@@ -191,7 +191,7 @@ impl<'a> Gmail<'a> {
         &self,
         path: &str,
         body: &serde_json::Value,
-    ) -> Result<reqwest::Response, GoogleError> {
+    ) -> Result<reqwest::Response, ProviderError> {
         let response = self
             .http
             .post(self.url(path)?)
@@ -214,7 +214,7 @@ impl<'a> Gmail<'a> {
         id: &str,
         add: &[String],
         remove: &[String],
-    ) -> Result<MessageMeta, GoogleError> {
+    ) -> Result<MessageMeta, ProviderError> {
         let body = serde_json::json!({"addLabelIds": add, "removeLabelIds": remove});
         let response = self
             .post(&format!("users/me/messages/{id}/modify"), &body)
@@ -229,19 +229,19 @@ impl<'a> Gmail<'a> {
         ids: &[String],
         add: &[String],
         remove: &[String],
-    ) -> Result<(), GoogleError> {
+    ) -> Result<(), ProviderError> {
         let body = serde_json::json!({"ids": ids, "addLabelIds": add, "removeLabelIds": remove});
         self.post("users/me/messages/batchModify", &body).await?;
         Ok(())
     }
 
     /// `users.getProfile`.
-    pub async fn profile(&self) -> Result<Profile, GoogleError> {
+    pub async fn profile(&self) -> Result<Profile, ProviderError> {
         self.get("users/me/profile", &[]).await
     }
 
     /// `users.labels.list`.
-    pub async fn labels(&self) -> Result<Vec<LabelInfo>, GoogleError> {
+    pub async fn labels(&self) -> Result<Vec<LabelInfo>, ProviderError> {
         #[derive(Deserialize)]
         struct Labels {
             #[serde(default)]
@@ -258,7 +258,7 @@ impl<'a> Gmail<'a> {
         query: &str,
         page_token: Option<&str>,
         max: u32,
-    ) -> Result<ListPage, GoogleError> {
+    ) -> Result<ListPage, ProviderError> {
         let max = max.to_string();
         let mut params = vec![
             ("q", query),
@@ -272,7 +272,7 @@ impl<'a> Gmail<'a> {
     }
 
     /// A message's labels (`format=minimal`).
-    pub async fn minimal(&self, id: &str) -> Result<MessageMeta, GoogleError> {
+    pub async fn minimal(&self, id: &str) -> Result<MessageMeta, ProviderError> {
         self.get(&format!("users/me/messages/{id}"), &[("format", "minimal")])
             .await
     }
@@ -280,7 +280,7 @@ impl<'a> Gmail<'a> {
     /// A message's raw RFC 5322 bytes and labels (`format=raw`), unless it
     /// is larger than `max_bytes`: the answer is read as it arrives and
     /// abandoned as soon as it grows past the limit.
-    pub async fn raw(&self, id: &str, max_bytes: u64) -> Result<RawFetch, GoogleError> {
+    pub async fn raw(&self, id: &str, max_bytes: u64) -> Result<RawFetch, ProviderError> {
         #[derive(Deserialize)]
         struct Raw {
             #[serde(flatten)]
@@ -311,12 +311,12 @@ impl<'a> Gmail<'a> {
         }
         let fetched_bytes = u64::try_from(body.len()).unwrap_or(u64::MAX);
         let message: Raw = serde_json::from_slice(&body)
-            .map_err(|e| GoogleError::Unexpected(format!("raw message answer: {e}")))?;
+            .map_err(|e| ProviderError::Unexpected(format!("raw message answer: {e}")))?;
         drop(body);
         // Gmail pads base64url; accept it with or without padding.
         let raw = URL_SAFE_NO_PAD
             .decode(message.raw.trim_end_matches('='))
-            .map_err(|e| GoogleError::Unexpected(format!("raw message is not base64url: {e}")))?;
+            .map_err(|e| ProviderError::Unexpected(format!("raw message is not base64url: {e}")))?;
         if u64::try_from(raw.len()).unwrap_or(u64::MAX) > max_bytes {
             return Ok(RawFetch::TooLarge);
         }
@@ -334,7 +334,7 @@ impl<'a> Gmail<'a> {
         start: &str,
         page_token: Option<&str>,
         max: u32,
-    ) -> Result<HistoryPage, GoogleError> {
+    ) -> Result<HistoryPage, ProviderError> {
         let max = max.to_string();
         let mut params = vec![
             ("startHistoryId", start),
@@ -354,11 +354,15 @@ impl<'a> Gmail<'a> {
     /// when given (a multipart upload: the metadata, then the message).
     /// Never retried here: the caller decides, knowing whether Gmail may
     /// have it.
-    pub async fn send(&self, raw: &[u8], thread: Option<&str>) -> Result<SentMessage, GoogleError> {
+    pub async fn send(
+        &self,
+        raw: &[u8],
+        thread: Option<&str>,
+    ) -> Result<SentMessage, ProviderError> {
         let mut url = self
             .upload
             .join("users/me/messages/send")
-            .map_err(|e| GoogleError::Unexpected(format!("Gmail URL: {e}")))?;
+            .map_err(|e| ProviderError::Unexpected(format!("Gmail URL: {e}")))?;
         url.query_pairs_mut().append_pair("uploadType", "multipart");
         let boundary = format!("campbooks-{}", uuid::Uuid::now_v7().simple());
         let metadata = match thread {
@@ -392,7 +396,7 @@ impl<'a> Gmail<'a> {
         }
         // Accepted: an answer we cannot read must not count as a refusal.
         response.json().await.map_err(|e| {
-            GoogleError::Unavailable(format!("unreadable answer to a send: {}", e.without_url()))
+            ProviderError::Unavailable(format!("unreadable answer to a send: {}", e.without_url()))
         })
     }
 
@@ -401,13 +405,13 @@ impl<'a> Gmail<'a> {
     pub async fn find_by_message_id(
         &self,
         rfc_message_id: &str,
-    ) -> Result<Option<MessageMeta>, GoogleError> {
+    ) -> Result<Option<MessageMeta>, ProviderError> {
         let query = format!("rfc822msgid:{rfc_message_id}");
         let page = self.list(&query, None, 1).await?;
         match page.messages.first() {
             Some(found) => match self.minimal(&found.id).await {
                 Ok(meta) => Ok(Some(meta)),
-                Err(GoogleError::NotFound) => Ok(None),
+                Err(ProviderError::NotFound) => Ok(None),
                 Err(other) => Err(other),
             },
             None => Ok(None),
