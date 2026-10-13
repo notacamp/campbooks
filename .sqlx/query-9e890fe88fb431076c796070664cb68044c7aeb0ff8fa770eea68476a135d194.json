@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.connections SET health = 'failing'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "9e890fe88fb431076c796070664cb68044c7aeb0ff8fa770eea68476a135d194"
+}

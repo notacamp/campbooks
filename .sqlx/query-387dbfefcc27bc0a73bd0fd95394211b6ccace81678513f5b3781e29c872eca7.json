@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id AS \"inbox_id!: InboxId\" FROM connectors.streams\n            WHERE connection_id = $1 AND inbox_id IS NOT NULL ORDER BY inbox_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox_id!: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "inbox_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "387dbfefcc27bc0a73bd0fd95394211b6ccace81678513f5b3781e29c872eca7"
+}

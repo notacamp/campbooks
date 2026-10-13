@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT refresh_token, access_token FROM connectors.credentials",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "refresh_token",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "connectors.credentials",
+            "name": "refresh_token"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "access_token",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "connectors.credentials",
+            "name": "access_token"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "75ef6e009907a455b7884073063921d0f63fa95f4c5ae46b883c684be6d8666b"
+}

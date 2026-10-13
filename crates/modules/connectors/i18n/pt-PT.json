@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "connection_needs_user": "Só um membro com sessão iniciada pode ligar ou desligar uma conta.",
+    "provider_not_configured": "Este fornecedor não está configurado nesta instância. Peça ao seu administrador para o configurar.",
+    "capabilities_required": "Escolha pelo menos uma coisa para ligar.",
+    "capability_not_offered": "Ainda não é possível ligar {{capability}}.",
+    "authorization_code_invalid": "O início de sessão no fornecedor expirou ou já foi utilizado. Comece a ligação de novo.",
+    "provider_unavailable": "Não foi possível contactar o fornecedor. Tente novamente daqui a pouco.",
+    "consent_incomplete": "O Campbooks não recebeu acesso ao que escolheu. Ligue de novo e permita o acesso.",
+    "no_offline_access": "O fornecedor não permitiu que o Campbooks ficasse ligado. Ligue de novo e permita o acesso.",
+    "account_mismatch": "Iniciou sessão com uma conta diferente da que está a alargar. Use a mesma conta.",
+    "account_connected_by_another_member": "Outro membro deste espaço de trabalho já ligou esta conta.",
+    "needs_reauth": "Esta ligação precisa que volte a ligar a conta antes de poder sincronizar."
+  }
+}

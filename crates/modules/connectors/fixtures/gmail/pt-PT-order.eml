@@ -1,0 +1,12 @@
+From: "Marta Costa" <marta@padaria.example.com>
+To: "Sam Rivera" <sam@example.com>
+Subject: =?UTF-8?Q?Encomenda_para_s=C3=A1bado?=
+Date: Mon, 12 Oct 2026 10:02:00 +0100
+Message-ID: <encomenda-77@padaria.example.com>
+In-Reply-To: <pedido-76@example.com>
+References: <pedido-76@example.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+Content-Transfer-Encoding: 8bit
+
+Olá Sam, confirmamos a encomenda de pão para sábado às 9h. Obrigada!

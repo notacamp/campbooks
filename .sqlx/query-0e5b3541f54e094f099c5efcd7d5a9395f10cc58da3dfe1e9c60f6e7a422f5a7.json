@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT least($2, tokens + extract(epoch FROM clock_timestamp() - refilled_at)::float8 * $3)\n                  AS \"available!\"\n             FROM connectors.provider_budgets WHERE provider = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "available!",
+        "type_info": "Float8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "0e5b3541f54e094f099c5efcd7d5a9395f10cc58da3dfe1e9c60f6e7a422f5a7"
+}

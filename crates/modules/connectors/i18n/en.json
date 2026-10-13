@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "connection_needs_user": "Only a signed-in member can connect or disconnect an account.",
+    "provider_not_configured": "This provider is not set up on this instance. Ask your administrator to configure it.",
+    "capabilities_required": "Choose at least one thing to connect.",
+    "capability_not_offered": "Connecting {{capability}} is not available yet.",
+    "authorization_code_invalid": "The sign-in with the provider expired or was already used. Start connecting again.",
+    "provider_unavailable": "The provider could not be reached. Try again in a moment.",
+    "consent_incomplete": "Campbooks was not given access to what you chose. Connect again and allow access.",
+    "no_offline_access": "The provider did not allow Campbooks to stay connected. Connect again and allow access.",
+    "account_mismatch": "You signed in with a different account than the one you are extending. Use the same account.",
+    "account_connected_by_another_member": "Another member of this workspace already connected this account.",
+    "needs_reauth": "This connection needs you to connect the account again before it can sync."
+  }
+}

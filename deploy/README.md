@@ -373,16 +373,17 @@ identity-provider session ends (back-channel logout). The cookie is `Secure` and
 
 | `server-secrets` volume | What |
 | --- | --- |
-| `secret-key` | `CAMPBOOKS_SECRET_KEY`: encrypts the web sessions' tokens. Generated on first boot |
+| `secret-key` | `CAMPBOOKS_SECRET_KEY`: encrypts the web sessions' tokens and connected accounts' credentials. Generated on first boot |
 | `campbooks-web.client-secret` | Secret of the web app's OIDC client, written by `idp-provision` |
 
 The server mounts this volume read-only (through group 10001); it never sees the
 `idp-data` volume. Both files are regenerated if missing, so the volume needs no backup:
-losing it only signs everyone out.
+losing it signs everyone out and asks members to connect their accounts again.
 
 - **Instance secret key:** `docker compose run --rm server-init rm /secrets/secret-key`,
   then `docker compose up -d && docker compose restart server`. Everyone has to sign in to
-  the web app again; nothing else is lost. (Without compose, set `CAMPBOOKS_SECRET_KEY` to
+  the web app again, and connected accounts show "needs reauthorisation" until their member
+  connects them again; nothing else is lost. (Without compose, set `CAMPBOOKS_SECRET_KEY` to
   `openssl rand -base64 32`.)
 - **Back-channel logout** needs an `https://` `CAMPBOOKS_PUBLIC_URL` that the `idp`
   container can reach: Rauthy only calls https URLs. `idp-provision` registers
@@ -393,6 +394,31 @@ losing it only signs everyone out.
   you to the identity provider to end that session too (Rauthy asks you to confirm).
 
 Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
+
+## Connected accounts
+
+Members connect outside accounts (Gmail today); Campbooks asks Google for consent, keeps the grant encrypted with the instance secret key (schema `connectors`), and
+syncs mail on its own: every minute while an account is busy, backing off to every few
+hours when nothing changes. Nothing is connected until you register an OAuth client:
+
+1. In the Google Cloud console, create an OAuth client of type **Web application** and
+   enable the **Gmail API** for its project.
+2. Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/connections/google/callback`, e.g.
+   `https://campbooks.example.com/connections/google/callback`.
+3. Add the scopes `openid`, `email` and `https://www.googleapis.com/auth/gmail.modify` to
+   the consent screen. Gmail's scope is restricted: until Google verifies your app, only
+   the test users you list can connect.
+4. Set `CAMPBOOKS_GOOGLE__CLIENT_ID` and put the client secret in a file the server reads
+   (`CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`; `CAMPBOOKS_GOOGLE__CLIENT_SECRET` inline for
+   development), then restart the server.
+
+A connection belongs to the workspace and records the member who granted it. When that
+member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
+Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
+
+The web app's Connections screen, which serves that redirect URI, is not built yet; until
+it is, connections are made through the API (`connectors.start_connection`, then
+`connectors.complete_connection` with the `state` and `code` Google redirects with).
 
 ### Developing against the IdP
 

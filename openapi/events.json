@@ -3,6 +3,190 @@
   "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
   "events": [
     {
+      "name": "connectors.capability_granted",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A connection gained a capability: a new connection, or an incremental\nconsent. For `messages` it names the inbox this module minted; the\nconversations module creates it, with `granted_by` as its manager\n(`contracts/connectors.capability_granted.v1.schema.json`).",
+        "required": [
+          "workspace",
+          "connection",
+          "capability",
+          "granted_by",
+          "account"
+        ],
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The account's address and name: an [`AccountDocument`] blob."
+          },
+          "capability": {
+            "$ref": "#/components/schemas/Capability",
+            "description": "The capability."
+          },
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who granted it."
+          },
+          "inbox_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxId",
+                "description": "The inbox the stream feeds (`messages` only)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.connection_added",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member connected an outside account.",
+        "required": [
+          "workspace",
+          "connection",
+          "provider",
+          "granted_by"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who granted it."
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider",
+            "description": "The provider."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.connection_needs_reauth",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A connection's grant stopped working (revoked, expired, or its stored\ncredentials can no longer be read): the member must connect again.",
+        "required": [
+          "workspace",
+          "connection",
+          "granted_by",
+          "reason"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who granted it, who can grant it again."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why (`grant_revoked`, `credentials_unreadable`)."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.connection_removed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. What becomes of the inboxes it fed is their owner's call.",
+        "required": [
+          "workspace",
+          "connection",
+          "inbox_ids"
+        ],
+        "properties": {
+          "connection": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "inbox_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxId"
+            },
+            "description": "The inboxes its streams fed."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "connectors.messages_changed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A messages stream produced a `MessageChangeBatch` for an inbox\n(`contracts/connectors.messages_changed.v1.schema.json`). Published in\nthe transaction that advances the stream's cursor.",
+        "required": [
+          "workspace",
+          "inbox_id",
+          "batch",
+          "cursor"
+        ],
+        "properties": {
+          "batch": {
+            "$ref": "#/components/schemas/BlobRef",
+            "description": "The `MessageChangeBatch` v1 document, a blob of the workspace."
+          },
+          "cursor": {
+            "type": "string",
+            "description": "The stream's cursor after this batch (opaque, never personal data)."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The conversations inbox; equals the batch's `inbox`."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "workspaces.member_joined",
       "module": "workspaces",
       "version": 1,
@@ -199,12 +383,64 @@
   ],
   "components": {
     "schemas": {
+      "BlobRef": {
+        "type": "object",
+        "description": "How a [`BlobRef`] looks on the wire, for the events catalogue.",
+        "required": [
+          "hash",
+          "size",
+          "content_type"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "The media type given when it was stored."
+          },
+          "hash": {
+            "type": "string",
+            "description": "SHA-256 of the bytes, 64 lower-case hex digits."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Length in bytes.",
+            "minimum": 0
+          }
+        }
+      },
+      "Capability": {
+        "type": "string",
+        "description": "What a connection lets Campbooks do with the account.",
+        "enum": [
+          "messages",
+          "calendar",
+          "files",
+          "bank"
+        ]
+      },
+      "ConnectionId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ConnectionId (UUIDv7)"
+      },
+      "InboxId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "InboxId (UUIDv7)"
+      },
       "Kind": {
         "type": "string",
         "description": "What a workspace is for.",
         "enum": [
           "business",
           "personal"
+        ]
+      },
+      "Provider": {
+        "type": "string",
+        "description": "An outside provider.",
+        "enum": [
+          "google"
         ]
       },
       "Role": {

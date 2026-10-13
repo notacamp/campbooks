@@ -1,0 +1,21 @@
+From: "Notifications Banque" <no-reply@banque.example.com>
+To: sam@example.com
+Subject: =?UTF-8?Q?Votre_relev=C3=A9_est_disponible?=
+Date: Sat, 10 Oct 2026 06:30:00 +0200
+Message-ID: <releve-10-2026@banque.example.com>
+Auto-Submitted: auto-generated
+MIME-Version: 1.0
+Content-Type: multipart/related; boundary="rel"
+
+--rel
+Content-Type: text/html; charset=utf-8
+
+<p><img src="cid:logo"> Votre relevé d’octobre est disponible.</p>
+--rel
+Content-Type: image/png
+Content-ID: <logo>
+Content-Disposition: inline; filename="logo.png"
+Content-Transfer-Encoding: base64
+
+iVBORw0KGgo=
+--rel--

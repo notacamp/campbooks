@@ -3,26 +3,40 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     pin::Pin,
+    sync::Arc,
     time::Duration,
 };
 
 use serde_json::Value;
 
-use super::{Job, JobContext, JobError, PruneJobs};
+use super::{Job, JobContext, JobError, JobHandler, PruneJobs};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
     changes::{PruneChanges, SequenceChanges},
-    events::{DomainEvent, Event, EventHandler, EventId, PublishedEvent},
+    events::{DomainEvent, Event, EventConsumer, EventHandler, EventId, PublishedEvent},
     idempotency::PruneIdempotency,
 };
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// Runs one job of a registered kind: decodes the payload and calls the
-/// handler.
-pub(crate) type RunFn =
-    for<'a> fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>>;
+/// handler. Shared, because a [`JobHandler`] or [`EventConsumer`] owns the
+/// dependencies its module was composed with.
+pub(crate) type RunFn = Arc<
+    dyn for<'a> Fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>> + Send + Sync,
+>;
+
+/// Fixes a closure's signature to the higher-ranked one [`RunFn`] needs.
+fn run_fn<F>(f: F) -> RunFn
+where
+    F: for<'a> Fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>>
+        + Send
+        + Sync
+        + 'static,
+{
+    Arc::new(f)
+}
 
 /// A module's background work: the events it publishes, the jobs it runs,
 /// the events it consumes and its recurring schedules. Part of its
@@ -34,6 +48,9 @@ pub(crate) type RunFn =
 ///     .job::<SyncMailbox>()
 ///     .on_event::<TrackSender>()
 ///     .schedule::<RefreshTokens>(Duration::from_secs(15 * 60))
+///     // Handlers that own dependencies the module was composed with:
+///     .handler(ApplyChanges { rules })
+///     .consumer(DecideMessage { ai })
 /// ```
 #[derive(Default)]
 pub struct Background {
@@ -120,7 +137,7 @@ impl Background {
             name: J::NAME,
             queue: J::QUEUE,
             max_attempts: J::MAX_ATTEMPTS,
-            run: run_job::<J>,
+            run: run_fn(run_job::<J>),
             consumes: None,
         });
         self
@@ -133,8 +150,53 @@ impl Background {
             name: H::NAME,
             queue: H::QUEUE,
             max_attempts: H::MAX_ATTEMPTS,
-            run: run_handler::<H>,
+            run: run_fn(run_handler::<H>),
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
+        });
+        self
+    }
+
+    /// Run jobs of kind `H::NAME` with `handler`, a value that owns the
+    /// dependencies the module was composed with (constructor injection).
+    /// Enqueue them with [`enqueue_to::<H>`](super::enqueue_to).
+    #[must_use]
+    pub fn handler<H: JobHandler>(mut self, handler: H) -> Self {
+        let handler = Arc::new(handler);
+        self.kinds.push(KindSpec {
+            name: H::NAME,
+            queue: H::QUEUE,
+            max_attempts: H::MAX_ATTEMPTS,
+            run: run_fn(move |ctx, payload| {
+                let handler = Arc::clone(&handler);
+                Box::pin(async move {
+                    let payload: H::Payload = serde_json::from_value(payload).map_err(|e| {
+                        JobError::fatal(format!("payload does not decode as `{}`: {e}", H::NAME))
+                    })?;
+                    handler.run(ctx, payload).await
+                })
+            }),
+            consumes: None,
+        });
+        self
+    }
+
+    /// Deliver every published `C::Event` to `consumer`, a value that owns
+    /// the dependencies the module was composed with (constructor injection).
+    #[must_use]
+    pub fn consumer<C: EventConsumer>(mut self, consumer: C) -> Self {
+        let consumer = Arc::new(consumer);
+        self.kinds.push(KindSpec {
+            name: C::NAME,
+            queue: C::QUEUE,
+            max_attempts: C::MAX_ATTEMPTS,
+            run: run_fn(move |ctx, _payload| {
+                let consumer = Arc::clone(&consumer);
+                Box::pin(async move {
+                    let event = load_event::<C::Event>(ctx).await?;
+                    consumer.handle(ctx, event).await
+                })
+            }),
+            consumes: Some((C::Event::NAME, C::Event::VERSION)),
         });
         self
     }
@@ -216,7 +278,7 @@ async fn load_event<E: DomainEvent>(ctx: &JobContext) -> Result<Event<E>, JobErr
 }
 
 /// A registered job kind.
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub(crate) struct KindInfo {
     pub queue: &'static str,
     pub max_attempts: u32,
@@ -378,7 +440,7 @@ impl Registry {
                 KindInfo {
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
-                    run: kind.run,
+                    run: Arc::clone(&kind.run),
                 },
             );
             if let Some((event, _)) = kind.consumes {
@@ -504,7 +566,7 @@ impl Registry {
     }
 
     pub(crate) fn kind(&self, name: &str) -> Option<KindInfo> {
-        self.kinds.get(name).copied()
+        self.kinds.get(name).cloned()
     }
 
     pub(crate) fn schedules(&self) -> &[ScheduleInfo] {

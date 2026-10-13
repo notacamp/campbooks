@@ -440,6 +440,562 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/connections": {
+      "get": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "List connections.",
+        "operationId": "connectors.list_connections",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The connections you may see.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/authorizations": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Start connecting an account.",
+        "operationId": "connectors.start_connection",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartConnection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Send the browser to `authorize_url`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedConnection"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or no such connection of yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The provider is not configured on this instance (`provider_not_configured`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Complete a connection.",
+        "operationId": "connectors.complete_connection",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompleteConnection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The connection, syncing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such started connection of yours in this workspace, or it expired.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The provider could not be reached (`provider_unavailable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/{connection_id}": {
+      "get": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Read a connection.",
+        "operationId": "connectors.get_connection",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "path",
+            "description": "The connection.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConnectionId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The connection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection, or you may not see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Disconnect a connection.",
+        "operationId": "connectors.disconnect",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "path",
+            "description": "The connection.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConnectionId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Disconnected."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection, or you may not see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
+      "post": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "Sync a connection now.",
+        "operationId": "connectors.sync_now",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "connection_id",
+            "in": "path",
+            "description": "The connection.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConnectionId"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Its streams run now; a run already waiting absorbs this one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncScheduled"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such connection, or you may not see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The member must connect it again first (`needs_reauth`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "connectors.connection"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -2025,6 +2581,11 @@
         },
         "additionalProperties": false
       },
+      "AuthorizationId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "AuthorizationId (UUIDv7)"
+      },
       "BackchannelLogout": {
         "type": "object",
         "required": [
@@ -2036,6 +2597,16 @@
             "description": "The identity provider's signed logout token."
           }
         }
+      },
+      "Capability": {
+        "type": "string",
+        "description": "What a connection lets Campbooks do with the account.",
+        "enum": [
+          "messages",
+          "calendar",
+          "files",
+          "bank"
+        ]
       },
       "ChangeRole": {
         "type": "object",
@@ -2050,6 +2621,126 @@
           }
         },
         "additionalProperties": false
+      },
+      "CompleteConnection": {
+        "type": "object",
+        "description": "What Google redirected the browser with.",
+        "required": [
+          "state",
+          "code"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The `code` query parameter."
+          },
+          "state": {
+            "type": "string",
+            "description": "The `state` query parameter."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConnectionId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ConnectionId (UUIDv7)"
+      },
+      "ConnectionList": {
+        "type": "object",
+        "description": "The caller's connections.",
+        "required": [
+          "connections"
+        ],
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectionView"
+            },
+            "description": "Oldest first."
+          }
+        }
+      },
+      "ConnectionView": {
+        "type": "object",
+        "description": "A connection as the API shows it. Never carries a credential.",
+        "required": [
+          "id",
+          "provider",
+          "address",
+          "address_verified",
+          "granted_by",
+          "capabilities",
+          "health",
+          "health_changed_at",
+          "streams",
+          "created_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The account's email address."
+          },
+          "address_verified": {
+            "type": "boolean",
+            "description": "Whether the provider verified it."
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "description": "What it lets Campbooks do."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was connected."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The account's display name, when the provider gives one."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who granted it."
+          },
+          "health": {
+            "$ref": "#/components/schemas/Health",
+            "description": "How it is doing."
+          },
+          "health_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Since when it has had this health."
+          },
+          "health_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …)."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider",
+            "description": "The provider."
+          },
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StreamView"
+            },
+            "description": "Its change streams."
+          }
+        }
       },
       "CreateWorkspace": {
         "type": "object",
@@ -2111,6 +2802,16 @@
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
       },
+      "Health": {
+        "type": "string",
+        "description": "How a connection is doing.",
+        "enum": [
+          "ok",
+          "needs_reauth",
+          "throttled",
+          "failing"
+        ]
+      },
       "HealthResponse": {
         "type": "object",
         "description": "The instance is healthy.",
@@ -2130,6 +2831,11 @@
             "example": "ok"
           }
         }
+      },
+      "InboxId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "InboxId (UUIDv7)"
       },
       "InvitationId": {
         "type": "string",
@@ -2287,6 +2993,15 @@
           }
         }
       },
+      "Phase": {
+        "type": "string",
+        "description": "Where a stream is in its reading.",
+        "enum": [
+          "backfill",
+          "incremental",
+          "resync"
+        ]
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details.",
@@ -2328,6 +3043,13 @@
           "title": "Not found",
           "type": "about:blank"
         }
+      },
+      "Provider": {
+        "type": "string",
+        "description": "An outside provider.",
+        "enum": [
+          "google"
+        ]
       },
       "Role": {
         "type": "string",
@@ -2455,6 +3177,136 @@
           "sub": {
             "type": "string",
             "description": "Stable user id at the identity provider."
+          }
+        }
+      },
+      "StartConnection": {
+        "type": "object",
+        "description": "What to connect.",
+        "required": [
+          "provider",
+          "capabilities"
+        ],
+        "properties": {
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "description": "The capabilities to ask for (`messages` is offered today)."
+          },
+          "connection": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConnectionId",
+                "description": "An existing connection of yours to extend (incremental consent);\nthe same account must consent."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider",
+            "description": "The provider."
+          }
+        },
+        "additionalProperties": false
+      },
+      "StartedConnection": {
+        "type": "object",
+        "description": "A started consent.",
+        "required": [
+          "authorization",
+          "authorize_url",
+          "expires_at"
+        ],
+        "properties": {
+          "authorization": {
+            "$ref": "#/components/schemas/AuthorizationId",
+            "description": "The started authorization."
+          },
+          "authorize_url": {
+            "type": "string",
+            "description": "Where to send the browser."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the consent must be completed by."
+          }
+        }
+      },
+      "StreamView": {
+        "type": "object",
+        "description": "A change stream as the API shows it.",
+        "required": [
+          "capability",
+          "phase",
+          "paused"
+        ],
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability",
+            "description": "The capability it reads."
+          },
+          "inbox_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxId",
+                "description": "The conversations inbox it feeds (`messages`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_change_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a run last found a change."
+          },
+          "last_synced_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a run last finished."
+          },
+          "next_sync_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it is next due."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused until the member connects again."
+          },
+          "phase": {
+            "$ref": "#/components/schemas/Phase",
+            "description": "Where it is in its reading."
+          }
+        }
+      },
+      "SyncScheduled": {
+        "type": "object",
+        "description": "What was scheduled.",
+        "required": [
+          "streams"
+        ],
+        "properties": {
+          "streams": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many streams will run now.",
+            "minimum": 0
           }
         }
       },
@@ -2602,7 +3454,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -2620,6 +3472,10 @@
     {
       "name": "workspaces",
       "description": "Workspaces, members and roles, invitations and the security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a caller who is not a member (or a client token bound to another workspace) gets 404."
+    },
+    {
+      "name": "connectors",
+      "description": "Connections to outside accounts (Gmail first): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
     },
     {
       "name": "changes",
