@@ -46,6 +46,10 @@ pub enum Error {
     /// `detail`. Like [`Error::Forbidden`], never for reads.
     #[error("denied: {0}")]
     Denied(&'static str),
+    /// The caller holds too many of a limited resource at once (e.g. open
+    /// change streams); the machine-readable code is the problem `detail`.
+    #[error("too many requests: {0}")]
+    TooManyRequests(&'static str),
     /// The request conflicts with the current state; the message is shown.
     #[error("{0}")]
     Conflict(String),
@@ -74,6 +78,7 @@ impl Error {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) | Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -87,7 +92,7 @@ impl Error {
             }
             Self::Unauthorized(failure) => Some(failure.code().to_owned()),
             Self::InsufficientScope(_) => Some("insufficient_scope".to_owned()),
-            Self::Denied(code) => Some((*code).to_owned()),
+            Self::Denied(code) | Self::TooManyRequests(code) => Some((*code).to_owned()),
             Self::NotFound | Self::Forbidden | Self::Internal(_) => None,
         };
         Problem::new(self.status(), detail)

@@ -126,6 +126,13 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
         principal: &'a Principal,
         workspace: WorkspaceId,
     ) -> MembershipFuture<'a>;
+
+    /// Record types (`<module>.<record>`) whose changes may change who
+    /// belongs to a workspace. An open change stream that sees one resolves
+    /// the caller's membership again and ends when it is gone.
+    fn access_records(&self) -> &'static [&'static str] {
+        &[]
+    }
 }
 
 /// The port before any module provides one: nobody belongs anywhere.
@@ -241,6 +248,7 @@ mod tests {
             email: None,
             email_verified: false,
             name: None,
+            expires_at: None,
         }
     }
 

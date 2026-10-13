@@ -202,6 +202,7 @@ impl Kit {
             email: inviter.email.clone(),
             email_verified: true,
             name: None,
+            expires_at: None,
         };
         let access = WorkspaceMembership
             .resolve(&self.state.db, &principal, workspace)

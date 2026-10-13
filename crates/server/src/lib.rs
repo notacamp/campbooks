@@ -521,6 +521,7 @@ mod tests {
             email: None,
             email_verified: false,
             name: None,
+            expires_at: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(

@@ -146,6 +146,10 @@ pub struct Principal {
     /// The user's display name (`name`, else `preferred_username`), when the
     /// token carries one. Always `None` for clients.
     pub name: Option<String>,
+    /// When the access token expires (`exp`); `None` for a principal
+    /// authenticated in-process without a token. Long-lived responses (the
+    /// change feed) end by then, so the caller is authorized again.
+    pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl Principal {

@@ -27,6 +27,7 @@ Schema **`kernel`** (infrastructure, like the event log), migration
 ```sql
 CREATE TABLE kernel.changes (
     id uuid PRIMARY KEY DEFAULT kernel.uuid_v7(),
+    published bigint GENERATED ALWAYS AS IDENTITY,  -- insertion order
     workspace_id text NOT NULL,
     -- NULL until the sequencer assigns it; then dense per workspace.
     seq bigint,
@@ -39,7 +40,7 @@ CREATE TABLE kernel.changes (
     occurred_at timestamptz NOT NULL DEFAULT now(),
     UNIQUE (workspace_id, seq)
 );
-CREATE INDEX changes_unsequenced_idx ON kernel.changes (workspace_id, id) WHERE seq IS NULL;
+CREATE INDEX changes_unsequenced_idx ON kernel.changes (workspace_id, published) WHERE seq IS NULL;
 CREATE INDEX changes_occurred_at_idx ON kernel.changes (occurred_at);
 CREATE TABLE kernel.change_heads (
     workspace_id text PRIMARY KEY,
@@ -90,26 +91,45 @@ assistant. The web app reaches it as `GET /bff/api/v1/w/{ws}/changes`
 
 Producers already publish events in their transaction. An event type
 declares the records it changed (`changes()`), so modules write no second
-call and cannot forget it. `publish` inserts those rows unsequenced and one
-`kernel.sequence_changes` job (unique per event) in the same transaction.
+call and cannot forget it. When an event declares changes, `publish`, in the
+publisher's transaction:
+
+1. takes the workspace's **shared** advisory lock
+   (`pg_advisory_xact_lock_shared(hash('kernel.changes:' || ws))`), held
+   until the publisher commits; producers never block each other;
+2. inserts the changes unsequenced (`seq` NULL);
+3. enqueues `kernel.sequence_changes` for the workspace with
+   `unique_key = <workspace>`: a burst of any size collapses into one
+   unfinished sequencing job per workspace.
 
 The sequencer job, in its transaction:
-1. `SELECT … FROM kernel.change_heads WHERE workspace_id = $1 FOR UPDATE`
-   (inserting the row first if missing): sequencers of one workspace now run
-   one at a time; other workspaces are unaffected.
-2. Number every unsequenced change of that workspace by `id` from
-   `head + 1`, update the head.
-3. `NOTIFY kernel_changes, '<workspace>'`, commit.
 
-Because step 1 serializes sequencing per workspace and step 2 only sees
-committed producer rows, a change gets its cursor after every change with a
-smaller cursor has committed: readers never skip. Every later job of the
-same burst finds nothing to do and ends at once. Delivery is at least once;
-the job is database-only, so it takes effect once. The lock is held for a
-few milliseconds, never during a producer's transaction (producers stay
-parallel). Cost: one extra job per changing event and the queue latency
-(a `NOTIFY`-woken worker: milliseconds in `all`, the same in split roles).
-Queue `changes` keeps it clear of sync and AI backlogs.
+1. takes the workspace's **exclusive** advisory lock (waiting at most
+   `lock_timeout` = 2 s, else it retries shortly): it now runs after every
+   producer that is in flight has committed or rolled back;
+2. numbers **all** unsequenced changes of the workspace from `head + 1`, in
+   publish order (`event_id`, then `id`, both UUIDv7), and moves
+   `kernel.change_heads.head`;
+3. sends one `NOTIFY kernel_changes, '<workspace>'` and commits (its lock is
+   released with the job marked succeeded, in the same commit).
+
+Why the lock pair: the queue's unique key covers pending *and running*
+jobs, so a producer can find the key taken by a sequencer that is already
+running and has already numbered what it could see. Without the lock, that
+producer's changes would wait, unnumbered, for the next burst. With it, a
+producer that saw a running (or pending) job holds the shared lock until it
+commits, so that job cannot number anything before the producer's changes
+are visible; a producer that arrives after the sequencer took the lock
+waits for its (millisecond) commit and then finds no unfinished job and
+enqueues a new one. Cursor order is therefore commit order per workspace:
+a reader that has seen cursor N never finds a later-committed change below
+N. A waiting exclusive request queues ahead of new shared requests, so a
+busy workspace cannot starve its sequencer; the price is that new producers
+of that workspace wait for the in-flight ones while a sequencer waits (the
+2 s `lock_timeout` bounds it). An hourly sweep re-enqueues sequencing for
+any workspace left with unnumbered changes (a sequencer that ran out of
+attempts). Delivery is at least once; the job is database-only, so it takes
+effect once. Queue `changes` keeps it clear of sync and AI backlogs.
 
 ### 2. Waking streams: one listener per process
 
@@ -146,7 +166,8 @@ event: closing       data: {"reason":"max_age"}   then the body ends
 - **Paging and backpressure**: changes are read 200 at a time and the next
   page is read only when the response body is polled again, so a slow client
   holds at most one page in memory and no database connection between pages.
-  Duplicates of the same (record, op) inside a page collapse to the last.
+  Several changes of the same record inside a page collapse to the last
+  one (a refetch shows the current state either way).
 - **Visibility**: filtered per change before framing (scopes, then the
   container port). Filtered changes still advance the cursor: the `id` of the
   next delivered frame, or the head carried by a heartbeat event every
@@ -239,6 +260,11 @@ by cursor), privacy (no contents) and the BFF fit (plain HTTP).
   read time to know what record changed; there is no per-workspace index;
   and #65's retention and per-workspace purge would remove resume points
   from under clients. Rejected.
+- **One sequencing job per changing event** (the first draft). Simple and
+  race-free without locks, but a burst of 1 000 events is 1 000 jobs that
+  each find nothing to do but the first. Replaced by one coalesced job per
+  workspace (`unique_key = <workspace>`) plus the shared/exclusive lock
+  pair, which closes the window a running job leaves open (decision 1).
 - **Projection table written by an event handler.** Faithful to "projections
   consume the log" and rebuildable by replay, but it needs a consumer per
   event type (registered by every publishing module) and still needs a

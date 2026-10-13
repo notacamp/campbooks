@@ -169,6 +169,7 @@ fn principal(scopes: &[&str]) -> Principal {
         email: None,
         email_verified: false,
         name: None,
+        expires_at: None,
     }
 }
 

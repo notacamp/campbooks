@@ -17,11 +17,13 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/52.
   Vec<Change>` (default: none). A `Change` is `{ record: RecordRef, op:
   upsert | delete }`, ids only. When `EventBus::publish` publishes an event
   that declares changes, it writes them to a new `kernel.changes` table in
-  the same transaction, unsequenced, and enqueues a `kernel.sequence_changes`
-  delivery for the event.
+  the same transaction, unsequenced, under the workspace's shared advisory
+  lock, and enqueues `kernel.sequence_changes` with `unique_key =
+  <workspace>`, so a burst collapses into one job per workspace.
 - **Kernel: the sequencer.** The `kernel.sequence_changes` job (queue
-  `changes`) gives every unsequenced change of its workspace the next
-  per-workspace cursor under a per-workspace row lock, commits, and sends
+  `changes`) takes the workspace's exclusive advisory lock (so every
+  in-flight producer has committed), gives all unsequenced changes of the
+  workspace the next per-workspace cursors in publish order, commits, and sends
   `NOTIFY kernel_changes, '<workspace id>'`. Cursor order is therefore
   commit order per workspace, so a reader that has seen cursor N never
   finds a later-committed change below N (the gap ADR 0012 rejected offset

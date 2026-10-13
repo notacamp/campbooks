@@ -7,6 +7,7 @@
 
 pub mod auth;
 pub mod blobs;
+pub mod changes;
 pub mod clock;
 pub mod config;
 pub mod db;
