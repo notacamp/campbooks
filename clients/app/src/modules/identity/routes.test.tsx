@@ -101,7 +101,7 @@ describe("SignInScreen", () => {
     renderAt("/sign-in", <SignInScreen error="invalid_state" leave={leave} />);
 
     expect(
-      await screen.findByRole("heading", { name: "That sign-in can’t be finished." }),
+      await screen.findByRole("heading", { name: "That sign-in can’t be finished" }),
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Start again" }));
     expect(leave).toHaveBeenCalledWith("/bff/login?return_to=%2Fw%2F2");

@@ -7,6 +7,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
+  and French. Opening the app signed out goes straight to "Sign in to
+  Campbooks" (and back to the page you opened afterwards), with one button
+  per way in this instance offers (keys `1`, `2`, `3`; `P` for a passkey once
+  passkeys arrive). Before you leave for Google it says what the one consent
+  covers (your Gmail is connected too, what Campbooks keeps, that you can
+  untick mail access) and that Google may warn the app isn't verified yet.
+  A first sign-in shows the new-account screen (your name and address, and
+  what happens next); every sign-in problem is explained with what to do.
+- Right after you create your first workspace, "Your Gmail … will be
+  connected to this workspace": Connect, or Not now. Home keeps offering it
+  (Connect, or forget it) until it expires after 7 days, and names the
+  mailbox once it is connected.
 - Campbooks can be its own identity provider (ADR 0014), replacing Rauthy in
   a later release. With `CAMPBOOKS_AUTH__ISSUER` unset and
   `CAMPBOOKS_SECRET_KEY` set, the server is an OAuth 2.1 / OpenID Connect

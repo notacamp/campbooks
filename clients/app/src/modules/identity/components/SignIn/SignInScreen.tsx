@@ -70,7 +70,8 @@ function StartAgain({
     <FocusPage
       top={<Brand name={tShell("appName")} />}
       leading={<Visor state="unsure" size="xl" />}
-      title={title}
+      // Error sentences end with a full stop; a page title doesn't.
+      title={title.replace(/\.$/u, "")}
       lead={lead}
       actions={
         <Button
