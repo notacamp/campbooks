@@ -65,7 +65,7 @@ async fn a_deleted_workspaces_connections_are_revoked_at_once(db: PgPool) {
     let other = WorkspaceId::new();
     let bea = kit.user("bea");
     kit.join(&bea, other, Role::Owner);
-    kit.consent(&bea, other).await; // a started consent elsewhere stays
+    kit.connect(&bea, other).await; // a connection elsewhere stays
 
     let mut tx = kit.state.db.begin_for(ws).await.unwrap();
     kit.state
@@ -81,12 +81,6 @@ async fn a_deleted_workspaces_connections_are_revoked_at_once(db: PgPool) {
         .unwrap();
     tx.commit().await.unwrap();
     kit.run_jobs().await;
-    assert_eq!(connections(&kit).await, 0);
+    assert_eq!(connections(&kit).await, 1, "only the other workspace's");
     assert_eq!(kit.google.revoked().len(), 1);
-    let started: i64 =
-        sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.authorizations"#)
-            .fetch_one(&kit.db)
-            .await
-            .unwrap();
-    assert_eq!(started, 1);
 }

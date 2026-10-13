@@ -1,6 +1,5 @@
 //! One folder per use case.
 
-pub mod complete_connection;
 pub mod disconnect;
 pub mod dispatch_due;
 pub mod get_connection;

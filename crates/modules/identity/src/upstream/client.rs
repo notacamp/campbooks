@@ -465,9 +465,9 @@ impl Upstream {
             Rule::Fixed(verified) | Rule::Tenant { verified, .. } => Some(verified),
             Rule::Servers(servers) => {
                 let named = accounts_server?;
-                servers.iter().find(|v| {
-                    v.server.issuer.trim_end_matches('/') == named.trim_end_matches('/')
-                })
+                servers
+                    .iter()
+                    .find(|v| v.server.issuer.trim_end_matches('/') == named.trim_end_matches('/'))
             }
         }
     }
@@ -556,7 +556,12 @@ impl Upstream {
             let issuer = format!("{prefix}{tid}{suffix}");
             let (id, claims) = server
                 .verifier
-                .verify_id_token_with::<ProviderClaims>(token, &self.client_id, nonce, Some(&issuer))
+                .verify_id_token_with::<ProviderClaims>(
+                    token,
+                    &self.client_id,
+                    nonce,
+                    Some(&issuer),
+                )
                 .await
                 .map_err(invalid)?;
             if claims.tid.as_deref() != Some(tid.as_str()) {
@@ -574,10 +579,10 @@ impl Upstream {
         let email_verified = match self.provider {
             // Microsoft does not verify `email`; only `xms_edov` says the
             // domain's owner did.
-            Provider::Microsoft => matches!(
-                claims.xms_edov,
-                Some(serde_json::Value::Bool(true))
-            ) || matches!(&claims.xms_edov, Some(serde_json::Value::String(v)) if v == "true" || v == "1"),
+            Provider::Microsoft => {
+                matches!(claims.xms_edov, Some(serde_json::Value::Bool(true)))
+                    || matches!(&claims.xms_edov, Some(serde_json::Value::String(v)) if v == "true" || v == "1")
+            }
             Provider::Google | Provider::Zoho => id.email_verified,
         };
         Ok(ProviderIdentity {
@@ -799,7 +804,8 @@ mod tests {
 
     #[test]
     fn fakes_are_laid_out_under_their_base() {
-        let google = Endpoints::under(Provider::Google, "http://127.0.0.1:9000/", "common").unwrap();
+        let google =
+            Endpoints::under(Provider::Google, "http://127.0.0.1:9000/", "common").unwrap();
         assert_eq!(
             google.authorize.as_str(),
             "http://127.0.0.1:9000/o/oauth2/v2/auth"

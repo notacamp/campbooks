@@ -1,14 +1,93 @@
-//! Connecting an account, end to end against the fake Google.
+//! Connecting an account: `start_connection` checks what the connectors
+//! module owns and delegates the consent to the identity module's front
+//! door; the grant comes back through the grant-intake port.
 
 use axum::http::StatusCode;
 use campbooks_kernel::{
     blobs::BlobRef,
     tenancy::{Role, WorkspaceId},
 };
-use chrono::TimeDelta;
 use sqlx::PgPool;
 
 use crate::testkit::{ACCOUNT_SUB, Kit, assert_contract};
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn starting_a_connection_goes_through_the_front_door(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let ana = kit.user("ana");
+    kit.join(&ana, ws, Role::Member);
+    let started = kit.start(&ana, ws).await;
+    assert_eq!(started.status, StatusCode::CREATED, "{:?}", started.json);
+    assert_eq!(
+        started.json["authorize_url"],
+        "/auth/start/google?link=fake-ticket"
+    );
+    assert!(started.json["expires_at"].is_string());
+    assert_eq!(
+        kit.door.asked(),
+        [(ws, "ana".to_owned(), "google".to_owned(), None)]
+    );
+
+    // Re-authorising your own connection names it.
+    let connection = kit.connect(&ana, ws).await;
+    let id = connection["id"].as_str().unwrap().to_owned();
+    let again = kit
+        .post(
+            &ana,
+            &format!("/api/v1/w/{ws}/connections/authorizations"),
+            serde_json::json!({"provider": "google", "capabilities": ["messages"], "connection": id}),
+        )
+        .await;
+    assert_eq!(again.status, StatusCode::CREATED);
+    assert_eq!(kit.door.asked()[1].3.as_deref(), Some(id.as_str()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reconnect_is_for_its_grantor_and_its_account_only(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    let ana = kit.user("ana");
+    kit.join(&ana, ws, Role::Member);
+    let bea = kit.user("bea");
+    kit.join(&bea, ws, Role::Member);
+    let id = kit.connect(&ana, ws).await["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let intake = crate::grant_intake(kit.deps.clone());
+
+    let target = intake
+        .reconnect_target(&kit.state, "ana", ws, &id)
+        .await
+        .unwrap();
+    assert_eq!(target.provider, "google");
+    assert_eq!(target.address, "sam@example.com");
+    for (who, connection) in [("bea", id.as_str()), ("eve", id.as_str()), ("ana", "nope")] {
+        assert!(
+            matches!(
+                intake
+                    .reconnect_target(&kit.state, who, ws, connection)
+                    .await,
+                Err(campbooks_kernel::Error::NotFound)
+            ),
+            "{who} {connection}"
+        );
+    }
+
+    // The same account re-authorises it; another account is refused.
+    assert_eq!(
+        kit.adopt(&ana, ws, ACCOUNT_SUB, Some(id.clone()))
+            .await
+            .unwrap(),
+        id
+    );
+    let other = kit
+        .adopt(&ana, ws, "google-sub-other", Some(id.clone()))
+        .await
+        .unwrap_err();
+    assert_eq!(other.code(), "account_mismatch");
+}
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_member_connects_gmail(db: PgPool) {
@@ -79,56 +158,6 @@ async fn a_member_connects_gmail(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn only_the_member_who_started_can_complete(db: PgPool) {
-    let kit = Kit::new(db).await;
-    let ws = WorkspaceId::new();
-    let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
-    let eve = kit.user("eve");
-    kit.join(&eve, ws, Role::Owner);
-    let other_ws = WorkspaceId::new();
-    kit.join(&ana, other_ws, Role::Member);
-
-    let (state, code) = kit.consent(&ana, ws).await;
-    kit.google.clear_calls();
-    // Someone else, even an owner, or the same member in another workspace.
-    let by_eve = kit.complete(&eve, ws, &state, &code).await;
-    assert_eq!(by_eve.status, StatusCode::NOT_FOUND);
-    let elsewhere = kit.complete(&ana, other_ws, &state, &code).await;
-    assert_eq!(elsewhere.status, StatusCode::NOT_FOUND);
-    assert!(
-        !kit.google
-            .calls()
-            .iter()
-            .any(|c| c.starts_with("POST /token")),
-        "the code was never exchanged: {:?}",
-        kit.google.calls()
-    );
-    // The member who started still can, once.
-    let mine = kit.complete(&ana, ws, &state, &code).await;
-    assert_eq!(mine.status, StatusCode::OK, "{:?}", mine.json);
-    let again = kit.complete(&ana, ws, &state, &code).await;
-    assert_eq!(again.status, StatusCode::NOT_FOUND);
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
-async fn an_expired_authorization_is_gone(db: PgPool) {
-    let kit = Kit::new(db).await;
-    let ws = WorkspaceId::new();
-    let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
-    let (state, code) = kit.consent(&ana, ws).await;
-    kit.clock.advance(TimeDelta::minutes(11));
-    let late = kit.complete(&ana, ws, &state, &code).await;
-    assert_eq!(late.status, StatusCode::NOT_FOUND);
-    let none: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.connections"#)
-        .fetch_one(&kit.db)
-        .await
-        .unwrap();
-    assert_eq!(none, 0);
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
 async fn connecting_the_same_account_again_keeps_one_connection(db: PgPool) {
     let kit = Kit::new(db).await;
     let ws = WorkspaceId::new();
@@ -154,10 +183,8 @@ async fn connecting_the_same_account_again_keeps_one_connection(db: PgPool) {
     // Another member connecting the same account is refused.
     let bea = kit.user("bea");
     kit.join(&bea, ws, Role::Member);
-    let (state, code) = kit.consent(&bea, ws).await;
-    let taken = kit.complete(&bea, ws, &state, &code).await;
-    assert_eq!(taken.status, StatusCode::CONFLICT);
-    assert_eq!(taken.json["code"], "account_connected_by_another_member");
+    let taken = kit.adopt(&bea, ws, ACCOUNT_SUB, None).await.unwrap_err();
+    assert_eq!(taken.code(), "account_connected_by_another_member");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -190,6 +217,10 @@ async fn refusals(db: PgPool) {
     assert_eq!(client.status, StatusCode::FORBIDDEN);
     assert_eq!(client.json["code"], "connection_needs_user");
 
+    assert!(
+        kit.door.asked().is_empty(),
+        "no refusal reached the front door"
+    );
     let stranger = kit.user("eve");
     assert_eq!(kit.start(&stranger, ws).await.status, StatusCode::NOT_FOUND);
     let anonymous = kit

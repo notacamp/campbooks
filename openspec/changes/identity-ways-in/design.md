@@ -30,10 +30,10 @@ Schema **`identity`**, migration `<ts>_identity__ways_in.sql`:
 
 ```text
 link_tickets   ticket_hash bytea PK · account_id → accounts · provider ·
-               purpose (link|connect|reconnect) · workspace_id? ·
+               purpose (link|connect|reconnect) · target_workspace_id? ·
                connection_id? · login_hint? · return_to · created_at ·
                expires_at (2 minutes)
-upstream_flows + account_id? → accounts · workspace_id? · connection_id?
+upstream_flows + account_id? → accounts · target_workspace_id? · connection_id?
 ```
 
 `identity.prune` also deletes expired tickets. A ticket's `login_hint` is

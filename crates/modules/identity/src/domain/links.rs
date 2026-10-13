@@ -49,7 +49,7 @@ pub async fn issue(
     let expires_at = now + TICKET_LIFETIME;
     sqlx::query(
         "INSERT INTO identity.link_tickets
-             (ticket_hash, account_id, provider, purpose, workspace_id, connection_id,
+             (ticket_hash, account_id, provider, purpose, target_workspace_id, connection_id,
               login_hint, return_to, created_at, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
@@ -84,23 +84,22 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
     }
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.link_tickets WHERE ticket_hash = $1
-         RETURNING account_id, provider, purpose, workspace_id, connection_id, login_hint,
+         RETURNING account_id, provider, purpose, target_workspace_id AS workspace_id, connection_id,
+                   login_hint,
                    return_to, expires_at",
     )
     .bind(hash(token))
     .fetch_optional(db)
     .await?;
-    Ok(row
-        .filter(|row| row.expires_at > now)
-        .and_then(|row| {
-            Some(Ticket {
-                account_id: row.account_id,
-                provider: Provider::parse(&row.provider)?,
-                purpose: Purpose::parse(&row.purpose)?,
-                workspace_id: row.workspace_id,
-                connection_id: row.connection_id,
-                login_hint: row.login_hint,
-                return_to: row.return_to,
-            })
-        }))
+    Ok(row.filter(|row| row.expires_at > now).and_then(|row| {
+        Some(Ticket {
+            account_id: row.account_id,
+            provider: Provider::parse(&row.provider)?,
+            purpose: Purpose::parse(&row.purpose)?,
+            workspace_id: row.workspace_id,
+            connection_id: row.connection_id,
+            login_hint: row.login_hint,
+            return_to: row.return_to,
+        })
+    }))
 }

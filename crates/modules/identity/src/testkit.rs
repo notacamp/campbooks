@@ -20,17 +20,14 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
-    AppState,
+    AppState, Error,
     auth::{Principal, TokenVerifier},
     clock::SystemClock,
     config::SignupPolicy,
-    connections::{
-        AdoptFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture,
-    },
+    connections::{AdoptFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture},
     crypto::{SecretKey, pkce_challenge, random_token},
     signup::{Invitations, InvitedFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
-    Error,
     testing::{
         self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
     },

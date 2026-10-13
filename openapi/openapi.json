@@ -217,6 +217,262 @@
         }
       }
     },
+    "/api/v1/identity/links": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start adding a way in, connecting or reconnecting a mailbox.",
+        "operationId": "identity.start_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Send the browser to `url`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field the purpose needs is missing (`link_incomplete`), or `invalid_return_to`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or adding a way in or connecting needs a sign-in in the last ten minutes (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or unconfigured provider, a workspace the caller is not in, a connection the caller did not grant, or another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This instance cannot connect that provider's mailbox (`mailbox_unsupported`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.link_ticket"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/ways-in": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List how you sign in.",
+        "operationId": "identity.list_ways_in",
+        "responses": {
+          "200": {
+            "description": "The caller's provider ways in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaysIn"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.provider_identity"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/ways-in/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Remove a way in.",
+        "operationId": "identity.remove_way_in",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The way in.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed. Mailbox connections are untouched."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's way in, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is the account's last way in (`last_way_in`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.provider_identity"
+          ],
+          "risk": "high"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -785,7 +1041,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "description": "Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old for a new connection (`step_up_required`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -805,115 +1061,7 @@
             }
           },
           "409": {
-            "description": "The provider is not configured on this instance (`provider_not_configured`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "connectors:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "assistant": false,
-          "automation": false,
-          "mutates": true,
-          "records": [
-            "connectors.connection"
-          ],
-          "risk": "low"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
-      "post": {
-        "tags": [
-          "connectors"
-        ],
-        "summary": "Complete a connection.",
-        "operationId": "connectors.complete_connection",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteConnection"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The connection, syncing.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectionView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such started connection of yours in this workspace, or it expired.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The provider could not be reached (`provider_unavailable`).",
+            "description": "The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3424,7 +3572,7 @@
           {
             "name": "provider",
             "in": "path",
-            "description": "`google`.",
+            "description": "`google`, `microsoft` or `zoho`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3465,11 +3613,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "accounts-server",
+            "in": "query",
+            "description": "Zoho's accounts server of the person's data centre.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`.",
+            "description": "Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. A signed-in round trip returns to its `return_to` with `linked=`, `connected=` or `link_error=`.",
             "headers": {
               "location": {
                 "schema": {
@@ -3485,6 +3642,16 @@
           },
           "404": {
             "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3671,7 +3838,7 @@
           {
             "name": "provider",
             "in": "path",
-            "description": "`google`.",
+            "description": "`google`, `microsoft` or `zoho`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3694,11 +3861,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "link",
+            "in": "query",
+            "description": "A signed-in round trip's ticket (from `identity.start_link`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "To the provider, with a round-trip cookie.",
+            "description": "To the provider, with a round-trip cookie; or, for a `link` ticket that is spent, expired or opened by a browser not signed in to its account, back with `link_error=`.",
             "headers": {
               "location": {
                 "schema": {
@@ -3724,6 +3900,16 @@
           },
           "404": {
             "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4966,11 +5152,6 @@
           }
         }
       },
-      "AuthorizationId": {
-        "type": "string",
-        "format": "uuid",
-        "description": "AuthorizationId (UUIDv7)"
-      },
       "BackchannelLogout": {
         "type": "object",
         "required": [
@@ -5013,25 +5194,6 @@
         "enum": [
           "email"
         ]
-      },
-      "CompleteConnection": {
-        "type": "object",
-        "description": "What Google redirected the browser with.",
-        "required": [
-          "state",
-          "code"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "The `code` query parameter."
-          },
-          "state": {
-            "type": "string",
-            "description": "The `state` query parameter."
-          }
-        },
-        "additionalProperties": false
       },
       "ConnectionId": {
         "type": "string",
@@ -5659,6 +5821,15 @@
           }
         }
       },
+      "LinkPurpose": {
+        "type": "string",
+        "description": "What the round trip is for.",
+        "enum": [
+          "link",
+          "connect",
+          "reconnect"
+        ]
+      },
       "LogoutResponse": {
         "type": "object",
         "description": "Where to send the browser to sign out of the identity provider too.",
@@ -6170,7 +6341,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ConnectionId",
-                "description": "An existing connection of yours to extend (incremental consent);\nthe same account must consent."
+                "description": "An existing connection of yours to re-authorise; the same account\nmust consent."
               },
               {
                 "type": "null"
@@ -6184,27 +6355,87 @@
         },
         "additionalProperties": false
       },
+      "StartLink": {
+        "type": "object",
+        "description": "The round trip to start.",
+        "required": [
+          "purpose"
+        ],
+        "properties": {
+          "connection_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The connection, for `reconnect`."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`google`, `microsoft` or `zoho`; for `link` and `connect`. A\nreconnect uses the connection's."
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/LinkPurpose",
+            "description": "What for."
+          },
+          "return_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Same-origin path to come back to (default `/`), with `linked=`,\n`connected=` or `link_error=` added."
+          },
+          "workspace_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId",
+                "description": "The workspace, for `connect` and `reconnect`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "StartedConnection": {
         "type": "object",
         "description": "A started consent.",
         "required": [
-          "authorization",
           "authorize_url",
           "expires_at"
         ],
         "properties": {
-          "authorization": {
-            "$ref": "#/components/schemas/AuthorizationId",
-            "description": "The started authorization."
-          },
           "authorize_url": {
             "type": "string",
-            "description": "Where to send the browser."
+            "description": "Where to send the browser: this instance's front door\n(`/auth/start/{provider}?link=…`), which comes back with\n`connected=<connection id>` or `link_error=<code>`."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the consent must be completed by."
+            "description": "When the consent must be started by."
+          }
+        }
+      },
+      "StartedLink": {
+        "type": "object",
+        "description": "A started round trip.",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "It stops working then."
+          },
+          "url": {
+            "type": "string",
+            "description": "Send the browser here (same origin)."
           }
         }
       },
@@ -6448,6 +6679,80 @@
             "type": "string",
             "description": "Semantic version of the server.",
             "example": "0.1.0"
+          }
+        }
+      },
+      "WayIn": {
+        "type": "object",
+        "description": "A provider account the caller signs in with.",
+        "required": [
+          "id",
+          "kind",
+          "provider",
+          "linked_via",
+          "linked_at"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address the provider gave when it was added (shown, never used\nto find an account)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`provider` (passkeys are listed with the passkeys)."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was last used to sign in."
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "linked_via": {
+            "type": "string",
+            "description": "`sign_up`, `link` or `connect`."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`google`, `microsoft` or `zoho`."
+          }
+        }
+      },
+      "WaysIn": {
+        "type": "object",
+        "description": "The caller's ways in.",
+        "required": [
+          "items",
+          "providers"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WayIn"
+            },
+            "description": "Oldest first."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers this instance offers, in display order."
           }
         }
       },

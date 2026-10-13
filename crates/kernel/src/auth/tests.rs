@@ -696,7 +696,12 @@ async fn id_token_for_a_given_issuer_with_its_own_claims() {
     // The nonce is still checked.
     invalid(
         &verifier
-            .verify_id_token_with::<TenantClaims>(&token, CLIENT, other_nonce(), Some(tenant_issuer))
+            .verify_id_token_with::<TenantClaims>(
+                &token,
+                CLIENT,
+                other_nonce(),
+                Some(tenant_issuer),
+            )
             .await
             .map(|(id, _)| id),
     );

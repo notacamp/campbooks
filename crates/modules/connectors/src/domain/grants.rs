@@ -1,8 +1,7 @@
 //! Turning a provider grant that is already in hand into a connection: the
-//! one seam every way of obtaining a grant goes through. The connector's own
-//! consent flow (`connectors.complete_connection`) calls it today; a sign-in
-//! flow that obtains the same grant can call it later without the
-//! connector's start/callback.
+//! one seam every way of obtaining a grant goes through. Grants come from
+//! the identity module (a sign-up's held grant, or a connect or reconnect
+//! through its front door) by way of the kernel's grant-intake port.
 
 use campbooks_kernel::{
     AppState, Error, Result,

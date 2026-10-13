@@ -84,7 +84,11 @@ impl std::fmt::Debug for Issuer {
             .field("url", &self.url)
             .field(
                 "upstreams",
-                &self.upstreams.iter().map(Upstream::provider).collect::<Vec<_>>(),
+                &self
+                    .upstreams
+                    .iter()
+                    .map(Upstream::provider)
+                    .collect::<Vec<_>>(),
             )
             .finish_non_exhaustive()
     }
@@ -203,11 +207,8 @@ fn upstream_client(
     issuer: &str,
 ) -> Result<Option<Upstream>, String> {
     let prefix = env_prefix(provider);
-    let present = |value: Option<String>| {
-        value
-            .map(|v| v.trim().to_owned())
-            .filter(|v| !v.is_empty())
-    };
+    let present =
+        |value: Option<String>| value.map(|v| v.trim().to_owned()).filter(|v| !v.is_empty());
     let client_id = present(settings.client_id);
     let secret = match (settings.client_secret_file, settings.client_secret) {
         (Some(path), _) if !path.as_os_str().is_empty() => Some(ClientSecret::File(path)),
@@ -412,7 +413,11 @@ mod tests {
         )
         .unwrap();
         let issuer = rails.issuer.unwrap();
-        let uris: Vec<&str> = issuer.upstreams.iter().map(Upstream::redirect_uri).collect();
+        let uris: Vec<&str> = issuer
+            .upstreams
+            .iter()
+            .map(Upstream::redirect_uri)
+            .collect();
         assert_eq!(
             uris,
             [

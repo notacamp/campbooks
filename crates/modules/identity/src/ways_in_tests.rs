@@ -3,18 +3,12 @@
 //! signing in with Microsoft and Zoho; with every refusal, one by one.
 
 use axum::http::{Method, StatusCode};
-use campbooks_kernel::{
-    config::SignupPolicy,
-    connections::ConsentRequest,
-    testing::TestUser,
-};
+use campbooks_kernel::{config::SignupPolicy, connections::ConsentRequest, testing::TestUser};
 use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
-    testkit::{
-        Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, query,
-    },
+    testkit::{Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, query},
     upstream::{
         Provider,
         client::{MICROSOFT_ISSUER_PREFIX, MICROSOFT_ISSUER_SUFFIX},
@@ -96,10 +90,11 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
     let (url, verifier) = Kit::web_authorize();
     let request = kit.get(&url).await.location_query()["request"].clone();
     let shown = kit.get(&format!("/auth/requests/{request}")).await;
-    assert_eq!(shown.json["providers"], json!(["google", "microsoft", "zoho"]));
-    let signed_in = kit
-        .round_trip_with(Provider::Zoho, Some(&request))
-        .await;
+    assert_eq!(
+        shown.json["providers"],
+        json!(["google", "microsoft", "zoho"])
+    );
+    let signed_in = kit.round_trip_with(Provider::Zoho, Some(&request)).await;
     assert!(
         signed_in
             .location()
@@ -182,7 +177,11 @@ async fn a_link_ticket_works_once_and_only_in_its_accounts_browser(db: PgPool) {
         "/?link_error=link_expired"
     );
     assert_eq!(
-        count(&kit, "SELECT count(*) FROM identity.upstream_flows WHERE purpose = 'link'").await,
+        count(
+            &kit,
+            "SELECT count(*) FROM identity.upstream_flows WHERE purpose = 'link'"
+        )
+        .await,
         0
     );
 }
@@ -205,7 +204,10 @@ async fn another_accounts_way_in_is_refused_and_nothing_is_revoked(db: PgPool) {
         back.location(),
         format!("{SETTINGS}?link_error=way_in_belongs_to_another_account")
     );
-    assert_eq!(kit.ways_in(&bea).await["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        kit.ways_in(&bea).await["items"].as_array().unwrap().len(),
+        1
+    );
     assert_eq!(
         count(&kit, "SELECT count(*) FROM identity.provider_identities").await,
         2
@@ -221,7 +223,13 @@ async fn linking_your_own_way_in_again_changes_nothing(db: PgPool) {
     let at_google = link_to(&kit, &access, Provider::Google).await;
     let back = kit.via(Provider::Google, &at_google).await;
     assert_eq!(back.location(), format!("{SETTINGS}?linked=google"));
-    assert_eq!(kit.ways_in(&access).await["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        kit.ways_in(&access).await["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -269,7 +277,10 @@ async fn the_last_way_in_cannot_be_removed_and_others_can(db: PgPool) {
 
     let removed = kit.api(Method::DELETE, &path(&zoho), &fresh).await;
     assert_eq!(removed.status, StatusCode::NO_CONTENT, "{removed:?}");
-    assert_eq!(kit.ways_in(&fresh).await["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        kit.ways_in(&fresh).await["items"].as_array().unwrap().len(),
+        1
+    );
     assert_eq!(
         count(
             &kit,
@@ -328,7 +339,10 @@ async fn connecting_a_mailbox_links_it_and_hands_its_grant_over(db: PgPool) {
     assert_eq!(zoho.json["code"], "mailbox_unsupported");
     // A missing workspace is a bad request; an unknown provider is 404.
     let incomplete = kit
-        .start_link(&access, &json!({ "purpose": "connect", "provider": "google" }))
+        .start_link(
+            &access,
+            &json!({ "purpose": "connect", "provider": "google" }),
+        )
         .await;
     assert_eq!(incomplete.json["code"], "link_incomplete");
     let unknown = kit
@@ -358,13 +372,20 @@ async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) 
         .await;
     let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
     // The person unticks the mail permission.
-    let declined = to_google
-        .location()
-        .replace(&url::form_urlencoded::byte_serialize(MAIL_SCOPE.as_bytes()).collect::<String>(), "");
+    let declined = to_google.location().replace(
+        &url::form_urlencoded::byte_serialize(MAIL_SCOPE.as_bytes()).collect::<String>(),
+        "",
+    );
     let back = kit.via(Provider::Google, &declined).await;
     assert_eq!(back.location(), "/w/ws?link_error=consent_incomplete");
     assert!(kit.intake.adopted().is_empty());
-    assert_eq!(kit.ways_in(&access).await["items"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        kit.ways_in(&access).await["items"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -420,7 +441,11 @@ async fn the_consent_door_starts_a_connect_for_other_modules(db: PgPool) {
         )
         .await
         .unwrap();
-    assert!(started.url.starts_with("/auth/start/google?link="), "{}", started.url);
+    assert!(
+        started.url.starts_with("/auth/start/google?link="),
+        "{}",
+        started.url
+    );
     let to_google = kit.get(&started.url).await;
     assert_eq!(query(&to_google.location())["access_type"], "offline");
 }

@@ -539,9 +539,14 @@ fn log_composition(composition: &campbooks_server::Composition) {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
     }
     if let Some(issuer) = &composition.identity.issuer {
+        let providers: Vec<&str> = issuer
+            .upstreams
+            .iter()
+            .map(|u| u.provider().as_str())
+            .collect();
         tracing::info!(
             issuer = %issuer.url,
-            google = issuer.google.is_some(),
+            providers = ?providers,
             "this instance is its own identity provider (OAuth 2.1 issuer)"
         );
     } else {

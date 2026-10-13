@@ -398,7 +398,7 @@ Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF
 ## Built-in sign-in (Campbooks as its own identity provider)
 
 Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
-Google (Microsoft, Zoho and passkeys follow) and issues every token itself, so the `idp`
+Google, Microsoft or Zoho (passkeys follow) and issues every token itself, so the `idp`
 services above will go away. The built-in issuer is already in the server. It runs when
 `CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
 `CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
@@ -438,20 +438,45 @@ With the built-in issuer:
   (`CAMPBOOKS_<PROVIDER>__REDIRECT_PATH`, default `/auth/callback/<provider>`). The value
   must be an absolute path with no host, query or fragment, or the server refuses to
   start.
-- Accounts are linked to a Google account by its id, never by email address. Signing in
-  with a Google account Campbooks doesn't know offers to create a new account.
+- Accounts are linked to a provider account by its id, never by email address. Signing in
+  with a provider account Campbooks doesn't know offers to create a new account.
+- **Sign in with Microsoft** (personal, work and school accounts). In the Microsoft Entra
+  admin center, register an app (**App registrations**, "Accounts in any organizational
+  directory and personal Microsoft accounts"), add the **Web** redirect URI
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/microsoft`, create a client secret, and set
+  `CAMPBOOKS_MICROSOFT__CLIENT_ID` and `CAMPBOOKS_MICROSOFT__CLIENT_SECRET_FILE`.
+  `CAMPBOOKS_MICROSOFT__TENANT` (default `common`) narrows who may sign in:
+  `organizations` (work and school only, for an app registered that way), `consumers`
+  (personal only) or one tenant id. Microsoft does not verify the address it reports, so
+  it counts as verified (for an invite-only instance) only when you also add the optional
+  claim `xms_edov` to the ID token (**Token configuration**). Microsoft has no mailbox
+  adapter yet: signing in with it connects no mail.
+- **Sign in with Zoho**, in every Zoho data centre. In the Zoho API console, add a
+  **Server-based application** with the redirect URI
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/zoho`, and turn on **Multi-DC** (Settings) so the
+  same client works for people in every data centre. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
+  `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
+  servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
+  forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
+- **More ways in.** Signed in, a person adds another Google, Microsoft or Zoho account
+  under Settings → Ways to sign in, and every mailbox they connect becomes a way in too.
+  A provider account that is already another Campbooks account's way in is refused, never
+  merged. The last way in can't be removed, and adding or removing one needs a sign-in in
+  the last ten minutes. Disconnecting a mailbox keeps its sign-in.
 
 ## Connected accounts
 
-Members connect outside accounts (Gmail today); Campbooks asks Google for consent, keeps the grant encrypted with the instance secret key (schema `connectors`), and
+Members connect outside accounts (Gmail today); Campbooks asks Google for consent through
+its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
+encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
 hours when nothing changes. Nothing is connected until you register an OAuth client:
 
 1. In the Google Cloud console, create an OAuth client of type **Web application** and
    enable the **Gmail API** for its project.
-2. Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/connections/google/callback`, e.g.
-   `https://campbooks.example.com/connections/google/callback` (and, for the built-in
-   sign-in, `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google`).
+2. Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google`, e.g.
+   `https://campbooks.example.com/auth/callback/google`. The earlier
+   `/connections/google/callback` is no longer used; you can remove it.
 3. Add the scopes `openid`, `email`, `profile` and
    `https://www.googleapis.com/auth/gmail.modify` to the consent screen. Gmail's scope is restricted: until Google verifies your app, only
    the test users you list can connect.
@@ -463,9 +488,9 @@ A connection belongs to the workspace and records the member who granted it. Whe
 member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
 Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
 
-The web app's Connections screen, which serves that redirect URI, is not built yet; until
-it is, connections are made through the API (`connectors.start_connection`, then
-`connectors.complete_connection` with the `state` and `code` Google redirects with).
+Connecting needs the built-in sign-in: an install still on Rauthy (`CAMPBOOKS_AUTH__ISSUER`
+set) cannot connect mail until it switches. `connectors.start_connection` answers with the
+built-in sign-in's URL, which comes back to the app with `connected=<connection id>`.
 
 ### Developing against the IdP
 

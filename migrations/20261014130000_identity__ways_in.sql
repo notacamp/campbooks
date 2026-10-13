@@ -12,14 +12,17 @@ CREATE TABLE identity.link_tickets (
     account_id uuid NOT NULL REFERENCES identity.accounts (id) ON DELETE CASCADE,
     provider text NOT NULL CHECK (provider IN ('google', 'microsoft', 'zoho')),
     purpose text NOT NULL CHECK (purpose IN ('link', 'connect', 'reconnect')),
-    -- A workspace and connection of another module, by id (no foreign key).
-    workspace_id uuid,
+    -- The workspace a mailbox is connected in, and the connection being
+    -- reconnected: another module's, by id (no foreign key). Named `target_`
+    -- because the row is a person's, not the workspace's (no row-level
+    -- security, like every identity table).
+    target_workspace_id uuid,
     connection_id text,
     login_hint text,
     return_to text NOT NULL,
     created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL,
-    CHECK ((purpose = 'link') = (workspace_id IS NULL)),
+    CHECK ((purpose = 'link') = (target_workspace_id IS NULL)),
     CHECK ((purpose = 'reconnect') = (connection_id IS NOT NULL))
 );
 CREATE INDEX link_tickets_expires_idx ON identity.link_tickets (expires_at);
@@ -27,7 +30,7 @@ CREATE INDEX link_tickets_expires_idx ON identity.link_tickets (expires_at);
 -- What a signed-in round trip is for.
 ALTER TABLE identity.upstream_flows
     ADD COLUMN account_id uuid REFERENCES identity.accounts (id) ON DELETE CASCADE,
-    ADD COLUMN workspace_id uuid,
+    ADD COLUMN target_workspace_id uuid,
     ADD COLUMN connection_id text,
     ADD CONSTRAINT upstream_flows_account_purpose_check
         CHECK ((purpose = 'sign_in') = (account_id IS NULL));

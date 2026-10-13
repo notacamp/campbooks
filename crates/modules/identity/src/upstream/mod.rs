@@ -197,7 +197,7 @@ pub async fn store_flow(
     let state_hash = hash(state);
     sqlx::query(
         "INSERT INTO identity.upstream_flows
-             (state_hash, browser_hash, provider, purpose, account_id, workspace_id,
+             (state_hash, browser_hash, provider, purpose, account_id, target_workspace_id,
               connection_id, request_id, return_to, nonce, code_verifier, consent_retry,
               created_at, expires_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
@@ -250,7 +250,8 @@ pub async fn take_flow(
     // Deleted whether or not it matches: a state is tried once.
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.upstream_flows WHERE state_hash = $1
-         RETURNING browser_hash, provider, purpose, account_id, workspace_id, connection_id,
+         RETURNING browser_hash, provider, purpose, account_id,
+                   target_workspace_id AS workspace_id, connection_id,
                    request_id, return_to, nonce, code_verifier, consent_retry, expires_at",
     )
     .bind(&state_hash)
