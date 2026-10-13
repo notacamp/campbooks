@@ -1,7 +1,8 @@
 //! Test fixtures: the module over a database whose connections run as the
 //! runtime role (row-level security applies, as in production), a test
-//! identity provider, a fake Google (OAuth + Gmail, on wiremock) serving
-//! recorded fictional mail, a fixed clock, and the contract schemas.
+//! identity provider, a fake Google (tokens + Gmail, on wiremock) serving
+//! recorded fictional mail, a fake consent door (the identity module's front
+//! door), a fixed clock, and the contract schemas.
 //!
 //! No test talks to Google.
 
@@ -18,11 +19,12 @@ use axum::{
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::clock::Clock as _;
 use campbooks_kernel::{
-    AppState,
+    AppState, Error,
     auth::{Principal, PrincipalKind},
     blobs::{BlobRef, BlobStore},
     clock::FixedClock,
     config::BlobsConfig,
+    connections::{ConsentDoor, ConsentFuture, ConsentRequest, ProviderGrant, StartedConsent},
     crypto::{Cipher, SecretKey},
     jobs::{Registry, Worker},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
@@ -30,6 +32,7 @@ use campbooks_kernel::{
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use futures_util::StreamExt as _;
+use secrecy::SecretString;
 use sqlx::PgPool;
 use url::Url;
 use wiremock::{Mock, MockServer, Respond, ResponseTemplate, matchers::any};
@@ -38,7 +41,8 @@ use crate::{
     Deps,
     config::ConnectorsConfig,
     deps::CREDENTIALS_PURPOSE,
-    google::{ClientSecret, Endpoints, Google},
+    domain::intake::grant_intake,
+    google::{ClientSecret, Endpoints, GMAIL_SCOPE, Google},
 };
 
 /// Every scope of this module.
@@ -139,6 +143,8 @@ pub struct Kit {
     pub google: FakeGoogle,
     /// What the module was composed with.
     pub deps: Deps,
+    /// The identity module's front door, faked.
+    pub door: Arc<FakeDoor>,
     app: Router,
     idp: TestIdp,
     membership: Arc<FakeMembership>,
@@ -162,7 +168,6 @@ impl Kit {
                 Google::new(
                     "client-1.apps.example.com".into(),
                     ClientSecret::Inline("test-client-secret".into()),
-                    "http://localhost:8080/connections/google/callback".into(),
                     Endpoints::under(&google.base()),
                 )
                 .unwrap(),
@@ -192,10 +197,12 @@ impl Kit {
         let pool = testing::app_role_pool(&db).await;
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
         let membership = Arc::new(FakeMembership::default());
+        let door = Arc::new(FakeDoor::default());
         let state = idp
             .state(pool)
             .with_blobs(blobs)
             .with_membership(membership.clone())
+            .with_consent_door(door.clone())
             .with_registry(Registry::build(&[crate::module(deps.clone())]).unwrap());
         let app = testing::app(crate::module(deps.clone()), state.clone());
         Self {
@@ -204,6 +211,7 @@ impl Kit {
             clock,
             google,
             deps,
+            door,
             app,
             idp,
             membership,
@@ -305,42 +313,54 @@ impl Kit {
         .await
     }
 
-    /// Start a connection and play Google's consent: the `state` and the
-    /// `code` the browser would come back with.
-    pub async fn consent(&self, caller: &Caller, workspace: WorkspaceId) -> (String, String) {
-        let started = self.start(caller, workspace).await;
-        assert_eq!(started.status.as_u16(), 201, "{:?}", started.json);
-        let url = Url::parse(started.json["authorize_url"].as_str().unwrap()).unwrap();
-        let query: HashMap<_, _> = url.query_pairs().into_owned().collect();
-        let code = self
-            .google
-            .issue_code(&query["code_challenge"], &query["scope"]);
-        (query["state"].clone(), code)
-    }
-
-    /// Connect Gmail as `caller` in `workspace`, end to end; the connection
-    /// JSON.
-    pub async fn connect(&self, caller: &Caller, workspace: WorkspaceId) -> serde_json::Value {
-        let (state, code) = self.consent(caller, workspace).await;
-        let completed = self.complete(caller, workspace, &state, &code).await;
-        assert_eq!(completed.status.as_u16(), 200, "{:?}", completed.json);
-        completed.json
-    }
-
-    /// Complete a consent.
-    pub async fn complete(
+    /// A consent for `account_subject` coming back through the identity
+    /// module's front door, handed to the grant-intake port for `caller`
+    /// in `workspace` (extending `extending`): the connection id.
+    pub async fn adopt(
         &self,
         caller: &Caller,
         workspace: WorkspaceId,
-        state: &str,
-        code: &str,
-    ) -> TestResponse {
-        self.post(
-            caller,
-            &format!("/api/v1/w/{workspace}/connections/authorizations/complete"),
-            serde_json::json!({"state": state, "code": code}),
-        )
-        .await
+        account_subject: &str,
+        extending: Option<String>,
+    ) -> Result<String, Error> {
+        let (access, refresh) = self.google.grant();
+        grant_intake(self.deps.clone())
+            .adopt(
+                &self.state,
+                ProviderGrant {
+                    workspace,
+                    subject: caller.subject.clone(),
+                    provider: "google".to_owned(),
+                    account_subject: account_subject.to_owned(),
+                    address: "Sam@Example.com".to_owned(),
+                    address_verified: self.google.email_verified(),
+                    display_name: Some("Sam Rivera".to_owned()),
+                    scopes: vec![
+                        "openid".to_owned(),
+                        "email".to_owned(),
+                        GMAIL_SCOPE.to_owned(),
+                    ],
+                    access_token: SecretString::from(access),
+                    refresh_token: Some(SecretString::from(refresh)),
+                    expires_in: Some(3599),
+                    extending,
+                },
+            )
+            .await
+    }
+
+    /// Connect Gmail as `caller` in `workspace`, end to end from the
+    /// grant-intake port; the connection JSON.
+    pub async fn connect(&self, caller: &Caller, workspace: WorkspaceId) -> serde_json::Value {
+        let id = self
+            .adopt(caller, workspace, ACCOUNT_SUB, None)
+            .await
+            .unwrap_or_else(|e| panic!("adopting: {e:?}"));
+        let read = self
+            .get(caller, &format!("/api/v1/w/{workspace}/connections/{id}"))
+            .await;
+        assert_eq!(read.status.as_u16(), 200, "{:?}", read.json);
+        read.json
     }
 
     /// Run every ready job.
@@ -467,6 +487,48 @@ pub struct FakeMessage {
     pub internal_date: DateTime<Utc>,
 }
 
+/// What the fake front door was asked: workspace, subject, provider,
+/// connection.
+pub type Asked = (WorkspaceId, String, String, Option<String>);
+
+/// The identity module's front door, faked: records what it was asked and
+/// answers a front-door URL.
+#[derive(Debug, Default)]
+pub struct FakeDoor {
+    asked: Mutex<Vec<Asked>>,
+}
+
+impl FakeDoor {
+    /// What each request asked.
+    pub fn asked(&self) -> Vec<Asked> {
+        self.asked
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl ConsentDoor for FakeDoor {
+    fn start<'a>(&'a self, _state: &'a AppState, request: ConsentRequest) -> ConsentFuture<'a> {
+        let url = format!("/auth/start/{}?link=fake-ticket", request.provider);
+        self.asked
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push((
+                request.workspace,
+                request.principal.subject,
+                request.provider,
+                request.connection,
+            ));
+        Box::pin(async move {
+            Ok(StartedConsent {
+                url,
+                expires_at: Utc::now() + TimeDelta::minutes(2),
+            })
+        })
+    }
+}
+
 #[derive(Debug, Default)]
 struct Mailbox {
     messages: BTreeMap<String, FakeMessage>,
@@ -476,8 +538,6 @@ struct Mailbox {
     /// History before this id is forgotten (404).
     history_floor: u64,
     next_id: u64,
-    /// code → (challenge, scope).
-    codes: HashMap<String, (String, String)>,
     access_tokens: Vec<String>,
     refresh_tokens: Vec<String>,
     revoked: Vec<String>,
@@ -523,15 +583,22 @@ impl FakeGoogle {
         self.mailbox.lock().unwrap_or_else(PoisonError::into_inner)
     }
 
-    /// Google's consent: a code for a PKCE `challenge`, granting `scope`.
-    pub fn issue_code(&self, challenge: &str, scope: &str) -> String {
+    /// A consent, as the identity module's front door obtains one: fresh
+    /// access and refresh tokens Google will accept.
+    pub fn grant(&self) -> (String, String) {
         let mut mailbox = self.lock();
-        let code = format!("code-{}", mailbox.next_id);
-        mailbox.next_id += 1;
-        mailbox
-            .codes
-            .insert(code.clone(), (challenge.to_owned(), scope.to_owned()));
-        code
+        let access = format!("fake-access-{}", mailbox.next_id);
+        let refresh = format!("fake-refresh-{}", mailbox.next_id + 1);
+        mailbox.next_id += 2;
+        mailbox.access_tokens.push(access.clone());
+        mailbox.refresh_tokens.push(refresh.clone());
+        mailbox.refresh_invalid = false;
+        (access, refresh)
+    }
+
+    /// Whether the provider verified the account's address.
+    fn email_verified(&self) -> bool {
+        !self.lock().email_unverified
     }
 
     /// Put a message in the mailbox (no history record: as if it was there
@@ -647,11 +714,6 @@ impl FakeGoogle {
         self.lock().calls.clone()
     }
 
-    /// Forget the calls seen so far.
-    pub fn clear_calls(&self) {
-        self.lock().calls.clear();
-    }
-
     /// How many raw downloads of `id` were made.
     pub fn raw_fetches(&self, id: &str) -> usize {
         let needle = format!("GET /gmail/v1/users/me/messages/{id}?format=raw");
@@ -698,16 +760,6 @@ impl Respond for Responder {
                 mailbox.revoked.push(token);
                 ResponseTemplate::new(200)
             }
-            ("GET", "/v1/userinfo") => {
-                if !authorized(&mailbox, request) {
-                    return json(401, &serde_json::json!({"error": "invalid_token"}));
-                }
-                json(
-                    200,
-                    &serde_json::json!({"sub": ACCOUNT_SUB, "email": "Sam@Example.com",
-                        "email_verified": !mailbox.email_unverified, "name": "Sam Rivera"}),
-                )
-            }
             ("GET", gmail) if gmail.starts_with("/gmail/v1/users/me/") => {
                 if let Some(seconds) = mailbox.rate_limit_next.take() {
                     return json(
@@ -744,29 +796,6 @@ fn token(mailbox: &mut Mailbox, form: &HashMap<String, String>) -> ResponseTempl
     let access = format!("fake-access-{}", mailbox.next_id);
     mailbox.next_id += 1;
     match form.get("grant_type").map(String::as_str) {
-        Some("authorization_code") => {
-            let Some((challenge, scope)) = form.get("code").and_then(|c| mailbox.codes.remove(c))
-            else {
-                return invalid();
-            };
-            let verifier = form.get("code_verifier").cloned().unwrap_or_default();
-            let digest = campbooks_kernel::crypto::pkce_challenge(&verifier);
-            if digest != challenge {
-                return invalid();
-            }
-            let refresh = format!("fake-refresh-{}", mailbox.next_id);
-            mailbox.next_id += 1;
-            mailbox.access_tokens.push(access.clone());
-            mailbox.refresh_tokens.push(refresh.clone());
-            mailbox.refresh_invalid = false;
-            json(
-                200,
-                &serde_json::json!({
-                    "access_token": access, "expires_in": 3599, "refresh_token": refresh,
-                    "scope": scope, "token_type": "Bearer", "id_token": "unused"
-                }),
-            )
-        }
         Some("refresh_token") => {
             let known = form
                 .get("refresh_token")

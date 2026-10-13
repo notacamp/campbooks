@@ -1,35 +1,85 @@
-// A fake Google for recordings and local development only: an OAuth consent
-// page, a token endpoint (authorization code + PKCE S256) and a JWKS, laid
-// out like Google under one base URL. The server talks to it only with
-// CAMPBOOKS_ENV=development and CAMPBOOKS_GOOGLE__BASE_URL set to its address
-// (the server refuses that setting otherwise).
+// A fake Google, Microsoft or Zoho for recordings and local development only:
+// a consent page, a token endpoint (authorization code + PKCE S256) and a key
+// set, laid out like the real provider under one base URL. The server talks to
+// it only with CAMPBOOKS_ENV=development and CAMPBOOKS_<PROVIDER>__BASE_URL set
+// to its address (the server refuses that setting otherwise).
 //
-//   pnpm --dir clients fake-google [--port 9050]
+//   pnpm --dir clients fake-google      # :9050
+//   pnpm --dir clients fake-microsoft   # :9051
+//   pnpm --dir clients fake-zoho        # :9052
 //
 // Everyone who signs in is the same fictional person, Sam Rivera; each new
-// browser (a cookie on this origin) is a different Google account of hers,
-// so every recording run starts as someone Campbooks has not met.
+// browser (a cookie on this origin) is a different account of hers at that
+// provider, so every recording run starts as someone Campbooks has not met.
 //
-// Each account also has a demo Gmail mailbox (scripts/fake-gmail.ts) that the
-// connectors module syncs: `POST /fake/deliver` drops one more message into
-// every mailbox, to show mail arriving live.
+// - Google: issuer = the base URL; `email_verified` true.
+// - Microsoft: issuer = `<base>/<tid>/v2.0` for one fictional tenant, as the
+//   real `common` endpoint does; no `email_verified` (Microsoft never sends it).
+// - Zoho: one data centre (the base URL); the callback names it in
+//   `accounts-server`, as Zoho's does.
+//
+// Each fake Google account also has a demo Gmail mailbox (scripts/
+// fake-gmail.ts) that the connectors module syncs: `POST /fake/deliver` drops
+// one more message into every mailbox, to show mail arriving live.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
 
 import { createMailbox, deliverDemo, demoImage, handleGmail, type Mailbox } from "./fake-gmail.ts";
 
-const { values } = parseArgs({ options: { port: { type: "string", default: "9050" } } });
-const port = Number(values.port);
-const issuer = `http://127.0.0.1:${String(port)}`;
-const person = { email: "sam.rivera@example.com", name: "Sam Rivera" };
+type Provider = "google" | "microsoft" | "zoho";
+
+const { values } = parseArgs({
+  options: { provider: { type: "string", default: "google" }, port: { type: "string" } },
+});
+const provider = values.provider as Provider;
+const DEFAULT_PORTS: Record<Provider, string> = { google: "9050", microsoft: "9051", zoho: "9052" };
+if (!(provider in DEFAULT_PORTS)) {
+  throw new Error(`--provider must be google, microsoft or zoho, not ${values.provider}`);
+}
+const port = Number(values.port ?? DEFAULT_PORTS[provider]);
+const base = `http://127.0.0.1:${String(port)}`;
+/** The fictional Microsoft tenant everyone belongs to. */
+const TENANT = "2b5a2c1e-6f1d-4c8e-9a3b-7d4e5f6a7b8c";
+const NAMES: Record<Provider, string> = { google: "Google", microsoft: "Microsoft", zoho: "Zoho" };
+
+const person = {
+  name: "Sam Rivera",
+  email: {
+    google: "sam.rivera@example.com",
+    microsoft: "sam.rivera@example.org",
+    zoho: "sam.rivera@example.net",
+  }[provider],
+};
+
+/** Where each endpoint lives, as at the real provider. */
+const layout = {
+  google: {
+    authorize: "/o/oauth2/v2/auth",
+    token: "/token",
+    keys: "/oauth2/v3/certs",
+    issuer: base,
+  },
+  microsoft: {
+    authorize: "/common/oauth2/v2.0/authorize",
+    token: "/common/oauth2/v2.0/token",
+    keys: "/common/discovery/v2.0/keys",
+    issuer: `${base}/${TENANT}/v2.0`,
+  },
+  zoho: {
+    authorize: "/oauth/v2/auth",
+    token: "/oauth/v2/token",
+    keys: "/oauth/v2/keys",
+    issuer: base,
+  },
+}[provider];
 
 const b64url = (data: Buffer | string) => Buffer.from(data).toString("base64url");
 
 // A fresh key (and key id) per run, so a server that cached an earlier run's
 // keys fetches these.
 const { privateKey, publicKey } = generateKeyPairSync("ed25519");
-const kid = `fake-google-${b64url(randomBytes(6))}`;
+const kid = `fake-${provider}-${b64url(randomBytes(6))}`;
 const jwk = { ...publicKey.export({ format: "jwk" }), kid, use: "sig", alg: "EdDSA" };
 
 interface Grant {
@@ -39,6 +89,8 @@ interface Grant {
   scope: string;
   nonce: string;
   challenge: string;
+  /** Whether offline access was asked (a refresh token comes back). */
+  offline: boolean;
 }
 const codes = new Map<string, Grant>();
 /** Access and refresh tokens → the account they were issued for. */
@@ -48,7 +100,7 @@ const mailboxes = new Map<string, Mailbox>();
 function mailboxOf(sub: string): Mailbox {
   let mailbox = mailboxes.get(sub);
   if (mailbox === undefined) {
-    mailbox = createMailbox(person.email, `${issuer}/images`);
+    mailbox = createMailbox(person.email, `${base}/images`);
     mailboxes.set(sub, mailbox);
   }
   return mailbox;
@@ -60,6 +112,7 @@ function bearer(request: IncomingMessage): string | undefined {
   return token === undefined ? undefined : tokens.get(token);
 }
 
+/** A new access token (and refresh token, unless one is being reused) for `sub`. */
 function issueTokens(sub: string, refresh?: string) {
   const access = `fake-access-${b64url(randomBytes(12))}`;
   tokens.set(access, sub);
@@ -71,22 +124,26 @@ function issueTokens(sub: string, refresh?: string) {
 function idToken(sub: string, clientId: string, nonce: string): string {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(JSON.stringify({ alg: "EdDSA", typ: "JWT", kid }));
-  const claims = b64url(
-    JSON.stringify({
-      iss: issuer,
-      aud: clientId,
-      azp: clientId,
-      sub,
-      email: person.email,
-      email_verified: true,
-      name: person.name,
-      nonce,
-      iat: now,
-      exp: now + 600,
-    }),
-  );
-  const signature = sign(null, Buffer.from(`${header}.${claims}`), privateKey);
-  return `${header}.${claims}.${b64url(signature)}`;
+  const claims: Record<string, unknown> = {
+    iss: layout.issuer,
+    aud: clientId,
+    azp: clientId,
+    sub,
+    email: person.email,
+    name: person.name,
+    nonce,
+    iat: now,
+    exp: now + 600,
+  };
+  if (provider === "microsoft") {
+    claims["tid"] = TENANT;
+    claims["preferred_username"] = person.email;
+  } else {
+    claims["email_verified"] = true;
+  }
+  const body = b64url(JSON.stringify(claims));
+  const signature = sign(null, Buffer.from(`${header}.${body}`), privateKey);
+  return `${header}.${body}.${b64url(signature)}`;
 }
 
 const escape = (text: string) =>
@@ -95,9 +152,10 @@ const escape = (text: string) =>
 function consentPage(query: URLSearchParams): string {
   const scopes = (query.get("scope") ?? "").split(" ").filter(Boolean);
   const wording: Record<string, string> = {
-    openid: "Know who you are on Google",
+    openid: `Know who you are on ${NAMES[provider]}`,
     email: "See your email address",
     profile: "See your name",
+    offline_access: "Keep access when you are away",
     "https://www.googleapis.com/auth/gmail.modify": "Read, compose and organise your mail",
   };
   const items = scopes.map((s) => `<li>${escape(wording[s] ?? s)}</li>`).join("");
@@ -105,22 +163,22 @@ function consentPage(query: URLSearchParams): string {
   allow.set("decision", "allow");
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Fake Google: sign in</title>
+<title>Fake ${NAMES[provider]}: sign in</title>
 <style>
 body{margin:0;font:16px/1.5 system-ui,sans-serif;background:#f1f3f4;color:#202124}
 main{max-width:26rem;margin:2rem auto;background:#fff;border-radius:12px;padding:1.5rem;box-shadow:0 1px 3px #0003}
 .tag{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:#b3261e}
 h1{font-size:1.4rem;margin:.25rem 0 1rem}
 .who{display:flex;gap:.75rem;align-items:center;padding:.75rem;border:1px solid #dadce0;border-radius:8px}
-.avatar{width:2.5rem;height:2.5rem;border-radius:50%;background:#1a73e8;color:#fff;display:grid;place-items:center;font-weight:600}
-ul{padding-left:1.2rem} a.allow{display:block;text-align:center;margin-top:1rem;background:#1a73e8;color:#fff;
+.avatar{width:2.5rem;height:2.5rem;border-radius:50%;background:#3c4043;color:#fff;display:grid;place-items:center;font-weight:600}
+ul{padding-left:1.2rem} a.allow{display:block;text-align:center;margin-top:1rem;background:#3c4043;color:#fff;
 text-decoration:none;padding:.7rem;border-radius:6px;font-weight:600}
 </style></head><body><main>
-<div class="tag">Fake Google · development only</div>
+<div class="tag">Fake ${NAMES[provider]} · development only</div>
 <h1>Sign in to Campbooks</h1>
 <div class="who"><div class="avatar">SR</div><div><strong>${escape(person.name)}</strong><br>${escape(person.email)}</div></div>
 <p>Campbooks wants to:</p><ul>${items}</ul>
-<a class="allow" href="/o/oauth2/v2/auth?${escape(allow.toString())}">Allow</a>
+<a class="allow" href="${layout.authorize}?${escape(allow.toString())}">Allow</a>
 </main></body></html>`;
 }
 
@@ -135,16 +193,21 @@ function json(response: ServerResponse, status: number, value: unknown) {
   response.end(JSON.stringify(value));
 }
 
+/** One account per browser, per provider (cookies are not kept apart by port). */
+const COOKIE = `fake_${provider}_account`;
+
 const server = createServer((request, response) => {
   void (async () => {
-    const url = new URL(request.url ?? "/", issuer);
-    if (url.pathname === "/o/oauth2/v2/auth") {
+    const url = new URL(request.url ?? "/", base);
+    if (url.pathname === layout.authorize) {
       const q = url.searchParams;
-      const cookie = /(?:^|;\s*)fg_account=([\w-]+)/u.exec(request.headers.cookie ?? "")?.[1];
+      const cookie = new RegExp(String.raw`(?:^|;\s*)${COOKIE}=([\w-]+)`, "u").exec(
+        request.headers.cookie ?? "",
+      )?.[1];
       if (q.get("decision") !== "allow") {
         response.writeHead(200, {
           "content-type": "text/html; charset=utf-8",
-          "set-cookie": `fg_account=${cookie ?? `demo-${b64url(randomBytes(6))}`}; Path=/; HttpOnly; Secure; SameSite=Lax`,
+          "set-cookie": `${COOKIE}=${cookie ?? `demo-${b64url(randomBytes(6))}`}; Path=/; HttpOnly; Secure; SameSite=Lax`,
         });
         response.end(consentPage(q));
         return;
@@ -157,15 +220,23 @@ const server = createServer((request, response) => {
         scope: q.get("scope") ?? "",
         nonce: q.get("nonce") ?? "",
         challenge: q.get("code_challenge") ?? "",
+        offline:
+          provider === "microsoft"
+            ? (q.get("scope") ?? "").split(" ").includes("offline_access")
+            : q.get("access_type") === "offline",
       });
       const back = new URL(q.get("redirect_uri") ?? "");
       back.searchParams.set("code", code);
       back.searchParams.set("state", q.get("state") ?? "");
+      if (provider === "zoho") {
+        back.searchParams.set("location", "eu");
+        back.searchParams.set("accounts-server", base);
+      }
       response.writeHead(302, { location: back.toString() });
       response.end();
       return;
     }
-    if (url.pathname === "/token" && request.method === "POST") {
+    if (url.pathname === layout.token && request.method === "POST") {
       const form = await body(request);
       if (form.get("grant_type") === "refresh_token") {
         const refresh = form.get("refresh_token") ?? "";
@@ -202,7 +273,7 @@ const server = createServer((request, response) => {
       const issued = issueTokens(grant.sub);
       json(response, 200, {
         access_token: issued.access,
-        refresh_token: issued.refresh,
+        ...(grant.offline ? { refresh_token: issued.refresh } : {}),
         expires_in: 3599,
         token_type: "Bearer",
         scope: grant.scope,
@@ -210,53 +281,52 @@ const server = createServer((request, response) => {
       });
       return;
     }
-    if (url.pathname === "/revoke" && request.method === "POST") {
-      json(response, 200, {});
-      return;
-    }
-    if (url.pathname === "/v1/userinfo") {
-      const sub = bearer(request);
-      if (sub === undefined) {
-        json(response, 401, { error: "invalid_token" });
-        return;
-      }
-      json(response, 200, { sub, email: person.email, email_verified: true, name: person.name });
-      return;
-    }
-    if (url.pathname.startsWith("/gmail/v1/users/me/")) {
-      const sub = bearer(request);
-      if (sub === undefined) {
-        json(response, 401, { error: { code: 401, message: "Invalid Credentials" } });
-        return;
-      }
-      if (handleGmail(request, url, response, mailboxOf(sub))) {
-        return;
-      }
-    }
-    if (url.pathname.startsWith("/images/")) {
-      const image = demoImage(url.pathname.slice("/images/".length));
-      if (image !== undefined) {
-        response.writeHead(200, { "content-type": image.type, "cache-control": "no-store" });
-        response.end(Buffer.from(image.body, "latin1"));
-        if (url.pathname.endsWith("track.png")) {
-          console.log("fake Google: a tracking pixel was loaded");
-        }
-        return;
-      }
-    }
-    if (url.pathname === "/fake/deliver" && request.method === "POST") {
-      const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
-      json(response, 200, { delivered });
-      return;
-    }
-    if (url.pathname === "/oauth2/v3/certs") {
+    if (url.pathname === layout.keys) {
       json(response, 200, { keys: [jwk] });
       return;
+    }
+    if (provider === "google") {
+      if (url.pathname === "/revoke" && request.method === "POST") {
+        json(response, 200, {});
+        return;
+      }
+      if (url.pathname === "/v1/userinfo") {
+        const sub = bearer(request);
+        if (sub === undefined) {
+          json(response, 401, { error: "invalid_token" });
+          return;
+        }
+        json(response, 200, { sub, email: person.email, email_verified: true, name: person.name });
+        return;
+      }
+      if (url.pathname.startsWith("/gmail/v1/users/me/")) {
+        const sub = bearer(request);
+        if (sub === undefined) {
+          json(response, 401, { error: { code: 401, message: "Invalid Credentials" } });
+          return;
+        }
+        if (handleGmail(request, url, response, mailboxOf(sub))) {
+          return;
+        }
+      }
+      if (url.pathname.startsWith("/images/")) {
+        const image = demoImage(url.pathname.slice("/images/".length));
+        if (image !== undefined) {
+          response.writeHead(200, { "content-type": image.type, "cache-control": "no-store" });
+          response.end(Buffer.from(image.body, "latin1"));
+          return;
+        }
+      }
+      if (url.pathname === "/fake/deliver" && request.method === "POST") {
+        const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
+        json(response, 200, { delivered });
+        return;
+      }
     }
     json(response, 404, { error: "not_found" });
   })();
 });
 
 server.listen(port, "127.0.0.1", () => {
-  console.log(`fake Google (development only) on ${issuer}`);
+  console.log(`fake ${NAMES[provider]} (development only) on ${base}`);
 });

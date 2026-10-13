@@ -40,7 +40,8 @@
     },
     "language": "Langue",
     "signOut": "Se déconnecter",
-    "signingOut": "Déconnexion…"
+    "signingOut": "Déconnexion…",
+    "waysIn": "Moyens de connexion"
   },
   "home": {
     "title": "Rien n’a encore besoin de vous",

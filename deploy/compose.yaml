@@ -11,6 +11,11 @@ services:
   server:
     image: ghcr.io/notacamp/campbooks:next
     restart: unless-stopped
+    # Behind a reverse proxy, set CAMPBOOKS_TRUSTED_PROXIES in .env to the
+    # proxy's address or network (comma-separated addresses or CIDR blocks,
+    # e.g. the Docker network the proxy reaches this container over). Without
+    # it every request seems to come from the proxy, and the sign-in rate
+    # limits count all clients as one.
     env_file: .env
     environment:
       # Two logins (ADR 0011). The server queries as `campbooks_runtime`, a

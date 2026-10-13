@@ -1,17 +1,20 @@
 //! `POST /api/v1/w/{workspace_id}/connections/authorizations` — start
-//! connecting an outside account: the provider's authorize URL, bound to the
-//! calling member and workspace. Google sends the browser back to the web
-//! app's callback page, which completes it with
-//! `connectors.complete_connection`.
+//! connecting an outside account. The consent itself goes through the
+//! identity module's front door (ADR 0014): this checks what the connectors
+//! module owns (a member, offered capabilities, a connection of theirs to
+//! extend) and hands over through the kernel's consent-door port. The
+//! provider redirects to the identity module, which links the account as a
+//! way in and hands the grant back through the grant-intake port.
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
-    crypto::{self, Cipher},
+    auth::Principal,
+    connections::ConsentRequest,
     db::BeginFor as _,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
-use chrono::{DateTime, TimeDelta, Utc};
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -20,14 +23,11 @@ use crate::{
     deps::Deps,
     domain::{
         connections,
-        model::{AuthorizationId, Capability, ConnectionId, Provider},
+        model::{Capability, ConnectionId, Provider},
     },
-    google::{self, IDENTITY_SCOPES},
+    google,
     scopes::ConnectorsWrite,
 };
-
-/// How long a started consent may take.
-pub const AUTHORIZATION_LIFETIME: TimeDelta = TimeDelta::minutes(10);
 
 /// What to connect.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -37,8 +37,8 @@ pub struct StartConnection {
     pub provider: Provider,
     /// The capabilities to ask for (`messages` is offered today).
     pub capabilities: Vec<Capability>,
-    /// An existing connection of yours to extend (incremental consent);
-    /// the same account must consent.
+    /// An existing connection of yours to re-authorise; the same account
+    /// must consent.
     #[serde(default)]
     pub connection: Option<ConnectionId>,
 }
@@ -46,11 +46,11 @@ pub struct StartConnection {
 /// A started consent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct StartedConnection {
-    /// The started authorization.
-    pub authorization: AuthorizationId,
-    /// Where to send the browser.
+    /// Where to send the browser: this instance's front door
+    /// (`/auth/start/{provider}?link=…`), which comes back with
+    /// `connected=<connection id>` or `link_error=<code>`.
     pub authorize_url: String,
-    /// When the consent must be completed by.
+    /// When the consent must be started by.
     pub expires_at: DateTime<Utc>,
 }
 
@@ -71,12 +71,15 @@ pub struct StartedConnection {
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
-        (status = FORBIDDEN, description = "Missing scope, or a client token \
-            (`connection_needs_user`).", body = Problem, content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, a client token \
+            (`connection_needs_user`), or a sign-in more than ten minutes old for a new \
+            connection (`step_up_required`).", body = Problem,
+            content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such workspace, or no such connection of yours.",
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "The provider is not configured on this instance \
-            (`provider_not_configured`).", body = Problem, content_type = "application/problem+json"),
+            (`provider_not_configured`), or this instance has no front door for consents \
+            (`mailbox_unsupported`).", body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(
@@ -85,109 +88,79 @@ pub async fn handler(
     workspace: Workspace<ConnectorsWrite>,
     Json(input): Json<StartConnection>,
 ) -> Result<(StatusCode, Json<StartedConnection>)> {
-    let started = execute(&state, &deps, &workspace.access, input).await?;
+    let started = execute(
+        &state,
+        &deps,
+        &workspace.principal,
+        &workspace.access,
+        input,
+    )
+    .await?;
     Ok((StatusCode::CREATED, Json(started)))
 }
 
-/// Start connecting an account for the member of `access`.
+/// Start connecting an account for `principal`, the member of `access`.
 pub async fn execute(
     state: &AppState,
     deps: &Deps,
+    principal: &Principal,
     access: &Access,
     input: StartConnection,
 ) -> Result<StartedConnection> {
     let user = acting_member(access)?;
-    let (Some(google), Some(cipher)) = (&deps.google, &deps.cipher) else {
+    if deps.google.is_none() || deps.cipher.is_none() {
         return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
-    };
+    }
     let mut capabilities = input.capabilities.clone();
     capabilities.sort_unstable();
     capabilities.dedup();
     if capabilities.is_empty() {
         return Err(Error::BadRequest(MESSAGES.reason("capabilities_required")));
     }
-    let mut scopes: Vec<&str> = IDENTITY_SCOPES.to_vec();
     for &capability in &capabilities {
-        let scope = google::capability_scope(capability).ok_or_else(|| {
-            Error::BadRequest(
+        if google::capability_scope(capability).is_none() {
+            return Err(Error::BadRequest(
                 MESSAGES
                     .reason("capability_not_offered")
                     .arg("capability", capability.as_str()),
-            )
-        })?;
-        scopes.push(scope);
+            ));
+        }
     }
-
-    let now = deps.clock.now();
-    let id = AuthorizationId::new();
-    let state_token = crypto::random_token();
-    let verifier = crypto::random_token();
-    let expires_at = now + AUTHORIZATION_LIFETIME;
-    let mut tx = state.db.begin_for(access.workspace).await?;
     if let Some(connection) = input.connection {
+        let mut tx = state.db.begin_for(access.workspace).await?;
         let existing = connections::load(&mut tx, connection).await?;
-        // Only the grantor extends their own grant.
+        tx.commit().await?;
+        // Only the grantor re-authorises their own grant.
         if !existing.is_some_and(|c| c.granted_by == user && c.provider == input.provider) {
             return Err(Error::NotFound);
         }
     }
-    // Expired consents of this workspace go first.
-    sqlx::query!(
-        "DELETE FROM connectors.authorizations WHERE expires_at <= $1",
-        now
-    )
-    .execute(&mut *tx)
-    .await?;
-    let capability_names: Vec<String> =
-        capabilities.iter().map(|c| c.as_str().to_owned()).collect();
-    sqlx::query!(
-        r#"INSERT INTO connectors.authorizations
-               (id, workspace_id, user_id, provider, capabilities, connection_id, state_hash,
-                pkce_verifier, expires_at, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
-        id as AuthorizationId,
-        access.workspace as WorkspaceId,
-        user as UserId,
-        input.provider.as_str(),
-        &capability_names,
-        input.connection as Option<ConnectionId>,
-        crypto::hash(&state_token),
-        seal_verifier(cipher, id, &verifier),
-        expires_at,
-        now,
-    )
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
-    let authorize_url =
-        google.authorize_url(&scopes, &state_token, &crypto::pkce_challenge(&verifier));
-    tracing::info!(workspace = %access.workspace, %user, authorization = %id, "connection started");
+    let started = state
+        .consent
+        .start(
+            state,
+            ConsentRequest {
+                principal: principal.clone(),
+                workspace: access.workspace,
+                provider: input.provider.as_str().to_owned(),
+                connection: input.connection.map(|c| c.to_string()),
+            },
+        )
+        .await?;
+    tracing::info!(workspace = %access.workspace, %user, "connection started");
     Ok(StartedConnection {
-        authorization: id,
-        authorize_url,
-        expires_at,
+        authorize_url: started.url,
+        expires_at: started.expires_at,
     })
 }
 
 /// The calling member: connections are a member's grant, so client tokens
-/// cannot start or complete one.
+/// cannot start one.
 pub fn acting_member(access: &Access) -> Result<UserId> {
     access
         .user
         .ok_or_else(|| Error::Denied(MESSAGES.reason("connection_needs_user")))
 }
 
-/// Associated data of a sealed PKCE verifier.
-fn verifier_context(id: AuthorizationId) -> Vec<u8> {
-    format!("connectors.authorizations:pkce_verifier:{id}").into_bytes()
-}
-
-/// Seal the PKCE verifier of authorization `id`.
-pub fn seal_verifier(cipher: &Cipher, id: AuthorizationId, verifier: &str) -> Vec<u8> {
-    cipher.seal(verifier, &verifier_context(id))
-}
-
-/// Open the PKCE verifier of authorization `id`.
-pub fn open_verifier(cipher: &Cipher, id: AuthorizationId, sealed: &[u8]) -> Option<String> {
-    cipher.open(sealed, &verifier_context(id)).ok()
-}
+#[cfg(test)]
+mod tests;

@@ -146,3 +146,31 @@ pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Resul
     .await?;
     Ok(())
 }
+
+/// End every live session signed in with provider identity `identity_id`
+/// and revoke the refresh tokens issued in them (the way in is being
+/// removed: whoever signed in with it is signed out). How many ended.
+pub async fn end_signed_in_with(
+    conn: &mut PgConnection,
+    identity_id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<usize> {
+    let ended: Vec<Uuid> = sqlx::query_scalar(
+        "UPDATE identity.sessions SET ended_at = $2
+          WHERE provider_identity_id = $1 AND ended_at IS NULL
+         RETURNING id",
+    )
+    .bind(identity_id)
+    .bind(now)
+    .fetch_all(&mut *conn)
+    .await?;
+    sqlx::query(
+        "UPDATE identity.refresh_families SET revoked_at = $2, revoke_reason = 'way_in_removed'
+          WHERE session_id = ANY($1) AND revoked_at IS NULL",
+    )
+    .bind(&ended)
+    .bind(now)
+    .execute(conn)
+    .await?;
+    Ok(ended.len())
+}

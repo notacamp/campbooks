@@ -9,11 +9,12 @@ use crate::{
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
-    connections::{GrantIntakePort, NoGrantIntake},
+    connections::{ConsentDoorPort, GrantIntakePort, NoConsentDoor, NoGrantIntake},
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
+    rate_limit::RateLimits,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
     tenancy::{MembershipPort, NoMembership},
@@ -56,10 +57,17 @@ pub struct AppState {
     /// server registers the `connectors` module's implementation; until
     /// then no mailbox can be connected that way.
     pub grants: GrantIntakePort,
+    /// Starts provider consents for other modules (the identity module's
+    /// front door). Until the server registers it, none can start.
+    pub consent: ConsentDoorPort,
     /// Answers whether an address has a pending invitation. The server
     /// registers the `workspaces` module's implementation; until then
     /// nobody is invited.
     pub invitations: InvitationsPort,
+    /// Counts hits of endpoints anyone can call ([`rate_limit`](crate::rate_limit)).
+    /// The server installs one keyed by the instance secret, shared by all
+    /// its processes; until then it counts per process.
+    pub rate_limits: RateLimits,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -81,10 +89,12 @@ impl AppState {
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
             grants: Arc::new(NoGrantIntake),
+            consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
             locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
             operations: Operations::default(),
+            rate_limits: RateLimits::default(),
         }
     }
 
@@ -100,6 +110,13 @@ impl AppState {
     #[must_use]
     pub fn with_grant_intake(mut self, grants: GrantIntakePort) -> Self {
         self.grants = grants;
+        self
+    }
+
+    /// The same state, starting provider consents through `consent`.
+    #[must_use]
+    pub fn with_consent_door(mut self, consent: ConsentDoorPort) -> Self {
+        self.consent = consent;
         self
     }
 
@@ -130,6 +147,13 @@ impl AppState {
     #[must_use]
     pub fn with_locales(mut self, locales: LocalePreferencePort) -> Self {
         self.locales = locales;
+        self
+    }
+
+    /// The same state, counting rate limits with `rate_limits`.
+    #[must_use]
+    pub fn with_rate_limits(mut self, rate_limits: RateLimits) -> Self {
+        self.rate_limits = rate_limits;
         self
     }
 

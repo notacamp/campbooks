@@ -33,6 +33,9 @@ tower-http = { version = "0.7.1", features = ["request-id", "timeout", "compress
 http-body-util = "0.1.5"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "json", "charset"] }
 url = { version = "2.5.8", features = ["serde"] }
+# CIDR blocks of trusted reverse proxies (rate limits); already in the graph
+# through reqwest.
+ipnet = "2.12.2"
 
 # OpenAPI
 utoipa = { version = "6.0.0", features = ["axum_extras", "uuid", "chrono", "url"] }

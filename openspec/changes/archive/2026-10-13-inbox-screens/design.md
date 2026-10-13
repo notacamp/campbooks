@@ -134,7 +134,7 @@ Defaults reused: J/K, Enter, E (Done = archive), R (reply), Z (undo), Esc,
 1 (take the suggestion). Module shortcuts (`modules/conversations/
 shortcuts.ts`): S `conversations.star` (toggle), U
 `conversations.mark_unread` (toggle read), M `conversations.move_to_stream`
-(then 1–4 in the menu), A `item.reply_all`, F `item.forward`, Shift+I
+(then 1–4 in the menu), Shift+R `item.reply_all`, F `item.forward`, Shift+I
 `inbox.show_images`, G then 1–4 `inbox.stream.*`. Bare 1–4 for streams (as
 the prototype sketches) would collide with `item.choice1/2`, which the note's
 choice uses; the registry refuses the conflict, so streams take G then 1–4.
@@ -148,7 +148,7 @@ ReplySlotContext) => ReactNode`. The context carries `workspaceId`,
 "reply" | "reply_all" | "forward", messageId, nonce} | null`, plus
 `onClose()`. `InboxScreen` takes `renderReplySlot` (and `composeAction` for a
 "New message" button in the list header); the reader renders the slot at the
-end of the thread and owns the Reply/Reply all/Forward buttons and R/A/F,
+end of the thread and owns the Reply/Reply all/Forward buttons and R/Shift+R/F,
 which set `request`; without a renderer those buttons are hidden. The reader
 remounts per conversation (keyed), so the slot does too.
 

@@ -31,14 +31,16 @@ export function buildModuleRoutes<
   const { root, workspace } = parents;
   // After a workspace is created, `identity` offers the mailbox held since sign-up.
   const workspaces = buildWorkspacesRoutes({ root, workspace, afterCreate: MailboxStep });
+  const identity = buildIdentityRoutes({ public: parents.public, workspace });
   return {
     // Signed in or not: signing in, creating an account.
-    public: [...buildIdentityRoutes(parents.public)],
+    public: [...identity.public],
     // Pages outside any workspace: status, first run, invitation links.
     root: [...buildSystemRoutes(root), ...workspaces.root],
     // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
     workspace: [
       ...workspaces.workspace,
+      ...identity.workspace,
       ...buildConversationsRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.

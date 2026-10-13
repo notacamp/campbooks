@@ -37,7 +37,7 @@ pub struct TokenVerifier {
 }
 
 pub(super) struct Inner {
-    issuer: String,
+    pub(super) issuer: String,
     audience: String,
     leeway_seconds: u64,
     keys: Jwks,
@@ -170,6 +170,21 @@ impl Inner {
         allowed_types: &[&str],
         require_iat: bool,
     ) -> Result<T, Error> {
+        self.decode_from(token, &self.issuer, audience, allowed_types, require_iat)
+            .await
+    }
+
+    /// [`decode`](Self::decode) for tokens of `issuer` instead of the
+    /// configured one, still signed by one of this verifier's keys (a
+    /// multi-tenant provider publishes one key set for many issuers).
+    pub(super) async fn decode_from<T: DeserializeOwned>(
+        &self,
+        token: &str,
+        issuer: &str,
+        audience: &str,
+        allowed_types: &[&str],
+        require_iat: bool,
+    ) -> Result<T, Error> {
         let invalid = || Error::Unauthorized(AuthFailure::InvalidToken);
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
@@ -185,7 +200,7 @@ impl Inner {
         let key = self.keys.key(kid, header.alg).await?.ok_or_else(invalid)?;
 
         let mut validation = Validation::new(header.alg);
-        validation.set_issuer(&[&self.issuer]);
+        validation.set_issuer(&[issuer]);
         validation.set_audience(&[audience]);
         validation.set_required_spec_claims(&["exp", "iss", "aud"]);
         validation.validate_nbf = true;
@@ -230,6 +245,7 @@ pub(super) fn is_allowed_type(typ: &str, allowed: &[&str]) -> bool {
 #[derive(Debug, Deserialize)]
 struct Claims {
     exp: Option<i64>,
+    auth_time: Option<i64>,
     sub: Option<String>,
     azp: Option<String>,
     scope: Option<String>,
@@ -304,6 +320,12 @@ impl Claims {
             expires_at: self
                 .exp
                 .and_then(|exp| chrono::DateTime::from_timestamp(exp, 0)),
+            auth_time: match kind {
+                PrincipalKind::User => self
+                    .auth_time
+                    .and_then(|at| chrono::DateTime::from_timestamp(at, 0)),
+                PrincipalKind::Client => None,
+            },
         })
     }
 }
@@ -330,6 +352,27 @@ mod tests {
         assert!(principal.has_scope("openid"));
         assert!(!principal.has_scope("mail:read"));
         assert_eq!(principal.workspace, None);
+    }
+
+    #[test]
+    fn a_users_auth_time_is_kept_and_a_clients_is_not() {
+        let user = claims(serde_json::json!({
+            "sub": "user-1", "azp": "campbooks-web", "auth_time": 1_700_000_000
+        }))
+        .into_principal()
+        .unwrap();
+        assert_eq!(
+            user.auth_time,
+            chrono::DateTime::from_timestamp(1_700_000_000, 0)
+        );
+        let none = claims(serde_json::json!({ "sub": "user-1" }))
+            .into_principal()
+            .unwrap();
+        assert_eq!(none.auth_time, None);
+        let client = claims(serde_json::json!({ "azp": "acme-sync", "auth_time": 1_700_000_000 }))
+            .into_principal()
+            .unwrap();
+        assert_eq!(client.auth_time, None);
     }
 
     #[test]
