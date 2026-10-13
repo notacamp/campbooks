@@ -7,8 +7,8 @@ use std::sync::Arc;
 use campbooks_kernel::{
     RecordRef,
     authz::{
-        Action, Facts, FactsFuture, Grant, Grantee, Owner, OwnerFact, ResourceFacts,
-        ResourceType, Resources, Tenancy,
+        Action, Facts, FactsFuture, Grant, Grantee, Owner, OwnerFact, ResourceFacts, ResourceType,
+        Resources, Tenancy,
     },
     tenancy::{Access, Role, UserId, WorkspaceId},
 };

@@ -50,9 +50,7 @@ use crate::{
 };
 
 /// What a caller does to a resource.
-#[derive(
-    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Action {
     /// See it (and know it exists).
@@ -315,7 +313,10 @@ pub struct Resources {
 impl fmt::Debug for Resources {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Resources")
-            .field("types", &self.types.iter().map(|t| t.name).collect::<Vec<_>>())
+            .field(
+                "types",
+                &self.types.iter().map(|t| t.name).collect::<Vec<_>>(),
+            )
             .field("facts", &self.facts.is_some())
             .finish()
     }
@@ -364,7 +365,10 @@ impl Catalogue {
                     .insert(declared.name, (*declared, resources.facts.clone()))
                     .is_some()
                 {
-                    return Err(format!("resource type `{}` is declared twice", declared.name));
+                    return Err(format!(
+                        "resource type `{}` is declared twice",
+                        declared.name
+                    ));
                 }
             }
         }
@@ -378,9 +382,10 @@ impl Catalogue {
     fn check(&self) -> Result<(), String> {
         for (declared, _) in self.types.values() {
             for grant in declared.grants {
-                let role = match grant.to {
-                    Grantee::ContainerRole(role) | Grantee::OwnerWithContainerRole(role) => role,
-                    _ => continue,
+                let (Grantee::ContainerRole(role) | Grantee::OwnerWithContainerRole(role)) =
+                    grant.to
+                else {
+                    continue;
                 };
                 let ladder = declared
                     .container
@@ -459,14 +464,19 @@ fn workspace_rank(role: Role) -> u8 {
 }
 
 /// The actions `access` may take on a resource of `declared` with `facts`.
-fn allowed(catalogue: &Catalogue, declared: &ResourceType, access: &Access, facts: &Facts) -> BTreeSet<Action> {
+fn allowed(
+    catalogue: &Catalogue,
+    declared: &ResourceType,
+    access: &Access,
+    facts: &Facts,
+) -> BTreeSet<Action> {
     let is_owner = match (&facts.owner, declared.owner) {
-        (_, Owner::Nobody) => false,
         (_, Owner::WorkspaceOwners) => access.role == Some(Role::Owner),
         (OwnerFact::User(owner), Owner::Member) => access.user == Some(*owner),
         (OwnerFact::Clients, Owner::Member) => access.user.is_none(),
         // Account resources are answered for the caller's own account only.
         (OwnerFact::Subject(_), Owner::Account) => true,
+        // Nobody owns it, or the fact does not fit the declaration.
         _ => false,
     };
     let container_rank = facts
@@ -550,7 +560,13 @@ pub async fn authorize(
         return Ok(Decision::NotFound);
     };
     let facts = port.facts(conn, access, resource).await?;
-    let decision = decide(catalogue, access, action, &resource.record_type, facts.as_ref());
+    let decision = decide(
+        catalogue,
+        access,
+        action,
+        &resource.record_type,
+        facts.as_ref(),
+    );
     if decision == Decision::Allow
         && let Some(container) = facts.and_then(|facts| facts.container)
     {
@@ -592,14 +608,15 @@ pub fn authorize_type(
         return Decision::NotFound;
     };
     let possible = |grant: &Grant| grant.actions.contains(&action);
-    let allowed = match access.user {
-        None => declared.grants.iter().any(|grant| {
+    let allowed = if access.user.is_none() {
+        declared.grants.iter().any(|grant| {
             matches!(
                 grant.to,
                 Grantee::Clients | Grantee::OwningClients | Grantee::Anyone
             ) && possible(grant)
-        }),
-        Some(_) => {
+        })
+    } else {
+        {
             let by_owner = match declared.owner {
                 Owner::Member | Owner::Account => declared.owner_actions.contains(&action),
                 Owner::WorkspaceOwners => {
@@ -614,11 +631,12 @@ pub fn authorize_type(
                             Grantee::WorkspaceRole(min) => access
                                 .role
                                 .is_some_and(|role| workspace_rank(role) >= workspace_rank(min)),
-                            Grantee::ContainerRole(_) | Grantee::OwnerWithContainerRole(_) => true,
-                            Grantee::Anyone => true,
-                            Grantee::Clients
-                            | Grantee::OwningClients
-                            | Grantee::InstanceAdmins => false,
+                            Grantee::ContainerRole(_)
+                            | Grantee::OwnerWithContainerRole(_)
+                            | Grantee::Anyone => true,
+                            Grantee::Clients | Grantee::OwningClients | Grantee::InstanceAdmins => {
+                                false
+                            }
                         }
                 })
         }

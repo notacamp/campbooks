@@ -1321,12 +1321,13 @@ async fn a_workspace_transaction_sees_and_writes_only_its_kernel_rows(db: PgPool
     for (table, sql) in [
         ("events", "SELECT DISTINCT workspace_id FROM kernel.events"),
         ("jobs", "SELECT DISTINCT workspace_id FROM kernel.jobs"),
-        ("changes", "SELECT DISTINCT workspace_id FROM kernel.changes"),
+        (
+            "changes",
+            "SELECT DISTINCT workspace_id FROM kernel.changes",
+        ),
     ] {
-        let workspaces: Vec<Option<String>> = sqlx::query_scalar(sql)
-            .fetch_all(&mut *tx)
-            .await
-            .unwrap();
+        let workspaces: Vec<Option<String>> =
+            sqlx::query_scalar(sql).fetch_all(&mut *tx).await.unwrap();
         assert!(
             workspaces
                 .iter()

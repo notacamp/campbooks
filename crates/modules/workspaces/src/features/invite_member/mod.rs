@@ -8,13 +8,13 @@
 //! replaces the invitation and returns a fresh link.
 
 use axum::{Json, extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -24,9 +24,9 @@ use crate::MESSAGES;
 use crate::{
     domain::{
         access::{acting_user, authorize_type, lock_workspace},
-        resources::INVITATION_RECORD,
         invitation::{self, InvitationView, VALIDITY},
         model::InvitationId,
+        resources::INVITATION_RECORD,
         security::{self, SecurityKind},
     },
     scopes::WorkspacesAdmin,

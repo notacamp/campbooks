@@ -17,6 +17,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::paths::ConversationPath,
     domain::{
@@ -29,10 +31,8 @@ use crate::{
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
 };
-use campbooks_kernel::authz::Action;
 use campbooks_kernel::RecordRef;
-use crate::domain::resources;
-use crate::events::CONVERSATION_RECORD;
+use campbooks_kernel::authz::Action;
 
 /// Newest messages returned with a conversation.
 pub const MAX_MESSAGES: i64 = 100;

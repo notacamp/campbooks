@@ -226,7 +226,11 @@ async fn survey(
 }
 
 /// Whether `inbox` was deleted with its connection or kept read-only.
-async fn closed(state: &AppState, workspace: WorkspaceId, inbox: InboxId) -> Result<bool, JobError> {
+async fn closed(
+    state: &AppState,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+) -> Result<bool, JobError> {
     let mut tx = state.db.begin_for(workspace).await?;
     let closed = sqlx::query_scalar!(
         r#"SELECT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)

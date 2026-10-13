@@ -213,6 +213,16 @@ struct Feed {
     _slot: StreamSlot,
 }
 
+/// A change's audience as stored.
+enum RowAudience {
+    /// Everyone the other rules admit.
+    Everyone,
+    /// This audience.
+    Only(Audience),
+    /// One this version cannot read: nobody.
+    Unknown,
+}
+
 /// A change as read from `kernel.changes`.
 struct Row {
     seq: i64,
@@ -220,9 +230,8 @@ struct Row {
     record: RecordRef,
     op: ChangeOp,
     container: Option<RecordRef>,
-    /// `None`: no audience; `Some(None)`: an audience this version cannot
-    /// read (shown to nobody).
-    audience: Option<Option<Audience>>,
+    /// Who it is private to.
+    audience: RowAudience,
 }
 
 impl Feed {
@@ -313,9 +322,11 @@ impl Feed {
                     .container_type
                     .zip(row.container_id)
                     .map(|(t, id)| RecordRef { record_type: t, id }),
-                audience: row.audience.as_deref().map(|kind| {
-                    Audience::from_columns(kind, row.audience_user.as_deref())
-                }),
+                audience: match row.audience.as_deref() {
+                    None => RowAudience::Everyone,
+                    Some(kind) => Audience::from_columns(kind, row.audience_user.as_deref())
+                        .map_or(RowAudience::Unknown, RowAudience::Only),
+                },
             })
             .collect();
         self.cursor = last;
@@ -355,10 +366,10 @@ impl Feed {
             }
         }
         // A container shown before and hidden now: drop the client's cache.
-        let lost = page_containers
+        let out_of_sight = page_containers
             .iter()
             .any(|(container, visible)| !visible && self.shown.contains(container));
-        if lost {
+        if out_of_sight {
             self.lost_sight();
         }
         if !self.out.is_empty() {
@@ -380,29 +391,27 @@ impl Feed {
         {
             return Ok(false);
         }
-        match row.audience {
-            None => {}
-            Some(None) => return Ok(false),
-            Some(Some(audience)) => {
-                if !audience.admits(&self.subscription.access) {
-                    return Ok(false);
-                }
-            }
+        let admitted = match row.audience {
+            RowAudience::Everyone => true,
+            RowAudience::Unknown => false,
+            RowAudience::Only(audience) => audience.admits(&self.subscription.access),
+        };
+        if !admitted {
+            return Ok(false);
         }
         let Some(container) = &row.container else {
             return Ok(true);
         };
-        let visible = match page.get(container) {
-            Some(visible) => *visible,
-            None => {
-                let visible = self
-                    .state
-                    .visibility
-                    .container_visible(&self.state.db, &self.subscription.access, container)
-                    .await?;
-                page.insert(container.clone(), visible);
-                visible
-            }
+        let visible = if let Some(visible) = page.get(container) {
+            *visible
+        } else {
+            let visible = self
+                .state
+                .visibility
+                .container_visible(&self.state.db, &self.subscription.access, container)
+                .await?;
+            page.insert(container.clone(), visible);
+            visible
         };
         if visible {
             self.shown.insert(container.clone());

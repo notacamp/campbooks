@@ -11,14 +11,14 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::access::visible_inboxes,
     model::{InboxId, Stream},
     scopes::ConversationsRead,
 };
 use campbooks_kernel::authz::Action;
-use crate::domain::resources;
-use crate::events::CONVERSATION_RECORD;
 
 /// Which inbox.
 #[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]

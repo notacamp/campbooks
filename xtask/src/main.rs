@@ -235,25 +235,7 @@ fn run_arch(root: &Path) -> Result<String> {
         .unwrap_or_default();
     violations.extend(arch::check_background(&background));
     if let Ok(registry) = &registry {
-        let published: Vec<arch::EventDecl> = registry
-            .published()
-            .iter()
-            .map(|e| arch::EventDecl {
-                by: e.module.to_owned(),
-                name: e.name.to_owned(),
-                version: e.version,
-            })
-            .collect();
-        let consumed: Vec<arch::EventDecl> = registry
-            .consumers()
-            .iter()
-            .map(|c| arch::EventDecl {
-                by: c.name.to_owned(),
-                name: c.event.to_owned(),
-                version: c.event_version,
-            })
-            .collect();
-        violations.extend(arch::check_events(&published, &consumed));
+        violations.extend(event_violations(registry));
     }
     violations.extend(arch::check_versions(&version, &crates));
 
@@ -301,6 +283,29 @@ fn run_arch(root: &Path) -> Result<String> {
     )
 }
 
+/// Every consumed event is published, at the version read.
+fn event_violations(registry: &campbooks_kernel::jobs::Registry) -> Vec<String> {
+    let published: Vec<arch::EventDecl> = registry
+        .published()
+        .iter()
+        .map(|e| arch::EventDecl {
+            by: e.module.to_owned(),
+            name: e.name.to_owned(),
+            version: e.version,
+        })
+        .collect();
+    let consumed: Vec<arch::EventDecl> = registry
+        .consumers()
+        .iter()
+        .map(|c| arch::EventDecl {
+            by: c.name.to_owned(),
+            name: c.event.to_owned(),
+            version: c.event_version,
+        })
+        .collect();
+    arch::check_events(&published, &consumed)
+}
+
 /// The rules of ADR 0017: every operation declares a catalogued resource
 /// and action, its handler asks the central check, module code queries
 /// workspace tables only in a workspace transaction, and every published
@@ -325,7 +330,10 @@ fn check_access(
                 .iter()
                 .map(|a| a.as_str().to_owned())
                 .collect();
-            (declared.name.to_owned(), access::Resource { tenancy, actions })
+            (
+                declared.name.to_owned(),
+                access::Resource { tenancy, actions },
+            )
         })
         .collect();
     let mut sources = Vec::new();

@@ -99,12 +99,28 @@ pub async fn execute(
     let resource = RecordRef::new(CONNECTION_RECORD, &id);
     let forbidden = || Error::Denied(MESSAGES.reason("disconnect_owner_only"));
     let mut tx = state.db.begin_for(access.workspace).await?;
-    authz::require(state, &mut tx, access, Action::Disconnect, &resource, forbidden).await?;
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Disconnect,
+        &resource,
+        forbidden,
+    )
+    .await?;
     tx.commit().await?;
     removal::revoke(state, deps, access.workspace, id).await;
     let mut tx = state.db.begin_for(access.workspace).await?;
     // Asked again in the transaction that deletes: the grant may have moved.
-    authz::require(state, &mut tx, access, Action::Disconnect, &resource, forbidden).await?;
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Disconnect,
+        &resource,
+        forbidden,
+    )
+    .await?;
     removal::delete(&mut tx, state, access.workspace, id, mail).await?;
     tx.commit().await?;
     tracing::info!(workspace = %access.workspace, %user, connection = %id, ?mail, "disconnected");

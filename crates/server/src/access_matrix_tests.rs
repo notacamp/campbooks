@@ -207,6 +207,14 @@ impl World {
 
     /// Seed A (every record) and B (its owner).
     async fn seed(&mut self) {
+        self.seed_people().await;
+        let (inbox, connection) = self.seed_mailbox().await;
+        self.seed_records(inbox, connection).await;
+    }
+
+    /// Everyone: A's members, B's owner, a person in no workspace and an
+    /// instance administrator.
+    async fn seed_people(&mut self) {
         self.users.clear();
         let db = self.db.clone();
         let run = Uuid::now_v7().simple().to_string();
@@ -221,16 +229,25 @@ impl World {
         join(&db, self.b, bo, Role::Owner).await;
         user(&db, &format!("eve-{run}")).await;
         user(&db, &format!("ivy-{run}")).await;
-        sqlx::query(
-            "INSERT INTO admin.profiles (account_id, permissions, granted_at, updated_at)
-             VALUES ($1, '{super}', now(), now())",
+        // An instance administrator, as `campbooks-server admin grant` makes one.
+        let mut conn = db.acquire().await.unwrap();
+        campbooks_admin::cli::grant(
+            &mut conn,
+            &format!("ivy-{run}"),
+            &[campbooks_kernel::admin::Permission::Super],
+            None,
+            chrono::Utc::now(),
         )
-        .bind(format!("ivy-{run}"))
-        .execute(&db)
         .await
         .unwrap();
         self.run.clone_from(&run);
+    }
 
+    /// The connector's mailbox: an inbox with the `en` fixture, fed by a
+    /// connection.
+    async fn seed_mailbox(&mut self) -> (campbooks_conversations::model::InboxId, Uuid) {
+        let db = self.db.clone();
+        let run = self.run.clone();
         let u = |who: Who| self.users[&who];
         let (connector, reader, sender) = (u(Who::Connector), u(Who::Reader), u(Who::Sender));
         let inbox = dev::create_inbox(
@@ -271,21 +288,27 @@ impl World {
             .execute(&db)
             .await
             .unwrap();
+        (inbox, connection)
+    }
 
+    /// A message (`en-1`), its conversation, an attachment, a decision and a
+    /// label of `inbox`, as ingested.
+    async fn inside(&self, inbox: campbooks_conversations::model::InboxId) -> [String; 5] {
+        let db = &self.db;
         let message = scalar(
-            &db,
+            db,
             "SELECT id::text FROM conversations.messages WHERE inbox_id = $1 AND provider_message_id = 'en-1'",
             *inbox.as_uuid(),
         )
         .await;
         let conversation = scalar(
-            &db,
+            db,
             "SELECT conversation_id::text FROM conversations.messages WHERE inbox_id = $1 AND provider_message_id = 'en-1'",
             *inbox.as_uuid(),
         )
         .await;
         let attachment = scalar(
-            &db,
+            db,
             "SELECT a.id::text FROM conversations.attachments a
                JOIN conversations.messages m ON m.id = a.message_id
               WHERE m.inbox_id = $1 LIMIT 1",
@@ -293,7 +316,7 @@ impl World {
         )
         .await;
         let decision = scalar(
-            &db,
+            db,
             "SELECT d.id::text FROM conversations.decisions d
                JOIN conversations.messages m ON m.id = d.message_id
               WHERE m.inbox_id = $1 LIMIT 1",
@@ -301,11 +324,25 @@ impl World {
         )
         .await;
         let label = scalar(
-            &db,
+            db,
             "SELECT id::text FROM conversations.labels WHERE inbox_id = $1 LIMIT 1",
             *inbox.as_uuid(),
         )
         .await;
+        [message, conversation, attachment, decision, label]
+    }
+
+    /// One record of every other type, and what the inbox holds.
+    async fn seed_records(
+        &mut self,
+        inbox: campbooks_conversations::model::InboxId,
+        connection: Uuid,
+    ) {
+        let db = self.db.clone();
+        let run = self.run.clone();
+        let u = |who: Who| self.users[&who];
+        let sender = u(Who::Sender);
+        let [message, conversation, attachment, decision, label] = self.inside(inbox).await;
         let correction = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO conversations.corrections
@@ -395,7 +432,10 @@ impl World {
     /// made it.
     fn truth(&self, resource_type: &str, who: Who) -> Facts {
         let u = |w: Who| self.users[&w];
-        let inbox = RecordRef::new("conversations.inbox", &self.instances["conversations.inbox"]);
+        let inbox = RecordRef::new(
+            "conversations.inbox",
+            &self.instances["conversations.inbox"],
+        );
         let role = who.inbox_role().map(ToOwned::to_owned);
         match resource_type {
             "workspaces.member" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
@@ -403,7 +443,9 @@ impl World {
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
             }
-            "conversations.draft" => Facts::owned_by(OwnerFact::User(u(Who::Sender))).within(inbox, role),
+            "conversations.draft" => {
+                Facts::owned_by(OwnerFact::User(u(Who::Sender))).within(inbox, role)
+            }
             name if name.starts_with("conversations.") => {
                 Facts::owned_by(OwnerFact::Nobody).within(inbox, role)
             }
@@ -547,7 +589,11 @@ async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgP
             "conversations.message",
             "conversations.draft",
         ] {
-            assert_eq!(ask(who, Action::Read, name).await, Decision::NotFound, "{who:?} {name}");
+            assert_eq!(
+                ask(who, Action::Read, name).await,
+                Decision::NotFound,
+                "{who:?} {name}"
+            );
         }
         assert_eq!(
             ask(who, Action::Disconnect, "connectors.connection").await,
@@ -559,9 +605,18 @@ async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgP
         ask(Who::Connector, Action::Disconnect, "connectors.connection").await,
         Decision::Allow
     );
-    assert_eq!(ask(Who::Sender, Action::Send, "conversations.draft").await, Decision::Allow);
-    assert_eq!(ask(Who::Connector, Action::Read, "conversations.draft").await, Decision::NotFound);
-    assert_eq!(ask(Who::Reader, Action::Write, "conversations.conversation").await, Decision::Forbidden);
+    assert_eq!(
+        ask(Who::Sender, Action::Send, "conversations.draft").await,
+        Decision::Allow
+    );
+    assert_eq!(
+        ask(Who::Connector, Action::Read, "conversations.draft").await,
+        Decision::NotFound
+    );
+    assert_eq!(
+        ask(Who::Reader, Action::Write, "conversations.conversation").await,
+        Decision::Forbidden
+    );
 }
 
 // --- operations × callers ------------------------------------------------------
@@ -576,7 +631,9 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "workspaces.change_role" => json!({"role": "admin"}),
         "workspaces.create" => json!({"name": "New", "kind": "business"}),
         "workspaces.accept_invitation" => json!({"token": "not-a-real-token"}),
-        "connectors.start_connection" => json!({"provider": "google", "capabilities": ["messages"]}),
+        "connectors.start_connection" => {
+            json!({"provider": "google", "capabilities": ["messages"]})
+        }
         "conversations.add_label" => json!({"name": "Matrix"}),
         "conversations.move_to_stream" => json!({"stream": "updates"}),
         "conversations.create_draft" => json!({"kind": "new", "inbox_id": inbox}),
@@ -601,7 +658,9 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.message" => "{message_id}",
         "conversations.attachment" => "{attachment_id}",
         "conversations.draft" => "{draft_id}",
-        "conversations.inbox" if id == "conversations.create_draft" => return world.instances.get(resource).cloned(),
+        "conversations.inbox" if id == "conversations.create_draft" => {
+            return world.instances.get(resource).cloned();
+        }
         _ => return None,
     };
     if id == "workspaces.leave" {
@@ -618,7 +677,10 @@ fn fill(world: &World, path: &str) -> String {
     path.replace("{workspace_id}", &world.a.to_string())
         .replace("{conversation_id}", message_conversation)
         .replace("{message_id}", &world.instances["conversations.message"])
-        .replace("{attachment_id}", &world.instances["conversations.attachment"])
+        .replace(
+            "{attachment_id}",
+            &world.instances["conversations.attachment"],
+        )
         .replace("{draft_id}", &world.instances["conversations.draft"])
         .replace("{connection_id}", &world.instances["connectors.connection"])
         .replace("{label_id}", &world.instances["conversations.label"])
@@ -628,7 +690,14 @@ fn fill(world: &World, path: &str) -> String {
 
 /// What the catalogue says `who` gets from operation (`resource`, `action`)
 /// on `instance` (or on the type, for lists and creations).
-fn expected(world: &World, who: Who, resource: &str, action: Action, instance: Option<&str>, id: &str) -> Decision {
+fn expected(
+    world: &World,
+    who: Who,
+    resource: &str,
+    action: Action,
+    instance: Option<&str>,
+    id: &str,
+) -> Decision {
     let access = world.access(who);
     if id == "workspaces.leave" {
         // The caller's own membership.
@@ -717,7 +786,9 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
             ("a client token of another workspace", world.client(world.b)),
         ];
         for (who, token) in &strangers {
-            let (status, bytes) = world.call(Some(token), &method, &uri, body_now.as_ref()).await;
+            let (status, bytes) = world
+                .call(Some(token), &method, &uri, body_now.as_ref())
+                .await;
             if in_workspace {
                 assert_eq!(status, StatusCode::NOT_FOUND, "{who}: {what}");
                 assert_eq!(bytes, canonical, "{who}: {what}: not the same 404");
@@ -760,7 +831,9 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
                 Who::Client => world.client(world.a),
                 other => world.token(other.subject()),
             };
-            let (status, bytes) = world.call(Some(&token), &method, &uri, body_now.as_ref()).await;
+            let (status, bytes) = world
+                .call(Some(&token), &method, &uri, body_now.as_ref())
+                .await;
             let text = String::from_utf8_lossy(&bytes);
             checks += 1;
             match decision {
@@ -775,11 +848,16 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
                     assert!(
                         !matches!(
                             status,
-                            StatusCode::UNAUTHORIZED | StatusCode::FORBIDDEN | StatusCode::NOT_FOUND
+                            StatusCode::UNAUTHORIZED
+                                | StatusCode::FORBIDDEN
+                                | StatusCode::NOT_FOUND
                         ),
                         "{who:?}: {what}: allowed, but {status} {text}"
                     );
-                    assert!(!status.is_server_error(), "{who:?}: {what}: {status} {text}");
+                    assert!(
+                        !status.is_server_error(),
+                        "{who:?}: {what}: {status} {text}"
+                    );
                 }
             }
             // Nothing of an inbox a caller may not read leaks through a list.

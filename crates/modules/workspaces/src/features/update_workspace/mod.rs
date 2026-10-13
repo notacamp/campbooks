@@ -2,13 +2,13 @@
 //! accent. Owners and admins.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -73,7 +73,14 @@ pub async fn execute(
     let (actor, _) = acting_user(access)?;
     let name = input.name.as_deref().map(workspace_name).transpose()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    authorize(state, &mut tx, access, Action::Write, &workspace_resource(access)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Write,
+        &workspace_resource(access),
+    )
+    .await?;
     lock_workspace(&mut tx, access.workspace).await?;
     let changed = sqlx::query!(
         r#"WITH old AS (SELECT name, accent FROM workspaces.workspaces WHERE id = $1)

@@ -99,9 +99,7 @@ pub struct MemberLeft {
 }
 
 /// What becomes of a departing member's mail (campbooks-cloud#117).
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema,
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MailChoice {
     /// Delete it with their connections (the default).

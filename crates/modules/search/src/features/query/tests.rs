@@ -746,7 +746,12 @@ async fn a_removed_inbox_leaves_the_index(db: PgPool) {
             Conversation::new(
                 inbox,
                 "Quarterly invoice",
-                vec![Message::new(&format!("m-{id}"), "ops@example.com", "Invoice", 1)],
+                vec![Message::new(
+                    &format!("m-{id}"),
+                    "ops@example.com",
+                    "Invoice",
+                    1,
+                )],
             ),
         )
         .await;

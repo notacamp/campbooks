@@ -9,13 +9,13 @@
 use std::time::Duration;
 
 use axum::{Json, extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Job, JobContext, JobError, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     jobs::{self, EnqueueOptions},
     tenancy::{Access, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -75,7 +75,14 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
     let (user, _) = acting_user(access)?;
     let id = access.workspace;
     let mut tx = state.db.begin_for(id).await?;
-    authorize(state, &mut tx, access, Action::Delete, &workspace_resource(access)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &workspace_resource(access),
+    )
+    .await?;
     lock_workspace(&mut tx, id).await?;
     let purge_after = sqlx::query_scalar!(
         r#"UPDATE workspaces.workspaces

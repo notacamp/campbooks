@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -24,8 +26,6 @@ use crate::{
     scopes::ConversationsRead,
 };
 use campbooks_kernel::authz::Action;
-use crate::domain::resources;
-use crate::events::CONVERSATION_RECORD;
 
 /// Page size when none is asked for.
 pub const DEFAULT_LIMIT: u32 = 50;

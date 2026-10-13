@@ -8,7 +8,10 @@ const BOX: ResourceType = ResourceType {
     roles: &["reader", "writer"],
     grants: &[
         Grant::new(Grantee::ContainerRole("reader"), &[Action::Read]),
-        Grant::new(Grantee::ContainerRole("writer"), &[Action::Read, Action::Write]),
+        Grant::new(
+            Grantee::ContainerRole("writer"),
+            &[Action::Read, Action::Write],
+        ),
         Grant::new(Grantee::Clients, &[Action::Read]),
     ],
     ..ResourceType::new("t.box", "A container.", Tenancy::Workspace)
@@ -38,10 +41,19 @@ const SETTING: ResourceType = ResourceType {
     owner: Owner::WorkspaceOwners,
     owner_actions: &[Action::Read, Action::Write, Action::Delete],
     grants: &[
-        Grant::new(Grantee::WorkspaceRole(Role::Admin), &[Action::Read, Action::Write]),
+        Grant::new(
+            Grantee::WorkspaceRole(Role::Admin),
+            &[Action::Read, Action::Write],
+        ),
         Grant::new(Grantee::WorkspaceRole(Role::Member), &[Action::Read]),
     ],
     ..ResourceType::new("t.setting", "Workspace-wide.", Tenancy::Workspace)
+};
+
+const BAD: ResourceType = ResourceType {
+    container: Some("t.box"),
+    grants: &[Grant::new(Grantee::ContainerRole("owner"), &[Action::Read])],
+    ..ResourceType::new("t.bad", "Names a role the box lacks.", Tenancy::Workspace)
 };
 
 static TYPES: [ResourceType; 4] = [BOX, ITEM, NOTE, SETTING];
@@ -79,7 +91,10 @@ fn unknown_types_and_missing_resources_are_not_found() {
         decide(&c, &ana, Action::Read, "t.unknown", Some(&facts)),
         Decision::NotFound
     );
-    assert_eq!(decide(&c, &ana, Action::Read, "t.item", None), Decision::NotFound);
+    assert_eq!(
+        decide(&c, &ana, Action::Read, "t.item", None),
+        Decision::NotFound
+    );
 }
 
 #[test]
@@ -90,14 +105,23 @@ fn container_roles_grant_exactly_their_actions() {
     let reader = in_box(OwnerFact::Nobody, Some("reader"));
     let writer = in_box(OwnerFact::Nobody, Some("writer"));
     let outsider = in_box(OwnerFact::Nobody, None);
-    assert_eq!(decide(&c, &caller, Action::Read, "t.item", Some(&reader)), Decision::Allow);
+    assert_eq!(
+        decide(&c, &caller, Action::Read, "t.item", Some(&reader)),
+        Decision::Allow
+    );
     assert_eq!(
         decide(&c, &caller, Action::Write, "t.item", Some(&reader)),
         Decision::Forbidden
     );
-    assert_eq!(decide(&c, &caller, Action::Write, "t.item", Some(&writer)), Decision::Allow);
+    assert_eq!(
+        decide(&c, &caller, Action::Write, "t.item", Some(&writer)),
+        Decision::Allow
+    );
     // Higher roles hold the lower ones' grants.
-    assert_eq!(decide(&c, &caller, Action::Read, "t.item", Some(&writer)), Decision::Allow);
+    assert_eq!(
+        decide(&c, &caller, Action::Read, "t.item", Some(&writer)),
+        Decision::Allow
+    );
     for action in Action::ALL {
         assert_eq!(
             decide(&c, &caller, action, "t.item", Some(&outsider)),
@@ -112,8 +136,14 @@ fn workspace_admins_get_nothing_inside_containers() {
     let c = catalogue();
     let admin = member(UserId::new(), Role::Owner);
     let facts = in_box(OwnerFact::User(UserId::new()), None);
-    assert_eq!(decide(&c, &admin, Action::Read, "t.box", Some(&facts)), Decision::NotFound);
-    assert_eq!(decide(&c, &admin, Action::Read, "t.item", Some(&facts)), Decision::NotFound);
+    assert_eq!(
+        decide(&c, &admin, Action::Read, "t.box", Some(&facts)),
+        Decision::NotFound
+    );
+    assert_eq!(
+        decide(&c, &admin, Action::Read, "t.item", Some(&facts)),
+        Decision::NotFound
+    );
 }
 
 #[test]
@@ -122,41 +152,92 @@ fn owners_get_their_actions_and_others_do_not_see_private_records() {
     let author = UserId::new();
     let facts = in_box(OwnerFact::User(author), Some("writer"));
     let own = member(author, Role::Member);
-    assert_eq!(decide(&c, &own, Action::Send, "t.note", Some(&facts)), Decision::Allow);
-    assert_eq!(decide(&c, &own, Action::Share, "t.note", Some(&facts)), Decision::Forbidden);
+    assert_eq!(
+        decide(&c, &own, Action::Send, "t.note", Some(&facts)),
+        Decision::Allow
+    );
+    assert_eq!(
+        decide(&c, &own, Action::Share, "t.note", Some(&facts)),
+        Decision::Forbidden
+    );
     // Another writer of the same box, even the workspace's owner.
     let other = member(UserId::new(), Role::Owner);
-    assert_eq!(decide(&c, &other, Action::Read, "t.note", Some(&facts)), Decision::NotFound);
+    assert_eq!(
+        decide(&c, &other, Action::Read, "t.note", Some(&facts)),
+        Decision::NotFound
+    );
     // The author demoted to reader keeps reading and deleting, not sending.
     let demoted = in_box(OwnerFact::User(author), Some("reader"));
-    assert_eq!(decide(&c, &own, Action::Delete, "t.note", Some(&demoted)), Decision::Allow);
-    assert_eq!(decide(&c, &own, Action::Send, "t.note", Some(&demoted)), Decision::Forbidden);
+    assert_eq!(
+        decide(&c, &own, Action::Delete, "t.note", Some(&demoted)),
+        Decision::Allow
+    );
+    assert_eq!(
+        decide(&c, &own, Action::Send, "t.note", Some(&demoted)),
+        Decision::Forbidden
+    );
 }
 
 #[test]
 fn clients_get_their_explicit_grant_only() {
     let c = catalogue();
     let facts = in_box(OwnerFact::User(UserId::new()), None);
-    assert_eq!(decide(&c, &client(), Action::Read, "t.box", Some(&facts)), Decision::Allow);
+    assert_eq!(
+        decide(&c, &client(), Action::Read, "t.box", Some(&facts)),
+        Decision::Allow
+    );
     assert_eq!(
         decide(&c, &client(), Action::Write, "t.box", Some(&facts)),
         Decision::Forbidden
     );
-    assert_eq!(decide(&c, &client(), Action::Read, "t.item", Some(&facts)), Decision::NotFound);
+    assert_eq!(
+        decide(&c, &client(), Action::Read, "t.item", Some(&facts)),
+        Decision::NotFound
+    );
     // A record a client wrote belongs to the clients.
     let written = in_box(OwnerFact::Clients, None);
-    assert_eq!(decide(&c, &client(), Action::Delete, "t.note", Some(&written)), Decision::Allow);
+    assert_eq!(
+        decide(&c, &client(), Action::Delete, "t.note", Some(&written)),
+        Decision::Allow
+    );
     let user = member(UserId::new(), Role::Owner);
-    assert_eq!(decide(&c, &user, Action::Read, "t.note", Some(&written)), Decision::NotFound);
+    assert_eq!(
+        decide(&c, &user, Action::Read, "t.note", Some(&written)),
+        Decision::NotFound
+    );
 }
 
 #[test]
 fn workspace_roles_rank() {
     let c = catalogue();
     let facts = Facts::owned_by(OwnerFact::Nobody);
-    let read = |role| decide(&c, &member(UserId::new(), role), Action::Read, "t.setting", Some(&facts));
-    let write = |role| decide(&c, &member(UserId::new(), role), Action::Write, "t.setting", Some(&facts));
-    let delete = |role| decide(&c, &member(UserId::new(), role), Action::Delete, "t.setting", Some(&facts));
+    let read = |role| {
+        decide(
+            &c,
+            &member(UserId::new(), role),
+            Action::Read,
+            "t.setting",
+            Some(&facts),
+        )
+    };
+    let write = |role| {
+        decide(
+            &c,
+            &member(UserId::new(), role),
+            Action::Write,
+            "t.setting",
+            Some(&facts),
+        )
+    };
+    let delete = |role| {
+        decide(
+            &c,
+            &member(UserId::new(), role),
+            Action::Delete,
+            "t.setting",
+            Some(&facts),
+        )
+    };
     assert_eq!(read(Role::Member), Decision::Allow);
     assert_eq!(write(Role::Member), Decision::Forbidden);
     assert_eq!(write(Role::Admin), Decision::Allow);
@@ -174,30 +255,46 @@ fn frozen_resources_are_read_only() {
     let owner = UserId::new();
     let facts = in_box(OwnerFact::User(owner), Some("writer")).frozen(true);
     let caller = member(owner, Role::Member);
-    assert_eq!(decide(&c, &caller, Action::Read, "t.box", Some(&facts)), Decision::Allow);
-    assert_eq!(decide(&c, &caller, Action::Write, "t.box", Some(&facts)), Decision::Forbidden);
+    assert_eq!(
+        decide(&c, &caller, Action::Read, "t.box", Some(&facts)),
+        Decision::Allow
+    );
+    assert_eq!(
+        decide(&c, &caller, Action::Write, "t.box", Some(&facts)),
+        Decision::Forbidden
+    );
 }
 
 #[test]
 fn type_level_checks_follow_the_grants() {
     let c = catalogue();
     let user = member(UserId::new(), Role::Member);
-    assert_eq!(authorize_type(&c, &user, Action::Read, "t.item"), Decision::Allow);
-    assert_eq!(authorize_type(&c, &client(), Action::Read, "t.box"), Decision::Allow);
-    assert_eq!(authorize_type(&c, &client(), Action::Read, "t.item"), Decision::Forbidden);
-    assert_eq!(authorize_type(&c, &user, Action::Write, "t.setting"), Decision::Forbidden);
-    assert_eq!(authorize_type(&c, &user, Action::Read, "t.nope"), Decision::NotFound);
+    assert_eq!(
+        authorize_type(&c, &user, Action::Read, "t.item"),
+        Decision::Allow
+    );
+    assert_eq!(
+        authorize_type(&c, &client(), Action::Read, "t.box"),
+        Decision::Allow
+    );
+    assert_eq!(
+        authorize_type(&c, &client(), Action::Read, "t.item"),
+        Decision::Forbidden
+    );
+    assert_eq!(
+        authorize_type(&c, &user, Action::Write, "t.setting"),
+        Decision::Forbidden
+    );
+    assert_eq!(
+        authorize_type(&c, &user, Action::Read, "t.nope"),
+        Decision::NotFound
+    );
 }
 
 #[test]
 fn the_catalogue_rejects_duplicates_and_unknown_container_roles() {
     let types: &'static [ResourceType] = Box::leak(Box::new([BOX, BOX]));
     assert!(Catalogue::new([&Resources::declared(types)]).is_err());
-    const BAD: ResourceType = ResourceType {
-        container: Some("t.box"),
-        grants: &[Grant::new(Grantee::ContainerRole("owner"), &[Action::Read])],
-        ..ResourceType::new("t.bad", "Names a role the box lacks.", Tenancy::Workspace)
-    };
     let types: &'static [ResourceType] = Box::leak(Box::new([BOX, BAD]));
     assert!(Catalogue::new([&Resources::declared(types)]).is_err());
 }

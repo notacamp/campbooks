@@ -336,6 +336,15 @@ impl std::fmt::Debug for Registry {
                 "published",
                 &self.published.iter().map(|e| e.name).collect::<Vec<_>>(),
             )
+            .field("resources", &self.resources)
+            .field(
+                "declared",
+                &self
+                    .declared
+                    .iter()
+                    .map(|(owner, _)| owner)
+                    .collect::<Vec<_>>(),
+            )
             .finish()
     }
 }

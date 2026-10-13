@@ -3,13 +3,13 @@
 //! workspace always keeps an owner.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -81,7 +81,14 @@ pub async fn execute(
     let (actor, actor_role) = acting_user(access)?;
     let id = access.workspace;
     let mut tx = state.db.begin_for(id).await?;
-    authorize(state, &mut tx, access, Action::Write, &member_resource(member)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Write,
+        &member_resource(member),
+    )
+    .await?;
     lock_workspace(&mut tx, id).await?;
     let from = role_of(&mut tx, id, member).await?.ok_or(Error::NotFound)?;
     let to = input.role;

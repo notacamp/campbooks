@@ -52,8 +52,10 @@ async fn setup(kit: &Kit) -> Setup {
         .post(
             &sam,
             &format!("/api/v1/w/{workspace}/drafts"),
-            Some(json!({"kind": "new", "inbox_id": inbox, "to": [{"address": "leo@example.com"}],
-                        "subject": "Hello", "body": "Hi Leo"})),
+            Some(
+                json!({"kind": "new", "inbox_id": inbox, "to": [{"address": "leo@example.com"}],
+                        "subject": "Hello", "body": "Hi Leo"}),
+            ),
         )
         .await;
     assert_eq!(draft.status, StatusCode::CREATED, "{:?}", draft.json);
@@ -172,7 +174,10 @@ async fn deleting_a_connections_mail_leaves_nothing_behind(db: PgPool) {
     let kept = kit
         .get(
             &other.sam,
-            &format!("/api/v1/w/{}/conversations/{}", other.workspace, other.conversation),
+            &format!(
+                "/api/v1/w/{}/conversations/{}",
+                other.workspace, other.conversation
+            ),
         )
         .await;
     assert_eq!(kept.status, StatusCode::OK);
@@ -192,9 +197,7 @@ async fn kept_mail_is_read_only_history(db: PgPool) {
     let list = kit.get(&s.sam, &format!("/api/v1/w/{ws}/inboxes")).await;
     assert_eq!(list.json["inboxes"][0]["read_only"], true);
     // Nothing is written or sent.
-    let archived = kit
-        .post(&s.sam, &format!("{path}/archive"), None)
-        .await;
+    let archived = kit.post(&s.sam, &format!("{path}/archive"), None).await;
     assert_eq!(archived.status, StatusCode::FORBIDDEN);
     assert_eq!(archived.json["code"], "inbox_read_only");
     let draft = kit
@@ -268,11 +271,12 @@ async fn a_departed_member_keeps_nothing(db: PgPool) {
     )
     .await;
     assert_eq!(kit.events("conversations.inbox_changed").await.len(), 1);
-    let drafts: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.drafts WHERE author = $1")
-        .bind(s.bea_id.as_uuid())
-        .fetch_one(&kit.db)
-        .await
-        .unwrap();
+    let drafts: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM conversations.drafts WHERE author = $1")
+            .bind(s.bea_id.as_uuid())
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
     assert_eq!(drafts, 0);
     // Back in the workspace (the test membership still admits her), Bea sees
     // none of it: memberships are not restored by coming back.

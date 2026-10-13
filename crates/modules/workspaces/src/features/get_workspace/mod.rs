@@ -1,12 +1,12 @@
 //! `GET /api/v1/w/{workspace_id}` — one workspace, with the caller's role.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 
 use crate::{
     domain::{
@@ -45,7 +45,14 @@ pub async fn handler(
 /// The workspace `access` is for.
 pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceView> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    authorize(state, &mut tx, access, Action::Read, &workspace_resource(access)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Read,
+        &workspace_resource(access),
+    )
+    .await?;
     let view = load(&mut tx, access).await?;
     tx.commit().await?;
     Ok(view)

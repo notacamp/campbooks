@@ -851,17 +851,29 @@ async fn a_replay_needs_the_access_the_first_run_had(db: PgPool) {
 
     // Out of the box: the stored response is not served (the 404 the
     // handler gives), and the operation does not run again either.
-    switches.0.hidden.store(true, std::sync::atomic::Ordering::SeqCst);
+    switches
+        .0
+        .hidden
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     let (status, headers, body) = http.send("POST", &uri, Some("k-box"), None).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
     assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
-    switches.0.hidden.store(false, std::sync::atomic::Ordering::SeqCst);
+    switches
+        .0
+        .hidden
+        .store(false, std::sync::atomic::Ordering::SeqCst);
 
     // Out of the workspace: 404 too.
-    switches.0.left.store(true, std::sync::atomic::Ordering::SeqCst);
+    switches
+        .0
+        .left
+        .store(true, std::sync::atomic::Ordering::SeqCst);
     let (status, ..) = http.send("POST", &uri, Some("k-box"), None).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
-    switches.0.left.store(false, std::sync::atomic::Ordering::SeqCst);
+    switches
+        .0
+        .left
+        .store(false, std::sync::atomic::Ordering::SeqCst);
 
     // Without the scope any more: 403, like the handler.
     let reader = Http {

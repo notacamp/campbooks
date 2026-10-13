@@ -107,10 +107,7 @@ impl Audience {
             Self::UserAndManagers(user) => match access.user {
                 None => true,
                 Some(caller) => {
-                    caller == user
-                        || access
-                            .role
-                            .is_some_and(crate::tenancy::Role::can_manage)
+                    caller == user || access.role.is_some_and(crate::tenancy::Role::can_manage)
                 }
             },
             Self::Clients => access.user.is_none(),

@@ -153,7 +153,9 @@ pub async fn update(
     )
     .execute(&mut *tx)
     .await?;
-    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
+        .await?
+        .view()?;
     tx.commit().await?;
     Ok(Json(draft))
 }

@@ -37,7 +37,11 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     let admin = kit.delete(&cid, &uri).await;
     assert_eq!(admin.status, StatusCode::FORBIDDEN);
     assert_eq!(admin.json["code"], "disconnect_owner_only");
-    assert!(kit.payloads(ws, "connectors.connection_removed").await.is_empty());
+    assert!(
+        kit.payloads(ws, "connectors.connection_removed")
+            .await
+            .is_empty()
+    );
 
     assert_eq!(kit.delete(&ana, &uri).await.status, StatusCode::NO_CONTENT);
     let revoked = kit.google.revoked();
@@ -100,7 +104,10 @@ async fn the_grantor_may_keep_the_mail_read_only(db: PgPool) {
     assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
     assert_eq!(removed[0]["mail"], "keep");
     let bad = kit
-        .delete(&ana, &format!("/api/v1/w/{ws}/connections/{id}?mail=archive"))
+        .delete(
+            &ana,
+            &format!("/api/v1/w/{ws}/connections/{id}?mail=archive"),
+        )
         .await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 }

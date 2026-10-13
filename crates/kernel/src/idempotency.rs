@@ -132,14 +132,22 @@ impl Idempotency {
         parts: &Parts,
         containers: &[RecordRef],
     ) -> Option<Response> {
-        if !operation.scopes.iter().all(|scope| principal.has_scope(scope)) {
+        if !operation
+            .scopes
+            .iter()
+            .all(|scope| principal.has_scope(scope))
+        {
             return Some(crate::Error::Forbidden.into_response());
         }
         let not_found = || Some(crate::Error::NotFound.into_response());
         let Some(workspace) = workspace_of(operation, parts.uri.path()) else {
             // Not a workspace route: nothing else to resolve unless the
             // handler checked containers (it cannot have without one).
-            return if containers.is_empty() { None } else { not_found() };
+            return if containers.is_empty() {
+                None
+            } else {
+                not_found()
+            };
         };
         let Ok(workspace) = workspace.parse::<WorkspaceId>() else {
             return not_found();
@@ -153,7 +161,11 @@ impl Idempotency {
         {
             return not_found();
         }
-        let access = match self.membership.resolve(&self.db, principal, workspace).await {
+        let access = match self
+            .membership
+            .resolve(&self.db, principal, workspace)
+            .await
+        {
             Ok(Some(access)) if access.workspace == workspace => access,
             Ok(_) => return not_found(),
             Err(error) => return Some(error.into_response()),

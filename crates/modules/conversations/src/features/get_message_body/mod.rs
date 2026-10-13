@@ -22,6 +22,8 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::MESSAGE_RECORD;
 use crate::{
     domain::paths::MessagePath,
     domain::{
@@ -34,10 +36,8 @@ use crate::{
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
-use campbooks_kernel::authz::Action;
 use campbooks_kernel::RecordRef;
-use crate::domain::resources;
-use crate::events::MESSAGE_RECORD;
+use campbooks_kernel::authz::Action;
 
 /// Longest body returned, in bytes, per part.
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;

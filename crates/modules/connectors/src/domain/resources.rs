@@ -47,11 +47,7 @@ pub fn facts(granted_by: UserId) -> Facts {
 
 /// Whether `access` may see a connection granted by `granted_by` (the
 /// catalogue's `read`).
-pub fn visible(
-    catalogue: &authz::Catalogue,
-    access: &Access,
-    granted_by: UserId,
-) -> bool {
+pub fn visible(catalogue: &authz::Catalogue, access: &Access, granted_by: UserId) -> bool {
     authz::decide(
         catalogue,
         access,
@@ -118,7 +114,10 @@ mod tests {
         };
         let member = |user| access(Some(user), Some(Role::Member));
         assert_eq!(decide(&member(grantor), Read, grantor), Decision::Allow);
-        assert_eq!(decide(&member(grantor), Disconnect, grantor), Decision::Allow);
+        assert_eq!(
+            decide(&member(grantor), Disconnect, grantor),
+            Decision::Allow
+        );
         assert_eq!(decide(&member(other), Read, grantor), Decision::NotFound);
         for role in [Role::Admin, Role::Owner] {
             let manager = access(Some(other), Some(role));

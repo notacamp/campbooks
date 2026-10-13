@@ -108,9 +108,7 @@ impl Capability {
 /// default), or kept as read-only history. Only the member who connected
 /// it chooses when disconnecting; an owner or admin chooses when removing
 /// that member.
-#[derive(
-    Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema,
-)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum MailChoice {
     /// Delete the inboxes it fed: messages, conversations, drafts,

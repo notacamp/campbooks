@@ -2,13 +2,13 @@
 //! log, newest first. Owners and admins.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result,
     db::BeginFor as _,
     extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
@@ -16,9 +16,7 @@ use utoipa::{IntoParams, ToSchema};
 use crate::MESSAGES;
 
 use crate::{
-    domain::{
-        access::authorize_type, model::SecurityEventId, resources::SECURITY_EVENT_RECORD,
-    },
+    domain::{access::authorize_type, model::SecurityEventId, resources::SECURITY_EVENT_RECORD},
     scopes::WorkspacesAdmin,
 };
 

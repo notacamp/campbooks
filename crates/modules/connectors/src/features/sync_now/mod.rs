@@ -88,7 +88,9 @@ pub async fn execute(
         || Error::Forbidden,
     )
     .await?;
-    let connection = connections::load(&mut tx, id).await?.ok_or(Error::NotFound)?;
+    let connection = connections::load(&mut tx, id)
+        .await?
+        .ok_or(Error::NotFound)?;
     if connection.health == Health::NeedsReauth {
         return Err(Error::Conflict(MESSAGES.reason("needs_reauth")));
     }

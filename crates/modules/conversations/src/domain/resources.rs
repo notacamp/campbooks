@@ -52,7 +52,11 @@ const WRITE_INSIDE: &[Grant] = &[
     Grant::new(Grantee::Clients, &[Read, Write]),
 ];
 
-const fn inside(name: &'static str, description: &'static str, grants: &'static [Grant]) -> ResourceType {
+const fn inside(
+    name: &'static str,
+    description: &'static str,
+    grants: &'static [Grant],
+) -> ResourceType {
     ResourceType {
         container: Some(INBOX_RECORD),
         grants,
@@ -320,7 +324,12 @@ mod tests {
     fn workspace_owners_never_read_an_inbox_they_are_not_in() {
         let catalogue = Catalogue::new([&resources()]).unwrap();
         let owner = member(UserId::new(), Role::Owner);
-        for name in [INBOX_RECORD, CONVERSATION_RECORD, MESSAGE_RECORD, DRAFT_RECORD] {
+        for name in [
+            INBOX_RECORD,
+            CONVERSATION_RECORD,
+            MESSAGE_RECORD,
+            DRAFT_RECORD,
+        ] {
             let decision = decide(
                 &catalogue,
                 &owner,

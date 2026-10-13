@@ -5,23 +5,23 @@
 //! connections. Their inbox memberships and drafts go either way.
 
 use axum::{extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::db::BeginFor as _;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
-use campbooks_kernel::db::BeginFor as _;
 
 use serde::Deserialize;
 use utoipa::IntoParams;
 
 use crate::{
-    events::MailChoice,
     domain::{
         access::{acting_user, authorize, member_resource},
         departure::{Departure, depart},
         model::MemberPath,
     },
+    events::MailChoice,
     scopes::WorkspacesAdmin,
 };
 
@@ -86,7 +86,14 @@ pub async fn execute(
 ) -> Result<()> {
     let (actor, role) = acting_user(access)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    authorize(state, &mut tx, access, Action::Delete, &member_resource(member)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &member_resource(member),
+    )
+    .await?;
     tx.commit().await?;
     let how = if actor == member {
         Departure::Leave

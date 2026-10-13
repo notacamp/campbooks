@@ -3,12 +3,12 @@
 //! an owner first.
 
 use axum::{extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::db::BeginFor as _;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk,
     tenancy::{Access, Workspace, WorkspaceId},
 };
-use campbooks_kernel::authz::Action;
-use campbooks_kernel::db::BeginFor as _;
 
 use crate::{
     domain::{
@@ -51,7 +51,14 @@ pub async fn handler(
 pub async fn execute(state: &AppState, access: &Access) -> Result<()> {
     let (user, _) = acting_user(access)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    authorize(state, &mut tx, access, Action::Delete, &member_resource(user)).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &member_resource(user),
+    )
+    .await?;
     tx.commit().await?;
     depart(state, access.workspace, user, Departure::Leave).await
 }

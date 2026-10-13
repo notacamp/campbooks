@@ -36,10 +36,7 @@ impl EventHandler for ForgetConnection {
     const NAME: &'static str = "conversations.forget_connection";
     const QUEUE: &'static str = "default";
 
-    async fn handle(
-        ctx: &mut JobContext,
-        event: Event<ConnectionRemoved>,
-    ) -> Result<(), JobError> {
+    async fn handle(ctx: &mut JobContext, event: Event<ConnectionRemoved>) -> Result<(), JobError> {
         let removed = event.payload;
         let workspace: WorkspaceId = removed
             .workspace

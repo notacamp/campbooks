@@ -17,8 +17,7 @@ use crate::{
     domain::{redact, resources},
     events::DRAFT_RECORD,
     model::{
-        Address, AttachmentId, ConversationId, DraftId, DraftKind, DraftState, InboxId,
-        MessageId,
+        Address, AttachmentId, ConversationId, DraftId, DraftKind, DraftState, InboxId, MessageId,
     },
 };
 
@@ -271,7 +270,14 @@ pub async fn load(
     lock: bool,
     action: Action,
 ) -> Result<DraftRow> {
-    resources::authorize(state, conn, access, action, &RecordRef::new(DRAFT_RECORD, &id)).await?;
+    resources::authorize(
+        state,
+        conn,
+        access,
+        action,
+        &RecordRef::new(DRAFT_RECORD, &id),
+    )
+    .await?;
     find(conn, access, id, lock).await?.ok_or(Error::NotFound)
 }
 

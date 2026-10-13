@@ -15,29 +15,28 @@ use crate::{
 
 /// The inboxes `access` may see in its workspace (the transaction's).
 pub async fn visible_inboxes(conn: &mut PgConnection, access: &Access) -> Result<Vec<InboxId>> {
-    let inboxes = match access.user {
-        Some(user) => {
-            sqlx::query_scalar!(
-                r#"SELECT inbox_id AS "id!: InboxId" FROM conversations.inbox_members
+    let inboxes =
+        match access.user {
+            Some(user) => {
+                sqlx::query_scalar!(
+                    r#"SELECT inbox_id AS "id!: InboxId" FROM conversations.inbox_members
                     WHERE workspace_id = $1 AND user_id = $2
                    UNION
                    SELECT id AS "id!: InboxId" FROM conversations.inboxes
                     WHERE workspace_id = $1 AND owner = $2"#,
-                access.workspace.as_uuid(),
-                user.as_uuid(),
-            )
-            .fetch_all(conn)
-            .await?
-        }
-        None => {
-            sqlx::query_scalar!(
+                    access.workspace.as_uuid(),
+                    user.as_uuid(),
+                )
+                .fetch_all(conn)
+                .await?
+            }
+            None => sqlx::query_scalar!(
                 r#"SELECT id AS "id: InboxId" FROM conversations.inboxes WHERE workspace_id = $1"#,
                 access.workspace.as_uuid(),
             )
             .fetch_all(conn)
-            .await?
-        }
-    };
+            .await?,
+        };
     Ok(inboxes)
 }
 

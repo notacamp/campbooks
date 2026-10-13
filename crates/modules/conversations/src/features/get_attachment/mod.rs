@@ -27,6 +27,8 @@ use futures_util::StreamExt as _;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::features::apply_changes::ATTACHMENT_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -38,10 +40,8 @@ use crate::{
     model::{AttachmentId, ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
-use campbooks_kernel::authz::Action;
 use campbooks_kernel::RecordRef;
-use crate::domain::resources;
-use crate::features::apply_changes::ATTACHMENT_RECORD;
+use campbooks_kernel::authz::Action;
 
 /// The policy of every attachment response: if a browser ever shows one as
 /// a document, it has an opaque origin, runs nothing, loads nothing, cannot

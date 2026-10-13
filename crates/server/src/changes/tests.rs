@@ -879,12 +879,18 @@ const EN: &str = include_str!("../../../modules/conversations/fixtures/en.json")
 const FR: &str = include_str!("../../../modules/conversations/fixtures/fr.json");
 
 impl World {
-    async fn ingest(&self, workspace: &str, inbox: campbooks_conversations::model::InboxId, json: &str) {
+    async fn ingest(
+        &self,
+        workspace: &str,
+        inbox: campbooks_conversations::model::InboxId,
+        json: &str,
+    ) {
         let workspace = workspace.parse().unwrap();
         let recorded: Value = serde_json::from_str(json).unwrap();
-        let batch = campbooks_conversations::dev::record(&self.server.state, workspace, inbox, &recorded)
-            .await
-            .unwrap();
+        let batch =
+            campbooks_conversations::dev::record(&self.server.state, workspace, inbox, &recorded)
+                .await
+                .unwrap();
         campbooks_conversations::dev::submit(&self.server.state, workspace, &batch)
             .await
             .unwrap();
@@ -893,7 +899,12 @@ impl World {
 
     async fn publish<E: campbooks_kernel::DomainEvent>(&self, event: &E) {
         let mut tx = self.db.begin().await.unwrap();
-        self.server.state.events.publish(&mut tx, event).await.unwrap();
+        self.server
+            .state
+            .events
+            .publish(&mut tx, event)
+            .await
+            .unwrap();
         tx.commit().await.unwrap();
         self.server.sequence().await;
     }
@@ -953,7 +964,10 @@ async fn a_member_taken_out_of_an_inbox_stops_getting_its_ids(db: PgPool) {
     .unwrap();
     assert!(!new_messages.is_empty());
     for id in new_messages {
-        assert!(!feed.raw.contains(&id), "{id} reached a former inbox member");
+        assert!(
+            !feed.raw.contains(&id),
+            "{id} reached a former inbox member"
+        );
         assert!(!seen.contains(&id));
     }
 }
@@ -986,7 +1000,11 @@ async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
     let mut feeds = Vec::new();
     for sub in ["ana", "bea", "cid", "dan"] {
         let token = world.token(sub, READ_ALL);
-        let mut feed = world.server.subscribe(Some(&token), &ws, None).await.unwrap();
+        let mut feed = world
+            .server
+            .subscribe(Some(&token), &ws, None)
+            .await
+            .unwrap();
         assert!(feed.next_event().await.is("ready"));
         feeds.push(feed);
     }
@@ -1015,7 +1033,11 @@ async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
     // Bea: her draft, then her connection.
     assert_eq!(
         record_of(&bea_feed.next_event().await),
-        ("conversations.draft".into(), draft.to_string(), "delete".into())
+        (
+            "conversations.draft".into(),
+            draft.to_string(),
+            "delete".into()
+        )
     );
     let connection_change = (
         "connectors.connection".to_owned(),

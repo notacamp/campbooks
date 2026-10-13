@@ -143,7 +143,9 @@ pub async fn send(
             .run_at(send_at),
     )
     .await?;
-    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
+        .await?
+        .view()?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
@@ -199,7 +201,9 @@ pub async fn cancel(
         // Not sending: nothing to take back.
         DraftState::Draft | DraftState::Failed => {}
     }
-    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
+        .await?
+        .view()?;
     tx.commit().await?;
     Ok(Json(draft))
 }

@@ -139,9 +139,10 @@ pub fn check_authorize_calls(
             .map_or("", |declared| declared.tenancy.as_str());
         // Public operations (`security(())`) authenticate what they act on
         // themselves (a code, a verifier, an ID token hint).
-        let public = operation["security"]
-            .as_array()
-            .is_some_and(|reqs| reqs.iter().any(|r| r.as_object().is_some_and(serde_json::Map::is_empty)));
+        let public = operation["security"].as_array().is_some_and(|reqs| {
+            reqs.iter()
+                .any(|r| r.as_object().is_some_and(serde_json::Map::is_empty))
+        });
         if !matches!(tenancy, "workspace" | "account") || public {
             continue;
         }
@@ -166,7 +167,10 @@ pub fn check_authorize_calls(
         };
         let code = without_tests(text);
         let asks = AUTHORIZE_CALL.is_match(code)
-            || file.helpers.iter().any(|helper| code.contains(helper.as_str()));
+            || file
+                .helpers
+                .iter()
+                .any(|helper| code.contains(helper.as_str()));
         if !asks {
             violations.push(format!(
                 "{path}: the handler of `{id}` never asks the central check: call \
@@ -192,7 +196,7 @@ static AUTHORIZE_CALL: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(
         r"\b(authz::(require|require_type|require_account|decide)|authorize(_type|_account)?)\s*\(",
     )
-        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+    .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
 /// The BFF documents its proxies with a macro taking the id as a literal.
@@ -225,8 +229,10 @@ fn operations(spec: &serde_json::Value) -> Vec<(String, &serde_json::Value)> {
 /// with a `workspace_id` column.
 pub fn workspace_tables(migrations: &[(String, String)]) -> BTreeSet<String> {
     static CREATE: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"(?is)create\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_]+\.[a-z_]+)\s*\((.*?)\n\);")
-            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+        Regex::new(
+            r"(?is)create\s+table\s+(?:if\s+not\s+exists\s+)?([a-z_]+\.[a-z_]+)\s*\((.*?)\n\);",
+        )
+        .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
     static ADDED: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(r"(?is)alter\s+table\s+([a-z_]+\.[a-z_]+)\s+add\s+column\s+workspace_id\b")
@@ -260,8 +266,7 @@ pub fn check_workspace_queries(
     file: &AccessFile,
 ) -> Vec<String> {
     static BEGIN: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\.begin\(\)")
-            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+        Regex::new(r"\.begin\(\)").unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
     static ON_POOL: LazyLock<Regex> = LazyLock::new(|| {
         Regex::new(
@@ -270,15 +275,20 @@ pub fn check_workspace_queries(
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
     let allowed = |path: &str| {
-        file.pool_access
-            .iter()
-            .any(|entry| path == entry.path || (entry.path.ends_with('/') && path.starts_with(&entry.path)))
+        file.pool_access.iter().any(|entry| {
+            path == entry.path || (entry.path.ends_with('/') && path.starts_with(&entry.path))
+        })
     };
     let mut violations: Vec<String> = file
         .pool_access
         .iter()
         .filter(|entry| entry.reason.trim().is_empty())
-        .map(|entry| format!("architecture.toml: pool access `{}` needs a reason", entry.path))
+        .map(|entry| {
+            format!(
+                "architecture.toml: pool access `{}` needs a reason",
+                entry.path
+            )
+        })
         .collect();
     for (path, text) in sources {
         if !path.starts_with("crates/modules/") || is_test_file(path) || allowed(path) {
@@ -294,7 +304,9 @@ pub fn check_workspace_queries(
             continue;
         }
         for found in ON_POOL.find_iter(code) {
-            let start = code[..found.start()].rfind("sqlx::query").unwrap_or(found.start());
+            let start = code[..found.start()]
+                .rfind("sqlx::query")
+                .unwrap_or(found.start());
             let names: Vec<String> = string_literals(&code[start..found.start()])
                 .iter()
                 .flat_map(|sql| qualified_names(sql))
@@ -385,7 +397,10 @@ mod tests {
             actions: actions.iter().map(|a| (*a).to_owned()).collect(),
         };
         [
-            ("mail.thread".to_owned(), resource("workspace", &["read", "write"])),
+            (
+                "mail.thread".to_owned(),
+                resource("workspace", &["read", "write"]),
+            ),
             ("system.health".to_owned(), resource("public", &["read"])),
         ]
         .into()
@@ -419,8 +434,16 @@ mod tests {
         let s = spec(Some(json!({"resource": "mail.thread", "action": "read"})));
         let declared = "#[utoipa::path(operation_id = \"mail.list\")]\nfn handler() {}\n";
         let file = AccessFile::default();
-        let src = |text: &str| vec![("crates/modules/mail/src/list.rs".to_owned(), text.to_owned())];
-        assert_eq!(check_authorize_calls(&s, &c, &src(declared), &file).len(), 1);
+        let src = |text: &str| {
+            vec![(
+                "crates/modules/mail/src/list.rs".to_owned(),
+                text.to_owned(),
+            )]
+        };
+        assert_eq!(
+            check_authorize_calls(&s, &c, &src(declared), &file).len(),
+            1
+        );
         // Naming the action in `x-campbooks` is not asking.
         let named = format!("{declared}// .access(\"mail.thread\", authz::Action::Read)\n");
         assert_eq!(check_authorize_calls(&s, &c, &src(&named), &file).len(), 1);
@@ -428,7 +451,10 @@ mod tests {
         assert!(check_authorize_calls(&s, &c, &src(&asking), &file).is_empty());
         // A call inside the test module does not count.
         let in_tests = format!("{declared}#[cfg(test)]\nmod tests {{ authz::x(); }}\n");
-        assert_eq!(check_authorize_calls(&s, &c, &src(&in_tests), &file).len(), 1);
+        assert_eq!(
+            check_authorize_calls(&s, &c, &src(&in_tests), &file).len(),
+            1
+        );
         let helper = format!("{declared}fn h() {{ lock_thread(&state); }}\n");
         let with_helper = AccessFile {
             helpers: vec!["lock_thread(".to_owned()],
@@ -450,7 +476,10 @@ mod tests {
             }],
             ..AccessFile::default()
         };
-        assert_eq!(check_authorize_calls(&s, &c, &src(&asking), &stale).len(), 1);
+        assert_eq!(
+            check_authorize_calls(&s, &c, &src(&asking), &stale).len(),
+            1
+        );
     }
 
     #[test]
@@ -489,7 +518,10 @@ mod tests {
         };
         assert!(
             check_workspace_queries(
-                &[("crates/modules/mail/src/a.rs".to_owned(), on_pool.to_owned())],
+                &[(
+                    "crates/modules/mail/src/a.rs".to_owned(),
+                    on_pool.to_owned()
+                )],
                 &tables,
                 &excused
             )

@@ -8,7 +8,9 @@ use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::Works
 
 use crate::{
     domain::index,
-    events::{CONVERSATION_RECORD, ConversationChanged, InboxRemoved, MessageReceived, MessageSent},
+    events::{
+        CONVERSATION_RECORD, ConversationChanged, InboxRemoved, MessageReceived, MessageSent,
+    },
 };
 
 /// Refresh `group` (of `group_type`) in `workspace`.

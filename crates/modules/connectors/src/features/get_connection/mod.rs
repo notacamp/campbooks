@@ -69,7 +69,9 @@ pub async fn execute(
         || Error::Forbidden,
     )
     .await?;
-    let connection = connections::load(&mut tx, id).await?.ok_or(Error::NotFound)?;
+    let connection = connections::load(&mut tx, id)
+        .await?
+        .ok_or(Error::NotFound)?;
     let view = connections::view(&mut tx, connection).await?;
     tx.commit().await?;
     Ok(view)

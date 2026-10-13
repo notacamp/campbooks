@@ -1564,7 +1564,7 @@
         ],
         "x-campbooks": {
           "access": {
-            "action": "write",
+            "action": "create",
             "resource": "connectors.connection"
           },
           "assistant": false,
