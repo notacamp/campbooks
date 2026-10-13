@@ -464,10 +464,13 @@ impl Upstream {
         match &self.rule {
             Rule::Fixed(verified) | Rule::Tenant { verified, .. } => Some(verified),
             Rule::Servers(servers) => {
-                let named = accounts_server?;
-                servers
+                // Only a position in the configured list comes out of the
+                // callback's value: the server used is always one of ours.
+                let named = accounts_server?.trim_end_matches('/');
+                let index = servers
                     .iter()
-                    .find(|v| v.server.issuer.trim_end_matches('/') == named.trim_end_matches('/'))
+                    .position(|v| v.server.issuer.trim_end_matches('/') == named)?;
+                servers.get(index)
             }
         }
     }
