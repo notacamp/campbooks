@@ -352,18 +352,14 @@ pub async fn end_session(
         sessions::end(&mut tx, session.id, now).await?;
         tx.commit().await?;
     }
-    let target = query
+    let client = query
         .client_id
         .as_deref()
-        .and_then(|id| issuer.clients.get(id))
-        .and(query.post_logout_redirect_uri.as_deref())
-        .filter(|uri| {
-            query
-                .client_id
-                .as_deref()
-                .and_then(|id| issuer.clients.get(id))
-                .is_some_and(|client| client.post_logout_redirect_uris.iter().any(|u| u == uri))
-        });
+        .and_then(|id| issuer.clients.get(id));
+    let target = query
+        .post_logout_redirect_uri
+        .as_deref()
+        .filter(|uri| client.is_some_and(|c| c.post_logout_redirect_uris.iter().any(|u| u == uri)));
     let response = match target {
         Some(uri) => {
             let mut url = url::Url::parse(uri).map_err(Error::internal)?;

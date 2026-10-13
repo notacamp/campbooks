@@ -10,7 +10,11 @@ use axum::{
 use campbooks_kernel::{Operation, Result};
 
 use super::Ctx;
-use crate::{deps::Issuer, domain::keys::RECHECK_EVERY};
+use crate::deps::Issuer;
+
+/// How long others may cache the JWKS: an hour, well inside the week a new
+/// key is published before it signs.
+const JWKS_CACHE: &str = "public, max-age=3600";
 
 /// Scopes every first-party client may ask for besides the API's.
 pub const OIDC_SCOPES: [&str; 4] = ["openid", "profile", "email", "offline_access"];
@@ -99,9 +103,8 @@ pub async fn jwks(State(ctx): State<Ctx>) -> Result<Response> {
     let issuer = ctx.issuer()?;
     let document = issuer.keys.jwks(&ctx.state.db).await?;
     let mut response = Json(document).into_response();
-    let max_age = format!("public, max-age={}", RECHECK_EVERY.num_seconds() * 60);
-    if let Ok(value) = HeaderValue::from_str(&max_age) {
-        response.headers_mut().insert(header::CACHE_CONTROL, value);
-    }
+    response
+        .headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static(JWKS_CACHE));
     Ok(response)
 }
