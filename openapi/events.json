@@ -3,6 +3,35 @@
   "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
   "events": [
     {
+      "name": "attention.item_changed",
+      "module": "attention",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An item opened, changed, cleared, or was snoozed or unsnoozed.",
+        "required": [
+          "workspace",
+          "item",
+          "container"
+        ],
+        "properties": {
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Who may see it: its container (`conversations.inbox`)."
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemId",
+            "description": "The item."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.capability_granted",
       "module": "connectors",
       "version": 1,
@@ -405,6 +434,85 @@
           }
         ],
         "description": "An outbound message was stored for the first time (sent from the\nprovider's own client today; from Campbooks once sending lands)."
+      }
+    },
+    {
+      "name": "conversations.need_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A conversation's need changed: it opened, changed, or was cleared.\nIds, enums and a date only (`contracts/conversations.need_changed.v1.schema.json`).",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message",
+          "revision",
+          "sent_at"
+        ],
+        "properties": {
+          "cleared_because": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClearCause",
+                "description": "Why it was cleared."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cleared_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who cleared it, when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the need."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The inbound message the need comes from."
+          },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NeedFacts",
+                "description": "The need, or `None` once cleared."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of this conversation's need; apply only\nnewer ones (deliveries are not ordered)."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When that message was sent."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
       }
     },
     {
@@ -910,6 +1018,18 @@
           "email"
         ]
       },
+      "ClearCause": {
+        "type": "string",
+        "description": "Why a need was cleared.",
+        "enum": [
+          "replied",
+          "archived",
+          "trashed",
+          "done",
+          "not_needed",
+          "superseded"
+        ]
+      },
       "ConnectionId": {
         "type": "string",
         "format": "uuid",
@@ -964,6 +1084,11 @@
         "type": "string",
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
+      },
+      "ItemId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ItemId (UUIDv7)"
       },
       "Kind": {
         "type": "string",
@@ -1055,6 +1180,55 @@
         "format": "uuid",
         "description": "MessageId (UUIDv7)"
       },
+      "NeedFacts": {
+        "type": "object",
+        "description": "What a conversation needs, as `need_changed` carries it.",
+        "required": [
+          "reason",
+          "trust",
+          "urgent"
+        ],
+        "properties": {
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due, when the message names a date that resolves."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why."
+          },
+          "trust": {
+            "$ref": "#/components/schemas/NeedTrust",
+            "description": "How much Campbooks stands behind it."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
+      "NeedReason": {
+        "type": "string",
+        "description": "Why a conversation needs its inbox's members (attention).",
+        "enum": [
+          "reply",
+          "do",
+          "pay",
+          "review"
+        ]
+      },
+      "NeedTrust": {
+        "type": "string",
+        "description": "How much Campbooks stands behind a need.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
       "Origin": {
         "type": "string",
         "description": "Where a change came from.",
@@ -1069,6 +1243,26 @@
         "enum": [
           "google"
         ]
+      },
+      "RecordRef": {
+        "type": "object",
+        "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id within its module.",
+            "example": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"
+          },
+          "type": {
+            "type": "string",
+            "description": "The record type, `<module>.<record>`.",
+            "example": "conversations.thread"
+          }
+        }
       },
       "RequestOrigin": {
         "type": "string",

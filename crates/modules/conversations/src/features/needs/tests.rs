@@ -25,7 +25,10 @@ async fn sams_needs(kit: &Kit) -> (WorkspaceId, InboxId, String) {
 async fn summary(kit: &Kit, token: &str, workspace: WorkspaceId, provider_id: &str) -> Value {
     let id = kit.conversation_of(provider_id).await;
     let list = kit
-        .get(token, &format!("/api/v1/w/{workspace}/conversations?ids={id}"))
+        .get(
+            token,
+            &format!("/api/v1/w/{workspace}/conversations?ids={id}"),
+        )
         .await;
     assert_eq!(list.status, StatusCode::OK, "{:?}", list.json);
     list.json["conversations"][0].clone()
@@ -75,8 +78,12 @@ async fn need_events_follow_the_contract_and_hold_no_personal_data(db: PgPool) {
     let (workspace, inbox, sam) = sams_needs(&kit).await;
     let id = kit.conversation_of("needs-3").await;
     let base = format!("/api/v1/w/{workspace}/conversations/{id}/need");
-    kit.post(&sam, &format!("{base}/resolve"), Some(json!({"outcome": "done"})))
-        .await;
+    kit.post(
+        &sam,
+        &format!("{base}/resolve"),
+        Some(json!({"outcome": "done"})),
+    )
+    .await;
     kit.ingest(workspace, inbox, "needs-replied").await;
     let events = kit.events("conversations.need_changed").await;
     assert!(events.len() >= 7, "{events:?}");
@@ -85,7 +92,14 @@ async fn need_events_follow_the_contract_and_hold_no_personal_data(db: PgPool) {
             panic!("{event} breaks the contract: {error}");
         }
         let text = event.to_string();
-        for personal in ["Marta", "marta@", "Pedro", "walkthrough", "INV-2041", "Jonas"] {
+        for personal in [
+            "Marta",
+            "marta@",
+            "Pedro",
+            "walkthrough",
+            "INV-2041",
+            "Jonas",
+        ] {
             assert!(!text.contains(personal), "{personal} in {text}");
         }
     }
@@ -99,7 +113,11 @@ async fn done_and_undo(db: PgPool) {
     let base = format!("/api/v1/w/{workspace}/conversations/{id}/need");
 
     let done = kit
-        .post(&sam, &format!("{base}/resolve"), Some(json!({"outcome": "done"})))
+        .post(
+            &sam,
+            &format!("{base}/resolve"),
+            Some(json!({"outcome": "done"})),
+        )
         .await;
     assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
     assert_eq!(done.json["need"], Value::Null);
@@ -110,7 +128,11 @@ async fn done_and_undo(db: PgPool) {
     assert!(last["cleared_by"].is_string());
 
     let again = kit
-        .post(&sam, &format!("{base}/resolve"), Some(json!({"outcome": "done"})))
+        .post(
+            &sam,
+            &format!("{base}/resolve"),
+            Some(json!({"outcome": "done"})),
+        )
         .await;
     assert_eq!(again.status, StatusCode::CONFLICT);
     assert_eq!(again.json["code"], "no_open_need");
@@ -153,7 +175,13 @@ async fn not_needed_teaches_and_undo_withdraws_it(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(
-        (question.as_str(), from.as_str(), to.as_str(), source.as_str(), withdrawn),
+        (
+            question.as_str(),
+            from.as_str(),
+            to.as_str(),
+            source.as_str(),
+            withdrawn
+        ),
         ("needs_reply", "true", "false", "rules", false)
     );
     let last = kit.events("conversations.need_changed").await;
@@ -248,7 +276,10 @@ async fn readers_and_strangers_cannot_resolve(db: PgPool) {
     let denied = kit.post(&ana, &uri, body.clone()).await;
     assert_eq!(denied.status, StatusCode::FORBIDDEN);
     assert_eq!(denied.json["code"], "inbox_read_only");
-    assert_eq!(kit.post(&eve, &uri, body).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        kit.post(&eve, &uri, body).await.status,
+        StatusCode::NOT_FOUND
+    );
     let bad = kit
         .post(&ana, &uri, Some(json!({"outcome": "later"})))
         .await;
@@ -267,7 +298,9 @@ async fn old_mail_raises_nothing(db: PgPool) {
         .await;
     // The same mail, sent six years ago: a first sync of an old mailbox.
     let old: Value = serde_json::from_str(&fixture("needs").replace("\"2026-", "\"2020-")).unwrap();
-    let batch = dev::record(&kit.state, workspace, inbox, &old).await.unwrap();
+    let batch = dev::record(&kit.state, workspace, inbox, &old)
+        .await
+        .unwrap();
     dev::submit(&kit.state, workspace, &batch).await.unwrap();
     kit.run_jobs().await;
     assert!(kit.events("conversations.need_changed").await.is_empty());
@@ -278,7 +311,10 @@ async fn listing_by_ids_leaves_out_what_you_cannot_see(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, sam) = sams_needs(&kit).await;
     let (eve, _) = kit.member("eve", workspace);
-    let ids = [kit.conversation_of("needs-1").await, kit.conversation_of("needs-2").await];
+    let ids = [
+        kit.conversation_of("needs-1").await,
+        kit.conversation_of("needs-2").await,
+    ];
     let uri = format!("/api/v1/w/{workspace}/conversations?ids={}", ids.join(","));
     let list = kit.get(&sam, &uri).await;
     assert_eq!(list.json["conversations"].as_array().unwrap().len(), 2);
@@ -286,7 +322,10 @@ async fn listing_by_ids_leaves_out_what_you_cannot_see(db: PgPool) {
     assert_eq!(none.json["conversations"].as_array().unwrap().len(), 0);
     let too_many = vec![ids[0].clone(); 101].join(",");
     let bad = kit
-        .get(&sam, &format!("/api/v1/w/{workspace}/conversations?ids={too_many}"))
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations?ids={too_many}"),
+        )
         .await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
     assert_eq!(bad.json["code"], "invalid_ids");

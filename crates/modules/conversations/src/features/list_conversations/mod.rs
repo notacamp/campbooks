@@ -221,13 +221,7 @@ async fn fetch_page(
 
 /// `ids=a,b,c`: 1 to [`MAX_LIMIT`] conversation ids.
 fn parse_ids(ids: &str) -> Result<Vec<ConversationId>> {
-    let bad = || {
-        Error::BadRequest(
-            crate::MESSAGES
-                .reason("invalid_ids")
-                .arg("max", MAX_LIMIT),
-        )
-    };
+    let bad = || Error::BadRequest(crate::MESSAGES.reason("invalid_ids").arg("max", MAX_LIMIT));
     let ids = ids
         .split(',')
         .map(|id| id.trim().parse::<ConversationId>().map_err(|_| bad()))

@@ -171,6 +171,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
+        campbooks_attention::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -302,6 +303,7 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
+        (name = "attention", description = "The attention module."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

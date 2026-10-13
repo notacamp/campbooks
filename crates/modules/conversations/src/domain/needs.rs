@@ -154,9 +154,7 @@ pub fn raise(
     };
     // A suspicious message is only ever a warning: its asks are not ours.
     let suspicious = answers.iter().find(|a| {
-        a.question == triage::SUSPICIOUS
-            && a.is_true()
-            && (a.basis == NeedBasis::Rules || a.acted)
+        a.question == triage::SUSPICIOUS && a.is_true() && (a.basis == NeedBasis::Rules || a.acted)
     });
     if let Some(answer) = suspicious {
         return Some(need(
@@ -377,6 +375,92 @@ async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answ
         .collect()
 }
 
+/// The need the conversation has now, before settling: what its newest
+/// inbound message raises when that is recent (or is the one the stored need
+/// already comes from), else the stored need while it is open.
+async fn candidate(
+    tx: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+    row: Option<&Row>,
+    settings: &NeedSettings,
+) -> Result<Option<Need>> {
+    let newest = sqlx::query!(
+        r#"SELECT id AS "id: MessageId", sent_at FROM conversations.messages
+            WHERE conversation_id = $1 AND direction = 'inbound'
+            ORDER BY sent_at DESC, id DESC LIMIT 1"#,
+        id as ConversationId,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+
+    // The newest inbound message raises the need when it is recent (or is
+    // the one the stored need already comes from); else an open need stays
+    // as it is, settled against what happened since.
+    let mut raised = None;
+    if let Some(newest) = &newest {
+        let recent = newest.sent_at >= Utc::now() - settings.window;
+        let same = row.is_some_and(|r| r.message_id == newest.id);
+        if recent || same {
+            let answers = answers(tx, newest.id).await?;
+            raised = raise(
+                newest.id,
+                newest.sent_at.date_naive(),
+                &answers,
+                settings.check_floor,
+            );
+        }
+    }
+    Ok(match (raised, row) {
+        (Some(need), _) => Some(need),
+        (None, Some(row)) if row.state == "open" => Some(row.need()?),
+        (None, _) => None,
+    })
+}
+
+/// What happened in conversation `id` since `need`'s message, given whether
+/// the conversation is archived and trashed (`state`); and when that message
+/// was sent (`None` once it is gone).
+async fn since(
+    tx: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+    state: &(bool, bool),
+    row: Option<&Row>,
+    need: &Need,
+) -> Result<(Since, Option<DateTime<Utc>>)> {
+    let sent = sqlx::query_scalar!(
+        "SELECT sent_at FROM conversations.messages WHERE id = $1",
+        need.message as MessageId,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    let replied = match sent {
+        Some(sent) => {
+            sqlx::query_scalar!(
+                r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
+                 WHERE conversation_id = $1 AND direction = 'outbound' AND sent_at > $2) AS "e!""#,
+                id as ConversationId,
+                sent,
+            )
+            .fetch_one(&mut **tx)
+            .await?
+        }
+        None => false,
+    };
+    let verdict = match row {
+        Some(row) => row.verdict_on(need.message)?,
+        None => None,
+    };
+    Ok((
+        Since {
+            replied,
+            archived: state.0,
+            trashed: state.1 || sent.is_none(),
+            verdict,
+        },
+        sent,
+    ))
+}
+
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
 /// gone, or has no inbound message, changes nothing.
@@ -398,69 +482,14 @@ pub async fn refresh(
     else {
         return Ok(());
     };
+    let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
-    let newest = sqlx::query!(
-        r#"SELECT id AS "id: MessageId", sent_at FROM conversations.messages
-            WHERE conversation_id = $1 AND direction = 'inbound'
-            ORDER BY sent_at DESC, id DESC LIMIT 1"#,
-        id as ConversationId,
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-
-    // The newest inbound message raises the need when it is recent (or is
-    // the one the stored need already comes from); else an open need stays
-    // as it is, settled against what happened since.
-    let mut raised = None;
-    if let Some(newest) = &newest {
-        let recent = newest.sent_at >= Utc::now() - settings.window;
-        let same = row.as_ref().is_some_and(|r| r.message_id == newest.id);
-        if recent || same {
-            let answers = answers(tx, newest.id).await?;
-            raised = raise(
-                newest.id,
-                newest.sent_at.date_naive(),
-                &answers,
-                settings.check_floor,
-            );
-        }
-    }
-    let need = match (raised, &row) {
-        (Some(need), _) => Some(need),
-        (None, Some(row)) if row.state == "open" => Some(row.need()?),
-        (None, _) => None,
-    };
+    let need = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
         return Ok(());
     };
 
-    let sent = sqlx::query_scalar!(
-        "SELECT sent_at FROM conversations.messages WHERE id = $1",
-        need.message as MessageId,
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-    let replied = match sent {
-        Some(sent) => sqlx::query_scalar!(
-            r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
-                 WHERE conversation_id = $1 AND direction = 'outbound' AND sent_at > $2) AS "e!""#,
-            id as ConversationId,
-            sent,
-        )
-        .fetch_one(&mut **tx)
-        .await?,
-        None => false,
-    };
-    let verdict = match &row {
-        Some(row) => row.verdict_on(need.message)?,
-        None => None,
-    };
-    let since = Since {
-        replied,
-        archived: conversation.archived,
-        trashed: conversation.trashed || sent.is_none(),
-        verdict,
-    };
+    let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
     let settled = settle(need, since);
 
     let (need, cause) = match &settled {
@@ -524,12 +553,15 @@ pub async fn refresh(
                 message: need.message,
                 revision,
                 sent_at: sent.unwrap_or_else(Utc::now),
-                need: cause.is_none().then(|| NeedFacts {
-                    reason: need.reason,
-                    trust: need.trust,
-                    due_on: need.due_on,
-                    urgent: need.urgent,
-                }),
+                need: match cause {
+                    None => Some(NeedFacts {
+                        reason: need.reason,
+                        trust: need.trust,
+                        due_on: need.due_on,
+                        urgent: need.urgent,
+                    }),
+                    Some(_) => None,
+                },
                 cleared_because: cause,
                 cleared_by,
             },
@@ -666,7 +698,11 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             .map(serde_json::from_value)
             .transpose()
             .map_err(|e| Error::internal(super::redact::json(&e)))?;
-        let quote = match (reasons.iter().find_map(|r| r.sentence.clone()), from, row.sent_at) {
+        let quote = match (
+            reasons.iter().find_map(|r| r.sentence.clone()),
+            from,
+            row.sent_at,
+        ) {
             (Some(text), Some(from), Some(sent_at)) => Some(Quote {
                 text,
                 from,
@@ -861,14 +897,34 @@ mod tests {
             ..Since::default()
         };
         let expect = [
-            (replied, [Some(ClearCause::Replied), Some(ClearCause::Replied), None, None]),
-            (archived, [Some(ClearCause::Archived), None, None, Some(ClearCause::Archived)]),
+            (
+                replied,
+                [
+                    Some(ClearCause::Replied),
+                    Some(ClearCause::Replied),
+                    None,
+                    None,
+                ],
+            ),
+            (
+                archived,
+                [
+                    Some(ClearCause::Archived),
+                    None,
+                    None,
+                    Some(ClearCause::Archived),
+                ],
+            ),
             (trashed, [Some(ClearCause::Trashed); 4]),
             (Since::default(), [None; 4]),
         ];
         for (since, causes) in expect {
             for (reason, expected) in [Reply, Do, Pay, Review].into_iter().zip(causes) {
-                assert_eq!(cause(&settle(need(reason), since)), expected, "{reason:?} {since:?}");
+                assert_eq!(
+                    cause(&settle(need(reason), since)),
+                    expected,
+                    "{reason:?} {since:?}"
+                );
             }
         }
     }

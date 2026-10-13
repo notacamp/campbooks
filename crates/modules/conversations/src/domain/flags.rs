@@ -5,8 +5,8 @@ use campbooks_kernel::{AppState, Result, db::BeginFor as _, tenancy::Access};
 
 use super::{
     access::lock_conversation,
-    needs::{self, NeedSettings},
     conversation::{Changed, ConversationSummary, request, summary},
+    needs::{self, NeedSettings},
 };
 use crate::{
     events::{Change, Origin, RequestedChange},

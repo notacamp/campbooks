@@ -795,6 +795,298 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/attention": {
+      "get": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "List what needs you.",
+        "operationId": "attention.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "`open` (default) or `cleared`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ListState"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a state.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Put an item off until later, for yourself.",
+        "operationId": "attention.snooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Snooze"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A time in the past or more than a year away (`invalid_until`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low",
+          "undo": "attention.unsnooze"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Bring an item you put off back now.",
+        "operationId": "attention.unsnooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/changes": {
       "get": {
         "tags": [
@@ -1414,6 +1706,15 @@
               "format": "int32",
               "minimum": 0
             }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "These conversations only (1 to 100 ids, comma-separated), whatever\ntheir stream or whether archived; those you cannot see are left\nout. Other filters and the cursor are ignored.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -1964,6 +2265,322 @@
             "conversations.message"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Answer yes to a question Campbooks put (a Review need it was unsure of).",
+        "operationId": "conversations.confirm_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No question to answer (`no_open_need`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take back Done, Not needed or a confirmation: the need is as it was.",
+        "operationId": "conversations.reopen_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to bring back (`nothing_to_reopen`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Mark what a conversation needs as done, or as not needed.",
+        "operationId": "conversations.resolve_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an outcome.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It needs nothing (`no_open_need`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
         }
       }
     },
@@ -6287,6 +6904,30 @@
           }
         }
       },
+      "AttentionList": {
+        "type": "object",
+        "description": "The caller's items.",
+        "required": [
+          "items",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonCount"
+            },
+            "description": "Open items per reason, every reason listed (open lists only; empty\nfor cleared)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemView"
+            },
+            "description": "Open: by reason (review, reply, decide, do, pay), then overdue, by\ndue date, urgent first, oldest first. Cleared: newest first."
+          }
+        }
+      },
       "BackchannelLogout": {
         "type": "object",
         "required": [
@@ -6547,6 +7188,17 @@
             "description": "Messages in it.",
             "minimum": 0
           },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NeedView",
+                "description": "What it needs from its inbox's members, while it needs something."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "snippet": {
             "type": "string",
             "description": "The start of the newest message's text."
@@ -6708,6 +7360,15 @@
           "source": {
             "$ref": "#/components/schemas/DecisionSource",
             "description": "Who answered."
+          },
+          "threshold": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The confidence, 0 to 100, from which an answer of this source to\nthis question may act; `None` when it never acts (a suggestion).",
+            "minimum": 0
           },
           "value": {
             "$ref": "#/components/schemas/AnswerView",
@@ -7283,6 +7944,120 @@
         },
         "additionalProperties": false
       },
+      "ItemId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ItemId (UUIDv7)"
+      },
+      "ItemState": {
+        "type": "string",
+        "description": "Whether an item still needs someone.",
+        "enum": [
+          "open",
+          "cleared"
+        ]
+      },
+      "ItemView": {
+        "type": "object",
+        "description": "An attention item, as the caller sees it. References and facts only: the\nowning module renders who and what.",
+        "required": [
+          "id",
+          "record",
+          "container",
+          "cause",
+          "reason",
+          "trust",
+          "overdue",
+          "urgent",
+          "since",
+          "state"
+        ],
+        "properties": {
+          "cause": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record that raised it."
+          },
+          "cleared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was cleared."
+          },
+          "cleared_because": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was cleared (`replied`, `archived`, `trashed`, `done`,\n`not_needed`), as the producing module said."
+          },
+          "cleared_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who cleared it, when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Who may see it: its container."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ItemId",
+            "description": "The item."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "Why."
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record it is about."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its cause arrived."
+          },
+          "snoozed_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when the caller put it off (\"Later\"), when they did."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ItemState",
+            "description": "Open or cleared."
+          },
+          "trust": {
+            "$ref": "#/components/schemas/Trust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
       "Kind": {
         "type": "string",
         "description": "What a workspace is for.",
@@ -7558,6 +8333,112 @@
         },
         "additionalProperties": false
       },
+      "NeedBasis": {
+        "type": "string",
+        "description": "Whose answer raised a need.",
+        "enum": [
+          "rules",
+          "model",
+          "member"
+        ]
+      },
+      "NeedQuestion": {
+        "type": "string",
+        "description": "The question whose answer raised a need.",
+        "enum": [
+          "needs_reply",
+          "asks_action",
+          "suspicious"
+        ]
+      },
+      "NeedReason": {
+        "type": "string",
+        "description": "Why a conversation needs its inbox's members (attention).",
+        "enum": [
+          "reply",
+          "do",
+          "pay",
+          "review"
+        ]
+      },
+      "NeedTrust": {
+        "type": "string",
+        "description": "How much Campbooks stands behind a need.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
+      "NeedView": {
+        "type": "object",
+        "description": "A conversation's open need, as lists and the reader show it.",
+        "required": [
+          "reason",
+          "trust",
+          "basis",
+          "question",
+          "overdue",
+          "urgent",
+          "message_id"
+        ],
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/NeedBasis",
+            "description": "Whose answer raised it."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message it comes from."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "question": {
+            "$ref": "#/components/schemas/NeedQuestion",
+            "description": "The question that raised it."
+          },
+          "quote": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Quote",
+                "description": "What the sender wrote, when the rules quoted it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why."
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule that decided it (`signals.reply_asked`, …), for the sentence\nthe client words it with.",
+            "example": "signals.reply_asked"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/NeedTrust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
       "NewAccount": {
         "type": "object",
         "description": "The pending new account, as the new-account screen shows it.",
@@ -7671,6 +8552,14 @@
           }
         }
       },
+      "Outcome": {
+        "type": "string",
+        "description": "How a member resolves a need.",
+        "enum": [
+          "done",
+          "not_needed"
+        ]
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -7729,6 +8618,61 @@
           "google"
         ]
       },
+      "Quote": {
+        "type": "object",
+        "description": "The sender's sentence a need quotes, with who wrote it and when.\nUntrusted mail content: clients show it as quoted plain text only.",
+        "required": [
+          "text",
+          "from",
+          "sent_at"
+        ],
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Address",
+            "description": "Who wrote it."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence, at most 240 characters."
+          }
+        }
+      },
+      "Reason": {
+        "type": "string",
+        "description": "Why an item needs someone, in the order Home shows the groups.",
+        "enum": [
+          "review",
+          "reply",
+          "decide",
+          "do",
+          "pay"
+        ]
+      },
+      "ReasonCount": {
+        "type": "object",
+        "description": "How many open items there are for one reason.",
+        "required": [
+          "reason",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Open items with it.",
+            "minimum": 0
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "The reason."
+          }
+        }
+      },
       "ReasonView": {
         "type": "object",
         "description": "One reason behind an answer: a stable rule id the client translates,\nand what it matched.",
@@ -7745,6 +8689,33 @@
             "type": "string",
             "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
             "example": "signals.list_header"
+          },
+          "sentence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's sentence holding the evidence, when it came from the\ntext. Untrusted: show it as quoted plain text only."
+          }
+        }
+      },
+      "RecordRef": {
+        "type": "object",
+        "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id within its module.",
+            "example": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"
+          },
+          "type": {
+            "type": "string",
+            "description": "The record type, `<module>.<record>`.",
+            "example": "conversations.thread"
           }
         }
       },
@@ -7768,6 +8739,20 @@
             "description": "The providers configured on this instance, in display order."
           }
         }
+      },
+      "Resolve": {
+        "type": "object",
+        "description": "A member's verdict on a need.",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "Done or Not needed."
+          }
+        },
+        "additionalProperties": false
       },
       "RevokeForm": {
         "type": "object",
@@ -7946,6 +8931,21 @@
             "description": "Stable user id at the identity provider."
           }
         }
+      },
+      "Snooze": {
+        "type": "object",
+        "description": "Until when.",
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Later than now and less than a year away."
+          }
+        },
+        "additionalProperties": false
       },
       "StartConnection": {
         "type": "object",
@@ -8333,6 +9333,14 @@
           }
         }
       },
+      "Trust": {
+        "type": "string",
+        "description": "How much the producing module stands behind an item.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
       "UpdateWorkspace": {
         "type": "object",
         "description": "The settings to change; absent fields stay as they are.",
@@ -8551,7 +9559,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -8581,6 +9589,10 @@
     {
       "name": "identity",
       "description": "Accounts and their ways in, and this instance's OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, sign-in with a provider, and the mailboxes a sign-up granted, waiting for a workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve browsers and OAuth clients; they answer 404 while another identity provider serves the instance."
+    },
+    {
+      "name": "attention",
+      "description": "The attention module."
     },
     {
       "name": "changes",

@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "invalid_until": "Choisissez une heure postérieure à maintenant et à moins d’un an.",
+    "snooze_needs_member": "Seul un membre peut remettre quelque chose à plus tard."
+  }
+}

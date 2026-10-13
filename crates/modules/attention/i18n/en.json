@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "invalid_until": "Choose a time later than now and less than a year away.",
+    "snooze_needs_member": "Only a member can put something off for later."
+  }
+}

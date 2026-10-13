@@ -1520,13 +1520,13 @@ impl EmailSignals {
                         reason.sentence = quoted_sentence(&fresh, reason);
                     }
                     Decided {
-                    answer: local_answer(
-                        q,
-                        peaked(q.option_count(), index, confidence),
-                        "signals",
-                        started,
-                    ),
-                    reasons,
+                        answer: local_answer(
+                            q,
+                            peaked(q.option_count(), index, confidence),
+                            "signals",
+                            started,
+                        ),
+                        reasons,
                     }
                 })
             })

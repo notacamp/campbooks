@@ -1,0 +1,221 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n               i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent,\n               i.since, i.state, i.cleared_because, i.cleared_by AS \"cleared_by: _\",\n               i.cleared_at, s.until AS \"snoozed_until?\"\n          FROM attention.items i\n          LEFT JOIN attention.snoozes s ON s.item_id = i.id AND s.user_id = $2\n         WHERE i.id = $1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ItemId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "record_type"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "container_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_type"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "container_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_id"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "cause_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "cause_type"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "cause_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "cause_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "reason"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "trust",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "trust"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "due_on",
+        "type_info": "Date",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "due_on"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "urgent",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "urgent"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "since",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "since"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "cleared_because",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "cleared_because"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "cleared_by: _",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "cleared_by"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "cleared_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "cleared_at"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "snoozed_until?",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "attention.snoozes",
+            "name": "until"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "2c60aa6cc737b6c95dae0910605451715fc5688ae9774eaa182f1308febe7eba"
+}

@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "invalid_until": "Elige una hora posterior a ahora y a menos de un año.",
+    "snooze_needs_member": "Solo un miembro puede dejar algo para más tarde."
+  }
+}

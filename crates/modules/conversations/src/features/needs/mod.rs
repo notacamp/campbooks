@@ -91,9 +91,15 @@ pub async fn resolve(
         Outcome::Done => NeedVerdict::Done,
         Outcome::NotNeeded => NeedVerdict::NotNeeded,
     };
-    judge(&state, &settings, &workspace.access, path.conversation_id, verdict)
-        .await
-        .map(Json)
+    judge(
+        &state,
+        &settings,
+        &workspace.access,
+        path.conversation_id,
+        verdict,
+    )
+    .await
+    .map(Json)
 }
 
 /// Answer yes to a question Campbooks put (a Review need it was unsure of).

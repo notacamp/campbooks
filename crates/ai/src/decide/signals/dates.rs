@@ -181,16 +181,17 @@ static NUMERIC: LazyLock<Regex> =
 static ISO: LazyLock<Regex> = LazyLock::new(|| regex(r"^(\d{4})-(\d{2})-(\d{2})$"));
 
 /// "within 3 days", "in 48 hours", "dentro de 5 dias", "sous 2 jours".
-static WITHIN: LazyLock<Regex> = LazyLock::new(|| {
-    regex(
-        r"(?i)(\d+)\s*(h|hours?|horas|heures|days?|dias|días|jours)\b",
-    )
-});
+static WITHIN: LazyLock<Regex> =
+    LazyLock::new(|| regex(r"(?i)(\d+)\s*(h|hours?|horas|heures|days?|dias|días|jours)\b"));
 
 /// The date the deadline words `evidence` name, for a message sent on
 /// `sent_on`, reading the sentence they came from (`context`) for a fuller
 /// date ("Friday 16 October", where the evidence is only "Friday").
-pub fn resolve_date(evidence: &str, context: Option<&str>, sent_on: NaiveDate) -> Option<NaiveDate> {
+pub fn resolve_date(
+    evidence: &str,
+    context: Option<&str>,
+    sent_on: NaiveDate,
+) -> Option<NaiveDate> {
     let words = evidence.trim().to_lowercase().replace('\u{2019}', "'");
     if words.is_empty() {
         return None;
@@ -244,11 +245,7 @@ fn named_date(text: &str, sent_on: NaiveDate) -> Option<NaiveDate> {
 
 fn numeric_date(words: &str, sent_on: NaiveDate) -> Option<NaiveDate> {
     if let Some(c) = ISO.captures(words) {
-        return NaiveDate::from_ymd_opt(
-            c[1].parse().ok()?,
-            c[2].parse().ok()?,
-            c[3].parse().ok()?,
-        );
+        return NaiveDate::from_ymd_opt(c[1].parse().ok()?, c[2].parse().ok()?, c[3].parse().ok()?);
     }
     let c = NUMERIC.captures(words)?;
     let day: u32 = c[1].parse().ok()?;
@@ -352,29 +349,68 @@ mod tests {
 
     #[test]
     fn weekdays_are_the_next_one_after_sending() {
-        assert_eq!(resolve_date("Thursday", None, sent()), Some(day(2026, 10, 15)));
-        assert_eq!(resolve_date("Monday", None, sent()), Some(day(2026, 10, 19)));
-        assert_eq!(resolve_date("quinta-feira", None, sent()), Some(day(2026, 10, 15)));
-        assert_eq!(resolve_date("viernes", None, sent()), Some(day(2026, 10, 16)));
-        assert_eq!(resolve_date("mercredi", None, sent()), Some(day(2026, 10, 14)));
+        assert_eq!(
+            resolve_date("Thursday", None, sent()),
+            Some(day(2026, 10, 15))
+        );
+        assert_eq!(
+            resolve_date("Monday", None, sent()),
+            Some(day(2026, 10, 19))
+        );
+        assert_eq!(
+            resolve_date("quinta-feira", None, sent()),
+            Some(day(2026, 10, 15))
+        );
+        assert_eq!(
+            resolve_date("viernes", None, sent()),
+            Some(day(2026, 10, 16))
+        );
+        assert_eq!(
+            resolve_date("mercredi", None, sent()),
+            Some(day(2026, 10, 14))
+        );
     }
 
     #[test]
     fn relative_words() {
         assert_eq!(resolve_date("today", None, sent()), Some(sent()));
-        assert_eq!(resolve_date("amanhã", None, sent()), Some(day(2026, 10, 13)));
-        assert_eq!(resolve_date("end of the week", None, sent()), Some(day(2026, 10, 16)));
-        assert_eq!(resolve_date("fin du mois", None, sent()), Some(day(2026, 10, 31)));
-        assert_eq!(resolve_date("next week", None, sent()), Some(day(2026, 10, 23)));
-        assert_eq!(resolve_date("within 3 days", None, sent()), Some(day(2026, 10, 15)));
-        assert_eq!(resolve_date("in 48 hours", None, sent()), Some(day(2026, 10, 14)));
+        assert_eq!(
+            resolve_date("amanhã", None, sent()),
+            Some(day(2026, 10, 13))
+        );
+        assert_eq!(
+            resolve_date("end of the week", None, sent()),
+            Some(day(2026, 10, 16))
+        );
+        assert_eq!(
+            resolve_date("fin du mois", None, sent()),
+            Some(day(2026, 10, 31))
+        );
+        assert_eq!(
+            resolve_date("next week", None, sent()),
+            Some(day(2026, 10, 23))
+        );
+        assert_eq!(
+            resolve_date("within 3 days", None, sent()),
+            Some(day(2026, 10, 15))
+        );
+        assert_eq!(
+            resolve_date("in 48 hours", None, sent()),
+            Some(day(2026, 10, 14))
+        );
     }
 
     #[test]
     fn numbers_are_day_first() {
         assert_eq!(resolve_date("30/10", None, sent()), Some(day(2026, 10, 30)));
-        assert_eq!(resolve_date("03/10/2027", None, sent()), Some(day(2027, 10, 3)));
-        assert_eq!(resolve_date("2026-11-02", None, sent()), Some(day(2026, 11, 2)));
+        assert_eq!(
+            resolve_date("03/10/2027", None, sent()),
+            Some(day(2027, 10, 3))
+        );
+        assert_eq!(
+            resolve_date("2026-11-02", None, sent()),
+            Some(day(2026, 11, 2))
+        );
         // Already past this year: next year's.
         assert_eq!(resolve_date("05/01", None, sent()), Some(day(2027, 1, 5)));
         assert_eq!(resolve_date("31/02", None, sent()), None);
@@ -383,11 +419,20 @@ mod tests {
     #[test]
     fn the_sentence_gives_the_full_date() {
         let sentence = "Please sign the attached lease and send it back by Friday 16 October.";
-        assert_eq!(resolve_date("Friday", Some(sentence), sent()), Some(day(2026, 10, 16)));
+        assert_eq!(
+            resolve_date("Friday", Some(sentence), sent()),
+            Some(day(2026, 10, 16))
+        );
         let pt = "O pagamento deve ser feito até 30 de outubro.";
-        assert_eq!(resolve_date("outubro", Some(pt), sent()), Some(day(2026, 10, 30)));
+        assert_eq!(
+            resolve_date("outubro", Some(pt), sent()),
+            Some(day(2026, 10, 30))
+        );
         let en = "Payment due by October 30th, 2026.";
-        assert_eq!(resolve_date("October", Some(en), sent()), Some(day(2026, 10, 30)));
+        assert_eq!(
+            resolve_date("October", Some(en), sent()),
+            Some(day(2026, 10, 30))
+        );
     }
 
     #[test]
