@@ -121,19 +121,42 @@ export function StatusLine({ visor = "idle", title, children }: StatusLineProps)
   );
 }
 
+/**
+ * Below the large breakpoint a list and its reader are separate screens:
+ * `hidden` takes this pane out there (the list while a conversation is
+ * open, the reader while none is).
+ */
+type Narrow = "shown" | "hidden";
+
 /** A list column (conversations of a stream). */
-export function ListPane({ label, children }: { label: string; children: ReactNode }) {
+export function ListPane({
+  label,
+  narrow = "shown",
+  children,
+}: {
+  label: string;
+  narrow?: Narrow | undefined;
+  children: ReactNode;
+}) {
   return (
-    <section className={styles["listPane"]} aria-label={label}>
+    <section className={styles["listPane"]} aria-label={label} data-narrow={narrow}>
       {children}
     </section>
   );
 }
 
 /** The reading column; `main` when it is the page's main content. */
-export function ReaderPane({ label, children }: { label: string; children: ReactNode }) {
+export function ReaderPane({
+  label,
+  narrow = "shown",
+  children,
+}: {
+  label: string;
+  narrow?: Narrow | undefined;
+  children: ReactNode;
+}) {
   return (
-    <main className={styles["reader"]} aria-label={label}>
+    <main className={styles["reader"]} aria-label={label} data-narrow={narrow}>
       {children}
     </main>
   );

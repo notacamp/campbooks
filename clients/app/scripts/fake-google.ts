@@ -9,9 +9,15 @@
 // Everyone who signs in is the same fictional person, Sam Rivera; each new
 // browser (a cookie on this origin) is a different Google account of hers,
 // so every recording run starts as someone Campbooks has not met.
+//
+// Each account also has a demo Gmail mailbox (scripts/fake-gmail.ts) that the
+// connectors module syncs: `POST /fake/deliver` drops one more message into
+// every mailbox, to show mail arriving live.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
+
+import { createMailbox, deliverDemo, demoImage, handleGmail, type Mailbox } from "./fake-gmail.ts";
 
 const { values } = parseArgs({ options: { port: { type: "string", default: "9050" } } });
 const port = Number(values.port);
@@ -35,6 +41,32 @@ interface Grant {
   challenge: string;
 }
 const codes = new Map<string, Grant>();
+/** Access and refresh tokens → the account they were issued for. */
+const tokens = new Map<string, string>();
+const mailboxes = new Map<string, Mailbox>();
+
+function mailboxOf(sub: string): Mailbox {
+  let mailbox = mailboxes.get(sub);
+  if (mailbox === undefined) {
+    mailbox = createMailbox(person.email, `${issuer}/images`);
+    mailboxes.set(sub, mailbox);
+  }
+  return mailbox;
+}
+
+/** The account a request's bearer token was issued for. */
+function bearer(request: IncomingMessage): string | undefined {
+  const token = /^Bearer (\S+)$/u.exec(request.headers.authorization ?? "")?.[1];
+  return token === undefined ? undefined : tokens.get(token);
+}
+
+function issueTokens(sub: string, refresh?: string) {
+  const access = `fake-access-${b64url(randomBytes(12))}`;
+  tokens.set(access, sub);
+  const refreshToken = refresh ?? `fake-refresh-${b64url(randomBytes(12))}`;
+  tokens.set(refreshToken, sub);
+  return { access, refresh: refreshToken };
+}
 
 function idToken(sub: string, clientId: string, nonce: string): string {
   const now = Math.floor(Date.now() / 1000);
@@ -135,6 +167,23 @@ const server = createServer((request, response) => {
     }
     if (url.pathname === "/token" && request.method === "POST") {
       const form = await body(request);
+      if (form.get("grant_type") === "refresh_token") {
+        const refresh = form.get("refresh_token") ?? "";
+        // A refresh token from an earlier run of the fake still works: it
+        // gets a fresh demo mailbox of its own.
+        const sub = tokens.get(refresh) ?? (refresh.startsWith("fake-refresh-") ? refresh : "");
+        if (sub === "") {
+          json(response, 400, { error: "invalid_grant" });
+          return;
+        }
+        const issued = issueTokens(sub, refresh);
+        json(response, 200, {
+          access_token: issued.access,
+          expires_in: 3599,
+          token_type: "Bearer",
+        });
+        return;
+      }
       const grant = codes.get(form.get("code") ?? "");
       codes.delete(form.get("code") ?? "");
       const challenge = b64url(
@@ -150,14 +199,54 @@ const server = createServer((request, response) => {
         json(response, 400, { error: "invalid_grant" });
         return;
       }
+      const issued = issueTokens(grant.sub);
       json(response, 200, {
-        access_token: `fake-access-${b64url(randomBytes(12))}`,
-        refresh_token: `fake-refresh-${b64url(randomBytes(12))}`,
+        access_token: issued.access,
+        refresh_token: issued.refresh,
         expires_in: 3599,
         token_type: "Bearer",
         scope: grant.scope,
         id_token: idToken(grant.sub, grant.clientId, grant.nonce),
       });
+      return;
+    }
+    if (url.pathname === "/revoke" && request.method === "POST") {
+      json(response, 200, {});
+      return;
+    }
+    if (url.pathname === "/v1/userinfo") {
+      const sub = bearer(request);
+      if (sub === undefined) {
+        json(response, 401, { error: "invalid_token" });
+        return;
+      }
+      json(response, 200, { sub, email: person.email, email_verified: true, name: person.name });
+      return;
+    }
+    if (url.pathname.startsWith("/gmail/v1/users/me/")) {
+      const sub = bearer(request);
+      if (sub === undefined) {
+        json(response, 401, { error: { code: 401, message: "Invalid Credentials" } });
+        return;
+      }
+      if (handleGmail(request, url, response, mailboxOf(sub))) {
+        return;
+      }
+    }
+    if (url.pathname.startsWith("/images/")) {
+      const image = demoImage(url.pathname.slice("/images/".length));
+      if (image !== undefined) {
+        response.writeHead(200, { "content-type": image.type, "cache-control": "no-store" });
+        response.end(Buffer.from(image.body, "latin1"));
+        if (url.pathname.endsWith("track.png")) {
+          console.log("fake Google: a tracking pixel was loaded");
+        }
+        return;
+      }
+    }
+    if (url.pathname === "/fake/deliver" && request.method === "POST") {
+      const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
+      json(response, 200, { delivered });
       return;
     }
     if (url.pathname === "/oauth2/v3/certs") {

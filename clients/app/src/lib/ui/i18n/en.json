@@ -56,6 +56,11 @@
   "navigation": {
     "main": "Main"
   },
+  "conversation": {
+    "unread": "Unread",
+    "starred": "Starred",
+    "attachment": "Has attachments"
+  },
   "recipients": {
     "list": "{{label}} recipients",
     "remove": "Remove {{name}}",

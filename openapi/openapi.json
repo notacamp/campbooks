@@ -1748,6 +1748,15 @@
             "schema": {
               "$ref": "#/components/schemas/MessageId"
             }
+          },
+          {
+            "name": "show_images",
+            "in": "query",
+            "description": "`true` to keep remote images (the member chose \"Show images\");\ntracking pixels are removed either way.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -3861,6 +3870,93 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/streams": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the streams and their counts.",
+        "operationId": "conversations.list_streams",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox",
+            "in": "query",
+            "description": "Only this inbox; every inbox you can read when absent.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The streams.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamCounts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "tags": [
@@ -5591,6 +5687,24 @@
           }
         }
       },
+      "AnswerView": {
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "Yes or no."
+          },
+          {
+            "type": "number",
+            "format": "double",
+            "description": "A level on the question's scale."
+          },
+          {
+            "type": "string",
+            "description": "One of the question's options."
+          }
+        ],
+        "description": "An answer's value: a label (choice), a level (score) or yes/no."
+      },
       "AttachmentId": {
         "type": "string",
         "format": "uuid",
@@ -5804,12 +5918,20 @@
         "description": "A conversation and its newest messages, oldest first.",
         "required": [
           "conversation",
-          "messages"
+          "messages",
+          "decisions"
         ],
         "properties": {
           "conversation": {
             "$ref": "#/components/schemas/ConversationSummary",
             "description": "The conversation."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionView"
+            },
+            "description": "The decide pass's answers about the newest inbound message, with\ntheir reasons: suggestions, except an answer marked `acted`."
           },
           "messages": {
             "type": "array",
@@ -5927,6 +6049,17 @@
             "type": "string",
             "description": "The first message's subject."
           },
+          "suggestion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StreamSuggestion",
+                "description": "Where the decide pass would put it instead, when it would: a\nsuggestion, never applied by itself."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unread_count": {
             "type": "integer",
             "format": "int32",
@@ -6007,6 +6140,62 @@
           }
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
+      },
+      "DecisionSource": {
+        "type": "string",
+        "description": "What kind of strategy gave an answer.",
+        "enum": [
+          "rules",
+          "model",
+          "knn",
+          "cascade"
+        ]
+      },
+      "DecisionView": {
+        "type": "object",
+        "description": "One answer of the decide pass about the newest inbound message.",
+        "required": [
+          "question",
+          "value",
+          "source",
+          "acted",
+          "reasons"
+        ],
+        "properties": {
+          "acted": {
+            "type": "boolean",
+            "description": "Whether it changed anything. In this version only a confident rules\nstream answer may; every other answer is a suggestion."
+          },
+          "confidence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How sure, 0 to 100, when the source says.",
+            "minimum": 0
+          },
+          "question": {
+            "type": "string",
+            "description": "The question: `stream`, `needs_reply`, `asks_action`,\n`has_deadline`, `urgency` or `suspicious`.",
+            "example": "needs_reply"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonView"
+            },
+            "description": "Why."
+          },
+          "source": {
+            "$ref": "#/components/schemas/DecisionSource",
+            "description": "Who answered."
+          },
+          "value": {
+            "$ref": "#/components/schemas/AnswerView",
+            "description": "The answer."
+          }
+        }
       },
       "Direction": {
         "type": "string",
@@ -6678,7 +6867,9 @@
         "type": "object",
         "description": "A message's bodies.",
         "required": [
-          "truncated"
+          "truncated",
+          "remote_images",
+          "images_shown"
         ],
         "properties": {
           "html": {
@@ -6686,7 +6877,17 @@
               "string",
               "null"
             ],
-            "description": "The HTML part: untrusted, to be shown only in a sandboxed frame."
+            "description": "The HTML part, sanitised; still to be shown only in a sandboxed frame."
+          },
+          "images_shown": {
+            "type": "boolean",
+            "description": "Whether the remote images were kept."
+          },
+          "remote_images": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Remote images in the HTML part: held back (their `src` removed)\nunless `show_images` was asked for.",
+            "minimum": 0
           },
           "text": {
             "type": [
@@ -7001,6 +7202,25 @@
           "google"
         ]
       },
+      "ReasonView": {
+        "type": "object",
+        "description": "One reason behind an answer: a stable rule id the client translates,\nand what it matched.",
+        "required": [
+          "rule",
+          "evidence"
+        ],
+        "properties": {
+          "evidence": {
+            "type": "string",
+            "description": "What it matched (a header name, a word), possibly empty."
+          },
+          "rule": {
+            "type": "string",
+            "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
+            "example": "signals.list_header"
+          }
+        }
+      },
       "RequestInfo": {
         "type": "object",
         "description": "What the sign-in screen shows for a waiting authorization request.",
@@ -7252,6 +7472,49 @@
           "newsletters"
         ]
       },
+      "StreamCount": {
+        "type": "object",
+        "description": "A stream and what it holds.",
+        "required": [
+          "stream",
+          "conversations",
+          "unread"
+        ],
+        "properties": {
+          "conversations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations in it that are still in the inbox.",
+            "minimum": 0
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The stream."
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, the ones with an unread message.",
+            "minimum": 0
+          }
+        }
+      },
+      "StreamCounts": {
+        "type": "object",
+        "description": "Every built-in stream, in display order (Primary first).",
+        "required": [
+          "streams"
+        ],
+        "properties": {
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StreamCount"
+            },
+            "description": "The streams, each listed even when empty."
+          }
+        }
+      },
       "StreamSource": {
         "type": "string",
         "description": "Who put a conversation in its stream.",
@@ -7261,6 +7524,41 @@
           "model",
           "member"
         ]
+      },
+      "StreamSuggestion": {
+        "type": "object",
+        "description": "Where the decide pass would put a conversation, when that is not where it\nis: a suggestion the member can take or leave.",
+        "required": [
+          "stream",
+          "source",
+          "reasons"
+        ],
+        "properties": {
+          "confidence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How sure, 0 to 100, when the source says.",
+            "minimum": 0
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonView"
+            },
+            "description": "Why."
+          },
+          "source": {
+            "$ref": "#/components/schemas/DecisionSource",
+            "description": "Who suggested it."
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The suggested stream."
+          }
+        }
       },
       "StreamView": {
         "type": "object",

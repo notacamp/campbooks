@@ -92,6 +92,9 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 cargo_metadata = "0.23.1"
 regex = "1.13.1"
 
+# Email: sanitising untrusted HTML bodies before they reach the client's
+# sandboxed frame (conversations). html5ever-based allow-list cleaner.
+ammonia = "4.2.0"
 # Email: MIME building of messages to send and parsing of raw messages
 # (connectors' email adapters).
 mail-builder = { version = "1.0.0", default-features = false }

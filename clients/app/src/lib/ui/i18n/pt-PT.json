@@ -56,6 +56,11 @@
   "navigation": {
     "main": "Principal"
   },
+  "conversation": {
+    "unread": "Não lida",
+    "starred": "Com estrela",
+    "attachment": "Tem anexos"
+  },
   "recipients": {
     "list": "Destinatários em {{label}}",
     "remove": "Remover {{name}}",

@@ -6,8 +6,7 @@
  */
 export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "connectors.connection": ["connectors.get_connection", "connectors.list_connections"],
-  "conversations.conversation": ["conversations.get", "conversations.list"],
-  "conversations.draft": ["conversations.get_draft", "conversations.list_drafts"],
+  "conversations.conversation": ["conversations.get", "conversations.list", "conversations.list_streams"],
   "conversations.inbox": ["conversations.list_inboxes"],
   "conversations.message": ["conversations.get", "conversations.get_message_body"],
   "identity.authorization_code": ["identity.authorize"],

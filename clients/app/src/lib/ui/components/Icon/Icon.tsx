@@ -96,6 +96,31 @@ const ICONS = {
       "M10.5 7H20M10.5 12H20M10.5 17H20M4.5 5.5 6 4.5v5M4.5 14.5a1.5 1.5 0 1 1 2.5 1.1L4.5 19.5H7",
     ),
   ],
+  star: [path("m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z")],
+  "star-filled": [
+    <path
+      key="s"
+      fill="currentColor"
+      d="m12 4 2.4 5 5.4.7-4 3.7 1 5.4-4.8-2.6-4.8 2.6 1-5.4-4-3.7 5.4-.7Z"
+    />,
+  ],
+  archive: [
+    <rect key="r" x="3.5" y="4.5" width="17" height="4.5" rx="1.5" />,
+    path("M5 9v9a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 18V9M10 13h4"),
+  ],
+  move: [path("M4 12h11M11 8l4 4-4 4"), path("M19 5v14")],
+  image: [
+    <rect key="r" x="3.5" y="4.5" width="17" height="15" rx="2.5" />,
+    <circle key="c" cx="9" cy="10" r="1.6" />,
+    path("m4 17 5-4.5 4 3.5 2.5-2 4.5 3.5"),
+  ],
+  forward: [path("m15 6 5 5-5 5"), path("M20 11H9.5A5.5 5.5 0 0 0 4 16.5V19")],
+  "reply-all": [
+    path("M11 14 6 9l5-5"),
+    path("M7 14 2 9l5-5"),
+    path("M6 9h8.5a5.5 5.5 0 0 1 0 11H12"),
+  ],
+  unread: [<circle key="c" cx="12" cy="12" r="4" fill="currentColor" />],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;
