@@ -792,7 +792,9 @@ mod tests {
             Provider::Zoho,
             Endpoints::zoho("https://accounts.zoho.eu").unwrap(),
         );
-        let (url, _) = query(&zoho.authorize_url(&request(false, false)));
+        let redirect = zoho.authorize_url(&request(false, false));
+        println!("sign-in sends the browser to: {redirect}");
+        let (url, _) = query(&redirect);
         assert_eq!(url.host_str(), Some("accounts.zoho.eu"));
         assert_eq!(url.path(), "/oauth/v2/auth");
         // The callback may still name any data centre.
