@@ -56,6 +56,10 @@ pub enum Error {
     /// reads.
     #[error("denied: {0}")]
     Denied(Reason),
+    /// The caller holds too many of a limited resource at once (e.g. open
+    /// change streams); the reason says which.
+    #[error("too many requests: {0}")]
+    TooManyRequests(Reason),
     /// The request conflicts with the current state.
     #[error("conflict: {0}")]
     Conflict(Reason),
@@ -84,6 +88,7 @@ impl Error {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) | Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
+            Self::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -97,6 +102,7 @@ impl Error {
             Self::BadRequest(reason)
             | Self::Denied(reason)
             | Self::Conflict(reason)
+            | Self::TooManyRequests(reason)
             | Self::Unavailable(reason) => reason.clone(),
             Self::NotFound => kernel.reason("not_found"),
             Self::Unauthorized(failure) => kernel.reason(failure.code()),

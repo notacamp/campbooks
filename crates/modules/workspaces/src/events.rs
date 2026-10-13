@@ -2,10 +2,13 @@
 //! change it describes. Every event belongs to its workspace; `workspace` is
 //! the workspace id as a string (the event bus keys deliveries by it).
 //! Each is declared in the module's `background` (`publishes`), which lists
-//! it in `openapi/events.json`.
+//! it in `openapi/events.json`, and declares the records it changed for the
+//! client change feed (`changes()`): `workspaces.workspace` (id: the
+//! workspace) and `workspaces.member` (id: the member's user id).
 
 use campbooks_kernel::{
-    DomainEvent,
+    DomainEvent, RecordRef,
+    changes::Change,
     tenancy::{Role, UserId},
 };
 use chrono::{DateTime, Utc};
@@ -13,6 +16,20 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::domain::model::Kind;
+
+/// The record type of a workspace in the change feed.
+pub const WORKSPACE_RECORD: &str = "workspaces.workspace";
+/// The record type of a membership in the change feed; its id is the
+/// member's user id.
+pub const MEMBER_RECORD: &str = "workspaces.member";
+
+fn workspace_record(workspace: &str) -> RecordRef {
+    RecordRef::new(WORKSPACE_RECORD, workspace)
+}
+
+fn member_record(user: UserId) -> RecordRef {
+    RecordRef::new(MEMBER_RECORD, &user)
+}
 
 /// A workspace was created; its creator is its first owner.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -31,6 +48,12 @@ impl DomainEvent for WorkspaceCreated {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        // The owner's membership comes with the `MemberJoined` published
+        // alongside.
+        vec![Change::upsert(workspace_record(&self.workspace))]
     }
 }
 
@@ -53,6 +76,10 @@ impl DomainEvent for MemberJoined {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(member_record(self.user))]
+    }
 }
 
 /// A user stopped being a member: they left, or were removed.
@@ -72,6 +99,10 @@ impl DomainEvent for MemberLeft {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::delete(member_record(self.user))]
     }
 }
 
@@ -97,6 +128,35 @@ impl DomainEvent for MemberRoleChanged {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(member_record(self.user))]
+    }
+}
+
+/// A workspace setting changed (its name or its colour). Carries which
+/// settings changed, never their values.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct WorkspaceUpdated {
+    /// The workspace.
+    pub workspace: String,
+    /// The settings that changed: `name`, `accent`.
+    pub fields: Vec<String>,
+    /// Who changed them.
+    pub updated_by: UserId,
+}
+
+impl DomainEvent for WorkspaceUpdated {
+    const NAME: &'static str = "workspaces.workspace_updated";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(workspace_record(&self.workspace))]
+    }
 }
 
 /// A workspace was deleted. Every module purges its data for it; the
@@ -117,5 +177,73 @@ impl DomainEvent for WorkspaceDeleting {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::delete(workspace_record(&self.workspace))]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::http::StatusCode;
+    use sqlx::PgPool;
+
+    use crate::testkit::Kit;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn every_change_is_recorded_for_the_change_feed_with_ids_only(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let bea = kit.join(&ana, ws, "bea", "member").await;
+        let (ana_id, bea_id) = (kit.user_id("ana").await, kit.user_id("bea").await);
+        let member = format!("/api/v1/w/{ws}/members/{bea_id}");
+        let ok = kit
+            .patch(
+                &ana,
+                &format!("/api/v1/w/{ws}"),
+                serde_json::json!({ "name": "Shop two" }),
+            )
+            .await;
+        assert_eq!(ok.status, StatusCode::OK);
+        let ok = kit
+            .patch(&ana, &member, serde_json::json!({ "role": "admin" }))
+            .await;
+        assert_eq!(ok.status, StatusCode::OK);
+        assert_eq!(
+            kit.delete(&ana, &member).await.status,
+            StatusCode::NO_CONTENT
+        );
+        drop(bea);
+        assert_eq!(
+            kit.delete(&ana, &format!("/api/v1/w/{ws}")).await.status,
+            StatusCode::ACCEPTED
+        );
+
+        let rows: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT record_type, record_id, op FROM kernel.changes
+              WHERE workspace_id = $1 ORDER BY published",
+        )
+        .bind(ws.to_string())
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+        let change = |t: &str, id: &str, op: &str| (t.to_owned(), id.to_owned(), op.to_owned());
+        let (ws, ana_id, bea_id) = (ws.to_string(), ana_id.to_string(), bea_id.to_string());
+        assert_eq!(
+            rows,
+            vec![
+                change("workspaces.workspace", &ws, "upsert"),
+                change("workspaces.member", &ana_id, "upsert"),
+                change("workspaces.member", &bea_id, "upsert"),
+                change("workspaces.workspace", &ws, "upsert"),
+                change("workspaces.member", &bea_id, "upsert"),
+                change("workspaces.member", &bea_id, "delete"),
+                change("workspaces.workspace", &ws, "delete"),
+            ],
+            "created, owner joined, bea joined, renamed, promoted, removed, deleted; \
+             the invitation is not a feed change"
+        );
     }
 }

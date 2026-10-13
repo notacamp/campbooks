@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT workspace_id FROM kernel.changes\n              WHERE seq IS NULL AND occurred_at < now() - make_interval(secs => $1)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workspace_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "workspace_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "f04271c958756656582195bb8ff81c33c39b92fea7d7ecb1cf7bc7237198b752"
+}

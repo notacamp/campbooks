@@ -179,6 +179,7 @@ pub(super) fn is_allowed_type(typ: &str, allowed: &[&str]) -> bool {
 /// `jsonwebtoken` itself.
 #[derive(Debug, Deserialize)]
 struct Claims {
+    exp: Option<i64>,
     sub: Option<String>,
     azp: Option<String>,
     scope: Option<String>,
@@ -250,6 +251,9 @@ impl Claims {
             email,
             email_verified,
             name,
+            expires_at: self
+                .exp
+                .and_then(|exp| chrono::DateTime::from_timestamp(exp, 0)),
         })
     }
 }
