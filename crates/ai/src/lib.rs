@@ -18,6 +18,7 @@ mod config;
 pub mod decide;
 mod error;
 mod gateway;
+mod telemetry;
 
 pub use config::{AiConfig, Protocol, ProviderConfig, Role};
 pub use error::Error;

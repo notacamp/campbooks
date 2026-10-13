@@ -26,7 +26,7 @@ use aws_lc_rs::signature::Ed25519KeyPair;
 use axum::{
     Json, Router,
     extract::State,
-    http::{HeaderValue, StatusCode, header},
+    http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -70,6 +70,8 @@ struct Shared {
     max_age: AtomicU64,
     /// Answer the JWKS with 503, as an IdP that is down.
     unavailable: AtomicBool,
+    /// The `traceparent` of the last request, if it carried one.
+    last_traceparent: Mutex<Option<String>>,
 }
 
 #[derive(Clone)]
@@ -115,6 +117,7 @@ impl TestIdp {
             discovery_fetches: AtomicUsize::new(0),
             max_age: AtomicU64::new(u64::MAX),
             unavailable: AtomicBool::new(false),
+            last_traceparent: Mutex::new(None),
         });
         let app = Router::new()
             .route("/auth/v1/.well-known/openid-configuration", get(discovery))
@@ -245,6 +248,12 @@ impl TestIdp {
         self.shared.discovery_fetches.load(Ordering::SeqCst)
     }
 
+    /// The W3C `traceparent` header of the last discovery or JWKS request,
+    /// if it carried one.
+    pub fn last_traceparent(&self) -> Option<String> {
+        lock(&self.shared.last_traceparent).clone()
+    }
+
     fn signing_key(&self) -> TestKey {
         lock(&self.shared.signing).clone()
     }
@@ -259,8 +268,18 @@ fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-async fn discovery(State(shared): State<Arc<Shared>>) -> Json<serde_json::Value> {
+fn note_traceparent(shared: &Shared, headers: &HeaderMap) {
+    if let Some(value) = headers.get("traceparent").and_then(|v| v.to_str().ok()) {
+        *lock(&shared.last_traceparent) = Some(value.to_owned());
+    }
+}
+
+async fn discovery(
+    State(shared): State<Arc<Shared>>,
+    headers: HeaderMap,
+) -> Json<serde_json::Value> {
     shared.discovery_fetches.fetch_add(1, Ordering::SeqCst);
+    note_traceparent(&shared, &headers);
     Json(serde_json::json!({
         "issuer": shared.issuer,
         "jwks_uri": format!("{}{JWKS_PATH}", shared.issuer),
@@ -269,8 +288,9 @@ async fn discovery(State(shared): State<Arc<Shared>>) -> Json<serde_json::Value>
     }))
 }
 
-async fn jwks(State(shared): State<Arc<Shared>>) -> Response {
+async fn jwks(State(shared): State<Arc<Shared>>, headers: HeaderMap) -> Response {
     shared.jwks_fetches.fetch_add(1, Ordering::SeqCst);
+    note_traceparent(&shared, &headers);
     if shared.unavailable.load(Ordering::SeqCst) {
         return StatusCode::SERVICE_UNAVAILABLE.into_response();
     }

@@ -277,6 +277,22 @@ tuned with `CAMPBOOKS_JOBS__*` (concurrency, per-workspace limit, poll
 interval, lease, retention, shutdown grace, retry backoff). A third role,
 `sync`, arrives with the connectors (ADR 0011).
 
+### Telemetry
+
+Spans are `tracing` spans, bridged to OpenTelemetry by the server; metrics
+use the OpenTelemetry metrics API. The kernel gives every request a server
+span (route template, status, request id, `workspace.id` and
+`principal.kind` recorded by the `Workspace`/`Scoped` extractors), every job
+attempt a consumer span linked to whoever enqueued it, and the IdP fetch a
+client span; `campbooks-ai` does the same for each provider call. Outbound
+calls carry the trace on with `kernel::telemetry::inject`. A module adds
+spans with `tracing::info_span!` like anywhere else, and **never puts
+personal data or secrets in a span field, log field or metric attribute**,
+nor ids in metric attributes. Nothing is exported unless
+`CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT` (OTLP/HTTP) or
+`CAMPBOOKS_TELEMETRY__METRICS_ADDR` (a Prometheus page on its own port) is
+set; see `deploy/README.md` → Monitoring.
+
 ### AI calls
 
 A module asks `campbooks-ai` for a **role**, never a vendor (ADR 0005).

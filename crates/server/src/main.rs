@@ -14,16 +14,16 @@ use std::sync::Arc;
 use campbooks_kernel::{
     AppState, Config,
     blobs::BlobStore,
-    config::{BlobBackend, LogFormat},
+    config::BlobBackend,
     db,
     events::{EventId, ReplayFrom},
     jobs::Worker,
 };
+use campbooks_server::telemetry::Telemetry;
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
 use sqlx::{Connection as _, PgConnection, PgPool, postgres::PgPoolOptions};
 use tokio::{sync::watch, task::JoinSet};
-use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
 /// Port used when `CAMPBOOKS_BIND_ADDR` is unset or unparsable.
 const DEFAULT_PORT: u16 = 8080;
@@ -104,6 +104,14 @@ enum Role {
 }
 
 impl Role {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::All => "all",
+            Self::Api => "api",
+            Self::Worker => "worker",
+        }
+    }
+
     fn api(self) -> bool {
         matches!(self, Self::All | Self::Api)
     }
@@ -148,13 +156,24 @@ fn serve(role: Role) -> ExitCode {
         Ok(config) => config,
         Err(e) => return fail(&e.to_string()),
     };
-    init_tracing(config.log_format);
-
+    if let Err(e) = config.telemetry.check() {
+        return fail(&e);
+    }
+    let telemetry = match Telemetry::new(&config.telemetry, role.as_str()) {
+        Ok(telemetry) => telemetry,
+        Err(e) => return fail(&e),
+    };
+    telemetry.install_subscriber(config.log_format);
     let runtime = match runtime() {
         Ok(runtime) => runtime,
         Err(e) => return fail(&e),
     };
-    match runtime.block_on(run(config, role)) {
+
+    let result = runtime.block_on(run(config, role, &telemetry));
+    // Stop every task first, then flush what they recorded.
+    drop(runtime);
+    telemetry.shutdown();
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!(error = %e, "server failed");
@@ -170,7 +189,11 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
         .map_err(|e| format!("could not start async runtime: {e}"))
 }
 
-async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error>> {
+async fn run(
+    config: Config,
+    role: Role,
+    telemetry: &Telemetry,
+) -> Result<(), Box<dyn std::error::Error>> {
     config.check()?;
     if role.api() {
         check_api_config(&config)?;
@@ -184,12 +207,15 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     }
     let db = connect(&config).await?;
     warn_if_row_security_is_bypassed(&db).await;
+    telemetry.observe_pool(&db, config.database_max_connections);
 
     let blobs = blob_store(&config, &db).await?;
 
     let bind_addr = config.bind_addr;
+    let metrics_addr = config.telemetry.metrics_addr;
     let state = campbooks_server::with_ports(
         AppState::new(db.clone(), config)
+            .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs),
     );
@@ -211,6 +237,26 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
                 .await
                 .map_err(|e| format!("http server failed: {e}"))
         });
+    }
+    if let (Some(router), Some(addr)) = (telemetry.metrics_router(), metrics_addr) {
+        let listener = tokio::net::TcpListener::bind(addr)
+            .await
+            .map_err(|e| format!("could not bind CAMPBOOKS_TELEMETRY__METRICS_ADDR={addr}: {e}"))?;
+        tracing::info!(%addr, "serving metrics at /metrics (keep this port private)");
+        let stopped = stopped(&stop);
+        parts.spawn(async move {
+            axum::serve(listener, router)
+                .with_graceful_shutdown(stopped)
+                .await
+                .map_err(|e| format!("metrics listener failed: {e}"))
+        });
+    }
+    if let Some(endpoint) = state.config.telemetry.otlp_endpoint() {
+        tracing::info!(
+            endpoint,
+            sample_ratio = state.config.telemetry.sample_ratio,
+            "exporting traces and metrics over OTLP"
+        );
     }
     if role.worker() {
         let worker = Worker::new(state);
@@ -290,7 +336,10 @@ async fn migrate(config: &Config) -> Result<(), String> {
 async fn connect(config: &Config) -> Result<PgPool, String> {
     let options = PgPoolOptions::new()
         .max_connections(config.database_max_connections)
-        .acquire_timeout(DB_ACQUIRE_TIMEOUT);
+        .acquire_timeout(DB_ACQUIRE_TIMEOUT)
+        // An event per acquire, for the pool-wait metric and span events;
+        // the log filter keeps it out of the logs.
+        .acquire_time_level(log::LevelFilter::Debug);
     db::with_runtime_role(options, config.database_role())
         .connect(config.database_url.expose_secret())
         .await
@@ -392,18 +441,6 @@ fn check_api_config(config: &Config) -> Result<(), String> {
         tracing::info!("CAMPBOOKS_WEB_DIR unset: serving the API only");
     }
     Ok(())
-}
-
-fn init_tracing(format: LogFormat) {
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info,tower_http=info,sqlx=warn"));
-    let registry = tracing_subscriber::registry().with(filter);
-    match format {
-        LogFormat::Json => registry
-            .with(fmt::layer().json().flatten_event(true))
-            .init(),
-        LogFormat::Pretty => registry.with(fmt::layer().pretty()).init(),
-    }
 }
 
 /// Resolves on Ctrl-C or SIGTERM (what `docker stop` sends).

@@ -7,6 +7,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod telemetry;
 pub mod web;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
@@ -14,7 +15,8 @@ use std::{fmt::Write as _, sync::Arc, time::Duration};
 use axum::{
     Json, Router,
     extract::Request as AxumRequest,
-    http::{HeaderName, HeaderValue, Request, StatusCode, header},
+    http::{HeaderName, HeaderValue, StatusCode, header},
+    middleware,
     routing::get,
 };
 use campbooks_kernel::{
@@ -27,10 +29,9 @@ use campbooks_kernel::{
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
-    request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     set_header::SetResponseHeaderLayer,
     timeout::TimeoutLayer,
-    trace::{DefaultOnResponse, TraceLayer},
 };
 use utoipa::{
     OpenApi as _,
@@ -164,8 +165,8 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// The full HTTP application: module routes (behind the idempotency layer),
 /// `/openapi.json`, the interim `/bff/api/*` passthrough, the web client
 /// (when `CAMPBOOKS_WEB_DIR` is set) or else a problem+json 404 fallback, and
-/// the middleware stack (security headers, request id, tracing, timeout,
-/// compression).
+/// the middleware stack (security headers, request id, tracing and metrics
+/// ([`telemetry::observe`]), timeout, compression).
 ///
 /// The same module routes are installed in the state's
 /// [`Operations`](operations::Operations), so automation and the assistant invoke operations by id
@@ -205,6 +206,7 @@ pub fn router(state: AppState) -> Router {
     let [nosniff, referrer, frame] = SECURITY_HEADERS.map(|(name, value)| {
         SetResponseHeaderLayer::overriding(name, HeaderValue::from_static(value))
     });
+    let metrics = state.metrics.clone();
 
     routes.with_state(state).layer(
         ServiceBuilder::new()
@@ -212,24 +214,7 @@ pub fn router(state: AppState) -> Router {
             .layer(referrer)
             .layer(frame)
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
-            .layer(
-                TraceLayer::new_for_http()
-                    .make_span_with(|request: &Request<_>| {
-                        let id = request
-                            .extensions()
-                            .get::<RequestId>()
-                            .and_then(|id| id.header_value().to_str().ok())
-                            .unwrap_or_default();
-                        tracing::info_span!(
-                            "http",
-                            method = %request.method(),
-                            uri = %request.uri(),
-                            request_id = %id,
-                        )
-                    })
-                    // One INFO line per request (status + latency).
-                    .on_response(DefaultOnResponse::new().level(tracing::Level::INFO)),
-            )
+            .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
             .layer(TimeoutLayer::with_status_code(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -241,7 +226,7 @@ pub fn router(state: AppState) -> Router {
 
 #[cfg(test)]
 mod tests {
-    use axum::body::Body;
+    use axum::{body::Body, http::Request};
     use campbooks_kernel::testing;
     use tower::ServiceExt;
 

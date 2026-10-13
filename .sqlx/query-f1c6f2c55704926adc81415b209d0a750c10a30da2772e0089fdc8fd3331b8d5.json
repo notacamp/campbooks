@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.workspaces SET purge_after = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "f1c6f2c55704926adc81415b209d0a750c10a30da2772e0089fdc8fd3331b8d5"
+}
