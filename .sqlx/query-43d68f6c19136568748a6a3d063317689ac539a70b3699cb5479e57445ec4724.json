@@ -1,0 +1,33 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts, run_at)\n        SELECT $1, $2, $3, $4, $5, coalesce($6, now())\n         WHERE NOT EXISTS (\n            SELECT 1 FROM kernel.jobs\n             WHERE queue = $1 AND workspace_key = $4 AND kind = $2 AND state = 'pending'\n         )\n        RETURNING id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Int4",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "43d68f6c19136568748a6a3d063317689ac539a70b3699cb5479e57445ec4724"
+}

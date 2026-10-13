@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bff;
+pub mod changes;
 pub mod telemetry;
 pub mod web;
 
@@ -191,6 +192,9 @@ fn security_scheme() -> SecurityScheme {
             channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes \
             they are a member of; a client token bound to the workspace sees them all."),
         // `cargo xtask new-module` inserts above this line.
+        (name = "changes", description = "The change feed: a Server-Sent Events stream per \
+            workspace of the records that changed (ids only), so clients refetch only what \
+            they show."),
     ),
 )]
 struct ApiDoc;
@@ -206,6 +210,7 @@ fn api(deps: &Deps) -> OpenApiRouter<AppState> {
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
         })
+        .merge(changes::router())
 }
 
 /// The OpenAPI document: every module's routes and the web BFF's.
@@ -565,6 +570,7 @@ mod tests {
             email: None,
             email_verified: false,
             name: None,
+            expires_at: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(

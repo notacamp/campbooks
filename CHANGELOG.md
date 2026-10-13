@@ -18,6 +18,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   its answers are recorded as suggestions only and change nothing yet. Mail
   older than `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14) gets
   no AI pass, so importing an old mailbox costs no AI.
+- Live updates: the app learns what changed in a workspace (renamed, a
+  member joined, left or changed role) as it happens and refreshes only what
+  it shows, catching up after a lost connection or a sleeping laptop. API
+  clients can follow the same stream at `GET /api/v1/w/{workspace_id}/changes`
+  (Server-Sent Events, ids only). Self-hosters behind a reverse proxy must
+  let `text/event-stream` responses through unbuffered; tuning lives in the
+  new `CAMPBOOKS_CHANGES__*` settings (see `deploy/.env.example`).
 - Sign in with Google, Microsoft or Zoho. Set a provider's client ID in
   `.env` (`CAMPBOOKS_IDP_GOOGLE_CLIENT_ID`, `CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID`,
   `CAMPBOOKS_IDP_ZOHO_CLIENT_ID`) and put its secret in

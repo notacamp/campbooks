@@ -206,6 +206,10 @@ fn run_arch(root: &Path) -> Result<String> {
     violations.extend(arch::check_allowlist(&arch_file.allow, &modules));
     violations.extend(arch::check_dependencies(&crates, &arch_file.allow));
     violations.extend(arch::check_migrations(&migrations, &modules));
+    violations.extend(arch::check_reserved_owner(
+        &modules,
+        campbooks_server::changes::OWNER,
+    ));
     violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
     let registry = campbooks_server::registry(&campbooks_server::Deps::offline());
     let background = registry
@@ -280,15 +284,21 @@ fn run_arch(root: &Path) -> Result<String> {
     )
 }
 
-/// `(METHOD, path)` → the module whose router declares the operation, or
-/// `bff` for the web BFF's own `/bff/*` operations (no module may take that
-/// name).
+/// `(METHOD, path)` → the module whose router declares the operation,
+/// `bff` for the web BFF's own `/bff/*` operations, or `changes` for the
+/// change feed (no module may take either name).
 fn operation_owners() -> Result<arch::Owners> {
     let mut owners = arch::Owners::new();
     let documents = campbooks_server::modules(&campbooks_server::Deps::offline())
         .into_iter()
         .map(|module| (module.name, module.router.into_openapi()))
-        .chain([(arch::BFF_SCHEMA, campbooks_server::bff::openapi())]);
+        .chain([
+            (arch::BFF_SCHEMA, campbooks_server::bff::openapi()),
+            (
+                campbooks_server::changes::OWNER,
+                campbooks_server::changes::router().into_openapi(),
+            ),
+        ]);
     for (name, document) in documents {
         let spec = serde_json::to_value(document)
             .with_context(|| format!("serializing `{name}`'s OpenAPI"))?;

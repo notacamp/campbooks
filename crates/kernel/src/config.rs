@@ -122,6 +122,9 @@ pub struct Config {
     /// Where message bodies and files are stored (`CAMPBOOKS_BLOBS__*`).
     #[serde(default)]
     pub blobs: BlobsConfig,
+    /// The client change feed (`CAMPBOOKS_CHANGES__*`).
+    #[serde(default)]
+    pub changes: ChangesConfig,
 
     /// Traces and metrics export (`CAMPBOOKS_TELEMETRY__*`); off by default.
     #[serde(default)]
@@ -176,6 +179,7 @@ impl Config {
             ));
         }
         self.signup.check()?;
+        self.changes.check()?;
         self.telemetry.check()
     }
 }
@@ -553,6 +557,81 @@ impl JobsConfig {
     }
 }
 
+/// Client change feed settings (`CAMPBOOKS_CHANGES__*`, ADR 0011).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct ChangesConfig {
+    /// How often an idle stream sends a heartbeat
+    /// (`CAMPBOOKS_CHANGES__HEARTBEAT_SECONDS`). Keep it below the idle
+    /// timeout of any proxy in front of the server.
+    pub heartbeat_seconds: u64,
+    /// Longest a stream stays open before it ends cleanly and the client
+    /// reconnects with its cursor (`CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS`).
+    /// A stream also ends when the caller's access token expires.
+    pub max_connection_seconds: u64,
+    /// How often an idle stream looks for changes when no notification
+    /// arrives (`CAMPBOOKS_CHANGES__POLL_INTERVAL_MS`); notifications wake
+    /// streams at once, the poll is the safety net.
+    pub poll_interval_ms: u64,
+    /// A client further behind than this many changes is told to `reset`
+    /// instead of catching up (`CAMPBOOKS_CHANGES__MAX_BACKLOG`).
+    pub max_backlog: u64,
+    /// How long changes are kept (`CAMPBOOKS_CHANGES__RETENTION_HOURS`);
+    /// a client resuming from an older cursor is told to `reset`.
+    pub retention_hours: u64,
+    /// Streams one caller may hold open at once, per server process
+    /// (`CAMPBOOKS_CHANGES__MAX_STREAMS_PER_PRINCIPAL`); more answer 429.
+    pub max_streams_per_principal: usize,
+}
+
+impl Default for ChangesConfig {
+    fn default() -> Self {
+        Self {
+            heartbeat_seconds: 25,
+            max_connection_seconds: 900,
+            poll_interval_ms: 5_000,
+            max_backlog: 10_000,
+            retention_hours: 72,
+            max_streams_per_principal: 8,
+        }
+    }
+}
+
+impl ChangesConfig {
+    /// Startup check: every value is in a usable range. The message names
+    /// the offending setting.
+    pub fn check(&self) -> Result<(), String> {
+        let checks = [
+            (
+                "HEARTBEAT_SECONDS",
+                self.heartbeat_seconds >= 1,
+                "at least 1",
+            ),
+            (
+                "MAX_CONNECTION_SECONDS",
+                self.max_connection_seconds >= self.heartbeat_seconds,
+                "at least HEARTBEAT_SECONDS",
+            ),
+            (
+                "POLL_INTERVAL_MS",
+                self.poll_interval_ms >= 10,
+                "at least 10",
+            ),
+            ("MAX_BACKLOG", self.max_backlog >= 1, "at least 1"),
+            ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
+            (
+                "MAX_STREAMS_PER_PRINCIPAL",
+                self.max_streams_per_principal >= 1,
+                "at least 1",
+            ),
+        ];
+        match checks.iter().find(|(_, ok, _)| !ok) {
+            Some((name, _, rule)) => Err(format!("CAMPBOOKS_CHANGES__{name} must be {rule}")),
+            None => Ok(()),
+        }
+    }
+}
+
 /// Access-token validation settings (`CAMPBOOKS_AUTH__*`). The API is an
 /// OAuth 2.1 resource server (ADR 0004): it trusts JWTs signed by the
 /// identity provider at [`issuer`](Self::issuer).
@@ -730,6 +809,8 @@ mod tests {
         assert_eq!(config.blobs.max_object_bytes, 52_428_800);
         assert_eq!(config.blobs.sweep_grace_hours, 24);
         assert!(config.blobs.check().is_ok());
+        assert_eq!(config.changes, ChangesConfig::default());
+        assert_eq!(config.changes.max_connection_seconds, 900);
         assert_eq!(config.telemetry.otlp_endpoint(), None);
         assert_eq!(config.telemetry.metrics_addr, None);
         assert!((config.telemetry.sample_ratio - 1.0).abs() < f64::EPSILON);
@@ -1011,6 +1092,22 @@ mod tests {
                 .contains("CAMPBOOKS_DATABASE_ROLE")
         );
         config.database_role = String::new();
+        config.changes.heartbeat_seconds = 0;
+        assert!(
+            config
+                .check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_CHANGES__HEARTBEAT_SECONDS")
+        );
+        config.changes = ChangesConfig::default();
+        config.changes.max_connection_seconds = 10;
+        assert!(
+            config
+                .check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS")
+        );
+        config.changes = ChangesConfig::default();
         config.signup.policy = SignupPolicy::Code;
         assert!(
             config

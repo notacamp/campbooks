@@ -369,6 +369,28 @@ The web target is served by `campbooks-server` itself (ADR 0006): the release
 image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share
 one origin and port.
 
+### The change feed (ADR 0011)
+
+Clients keep a cache per workspace and follow a stream of what changed
+instead of refetching lists (`openspec/changes/change-feed/`). A
+`DomainEvent` declares the records its change touched
+(`fn changes() -> Vec<Change>`: a `RecordRef` and `upsert`/`delete`, ids
+only); `publish` records them in `kernel.changes` in the same transaction.
+The `kernel.sequence_changes` job numbers a workspace's changes densely, in
+commit order (a shared/exclusive advisory-lock pair: producers never wait
+for it, it never numbers past a producer still in flight), so a cursor is
+never skipped. `GET /api/v1/w/{workspace_id}/changes` (`changes.stream`,
+`workspaces:read`) streams them as Server-Sent Events from a cursor
+(`Last-Event-ID` or `?after=`), filtered by the scopes of the read
+operations that return each record type and, for records inside a
+container, by the kernel's `Visibility` port; the web app reaches it through
+`/bff/api/…` unchanged. Frames never carry record contents. On the client,
+`lib/api/changes` turns frames into TanStack Query invalidations: query keys
+are `[operationId, params]` (`operationKey`) and `records.gen.ts` (generated
+from `x-campbooks.records`) says which operations read which record types.
+A module whose events change records says so in `changes()`; nothing else
+is needed for its screens to stay current.
+
 ### The web BFF
 
 `campbooks-server` signs browsers in itself (ADR 0004,

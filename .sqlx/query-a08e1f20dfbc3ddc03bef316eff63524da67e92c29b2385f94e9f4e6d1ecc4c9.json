@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "seq!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "seq"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "record_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "record_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "op",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "op"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "container_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "container_type"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "container_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "container_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "a08e1f20dfbc3ddc03bef316eff63524da67e92c29b2385f94e9f4e6d1ecc4c9"
+}

@@ -13,6 +13,7 @@ use super::{Job, JobContext, JobError, JobHandler, PruneJobs};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
+    changes::{PruneChanges, SequenceChanges},
     events::{DomainEvent, Event, EventConsumer, EventHandler, EventId, PublishedEvent},
     idempotency::PruneIdempotency,
 };
@@ -364,7 +365,9 @@ impl Registry {
         let kernel = Background::new()
             .schedule::<PruneJobs>(PRUNE_EVERY)
             .schedule::<SweepBlobs>(SWEEP_EVERY)
-            .schedule::<PruneIdempotency>(PRUNE_EVERY);
+            .schedule::<PruneIdempotency>(PRUNE_EVERY)
+            .job::<SequenceChanges>()
+            .schedule::<PruneChanges>(PRUNE_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)))
             .chain(others.iter().copied());

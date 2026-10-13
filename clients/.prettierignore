@@ -6,3 +6,4 @@ app/src-tauri/target/
 app/src-tauri/gen/
 # Generated from openapi/openapi.json; checked by `pnpm api:check` instead.
 app/src/lib/api/schema.gen.ts
+app/src/lib/api/records.gen.ts

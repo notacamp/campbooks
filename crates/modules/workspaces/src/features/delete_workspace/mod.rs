@@ -178,6 +178,8 @@ impl Job for PurgeWorkspace {
         )
         .execute(&mut **tx)
         .await?;
+        // Its change feed goes with it.
+        campbooks_kernel::changes::purge_workspace(tx, &workspace).await?;
         tracing::info!(workspace = %id, "workspace purged");
         Ok(())
     }
@@ -256,9 +258,23 @@ mod tests {
         .await
         .unwrap();
         let stats = worker.run_until_idle().await;
-        assert_eq!(stats.succeeded, 1, "{stats:?}");
+        assert_eq!(stats.failed, 0, "{stats:?}");
+        let purged: String = sqlx::query_scalar(
+            "SELECT state FROM kernel.jobs WHERE kind = 'workspaces.purge_workspace'",
+        )
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert_eq!(purged, "succeeded");
         assert_eq!(kit.rows_of(ws).await, (0, 0, 0));
         assert_eq!(kit.blobs_of(ws).await, 0);
+        let changes: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM kernel.changes WHERE workspace_id = $1")
+                .bind(ws.to_string())
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(changes, 0, "its change feed went with it");
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
