@@ -193,7 +193,12 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
         Google::new(
             FAKE_GOOGLE_CLIENT.to_owned(),
             campbooks_identity::deps::ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
-            ORIGIN,
+            campbooks_identity::upstream::redirect_uri(
+                campbooks_identity::upstream::Provider::Google,
+                ORIGIN,
+                None,
+            )
+            .unwrap(),
             GoogleEndpoints {
                 issuer: base.to_owned(),
                 authorize: at("oidc/authorize"),

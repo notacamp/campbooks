@@ -1,8 +1,8 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import createClient from "openapi-fetch";
 
 import { unwrap } from "./errors";
-import type { components, paths } from "./schema.gen";
+import type { components } from "./schema.gen";
+import { webRoutes } from "./web";
 
 /** Who is signed in to the web app (`GET /bff/session`). Never holds a token. */
 type Session = components["schemas"]["SessionInfo"];
@@ -15,10 +15,8 @@ type Session = components["schemas"]["SessionInfo"];
 const sessionQuery = (origin: string = globalThis.location.origin) =>
   queryOptions({
     queryKey: ["bff", "session"],
-    queryFn: async ({ signal }): Promise<Session> => {
-      const bff = createClient<paths>({ baseUrl: origin });
-      return unwrap(await bff.GET("/bff/session", { signal, credentials: "same-origin" }));
-    },
+    queryFn: async ({ signal }): Promise<Session> =>
+      unwrap(await webRoutes(origin).GET("/bff/session", { signal })),
     staleTime: 60_000,
   });
 
@@ -33,11 +31,9 @@ export function useSession() {
  * navigate to next, or null when the provider has none.
  */
 export async function signOut(origin: string = globalThis.location.origin): Promise<string | null> {
-  const bff = createClient<paths>({ baseUrl: origin });
-  const result = await bff.POST("/bff/logout", {
+  const result = await webRoutes(origin).POST("/bff/logout", {
     // The BFF refuses unsafe requests without its CSRF header.
     params: { header: { "x-campbooks-csrf": "1" } },
-    credentials: "same-origin",
   });
   return unwrap(result).logout_url ?? null;
 }

@@ -4,6 +4,9 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { readPref, writePref } from "~/lib/storage/prefs";
 
+import { readTabValue, writeTabValue } from "~/lib/storage/tab";
+
+import { CONNECTION, HELD_GRANT } from "../../test/demo/identity";
 import { ANA, DUARTE, HOUSEHOLD, PENDING, SESSION, SOFIA } from "../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../test/render";
 
@@ -33,25 +36,37 @@ describe("the app", () => {
     delete document.documentElement.dataset["accent"];
   });
 
-  it("shows the landing when signed out, signing in back to the same page", async () => {
+  it("sends a signed-out browser to the sign-in screen, which comes back to the same page", async () => {
     mockApi({ "GET /bff/session": { body: { authenticated: false } } });
-    globalThis.history.replaceState(null, "", "/w/abc/settings/members");
-    renderApp("/w/abc/settings/members");
+    const { router } = renderApp("/w/abc/settings/members?tab=all");
 
-    const signIn = await screen.findByRole("link", { name: "Sign in" });
-    expect(signIn).toHaveAttribute("href", "/bff/login?return_to=%2Fw%2Fabc%2Fsettings%2Fmembers");
-    globalThis.history.replaceState(null, "", "/");
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe("/sign-in");
+    });
+    expect(router.state.location.search).toEqual({ return_to: "/w/abc/settings/members?tab=all" });
+    expect(await screen.findByRole("heading", { name: "Opening sign-in…" })).toBeVisible();
+    expect(readTabValue("signIn.returnTo")).toBe("/w/abc/settings/members?tab=all");
+    writeTabValue("signIn.returnTo", "");
   });
 
-  it("uses invitation copy on an invitation link", async () => {
-    mockApi({ "GET /bff/session": { body: { authenticated: false } } });
-    globalThis.history.replaceState(null, "", "/invitations/accept?token=t0ken");
-    renderApp("/invitations/accept?token=t0ken");
+  it("says in place when a session ends while the app is open", async () => {
+    let signedIn = true;
+    mockApi({
+      "GET /bff/session": () => ({ body: signedIn ? SESSION : { authenticated: false } }),
+      [LIST]: { body: { workspaces: [DUARTE] } },
+    });
+    const { queryClient, router } = renderApp(`/w/${DUARTE.id}`);
+    await screen.findByRole("heading", { level: 1, name: "Nothing needs you yet" });
 
-    expect(
-      await screen.findByRole("heading", { name: "You’ve been invited to a workspace" }),
-    ).toBeVisible();
-    globalThis.history.replaceState(null, "", "/");
+    signedIn = false;
+    await queryClient.refetchQueries({ queryKey: ["bff", "session"] });
+
+    expect(await screen.findByRole("heading", { name: "You were signed out." })).toBeVisible();
+    expect(screen.getByRole("link", { name: "Sign in again" })).toHaveAttribute(
+      "href",
+      `/sign-in?return_to=${encodeURIComponent(`/w/${DUARTE.id}`)}`,
+    );
+    expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}`);
   });
 
   it("says when the server can't be reached", async () => {
@@ -70,6 +85,58 @@ describe("the app", () => {
       await screen.findByRole("heading", { name: "What should we call your workspace?" }),
     ).toBeVisible();
     expect(router.state.location.pathname).toBe("/welcome");
+  });
+
+  it("offers the mailbox held since sign-up on Home, then names it once connected", async () => {
+    let held = [HELD_GRANT] as unknown[];
+    let connections = [] as unknown[];
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      [LIST]: { body: { workspaces: [DUARTE] } },
+      "GET /bff/api/v1/identity/held-grants": () => ({ body: { items: held } }),
+      [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: () => ({ body: { connections } }),
+      [`POST /bff/api/v1/w/${DUARTE.id}/identity/held-grants/${HELD_GRANT.id}/adopt`]: () => {
+        held = [];
+        connections = [CONNECTION];
+        return { body: { connection: CONNECTION.id } };
+      },
+    });
+    renderApp(`/w/${DUARTE.id}`);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+
+    const mail = (await screen.findByRole("heading", { name: "Your mail" })).closest("section");
+    expect(mail).toHaveTextContent("ana@example.comConnected");
+    expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+  });
+
+  it("asks to connect the held mailbox right after the first workspace is created", async () => {
+    let workspaces = [] as unknown[];
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      [LIST]: () => ({ body: { workspaces } }),
+      "POST /bff/api/v1/workspaces": () => {
+        workspaces = [DUARTE];
+        return { status: 201, body: DUARTE };
+      },
+      "GET /bff/api/v1/identity/held-grants": { body: { items: [HELD_GRANT] } },
+      [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: { body: { connections: [] } },
+    });
+    const { router } = renderApp("/welcome");
+
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    expect(
+      await screen.findByRole("heading", {
+        name: "Your Gmail ana@example.com will be connected to this workspace",
+      }),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Not now/u }));
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}`);
+    });
+    expect(await screen.findByRole("heading", { name: "Connect ana@example.com" })).toBeVisible();
   });
 
   it("opens the last workspace, with its accent and the empty Home", async () => {

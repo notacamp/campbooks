@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
@@ -19,6 +26,16 @@ import { ACCENT_FOR_KIND, MAX_NAME_LENGTH } from "../../model";
 
 type Step = "name" | "kind" | "code" | "inviteOnly" | "approval" | "done";
 
+/** What a step after creating the workspace gets (see `afterCreate`). */
+export interface AfterCreateProps {
+  /** The workspace just created. */
+  workspace: Workspace;
+  /** Go on to the workspace's Home. */
+  onContinue: () => void;
+  /** The flow's own "is ready" view, for when there is nothing to add. */
+  children: ReactNode;
+}
+
 export interface CreateWorkspaceProps {
   /** The user has no workspace yet: no way out but signing out. */
   firstRun: boolean;
@@ -27,6 +44,11 @@ export interface CreateWorkspaceProps {
   /** Leave without creating one (only when it isn't the first). */
   onCancel?: (() => void) | undefined;
   onSignOut: () => void;
+  /**
+   * A step another module adds once the workspace exists (the mailbox held
+   * since sign-up). It renders `children` when it has nothing to ask.
+   */
+  afterCreate?: ComponentType<AfterCreateProps> | undefined;
 }
 
 /**
@@ -40,6 +62,7 @@ export function CreateWorkspace({
   onInvite,
   onCancel,
   onSignOut,
+  afterCreate: AfterCreate,
 }: CreateWorkspaceProps) {
   const { t } = useTranslation("workspaces");
   const { t: tShell } = useTranslation("shell");
@@ -58,6 +81,11 @@ export function CreateWorkspace({
   useEffect(() => {
     focusTarget.current?.focus();
   }, [step]);
+  // The ready view may appear later than its step (after a step another
+  // module adds has loaded), so it takes focus when it mounts.
+  const focusOnMount = useCallback((node: HTMLButtonElement | null) => {
+    node?.focus();
+  }, []);
 
   const defaultName = t("create.defaultName");
   const finalName = name.trim() === "" ? defaultName : name.trim();
@@ -329,7 +357,7 @@ export function CreateWorkspace({
       if (workspace === null) {
         return null;
       }
-      return (
+      const ready = (
         <FocusPage
           top={<Brand name={tShell("appName")} />}
           accent={workspace.accent}
@@ -341,7 +369,7 @@ export function CreateWorkspace({
           actions={
             <>
               <Button
-                ref={focusTarget}
+                ref={focusOnMount}
                 variant="primary"
                 size="lg"
                 onClick={() => {
@@ -363,6 +391,18 @@ export function CreateWorkspace({
             </>
           }
         />
+      );
+      return AfterCreate === undefined ? (
+        ready
+      ) : (
+        <AfterCreate
+          workspace={workspace}
+          onContinue={() => {
+            onOpen(workspace);
+          }}
+        >
+          {ready}
+        </AfterCreate>
       );
     }
   }

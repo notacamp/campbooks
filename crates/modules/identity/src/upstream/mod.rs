@@ -50,6 +50,47 @@ impl Provider {
     }
 }
 
+/// The `redirect_uri` sent to `provider` (in the authorization request and
+/// again in the code exchange, where the provider requires the two to match):
+/// `issuer` (this instance's origin) plus `configured`, the provider's
+/// `CAMPBOOKS_<PROVIDER>__REDIRECT_PATH`, or the route Campbooks serves,
+/// `/auth/callback/<provider>`, when it is unset.
+///
+/// A deployment whose OAuth app registered another callback path puts a
+/// reverse-proxy rewrite from that path to `/auth/callback/<provider>` in
+/// front of Campbooks and sets the setting to the registered path.
+pub fn redirect_uri(
+    provider: Provider,
+    issuer: &str,
+    configured: Option<&str>,
+) -> Result<String, String> {
+    let name = provider.as_str();
+    let setting = format!("CAMPBOOKS_{}__REDIRECT_PATH", name.to_ascii_uppercase());
+    let path = match configured.map(str::trim).filter(|p| !p.is_empty()) {
+        None => format!("/auth/callback/{name}"),
+        Some(path) => {
+            check_redirect_path(path).map_err(|why| format!("{setting}={path}: {why}"))?;
+            path.to_owned()
+        }
+    };
+    Ok(format!("{}{path}", issuer.trim_end_matches('/')))
+}
+
+/// A redirect path is an absolute path: `/` first, no scheme, host, query,
+/// fragment or dot segments.
+fn check_redirect_path(path: &str) -> Result<(), &'static str> {
+    const WHY: &str = "must be an absolute path such as /oauth/gmail/callback (no scheme, host, query or fragment)";
+    if !path.starts_with('/') || path.starts_with("//") {
+        return Err(WHY);
+    }
+    let base = url::Url::parse("https://campbooks.invalid").map_err(|_| WHY)?;
+    let joined = base.join(path).map_err(|_| WHY)?;
+    if joined.path() != path || joined.query().is_some() || joined.fragment().is_some() {
+        return Err(WHY);
+    }
+    Ok(())
+}
+
 /// A started round trip.
 #[derive(Debug)]
 pub struct Flow {

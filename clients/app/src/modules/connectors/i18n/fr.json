@@ -1,4 +1,13 @@
 {
   "title": "Comptes associés",
-  "summary": "Ce module n’a pas encore d’écrans."
+  "summary": "Ce module n’a pas encore d’écrans.",
+  "mail": {
+    "title": "Votre courrier",
+    "health": {
+      "ok": "Reliée",
+      "needs_reauth": "Vous devez vous reconnecter",
+      "throttled": "En pause un instant",
+      "failing": "Ne se synchronise plus"
+    }
+  }
 }

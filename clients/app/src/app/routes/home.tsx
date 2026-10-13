@@ -13,14 +13,51 @@ import {
   Tag,
   Text,
 } from "~/lib/ui";
+import { ConnectedMailboxes, useConnections } from "~/modules/connectors";
+import { MailboxOffer, useHeldGrants } from "~/modules/identity";
+import { useWorkspaces } from "~/modules/workspaces";
 
 /** Shortcuts worth knowing on day one, from the registry. */
 const STARTER_SHORTCUTS = ["command.open", "workspace.switch", "nav.settings", "sheet.open"];
 
 /**
- * A workspace's Home before anything can need the user: says so, offers
- * "Connect your mail" honestly as not ready yet (connectors, #36), and shows
- * the keyboard shortcuts that already work.
+ * Home's mail section: the mailbox held since sign-up (identity), else the
+ * mailboxes connected here (connectors), else "Connect your mail", honestly
+ * not ready yet.
+ */
+function MailSection({ workspaceId }: { workspaceId: string }) {
+  const { t } = useTranslation();
+  const held = useHeldGrants();
+  const connections = useConnections(workspaceId);
+  const workspaces = useWorkspaces();
+  const [grant] = held.data ?? [];
+  const name = workspaces.data?.find((workspace) => workspace.id === workspaceId)?.name ?? "";
+
+  if (grant !== undefined) {
+    return <MailboxOffer grant={grant} workspaceId={workspaceId} workspaceName={name} />;
+  }
+  if (connections.data !== undefined && connections.data.length > 0) {
+    return <ConnectedMailboxes connections={connections.data} />;
+  }
+  return (
+    <section className="flex flex-col items-start gap-3" aria-labelledby="connect-mail">
+      <div className="flex flex-wrap items-center gap-2">
+        <Heading level={2} size="title" id="connect-mail">
+          {t("home.connectTitle")}
+        </Heading>
+        <Tag>{t("home.soon")}</Tag>
+      </div>
+      <Text tone="secondary">{t("home.connectLead")}</Text>
+      <Button variant="primary" size="lg" icon="mail" disabled>
+        {t("home.connect")}
+      </Button>
+    </section>
+  );
+}
+
+/**
+ * A workspace's Home before anything can need the user: says so, the mail
+ * section, and the keyboard shortcuts that already work.
  */
 export function EmptyHome() {
   const { t, i18n } = useTranslation();
@@ -75,18 +112,7 @@ export function EmptyHome() {
         title={t("home.title")}
         subline={t("home.subline")}
       />
-      <section className="flex flex-col items-start gap-3" aria-labelledby="connect-mail">
-        <div className="flex flex-wrap items-center gap-2">
-          <Heading level={2} size="title" id="connect-mail">
-            {t("home.connectTitle")}
-          </Heading>
-          <Tag>{t("home.soon")}</Tag>
-        </div>
-        <Text tone="secondary">{t("home.connectLead")}</Text>
-        <Button variant="primary" size="lg" icon="mail" disabled>
-          {t("home.connect")}
-        </Button>
-      </section>
+      <MailSection workspaceId={workspaceId ?? ""} />
     </HomeLayout>
   );
 }
