@@ -329,7 +329,8 @@
     "conversations_write": "Répondre, envoyer, archiver et trier vos conversations",
     "identity_read": "Voir votre compte et vos moyens de connexion",
     "identity_write": "Modifier vos moyens de connexion",
-    "identity_clients": "Gérer les applications d’un espace de travail"
+    "identity_clients": "Gérer les applications d’un espace de travail",
+    "conversations_send": "Envoyer du courrier depuis vos boîtes mail"
   },
   "apps": {
     "title": "Applications et intégrations",

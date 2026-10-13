@@ -329,7 +329,8 @@
     "conversations_write": "Reply, send, archive and sort your conversations",
     "identity_read": "See your account and how you sign in",
     "identity_write": "Change how you sign in",
-    "identity_clients": "Manage a workspace’s own apps"
+    "identity_clients": "Manage a workspace’s own apps",
+    "conversations_send": "Send mail from your mailboxes"
   },
   "apps": {
     "title": "Apps and integrations",

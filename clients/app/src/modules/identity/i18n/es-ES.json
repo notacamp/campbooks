@@ -329,7 +329,8 @@
     "conversations_write": "Responder, enviar, archivar y ordenar tus conversaciones",
     "identity_read": "Ver tu cuenta y cómo inicias sesión",
     "identity_write": "Cambiar cómo inicias sesión",
-    "identity_clients": "Gestionar las aplicaciones de un espacio de trabajo"
+    "identity_clients": "Gestionar las aplicaciones de un espacio de trabajo",
+    "conversations_send": "Enviar correo desde tus buzones"
   },
   "apps": {
     "title": "Aplicaciones e integraciones",

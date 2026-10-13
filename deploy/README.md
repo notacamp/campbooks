@@ -462,8 +462,9 @@ With the built-in issuer:
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
   forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
-- **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks
-  and starting a link are rate-limited per client address. Behind a proxy every request
+- **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks,
+  starting a link, the token endpoint, client registration and the consent screen are
+  rate-limited per client address. Behind a proxy every request
   comes from the proxy, so without this setting all clients share one budget (30
   sign-ins a minute for everyone). Set it to the proxy's address or network, as
   comma-separated addresses or CIDR blocks, e.g. `CAMPBOOKS_TRUSTED_PROXIES=172.18.0.0/16`
@@ -476,6 +477,26 @@ With the built-in issuer:
   A provider account that is already another Campbooks account's way in is refused, never
   merged. The last way in can't be removed, and adding or removing one needs a sign-in in
   the last ten minutes. Disconnecting a mailbox keeps its sign-in.
+- **Apps other than the web app.** Every one of them gets in only after the person
+  allows it on Campbooks' consent screen, which names the app, says whether anyone
+  vouches for it, lists what it will be able to do and asks which workspace it may use.
+  People see and revoke what they allowed under Settings → Apps and integrations.
+  - **The desktop and mobile apps** (`campbooks-native`) sign in in the system browser
+    with a loopback or `com.notacamp.campbooks:` redirect. They are asked for every
+    time: any program on a device can listen on a loopback port.
+  - **A workspace's own apps.** Owners and admins register them under Settings → Apps
+    and integrations: a server-to-server app gets a client id and secret for the
+    `client_credentials` grant (`POST /oauth2/token`), its tokens work in that workspace
+    only, and the secret is shown once (rotate it if it is lost); a sign-in app gets a
+    client id for its users to allow.
+  - **MCP agents and other apps** find everything from the API's URL: a call without a
+    token answers `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/api"`,
+    which names this issuer. They register themselves at `/oauth2/register` (public
+    clients only; unused ones are deleted after 30 days) or use an `https` URL of their
+    metadata document as their client id. The consent screen marks them unverified. Their
+    tokens are bound to one workspace and can never manage accounts or apps.
+  - Access tokens now name `${CAMPBOOKS_PUBLIC_URL}/api` as their audience;
+    `CAMPBOOKS_AUTH__AUDIENCE` only applies to an outside identity provider.
 
 ## Connected accounts
 

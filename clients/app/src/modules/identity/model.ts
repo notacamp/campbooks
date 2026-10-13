@@ -152,6 +152,7 @@ export const APP_ACCESS = {
     "connectors:write",
     "conversations:read",
     "conversations:write",
+    "conversations:send",
   ],
 } as const satisfies Record<string, readonly string[]>;
 export type AppAccess = keyof typeof APP_ACCESS;
