@@ -14,11 +14,11 @@ layout only. The rules and how CI enforces them are in AGENTS.md → UI.
 `lib/ui/tokens/tokens.css` is the only file with colour, size and duration
 values.
 
-| Layer | What | Examples | Who reads it |
-| --- | --- | --- | --- |
-| 1. Primitives | Raw hues, chroma and scales | `--accent-h`, `--neutral-c`, `--signal-pay-h`, `--space-3`, `--radius-md`, `--duration-fast` | Only the other two layers |
-| 2. Semantic | Roles, each defined once for light and dark with `light-dark()` | `--surface-raised`, `--text-secondary`, `--border-subtle`, `--accent`, `--on-accent`, `--signal-reply`, `--danger` | Components, Tailwind utilities |
-| 3. Component | Per-component knobs | `--btn-height`, `--row-pad-y`, `--kbd-bg`, `--sidebar-width` | Components |
+| Layer         | What                                                            | Examples                                                                                                           | Who reads it                   |
+| ------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| 1. Primitives | Raw hues, chroma and scales                                     | `--accent-h`, `--neutral-c`, `--signal-pay-h`, `--space-3`, `--radius-md`, `--duration-fast`                       | Only the other two layers      |
+| 2. Semantic   | Roles, each defined once for light and dark with `light-dark()` | `--surface-raised`, `--text-secondary`, `--border-subtle`, `--accent`, `--on-accent`, `--signal-reply`, `--danger` | Components, Tailwind utilities |
+| 3. Component  | Per-component knobs                                             | `--btn-height`, `--row-pad-y`, `--kbd-bg`, `--sidebar-width`                                                       | Components                     |
 
 A theme is three attributes, on `<html>` or any element:
 
@@ -90,26 +90,26 @@ attributes, e.g. `data-variant="primary"`), a story and a test. Fonts are
 Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
 (SIL OFL 1.1).
 
-| Component | Notes |
-| --- | --- |
-| Button, ButtonLink | primary, secondary, ghost, danger, link; `md` follows density, `lg` is the 44px touch size; `shortcut` shows the keys and sets `aria-keyshortcuts` |
-| IconButton | required `label`; tooltip includes the keys |
-| Kbd, KbdHint | keycaps read from the registry (`shortcut`) or one-off `keys`; hidden on touch-only devices |
-| Avatar | 8 low-chroma identity hues from a hash of the name; services are squircles |
-| Pill, Tag, Dot | signals (review, reply, decide, do, pay, sort) carry meaning only |
-| Visor | the assistant's face: idle, reading, thinking, unsure, happy, alert, asleep; sm to xl |
-| Note | "where things stand": linked records, confidence, a Why? disclosure, the low-confidence choice |
-| Banner, EmptyState, Skeleton, Toast | states; `UndoProvider` + `useUndoToast()` is the undo stack (Z) |
-| Item, ConversationRow, NavItem, Segmented, Chip, TabBar, ActionBar | rows and navigation |
-| Shell, Sidebar, ListPane, ReaderPane, PaneHeader, HomeLayout, PageHero, QueueGroup, AsideSection, Line, Figure, MessageCard, Composer | layout and screen pieces |
-| CommandMenu (⌘K), ShortcutSheet (?) | modal dialogs that read the shortcut registry |
-| TextField, Select, ChoiceCards | labelled form controls with help and errors; ChoiceCards are native radios with a sentence each |
-| FocusPage, Brand | a centred page that asks one thing (signing in, each first-run step); can preview an accent with `accent` |
-| Popover, PopoverSection | a small non-modal panel on its trigger (the account menu); Escape and outside clicks close it |
-| WorkspaceMenu, WorkspaceMark, AccountButton, PhoneHeader | the workspace switcher (⌘⇧W) with each workspace in its own accent, who is signed in, the phone's top bar |
-| List, ListRow, InlineConfirm | rows of people or invitations; risky actions confirm in place, not in a modal |
-| Fact, FactList | a description list of label and value (the admin System panel), with an optional status dot: success, danger or off |
-| Heading, Text, VisuallyHidden, Icon | typography and icons for modules |
+| Component                                                                                                                             | Notes                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Button, ButtonLink                                                                                                                    | primary, secondary, ghost, danger, link; `md` follows density, `lg` is the 44px touch size; `shortcut` shows the keys and sets `aria-keyshortcuts` |
+| IconButton                                                                                                                            | required `label`; tooltip includes the keys                                                                                                        |
+| Kbd, KbdHint                                                                                                                          | keycaps read from the registry (`shortcut`) or one-off `keys`; hidden on touch-only devices                                                        |
+| Avatar                                                                                                                                | 8 low-chroma identity hues from a hash of the name; services are squircles                                                                         |
+| Pill, Tag, Dot                                                                                                                        | signals (review, reply, decide, do, pay, sort) carry meaning only                                                                                  |
+| Visor                                                                                                                                 | the assistant's face: idle, reading, thinking, unsure, happy, alert, asleep, plus the emotions dizzy, starry and hearts; sm to xl                  |
+| Note                                                                                                                                  | "where things stand": linked records, confidence, a Why? disclosure, the low-confidence choice                                                     |
+| Banner, EmptyState, Skeleton, Toast                                                                                                   | states; `UndoProvider` + `useUndoToast()` is the undo stack (Z)                                                                                    |
+| Item, ConversationRow, NavItem, Segmented, Chip, TabBar, ActionBar                                                                    | rows and navigation                                                                                                                                |
+| Shell, Sidebar, ListPane, ReaderPane, PaneHeader, HomeLayout, PageHero, QueueGroup, AsideSection, Line, Figure, MessageCard, Composer | layout and screen pieces                                                                                                                           |
+| CommandMenu (⌘K), ShortcutSheet (?)                                                                                                   | modal dialogs that read the shortcut registry                                                                                                      |
+| TextField, Select, ChoiceCards                                                                                                        | labelled form controls with help and errors; ChoiceCards are native radios with a sentence each                                                    |
+| FocusPage, Brand                                                                                                                      | a centred page that asks one thing (signing in, each first-run step); can preview an accent with `accent`                                          |
+| Popover, PopoverSection                                                                                                               | a small non-modal panel on its trigger (the account menu); Escape and outside clicks close it                                                      |
+| WorkspaceMenu, WorkspaceMark, AccountButton, PhoneHeader                                                                              | the workspace switcher (⌘⇧W) with each workspace in its own accent, who is signed in, the phone's top bar                                          |
+| List, ListRow, InlineConfirm                                                                                                          | rows of people or invitations; risky actions confirm in place, not in a modal                                                                      |
+| Fact, FactList                                                                                                                        | a description list of label and value (the admin System panel), with an optional status dot: success, danger or off                                |
+| Heading, Text, VisuallyHidden, Icon                                                                                                   | typography and icons for modules                                                                                                                   |
 
 ## Keyboard shortcuts
 

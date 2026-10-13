@@ -14,6 +14,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- The Visor (the assistant's face) has three new emotions: dizzy (something failed on
+  our side), starry (a big win) and heart eyes (a warm moment), with an optional
+  gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at
+  small sizes.
 - Passkeys. Add one under Settings → Ways to sign in (Add a passkey, `N` `P`), then sign
   in with it on the sign-in screen: the passkey button (`P`) or your browser's
   autofill. You can also create an account with a passkey alone, no Google, Microsoft or
