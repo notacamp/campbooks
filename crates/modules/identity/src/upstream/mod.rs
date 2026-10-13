@@ -148,6 +148,8 @@ pub struct Flow {
     pub workspace_id: Option<Uuid>,
     /// The connection a reconnect re-authorises.
     pub connection_id: Option<String>,
+    /// For a reconnect, the provider account (`sub`) that must come back.
+    pub expected_subject: Option<String>,
     /// The `/oauth2/authorize` request to complete afterwards.
     pub request_id: Option<String>,
     /// Same-origin path to land on when there is no request to complete.
@@ -169,6 +171,7 @@ impl Flow {
             account_id: None,
             workspace_id: None,
             connection_id: None,
+            expected_subject: None,
             request_id,
             return_to,
             nonce: random_token(),
@@ -198,9 +201,9 @@ pub async fn store_flow(
     sqlx::query(
         "INSERT INTO identity.upstream_flows
              (state_hash, browser_hash, provider, purpose, account_id, target_workspace_id,
-              connection_id, request_id, return_to, nonce, code_verifier, consent_retry,
-              created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
+              connection_id, expected_subject, request_id, return_to, nonce, code_verifier,
+              consent_retry, created_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
     )
     .bind(&state_hash)
     .bind(hash(browser_token))
@@ -209,6 +212,7 @@ pub async fn store_flow(
     .bind(flow.account_id)
     .bind(flow.workspace_id)
     .bind(&flow.connection_id)
+    .bind(&flow.expected_subject)
     .bind(&flow.request_id)
     .bind(&flow.return_to)
     .bind(&flow.nonce)
@@ -239,6 +243,7 @@ pub async fn take_flow(
         account_id: Option<Uuid>,
         workspace_id: Option<Uuid>,
         connection_id: Option<String>,
+        expected_subject: Option<String>,
         request_id: Option<String>,
         return_to: String,
         nonce: String,
@@ -251,7 +256,7 @@ pub async fn take_flow(
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.upstream_flows WHERE state_hash = $1
          RETURNING browser_hash, provider, purpose, account_id,
-                   target_workspace_id AS workspace_id, connection_id,
+                   target_workspace_id AS workspace_id, connection_id, expected_subject,
                    request_id, return_to, nonce, code_verifier, consent_retry, expires_at",
     )
     .bind(&state_hash)
@@ -278,6 +283,7 @@ pub async fn take_flow(
         account_id: row.account_id,
         workspace_id: row.workspace_id,
         connection_id: row.connection_id,
+        expected_subject: row.expected_subject,
         request_id: row.request_id,
         return_to: row.return_to,
         nonce: row.nonce,

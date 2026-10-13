@@ -361,7 +361,7 @@ pub async fn callback(
         Err(code) => return Ok(with_cookie(fail(code), clear_flow)),
     };
     if flow.purpose != Purpose::SignIn {
-        let response = link::finish(&ctx, flow, signed_in, now).await?;
+        let response = link::finish(&ctx, issuer, &headers, flow, signed_in, now).await?;
         return Ok(with_cookie(response, clear_flow));
     }
     let Upstreamed { identity, tokens } = signed_in;

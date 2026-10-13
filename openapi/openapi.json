@@ -412,7 +412,7 @@
         ],
         "responses": {
           "204": {
-            "description": "Removed. Mailbox connections are untouched."
+            "description": "Removed; the sessions signed in with it ended. Mailbox connections are untouched."
           },
           "401": {
             "description": "No valid access token.",

@@ -29,7 +29,8 @@ use campbooks_kernel::{
     signup::{Invitations, InvitedFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{
-        self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
+        self, TestIdp, TestUser, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT,
+        WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
     },
 };
 use figment::{Figment, providers::Serialized};
@@ -58,8 +59,11 @@ pub const ORIGIN: &str = "http://localhost:8080";
 pub const MAIL_SCOPE: &str = "https://mail.example.com/modify";
 /// The fake Microsoft's tenant.
 pub const TENANT: &str = "2b5a2c1e-6f1d-4c8e-9a3b-7d4e5f6a7b8c";
-/// The connection the fake intake lets its grantor reconnect.
+/// The connection the fake intake lets its grantor reconnect: its grant
+/// stopped working, and it is the fake Google's default account's.
 pub const RECONNECTABLE: &str = "connection-1";
+/// A connection whose grant still works, of the same account.
+pub const HEALTHY: &str = "connection-healthy";
 /// That connection's address.
 pub const RECONNECTABLE_ADDRESS: &str = "test-user@example.com";
 
@@ -124,16 +128,20 @@ impl GrantIntake for FakeIntake {
         _workspace: WorkspaceId,
         connection: &'a str,
     ) -> TargetFuture<'a> {
-        let found = connection == RECONNECTABLE;
+        let needs_reauth = match connection {
+            RECONNECTABLE => Some(true),
+            HEALTHY => Some(false),
+            _ => None,
+        };
         Box::pin(async move {
-            if found {
-                Ok(ReconnectTarget {
+            needs_reauth
+                .map(|needs_reauth| ReconnectTarget {
                     provider: "google".to_owned(),
                     address: RECONNECTABLE_ADDRESS.to_owned(),
+                    account_subject: TestUser::default().subject,
+                    needs_reauth,
                 })
-            } else {
-                Err(Error::NotFound)
-            }
+                .ok_or(Error::NotFound)
         })
     }
 }

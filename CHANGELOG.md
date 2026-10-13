@@ -31,6 +31,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   mailbox you connect becomes a way in too. A provider account that is already
   another Campbooks account's way in is refused, never merged. Adding or removing
   a way in, or connecting a mailbox, needs a sign-in in the last ten minutes.
+  Removing a way in signs out every session that signed in with it.
+- `CAMPBOOKS_TRUSTED_PROXIES` (comma-separated addresses or CIDR blocks): the
+  reverse proxies whose `X-Forwarded-For` names the client. Set it behind a proxy,
+  or the per-address sign-in rate limits count every client as one (see
+  `deploy/README.md` → Built-in sign-in).
 - `CAMPBOOKS_GOOGLE__REDIRECT_PATH` (default `/auth/callback/google`): the callback
   path Campbooks sends to Google when your OAuth app registered another one, with a
   reverse proxy rewriting it to `/auth/callback/google`. The same

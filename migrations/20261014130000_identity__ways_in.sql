@@ -18,12 +18,16 @@ CREATE TABLE identity.link_tickets (
     -- security, like every identity table).
     target_workspace_id uuid,
     connection_id text,
+    -- A reconnect: the provider account (`sub`) of the connection. Only it
+    -- may come back, and a reconnect never adds a way in.
+    expected_subject text,
     login_hint text,
     return_to text NOT NULL,
     created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL,
     CHECK ((purpose = 'link') = (target_workspace_id IS NULL)),
-    CHECK ((purpose = 'reconnect') = (connection_id IS NOT NULL))
+    CHECK ((purpose = 'reconnect') = (connection_id IS NOT NULL)),
+    CHECK ((purpose = 'reconnect') = (expected_subject IS NOT NULL))
 );
 CREATE INDEX link_tickets_expires_idx ON identity.link_tickets (expires_at);
 
@@ -32,6 +36,7 @@ ALTER TABLE identity.upstream_flows
     ADD COLUMN account_id uuid REFERENCES identity.accounts (id) ON DELETE CASCADE,
     ADD COLUMN target_workspace_id uuid,
     ADD COLUMN connection_id text,
+    ADD COLUMN expected_subject text,
     ADD CONSTRAINT upstream_flows_account_purpose_check
         CHECK ((purpose = 'sign_in') = (account_id IS NULL));
 

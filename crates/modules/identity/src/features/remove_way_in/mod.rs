@@ -1,8 +1,8 @@
 //! `DELETE /api/v1/identity/ways-in/{id}` — stop signing in with a provider
 //! account. Needs a recent sign-in, and never removes the account's last way
-//! in (provider identities and passkeys count alike). It never disconnects a
-//! mailbox: connections are the connectors module's, with their own
-//! lifecycle.
+//! in (provider identities and passkeys count alike). Every session signed
+//! in with it ends, with its refresh tokens. It never disconnects a mailbox:
+//! connections are the connectors module's, with their own lifecycle.
 
 use axum::{
     Extension,
@@ -15,7 +15,7 @@ use uuid::Uuid;
 use crate::{
     MESSAGES,
     deps::Deps,
-    domain::{accounts, step_up, ways_in},
+    domain::{accounts, sessions, step_up, ways_in},
     events::WayInRemoved,
     scopes::IdentityWrite,
 };
@@ -38,7 +38,8 @@ pub struct WayInPath {
     extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.provider_identity"])))),
     params(("id" = Uuid, Path, description = "The way in.")),
     responses(
-        (status = NO_CONTENT, description = "Removed. Mailbox connections are untouched."),
+        (status = NO_CONTENT, description = "Removed; the sessions signed in with it ended. \
+            Mailbox connections are untouched."),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "The token lacks `identity:write`, or the sign-in \
@@ -75,6 +76,8 @@ pub async fn handler(
     if count <= 1 {
         return Err(Error::Conflict(MESSAGES.reason("last_way_in")));
     }
+    // Whoever signed in with it is signed out, before the link to it goes.
+    let ended = sessions::end_signed_in_with(&mut tx, path.id, now).await?;
     let provider = accounts::remove(&mut tx, path.id, account)
         .await?
         .ok_or(Error::NotFound)?;
@@ -82,7 +85,7 @@ pub async fn handler(
         &mut tx,
         Some(account),
         "way_in_removed",
-        serde_json::json!({ "method": "provider", "provider": provider, "way_in": path.id }),
+        serde_json::json!({ "method": "provider", "provider": provider, "way_in": path.id, "sessions_ended": ended }),
         now,
     )
     .await?;

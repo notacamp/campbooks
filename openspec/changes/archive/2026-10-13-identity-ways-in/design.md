@@ -82,10 +82,11 @@ The protocol routes keep their paths: `/auth/start/{provider}` gains the
      member (`Membership` port, else 404); the provider must have mailbox
      scopes (`GrantIntake::mailbox_scopes`), else 409 `mailbox_unsupported`.
    - `reconnect`: `workspace_id` and `connection_id`; the grant-intake port's
-     `reconnect_target` says which provider and address, and answers 404
-     unless the caller granted that connection. No step-up: the provider
-     must return the same account (`connectors` refuses `account_mismatch`),
-     so nothing new becomes a way in.
+     `reconnect_target` says which provider, address and provider account
+     (`sub`), whether it needs re-authorisation, and answers 404 unless the
+     caller granted that connection. Step-up only when it doesn't need
+     re-authorisation (renewing a working grant). The expected `sub` is kept
+     with the ticket and the flow.
 2. The answer is `{ url: "/auth/start/{provider}?link=<ticket>", expires_at }`:
    a random 256-bit ticket, stored hashed, single use, two minutes.
 3. The browser navigates there. `/auth/start` takes the ticket and requires
@@ -103,7 +104,11 @@ The protocol routes keep their paths: `/auth/start/{provider}` gains the
 ### Finishing it
 
 The callback validates as for sign-in (state, browser, provider error,
-RFC 9207 `iss`, code exchange with PKCE, ID token). Then, by
+RFC 9207 `iss`, code exchange with PKCE, ID token), and requires the browser
+to be still signed in to the flow's account (else `sign_in_again`, nothing
+written). A **reconnect** then accepts only the expected `sub`, refusing any
+other with `account_mismatch` before any write, and **never links a way in**:
+it only hands the grant over. For link and connect, by
 `(provider, issuer, subject)`:
 
 - **This account's** way in: refreshed (`last_used_at`).
@@ -125,7 +130,9 @@ lands on `return_to?linked=<provider>` or `?connected=<connection id>`.
 `ways_in::lock_and_count` (locks the account row; providers plus passkeys)
 and refuses 409 `last_way_in` when the count is one; otherwise it deletes the
 provider identity (404 when it is not the caller's), audits, and publishes
-`identity.way_in_removed`. It never disconnects a mailbox. A grant held since
+`identity.way_in_removed`. Every session signed in with that way in ends,
+with its refresh families (an attacker's session must not outlive the
+removal). It never disconnects a mailbox. A grant held since
 sign-up for that identity goes with it (the cascade S1a set up); the
 confirmation says so. Sessions signed in with it keep running.
 
@@ -318,11 +325,17 @@ round trip only, and there is one front door.
 
 ### 5. Step-up on reconnect
 
-- **A. Not needed (chosen).** The provider must return the very account of
-  the connection (`account_mismatch` otherwise), so no new way in can appear,
-  and a mailbox that stopped syncing is fixed in one click.
-- **B. Needed, like connect.** Uniform, but it adds a full sign-in before
-  every reconnect for no security gain.
+- **A. Not needed for a connection that needs re-authorisation, needed
+  otherwise (chosen, after the security review).** The callback accepts only
+  the connection's own provider account and a reconnect never adds a way in,
+  so a stolen session can at most re-authorise the victim's own mailbox that
+  had stopped working. A mailbox that stopped syncing is fixed in one click.
+- **B. Never needed.** The first draft. The security review showed it needs
+  A's two guards: with the identity linked before the account check, a
+  stolen session could make the attacker's provider account a permanent way
+  in.
+- **C. Always needed, like connect.** Uniform, but a full sign-in before every
+  repair for no further gain.
 
 ### 6. Provider code shape
 

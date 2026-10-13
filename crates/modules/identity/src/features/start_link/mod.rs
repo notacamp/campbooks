@@ -5,8 +5,10 @@
 //! The answer is a same-origin URL holding a single-use, two-minute ticket.
 //! It works only in a browser signed in to the issuer as the same account
 //! (see `protocol::link`). Adding a way in and connecting need a sign-in in
-//! the last ten minutes; reconnecting does not, because the provider must
-//! return the very account of the connection.
+//! the last ten minutes. Reconnecting a mailbox whose grant stopped working
+//! does not: only the connection's own provider account may come back, and a
+//! reconnect never adds a way in. Renewing a grant that still works needs the
+//! recent sign-in too.
 
 use std::time::Duration;
 
@@ -146,6 +148,7 @@ pub async fn execute(
                 purpose: Purpose::Link,
                 workspace_id: None,
                 connection_id: None,
+                expected_subject: None,
                 login_hint: None,
                 return_to,
             }
@@ -168,6 +171,7 @@ pub async fn execute(
                 purpose: Purpose::Connect,
                 workspace_id: Some(*workspace.as_uuid()),
                 connection_id: None,
+                expected_subject: None,
                 login_hint: None,
                 return_to,
             }
@@ -179,12 +183,18 @@ pub async fn execute(
                 .grants
                 .reconnect_target(state, &principal.subject, workspace, &connection)
                 .await?;
+            // A grant that still works is renewed only after a recent
+            // sign-in, like adding one.
+            if !target.needs_reauth {
+                step_up::require_recent(principal, now)?;
+            }
             Ticket {
                 account_id: account,
                 provider: configured(&target.provider)?,
                 purpose: Purpose::Reconnect,
                 workspace_id: Some(*workspace.as_uuid()),
                 connection_id: Some(connection),
+                expected_subject: Some(target.account_subject),
                 login_hint: Some(target.address),
                 return_to,
             }

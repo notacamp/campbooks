@@ -2089,7 +2089,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Removed. Mailbox connections are untouched. */
+            /** @description Removed; the sessions signed in with it ended. Mailbox connections are untouched. */
             204: {
                 headers: {
                     [name: string]: unknown;

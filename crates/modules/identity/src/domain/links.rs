@@ -33,6 +33,8 @@ pub struct Ticket {
     pub workspace_id: Option<Uuid>,
     /// The connection a reconnect re-authorises.
     pub connection_id: Option<String>,
+    /// For a reconnect, the provider account (`sub`) that must come back.
+    pub expected_subject: Option<String>,
     /// The account to suggest at the provider.
     pub login_hint: Option<String>,
     /// Same-origin path to come back to.
@@ -50,8 +52,8 @@ pub async fn issue(
     sqlx::query(
         "INSERT INTO identity.link_tickets
              (ticket_hash, account_id, provider, purpose, target_workspace_id, connection_id,
-              login_hint, return_to, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+              expected_subject, login_hint, return_to, created_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
     )
     .bind(hash(&token))
     .bind(ticket.account_id)
@@ -59,6 +61,7 @@ pub async fn issue(
     .bind(ticket.purpose.as_str())
     .bind(ticket.workspace_id)
     .bind(&ticket.connection_id)
+    .bind(&ticket.expected_subject)
     .bind(&ticket.login_hint)
     .bind(&ticket.return_to)
     .bind(now)
@@ -78,6 +81,7 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
         purpose: String,
         workspace_id: Option<Uuid>,
         connection_id: Option<String>,
+        expected_subject: Option<String>,
         login_hint: Option<String>,
         return_to: String,
         expires_at: DateTime<Utc>,
@@ -85,7 +89,7 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.link_tickets WHERE ticket_hash = $1
          RETURNING account_id, provider, purpose, target_workspace_id AS workspace_id, connection_id,
-                   login_hint,
+                   expected_subject, login_hint,
                    return_to, expires_at",
     )
     .bind(hash(token))
@@ -98,6 +102,7 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
             purpose: Purpose::parse(&row.purpose)?,
             workspace_id: row.workspace_id,
             connection_id: row.connection_id,
+            expected_subject: row.expected_subject,
             login_hint: row.login_hint,
             return_to: row.return_to,
         })

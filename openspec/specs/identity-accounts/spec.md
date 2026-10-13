@@ -150,7 +150,9 @@ single use, expire after two minutes, and start a round trip only in a
 browser whose issuer session belongs to the same account; otherwise nothing
 SHALL start and the browser SHALL return with `link_error=sign_in_again` or
 `link_error=link_expired`. The round trip SHALL ask for consent again
-(`prompt=consent`). Completed, it SHALL link the provider identity to the
+(`prompt=consent`), and its callback SHALL find the same browser still
+signed in to that account, or link nothing and return with
+`link_error=sign_in_again`. Completed, it SHALL link the provider identity to the
 account (or refresh it when already linked), audit it, publish
 `identity.way_in_added`, and return the browser to `return_to?linked=<provider>`.
 
@@ -171,11 +173,14 @@ account (or refresh it when already linked), audit it, publish
 belongs to (404 otherwise), a provider whose mailbox the instance can sync
 (409 `mailbox_unsupported` otherwise) and a recent sign-in. With purpose
 `reconnect` it SHALL need a connection the caller granted in that workspace
-(404 otherwise) and no recent sign-in. Both SHALL ask for identity, mailbox
-and offline access with `prompt=consent`, link the identity as for `link`,
-and then hand the grant to the grant-intake port for that workspace (naming
-the connection for `reconnect`). A refusal of the port SHALL return the
-browser with `link_error=<its code>` and keep the way in; success SHALL
+(404 otherwise), and a recent sign-in unless that connection needs
+re-authorisation. Both SHALL ask for identity, mailbox and offline access with
+`prompt=consent`. A connect SHALL link the identity as for `link`. A
+reconnect SHALL accept only the connection's own provider account, refusing
+any other with `link_error=account_mismatch` before writing anything, and
+SHALL never add a way in. Then the grant SHALL go to the grant-intake port
+for that workspace (naming the connection for `reconnect`). A refusal of the
+port SHALL return the browser with `link_error=<its code>`; success SHALL
 return it with `connected=<connection id>`.
 
 #### Scenario: Connect a second Gmail
@@ -190,6 +195,14 @@ return it with `connected=<connection id>`.
 - **WHEN** a member starts a `reconnect` for a connection a colleague granted
 - **THEN** the response is 404
 
+#### Scenario: Another provider account comes back from a reconnect
+- **WHEN** a reconnect is started for a connection and a different Google account consents at the provider
+- **THEN** the browser returns with `link_error=account_mismatch`, and the account's ways in, sessions and connections are unchanged
+
+#### Scenario: Renewing a grant that still works
+- **WHEN** a member whose sign-in is an hour old starts a `reconnect` for a healthy connection
+- **THEN** the response is 403 with `code` = `step_up_required`
+
 ### Requirement: Listing and removing ways in
 `identity.list_ways_in` (`identity:read`) SHALL list the caller's provider
 ways in (provider, address as given at link time, how and when linked, last
@@ -197,12 +210,17 @@ used) and the providers configured on the instance.
 `identity.remove_way_in` (`identity:write`) SHALL need a recent sign-in,
 lock the account, and refuse with 409 `last_way_in` when the way in is the
 account's only one, counting provider identities and passkeys. A way in of
-another account SHALL be 404. Removing SHALL NOT disconnect any mailbox,
-SHALL be audited, and SHALL publish `identity.way_in_removed`.
+another account SHALL be 404. Removing SHALL end every session signed in
+with that way in and revoke their refresh tokens, SHALL NOT disconnect any
+mailbox, SHALL be audited, and SHALL publish `identity.way_in_removed`.
 
 #### Scenario: Remove the last way in
 - **WHEN** a person with only a Google way in removes it
 - **THEN** the response is 409 with `code` = `last_way_in` and the way in remains
+
+#### Scenario: Whoever signed in with it is signed out
+- **WHEN** a way in is removed while another browser is signed in with it
+- **THEN** that browser's session ends and its refresh token is refused
 
 #### Scenario: Remove one of two
 - **WHEN** a person with a Google and a Zoho way in removes the Zoho one

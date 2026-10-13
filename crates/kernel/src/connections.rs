@@ -75,6 +75,11 @@ pub struct ReconnectTarget {
     pub provider: String,
     /// Its mailbox address (to suggest the account at the provider).
     pub address: String,
+    /// The provider's id of the connected account (`sub`): only this
+    /// account may consent again.
+    pub account_subject: String,
+    /// Whether its grant stopped working and needs consent again.
+    pub needs_reauth: bool,
 }
 
 /// A future returned by [`GrantIntake::reconnect_target`].
@@ -94,8 +99,8 @@ pub trait GrantIntake: std::fmt::Debug + Send + Sync + 'static {
     fn adopt<'a>(&'a self, state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a>;
 
     /// The connection `connection` of workspace `workspace`, when the person
-    /// with token subject `subject` granted it there and may consent to it
-    /// again; [`Error::NotFound`] otherwise.
+    /// with token subject `subject` granted it there; [`Error::NotFound`]
+    /// otherwise.
     fn reconnect_target<'a>(
         &'a self,
         state: &'a AppState,

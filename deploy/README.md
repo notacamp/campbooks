@@ -458,6 +458,15 @@ With the built-in issuer:
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
   forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
+- **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks
+  and starting a link are rate-limited per client address. Behind a proxy every request
+  comes from the proxy, so without this setting all clients share one budget (30
+  sign-ins a minute for everyone). Set it to the proxy's address or network, as
+  comma-separated addresses or CIDR blocks, e.g. `CAMPBOOKS_TRUSTED_PROXIES=172.18.0.0/16`
+  for the Docker network your proxy reaches the server over (`docker network inspect
+  <network>` shows its subnet). Campbooks then reads `X-Forwarded-For` from those
+  addresses only, taking the right-most entry that is not one of them; anything a client
+  writes further left is ignored.
 - **More ways in.** Signed in, a person adds another Google, Microsoft or Zoho account
   under Settings → Ways to sign in, and every mailbox they connect becomes a way in too.
   A provider account that is already another Campbooks account's way in is refused, never

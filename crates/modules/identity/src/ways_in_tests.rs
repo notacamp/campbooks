@@ -8,7 +8,9 @@ use serde_json::json;
 use sqlx::PgPool;
 
 use crate::{
-    testkit::{Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, query},
+    testkit::{
+        HEALTHY, Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, query,
+    },
     upstream::{
         Provider,
         client::{MICROSOFT_ISSUER_PREFIX, MICROSOFT_ISSUER_SUFFIX},
@@ -569,5 +571,145 @@ async fn a_european_zoho_account_signs_in_at_its_data_centre(db: PgPool) {
     assert_eq!(
         count(&kit, "SELECT count(*) FROM identity.held_grants").await,
         0
+    );
+}
+
+/// Ways in, live sessions and connections handed over, as counts.
+async fn footprint(kit: &Kit) -> (i64, i64, usize) {
+    (
+        count(kit, "SELECT count(*) FROM identity.provider_identities").await,
+        count(
+            kit,
+            "SELECT count(*) FROM identity.sessions WHERE ended_at IS NULL",
+        )
+        .await,
+        kit.intake.adopted().len(),
+    )
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reconnect_by_another_provider_account_changes_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let stale = kit.stale(&access).await;
+    let before = footprint(&kit).await;
+    let started = kit
+        .start_link(
+            &stale,
+            &json!({ "purpose": "reconnect", "workspace_id": uuid::Uuid::now_v7(),
+                     "connection_id": RECONNECTABLE, "return_to": "/w/ws" }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    // At the provider, someone signs in with another account.
+    kit.google.set_user(user("attacker"));
+    let back = kit.via(Provider::Google, &to_google.location()).await;
+    assert_eq!(back.location(), "/w/ws?link_error=account_mismatch");
+    assert_eq!(
+        footprint(&kit).await,
+        before,
+        "no way in, session or connection"
+    );
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
+        )
+        .await,
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn renewing_a_working_grant_needs_a_recent_sign_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let stale = kit.stale(&access).await;
+    let body = json!({ "purpose": "reconnect", "workspace_id": uuid::Uuid::now_v7(),
+                       "connection_id": HEALTHY });
+    let refused = kit.start_link(&stale, &body).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+    assert_eq!(refused.json["code"], "step_up_required");
+    // Signing in again (the same account) makes it recent.
+    kit.new_browser();
+    let (url, verifier) = Kit::web_authorize();
+    let request = kit.get(&url).await.location_query()["request"].clone();
+    let signed_in = kit.round_trip(Some(&request)).await;
+    let tokens = kit
+        .redeem(&signed_in.location_query()["code"], &verifier)
+        .await;
+    let fresh = tokens.json["access_token"].as_str().unwrap().to_owned();
+    let allowed = kit.start_link(&fresh, &body).await;
+    assert_eq!(allowed.status, StatusCode::CREATED, "{allowed:?}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn removing_a_way_in_signs_out_whoever_used_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    kit.zoho.set_user(user("zoho-sam"));
+    let at_zoho = link_to(&kit, &access, Provider::Zoho).await;
+    kit.via(Provider::Zoho, &at_zoho).await;
+    let zoho = kit.ways_in(&access).await["items"][1]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+
+    // Another browser signs in with Zoho and holds a refresh token.
+    kit.new_browser();
+    let (url, verifier) = Kit::web_authorize();
+    let request = kit.get(&url).await.location_query()["request"].clone();
+    let signed_in = kit.round_trip_with(Provider::Zoho, Some(&request)).await;
+    let tokens = kit
+        .redeem(&signed_in.location_query()["code"], &verifier)
+        .await;
+    let refresh = tokens.json["refresh_token"].as_str().unwrap().to_owned();
+
+    // The owner removes Zoho from the first sign-in (still recent).
+    let removed = kit
+        .api(
+            Method::DELETE,
+            &format!("/api/v1/identity/ways-in/{zoho}"),
+            &access,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{removed:?}");
+
+    // That browser's session and refresh tokens are gone.
+    let refreshed = kit.refresh(&refresh).await;
+    assert_eq!(refreshed.status, StatusCode::BAD_REQUEST, "{refreshed:?}");
+    assert_eq!(refreshed.json["error"], "invalid_grant");
+    let (url, _) = Kit::web_authorize();
+    assert!(
+        kit.get(&url)
+            .await
+            .location()
+            .starts_with("/sign-in?request="),
+        "signed out of the issuer too"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_link_finishes_only_in_the_same_signed_in_browser(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    kit.zoho.set_user(user("zoho-sam"));
+    let at_zoho = link_to(&kit, &access, Provider::Zoho).await;
+    // While at Zoho, the browser's issuer session ends (signed out
+    // elsewhere, or expired).
+    sqlx::query("UPDATE identity.sessions SET ended_at = now()")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let back = kit.via(Provider::Zoho, &at_zoho).await;
+    assert_eq!(
+        back.location(),
+        format!("{SETTINGS}?link_error=sign_in_again")
+    );
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.provider_identities").await,
+        1,
+        "nothing linked"
     );
 }

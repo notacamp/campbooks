@@ -12,14 +12,13 @@ use campbooks_kernel::{
         TargetFuture,
     },
     db::BeginFor as _,
-    tenancy::{Access, WorkspaceId},
+    tenancy::{Access, UserId, WorkspaceId},
 };
 use secrecy::ExposeSecret as _;
 
 use super::{
-    connections,
     grants::{ProviderGrant, create_or_refresh_connection},
-    model::{Capability, ConnectionId, Provider},
+    model::{Capability, ConnectionId, Health, Provider},
 };
 use crate::{MESSAGES, deps::Deps, google};
 
@@ -106,15 +105,23 @@ impl GrantIntake for Intake {
             let access = member(state, subject, workspace).await?;
             let user = access.user.ok_or(Error::NotFound)?;
             let mut tx = state.db.begin_for(workspace).await?;
-            let found = connections::load(&mut tx, id).await?;
+            let found = sqlx::query!(
+                r#"SELECT provider, address, account_subject, health
+                     FROM connectors.connections
+                    WHERE id = $1 AND granted_by = $2"#,
+                id as ConnectionId,
+                user as UserId,
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
             tx.commit().await?;
             // Only the grantor consents to their grant again.
-            let connection = found
-                .filter(|c| c.granted_by == user)
-                .ok_or(Error::NotFound)?;
+            let found = found.ok_or(Error::NotFound)?;
             Ok(ReconnectTarget {
-                provider: connection.provider.as_str().to_owned(),
-                address: connection.address,
+                provider: found.provider,
+                address: found.address,
+                account_subject: found.account_subject,
+                needs_reauth: found.health == Health::NeedsReauth.as_str(),
             })
         })
     }

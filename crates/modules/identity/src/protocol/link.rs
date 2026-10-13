@@ -7,10 +7,12 @@
 //!    session belongs to the ticket's account. The provider is asked for
 //!    consent again (so a refresh token comes back when offline access is
 //!    asked), for the connection's account when reconnecting.
-//! 3. [`finish`], at the callback, links the provider identity to the
-//!    account (or finds it already there) and refuses one that is another
-//!    account's way in. For a connect or a reconnect, the grant then goes to
-//!    the connectors module through the grant-intake port.
+//! 3. [`finish`], at the callback, checks the browser is still signed in as
+//!    that account. A link or a connect links the provider identity (or finds
+//!    it already there) and refuses one that is another account's way in. A
+//!    reconnect accepts only the connection's own provider account and never
+//!    links anything. For a connect or a reconnect, the grant then goes to the
+//!    connectors module through the grant-intake port.
 //!
 //! The browser always lands back on the ticket's `return_to`, with
 //! `linked=<provider>`, `connected=<connection id>` or `link_error=<code>`.
@@ -22,6 +24,7 @@ use axum::{http::HeaderMap, response::Response};
 use campbooks_kernel::{Result, connections::ProviderGrant, tenancy::WorkspaceId};
 use chrono::{DateTime, Utc};
 use secrecy::SecretString;
+use uuid::Uuid;
 
 use super::{
     Ctx,
@@ -30,13 +33,13 @@ use super::{
 use crate::{
     deps::Issuer,
     domain::{
-        accounts::{self, LinkOutcome},
+        accounts::{self, LinkOutcome, ProviderIdentity},
         links, sessions,
     },
     events::WayInAdded,
     upstream::{
         Flow, Purpose,
-        client::{SignedIn, Upstream},
+        client::{SignedIn, Tokens, Upstream},
     },
     web::see_other,
 };
@@ -68,11 +71,7 @@ pub(super) async fn start(
     else {
         return Ok(back(HOME, "link_error", "link_expired"));
     };
-    let session = match issuer.session_cookie(headers) {
-        Some(token) => sessions::current(&ctx.state.db, &token, now).await?,
-        None => None,
-    };
-    if session.is_none_or(|s| s.account_id != ticket.account_id) {
+    if !signed_in_as(ctx, issuer, headers, ticket.account_id, now).await? {
         tracing::info!(
             purpose = ticket.purpose.as_str(),
             "a link ticket was opened by a browser not signed in to its account"
@@ -85,6 +84,7 @@ pub(super) async fn start(
         account_id: Some(ticket.account_id),
         workspace_id: ticket.workspace_id,
         connection_id: ticket.connection_id,
+        expected_subject: ticket.expected_subject,
         request_id: None,
         return_to: ticket.return_to,
         nonce: campbooks_kernel::crypto::random_token(),
@@ -104,10 +104,27 @@ pub(super) async fn start(
     .await
 }
 
+/// Whether this browser's issuer session is a live one of `account`.
+async fn signed_in_as(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    headers: &HeaderMap,
+    account: Uuid,
+    now: DateTime<Utc>,
+) -> Result<bool> {
+    let session = match issuer.session_cookie(headers) {
+        Some(token) => sessions::current(&ctx.state.db, &token, now).await?,
+        None => None,
+    };
+    Ok(session.is_some_and(|s| s.account_id == account))
+}
+
 /// Finish the signed-in round trip `flow` the provider answered with
-/// `signed_in`.
+/// `signed_in`, in the browser that sent `headers`.
 pub(super) async fn finish(
     ctx: &Ctx,
+    issuer: &Issuer,
+    headers: &HeaderMap,
     flow: Flow,
     signed_in: SignedIn,
     now: DateTime<Utc>,
@@ -115,11 +132,25 @@ pub(super) async fn finish(
     let Some(account) = flow.account_id else {
         return Ok(back(&flow.return_to, "link_error", "link_expired"));
     };
-    if accounts::profile(&ctx.state.db, account).await?.is_none() {
+    // Still signed in as that account (not signed out, or in as someone
+    // else, during the round trip), and the account still exists.
+    if !signed_in_as(ctx, issuer, headers, account, now).await? {
         return Ok(back(&flow.return_to, "link_error", "sign_in_again"));
     }
     let SignedIn { identity, tokens } = signed_in;
     let provider = flow.provider;
+    if flow.purpose == Purpose::Reconnect {
+        // Only the connection's own account may come back, and a reconnect
+        // never adds a way in: nothing is written for any other.
+        if flow.expected_subject.as_deref() != Some(identity.subject.as_str()) {
+            tracing::info!(
+                provider = provider.as_str(),
+                "refused a reconnect by another provider account"
+            );
+            return Ok(back(&flow.return_to, "link_error", "account_mismatch"));
+        }
+        return Ok(hand_over(ctx, flow, identity, tokens).await);
+    }
     let via = if flow.purpose == Purpose::Link {
         "link"
     } else {
@@ -168,15 +199,23 @@ pub(super) async fn finish(
     if !flow.purpose.wants_mailbox() {
         return Ok(back(&flow.return_to, "linked", provider.as_str()));
     }
-    let Some(workspace) = flow.workspace_id else {
-        return Ok(back(&flow.return_to, "link_error", "link_expired"));
+    Ok(hand_over(ctx, flow, identity, tokens).await)
+}
+
+/// Hand the mailbox grant of a connect or reconnect to the connectors
+/// module; where the browser goes next.
+async fn hand_over(ctx: &Ctx, flow: Flow, identity: ProviderIdentity, tokens: Tokens) -> Response {
+    let provider = flow.provider;
+    let (Some(account), Some(workspace)) = (flow.account_id, flow.workspace_id) else {
+        return back(&flow.return_to, "link_error", "link_expired");
     };
     let mail = MailGrant::of(ctx, provider, &tokens);
     let (true, Some(refresh), Some(address)) =
         (mail.granted, tokens.refresh_token, identity.email.clone())
     else {
-        // The way in stays: the round trip proved the account is theirs.
-        return Ok(back(&flow.return_to, "link_error", "consent_incomplete"));
+        // A way in it may have become stays: the round trip proved the
+        // account is theirs.
+        return back(&flow.return_to, "link_error", "consent_incomplete");
     };
     let grant = ProviderGrant {
         workspace: WorkspaceId::from_uuid(workspace),
@@ -192,7 +231,7 @@ pub(super) async fn finish(
         expires_in: tokens.expires_in,
         extending: flow.connection_id,
     };
-    Ok(match ctx.state.grants.adopt(&ctx.state, grant).await {
+    match ctx.state.grants.adopt(&ctx.state, grant).await {
         Ok(connection) => back(&flow.return_to, "connected", &connection),
         Err(error) => {
             tracing::info!(
@@ -203,7 +242,7 @@ pub(super) async fn finish(
             );
             back(&flow.return_to, "link_error", error.code())
         }
-    })
+    }
 }
 
 #[cfg(test)]
