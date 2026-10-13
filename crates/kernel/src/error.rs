@@ -421,6 +421,7 @@ mod tests {
             Error::Unauthorized(AuthFailure::MissingToken),
             Error::Unauthorized(AuthFailure::InvalidToken),
             Error::Unauthorized(AuthFailure::ExpiredToken),
+            Error::Unauthorized(AuthFailure::AdminReauthRequired),
         ];
         for err in errors {
             for locale in Locale::ALL {

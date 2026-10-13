@@ -2,6 +2,8 @@
 
 #![forbid(unsafe_code)]
 
+mod admin_cli;
+
 use std::{
     io::{Read as _, Write as _},
     net::{SocketAddr, TcpStream},
@@ -60,6 +62,13 @@ enum Command {
     Events {
         #[command(subcommand)]
         command: EventsCommand,
+    },
+    /// Manage instance administrators (ADR 0015): `grant`, `revoke`, `list`
+    /// and the audit `log`. The only way to make someone an administrator;
+    /// runs on the migration login.
+    Admin {
+        #[command(subcommand)]
+        command: admin_cli::AdminCommand,
     },
     /// Work with the search index.
     Search {
@@ -151,6 +160,7 @@ fn main() -> ExitCode {
             Ok(catalogue) => print_json(&catalogue, "events catalogue"),
             Err(e) => fail(&e.to_string()),
         },
+        Command::Admin { command } => admin_cli::run(command),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
