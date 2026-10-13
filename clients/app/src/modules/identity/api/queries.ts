@@ -102,3 +102,44 @@ export function useDiscardHeldGrant() {
     },
   });
 }
+
+export type WayIn = Schema<"WayIn">;
+export type WaysIn = Schema<"WaysIn">;
+export type StartLink = Schema<"StartLink">;
+
+const waysInKey = operationKey("identity.list_ways_in");
+
+/** `identity.list_ways_in`: the provider accounts you sign in with, and the providers on offer. */
+export function useWaysIn() {
+  return useQuery({
+    queryKey: waysInKey,
+    queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/identity/ways-in", { signal })),
+  });
+}
+
+/** `identity.remove_way_in`: stop signing in with one (never the last; needs a recent sign-in). */
+export function useRemoveWayIn() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      unwrapEmpty(await api.DELETE("/api/v1/identity/ways-in/{id}", { params: { path: { id } } }));
+      return id;
+    },
+    onSuccess: (id) => {
+      queryClient.setQueryData<WaysIn>(waysInKey, (ways) =>
+        ways === undefined ? ways : { ...ways, items: ways.items.filter((way) => way.id !== id) },
+      );
+    },
+  });
+}
+
+/**
+ * `identity.start_link`: a single-use URL of the front door for adding a way
+ * in, connecting a mailbox or reconnecting one; the browser goes there next.
+ */
+export function useStartLink() {
+  return useMutation({
+    mutationFn: async (body: StartLink) =>
+      unwrap(await api.POST("/api/v1/identity/links", { body })).url,
+  });
+}

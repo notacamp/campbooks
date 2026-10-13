@@ -28,7 +28,7 @@ export const Default: Story = {};
 /** A remote image the server held back: its alt text, until "Show images". */
 export const ImageBlocked: Story = {
   args: {
-    html: `<img alt="The Weekly Ledger" width="480" height="100" data-blocked="remote">${NEWSLETTER}`,
+    html: `<img alt="The Weekly Ledger" width="480" height="100">${NEWSLETTER}`,
   },
 };
 

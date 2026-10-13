@@ -28,7 +28,7 @@ dependency.
   Esc), the assistant's note (what the decide pass thinks, as suggestions;
   "Why?" lists the stored reasons; a stream suggestion offers Move (1)),
   the thread newest first with older messages folded, attachments listed,
-  and a **reply slot** the send slice fills (Reply R, Reply all A, Forward F).
+  and a **reply slot** the send slice fills (Reply R, Reply all Shift+R, Forward F).
   Opening an unread conversation reads it. Every action pushes an Undo (Z).
 - **Phones**: below 64rem list and reader are separate screens; below 48rem
   the streams are chips and the reader's main actions float above the tab

@@ -67,6 +67,19 @@ struct IdClaims {
     auth_time: Option<i64>,
 }
 
+/// The standard claims next to a provider's own `T`.
+#[derive(Deserialize)]
+struct WithExtra<T> {
+    #[serde(flatten)]
+    claims: IdClaims,
+    #[serde(flatten)]
+    extra: T,
+}
+
+/// No provider-specific claims.
+#[derive(Deserialize)]
+struct NoExtraClaims {}
+
 #[derive(Deserialize)]
 struct LogoutClaims {
     sub: Option<String>,
@@ -93,13 +106,31 @@ impl TokenVerifier {
         client_id: &str,
         nonce: &str,
     ) -> Result<IdToken, Error> {
+        self.verify_id_token_with::<NoExtraClaims>(token, client_id, nonce, None)
+            .await
+            .map(|(id, _)| id)
+    }
+
+    /// [`verify_id_token`](Self::verify_id_token), requiring `iss` to be
+    /// `issuer` instead of the configured issuer when one is given (a
+    /// multi-tenant provider signs for many issuers with one key set; the
+    /// caller decides which one this token must come from), and returning the
+    /// provider-specific claims `T` read from the validated token too.
+    pub async fn verify_id_token_with<T: serde::de::DeserializeOwned>(
+        &self,
+        token: &str,
+        client_id: &str,
+        nonce: &str,
+        issuer: Option<&str>,
+    ) -> Result<(IdToken, T), Error> {
         let invalid = || Error::Unauthorized(AuthFailure::InvalidToken);
         let inner = self
             .inner
             .as_ref()
             .ok_or(Error::Unauthorized(AuthFailure::NotConfigured))?;
-        let claims: IdClaims = inner
-            .decode(token, client_id, &ID_TOKEN_TYPES, true)
+        let issuer = issuer.unwrap_or(&inner.issuer);
+        let WithExtra { claims, extra }: WithExtra<T> = inner
+            .decode_from(token, issuer, client_id, &ID_TOKEN_TYPES, true)
             .await
             .inspect_err(|err| tracing::debug!(error = %err, "ID token rejected"))?;
         if claims.nonce.as_deref() != Some(nonce) {
@@ -115,7 +146,7 @@ impl TokenVerifier {
             (Some(given), Some(family)) => Some(format!("{given} {family}")),
             (given, family) => given.or(family),
         };
-        Ok(IdToken {
+        let id = IdToken {
             subject,
             session_id: non_blank(claims.sid),
             name: non_blank(claims.name)
@@ -125,7 +156,8 @@ impl TokenVerifier {
             email_verified: matches!(claims.email_verified, Some(serde_json::Value::Bool(true)))
                 || matches!(&claims.email_verified, Some(serde_json::Value::String(v)) if v == "true"),
             auth_time: claims.auth_time,
-        })
+        };
+        Ok((id, extra))
     }
 
     /// Validate a back-channel logout token sent to `client_id`

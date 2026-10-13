@@ -58,12 +58,6 @@ impl EventConsumer for RevokeWorkspaceGrants {
         for id in all {
             removal::delete(tx, &state, workspace, id).await?;
         }
-        sqlx::query!(
-            "DELETE FROM connectors.authorizations WHERE workspace_id = $1",
-            workspace as WorkspaceId
-        )
-        .execute(&mut **tx)
-        .await?;
         // Sends still open will never go out.
         let sends = sqlx::query_scalar!(
             "DELETE FROM connectors.sends WHERE workspace_id = $1 RETURNING id",

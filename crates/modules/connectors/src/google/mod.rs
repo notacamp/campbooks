@@ -17,9 +17,6 @@ use url::Url;
 
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
-/// Google's `OpenID` scopes asked with every consent: who the account is.
-pub const IDENTITY_SCOPES: [&str; 2] = ["openid", "email"];
-
 /// The scope the `messages` capability needs: read mail and change labels,
 /// no permanent deletion.
 pub const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
@@ -52,14 +49,10 @@ pub fn granted_capabilities(scopes: &[String]) -> Vec<Capability> {
 /// Where Google's services live.
 #[derive(Debug, Clone)]
 pub struct Endpoints {
-    /// The authorization endpoint (the browser goes there).
-    pub authorize: Url,
     /// The token endpoint.
     pub token: Url,
     /// The revocation endpoint.
     pub revoke: Url,
-    /// The `OpenID` userinfo endpoint.
-    pub userinfo: Url,
     /// The Gmail API base, up to `/gmail/v1/`.
     pub gmail: Url,
     /// The Gmail upload base, up to `/upload/gmail/v1/` (sending).
@@ -71,10 +64,8 @@ impl Endpoints {
     pub fn google() -> Self {
         let parse = |url: &str| Url::parse(url).unwrap_or_else(|e| unreachable!("{url}: {e}"));
         Self {
-            authorize: parse("https://accounts.google.com/o/oauth2/v2/auth"),
             token: parse("https://oauth2.googleapis.com/token"),
             revoke: parse("https://oauth2.googleapis.com/revoke"),
-            userinfo: parse("https://openidconnect.googleapis.com/v1/userinfo"),
             gmail: parse("https://gmail.googleapis.com/gmail/v1/"),
             gmail_upload: parse("https://gmail.googleapis.com/upload/gmail/v1/"),
         }
@@ -87,10 +78,8 @@ impl Endpoints {
                 .unwrap_or_else(|e| unreachable!("{base} + {path}: {e}"))
         };
         Self {
-            authorize: join("o/oauth2/v2/auth"),
             token: join("token"),
             revoke: join("revoke"),
-            userinfo: join("v1/userinfo"),
             gmail: join("gmail/v1/"),
             gmail_upload: join("upload/gmail/v1/"),
         }
@@ -112,7 +101,6 @@ pub struct Google {
     http: reqwest::Client,
     client_id: String,
     client_secret: ClientSecret,
-    redirect_uri: String,
     endpoints: Endpoints,
 }
 
@@ -171,28 +159,12 @@ impl TokenGrant {
     }
 }
 
-/// The account the tokens are for (`OpenID` userinfo).
-#[derive(Debug, Clone, Deserialize)]
-pub struct Account {
-    /// Google's stable account id.
-    pub sub: String,
-    /// The account's address.
-    pub email: String,
-    /// Whether Google verified the address.
-    #[serde(default)]
-    pub email_verified: bool,
-    /// Its display name.
-    #[serde(default)]
-    pub name: Option<String>,
-}
-
 impl Google {
-    /// A client with id `client_id` and secret `client_secret`, redirecting
-    /// to `redirect_uri`, talking to `endpoints`.
+    /// A client with id `client_id` and secret `client_secret`, talking to
+    /// `endpoints`.
     pub fn new(
         client_id: String,
         client_secret: ClientSecret,
-        redirect_uri: String,
         endpoints: Endpoints,
     ) -> Result<Self, String> {
         let http = reqwest::Client::builder()
@@ -205,14 +177,8 @@ impl Google {
             http,
             client_id,
             client_secret,
-            redirect_uri,
             endpoints,
         })
-    }
-
-    /// The redirect URI registered with Google.
-    pub fn redirect_uri(&self) -> &str {
-        &self.redirect_uri
     }
 
     /// The Gmail API with `access_token`.
@@ -223,38 +189,6 @@ impl Google {
             &self.endpoints.gmail_upload,
             access_token,
         )
-    }
-
-    /// Where to send the browser: authorization code with PKCE (S256),
-    /// offline access, incremental consent.
-    pub fn authorize_url(&self, scopes: &[&str], state: &str, challenge: &str) -> String {
-        let mut url = self.endpoints.authorize.clone();
-        url.query_pairs_mut()
-            .append_pair("client_id", &self.client_id)
-            .append_pair("redirect_uri", &self.redirect_uri)
-            .append_pair("response_type", "code")
-            .append_pair("scope", &scopes.join(" "))
-            .append_pair("state", state)
-            .append_pair("code_challenge", challenge)
-            .append_pair("code_challenge_method", "S256")
-            .append_pair("access_type", "offline")
-            .append_pair("include_granted_scopes", "true")
-            .append_pair("prompt", "consent");
-        url.into()
-    }
-
-    /// Exchange an authorization code (with its PKCE verifier) for tokens.
-    pub async fn exchange(&self, code: &str, verifier: &str) -> Result<TokenGrant, GoogleError> {
-        let secret = self.secret()?;
-        self.token_request(&[
-            ("grant_type", "authorization_code"),
-            ("code", code),
-            ("code_verifier", verifier),
-            ("redirect_uri", &self.redirect_uri),
-            ("client_id", &self.client_id),
-            ("client_secret", secret.expose_secret()),
-        ])
-        .await
     }
 
     /// A fresh access token for `refresh_token`.
@@ -286,18 +220,6 @@ impl Google {
             return Ok(());
         }
         Err(classify(status, response.headers(), None))
-    }
-
-    /// The account `access_token` belongs to.
-    pub async fn account(&self, access_token: &str) -> Result<Account, GoogleError> {
-        let response = self
-            .http
-            .get(self.endpoints.userinfo.clone())
-            .bearer_auth(access_token)
-            .send()
-            .await
-            .map_err(transport)?;
-        json(response).await
     }
 
     async fn token_request(&self, form: &[(&str, &str)]) -> Result<TokenGrant, GoogleError> {
@@ -445,44 +367,6 @@ fn classify(
 mod tests {
     use super::*;
 
-    fn google() -> Google {
-        Google::new(
-            "client-1.apps.example.com".into(),
-            ClientSecret::Inline(SecretString::from("s3cret")),
-            "https://app.example.com/connections/google/callback".into(),
-            Endpoints::google(),
-        )
-        .unwrap()
-    }
-
-    #[test]
-    fn the_authorize_url_asks_for_offline_pkce_and_incremental_consent() {
-        let url = Url::parse(&google().authorize_url(
-            &["openid", "email", GMAIL_SCOPE],
-            "the-state",
-            "the-challenge",
-        ))
-        .unwrap();
-        assert_eq!(url.host_str(), Some("accounts.google.com"));
-        let query: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
-        assert_eq!(query["response_type"], "code");
-        assert_eq!(query["code_challenge_method"], "S256");
-        assert_eq!(query["code_challenge"], "the-challenge");
-        assert_eq!(query["state"], "the-state");
-        assert_eq!(query["access_type"], "offline");
-        assert_eq!(query["include_granted_scopes"], "true");
-        assert_eq!(query["prompt"], "consent");
-        assert_eq!(
-            query["scope"],
-            "openid email https://www.googleapis.com/auth/gmail.modify"
-        );
-        assert_eq!(
-            query["redirect_uri"],
-            "https://app.example.com/connections/google/callback"
-        );
-        assert!(!url.as_str().contains("s3cret"));
-    }
-
     /// Against a real Google account (staging, #53). Run with
     /// `CAMPBOOKS_GOOGLE__CLIENT_ID`, `CAMPBOOKS_GOOGLE__CLIENT_SECRET` and
     /// `CAMPBOOKS_TEST_GOOGLE_REFRESH_TOKEN` (a token of a test user granted
@@ -495,7 +379,6 @@ mod tests {
         let google = Google::new(
             var("CAMPBOOKS_GOOGLE__CLIENT_ID"),
             ClientSecret::Inline(SecretString::from(var("CAMPBOOKS_GOOGLE__CLIENT_SECRET"))),
-            "http://localhost:8080/connections/google/callback".into(),
             Endpoints::google(),
         )
         .unwrap();

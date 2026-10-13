@@ -59,7 +59,8 @@ export const CONVERSATIONS_SHORTCUTS = [
   },
   {
     id: "item.reply_all",
-    keys: "a",
+    // A is Settings' "add a way in" (identity.start_link), live alongside.
+    keys: "shift+r",
     scope: "item",
     group: "item",
     label: "conversations:shortcuts.replyAll",

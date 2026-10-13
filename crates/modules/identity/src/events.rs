@@ -67,3 +67,47 @@ impl DomainEvent for RefreshReuseDetected {
         None
     }
 }
+
+/// An account gained a way in: a provider identity or a passkey.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct WayInAdded {
+    /// The account.
+    pub account: Uuid,
+    /// `provider` or `passkey`.
+    pub method: String,
+    /// The provider, for a provider identity.
+    pub provider: Option<String>,
+    /// How it was added: `sign_up`, `link`, `connect` or `passkey`.
+    pub via: String,
+}
+
+impl DomainEvent for WayInAdded {
+    const NAME: &'static str = "identity.way_in_added";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// An account lost a way in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct WayInRemoved {
+    /// The account.
+    pub account: Uuid,
+    /// `provider` or `passkey`.
+    pub method: String,
+    /// The provider, for a provider identity.
+    pub provider: Option<String>,
+}
+
+impl DomainEvent for WayInRemoved {
+    const NAME: &'static str = "identity.way_in_removed";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}

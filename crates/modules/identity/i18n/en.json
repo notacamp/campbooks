@@ -8,6 +8,10 @@
     "invalid_return_to": "After signing in, Campbooks can only return to one of its own pages.",
     "held_grant_not_found": "There is no mailbox waiting to be connected.",
     "invalid_id_token_hint": "This sign-out request is not signed by Campbooks for this app; nothing was ended.",
-    "signup_invite_only": "This Campbooks takes invited people only. Ask someone to invite this address, then sign in again."
+    "signup_invite_only": "This Campbooks takes invited people only. Ask someone to invite this address, then sign in again.",
+    "step_up_required": "Sign in again first: changing how you sign in needs a sign-in from the last ten minutes.",
+    "last_way_in": "This is the only way you can sign in, so it can't be removed. Add another way first.",
+    "link_incomplete": "Say which provider, workspace or mailbox this is for.",
+    "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet."
   }
 }

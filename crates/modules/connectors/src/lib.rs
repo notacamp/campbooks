@@ -38,7 +38,7 @@ pub mod scopes;
 #[cfg(test)]
 mod testkit;
 
-pub use deps::{CREDENTIALS_PURPOSE, Deps, GOOGLE_CALLBACK_PATH};
+pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::intake::grant_intake;
 pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
@@ -61,7 +61,6 @@ pub fn module(deps: Deps) -> Module {
         router: OpenApiRouter::new()
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
-            .routes(routes!(features::complete_connection::handler))
             .routes(routes!(
                 features::get_connection::handler,
                 features::disconnect::handler

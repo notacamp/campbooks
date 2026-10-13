@@ -48,7 +48,7 @@ Done the next conversation opens (the list, on phones).
 
 ### Requirement: The reply slot
 The reader SHALL expose a slot at the end of the thread for the send slice's
-composer, with Reply (R), Reply all (A) and Forward (F) that tell the slot
+composer, with Reply (R), Reply all (Shift+R) and Forward (F) that tell the slot
 which message to answer and how; without a composer those actions SHALL be
 hidden.
 

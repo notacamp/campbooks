@@ -6,7 +6,7 @@ import type { Schema } from "~/lib/api";
  * The reader's slot for answering a conversation (the send slice fills it).
  *
  * The reader owns the Reply / Reply all / Forward buttons and their
- * shortcuts (`item.reply` R, `item.reply_all` A, `item.forward` F); a press
+ * shortcuts (`item.reply` R, `item.reply_all` Shift+R, `item.forward` F); a press
  * sets {@link ReplySlotContext.request}. The slot renders the composer at the
  * end of the thread, and calls `onClose` when it is done (sent, discarded or
  * closed), which sets `request` back to `null`. With no renderer, the reader

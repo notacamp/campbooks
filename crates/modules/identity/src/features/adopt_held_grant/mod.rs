@@ -84,6 +84,7 @@ pub async fn handler(
         access_token: SecretString::from(taken.tokens.access_token.clone()),
         refresh_token: taken.tokens.refresh_token.clone().map(SecretString::from),
         expires_in: taken.tokens.expires_in,
+        extending: None,
     };
     // The grant is deleted only once it is a connection: if the intake
     // refuses, the row stays (rolled back) and the person can retry.

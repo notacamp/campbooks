@@ -16,7 +16,14 @@
 //!   tracking pixels (an image of at most 2×2, or one hidden by its style)
 //!   are removed either way.
 
-use std::{borrow::Cow, collections::HashSet, fmt::Write as _, sync::LazyLock};
+use std::{
+    borrow::Cow,
+    collections::HashSet,
+    sync::{
+        Arc, LazyLock,
+        atomic::{AtomicU32, Ordering},
+    },
+};
 
 use ammonia::{Builder, UrlRelative};
 use regex::Regex;
@@ -50,14 +57,47 @@ const UNSAFE_CSS: [&str; 7] = [
     "\\",
 ];
 
-/// Sanitise `html`. Remote images keep their `src` only when
-/// `show_remote_images` is set.
-pub fn sanitize(html: &str, show_remote_images: bool) -> Sanitized {
-    let cleaned = builder().clean(html).to_string();
-    images(&cleaned, show_remote_images)
+/// What the second pass does with every image source that survived the
+/// first: `data:` and relative URLs are already gone, so each one left is a
+/// remote image, whatever its case or surrounding whitespace.
+struct Images {
+    /// Keep the sources (the member chose "Show images").
+    show: bool,
+    /// How many sources there were.
+    seen: Arc<AtomicU32>,
 }
 
-fn builder() -> Builder<'static> {
+/// Sanitise `html`. Remote images keep their `src` only when
+/// `show_remote_images` is set.
+///
+/// Three steps: ammonia cleans (allow-lists, schemes, links, style
+/// declarations); a best-effort pass drops tracking pixels from its canonical
+/// output; ammonia runs again with the image policy in its attribute filter,
+/// so every `img[src]` the HTML parser sees is counted and, unless shown,
+/// removed. A last check strips every image if a source still survived a
+/// blocked render.
+pub fn sanitize(html: &str, show_remote_images: bool) -> Sanitized {
+    let cleaned = builder(None).clean(html).to_string();
+    let without_pixels = drop_tracking_pixels(&cleaned);
+    let seen = Arc::new(AtomicU32::new(0));
+    let policy = Images {
+        show: show_remote_images,
+        seen: Arc::clone(&seen),
+    };
+    let mut html = builder(Some(policy)).clean(&without_pixels).to_string();
+    if !show_remote_images && IMG_WITH_SRC.is_match(&html) {
+        // Unreachable with the filter above; fail closed if it ever is not.
+        let mut strict = builder(None);
+        strict.rm_tags(["img"]);
+        html = strict.clean(&html).to_string();
+    }
+    Sanitized {
+        html,
+        remote_images: seen.load(Ordering::Relaxed),
+    }
+}
+
+fn builder(images: Option<Images>) -> Builder<'static> {
     let mut builder = Builder::default();
     builder
         .add_tags(EXTRA_TAGS)
@@ -72,12 +112,16 @@ fn builder() -> Builder<'static> {
         .url_relative(UrlRelative::Deny)
         .link_rel(Some("noopener noreferrer"))
         .set_tag_attribute_value("a", "target", "_blank")
-        .attribute_filter(|_element, attribute, value| {
-            if attribute == "style" {
-                safe_style(value).map(Cow::Owned)
-            } else {
-                Some(Cow::Borrowed(value))
-            }
+        .attribute_filter(move |element, attribute, value| match (element, attribute) {
+            (_, "style") => safe_style(value).map(Cow::Owned),
+            ("img", "src") => match &images {
+                None => Some(Cow::Borrowed(value)),
+                Some(images) => {
+                    images.seen.fetch_add(1, Ordering::Relaxed);
+                    images.show.then_some(Cow::Borrowed(value))
+                }
+            },
+            _ => Some(Cow::Borrowed(value)),
         });
     builder
 }
@@ -98,46 +142,33 @@ fn safe_style(style: &str) -> Option<String> {
 }
 
 /// An `<img>` tag as ammonia serialises it: lower-case attribute names,
-/// double-quoted values (a `"` inside a value is always `&quot;`).
+/// double-quoted values (a `"` inside a value is always `&quot;`). Used only
+/// to find tracking pixels, best effort: blocking does not depend on it.
 static IMG: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"<img((?:\s+[a-z-]+="[^"]*")*)\s*/?>"#).unwrap_or_else(|e| unreachable!("{e}"))
 });
 static ATTRIBUTE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"([a-z-]+)="([^"]*)""#).unwrap_or_else(|e| unreachable!("{e}")));
+/// Any image that still has a source, however written: the final check of a
+/// blocked render (a false positive only strips the images).
+static IMG_WITH_SRC: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)<img\b[^>]*\ssrc\s*=").unwrap_or_else(|e| unreachable!("{e}"))
+});
 
-/// Apply the image policy to ammonia's output.
-fn images(html: &str, show_remote: bool) -> Sanitized {
-    let mut remote_images = 0_u32;
-    let html = IMG.replace_all(html, |tag: &regex::Captures<'_>| {
+/// Remove the images ammonia's output shows to be tracking pixels.
+fn drop_tracking_pixels(html: &str) -> String {
+    IMG.replace_all(html, |tag: &regex::Captures<'_>| {
         let attributes: Vec<(&str, &str)> = ATTRIBUTE
             .captures_iter(tag.get(1).map_or("", |m| m.as_str()))
             .filter_map(|c| Some((c.get(1)?.as_str(), c.get(2)?.as_str())))
             .collect();
         if is_tracking_pixel(&attributes) {
-            return String::new();
+            String::new()
+        } else {
+            tag[0].to_owned()
         }
-        let remote = attribute(&attributes, "src")
-            .is_some_and(|src| src.starts_with("http://") || src.starts_with("https://"));
-        if remote {
-            remote_images += 1;
-        }
-        let mut out = String::from("<img");
-        for (name, value) in &attributes {
-            if *name == "src" && (!remote || !show_remote) {
-                continue;
-            }
-            let _ = write!(out, " {name}=\"{value}\"");
-        }
-        if remote && !show_remote {
-            out.push_str(" data-blocked=\"remote\"");
-        }
-        out.push('>');
-        out
-    });
-    Sanitized {
-        html: html.into_owned(),
-        remote_images,
-    }
+    })
+    .into_owned()
 }
 
 fn attribute<'a>(attributes: &[(&str, &'a str)], name: &str) -> Option<&'a str> {
@@ -250,11 +281,7 @@ mod tests {
         assert_eq!(blocked.remote_images, 2);
         assert!(!blocked.html.contains("cdn.example"), "{}", blocked.html);
         assert!(blocked.html.contains(r#"alt="Logo""#), "{}", blocked.html);
-        assert!(
-            blocked.html.contains(r#"data-blocked="remote""#),
-            "{}",
-            blocked.html
-        );
+        assert!(!blocked.html.contains("src="), "{}", blocked.html);
 
         let shown = sanitize(html, true);
         assert_eq!(shown.remote_images, 2);
@@ -263,7 +290,6 @@ mod tests {
             "{}",
             shown.html
         );
-        assert!(!shown.html.contains("data-blocked"), "{}", shown.html);
     }
 
     #[test]
@@ -299,5 +325,71 @@ mod tests {
         );
         assert!(html.contains("title="), "{html}");
         assert_eq!(sanitize(&html, false).remote_images, 0);
+    }
+
+    /// Sources `Url::parse` accepts but a prefix check would miss.
+    #[test]
+    fn every_remote_source_is_blocked_whatever_its_case_or_whitespace() {
+        let sources = [
+            "HTTPS://t.example/a.gif",
+            "hTtPs://t.example/b.gif",
+            "Http://t.example/c.gif",
+            " https://t.example/d.gif",
+            "\thttps://t.example/e.gif",
+            "\nhttps://t.example/f.gif",
+            "https://t.example/g.gif ",
+        ];
+        for src in sources {
+            let html = format!(r#"<p>x</p><img src="{src}" alt="a" width="300" height="80">"#);
+            let blocked = sanitize(&html, false);
+            assert!(
+                !blocked.html.contains("t.example"),
+                "{src:?}: {}",
+                blocked.html
+            );
+            assert!(!blocked.html.contains("src="), "{src:?}: {}", blocked.html);
+            assert_eq!(blocked.remote_images, 1, "{src:?}: {}", blocked.html);
+            let shown = sanitize(&html, true);
+            assert!(shown.html.contains("t.example"), "{src:?}: {}", shown.html);
+            assert_eq!(shown.remote_images, 1, "{src:?}");
+        }
+    }
+
+    /// Markup a regex over the input would not recognise as an image.
+    #[test]
+    fn images_written_any_way_are_blocked() {
+        let variants = [
+            "<IMG SRC=https://t.example/a.gif>",
+            "<img src='https://t.example/b.gif' alt='x'>",
+            "<img/src=\"https://t.example/c.gif\">",
+            "<img\nsrc=\"https://t.example/d.gif\"\n>",
+            "<img alt=\"a>b\" src=\"https://t.example/e.gif\">",
+            "<svg><image href=\"https://t.example/f.gif\"></image></svg>",
+            "<picture><source srcset=\"https://t.example/g.gif\"><img src=\"https://t.example/h.gif\"></picture>",
+        ];
+        for html in variants {
+            let blocked = sanitize(html, false);
+            assert!(
+                !blocked.html.contains("t.example"),
+                "{html:?}: {}",
+                blocked.html
+            );
+            assert!(
+                !blocked.html.to_ascii_lowercase().contains("src"),
+                "{html:?}: {}",
+                blocked.html
+            );
+        }
+    }
+
+    #[test]
+    fn data_and_relative_sources_never_survive() {
+        let html =
+            r#"<img src="data:image/png;base64,AAAA"><img src="/logo.png"><img src="cid:logo@x">"#;
+        for show in [false, true] {
+            let result = sanitize(html, show);
+            assert!(!result.html.contains("src="), "{}", result.html);
+            assert_eq!(result.remote_images, 0, "{}", result.html);
+        }
     }
 }

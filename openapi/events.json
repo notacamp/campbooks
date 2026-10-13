@@ -563,6 +563,75 @@
       }
     },
     {
+      "name": "identity.way_in_added",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An account gained a way in: a provider identity or a passkey.",
+        "required": [
+          "account",
+          "method",
+          "via"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account."
+          },
+          "method": {
+            "type": "string",
+            "description": "`provider` or `passkey`."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider, for a provider identity."
+          },
+          "via": {
+            "type": "string",
+            "description": "How it was added: `sign_up`, `link`, `connect` or `passkey`."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.way_in_removed",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An account lost a way in.",
+        "required": [
+          "account",
+          "method"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account."
+          },
+          "method": {
+            "type": "string",
+            "description": "`provider` or `passkey`."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider, for a provider identity."
+          }
+        }
+      }
+    },
+    {
       "name": "workspaces.member_joined",
       "module": "workspaces",
       "version": 1,

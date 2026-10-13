@@ -4,7 +4,7 @@ import { pause, type ScenarioContext } from "../context.ts";
 
 // The inbox on the real stack: the Vite dev server, the real server (API,
 // BFF and worker) on a scratch database, and the fake Google with its demo
-// Gmail mailbox (`scripts/fake-google.ts`). Nothing is intercepted: the
+// Gmail mailbox (`scripts/fake-provider.ts`, `scripts/fake-gmail.ts`). Nothing is intercepted: the
 // mail is synced by the connectors module, sorted by the conversations
 // module, and read through the BFF.
 //

@@ -218,6 +218,9 @@ pub struct AuthorizationRequest<'a> {
     pub nonce: &'a str,
     /// The PKCE S256 challenge.
     pub code_challenge: &'a str,
+    /// `max_age`: sign in again unless the person did within this many
+    /// seconds (step-up).
+    pub max_age: Option<u32>,
 }
 
 impl Oidc {
@@ -298,6 +301,10 @@ impl Oidc {
             .append_pair("nonce", request.nonce)
             .append_pair("code_challenge", request.code_challenge)
             .append_pair("code_challenge_method", "S256");
+        if let Some(max_age) = request.max_age {
+            url.query_pairs_mut()
+                .append_pair("max_age", &max_age.to_string());
+        }
         Ok(url.into())
     }
 
