@@ -454,7 +454,11 @@ With the built-in issuer:
 - **Sign in with Zoho**, in every Zoho data centre. In the Zoho API console, add a
   **Server-based application** with the redirect URI
   `${CAMPBOOKS_PUBLIC_URL}/auth/callback/zoho`, and turn on **Multi-DC** (Settings) so the
-  same client works for people in every data centre. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
+  same client works for people in every data centre. Without Multi-DC, set
+  `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` to your app's data centre (for an app created in the
+  EU console, `https://accounts.zoho.eu`): the default, `https://accounts.zoho.com`, rejects
+  such an app as an invalid client. It must be one of the servers below, as
+  `https://<host>` with no path, or Campbooks refuses to start. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
   forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.

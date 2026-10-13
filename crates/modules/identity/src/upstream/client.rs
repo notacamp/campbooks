@@ -41,6 +41,10 @@ pub const MICROSOFT_ISSUER_SUFFIX: &str = "/v2.0";
 /// The tenant of every personal Microsoft account.
 pub const MICROSOFT_CONSUMERS_TENANT: &str = "9188040d-6c67-4c5b-b112-36a304b66dad";
 
+/// The accounts server the authorization request goes to unless
+/// `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` names another.
+pub const ZOHO_DEFAULT_ACCOUNTS_SERVER: &str = "https://accounts.zoho.com";
+
 /// Zoho's accounts servers, one per data centre. A callback naming any
 /// other server is refused before a request is made.
 pub const ZOHO_ACCOUNTS_SERVERS: [&str; 8] = [
@@ -160,18 +164,26 @@ impl Endpoints {
         })
     }
 
-    /// Zoho's endpoints: the global authorization endpoint and every data
-    /// centre's accounts server.
-    pub fn zoho() -> Self {
-        Self {
-            authorize: parse("https://accounts.zoho.com/oauth/v2/auth"),
+    /// Zoho's endpoints: the authorization endpoint of `accounts_server`
+    /// (one of [`ZOHO_ACCOUNTS_SERVERS`]; the default is
+    /// [`ZOHO_DEFAULT_ACCOUNTS_SERVER`]) and every data centre's accounts
+    /// server for the callback.
+    pub fn zoho(accounts_server: &str) -> Result<Self, String> {
+        if !ZOHO_ACCOUNTS_SERVERS.contains(&accounts_server) {
+            return Err(format!(
+                "{accounts_server} is not one of Zoho's accounts servers ({})",
+                ZOHO_ACCOUNTS_SERVERS.join(", ")
+            ));
+        }
+        Ok(Self {
+            authorize: parse(&format!("{accounts_server}/oauth/v2/auth")),
             issuers: IssuerRule::Servers(
                 ZOHO_ACCOUNTS_SERVERS
                     .iter()
                     .map(|server| zoho_server(server))
                     .collect(),
             ),
-        }
+        })
     }
 
     /// `provider`'s endpoints under `base`, a fake laid out like the real
@@ -760,8 +772,11 @@ mod tests {
     }
 
     #[test]
-    fn zoho_asks_at_its_global_endpoint() {
-        let zoho = client(Provider::Zoho, Endpoints::zoho());
+    fn zoho_asks_at_its_global_endpoint_by_default() {
+        let zoho = client(
+            Provider::Zoho,
+            Endpoints::zoho(ZOHO_DEFAULT_ACCOUNTS_SERVER).unwrap(),
+        );
         let (url, q) = query(&zoho.authorize_url(&request(false, false)));
         assert_eq!(url.host_str(), Some("accounts.zoho.com"));
         assert!(!q.contains_key("access_type"));
@@ -772,8 +787,38 @@ mod tests {
     }
 
     #[test]
+    fn zoho_asks_at_the_configured_data_centre() {
+        let zoho = client(
+            Provider::Zoho,
+            Endpoints::zoho("https://accounts.zoho.eu").unwrap(),
+        );
+        let (url, _) = query(&zoho.authorize_url(&request(false, false)));
+        assert_eq!(url.host_str(), Some("accounts.zoho.eu"));
+        assert_eq!(url.path(), "/oauth/v2/auth");
+        // The callback may still name any data centre.
+        assert!(zoho.server(Some("https://accounts.zoho.in")).is_some());
+    }
+
+    #[test]
+    fn zoho_refuses_an_accounts_server_that_is_not_zohos() {
+        for bad in [
+            "https://accounts.example.com",
+            "http://accounts.zoho.eu",
+            "https://accounts.zoho.eu/oauth",
+            "https://accounts.zoho.eu/",
+            "https://accounts.zoho.eu.evil.example.com",
+            "",
+        ] {
+            assert!(Endpoints::zoho(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
     fn zoho_redeems_only_at_its_own_accounts_servers() {
-        let zoho = client(Provider::Zoho, Endpoints::zoho());
+        let zoho = client(
+            Provider::Zoho,
+            Endpoints::zoho(ZOHO_DEFAULT_ACCOUNTS_SERVER).unwrap(),
+        );
         assert_eq!(
             zoho.server(Some("https://accounts.zoho.eu"))
                 .map(|v| v.server.token.as_str()),
