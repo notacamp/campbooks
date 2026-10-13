@@ -501,3 +501,23 @@ members already know it.
 
 Follow-up changes: `search-ui` (#108), `search-semantic` (#109),
 `search-suggestions` (#110).
+
+## After the security review
+
+- Migrations renumbered after every migration on `next`; `cargo xtask
+  migrations --base <ref>` (CI, pull requests) fails when a new migration
+  does not sort after the base's newest, beside `cargo xtask arch`'s check
+  that no version is used twice.
+- `ensure_backfill` reads first and writes only a missing or outdated row
+  (`ON CONFLICT DO NOTHING`, a guarded `UPDATE`); a backfill page holds no
+  row lock and moves the cursor by compare-and-set at its end, so searches
+  and live deliveries never wait on it.
+- The parser never panics on any input (the unit of `older_than:` is the
+  last character, whatever its width); the server's panic hook reports where
+  a panic happened, never its message.
+- Dates outside years 1 to 9999 are invalid values; a query that only
+  excludes is refused; filter-only queries count against a tighter rate
+  limit; a workspace being deleted is no longer indexed (its backfill rows
+  say `deleting` and stay after the purge, ids only); cursors are HMAC-signed
+  (kernel `Signer`, key derived from the instance secret) and bound to the
+  caller; the `tsquery` is built once per statement.

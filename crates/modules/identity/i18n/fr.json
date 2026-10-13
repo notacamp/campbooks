@@ -12,6 +12,11 @@
     "step_up_required": "Reconnectez-vous d’abord : pour changer votre façon de vous connecter, il faut vous être connecté dans les dix dernières minutes.",
     "last_way_in": "C’est votre seul moyen de connexion : il ne peut pas être retiré. Ajoutez-en d’abord un autre.",
     "link_incomplete": "Précisez le fournisseur, l’espace de travail ou la boîte mail concernés.",
-    "mailbox_unsupported": "Campbooks ne peut pas encore connecter la boîte mail de ce fournisseur sur cette instance."
+    "mailbox_unsupported": "Campbooks ne peut pas encore connecter la boîte mail de ce fournisseur sur cette instance.",
+    "passkey_not_accepted": "Cette clé d’accès n’a pas été acceptée. Réessayez, ou connectez-vous autrement.",
+    "passkey_expired": "Cette demande de clé d’accès a pris trop de temps ou a déjà servi. Réessayez.",
+    "passkey_already_registered": "Cette clé d’accès permet déjà d’accéder à Campbooks.",
+    "display_name_required": "Dites-nous comment vous appeler.",
+    "passkey_name_required": "Donnez à la clé d’accès un nom de 1 à 64 caractères."
   }
 }

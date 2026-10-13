@@ -26,8 +26,8 @@ export function waysIn(listed: readonly string[]): WaysIn {
   };
 }
 
-/** Where a provider (or a passkey) button goes: S1a's start route for this request. */
-export function startUrl(method: Provider | "passkey", request: string): string {
+/** Where a provider button goes: the start route for this request. */
+export function startUrl(method: Provider, request: string): string {
   return `/auth/start/${method}?request=${encodeURIComponent(request)}`;
 }
 

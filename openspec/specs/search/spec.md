@@ -89,7 +89,9 @@ stream, `inbox`, `archive`, `spam`, `trash` or `anywhere`), `is:` (`unread`,
 `newer_than:` (`d`, `w`, `m`, `y`), with dates in the caller's `tz`. Messages
 in spam or trash SHALL be excluded unless `in:spam`, `in:trash` or
 `in:anywhere` asks for them. An unknown operator or a bad value SHALL be
-treated as text and reported in `query.warnings`, never as an error. A query
+treated as text and reported in `query.warnings`, never as an error; dates
+SHALL be years 1 to 9999. A query that only excludes (`-word` and no
+filter) SHALL get 400 `query_only_excludes`. A query
 over 512 characters, 16 terms or 8 operators SHALL get 400 `query_too_long`.
 The response SHALL return the parsed filters in `query.filters`. User text
 SHALL reach the database only as bound parameters.
@@ -119,13 +121,18 @@ as a prefix.
 `sort=relevance` (the default) SHALL order them by text relevance weighted
 by field (subject, then people and attachment names, then body) and by
 recency. Results SHALL come in pages of `limit` (20 by default, at most 50)
-with an opaque `next_cursor`; a cursor SHALL only be valid for the query and
-order that produced it (400 `cursor_mismatch` otherwise), and relevance
+with an opaque `next_cursor`, signed with a key derived from the instance
+secret; a cursor SHALL only be valid for the caller, query and order that
+produced it (400 `cursor_mismatch` otherwise, also when it was altered), and relevance
 results SHALL stop after 1,000.
 
 #### Scenario: Next page
 - **WHEN** the member asks for the page after `next_cursor` with the same query
 - **THEN** the results continue without repeating a conversation
+
+#### Scenario: Someone else's cursor
+- **WHEN** Rui sends a cursor Sam's search returned
+- **THEN** the response is 400 with code `cursor_mismatch`
 
 #### Scenario: Cursor from another query
 - **WHEN** a cursor from the query "invoice" is sent with the query "receipt"
@@ -148,16 +155,22 @@ A workspace's index SHALL be built per source in the background, in pages,
 resuming where it stopped, starting at the first event or the first query
 seen for that workspace, and again whenever the module's index version
 changes. While a backfill runs, queries SHALL answer from what is indexed and
-say `indexing: true`. The command `campbooks-server search reindex
+say `indexing: true`, without waiting for the page in progress. The command `campbooks-server search reindex
 --workspace <id>` SHALL start one by hand.
+
+#### Scenario: A search during a backfill page
+- **WHEN** a backfill page is half-way through, its transaction open, and the member searches
+- **THEN** the search answers at once with `indexing: true`
 
 #### Scenario: First search in an existing workspace
 - **WHEN** a member searches a workspace whose mail arrived before the module existed
 - **THEN** the response says `indexing: true`, and once the backfill ends the same query returns the older mail with `indexing: false`
 
 ### Requirement: Workspace purge
-On `workspaces.workspace_deleting` the module SHALL schedule the deletion of
-every row of the workspace in the `search` schema for its `purge_after`.
+On `workspaces.workspace_deleting` the module SHALL stop indexing the
+workspace at once and schedule the deletion of its index for its
+`purge_after`; a delivery that arrives later SHALL index nothing and start
+no backfill.
 
 #### Scenario: Purged
 - **WHEN** a deleted workspace's grace period ends
