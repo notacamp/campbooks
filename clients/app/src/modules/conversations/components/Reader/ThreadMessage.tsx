@@ -1,9 +1,27 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, FoldedMessage, MessageCard, SafeHtml, Skeleton, Text } from "~/lib/ui";
+import {
+  AttachmentList,
+  Button,
+  FoldedMessage,
+  ImagePreview,
+  MessageCard,
+  SafeHtml,
+  Skeleton,
+  Text,
+} from "~/lib/ui";
 
+import { downloadAttachment, imageUrl, openPdf, type AttachmentRef } from "../../api/attachments";
 import { useMessageBody, type MessageView } from "../../api/queries";
-import { displayName, messageTime, recipientsLine, type Translate } from "../../model";
+import {
+  attachmentKind,
+  cleanFileName,
+  displayName,
+  messageTime,
+  recipientsLine,
+  type Translate,
+} from "../../model";
 
 export interface ThreadMessageProps {
   workspaceId: string;
@@ -47,6 +65,7 @@ export function ThreadMessage({
   const from = displayName(message.from);
   const time = messageTime(message.sent_at, i18n.language, now);
   const text = message.text?.content ?? "";
+  const files = useAttachments(workspaceId, conversationId, message, t);
 
   if (!open) {
     return (
@@ -61,9 +80,6 @@ export function ThreadMessage({
     );
   }
 
-  const files = message.attachments
-    .filter((attachment) => !attachment.inline)
-    .map((attachment) => attachment.filename);
   const remote = body.data?.remote_images ?? 0;
   const html = body.data?.html;
 
@@ -99,7 +115,7 @@ export function ThreadMessage({
       dateTime={message.sent_at}
       recipients={recipientsLine(t, message, i18n.language)}
       rich={message.has_html}
-      attachments={files}
+      files={files}
       actions={
         remote > 0 || truncated ? (
           <>
@@ -129,5 +145,122 @@ export function ThreadMessage({
     >
       {content}
     </MessageCard>
+  );
+}
+
+/**
+ * The message's files (not the images its body shows) with Download and
+ * Preview: a picture in a dialog from a `blob:` URL, a PDF in the browser's
+ * viewer in a new tab, anything else only downloaded.
+ */
+function useAttachments(
+  workspaceId: string,
+  conversationId: string,
+  message: MessageView,
+  t: Translate,
+) {
+  const [busy, setBusy] = useState<string | undefined>();
+  const [error, setError] = useState<string | undefined>();
+  const [preview, setPreview] = useState<{ id: string; src: string | undefined } | null>(null);
+  const attachments = message.attachments.filter((attachment) => !attachment.in_body);
+
+  // Let go of the picture's bytes when the preview closes or changes.
+  const src = preview?.src;
+  useEffect(
+    () => () => {
+      if (src !== undefined) {
+        URL.revokeObjectURL(src);
+      }
+    },
+    [src],
+  );
+
+  if (attachments.length === 0) {
+    return;
+  }
+  const refOf = (attachmentId: string): AttachmentRef => ({
+    workspaceId,
+    conversationId,
+    messageId: message.id,
+    attachmentId,
+  });
+  const find = (id: string) => attachments.find((attachment) => attachment.id === id);
+  const fail = (id: string) => {
+    setError(t("error.attachment", { name: cleanFileName(find(id)?.filename ?? "") }));
+  };
+
+  const download = (id: string) => {
+    const attachment = find(id);
+    if (attachment === undefined) {
+      return;
+    }
+    setError(undefined);
+    setBusy(id);
+    downloadAttachment(refOf(id), attachment.filename)
+      .catch(() => {
+        fail(id);
+      })
+      .finally(() => {
+        setBusy(undefined);
+      });
+  };
+  const showPreview = (id: string) => {
+    const attachment = find(id);
+    if (attachment === undefined) {
+      return;
+    }
+    setError(undefined);
+    if (attachmentKind(attachment.content_type) === "pdf") {
+      if (!openPdf(refOf(id))) {
+        download(id);
+      }
+      return;
+    }
+    setPreview({ id, src: undefined });
+    imageUrl(refOf(id), attachment.content_type)
+      .then((url) => {
+        setPreview((current) => {
+          if (current?.id !== id) {
+            URL.revokeObjectURL(url);
+            return current;
+          }
+          return { id, src: url };
+        });
+      })
+      .catch(() => {
+        setPreview(null);
+        fail(id);
+      });
+  };
+
+  const previewed = preview === null ? undefined : find(preview.id);
+  return (
+    <>
+      <AttachmentList
+        attachments={attachments.map((attachment) => ({
+          id: attachment.id,
+          name: cleanFileName(attachment.filename),
+          size: attachment.size,
+          kind: attachmentKind(attachment.content_type),
+        }))}
+        busy={busy}
+        error={error}
+        shortcut="inbox.next_attachment"
+        onDownload={download}
+        onPreview={showPreview}
+      />
+      {preview === null || previewed === undefined ? null : (
+        <ImagePreview
+          src={preview.src}
+          name={cleanFileName(previewed.filename)}
+          onClose={() => {
+            setPreview(null);
+          }}
+          onDownload={() => {
+            download(previewed.id);
+          }}
+        />
+      )}
+    </>
   );
 }
