@@ -10,6 +10,8 @@ use axum::{
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
     Error, Problem,
+    error::LocalizableProblem,
+    i18n,
     operations::{Operation, Risk},
 };
 use chrono::{DateTime, Utc};
@@ -26,8 +28,9 @@ use super::{
 /// Longest accepted `return_to`.
 const MAX_RETURN_TO: usize = 2048;
 
-/// Problem details of the BFF (also listed in the OpenAPI document).
-mod detail {
+/// Problem codes of the BFF (also listed in the OpenAPI document), each
+/// explained by `errors.<code>` in the server's catalogue.
+mod code {
     /// The BFF has no identity provider or client secret configured.
     pub const NOT_CONFIGURED: &str = "bff_not_configured";
     /// `/bff/api/*` without a live session: sign in at `/bff/login`.
@@ -60,12 +63,12 @@ mod detail {
 )]
 pub struct BffDoc;
 
-fn problem(status: StatusCode, detail: &str) -> Response {
-    Problem::new(status, Some(detail.to_owned())).into_response()
+fn problem(status: StatusCode, code: &'static str) -> Response {
+    LocalizableProblem::new(status, crate::MESSAGES.reason(code)).into_response()
 }
 
 fn not_configured() -> Response {
-    problem(StatusCode::SERVICE_UNAVAILABLE, detail::NOT_CONFIGURED)
+    problem(StatusCode::SERVICE_UNAVAILABLE, code::NOT_CONFIGURED)
 }
 
 fn no_store(mut response: Response) -> Response {
@@ -83,9 +86,9 @@ fn with_cookie(mut response: Response, cookie: HeaderValue) -> Response {
 fn oidc_failure(err: &OidcError) -> Response {
     tracing::warn!(error = %err, "web sign-in: identity provider call failed");
     match err {
-        OidcError::Rejected(_) => problem(StatusCode::BAD_REQUEST, detail::CODE_REJECTED),
+        OidcError::Rejected(_) => problem(StatusCode::BAD_REQUEST, code::CODE_REJECTED),
         OidcError::Unavailable(_) => {
-            Error::Unavailable("the identity provider is unavailable".to_owned()).into_response()
+            Error::Unavailable(i18n::MESSAGES.reason("idp_unavailable")).into_response()
         }
     }
 }
@@ -125,7 +128,7 @@ pub async fn login(State(bff): State<Bff>, Query(query): Query<LoginQuery>) -> R
         return not_configured();
     };
     let Some(return_to) = return_to(query.return_to.as_deref()) else {
-        return problem(StatusCode::BAD_REQUEST, detail::INVALID_RETURN_TO);
+        return problem(StatusCode::BAD_REQUEST, code::INVALID_RETURN_TO);
     };
     no_store(inner.start_login(return_to).await)
 }
@@ -260,7 +263,7 @@ pub async fn callback(
 
 impl Inner {
     async fn finish_login(&self, query: CallbackQuery, headers: &HeaderMap) -> Response {
-        let invalid_state = || problem(StatusCode::BAD_REQUEST, detail::INVALID_STATE);
+        let invalid_state = || problem(StatusCode::BAD_REQUEST, code::INVALID_STATE);
         let Some(state) = query.state.as_deref() else {
             return invalid_state();
         };
@@ -283,10 +286,10 @@ impl Inner {
                 .as_deref()
                 .is_some_and(|iss| iss != self.oidc.issuer())
         {
-            return problem(StatusCode::BAD_REQUEST, detail::LOGIN_FAILED);
+            return problem(StatusCode::BAD_REQUEST, code::LOGIN_FAILED);
         }
         let Some(code) = query.code.as_deref() else {
-            return problem(StatusCode::BAD_REQUEST, detail::LOGIN_FAILED);
+            return problem(StatusCode::BAD_REQUEST, code::LOGIN_FAILED);
         };
         let Ok(verifier) = self
             .cipher
@@ -299,7 +302,7 @@ impl Inner {
             Err(err) => return oidc_failure(&err),
         };
         let Some(id_token) = tokens.id_token.as_deref() else {
-            return problem(StatusCode::BAD_REQUEST, detail::INVALID_ID_TOKEN);
+            return problem(StatusCode::BAD_REQUEST, code::INVALID_ID_TOKEN);
         };
         let identity = match self
             .verifier
@@ -308,7 +311,7 @@ impl Inner {
         {
             Ok(identity) => identity,
             Err(Error::Unavailable(reason)) => return Error::Unavailable(reason).into_response(),
-            Err(_) => return problem(StatusCode::BAD_REQUEST, detail::INVALID_ID_TOKEN),
+            Err(_) => return problem(StatusCode::BAD_REQUEST, code::INVALID_ID_TOKEN),
         };
 
         // A sign-in always starts a new session with a new id; one this
@@ -577,7 +580,7 @@ pub async fn backchannel_logout(
         Err(_) => {
             return Ok(no_store(problem(
                 StatusCode::BAD_REQUEST,
-                detail::INVALID_LOGOUT_TOKEN,
+                code::INVALID_LOGOUT_TOKEN,
             )));
         }
     };
@@ -676,7 +679,7 @@ async fn api(State(bff): State<Bff>, request: Request) -> Result<Response, Error
     };
     let session_required = || {
         with_cookie(
-            problem(StatusCode::UNAUTHORIZED, detail::SESSION_REQUIRED),
+            problem(StatusCode::UNAUTHORIZED, code::SESSION_REQUIRED),
             inner.cookies.clear_session(),
         )
     };

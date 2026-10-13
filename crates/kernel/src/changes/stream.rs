@@ -143,7 +143,7 @@ pub async fn open(
     let slot = state
         .changes
         .admit(&subscription.principal.subject)
-        .ok_or(Error::TooManyRequests("too_many_streams"))?;
+        .ok_or_else(|| Error::TooManyRequests(crate::i18n::MESSAGES.reason("too_many_streams")))?;
     let workspace = subscription.workspace.to_string();
     // Subscribe before reading the head, so nothing sequenced in between
     // goes unnoticed.

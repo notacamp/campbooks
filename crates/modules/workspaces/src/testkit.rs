@@ -69,6 +69,7 @@ impl Kit {
             .state(pool)
             .with_blobs(blobs)
             .with_membership(crate::membership())
+            .with_locales(crate::locale_preference())
             .with_registry(Registry::build(&[crate::module()]).unwrap());
         let config = Arc::make_mut(&mut state.config);
         config.signup.policy = policy;

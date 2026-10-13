@@ -6,8 +6,7 @@ use campbooks_kernel::{
 };
 use sqlx::PgConnection;
 
-/// Detail of the 409 when a change would leave a workspace without an owner.
-pub const LAST_OWNER: &str = "last_owner";
+use crate::MESSAGES;
 
 /// The user acting through `access`, with their role. Client tokens act
 /// through their scopes only and cannot take role-gated actions: 403.
@@ -78,7 +77,7 @@ pub async fn keep_an_owner(
     .fetch_one(conn)
     .await?;
     if owners <= 1 {
-        return Err(Error::Conflict(LAST_OWNER.to_owned()));
+        return Err(Error::Conflict(MESSAGES.reason("last_owner")));
     }
     Ok(())
 }

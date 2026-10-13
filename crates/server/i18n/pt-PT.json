@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "bff_not_configured": "O início de sessão na web não está configurado neste servidor.",
+    "session_required": "A sua sessão terminou. Inicie sessão novamente.",
+    "invalid_return_to": "A página para onde voltar depois de iniciar sessão tem de ser deste site.",
+    "invalid_state": "Este início de sessão expirou ou já foi utilizado. Comece de novo.",
+    "login_failed": "Não foi possível iniciar sessão. Tente novamente.",
+    "code_rejected": "O serviço de início de sessão recusou este início de sessão. Tente novamente.",
+    "invalid_id_token": "O serviço de início de sessão enviou uma identidade que não foi possível verificar. Tente novamente.",
+    "invalid_logout_token": "Não foi possível verificar o pedido de fim de sessão.",
+    "csrf_check_failed": "Este pedido foi recusado porque não veio da aplicação Campbooks. Recarregue a página e tente novamente."
+  }
+}

@@ -114,9 +114,15 @@ plurals). Every string a user can see exists in all four before it ships.
 - **Our UI:** every `i18n/` namespace has `en`, `pt-PT`, `es-ES` and `fr` files with
   exactly the same keys and no empty values. *(CI: `pnpm i18n:check`.)*
 - **Our server:** messages a user reads (problem+json `title`/`detail`,
-  emails, notifications) are rendered in the recipient's locale, from
-  catalogues held to the same parity. *(Lands with the i18n foundation issue;
-  until then, no user-facing server text.)*
+  emails, notifications) are rendered in the recipient's locale from the
+  crate's catalogue (`crates/<crate>/i18n/<locale>.json`, the client's
+  format, declared with `kernel::catalogue!`), never from string literals.
+  Errors name a `Reason` (`MESSAGES.reason("code")`, a stable code plus the
+  message `errors.<code>`); handlers that render text take `Locale`; jobs
+  carry the recipient's `Locale` in their payload. Clients match on the
+  problem's `code`, never on `title` or `detail`. *(CI: `cargo xtask
+  i18n` — same keys, plural forms and placeholders in all four, no empty
+  values; each catalogue's unit test runs the same check.)*
 - **Other people's screens we put in front of users** — the identity
   provider's login, sign-up, account pages and emails, and any future
   component that renders UI or mail to end users — count as ours. A component

@@ -16,6 +16,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 use crate::{
     domain::{
         db::begin_as_user,
@@ -178,7 +180,7 @@ async fn check_signup(state: &AppState, user: UserId, code: Option<&str>) -> Res
     }
     match signup.policy {
         SignupPolicy::Open => Ok(()),
-        SignupPolicy::InviteOnly => Err(Error::Denied("signup_invite_only")),
+        SignupPolicy::InviteOnly => Err(Error::Denied(MESSAGES.reason("signup_invite_only"))),
         SignupPolicy::Approval => {
             security::record(
                 &mut tx,
@@ -189,13 +191,13 @@ async fn check_signup(state: &AppState, user: UserId, code: Option<&str>) -> Res
             )
             .await?;
             tx.commit().await?;
-            Err(Error::Denied("signup_requires_approval"))
+            Err(Error::Denied(MESSAGES.reason("signup_requires_approval")))
         }
         SignupPolicy::Code => {
             if code.is_some_and(|code| matches_any(code, &signup.codes())) {
                 Ok(())
             } else {
-                Err(Error::Denied("signup_code_invalid"))
+                Err(Error::Denied(MESSAGES.reason("signup_code_invalid")))
             }
         }
     }
@@ -309,7 +311,7 @@ mod tests {
             .await;
         (
             response.status,
-            response.json["detail"]
+            response.json["code"]
                 .as_str()
                 .unwrap_or_default()
                 .to_owned(),
@@ -365,7 +367,7 @@ mod tests {
         let missing = kit
             .post(&kit.user("third"), "/api/v1/workspaces", body())
             .await;
-        assert_eq!(missing.json["detail"], "signup_code_invalid");
+        assert_eq!(missing.json["code"], "signup_code_invalid");
 
         let ok = kit
             .post(

@@ -10,6 +10,7 @@ use crate::{
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
     events::EventBus,
+    i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
     tenancy::{MembershipPort, NoMembership},
@@ -31,6 +32,11 @@ pub struct AppState {
     /// registers the `workspaces` module's implementation; until then nobody
     /// belongs anywhere.
     pub membership: MembershipPort,
+    /// Answers which language a user chose, for the
+    /// [`Locale`](crate::i18n::Locale) of their requests. The server
+    /// registers the `workspaces` module's implementation; until then
+    /// nobody chose one.
+    pub locales: LocalePreferencePort,
     /// Message bodies, attachments and files (ADR 0011). Not configured
     /// until the server attaches one with [`with_blobs`](Self::with_blobs).
     pub blobs: BlobStore,
@@ -58,6 +64,7 @@ impl AppState {
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
+            locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
             operations: Operations::default(),
         }
@@ -75,6 +82,13 @@ impl AppState {
     #[must_use]
     pub fn with_visibility(mut self, visibility: VisibilityPort) -> Self {
         self.visibility = visibility;
+        self
+    }
+
+    /// The same state, reading users' chosen locales through `locales`.
+    #[must_use]
+    pub fn with_locales(mut self, locales: LocalePreferencePort) -> Self {
+        self.locales = locales;
         self
     }
 

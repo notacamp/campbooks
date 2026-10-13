@@ -32,8 +32,31 @@ pub enum Error {
 impl From<Error> for campbooks_kernel::Error {
     fn from(err: Error) -> Self {
         match err {
-            Error::RoleNotConfigured(_) => Self::Unavailable(err.to_string()),
+            Error::RoleNotConfigured(role) => Self::Unavailable(
+                crate::MESSAGES
+                    .reason("ai_role_not_configured")
+                    .arg("role", role.as_str()),
+            ),
             other => Self::internal(other),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::i18n::Locale;
+
+    use super::*;
+
+    #[test]
+    fn an_unconfigured_role_is_unavailable_and_explained() {
+        let err = campbooks_kernel::Error::from(Error::RoleNotConfigured(Role::Vision));
+        assert_eq!(err.code(), "ai_role_not_configured");
+        assert!(err.to_problem(Locale::Fr).detail.contains("vision"));
+    }
+
+    #[test]
+    fn catalogue_is_at_parity() {
+        assert_eq!(crate::MESSAGES.check(), Vec::<String>::new());
     }
 }

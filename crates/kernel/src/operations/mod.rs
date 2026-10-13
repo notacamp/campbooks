@@ -182,16 +182,23 @@ impl std::fmt::Debug for Composed {
 
 /// Compose `api` (every module's routes) over `state`: parse its document
 /// into the [`Catalogue`], put every route behind the
-/// [idempotency](crate::idempotency) layer, and install the result in the
+/// [idempotency](crate::idempotency) layer, with the
+/// [`localize`](crate::i18n::localize) layer on both sides of it (inside,
+/// so a stored response is already in the caller's language; outside, for
+/// the idempotency layer's own problems), and install the result in the
 /// state's [`Operations`]. HTTP requests and [`invoke`] then go through the
 /// same router.
 pub fn compose(api: OpenApiRouter<AppState>, state: AppState) -> Composed {
     let (routes, spec) = api.split_for_parts();
     let catalogue = Arc::new(Catalogue::from_openapi(&spec));
-    let routes = routes.route_layer(axum::middleware::from_fn_with_state(
-        idempotency::Idempotency::new(&state, Arc::clone(&catalogue)),
-        idempotency::middleware,
-    ));
+    let localize = || axum::middleware::from_fn_with_state(state.clone(), crate::i18n::localize);
+    let routes = routes
+        .route_layer(localize())
+        .route_layer(axum::middleware::from_fn_with_state(
+            idempotency::Idempotency::new(&state, Arc::clone(&catalogue)),
+            idempotency::middleware,
+        ))
+        .route_layer(localize());
     let state = state.with_operations(Operations::new(routes.clone(), catalogue));
     Composed {
         routes,
