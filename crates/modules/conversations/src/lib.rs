@@ -179,7 +179,12 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
     match gateway.config().provider_for_content(Role::Decide) {
         Ok(_) => true,
         Err(error @ campbooks_ai::Error::ExternalContentRefused { .. }) => {
-            tracing::warn!(%error, "the decide pass is off: rules alone sort mail");
+            // The module is composed more than once at startup (routes,
+            // catalogues, worker): say it once.
+            static WARNED: std::sync::Once = std::sync::Once::new();
+            WARNED.call_once(|| {
+                tracing::warn!(%error, "the decide pass is off: rules alone sort mail");
+            });
             false
         }
         Err(_) => false,
