@@ -1,5 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, Outlet, useNavigate, useParams } from "@tanstack/react-router";
+import {
+  createRootRouteWithContext,
+  createRoute,
+  Outlet,
+  useNavigate,
+  useParams,
+} from "@tanstack/react-router";
 import { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -38,9 +44,7 @@ function RootLayout() {
     // The accent follows the open workspace; outside one, the last one opened.
     <ThemeProvider workspaceId={workspaceId ?? readPref("workspace") ?? undefined}>
       <Suspense fallback={<Text tone="tertiary">{t("loading")}</Text>}>
-        <SessionGate>
-          <Outlet />
-        </SessionGate>
+        <Outlet />
       </Suspense>
       <ShortcutSheet
         open={sheetOpen}
@@ -61,4 +65,21 @@ function RootLayout() {
 export const rootRoute = createRootRouteWithContext<RouterContext>()({
   component: RootLayout,
   notFoundComponent: NotFound,
+});
+
+/**
+ * Every page that needs a signed-in browser sits under this pathless layout,
+ * which renders the session gate. Public pages (the sign-in screens) sit
+ * beside it under the root.
+ */
+export const gatedRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  id: "gated",
+  component: function GatedLayout() {
+    return (
+      <SessionGate>
+        <Outlet />
+      </SessionGate>
+    );
+  },
 });

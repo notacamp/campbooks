@@ -28,7 +28,7 @@ export const Landing: Story = {
         Sign in
       </Button>
     ),
-    footer: "Open source. Your data stays in your workspace.",
+    footer: "Source available. Your data stays in your workspace.",
   },
 };
 

@@ -16,9 +16,9 @@ import { pause, type ScenarioContext } from "../context.ts";
 //   pnpm --dir clients dev
 //   pnpm --dir clients record sign-in-built-in
 //
-// The sign-in and new-account screens are slice S1b: until they land, this
-// scenario does their two steps itself (choose Google; confirm the new
-// account), and says so on screen. Fictional person only; no token is shown.
+// Every screen is the real one: the sign-in and new-account screens (S1b),
+// the first run with its mailbox step, Home, and signing out and in again.
+// Fictional person only; no token is shown.
 
 /** A caption pinned to the bottom of the page, so the video explains itself. */
 async function caption(page: Page, text: string): Promise<void> {
@@ -32,117 +32,80 @@ async function caption(page: Page, text: string): Promise<void> {
       zIndex: "2147483647", padding: "10px 14px", borderRadius: "10px",
       background: "rgba(20, 20, 24, 0.88)", color: "#fff",
       font: "500 15px/1.4 system-ui, sans-serif",
+      pointerEvents: "none",
     });
     document.body.append(box);
   })()`);
   await pause(1600);
 }
 
-/** The `request` the issuer handed the sign-in screen. */
-async function signInRequest(page: Page): Promise<string> {
-  await page.waitForURL(/\/sign-in\?request=/u);
-  return new URL(page.url()).searchParams.get("request") ?? "";
-}
-
-/** What S1b's sign-in screen will do: start a round trip to Google. */
-async function chooseGoogle(page: Page, request: string): Promise<void> {
-  await caption(page, "Campbooks' issuer asks how to sign in (S1b's screen goes here): Google");
-  await page.goto(`/auth/start/google?request=${encodeURIComponent(request)}`);
-  await page.getByRole("heading", { name: "Sign in to Campbooks" }).waitFor();
-  await caption(page, "One Google consent: who you are, and your mail, with offline access");
-  await page.getByRole("link", { name: "Allow" }).click();
-}
-
-/** Call the API through the BFF from the page, as the app does. */
-async function api(page: Page, method: string, path: string): Promise<unknown> {
-  return page.evaluate(`fetch(${JSON.stringify(path)}, {
-    method: ${JSON.stringify(method)},
-    headers: { "x-campbooks-csrf": "1", "content-type": "application/json" },
-  }).then((response) => response.json())`);
-}
-
-/** Show a JSON answer of the API on screen. */
-async function showJson(page: Page, path: string, text: string): Promise<void> {
-  await page.goto(path);
-  await page.addStyleTag({ content: "body,pre{font-size:15px!important;white-space:pre-wrap}" });
-  // A raw JSON page has no viewport: phones would show it zoomed out.
-  await page.evaluate(`(() => {
-    const meta = document.createElement("meta");
-    meta.name = "viewport";
-    meta.content = "width=device-width, initial-scale=1";
-    document.head.append(meta);
-    const pre = document.querySelector("pre");
-    if (pre?.textContent) pre.textContent = JSON.stringify(JSON.parse(pre.textContent), null, 2);
-  })()`);
-  await caption(page, text);
+/** On the sign-in screen: Google is `1`; the fake Google's consent: Allow. */
+async function continueWithGoogle(page: Page): Promise<void> {
+  await page.getByRole("link", { name: /Continue with Google/u }).waitFor();
   await pause(1200);
+  await page.keyboard.press("1");
+  const allow = page.getByRole("link", { name: "Allow" });
+  await allow.waitFor();
+  await caption(page, "One Google consent: who you are, and your mail, with offline access");
+  await allow.click();
 }
 
 export default async function signInBuiltIn({ page }: ScenarioContext): Promise<void> {
+  // Signed out: the app goes through the BFF to Campbooks' own issuer, which
+  // shows its sign-in screen.
   await page.goto("/");
-  await page.getByRole("link", { name: "Sign in" }).waitFor();
+  await page.getByRole("link", { name: /Continue with Google/u }).waitFor();
   await caption(
     page,
-    "Signed out. Sign in goes to the web app's BFF, then to Campbooks' own issuer",
+    "Signed out: Campbooks' own sign-in screen, before anything leaves for Google",
   );
-  await page.getByRole("link", { name: "Sign in" }).click();
+  await page.getByText("What Campbooks reads and keeps").click();
+  await pause(2500);
+  await continueWithGoogle(page);
 
-  await chooseGoogle(page, await signInRequest(page));
+  // A Google account no Campbooks account uses yet.
+  const create = page.getByRole("button", { name: /Create account/u });
+  await create.waitFor();
+  await caption(page, "New here: nothing exists until you confirm. Enter creates the account");
+  await pause(1200);
+  await page.keyboard.press("Enter");
 
-  // A Google account no Campbooks account uses yet: S1b's "Create account".
-  await page.waitForURL(/\/sign-in\/new/u);
-  await caption(page, "New here: nothing exists until you confirm (S1b's screen) — Create account");
-  const created = (await api(page, "POST", "/auth/new-account")) as { redirect: string };
-  await page.goto(created.redirect);
-
-  // Back in the app, signed in: the first run asks for a workspace.
+  // Signed in: the first run asks for a workspace.
   const name = page.getByRole("textbox", { name: "Workspace name" });
   await name.waitFor();
-  await caption(page, "Signed in as Sam Rivera. First run: create a workspace");
+  await pause(800);
   await name.pressSequentially("Home", { delay: 60 });
   await page.keyboard.press("Enter");
   await page.getByRole("radio", { name: "Personal" }).click();
+  await pause(600);
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await page.getByRole("heading", { name: "Home is ready" }).waitFor();
-  await pause(800);
 
-  const { workspaces } = (await api(page, "GET", "/bff/api/v1/workspaces")) as {
-    workspaces: { id: string }[];
-  };
-  const workspace = workspaces[0]?.id ?? "";
-  await showJson(
-    page,
-    "/bff/api/v1/identity/held-grants",
-    "The mailbox granted at sign-up waits for a workspace (never its tokens)",
-  );
-  const held = (await api(page, "GET", "/bff/api/v1/identity/held-grants")) as {
-    items: { id: string }[];
-  };
-  await api(
-    page,
-    "POST",
-    `/bff/api/v1/w/${workspace}/identity/held-grants/${held.items[0]?.id ?? ""}/adopt`,
-  );
-  await showJson(
-    page,
-    `/bff/api/v1/w/${workspace}/connections`,
-    "Adopted (S1b's first-run step): Home's Gmail connection, with no second consent",
-  );
+  // The mailbox granted at sign-up: connect it here, with no second consent.
+  await page
+    .getByRole("heading", {
+      name: "Your Gmail sam.rivera@example.com will be connected to this workspace",
+    })
+    .waitFor();
+  await caption(page, "The Gmail from sign-up, held for 7 days: Enter connects it here");
+  await pause(1500);
+  await page.keyboard.press("Enter");
+
+  // Home names the connected mailbox.
+  await page.getByRole("heading", { name: "Your mail" }).waitFor();
+  await caption(page, "Home: the mailbox is connected");
+  await pause(1500);
 
   // Sign out, then in again: the same account and its workspace.
-  await page.goto(`/w/${workspace}`);
-  await page.getByRole("heading", { name: "Nothing needs you yet" }).waitFor();
   await page
     .getByRole("button", { name: /^(Sam Rivera|Account)/u })
     .first()
     .click();
-  await caption(page, "Sign out ends the web session and the issuer's, no confirmation page");
+  await pause(800);
   await page.getByRole("button", { name: "Sign out" }).click();
-  await page.getByRole("link", { name: "Sign in" }).waitFor();
+  await page.getByRole("link", { name: /Continue with Google/u }).waitFor();
   await caption(page, "Signed out. Sign in again with the same Google account");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await chooseGoogle(page, await signInRequest(page));
-  await page.getByRole("heading", { name: "Nothing needs you yet" }).waitFor();
-  await caption(page, "Back in the same account, in Home: no new account, no new grant");
-  await pause(1500);
+  await continueWithGoogle(page);
+  await page.getByRole("heading", { name: "Your mail" }).waitFor();
+  await caption(page, "Back in the same account and workspace: no new account, no new grant");
+  await pause(2000);
 }

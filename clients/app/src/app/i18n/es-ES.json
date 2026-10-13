@@ -7,14 +7,10 @@
     "home": "Ir a la página de inicio"
   },
   "landing": {
-    "title": "Lo que te necesita, en un solo lugar tranquilo",
-    "lead": "Campbooks lee tu correo y te trae solo lo que te necesita.",
-    "signIn": "Iniciar sesión",
-    "invitedTitle": "Te han invitado a un espacio de trabajo",
-    "invitedLead": "Inicia sesión con la dirección de correo a la que se envió la invitación y entrarás directamente.",
     "ended": "Se ha cerrado tu sesión.",
     "endedDetail": "Vuelve a iniciar sesión para seguir donde estabas.",
-    "footer": "Código abierto. Tu correo se queda en tu espacio de trabajo."
+    "signInAgain": "Volver a iniciar sesión",
+    "footer": "Código disponible. Tu correo se queda en tu espacio de trabajo."
   },
   "gate": {
     "opening": "Abriendo Campbooks…",
@@ -50,7 +46,7 @@
     "title": "Aún no hay nada que te necesite",
     "subline": "Cuando Campbooks tenga algo para ti, aparecerá aquí.",
     "connectTitle": "Conecta tu correo",
-    "connectLead": "Campbooks leerá tu correo y traerá a esta página lo que te necesita. Las conexiones de correo aún se están construyendo, así que todavía no puedes conectar un buzón.",
+    "connectLead": "Campbooks leerá tu correo y traerá a esta página lo que te necesita. Conectar un buzón desde aquí todavía se está construyendo.",
     "connect": "Conectar tu correo",
     "soon": "Próximamente",
     "context": "Primeros pasos",
