@@ -911,7 +911,7 @@ mod tests {
             "otlp-token-9",
             "user",
         ] {
-            assert!(!json.contains(secret), "{secret} leaked: {json}");
+            assert!(!json.contains(secret), "{secret} leaked into the summary");
         }
     }
 
