@@ -19,12 +19,12 @@ export const INBOX = {
 /** The clock the demo is set at: Tuesday 13 October 2026, 15:00 UTC. */
 export const NOW = new Date("2026-10-13T15:00:00Z");
 
-const base = {
+const base: Pick<Summary, "inbox_id" | "archived" | "labels" | "suggestion"> = {
   inbox_id: INBOX.id,
   archived: false,
   labels: [],
   suggestion: null,
-} as const;
+};
 
 export const Q4: Summary = {
   ...base,

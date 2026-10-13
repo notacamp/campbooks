@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -51,6 +51,8 @@ export interface InboxScreenProps {
    * ReplySlot.ts); the reader hides those actions without it.
    */
   renderReplySlot?: RenderReplySlot | undefined;
+  /** A list-header action from the send slice ("New message", C). */
+  composeAction?: ReactNode | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -66,6 +68,7 @@ export function InboxScreen({
   stream,
   conversationId,
   renderReplySlot,
+  composeAction,
   now,
 }: InboxScreenProps) {
   const { t: typed } = useTranslation("conversations");
@@ -197,6 +200,7 @@ export function InboxScreen({
             {name}
           </Heading>
           <Spacer />
+          {composeAction}
           <Segmented
             label={t("list.show")}
             value={show}
