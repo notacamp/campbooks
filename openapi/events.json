@@ -614,6 +614,128 @@
       }
     },
     {
+      "name": "identity.client_registered",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A workspace registered a client of its own.",
+        "required": [
+          "workspace",
+          "client",
+          "kind"
+        ],
+        "properties": {
+          "client": {
+            "type": "string",
+            "description": "The client id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`confidential` (client credentials) or `public` (sign-in app)."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.client_removed",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A workspace removed a client of its own; its tokens no longer work.",
+        "required": [
+          "workspace",
+          "client"
+        ],
+        "properties": {
+          "client": {
+            "type": "string",
+            "description": "The client id."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.consent_granted",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A person allowed a client (in a workspace, unless it is Campbooks' own\napp).",
+        "required": [
+          "account",
+          "client"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account."
+          },
+          "client": {
+            "type": "string",
+            "description": "The client id."
+          },
+          "workspace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace its tokens are bound to."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.consent_revoked",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A consent ended (revoked by the person, or because they left the\nworkspace, or it was deleted); the client's tokens for them stop\nworking.",
+        "required": [
+          "account",
+          "client",
+          "reason"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account."
+          },
+          "client": {
+            "type": "string",
+            "description": "The client id."
+          },
+          "reason": {
+            "type": "string",
+            "description": "`revoked`, `member_left`, `workspace_deleting` or `client_removed`."
+          },
+          "workspace": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace its tokens were bound to."
+          }
+        }
+      }
+    },
+    {
       "name": "identity.refresh_reuse_detected",
       "module": "identity",
       "version": 1,

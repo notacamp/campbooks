@@ -111,3 +111,126 @@ impl DomainEvent for WayInRemoved {
         None
     }
 }
+
+/// A workspace registered a client of its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ClientRegistered {
+    /// The workspace.
+    pub workspace: String,
+    /// The client id.
+    pub client: String,
+    /// `confidential` (client credentials) or `public` (sign-in app).
+    pub kind: String,
+}
+
+impl DomainEvent for ClientRegistered {
+    const NAME: &'static str = "identity.client_registered";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// A workspace removed a client of its own; its tokens no longer work.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ClientRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The client id.
+    pub client: String,
+}
+
+impl DomainEvent for ClientRemoved {
+    const NAME: &'static str = "identity.client_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// A person allowed a client (in a workspace, unless it is Campbooks' own
+/// app).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConsentGranted {
+    /// The account.
+    pub account: Uuid,
+    /// The client id.
+    pub client: String,
+    /// The workspace its tokens are bound to.
+    pub workspace: Option<String>,
+}
+
+impl DomainEvent for ConsentGranted {
+    const NAME: &'static str = "identity.consent_granted";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    // A person's, not a workspace's (Campbooks' own apps name none): the
+    // workspace is in the payload.
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// A consent ended (revoked by the person, or because they left the
+/// workspace, or it was deleted); the client's tokens for them stop
+/// working.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct ConsentRevoked {
+    /// The account.
+    pub account: Uuid,
+    /// The client id.
+    pub client: String,
+    /// The workspace its tokens were bound to.
+    pub workspace: Option<String>,
+    /// `revoked`, `member_left`, `workspace_deleting` or `client_removed`.
+    pub reason: String,
+}
+
+impl DomainEvent for ConsentRevoked {
+    const NAME: &'static str = "identity.consent_revoked";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    // A person's, not a workspace's (Campbooks' own apps name none): the
+    // workspace is in the payload.
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// `workspaces.member_left` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberLeft {
+    /// The workspace.
+    pub workspace: String,
+    /// The former member (the workspaces module's user id).
+    pub user: Uuid,
+}
+
+impl DomainEvent for MemberLeft {
+    const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.workspace_deleting` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspaceDeleting {
+    /// The workspace.
+    pub workspace: String,
+}
+
+impl DomainEvent for WorkspaceDeleting {
+    const NAME: &'static str = "workspaces.workspace_deleting";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}

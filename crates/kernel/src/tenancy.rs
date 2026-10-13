@@ -113,6 +113,21 @@ pub struct Access {
 pub type MembershipFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Option<Access>, Error>> + Send + 'a>>;
 
+/// A live workspace someone belongs to, as the [`Membership`] port lists it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WorkspaceSummary {
+    /// The workspace.
+    pub id: WorkspaceId,
+    /// Its name.
+    pub name: String,
+    /// Their role there.
+    pub role: Role,
+}
+
+/// A future returned by [`Membership::workspaces_of`].
+pub type WorkspacesFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Vec<WorkspaceSummary>, Error>> + Send + 'a>>;
+
 /// The port that answers "may this principal work in this workspace?".
 /// Implemented by the `workspaces` module; the server registers it with
 /// [`AppState::with_membership`].
@@ -126,6 +141,14 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
         principal: &'a Principal,
         workspace: WorkspaceId,
     ) -> MembershipFuture<'a>;
+
+    /// The live workspaces of the person signed in as `subject` (their
+    /// identity-provider subject), oldest first; none when they are not
+    /// known. For screens served outside any workspace (the consent screen
+    /// asks which workspace an app may use).
+    fn workspaces_of<'a>(&'a self, _db: &'a PgPool, _subject: &'a str) -> WorkspacesFuture<'a> {
+        Box::pin(async { Ok(Vec::new()) })
+    }
 
     /// Record types (`<module>.<record>`) whose changes may change who
     /// belongs to a workspace. An open change stream that sees one resolves
@@ -160,6 +183,8 @@ pub type MembershipPort = Arc<dyn Membership>;
 /// - token or scope problems → 401 / 403, before the workspace is looked at
 /// - `workspace_id` is not a UUID → 404
 /// - a client token whose `workspace_id` claim is missing or different → 404
+/// - a user token bound to another workspace (`workspace_id`, set by the
+///   in-process issuer when a person allowed an app in one workspace) → 404
 /// - a user who is not a member, or a deleted or unknown workspace → 404
 ///
 /// Operations using it document the path parameter and
@@ -205,7 +230,7 @@ impl<S: ScopeName> FromRequestParts<AppState> for Workspace<S> {
                 ))
             })?;
         let id: WorkspaceId = raw.parse().map_err(|_| Error::NotFound)?;
-        if principal.kind == PrincipalKind::Client && !client_bound_to(&principal, id) {
+        if !may_reach(&principal, id) {
             return Err(Error::NotFound);
         }
         let access = state
@@ -227,7 +252,20 @@ impl<S: ScopeName> FromRequestParts<AppState> for Workspace<S> {
     }
 }
 
-/// Whether a client token's `workspace_id` claim names `workspace`.
+/// Whether the token may reach `workspace` at all: a client token must name
+/// it; a user token that names a workspace (a third-party app the person
+/// allowed in one workspace) may reach that one only; any other user token
+/// leaves the question to membership.
+fn may_reach(principal: &Principal, workspace: WorkspaceId) -> bool {
+    match principal.kind {
+        PrincipalKind::Client => client_bound_to(principal, workspace),
+        PrincipalKind::User => {
+            principal.workspace.is_none() || client_bound_to(principal, workspace)
+        }
+    }
+}
+
+/// Whether a token's `workspace_id` claim names `workspace`.
 fn client_bound_to(principal: &Principal, workspace: WorkspaceId) -> bool {
     principal
         .workspace
@@ -272,6 +310,24 @@ mod tests {
             &principal(PrincipalKind::Client, Some("not-a-uuid")),
             id
         ));
+    }
+
+    #[test]
+    fn a_bound_user_token_reaches_its_workspace_only() {
+        let id = WorkspaceId::new();
+        let other = WorkspaceId::new();
+        let unbound = principal(PrincipalKind::User, None);
+        assert!(may_reach(&unbound, id) && may_reach(&unbound, other));
+        let bound = principal(PrincipalKind::User, Some(&id.to_string()));
+        assert!(may_reach(&bound, id));
+        assert!(!may_reach(&bound, other));
+        let garbled = principal(PrincipalKind::User, Some("not-a-uuid"));
+        assert!(
+            !may_reach(&garbled, id),
+            "a claim that names nothing reaches nothing"
+        );
+        let client = principal(PrincipalKind::Client, None);
+        assert!(!may_reach(&client, id));
     }
 
     #[test]

@@ -1,10 +1,16 @@
-//! `/oauth2/token` (`authorization_code`, `refresh_token`) and `/oauth2/revoke`
-//! (RFC 7009).
+//! `/oauth2/token` (`authorization_code`, `refresh_token`,
+//! `client_credentials`) and `/oauth2/revoke` (RFC 7009).
 //!
 //! Confidential clients authenticate with `client_secret_basic` or
 //! `client_secret_post`; public clients send only `client_id` and rely on
-//! PKCE. Responses are `no-store`; errors are RFC 6749 §5.2 JSON. Nothing a
-//! client sends is logged.
+//! PKCE. Only a workspace's own confidential client may use
+//! `client_credentials`; its token is bound to its workspace. Every token is
+//! for the API's resource (RFC 8707: another `resource` is
+//! `invalid_target`). Responses are `no-store`; errors are RFC 6749 §5.2
+//! JSON. Nothing a client sends is logged. Requests from the network count
+//! against a per-address limit.
+
+use std::time::Duration;
 
 use axum::{
     Form, Json,
@@ -13,7 +19,10 @@ use axum::{
     response::{IntoResponse as _, Response},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use campbooks_kernel::{Operation, Result, Risk};
+use campbooks_kernel::{
+    Operation, Result, Risk,
+    rate_limit::{ClientIp, Limit, RateKey},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -22,8 +31,8 @@ use crate::{
     deps::Issuer,
     domain::{
         accounts,
-        clients::Client,
-        sessions,
+        clients::{self, Client, Kind},
+        consents, sessions,
         tokens::{self, Grant, Mint, OFFLINE_ACCESS, Refusal, TOKEN_LIFETIME},
     },
     events::RefreshReuseDetected,
@@ -33,7 +42,7 @@ use crate::{
 /// A token request (`application/x-www-form-urlencoded`).
 #[derive(Deserialize, ToSchema)]
 pub struct TokenForm {
-    /// `authorization_code` or `refresh_token`.
+    /// `authorization_code`, `refresh_token` or `client_credentials`.
     pub grant_type: Option<String>,
     /// The authorization code.
     pub code: Option<String>,
@@ -47,7 +56,15 @@ pub struct TokenForm {
     pub client_id: Option<String>,
     /// The client's secret (`client_secret_post`).
     pub client_secret: Option<String>,
+    /// Space-separated scopes (`client_credentials`: at most what the
+    /// client was given; missing means all of them).
+    pub scope: Option<String>,
+    /// The resource the token is for (RFC 8707): the API's resource URI.
+    pub resource: Option<String>,
 }
+
+/// Token requests one address may send.
+const TOKEN_LIMIT: Limit = Limit::new("identity.token", 120, Duration::from_mins(1));
 
 /// A revocation request (`application/x-www-form-urlencoded`).
 #[derive(Deserialize, ToSchema)]
@@ -81,22 +98,21 @@ pub struct TokenResponse {
     pub scope: String,
 }
 
-/// The client a request authenticates as: HTTP Basic (RFC 6749 §2.3.1,
-/// form-urlencoded id and secret) or the form fields; never both.
-fn authenticate<'a>(
-    issuer: &'a Issuer,
+/// The client id and secret a request presents: HTTP Basic (RFC 6749
+/// §2.3.1, form-urlencoded id and secret) or the form fields; never both.
+fn credentials(
     headers: &HeaderMap,
     client_id: Option<&str>,
     client_secret: Option<&str>,
-) -> Option<&'a Client> {
+) -> Option<(String, Option<String>)> {
     let basic = headers
         .get(header::AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
         .and_then(|value| value.strip_prefix("Basic "))
         .and_then(|encoded| STANDARD.decode(encoded.trim()).ok())
         .and_then(|decoded| String::from_utf8(decoded).ok());
-    let (id, secret) = match (basic, client_secret) {
-        (Some(_), Some(_)) => return None,
+    match (basic, client_secret) {
+        (Some(_), Some(_)) => None,
         (Some(pair), None) => {
             let (id, secret) = pair.split_once(':')?;
             let decode = |s: &str| {
@@ -108,15 +124,31 @@ fn authenticate<'a>(
             if client_id.is_some_and(|form_id| form_id != id) {
                 return None;
             }
-            (id, Some(decode(secret)?))
+            Some((id, Some(decode(secret)?)))
         }
-        (None, secret) => (client_id?.to_owned(), secret.map(ToOwned::to_owned)),
-    };
-    let client = issuer.clients.get(&id)?;
-    client.authenticates(secret.as_deref()).then_some(client)
+        (None, secret) => Some((client_id?.to_owned(), secret.map(ToOwned::to_owned))),
+    }
 }
 
-/// Exchange an authorization code or a refresh token for tokens.
+/// The client a request authenticates as.
+async fn authenticate(
+    db: &sqlx::PgPool,
+    issuer: &Issuer,
+    headers: &HeaderMap,
+    client_id: Option<&str>,
+    client_secret: Option<&str>,
+) -> Result<Option<Client>> {
+    let Some((id, secret)) = credentials(headers, client_id, client_secret) else {
+        return Ok(None);
+    };
+    let Some(client) = issuer.clients.find(db, &id).await? else {
+        return Ok(None);
+    };
+    Ok(client.authenticates(secret.as_deref()).then_some(client))
+}
+
+/// Exchange an authorization code, a refresh token or a workspace client's
+/// credentials for tokens.
 #[utoipa::path(
     post,
     path = "/oauth2/token",
@@ -127,26 +159,43 @@ fn authenticate<'a>(
     security(()),
     responses(
         (status = 200, description = "Tokens.", body = TokenResponse),
-        (status = 400, description = "`invalid_request`, `invalid_grant` or `unsupported_grant_type`."),
+        (status = 400, description = "`invalid_request`, `invalid_grant`, `invalid_scope`, \
+            `invalid_target`, `unauthorized_client` or `unsupported_grant_type`."),
         (status = 401, description = "`invalid_client`."),
         (status = 404, description = "Another identity provider serves this instance."),
+        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn token(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     headers: HeaderMap,
     Form(form): Form<TokenForm>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &TOKEN_LIMIT, &RateKey::ip(ip))
+        .await?;
     let Some(client) = authenticate(
+        &ctx.state.db,
         issuer,
         &headers,
         form.client_id.as_deref(),
         form.client_secret.as_deref(),
-    ) else {
+    )
+    .await?
+    else {
         return Ok(oauth_error(StatusCode::UNAUTHORIZED, "invalid_client"));
     };
+    if let Some(refused) = refuse_early(issuer, &client, &form) {
+        return Ok(refused);
+    }
     let now = issuer.now();
+    if form.grant_type.as_deref() == Some("client_credentials") {
+        return client_credentials(&ctx, issuer, &client, form.scope.as_deref(), now).await;
+    }
     let mut tx = ctx.state.db.begin().await?;
     let (grant, refresh_token, nonce) = match form.grant_type.as_deref() {
         Some("authorization_code") => {
@@ -155,12 +204,23 @@ pub async fn token(
             else {
                 return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
             };
-            match tokens::redeem_code(&mut tx, code, client.id, redirect_uri, verifier, now).await?
+            match tokens::redeem_code(
+                &mut tx,
+                code,
+                &client.id,
+                redirect_uri,
+                verifier,
+                &issuer.resource,
+                now,
+            )
+            .await?
             {
                 Ok(redeemed) => {
-                    let refresh = if has_scope(&redeemed.grant, OFFLINE_ACCESS) {
+                    let refresh = if has_scope(&redeemed.grant, OFFLINE_ACCESS)
+                        && client.may_use("refresh_token")
+                    {
                         let (family, token) =
-                            tokens::create_family(&mut tx, &redeemed.grant, client, now).await?;
+                            tokens::create_family(&mut tx, &redeemed.grant, &client, now).await?;
                         tokens::attach_family(&mut tx, code, family).await?;
                         Some(token)
                     } else {
@@ -168,16 +228,16 @@ pub async fn token(
                     };
                     (redeemed.grant, refresh, redeemed.nonce)
                 }
-                Err(refusal) => return refused(&ctx, tx, client, refusal).await,
+                Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
         }
         Some("refresh_token") => {
             let Some(token) = &form.refresh_token else {
                 return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
             };
-            match tokens::rotate(&mut tx, token, client, now).await? {
+            match tokens::rotate(&mut tx, token, &client, &issuer.resource, now).await? {
                 Ok((grant, next)) => (grant, Some(next), None),
-                Err(refusal) => return refused(&ctx, tx, client, refusal).await,
+                Err(refusal) => return refused(&ctx, tx, &client, refusal).await,
             }
         }
         Some(_) => {
@@ -188,16 +248,63 @@ pub async fn token(
         }
         None => return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request")),
     };
+    let exchanged = Issued {
+        grant,
+        refresh_token,
+        nonce,
+    };
+    respond(&ctx, issuer, &client, tx, exchanged, now).await
+}
+
+/// What a code or refresh token was exchanged for, before signing.
+struct Issued {
+    grant: Grant,
+    refresh_token: Option<String>,
+    nonce: Option<String>,
+}
+
+/// Commit `tx` and answer the tokens `exchanged` stands for, with an ID token
+/// (carrying its nonce) when `openid` was granted.
+async fn respond(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    client: &Client,
+    tx: sqlx::Transaction<'static, sqlx::Postgres>,
+    exchanged: Issued,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<Response> {
+    let Issued {
+        grant,
+        refresh_token,
+        nonce,
+    } = exchanged;
+    // A code or refresh token of an app that needs consent stands on that
+    // consent: revoked, replaced by one for another workspace, or narrower,
+    // and nothing more is minted (the transaction rolls back).
+    if client.needs_consent()
+        && !consents::covers(
+            &ctx.state.db,
+            grant.account_id,
+            &client.id,
+            grant.workspace,
+            &grant.scope,
+        )
+        .await?
+    {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
     let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     };
     tx.commit().await?;
+    if !client.is_first_party() {
+        clients::touch(&ctx.state.db, &client.id, now).await?;
+    }
     let signer = issuer.keys.signer(&ctx.state.db).await?;
     let amr = sessions::amr(&ctx.state.db, grant.session_id).await?;
     let mint = Mint {
         amr: &amr,
         issuer: &issuer.url,
-        audience: &issuer.audience,
         signer: &signer,
         grant: &grant,
         profile: &profile,
@@ -219,6 +326,78 @@ pub async fn token(
     Ok(no_store(Json(body).into_response()))
 }
 
+/// `unauthorized_client` for a grant type the client may not use, and
+/// `invalid_target` for a resource other than the API's.
+fn refuse_early(issuer: &Issuer, client: &Client, form: &TokenForm) -> Option<Response> {
+    if let Some(grant_type) = form.grant_type.as_deref()
+        && matches!(
+            grant_type,
+            "authorization_code" | "refresh_token" | "client_credentials"
+        )
+        && !client.may_use(grant_type)
+    {
+        return Some(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
+    }
+    form.resource
+        .as_deref()
+        .is_some_and(|resource| resource != issuer.resource)
+        .then(|| oauth_error(StatusCode::BAD_REQUEST, "invalid_target"))
+}
+
+/// RFC 6749 §4.4: a workspace's own confidential client, acting on its own
+/// behalf in its workspace, for at most the scopes it was given. No refresh
+/// token, no ID token.
+async fn client_credentials(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    client: &Client,
+    requested: Option<&str>,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<Response> {
+    let (Kind::Workspace, Some(workspace), true) =
+        (client.kind, client.workspace, client.is_confidential())
+    else {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
+    };
+    let allowed = client.allowed_scopes.clone().unwrap_or_default();
+    let scope: Vec<&str> = match requested {
+        None => allowed.iter().map(String::as_str).collect(),
+        Some(requested) => {
+            let mut scope: Vec<&str> = Vec::new();
+            for name in requested.split_whitespace() {
+                if !allowed.iter().any(|a| a == name) {
+                    return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_scope"));
+                }
+                if !scope.contains(&name) {
+                    scope.push(name);
+                }
+            }
+            scope
+        }
+    };
+    let scope = scope.join(" ");
+    clients::touch(&ctx.state.db, &client.id, now).await?;
+    let signer = issuer.keys.signer(&ctx.state.db).await?;
+    let access_token = tokens::client_access_token(
+        &issuer.url,
+        &signer,
+        &client.id,
+        &scope,
+        workspace,
+        &issuer.resource,
+        now,
+    )?;
+    let body = TokenResponse {
+        access_token,
+        token_type: "Bearer",
+        expires_in: TOKEN_LIFETIME.num_seconds(),
+        refresh_token: None,
+        id_token: None,
+        scope,
+    };
+    Ok(no_store(Json(body).into_response()))
+}
+
 fn has_scope(grant: &Grant, scope: &str) -> bool {
     grant.scope.split_whitespace().any(|s| s == scope)
 }
@@ -235,7 +414,7 @@ async fn refused(
         let now = ctx.issuer()?.now();
         let event = RefreshReuseDetected {
             account: account_id,
-            client: client.id.to_owned(),
+            client: client.id.clone(),
         };
         accounts::audit(
             &mut tx,
@@ -247,7 +426,7 @@ async fn refused(
         .await?;
         ctx.state.events.publish(&mut tx, &event).await?;
         tracing::warn!(
-            client = client.id,
+            client = %client.id,
             "a spent code or rotated refresh token was used again; its tokens are revoked"
         );
     }
@@ -274,22 +453,30 @@ async fn refused(
 )]
 pub async fn revoke(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     headers: HeaderMap,
     Form(form): Form<RevokeForm>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &TOKEN_LIMIT, &RateKey::ip(ip))
+        .await?;
     let Some(client) = authenticate(
+        &ctx.state.db,
         issuer,
         &headers,
         form.client_id.as_deref(),
         form.client_secret.as_deref(),
-    ) else {
+    )
+    .await?
+    else {
         return Ok(oauth_error(StatusCode::UNAUTHORIZED, "invalid_client"));
     };
     let Some(token) = &form.token else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
     };
     let mut conn = ctx.state.db.acquire().await?;
-    tokens::revoke_token(&mut conn, token, client.id, issuer.now()).await?;
+    tokens::revoke_token(&mut conn, token, &client.id, issuer.now()).await?;
     Ok(no_store(StatusCode::OK.into_response()))
 }

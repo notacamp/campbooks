@@ -17,6 +17,17 @@
     "passkey_expired": "This passkey request took too long or was already used. Try again.",
     "passkey_already_registered": "This passkey is already a way into Campbooks.",
     "display_name_required": "Say what we should call you.",
-    "passkey_name_required": "Give the passkey a name of 1 to 64 characters."
+    "passkey_name_required": "Give the passkey a name of 1 to 64 characters.",
+    "invalid_target": "This app asked for access to something Campbooks does not serve.",
+    "consent_request_not_found": "This request to allow an app expired or was already answered. Start again from the app.",
+    "consent_needs_workspace": "Choose the workspace this app may use.",
+    "consent_wrong_workspace": "This app belongs to another workspace and can only be allowed there.",
+    "not_workspace_admin": "Only the workspace's owners and admins can manage its apps.",
+    "client_not_found": "There is no such app in this workspace.",
+    "invalid_client_metadata": "The app's details are not acceptable: {{reason}}",
+    "client_needs_redirect": "A sign-in app needs at least one https or loopback return address.",
+    "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
+    "client_is_public": "This app signs people in and has no secret to rotate.",
+    "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name."
   }
 }
