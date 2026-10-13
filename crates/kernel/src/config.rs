@@ -129,6 +129,12 @@ pub struct Config {
     /// Traces and metrics export (`CAMPBOOKS_TELEMETRY__*`); off by default.
     #[serde(default)]
     pub telemetry: TelemetryConfig,
+
+    /// Reverse proxies whose `X-Forwarded-For` names the client, for rate
+    /// limits (`CAMPBOOKS_TRUSTED_PROXIES`, comma-separated addresses or CIDR
+    /// blocks). Empty by default: the socket peer is the client.
+    #[serde(default)]
+    pub trusted_proxies: crate::rate_limit::TrustedProxies,
 }
 
 impl Config {
@@ -1076,6 +1082,30 @@ mod tests {
         assert_eq!(config.signup.codes(), ["alpha", "beta"]);
         assert!(config.check().is_ok());
         assert!(!format!("{config:?}").contains("alpha"));
+    }
+
+    #[test]
+    fn trusted_proxies_come_from_one_comma_separated_setting() {
+        let config = Config::from_figment(&figment(&[
+            ("database_url", "postgres://localhost/x"),
+            ("trusted_proxies", "10.0.0.0/8, 192.0.2.1"),
+        ]))
+        .unwrap();
+        assert!(config.trusted_proxies.contains("10.9.8.7".parse().unwrap()));
+        assert!(
+            !config
+                .trusted_proxies
+                .contains("203.0.113.1".parse().unwrap())
+        );
+        let err = Config::from_figment(&figment(&[
+            ("database_url", "postgres://localhost/x"),
+            ("trusted_proxies", "proxy"),
+        ]))
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("CAMPBOOKS_TRUSTED_PROXIES"),
+            "{err}"
+        );
     }
 
     #[test]

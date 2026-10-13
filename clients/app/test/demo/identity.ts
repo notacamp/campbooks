@@ -31,3 +31,26 @@ export const CONNECTION: Schema<"ConnectionView"> = {
   streams: [],
   created_at: "2026-10-13T09:00:00Z",
 };
+
+/** Ana's ways in: the Google account she signed up with, and a Zoho one she added. */
+export const GOOGLE_WAY_IN: Schema<"WayIn"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000d1",
+  kind: "provider",
+  provider: "google",
+  email: "ana@example.com",
+  linked_via: "sign_up",
+  linked_at: "2026-10-01T09:00:00Z",
+  last_used_at: "2026-10-13T08:30:00Z",
+};
+
+export const ZOHO_WAY_IN: Schema<"WayIn"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000d2",
+  kind: "provider",
+  provider: "zoho",
+  email: "ana.duarte@example.net",
+  linked_via: "link",
+  linked_at: "2026-10-12T15:00:00Z",
+  last_used_at: null,
+};
+
+export const ALL_PROVIDERS = ["google", "microsoft", "zoho"] as const;

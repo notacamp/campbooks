@@ -1,5 +1,6 @@
 //! What the module is composed with (constructor injection): settings, the
-//! Google client, the credentials cipher and the clock. Handlers reach it as
+//! Google client (refresh, revoke, Gmail; the consent itself is the identity
+//! module's), the credentials cipher and the clock. Handlers reach it as
 //! an axum extension; jobs and consumers own a copy.
 
 use std::sync::Arc;
@@ -20,9 +21,6 @@ use crate::{
 /// The HKDF label of the credentials key. Never change it: every stored
 /// credential was sealed under it.
 pub const CREDENTIALS_PURPOSE: &[u8] = b"campbooks connectors credentials v1";
-
-/// The path of the web app page Google redirects to after consent.
-pub const GOOGLE_CALLBACK_PATH: &str = "/connections/google/callback";
 
 /// The module's dependencies. `Default` is inert: no provider configured,
 /// nothing can be connected (what the OpenAPI and events catalogues use).
@@ -123,14 +121,9 @@ impl Deps {
                 Endpoints::under(&base)
             }
         };
-        let redirect_uri = format!(
-            "{}{GOOGLE_CALLBACK_PATH}",
-            config.public_url.trim_end_matches('/')
-        );
         deps.google = Some(Arc::new(Google::new(
             client_id.to_owned(),
             client_secret,
-            redirect_uri,
             endpoints,
         )?));
         deps.cipher = Some(Arc::new(Cipher::new(&secret, CREDENTIALS_PURPOSE)));
@@ -167,11 +160,7 @@ mod tests {
             Some(SecretKey::from_bytes([1; 32])),
         )
         .unwrap();
-        let google = deps.google.unwrap();
-        assert_eq!(
-            google.redirect_uri(),
-            "http://localhost:8080/connections/google/callback"
-        );
+        assert!(deps.google.is_some());
         assert!(deps.cipher.is_some());
     }
 

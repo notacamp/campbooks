@@ -56,12 +56,6 @@ impl EventConsumer for RevokeWorkspaceGrants {
         for id in all {
             removal::delete(tx, &state, workspace, id).await?;
         }
-        sqlx::query!(
-            "DELETE FROM connectors.authorizations WHERE workspace_id = $1",
-            workspace as WorkspaceId
-        )
-        .execute(&mut **tx)
-        .await?;
         tracing::info!(%workspace, "connections of a deleted workspace revoked");
         Ok(())
     }

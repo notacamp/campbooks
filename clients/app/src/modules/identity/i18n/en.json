@@ -8,7 +8,8 @@
     "choice1": "Sign in the first way listed",
     "choice2": "Sign in the second way listed",
     "choice3": "Sign in the third way listed",
-    "passkey": "Sign in with a passkey"
+    "passkey": "Sign in with a passkey",
+    "addWayIn": "Add a way to sign in"
   },
   "signIn": {
     "title": "Sign in to Campbooks",
@@ -157,5 +158,94 @@
     "confirm": "Forget it",
     "cancel": "Keep it",
     "forgetFailed": "Couldn’t forget it. Try again."
+  },
+  "waysIn": {
+    "title": "Ways to sign in",
+    "lead": "You can sign in to Campbooks with any of these accounts. Every mailbox you connect becomes one too.",
+    "list": "Your ways to sign in",
+    "loading": "Loading your ways to sign in…",
+    "loadError": {
+      "title": "Couldn’t load your ways to sign in",
+      "lead": "Campbooks didn’t answer. Check your connection, then try again.",
+      "retry": "Try again"
+    },
+    "signedUpWith": "Signed up with",
+    "added": "Added {{date}}",
+    "lastUsed": "Last used {{date}}",
+    "remove": "Remove",
+    "removeLabel": "Remove {{provider}} ({{address}})",
+    "confirm": "Remove",
+    "cancel": "Keep it",
+    "confirmRemove": "Stop signing in with {{provider}} ({{address}})? Any mailbox you connected with it stays connected.",
+    "confirmRemoveOnly": "Stop signing in with {{provider}} ({{address}})? Any mailbox you connected with it stays connected. You need another way to sign in first.",
+    "lastWayIn": {
+      "title": "This is your only way to sign in.",
+      "lead": "Add another way first, then remove this one."
+    },
+    "removeFailed": {
+      "title": "Couldn’t remove it.",
+      "lead": "Nothing changed. Try again."
+    },
+    "needsReconnect": "Its mailbox in this workspace stopped syncing. Reconnect it to carry on.",
+    "reconnect": "Reconnect",
+    "reconnectLabel": "Reconnect the mailbox {{address}}",
+    "addTitle": "Add a way to sign in",
+    "addLead": "Sign in with another account you own. You confirm it at the provider, and it’s added here.",
+    "addNone": "This Campbooks offers no sign-in provider. Ask whoever runs it to set one up.",
+    "add": {
+      "google": "Add a Google account",
+      "microsoft": "Add a Microsoft account",
+      "zoho": "Add a Zoho account"
+    },
+    "startFailed": "Couldn’t start that. Try again.",
+    "stepUp": {
+      "title": "Sign in again first",
+      "lead": "For your security, changing how you sign in needs a sign-in in the last 10 minutes.",
+      "action": "Sign in again"
+    },
+    "linked": "You can now sign in with {{provider}}.",
+    "connected": "The mailbox is connected again.",
+    "errors": {
+      "way_in_belongs_to_another_account": {
+        "title": "That account already signs in to another Campbooks account.",
+        "lead": "Nothing was moved or merged. Sign in with it to use that account."
+      },
+      "sign_in_again": {
+        "title": "Sign in again to do that.",
+        "lead": "This browser isn’t signed in as you any more. Sign in, then try again."
+      },
+      "link_expired": {
+        "title": "That took too long.",
+        "lead": "Nothing changed. Start again."
+      },
+      "cancelled_at_provider": {
+        "title": "You cancelled at the provider.",
+        "lead": "Nothing changed."
+      },
+      "login_failed": {
+        "title": "The provider couldn’t confirm the account.",
+        "lead": "Nothing changed. Try again."
+      },
+      "provider_unavailable": {
+        "title": "The provider didn’t answer.",
+        "lead": "Nothing changed. Wait a moment, then try again."
+      },
+      "consent_incomplete": {
+        "title": "Mail access wasn’t allowed.",
+        "lead": "You can sign in with that account now, but its mailbox isn’t connected. Try again and allow mail access."
+      },
+      "account_mismatch": {
+        "title": "That’s a different account.",
+        "lead": "Reconnect with the account this mailbox belongs to."
+      },
+      "account_connected_by_another_member": {
+        "title": "Someone else here already connected it.",
+        "lead": "Another member of this workspace connected that mailbox."
+      },
+      "unknown": {
+        "title": "Something went wrong.",
+        "lead": "Nothing changed. Try again."
+      }
+    }
   }
 }

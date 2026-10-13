@@ -20,6 +20,22 @@ All notable changes to Campbooks Next are documented here. The format follows
   connected to this workspace": Connect, or Not now. Home keeps offering it
   (Connect, or forget it) until it expires after 7 days, and names the
   mailbox once it is connected.
+- Sign in with Microsoft (personal, work and school accounts;
+  `CAMPBOOKS_MICROSOFT__CLIENT_ID`, `__CLIENT_SECRET_FILE`, `__TENANT`, default
+  `common`) and with Zoho in every data centre (`CAMPBOOKS_ZOHO__CLIENT_ID`,
+  `__CLIENT_SECRET_FILE`), when Campbooks is its own identity provider. Both take
+  `__REDIRECT_PATH` like Google. Register `/auth/callback/microsoft` and
+  `/auth/callback/zoho` (see `deploy/README.md` → Built-in sign-in).
+- More ways in: Settings → Ways to sign in lists how you sign in, adds another
+  Google, Microsoft or Zoho account, and removes one (never the last). Every
+  mailbox you connect becomes a way in too. A provider account that is already
+  another Campbooks account's way in is refused, never merged. Adding or removing
+  a way in, or connecting a mailbox, needs a sign-in in the last ten minutes.
+  Removing a way in signs out every session that signed in with it.
+- `CAMPBOOKS_TRUSTED_PROXIES` (comma-separated addresses or CIDR blocks): the
+  reverse proxies whose `X-Forwarded-For` names the client. Set it behind a proxy,
+  or the per-address sign-in rate limits count every client as one (see
+  `deploy/README.md` → Built-in sign-in).
 - `CAMPBOOKS_GOOGLE__REDIRECT_PATH` (default `/auth/callback/google`): the callback
   path Campbooks sends to Google when your OAuth app registered another one, with a
   reverse proxy rewriting it to `/auth/callback/google`. The same
@@ -302,6 +318,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Connecting a mailbox goes through the built-in sign-in: Google redirects to
+  `/auth/callback/google`, and `/connections/google/callback` is no longer used
+  (remove it from your Google OAuth client). `connectors.complete_connection` is
+  gone; `connectors.start_connection` answers with the sign-in URL. An install still
+  on Rauthy cannot connect mail until it switches to the built-in sign-in.
 - **API clients:** `POST /api/v1/w/{workspace_id}/invitations` now answers
   with `accept_url`, the invitation's accept link, built from
   `CAMPBOOKS_PUBLIC_URL`. It is returned only in that response (never listed,
