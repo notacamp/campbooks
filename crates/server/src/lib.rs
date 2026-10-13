@@ -334,7 +334,7 @@ struct ApiDoc;
             does not exist) unless the caller is a user whose bearer token carries the \
             `admin:access` scope and whose admin profile grants the operation's permission \
             (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last \
-            sign-in (`auth_time`) is more than 12 hours old answers 401 \
+            sign-in (`auth_time`) is more than an hour old answers 401 \
             `admin_reauth_required`. Every request past the profile check is recorded in the \
             audit trail. These operations are not part of the operation catalogue \
             (`/openapi.json`): automation and the assistant cannot call them. Admin profiles \

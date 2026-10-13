@@ -53,17 +53,30 @@ fn is_invisible(c: char) -> bool {
         )
 }
 
-/// Whether `name` would read as Campbooks' own: once lower-cased, stripped
-/// of everything but letters and digits, and with common look-alikes
-/// folded (Cyrillic and Greek letters, `0` for `o`, `1` for `l`…), it
-/// contains `campbooks` or `notacamp`.
+/// Whether `name` would read as Campbooks' own: once decomposed for
+/// compatibility (NFKD: full-width, mathematical and circled letters become
+/// plain ones), stripped of accents and other combining marks, lower-cased,
+/// stripped of everything but letters and digits, and with common
+/// look-alikes folded (Cyrillic and Greek letters, `0` for `o`, `1` for
+/// `l`…), it contains `campbooks` or `notacamp`.
 pub fn impersonates_campbooks(name: &str) -> bool {
-    let skeleton: String = clean(name)
+    let decomposed = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd().normalize(name);
+    let skeleton: String = clean(&decomposed)
         .chars()
+        .filter(|c| !is_combining_mark(*c))
         .flat_map(char::to_lowercase)
         .filter_map(fold)
         .collect();
     skeleton.contains("campbooks") || skeleton.contains("notacamp")
+}
+
+/// A combining mark (accents, overlays…) left by decomposition.
+fn is_combining_mark(c: char) -> bool {
+    matches!(
+        u32::from(c),
+        0x0300..=0x036F | 0x0483..=0x0489 | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF
+            | 0xFE20..=0xFE2F
+    )
 }
 
 /// One character of a name as the ASCII letter it looks like; `None` for
@@ -118,6 +131,13 @@ mod tests {
             "Not A Camp",
             "not.a.camp mail",
             "Camp\u{200B}books",
+            "Cámpbooks",
+            "C\u{0301}ampbooks",
+            "Ｃａｍｐｂｏｏｋｓ",
+            "𝐂𝐚𝐦𝐩𝐛𝐨𝐨𝐤𝐬",
+            "𝕮𝖆𝖒𝖕𝖇𝖔𝖔𝖐𝖘",
+            "Ⓒⓐⓜⓟⓑⓞⓞⓚⓢ",
+            "Nöt Á Cämp",
         ] {
             assert!(impersonates_campbooks(fake), "{fake}");
         }

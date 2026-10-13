@@ -20,7 +20,7 @@ use crate::{
 
 const SETTINGS: &str = "/w/ws/settings/sign-in";
 
-fn user(subject: &str) -> TestUser {
+pub(crate) fn user(subject: &str) -> TestUser {
     TestUser {
         subject: subject.to_owned(),
         name: "Sam Rivera".to_owned(),
@@ -37,7 +37,7 @@ async fn count(kit: &Kit, sql: &'static str) -> i64 {
 
 /// Start a `link` to `provider` and follow it to the provider: the
 /// authorization request the browser is sent to.
-async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
+pub(crate) async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
     let started = kit
         .start_link(
             access,

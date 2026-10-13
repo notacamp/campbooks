@@ -156,7 +156,7 @@ fn admin_operations_carry_their_permission() {
 }
 
 #[test]
-fn recent_means_within_twelve_hours() {
+fn recent_means_within_an_hour() {
     let now = Utc::now();
     assert!(recently_authenticated(
         Some(now - TimeDelta::hours(11)),

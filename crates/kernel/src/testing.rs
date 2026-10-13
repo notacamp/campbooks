@@ -49,6 +49,7 @@ pub fn config(database_url: &str) -> Config {
         signup: SignupConfig::default(),
         blobs: BlobsConfig::default(),
         changes: ChangesConfig::default(),
+        mail: crate::mail::MailConfig::default(),
         telemetry: TelemetryConfig::default(),
         trusted_proxies: crate::rate_limit::TrustedProxies::default(),
     }

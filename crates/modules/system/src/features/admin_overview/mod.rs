@@ -138,7 +138,7 @@ impl From<campbooks_ai::RoleHealth> for AiRoleStatus {
     responses(
         (status = OK, description = "The overview.", body = AdminOverview),
         (status = UNAUTHORIZED, description = "`admin_reauth_required`: sign in again (the last \
-            sign-in is more than 12 hours old).", body = campbooks_kernel::Problem,
+            sign-in is more than an hour old).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "Not an administrator with `system.read` (the same \
             answer as an unknown route).", body = campbooks_kernel::Problem,

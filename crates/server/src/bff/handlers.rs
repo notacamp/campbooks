@@ -709,7 +709,7 @@ macro_rules! admin_operation {
         /// the session's access token attached, exactly like `/bff/api/*`. Its
         /// answers are the admin API's own: 404 for anyone who is not an
         /// administrator with the operation's permission, 401
-        /// `admin_reauth_required` when the last sign-in is more than 12 hours
+        /// `admin_reauth_required` when the last sign-in is more than 1 hour
         /// old (sign in again at `/bff/login?max_age=0`). Without a live session
         /// the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
         /// need the `X-Campbooks-CSRF: 1` header from the app's origin.

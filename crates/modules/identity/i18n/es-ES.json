@@ -29,5 +29,17 @@
     "client_scope_not_allowed": "No se puede dar el permiso {{scope}} a aplicaciones.",
     "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar.",
     "client_name_reserved": "Solo las aplicaciones del propio Campbooks pueden llamarse Campbooks o Not A Camp. Elige otro nombre."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "Una nueva forma de iniciar sesión en tu cuenta de Campbooks",
+      "passkey": "Una llave de acceso",
+      "provider": "Una cuenta de {{provider}}",
+      "added": "{{what}} se añadió como forma de iniciar sesión en tu cuenta de Campbooks el {{when}}.",
+      "if_you": "Si fuiste tú, no tienes que hacer nada.",
+      "if_not": "Si no fuiste tú, abre Campbooks, ve a Ajustes → Formas de iniciar sesión, elimínala y elige Cerrar sesión en todas partes.",
+      "open": "Abrir Campbooks",
+      "why": "Campbooks envía este mensaje a las direcciones de tu cuenta cada vez que se añade una forma de iniciar sesión. No contiene ningún rastreo."
+    }
   }
 }

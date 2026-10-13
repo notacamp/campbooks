@@ -220,7 +220,7 @@ pub enum AuthFailure {
     ExpiredToken,
     /// The token is valid, but the person signed in too long ago for an
     /// admin operation ([`Admin`](crate::admin::Admin)): sign in again
-    /// (RFC 9470 step-up, `max_age` 12 hours).
+    /// (RFC 9470 step-up, `max_age` 1 hour).
     AdminReauthRequired,
 }
 

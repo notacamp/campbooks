@@ -270,6 +270,29 @@ header there unless you want callers to choose which of their requests are trace
 or email addresses, and metrics never carry ids (workspace ids appear on spans only). A
 test in the server enforces this for every release.
 
+## Outgoing mail
+
+Campbooks sends one kind of mail of its own today: when a way to sign in (a provider
+account, a passkey) is added to an account, a notice goes to the account's address and,
+for a new provider account, to that account's address too, in the person's language. It
+names what was added and when, links only to this instance, and carries no images or
+tracking. Without a mail server nothing is sent; the notice is shown in the app (Settings
+→ Ways to sign in highlights what is new) and kept in the account's history either way.
+
+Point the server at any SMTP server that accepts mail from it, with TLS:
+
+```sh
+CAMPBOOKS_MAIL__SMTP_URL=smtps://user:password@smtp.example.com                      # implicit TLS, port 465
+# CAMPBOOKS_MAIL__SMTP_URL=smtp://user:password@smtp.example.com:587?tls=required    # or STARTTLS
+CAMPBOOKS_MAIL__FROM=Campbooks <no-reply@example.com>
+```
+
+Set both or neither: one without the other stops the server at startup, naming the
+setting. The URL holds the password, so it is a secret: the server never logs it or
+repeats it in an error, and `CAMPBOOKS_MAIL__SMTP_URL_FILE` reads it from a file instead
+(a Docker secret, for example). Mail is sent by the worker and retried when the server is
+unreachable; a notice is never sent twice.
+
 ## Identity provider
 
 Sign-in is handled by [Rauthy](https://github.com/sebadob/rauthy), an OpenID Connect /

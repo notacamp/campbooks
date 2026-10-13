@@ -111,6 +111,7 @@ pub async fn handler(
                 method: "passkey".to_owned(),
                 provider: None,
                 via: "passkey".to_owned(),
+                way_in: Some(id),
             },
         )
         .await?;

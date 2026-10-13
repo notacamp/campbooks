@@ -263,6 +263,12 @@ async fn run(
     telemetry.observe_pool(&db, config.database_max_connections);
 
     let blobs = blob_store(&config, &db).await?;
+    let mailer = config.mail.mailer()?;
+    if mailer.is_configured() {
+        tracing::info!("security notices are sent by mail");
+    } else {
+        tracing::info!("no mail transport configured; security notices are shown in the app only");
+    }
 
     let bind_addr = config.bind_addr;
     let metrics_addr = config.telemetry.metrics_addr;
@@ -272,7 +278,8 @@ async fn run(
             .with_signer(signer()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
-            .with_blobs(blobs),
+            .with_blobs(blobs)
+            .with_mailer(mailer),
         &composition,
     );
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the

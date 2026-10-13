@@ -7,6 +7,7 @@ pub mod consents;
 pub mod held_grants;
 pub mod keys;
 pub mod links;
+pub mod notices;
 pub mod passkeys;
 pub mod sessions;
 pub mod step_up;

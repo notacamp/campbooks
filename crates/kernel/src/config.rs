@@ -127,6 +127,10 @@ pub struct Config {
     #[serde(default)]
     pub changes: ChangesConfig,
 
+    /// The instance's own mail (`CAMPBOOKS_MAIL__*`); none by default.
+    #[serde(default)]
+    pub mail: crate::mail::MailConfig,
+
     /// Traces and metrics export (`CAMPBOOKS_TELEMETRY__*`); off by default.
     #[serde(default)]
     pub telemetry: TelemetryConfig,
@@ -212,6 +216,7 @@ impl Config {
         }
         self.signup.check()?;
         self.changes.check()?;
+        self.mail.check()?;
         self.telemetry.check()
     }
 }

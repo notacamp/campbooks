@@ -79,6 +79,10 @@ pub struct WayInAdded {
     pub provider: Option<String>,
     /// How it was added: `sign_up`, `link`, `connect` or `passkey`.
     pub via: String,
+    /// The provider identity or passkey added (absent from events published
+    /// before it was recorded).
+    #[serde(default)]
+    pub way_in: Option<Uuid>,
 }
 
 impl DomainEvent for WayInAdded {

@@ -414,6 +414,42 @@ fn server_of(idp: &TestIdp) -> Server {
     }
 }
 
+/// The fake providers as the issuer's upstreams.
+fn fakes(
+    google: &TestIdp,
+    microsoft: &TestIdp,
+    zoho: &TestIdp,
+    zoho_eu: &TestIdp,
+    redirect_path: Option<&str>,
+) -> Vec<Upstream> {
+    vec![
+        fake(
+            Provider::Google,
+            google,
+            IssuerRule::Fixed(server_of(google)),
+            redirect_path,
+        ),
+        fake(
+            Provider::Microsoft,
+            microsoft,
+            IssuerRule::Tenant {
+                server: server_of(microsoft),
+                prefix: MICROSOFT_ISSUER_PREFIX.to_owned(),
+                suffix: MICROSOFT_ISSUER_SUFFIX.to_owned(),
+                only: None,
+                except: None,
+            },
+            None,
+        ),
+        fake(
+            Provider::Zoho,
+            zoho,
+            IssuerRule::Servers(vec![server_of(zoho), server_of(zoho_eu)]),
+            None,
+        ),
+    ]
+}
+
 /// The client of `provider`, talking to the fake `idp`, registered with
 /// callback path `redirect_path` (the default when `None`).
 fn fake(
@@ -456,6 +492,8 @@ pub struct Kit {
     pub deps: Deps,
     /// The metadata documents on the (fake) internet.
     pub documents: Arc<FakeDocuments>,
+    /// The mail the instance sent (nothing leaves the process).
+    pub outbox: Arc<campbooks_kernel::mail::Outbox>,
     /// The browser's cookies.
     cookies: Mutex<HashMap<String, String>>,
     /// The address requests come from (none: from inside the process).
@@ -527,35 +565,11 @@ impl Kit {
             // Microsoft sends no `email_verified`.
             "email_verified": null,
         }));
-        issuer.upstreams = vec![
-            fake(
-                Provider::Google,
-                &google,
-                IssuerRule::Fixed(server_of(&google)),
-                redirect_path,
-            ),
-            fake(
-                Provider::Microsoft,
-                &microsoft,
-                IssuerRule::Tenant {
-                    server: server_of(&microsoft),
-                    prefix: MICROSOFT_ISSUER_PREFIX.to_owned(),
-                    suffix: MICROSOFT_ISSUER_SUFFIX.to_owned(),
-                    only: None,
-                    except: None,
-                },
-                None,
-            ),
-            fake(
-                Provider::Zoho,
-                &zoho,
-                IssuerRule::Servers(vec![server_of(&zoho), server_of(&zoho_eu)]),
-                None,
-            ),
-        ];
+        issuer.upstreams = fakes(&google, &microsoft, &zoho, &zoho_eu, redirect_path);
         let documents = Arc::new(FakeDocuments::default());
         issuer.fetcher = documents.clone();
         let intake = Arc::new(FakeIntake::default());
+        let outbox = Arc::new(campbooks_kernel::mail::Outbox::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
         let mut auth = config.auth.clone();
         auth.audience.clone_from(&issuer.resource);
@@ -566,6 +580,7 @@ impl Kit {
             )
             .with_membership(Arc::new(Everyone))
             .with_grant_intake(intake.clone())
+            .with_mailer(outbox.clone())
             .with_invitations(Arc::new(Invited(
                 invited.iter().map(|e| (*e).to_owned()).collect(),
             )))
@@ -589,6 +604,7 @@ impl Kit {
             intake,
             deps,
             documents,
+            outbox,
             cookies: Mutex::default(),
             peer: Mutex::default(),
         }

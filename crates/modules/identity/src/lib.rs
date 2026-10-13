@@ -75,6 +75,7 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
             .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
     }

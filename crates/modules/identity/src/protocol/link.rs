@@ -193,6 +193,7 @@ pub(super) async fn finish(
                         method: "provider".to_owned(),
                         provider: Some(provider.as_str().to_owned()),
                         via: via.to_owned(),
+                        way_in: Some(id),
                     },
                 )
                 .await?;

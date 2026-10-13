@@ -646,6 +646,7 @@ pub async fn sign_up(
                 method: "passkey".to_owned(),
                 provider: None,
                 via: "sign_up".to_owned(),
+                way_in: Some(passkey),
             },
         )
         .await?;
