@@ -432,7 +432,7 @@
           },
           "reason": {
             "type": "string",
-            "description": "Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,\n`unknown_outcome`)."
+            "description": "Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,\n`unavailable`, `unknown_outcome`)."
           },
           "workspace": {
             "type": "string",

@@ -10,6 +10,10 @@ or `manager` role on the draft's inbox: a `reader` SHALL get 403
 - **WHEN** a client with only `conversations:read conversations:write` creates a draft
 - **THEN** the response is 403 as `application/problem+json`
 
+#### Scenario: The composer
+- **WHEN** a member presses Reply, Reply all or Forward in the reader, or `c` for a new message
+- **THEN** a composer opens From the inbox, with To, Cc and Bcc as chips, the quoted history folded under the text, forwarded attachments listed, ⌘↵ to send, ⌘B and ⌘I to format and Esc to close, and Undo in a toast after sending
+
 #### Scenario: A reader replies
 - **WHEN** a member with the `reader` role on an inbox creates a reply draft to one of its messages
 - **THEN** the response is 403 with code `inbox_read_only` and no draft exists
@@ -45,9 +49,9 @@ get 409 `draft_changed`.
 - **THEN** the response is 404
 
 ### Requirement: Sending with undo
-`conversations.send_draft` SHALL refuse a draft with no recipient (422
-`no_recipients`), a malformed address (422 `invalid_address`) or more than
-25 MiB of attachments (422 `too_large`); otherwise it SHALL schedule the
+`conversations.send_draft` SHALL refuse a draft with no recipient (400
+`no_recipients`), a malformed address (400 `invalid_address`) or more than
+25 MiB of attachments (400 `attachments_too_large`); otherwise it SHALL schedule the
 draft and answer 202 with the time it will be released, after
 `CAMPBOOKS_CONVERSATIONS__UNDO_SEND_SECONDS` (default 10). Until then
 `conversations.cancel_send` SHALL put it back to an editable draft; after

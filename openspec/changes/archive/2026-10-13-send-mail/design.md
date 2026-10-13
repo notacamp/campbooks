@@ -180,12 +180,13 @@ blob}]`. The bodies are inline (the document is itself a blob);
 attachments are blob references in the workspace's store.
 
 `contracts/conversations.send_requested.v1.schema.json`: `workspace`,
-`inbox_id`, `send_id`, `message` (blob reference).
+`inbox_id`, `draft`, `send_id`, `message` (blob reference).
 
 `contracts/connectors.send_completed.v1.schema.json`: `workspace`,
 `inbox_id`, `send_id`, `outcome` (`sent` / `failed`),
 `provider_message_id?`, `reason?` (`not_connected`, `needs_reauth`,
-`rejected`, `too_large`, `unknown_outcome`).
+`rejected`, `too_large`, `unavailable`: nothing was sent, `unknown_outcome`:
+it may have been).
 
 Both sides keep a contract test against each file.
 
@@ -194,7 +195,7 @@ Both sides keep a contract test against each file.
 | Event | Publisher | Consumer | Feed changes |
 | --- | --- | --- | --- |
 | `conversations.send_requested` v1 | `conversations` (release) | `connectors.queue_send` | draft upsert, in its inbox |
-| `connectors.send_completed` v1 | `connectors` (send job, or the consumer when there is no stream) | `conversations.record_send` | none |
+| `connectors.send_completed` v1 | `connectors` (the send job) | `conversations.record_send` | none |
 | `conversations.draft_sent` v1 | `conversations` | none yet | draft delete |
 | `conversations.send_failed` v1 | `conversations` | none yet | draft upsert |
 | `connectors.messages_changed` v1 (existing) | `connectors` (the sent message) | `conversations` | as today |
@@ -218,7 +219,7 @@ scope already, so it gets the new one without configuration.
 | `conversations.get_draft` | `GET /drafts/{draft_id}` | |
 | `conversations.update_draft` | `PATCH /drafts/{draft_id}` | partial; `version` required, 409 `draft_changed` on mismatch; 409 `draft_not_editable` while scheduled or sending |
 | `conversations.delete_draft` | `DELETE /drafts/{draft_id}` | discard; not while sending |
-| `conversations.send_draft` | `POST /drafts/{draft_id}/send` | 202; `Risk::High`, assistant (with confirmation); undo `cancel_send`; 422 `no_recipients`, `invalid_address`, `too_large` |
+| `conversations.send_draft` | `POST /drafts/{draft_id}/send` | 202; `Risk::High`, assistant (with confirmation); undo `cancel_send`; 400 `no_recipients`, `invalid_address`, `attachments_too_large` |
 | `conversations.cancel_send` | `POST /drafts/{draft_id}/cancel_send` | 409 `too_late` |
 
 Limits: 100 recipients in all, 998 characters of subject, 1 MiB of body
@@ -298,8 +299,8 @@ not copied.
 ## Risks / Trade-offs
 
 - **Gmail rewriting a `Message-ID`** would defeat the lookup. Gmail keeps a
-  client-set one; the ignored `real_google` test checks it against a real
-  account.
+  client-set one; this is checked on staging against a real test account
+  (sending to that account only) before the production cutover, not in CI.
 - **Search lag**: a message accepted seconds before a timeout might not be
   searchable yet; the 30 s wait before an unclear retry covers the common
   case, and `unknown_outcome` reports the rest honestly.
@@ -308,3 +309,12 @@ not copied.
   which reloads.
 - **Quoted history written by clients** means each client must write it;
   the API documents the format, and an empty quote is valid.
+- **Undo is shown for 6 seconds** (the app's undo toast) of a 10-second
+  window, so pressing Undo in the toast is always in time; Z after the
+  toast has gone may be too late (409 `too_late`), and the send then goes.
+- **A worker that dies during the last allowed attempt** leaves the send
+  pending (the kernel marks the job dead without running it again); the
+  draft then stays "sending". Eight attempts make it unlikely; a sweep of
+  stale sends is a follow-up.
+- **Shortcut change:** `c` (new message) is global, so the members page's
+  "copy invitation link" moves from `C` to `Y`.

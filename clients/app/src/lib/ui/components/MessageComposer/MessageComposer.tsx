@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -118,6 +118,9 @@ export function MessageComposer({
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
 
+  // Where formatting leaves the cursor, applied once the new text is in.
+  const selection = useRef<{ start: number; end: number } | null>(null);
+
   function format(kind: Format) {
     const box = bodyRef.current;
     if (box === null) {
@@ -127,12 +130,20 @@ export function MessageComposer({
       { text: body, start: box.selectionStart, end: box.selectionEnd },
       kind,
     );
+    selection.current = { start: edit.start, end: edit.end };
     onBodyChange(edit.text);
-    requestAnimationFrame(() => {
-      box.focus();
-      box.setSelectionRange(edit.start, edit.end);
-    });
   }
+
+  // Put the cursor back where formatting left it, in the same commit as the
+  // new text, so the next key lands inside the marks.
+  useLayoutEffect(() => {
+    const box = bodyRef.current;
+    if (box !== null && selection.current !== null && box.value === body) {
+      box.focus();
+      box.setSelectionRange(selection.current.start, selection.current.end);
+      selection.current = null;
+    }
+  }, [body]);
 
   useShortcut("compose.send", onSend, { enabled: active && !sending });
   useShortcut(

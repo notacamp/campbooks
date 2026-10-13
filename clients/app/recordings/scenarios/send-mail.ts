@@ -159,7 +159,7 @@ export default async function sendMail({ page }: ScenarioContext): Promise<void>
   await forward.waitFor();
   await caption(
     page,
-    "Forward keeps the subject and the attachments, any of which you can drop",
+    "Forward: the subject, the quoted message and its attachments come along",
     2200,
   );
   const to = forward.getByRole("textbox", { name: "To" });
@@ -184,9 +184,11 @@ export default async function sendMail({ page }: ScenarioContext): Promise<void>
   const freshTo = fresh.getByRole("textbox", { name: "To" });
   await freshTo.pressSequentially("Ana Lopes <ana@example.com>,", { delay: 25 });
   await fresh.getByRole("button", { name: "Cc Bcc" }).click();
-  await fresh.getByRole("textbox", { name: "Cc", exact: true }).pressSequentially("joana@example.com", {
-    delay: 25,
-  });
+  await fresh
+    .getByRole("textbox", { name: "Cc", exact: true })
+    .pressSequentially("joana@example.com", {
+      delay: 25,
+    });
   await fresh.getByRole("textbox", { name: "Subject" }).fill("Workshop on 20 October");
   const freshBody = fresh.getByRole("textbox", { name: "Message" });
   await freshBody.fill("Hi Ana,\n\nCould you book two seats?\n- morning session\n- lunch\n\nSam");

@@ -54,8 +54,10 @@ each with a contract in `contracts/` (ADR 0010, ADR 0012).
   plain text with basic formatting (bold, italic, lists, links), rendered to
   a safe HTML alternative on the server; Undo in a toast. Shortcuts: `c`
   new message, `⌘↵` send, `Esc` close, `⌘B`/`⌘I` formatting, all shown.
-  The reader owns `r` / `a` / `f`. Four locales, both themes, 375px and
-  desktop, Storybook stories.
+  The reader owns `r` / `a` / `f`. The members page's "copy invitation
+  link" moves from `C` to `Y`. Four locales, both themes, 375px and
+  desktop, Storybook stories. The dev fake Google stores what is sent as
+  SENT and never delivers it.
 
 ## Non-goals
 

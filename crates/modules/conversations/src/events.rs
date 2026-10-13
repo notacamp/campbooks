@@ -366,7 +366,7 @@ pub struct SendFailed {
     /// The draft.
     pub draft: DraftId,
     /// Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,
-    /// `unknown_outcome`).
+    /// `unavailable`, `unknown_outcome`).
     pub reason: String,
 }
 

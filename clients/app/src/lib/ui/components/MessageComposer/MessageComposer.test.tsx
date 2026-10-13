@@ -63,10 +63,6 @@ describe("MessageComposer", () => {
   it("formats from the toolbar, and offers its shortcuts", () => {
     const onBodyChange = vi.fn();
     renderUi(<MessageComposer {...props({ onBodyChange, body: "budget" })} />);
-    vi.spyOn(globalThis, "requestAnimationFrame").mockImplementation((step) => {
-      step(0);
-      return 0;
-    });
     expect(screen.getByRole("button", { name: "Bold" })).toHaveAttribute(
       "aria-keyshortcuts",
       "Control+B",
