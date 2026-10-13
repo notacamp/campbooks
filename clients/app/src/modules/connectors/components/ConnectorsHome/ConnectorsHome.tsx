@@ -1,15 +1,17 @@
 import { useTranslation } from "react-i18next";
 
+import { Heading, Text } from "~/lib/ui";
+
 /** Placeholder home page of the `connectors` module. */
 export function ConnectorsHome() {
   const { t } = useTranslation("connectors");
 
   return (
     <section aria-labelledby="connectors-home-title" className="max-w-xl space-y-4">
-      <h1 id="connectors-home-title" className="text-2xl font-semibold">
+      <Heading level={1} size="page" id="connectors-home-title">
         {t("title")}
-      </h1>
-      <p className="text-muted">{t("summary")}</p>
+      </Heading>
+      <Text tone="tertiary">{t("summary")}</Text>
     </section>
   );
 }

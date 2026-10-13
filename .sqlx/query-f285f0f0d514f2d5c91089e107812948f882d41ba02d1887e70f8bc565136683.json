@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.streams\n                  SET phase = $2, cursor = $3, interval_seconds = $4, last_synced_at = $5,\n                      last_change_at = CASE WHEN $6 THEN $5 ELSE last_change_at END,\n                      consecutive_failures = 0, throttled_until = NULL\n                WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Int4",
+        "Timestamptz",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f285f0f0d514f2d5c91089e107812948f882d41ba02d1887e70f8bc565136683"
+}

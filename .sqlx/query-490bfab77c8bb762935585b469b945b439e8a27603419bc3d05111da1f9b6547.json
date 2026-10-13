@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.credentials SET access_token = NULL, access_expires_at = NULL\n          WHERE connection_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "490bfab77c8bb762935585b469b945b439e8a27603419bc3d05111da1f9b6547"
+}

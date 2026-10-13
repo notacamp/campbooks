@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.provider_budgets SET tokens = $2, refilled_at = clock_timestamp()\n          WHERE provider = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ccfb8112c3fba7c982365df9f247b5a7c8c10a02fa4e41bc4f2bab3c8bf97b4b"
+}

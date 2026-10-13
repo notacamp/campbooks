@@ -55,8 +55,8 @@ Every connection SHALL have a health of `ok`, `needs_reauth`, `throttled` or
 `failing` with a reason. A revoked or expired grant SHALL set `needs_reauth`,
 pause its streams and publish `connectors.connection_needs_reauth`. A
 provider rate limit SHALL set `throttled` and pause only that stream until
-the provider's `Retry-After`. Repeated failures SHALL set `failing` while
-the stream keeps retrying at its maximum interval. Any successful run SHALL
+the provider's `Retry-After`. Repeated failures SHALL back the stream off
+towards its maximum interval and, past a threshold, set `failing`. Any successful run SHALL
 restore `ok`.
 
 #### Scenario: Grant revoked at Google
@@ -73,8 +73,8 @@ connection: the grant SHALL be revoked at the provider, credentials, streams
 and indexes deleted, and `connectors.connection_removed` published with the
 inbox ids. When a member leaves a workspace, the connections they granted
 there SHALL be disconnected the same way. When a workspace is being
-deleted, every grant SHALL be revoked and the module's rows purged at the
-end of the grace period.
+deleted, every grant SHALL be revoked and every connection deleted the same
+way at once.
 
 #### Scenario: Grantor disconnects
 - **WHEN** the grantor disconnects a Google connection
@@ -83,6 +83,10 @@ end of the grace period.
 #### Scenario: Grantor leaves the workspace
 - **WHEN** `workspaces.member_left` arrives for a member who granted a connection
 - **THEN** that connection is disconnected and revoked
+
+#### Scenario: Workspace deleted
+- **WHEN** `workspaces.workspace_deleting` arrives for a workspace with a connection
+- **THEN** its grant is revoked and the connection is gone, without waiting for the grace period
 
 ### Requirement: Adaptive, fair sync
 Each connection and capability SHALL be read as a stream with a cursor. A

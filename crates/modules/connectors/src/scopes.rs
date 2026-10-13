@@ -12,20 +12,22 @@ pub const ALL: &[ScopeInfo] = &[
     ScopeInfo::of::<ConnectorsWrite>(),
 ];
 
-/// `connectors:read` — read this module's data.
+/// `connectors:read` — see connected accounts and their health.
 #[derive(Debug, Clone, Copy)]
 pub struct ConnectorsRead;
 
 impl ScopeName for ConnectorsRead {
     const NAME: &'static str = "connectors:read";
-    const DESCRIPTION: &'static str = "Read your connectors data.";
+    const DESCRIPTION: &'static str =
+        "See the outside accounts connected to your workspaces and how their sync is doing.";
 }
 
-/// `connectors:write` — change this module's data.
+/// `connectors:write` — connect, sync and disconnect outside accounts.
 #[derive(Debug, Clone, Copy)]
 pub struct ConnectorsWrite;
 
 impl ScopeName for ConnectorsWrite {
     const NAME: &'static str = "connectors:write";
-    const DESCRIPTION: &'static str = "Change your connectors data.";
+    const DESCRIPTION: &'static str =
+        "Connect outside accounts (such as Gmail), sync them now and disconnect them.";
 }

@@ -25,7 +25,7 @@ describe("buildConnectorsRoutes", () => {
   it("mounts the connectors home page", async () => {
     renderAt("/connectors");
 
-    expect(await screen.findByRole("heading", { name: "Connectors" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Connected accounts" })).toBeVisible();
   });
 
   it("renders in the user's language", async () => {

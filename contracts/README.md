@@ -10,6 +10,8 @@ produce or accept against the file.
 | --- | --- | --- | --- |
 | `message-change-batch.v1.schema.json` | `connectors` | `conversations` | A batch of message changes for one inbox, stored as a blob (`application/vnd.campbooks.message-changes+json; version=1`) |
 | `connectors.messages_changed.v1.schema.json` | `connectors` | `conversations` | The event announcing a batch (ids and a blob reference only) |
+| `connectors.capability_granted.v1.schema.json` | `connectors` | `conversations` | The event announcing a connection's new capability; for `messages`, the inbox to create |
+| `connection-account.v1.schema.json` | `connectors` | `conversations` | The account behind a connection (address, name), as the blob that event points at |
 
 Rules:
 

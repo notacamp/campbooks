@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sync_due d SET due_at = $2\n            WHERE d.stream_id IN (\n                SELECT stream_id FROM connectors.sync_due\n                 WHERE due_at <= $1\n                 ORDER BY due_at\n                 LIMIT $3\n                 FOR UPDATE SKIP LOCKED)\n        RETURNING d.stream_id AS \"stream: StreamId\", d.workspace_id AS \"workspace: WorkspaceId\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sync_due",
+            "name": "stream_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "workspace: WorkspaceId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sync_due",
+            "name": "workspace_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "be46165c103133bdb202ccf1a88725e172d4fc724ed1b7b8b020dbf1d97c2f39"
+}

@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: ConnectionId\", provider, address, display_name,\n                  granted_by AS \"granted_by: UserId\", capabilities, health, health_reason,\n                  health_changed_at, created_at\n             FROM connectors.connections\n            WHERE $1::uuid IS NULL OR id = $1\n            ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "granted_by: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "granted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "capabilities",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "capabilities"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "health",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "health_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "health_changed_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health_changed_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "created_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "6adc5e440ccc13cb8dfae9967bf069bd2f8e16eb954868f5e88d6351f3addaeb"
+}

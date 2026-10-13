@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "connection_needs_user": "Solo un miembro con la sesión iniciada puede conectar o desconectar una cuenta.",
+    "provider_not_configured": "Este proveedor no está configurado en esta instancia. Pide a tu administrador que lo configure.",
+    "capabilities_required": "Elige al menos una cosa que conectar.",
+    "capability_not_offered": "Todavía no se puede conectar {{capability}}.",
+    "authorization_code_invalid": "El inicio de sesión con el proveedor ha caducado o ya se ha usado. Vuelve a empezar la conexión.",
+    "provider_unavailable": "No se ha podido contactar con el proveedor. Inténtalo de nuevo en un momento.",
+    "consent_incomplete": "Campbooks no ha recibido acceso a lo que elegiste. Vuelve a conectar y permite el acceso.",
+    "no_offline_access": "El proveedor no ha permitido que Campbooks siga conectado. Vuelve a conectar y permite el acceso.",
+    "account_mismatch": "Has iniciado sesión con una cuenta distinta de la que estás ampliando. Usa la misma cuenta.",
+    "account_connected_by_another_member": "Otro miembro de este espacio de trabajo ya ha conectado esta cuenta.",
+    "needs_reauth": "Esta conexión necesita que vuelvas a conectar la cuenta antes de poder sincronizar."
+  }
+}

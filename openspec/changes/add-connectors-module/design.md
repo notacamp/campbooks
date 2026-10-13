@@ -139,13 +139,22 @@ credentials unreadable: the connection goes `needs_reauth` (reason
   `UPDATE … RETURNING` and, if short, reschedules the stream a few seconds
   later instead of waiting. Per-account limits (Gmail: 250 units/user/s)
   are respected by one run per stream and bounded concurrency inside a page.
-- **Failures.** 401 → refresh once, then `needs_reauth`. 429 or
-  `rateLimitExceeded` → health `throttled`, `throttled_until` from
-  `Retry-After` (else backoff), the job succeeds (the stream row is the
-  schedule, not the queue's retry). 5xx and network errors →
-  `JobError::Retry`; after `CAMPBOOKS_CONNECTORS__FAILING_AFTER` (default 5)
-  consecutive failures health is `failing` and the stream keeps trying at
-  the maximum interval. Any success returns health to `ok`.
+- **Failures.** The stream row is the schedule, not the queue's retry:
+  provider trouble is recorded on it and the run ends normally. 401 → the
+  access token is dropped and the stream runs again in seconds, refreshing
+  it (`invalid_grant` there → `needs_reauth`). 429 or `rateLimitExceeded` →
+  health `throttled`, `throttled_until` from `Retry-After` (else the
+  minimum interval). 5xx and network errors → `consecutive_failures` grows
+  and the next run backs off from the minimum, doubling per failure, up to
+  the maximum interval; after `CAMPBOOKS_CONNECTORS__FAILING_AFTER` (default
+  5) health is `failing`. Database and blob store errors retry the job. Any
+  successful run returns health to `ok`.
+- **Leases.** The dispatcher (and "sync now") pushes a stream's row
+  [`LEASE`] (15 minutes) ahead when it enqueues a run, and the run sets the
+  real next time when it ends. A run that dies leaves the leased row, which
+  comes due again: the schedule never depends on a job surviving. A run
+  with more to read enqueues its continuation directly, ordered after
+  itself.
 - **Push hook (designed, not built).** A push endpoint per provider only
   makes the stream due now (same unique key). For Gmail: `users.watch`
   renewed daily for connections when `CAMPBOOKS_GOOGLE__PUBSUB_TOPIC` is set,
@@ -255,10 +264,13 @@ Published (workspace-scoped, v1, ids and non-personal facts only):
 
 Consumed (mirror types):
 
-- `workspaces.workspace_deleting` → revoke every grant now (the member
-  expects access to stop), then purge the module's rows at `purge_after`.
-- `workspaces.member_left` → disconnect (and revoke) the connections that
-  member granted in that workspace.
+- `connectors.revoke_workspace_grants` ← `workspaces.workspace_deleting`:
+  revoke every grant and delete every connection with what it holds at
+  once (access must stop when the workspace is deleted, and nothing the
+  module keeps is useful without the grant), plus started consents.
+- `connectors.revoke_departed_grants` ← `workspaces.member_left`:
+  disconnect (and revoke) the connections that member granted in that
+  workspace.
 
 ## Endpoints and scopes
 
@@ -295,11 +307,13 @@ complete one (no user to bind it to: 403 `connection_needs_user`).
   server passes Google's, tests pass the wiremock server's), not settings.
 
 The module is composed by the server with its dependencies
-(`connectors::module(Deps { google: Option<GoogleClient>, cipher, clock,
-config })`); handlers receive them as an axum extension and jobs as fields
-of their registered handler (the `JobHandler`/`EventConsumer` constructor
-injection #37 adds to the kernel; whichever PR merges second takes the
-other's version).
+(`connectors::module(Deps { google: Option<Google>, cipher, clock, config })`,
+read once at startup by `campbooks_server::Composition::from_env`; the
+catalogues use the inert default). Handlers receive them as an axum
+extension and jobs as fields of their registered handler (the
+`JobHandler`/`EventConsumer` constructor injection #37 adds to the kernel,
+taken here verbatim; whichever PR merges second takes the other's
+version).
 
 ## Testing without Google
 
@@ -397,6 +411,10 @@ framework's attribute encryption.
 - **Contract coordination.** `capability_granted` and the consumer wiring
   depend on #37 adding two small consumers; the order of merges is
   documented above.
+- **Revocation is per Google grant**, not per Campbooks connection: the
+  same Google account connected in two workspaces of one instance shares a
+  grant, so disconnecting it in one sends the other to `needs_reauth`. A
+  second workspace is rare for one account; the member reconnects there.
 - **Secret key rotation** makes stored credentials unreadable (reconnect),
   as it ends web sessions today. Key rotation with re-sealing is a
   follow-up.

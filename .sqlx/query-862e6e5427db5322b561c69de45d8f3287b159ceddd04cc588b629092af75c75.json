@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)\n                       VALUES ($1, $2, $3, $4, $5)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "862e6e5427db5322b561c69de45d8f3287b159ceddd04cc588b629092af75c75"
+}

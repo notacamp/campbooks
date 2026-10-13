@@ -23,9 +23,7 @@ pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// handler. Shared, because a [`JobHandler`] or [`EventConsumer`] owns the
 /// dependencies its module was composed with.
 pub(crate) type RunFn = Arc<
-    dyn for<'a> Fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>>
-        + Send
-        + Sync,
+    dyn for<'a> Fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>> + Send + Sync,
 >;
 
 /// Fixes a closure's signature to the higher-ranked one [`RunFn`] needs.

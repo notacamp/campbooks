@@ -181,7 +181,13 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     if role.worker() {
         config.jobs.check()?;
     }
-    let registry = campbooks_server::registry()?;
+    let composition = campbooks_server::Composition::from_env(&config)?;
+    if composition.connectors.google.is_some() {
+        tracing::info!("Google accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
+    }
+    let registry = campbooks_server::registry_with(&composition)?;
     if config.run_migrations {
         migrate(&config).await?;
     }
@@ -202,7 +208,7 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
-        let app = campbooks_server::router(state.clone(), bff);
+        let app = campbooks_server::router_with(state.clone(), bff, &composition);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;

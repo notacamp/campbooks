@@ -1,0 +1,27 @@
+From: "Olivia Park" <olivia@northwind.example.com>
+To: "Sam Rivera" <sam@example.com>
+Subject: Invoice INV-2041 for September
+Date: Mon, 12 Oct 2026 08:15:00 +0000
+Message-ID: <inv-2041@northwind.example.com>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="mix"
+
+--mix
+Content-Type: multipart/alternative; boundary="alt"
+
+--alt
+Content-Type: text/plain; charset=utf-8
+
+Hi Sam, please find attached invoice INV-2041, due on 30 October.
+--alt
+Content-Type: text/html; charset=utf-8
+
+<p>Hi Sam, please find attached invoice <b>INV-2041</b>, due on 30 October.</p>
+--alt--
+--mix
+Content-Type: application/pdf; name="INV-2041.pdf"
+Content-Disposition: attachment; filename="INV-2041.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjQKJSBmaWN0aW9uYWwgaW52b2ljZQo=
+--mix--
