@@ -18,6 +18,7 @@ pub mod list_streams;
 pub mod mark_read;
 pub mod move_to_stream;
 pub mod purge_workspace;
+pub mod search_source;
 pub mod record_send;
 pub mod release_send;
 pub mod send_draft;

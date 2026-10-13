@@ -15,6 +15,7 @@ use crate::{
     jobs::Registry,
     operations::Operations,
     rate_limit::RateLimits,
+    search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
     tenancy::{MembershipPort, NoMembership},
@@ -53,6 +54,9 @@ pub struct AppState {
     /// inbox, a calendar). Until a module registers one, such changes are
     /// shown to nobody.
     pub visibility: VisibilityPort,
+    /// The modules' records as the `search` module reads them (ADR 0016).
+    /// Until the server registers them, search indexes nothing.
+    pub search_sources: SearchSources,
     /// Takes mailbox grants obtained at sign-in into connections. The
     /// server registers the `connectors` module's implementation; until
     /// then no mailbox can be connected that way.
@@ -82,6 +86,7 @@ impl AppState {
         Self {
             changes: ChangeHub::new(db.clone(), &config.changes),
             visibility: Arc::new(NoContainers),
+            search_sources: SearchSources::default(),
             metrics,
             db,
             auth: TokenVerifier::new(&config.auth),
@@ -140,6 +145,13 @@ impl AppState {
     #[must_use]
     pub fn with_visibility(mut self, visibility: VisibilityPort) -> Self {
         self.visibility = visibility;
+        self
+    }
+
+    /// The same state, with the modules' search sources.
+    #[must_use]
+    pub fn with_search_sources(mut self, sources: SearchSources) -> Self {
+        self.search_sources = sources;
         self
     }
 

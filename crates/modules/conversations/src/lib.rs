@@ -14,6 +14,9 @@
 //!   `decisions`; a per-question switch says which may act. In this version
 //!   only confident rules answers place a conversation in a stream; model
 //!   answers are suggestions (ADR 0009 note, campbooks-cloud#59).
+//! - **Search**: the module is the search source of its conversations
+//!   ([`search_source`], ADR 0016) and lists the inboxes a caller may search
+//!   through its visibility port ([`visibility`]).
 //! - **Operations** under `/api/v1/w/{workspace_id}/…`: list inboxes and
 //!   conversations, read a conversation, mark read, star, archive, label,
 //!   move to a stream (recorded as a correction).
@@ -54,7 +57,7 @@ pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
-pub use features::inbox_visibility::visibility;
+pub use features::{inbox_visibility::visibility, search_source::search_source};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
