@@ -167,3 +167,51 @@ export function openByDefault(messages: readonly MessageView[]): Set<string> {
   }
   return open;
 }
+
+/** Raster images: decoded by an `<img>` and nothing else (the server's list). */
+const RASTER_IMAGES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+  "image/bmp",
+]);
+
+/** A media type without parameters, lower-cased: `IMAGE/PNG; name=a` → `image/png`. */
+function essence(contentType: string): string {
+  return (contentType.split(";", 1)[0] ?? "").trim().toLowerCase();
+}
+
+/**
+ * What an attachment can be shown as: a raster image or a PDF has a preview;
+ * everything else (HTML and SVG included) is only downloaded.
+ */
+export function attachmentKind(contentType: string): "image" | "pdf" | "file" {
+  const type = essence(contentType);
+  if (RASTER_IMAGES.has(type)) {
+    return "image";
+  }
+  return type === "application/pdf" ? "pdf" : "file";
+}
+
+/** The image type to show a preview as, from the client's own list only. */
+export function previewType(contentType: string): string | undefined {
+  const type = essence(contentType);
+  return RASTER_IMAGES.has(type) ? type : undefined;
+}
+
+/**
+ * A file name as the app shows and saves it: no control characters,
+ * bidirectional controls (`invoice‮fdp.exe` would read as
+ * `invoiceexe.pdf`) or path separators, and `attachment` when nothing is
+ * left.
+ */
+export function cleanFileName(name: string): string {
+  const cleaned = name
+    .replaceAll(/[\p{Cc}‎‏‪-‮⁦-⁩/\\]/gu, "")
+    .trim()
+    .replace(/^\.+/u, "")
+    .trim();
+  return cleaned === "" ? "attachment" : cleaned;
+}

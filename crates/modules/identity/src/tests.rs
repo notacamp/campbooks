@@ -101,6 +101,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     assert_eq!(handed[0].1, claims["sub"].as_str().unwrap());
     assert!(handed[0].3.is_some(), "the refresh token went along");
     assert!(handed[0].4.contains(&MAIL_SCOPE.to_owned()));
+    assert_eq!(kit.intake.issuers(), [kit.google.issuer()]);
     let after = kit
         .api(Method::GET, "/api/v1/identity/held-grants", &access)
         .await;

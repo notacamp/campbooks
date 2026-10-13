@@ -86,4 +86,12 @@ export const CONVERSATIONS_SHORTCUTS = [
     group: "item",
     label: "conversations:shortcuts.showImages",
   },
+  {
+    // Focus moves through the open messages' attachments; Enter opens one.
+    id: "inbox.next_attachment",
+    keys: "v",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.nextAttachment",
+  },
 ] as const satisfies readonly ShortcutDefinition[];

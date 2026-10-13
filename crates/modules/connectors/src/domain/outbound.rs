@@ -169,6 +169,42 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
     }
 }
 
+/// `change` in a Zoho message's state tokens (`zoho/state.rs`): read,
+/// flag and inbox. Zoho's labels are not carried and it has no streams of
+/// its own, so label changes and moves between streams are skipped.
+pub fn map_zoho(change: &RequestedChange) -> Mapped {
+    let set = |token: &str, on: bool| Mapped::Labels {
+        add: if on {
+            vec![token.to_owned()]
+        } else {
+            Vec::new()
+        },
+        remove: if on {
+            Vec::new()
+        } else {
+            vec![token.to_owned()]
+        },
+    };
+    match change {
+        RequestedChange::MarkRead => set("UNREAD", false),
+        RequestedChange::MarkUnread => set("UNREAD", true),
+        RequestedChange::Star => set("STARRED", true),
+        RequestedChange::Unstar => set("STARRED", false),
+        RequestedChange::Archive => set("INBOX", false),
+        RequestedChange::Unarchive => set("INBOX", true),
+        RequestedChange::AddLabel { .. } | RequestedChange::RemoveLabel { .. } => {
+            Mapped::Skip("label_not_at_provider")
+        }
+        RequestedChange::MoveToStream { stream } => match stream.as_str() {
+            "primary" | "updates" | "newsletters" | "receipts" => {
+                Mapped::Skip("no_provider_equivalent")
+            }
+            _ => Mapped::Skip("unsupported"),
+        },
+        RequestedChange::Unsupported => Mapped::Skip("unsupported"),
+    }
+}
+
 /// Labels to add and labels to remove.
 pub type LabelChange = (Vec<String>, Vec<String>);
 
@@ -274,7 +310,7 @@ pub async fn backlog(
         .into_iter()
         .collect();
     let labels = sqlx::query!(
-        r#"SELECT provider_message_id, label_ids FROM connectors.gmail_messages
+        r#"SELECT provider_message_id, label_ids FROM connectors.messages
             WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
         stream as StreamId,
         &ids,
@@ -387,7 +423,7 @@ pub async fn record_outcome(
     }
     for (message, labels) in &outcome.index {
         sqlx::query!(
-            r#"UPDATE connectors.gmail_messages SET label_ids = $3
+            r#"UPDATE connectors.messages SET label_ids = $3
                 WHERE stream_id = $1 AND provider_message_id = $2"#,
             stream as StreamId,
             message,
@@ -398,7 +434,7 @@ pub async fn record_outcome(
     }
     if !outcome.reemit.is_empty() {
         sqlx::query!(
-            r#"UPDATE connectors.gmail_messages SET reemit = true
+            r#"UPDATE connectors.messages SET reemit = true
                 WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
             stream as StreamId,
             &outcome.reemit,
@@ -435,7 +471,7 @@ pub async fn expire(
     .await?;
     if !expired.is_empty() {
         sqlx::query!(
-            r#"UPDATE connectors.gmail_messages SET reemit = true
+            r#"UPDATE connectors.messages SET reemit = true
                 WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
             stream as StreamId,
             &expired,
@@ -627,6 +663,45 @@ mod tests {
         assert_eq!(
             map(&RequestedChange::Unsupported, &known),
             Mapped::Skip("unsupported")
+        );
+    }
+
+    #[test]
+    fn intents_map_to_zoho_state() {
+        let lab = uuid::Uuid::nil();
+        assert_eq!(
+            map_zoho(&RequestedChange::Archive),
+            Mapped::Labels {
+                add: vec![],
+                remove: labels(&["INBOX"])
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::Star),
+            Mapped::Labels {
+                add: labels(&["STARRED"]),
+                remove: vec![]
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::MarkRead),
+            Mapped::Labels {
+                add: vec![],
+                remove: labels(&["UNREAD"])
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::AddLabel {
+                label: lab,
+                provider_key: Some("123".into())
+            }),
+            Mapped::Skip("label_not_at_provider")
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::MoveToStream {
+                stream: "newsletters".into()
+            }),
+            Mapped::Skip("no_provider_equivalent")
         );
     }
 

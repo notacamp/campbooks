@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use campbooks_kernel::{
-    blobs::{BlobError, BlobRef, BlobStore},
+    blobs::{BlobRef, BlobStore},
     db::BeginFor as _,
     tenancy::WorkspaceId,
 };
@@ -12,38 +12,17 @@ use futures_util::{StreamExt as _, stream::FuturesOrdered};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use super::{
-    Cursor, FETCH_CONCURRENCY, IndexOp, LIST_PAGE, MAX_CHANGED, Page,
-    normalize::{self, Flags},
-};
+use super::{Cursor, FETCH_CONCURRENCY, LIST_PAGE, MAX_CHANGED, Page, normalize};
 use crate::{
-    contract::{Attachment, MessageChange, NormalizedMessage},
+    contract::{MessageChange, NormalizedMessage},
     domain::{
         model::{Phase, StreamId},
         outbound,
     },
-    google::{Gmail, GoogleError, LabelInfo, MessageMeta, MessageRaw, RawFetch},
+    google::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch},
+    mail::{self, Fetched, IndexOp, ReadError, apply_flags},
+    provider::ProviderError,
 };
-
-/// Why a page could not be read.
-#[derive(Debug, thiserror::Error)]
-pub enum ReadError {
-    /// Gmail refused or failed.
-    #[error(transparent)]
-    Google(#[from] GoogleError),
-    /// The database failed.
-    #[error("database: {0}")]
-    Database(#[from] sqlx::Error),
-    /// The blob store failed.
-    #[error("blob store: {0}")]
-    Blob(#[from] BlobError),
-    /// Stored data did not decode.
-    #[error("{0}")]
-    Corrupt(String),
-    /// A query of the module failed.
-    #[error(transparent)]
-    Kernel(#[from] campbooks_kernel::Error),
-}
 
 /// Everything a run needs to read one page.
 pub struct Reader<'a> {
@@ -169,7 +148,7 @@ impl Reader<'_> {
         let latest = loop {
             let history = match self.gmail.history(&start, page_token.as_deref(), 500).await {
                 Ok(history) => history,
-                Err(GoogleError::NotFound) => {
+                Err(ProviderError::NotFound) => {
                     // Gmail forgot this history id: re-read the window.
                     tracing::info!(stream = %self.stream, "history expired; resyncing the window");
                     let next = Cursor {
@@ -294,7 +273,7 @@ impl Reader<'_> {
             .iter()
             .map(|(id, _)| self.gmail.minimal(id))
             .collect();
-        let metas: Vec<Result<MessageMeta, GoogleError>> = futures_util::stream::iter(checks)
+        let metas: Vec<Result<MessageMeta, ProviderError>> = futures_util::stream::iter(checks)
             .buffered(FETCH_CONCURRENCY)
             .collect()
             .await;
@@ -311,7 +290,7 @@ impl Reader<'_> {
         for ((id, known), meta) in work.recheck.into_iter().zip(metas) {
             let meta = match meta {
                 Ok(meta) => meta,
-                Err(GoogleError::NotFound) => {
+                Err(ProviderError::NotFound) => {
                     changes.push(MessageChange::Remove {
                         provider_message_id: id,
                     });
@@ -399,7 +378,7 @@ impl Reader<'_> {
                     continue;
                 }
                 // Deleted between listing and fetching.
-                Err(GoogleError::NotFound) => continue,
+                Err(ProviderError::NotFound) => continue,
                 Err(other) => return Err(other.into()),
             };
             fetched = fetched.saturating_add(raw.fetched_bytes);
@@ -434,13 +413,10 @@ impl Reader<'_> {
         user_labels: &HashMap<String, String>,
         generation: i32,
     ) -> Result<(NormalizedMessage, IndexOp), ReadError> {
-        store_message(
+        mail::store_message(
             self.blobs,
             &self.workspace_key(),
-            self.now,
-            id,
-            raw,
-            user_labels,
+            fetched(id, raw, user_labels, self.now),
             generation,
         )
         .await
@@ -448,13 +424,7 @@ impl Reader<'_> {
 
     /// A stored message document.
     async fn document(&self, blob: &BlobRef) -> Result<NormalizedMessage, ReadError> {
-        let mut stream = self.blobs.get(&self.workspace_key(), blob).await?;
-        let mut bytes = Vec::with_capacity(usize::try_from(blob.size).unwrap_or(0));
-        while let Some(chunk) = stream.next().await {
-            bytes.extend_from_slice(&chunk?);
-        }
-        serde_json::from_slice(&bytes)
-            .map_err(|e| ReadError::Corrupt(format!("a stored message document: {e}")))
+        mail::document(self.blobs, &self.workspace_key(), blob).await
     }
 
     /// Add the messages flagged for re-emitting (a member's change to them
@@ -463,7 +433,7 @@ impl Reader<'_> {
         let mut tx = self.pool.begin_for(self.workspace).await?;
         let rows = sqlx::query!(
             r#"SELECT id, provider_message_id, label_ids, document_hash, document_size
-                 FROM connectors.gmail_messages
+                 FROM connectors.messages
                 WHERE stream_id = $1 AND reemit
                 ORDER BY internal_date LIMIT $2"#,
             self.stream as StreamId,
@@ -494,7 +464,7 @@ impl Reader<'_> {
         }
         let mut tx = self.pool.begin_for(self.workspace).await?;
         let rows = sqlx::query_scalar!(
-            r#"SELECT provider_message_id FROM connectors.gmail_oversized
+            r#"SELECT provider_message_id FROM connectors.oversized
                 WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
             self.stream as StreamId,
             ids,
@@ -513,7 +483,7 @@ impl Reader<'_> {
         let mut tx = self.pool.begin_for(self.workspace).await?;
         let rows = sqlx::query!(
             r#"SELECT id, provider_message_id, label_ids, document_hash, document_size
-                 FROM connectors.gmail_messages
+                 FROM connectors.messages
                 WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
             self.stream as StreamId,
             ids,
@@ -542,12 +512,14 @@ impl Reader<'_> {
             .iter()
             .filter_map(|op| match op {
                 IndexOp::Insert { row, .. } | IndexOp::Update { row, .. } => Some(*row),
-                IndexOp::Remove { .. } | IndexOp::Oversized { .. } => None,
+                IndexOp::Remove { .. } | IndexOp::Oversized { .. } | IndexOp::Skipped { .. } => {
+                    None
+                }
             })
             .collect();
         let mut tx = self.pool.begin_for(self.workspace).await?;
         let gone = sqlx::query!(
-            r#"SELECT id, provider_message_id FROM connectors.gmail_messages
+            r#"SELECT id, provider_message_id FROM connectors.messages
                 WHERE stream_id = $1 AND internal_date >= $2 AND listed_generation < $3
                   AND NOT (id = ANY($4))
                 ORDER BY internal_date"#,
@@ -596,17 +568,10 @@ fn indexed_row(
     document_hash: &str,
     document_size: i64,
 ) -> Result<Indexed, ReadError> {
-    let hash = document_hash
-        .parse()
-        .map_err(|_| ReadError::Corrupt("an index row's document hash".into()))?;
     Ok(Indexed {
         row,
         label_ids,
-        document: BlobRef {
-            hash,
-            size: u64::try_from(document_size).unwrap_or(0),
-            content_type: "application/json".to_owned(),
-        },
+        document: mail::document_ref(document_hash, document_size)?,
     })
 }
 
@@ -641,29 +606,14 @@ impl LabelNames {
     }
 }
 
-/// Overwrite a stored message's state with `flags`.
-fn apply_flags(message: &mut NormalizedMessage, flags: &Flags) {
-    message.mailbox = flags.mailbox;
-    message.read = flags.read;
-    message.starred = flags.starred;
-    message.direction = flags.direction;
-    message.categories.clone_from(&flags.categories);
-    message.labels.clone_from(&flags.labels);
-}
-
-/// Store message `id`'s blobs (its raw bytes, bodies, attachments and
-/// normalised document) in `workspace` and build its upsert and index row:
-/// for a message read from Gmail, or one just sent through it.
-pub async fn store_message(
-    store: &BlobStore,
-    workspace: &str,
-    now: DateTime<Utc>,
+/// A message downloaded from Gmail (or just sent through it), ready to
+/// store.
+pub fn fetched(
     id: &str,
     raw: MessageRaw,
     user_labels: &HashMap<String, String>,
-    generation: i32,
-) -> Result<(NormalizedMessage, IndexOp), ReadError> {
-    let parsed = normalize::parse(&raw.raw);
+    now: DateTime<Utc>,
+) -> Fetched {
     let internal_date = raw
         .meta
         .internal_date
@@ -671,82 +621,12 @@ pub async fn store_message(
         .and_then(|ms| ms.parse::<i64>().ok())
         .and_then(DateTime::from_timestamp_millis)
         .unwrap_or(now);
-    let mut blobs = Vec::new();
-    let raw_blob = store.put(workspace, raw.raw, "message/rfc822").await?;
-    blobs.push(raw_blob.clone());
-    let text = match parsed.text {
-        Some(text) => {
-            let blob = store
-                .put(workspace, text.into_bytes(), "text/plain; charset=utf-8")
-                .await?;
-            blobs.push(blob.clone());
-            Some(blob)
-        }
-        None => None,
-    };
-    let html = match parsed.html {
-        Some(html) => {
-            let blob = store
-                .put(workspace, html.into_bytes(), "text/html; charset=utf-8")
-                .await?;
-            blobs.push(blob.clone());
-            Some(blob)
-        }
-        None => None,
-    };
-    let mut attachments = Vec::with_capacity(parsed.attachments.len());
-    for attachment in parsed.attachments {
-        let blob = store
-            .put(workspace, attachment.bytes, &attachment.content_type)
-            .await?;
-        blobs.push(blob.clone());
-        attachments.push(Attachment {
-            filename: attachment.filename,
-            content_type: attachment.content_type,
-            blob,
-            inline: attachment.inline,
-        });
-    }
-    let flags = normalize::flags(&raw.meta.label_ids, user_labels);
-    let message = NormalizedMessage {
-        provider_message_id: id.to_owned(),
-        thread_key: Some(raw.meta.thread_id.clone()),
-        rfc_message_id: parsed.rfc_message_id,
-        in_reply_to: parsed.in_reply_to,
-        references: parsed.references,
-        from: parsed.from,
-        to: parsed.to,
-        cc: parsed.cc,
-        reply_to: parsed.reply_to,
-        subject: parsed.subject,
-        sent_at: parsed.sent_at.unwrap_or(internal_date),
-        direction: flags.direction,
-        headers: parsed.headers,
-        raw: Some(raw_blob),
-        text,
-        html,
-        attachments,
-        mailbox: flags.mailbox,
-        labels: flags.labels,
-        categories: flags.categories,
-        read: flags.read,
-        starred: flags.starred,
-    };
-    let document_bytes = serde_json::to_vec(&message)
-        .map_err(|e| ReadError::Corrupt(format!("encoding a message document: {e}")))?;
-    let document = store
-        .put(workspace, document_bytes, "application/json")
-        .await?;
-    blobs.push(document.clone());
-    let op = IndexOp::Insert {
-        row: Uuid::now_v7(),
-        provider_message_id: id.to_owned(),
-        thread_id: raw.meta.thread_id,
+    Fetched {
+        id: id.to_owned(),
+        thread_key: Some(raw.meta.thread_id),
+        flags: normalize::flags(&raw.meta.label_ids, user_labels),
         label_ids: raw.meta.label_ids,
         internal_date,
-        document,
-        blobs,
-        generation,
-    };
-    Ok((message, op))
+        raw: raw.raw,
+    }
 }

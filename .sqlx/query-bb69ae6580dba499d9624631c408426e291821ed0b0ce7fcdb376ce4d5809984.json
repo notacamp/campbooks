@@ -1,0 +1,78 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id, provider_message_id, label_ids, document_hash, document_size\n                 FROM connectors.messages\n                WHERE stream_id = $1 AND internal_date >= $2 AND listed_generation < $3\n                  AND NOT ('ARCHIVED' = ANY(label_ids))\n                ORDER BY internal_date DESC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "label_ids",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "label_ids"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "document_hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "document_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "document_size",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "document_size"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "bb69ae6580dba499d9624631c408426e291821ed0b0ce7fcdb376ce4d5809984"
+}

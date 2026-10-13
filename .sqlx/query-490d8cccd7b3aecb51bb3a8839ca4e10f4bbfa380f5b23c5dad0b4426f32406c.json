@@ -1,0 +1,41 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_message_id, label_ids FROM connectors.messages\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "label_ids",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.messages",
+            "name": "label_ids"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "490d8cccd7b3aecb51bb3a8839ca4e10f4bbfa380f5b23c5dad0b4426f32406c"
+}

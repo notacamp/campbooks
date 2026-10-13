@@ -1241,7 +1241,8 @@
         "type": "string",
         "description": "An outside provider.",
         "enum": [
-          "google"
+          "google",
+          "zoho"
         ]
       },
       "RecordRef": {

@@ -34,7 +34,8 @@
     "goneBody": "Se ha eliminado o ya no tienes acceso a ella.",
     "body": "No se ha podido cargar este mensaje.",
     "retry": "Reintentar",
-    "action": "No se ha podido cambiar «{{subject}}». Inténtalo de nuevo."
+    "action": "No se ha podido cambiar «{{subject}}». Inténtalo de nuevo.",
+    "attachment": "No se ha podido abrir {{name}}. Inténtalo de nuevo."
   },
   "reader": {
     "label": "Conversación",
@@ -151,6 +152,7 @@
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes",
+    "nextAttachment": "Siguiente adjunto",
     "notNeeded": "No hace falta (o es seguro)"
   },
   "compose": {
@@ -188,9 +190,9 @@
       "draft_not_editable": "Este mensaje ya está en camino.",
       "not_connected": "Este buzón ya no está conectado. Vuelve a conectarlo y envíalo de nuevo.",
       "needs_reauth": "Campbooks necesita tu permiso de nuevo para enviar desde este buzón. Vuelve a conectarlo y envíalo de nuevo.",
-      "rejected": "Gmail ha rechazado este mensaje. Revisa las direcciones e inténtalo de nuevo.",
-      "too_large": "Este mensaje es demasiado grande para que Gmail lo envíe.",
-      "unavailable": "No se ha podido contactar con Gmail, así que no se ha enviado nada. Inténtalo de nuevo.",
+      "rejected": "Tu proveedor de correo ha rechazado este mensaje. Revisa las direcciones e inténtalo de nuevo.",
+      "too_large": "Este mensaje es demasiado grande para que tu proveedor de correo lo envíe.",
+      "unavailable": "No se ha podido contactar con tu proveedor de correo, así que no se ha enviado nada. Inténtalo de nuevo.",
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",

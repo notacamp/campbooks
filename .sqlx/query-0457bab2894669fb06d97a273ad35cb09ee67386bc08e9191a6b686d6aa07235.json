@@ -1,0 +1,55 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT a.filename, a.content_type, a.blob\n             FROM conversations.attachments a\n             JOIN conversations.messages m ON m.id = a.message_id\n            WHERE a.id = $1 AND a.message_id = $2 AND m.conversation_id = $3\n              AND m.inbox_id = ANY($4)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "filename",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "filename"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "content_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "content_type"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "blob",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "blob"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0457bab2894669fb06d97a273ad35cb09ee67386bc08e9191a6b686d6aa07235"
+}
