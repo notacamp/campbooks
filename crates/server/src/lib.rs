@@ -12,6 +12,9 @@ pub mod changes;
 pub mod telemetry;
 pub mod web;
 
+#[cfg(test)]
+mod identity_tests;
+
 use std::{fmt::Write as _, sync::Arc, time::Duration};
 
 use axum::{
@@ -79,6 +82,9 @@ pub struct Composition {
     /// The conversations module's AI gateway (when an AI role is set),
     /// settings, rules strategy and per-question policy.
     pub conversations: campbooks_conversations::ConversationsDeps,
+    /// The identity module's in-process issuer, when it serves this
+    /// instance (ADR 0014).
+    pub identity: campbooks_identity::Deps,
 }
 
 impl Composition {
@@ -91,8 +97,10 @@ impl Composition {
         } else {
             Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
         };
+        let scopes: Vec<&str> = scope_catalogue().iter().map(|scope| scope.name).collect();
         Ok(Self {
             connectors: campbooks_connectors::Deps::from_env(config)?,
+            identity: campbooks_identity::Deps::from_env(config, &scopes)?,
             conversations: campbooks_conversations::ConversationsDeps::new(
                 gateway,
                 campbooks_conversations::ConversationsConfig::from_env()?,
@@ -113,6 +121,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_workspaces::module(),
         campbooks_connectors::module(composition.connectors.clone()),
         campbooks_conversations::module(composition.conversations.clone()),
+        campbooks_identity::module(composition.identity.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -125,7 +134,33 @@ pub fn with_ports(state: AppState) -> AppState {
     state
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+}
+
+/// [`with_ports`], plus the ports of the modules composed with
+/// `composition`: the connectors module takes mailbox grants obtained at
+/// sign-in, and when the issuer runs in this process the API validates
+/// tokens with its keys, read in-process (ADR 0014).
+pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppState {
+    let state = with_ports(state).with_grant_intake(campbooks_connectors::grant_intake(
+        composition.connectors.clone(),
+    ));
+    match &composition.identity.issuer {
+        Some(issuer) => {
+            let keys = campbooks_identity::LocalKeys {
+                db: state.db.clone(),
+                keys: Arc::clone(&issuer.keys),
+            };
+            let verifier = campbooks_kernel::auth::TokenVerifier::in_process(
+                &state.config.auth,
+                &issuer.url,
+                Arc::new(keys),
+            );
+            state.with_auth(verifier)
+        }
+        None => state,
+    }
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
@@ -206,6 +241,12 @@ fn security_scheme() -> SecurityScheme {
         (name = "conversations", description = "Inboxes, conversations and messages on any \
             channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes \
             they are a member of; a client token bound to the workspace sees them all."),
+        (name = "identity", description = "Accounts and their ways in, and this instance's \
+            OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, \
+            sign-in with a provider, and the mailboxes a sign-up granted, waiting for a \
+            workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
+            browsers and OAuth clients; they answer 404 while another identity provider serves \
+            the instance."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -232,11 +273,19 @@ fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
         .merge(changes::router())
 }
 
-/// The OpenAPI document: every module's routes and the web BFF's.
+/// The OpenAPI document: every module's routes, the web BFF's and the
+/// identity issuer's protocol endpoints.
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut doc = api().into_openapi();
     doc.merge(bff::openapi());
+    doc.merge(identity_protocol_openapi());
     doc
+}
+
+/// The identity issuer's protocol endpoints (`/.well-known/*`, `/oauth2/*`,
+/// `/auth/*`): owned by the `identity` module, outside its API router.
+pub fn identity_protocol_openapi() -> utoipa::openapi::OpenApi {
+    campbooks_identity::protocol::openapi()
 }
 
 /// The full HTTP application: module routes (behind the idempotency and
@@ -267,7 +316,13 @@ pub fn router_with(
         state,
     } = operations::compose(api_with(composition), state);
     spec.merge(bff::openapi());
+    spec.merge(campbooks_identity::protocol::openapi());
     let spec = Arc::new(spec);
+
+    // The issuer's protocol endpoints (`/.well-known/*`, `/oauth2/*`,
+    // `/auth/*`); the BFF reaches them in-process when the issuer runs here.
+    let identity =
+        campbooks_identity::protocol::router(state.clone(), composition.identity.clone());
 
     // What `/bff/api/*` runs requests through: the composed module routes
     // (idempotency included), without the middleware below (the outer
@@ -276,9 +331,9 @@ pub fn router_with(
         .clone()
         .fallback(|| async { Error::NotFound })
         .with_state(state.clone());
-    let bff = bff::Bff::new(bff, &state, api_only);
+    let bff = bff::Bff::new(bff, &state, api_only, identity.clone());
 
-    compose(state, routes, spec, &bff)
+    compose(state, routes, spec, &bff, identity)
 }
 
 /// Assemble the application from the API routes, the OpenAPI document and
@@ -288,6 +343,7 @@ fn compose(
     routes: Router<AppState>,
     spec: Arc<utoipa::openapi::OpenApi>,
     bff: &bff::Bff,
+    identity: Router,
 ) -> Router {
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
     let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
@@ -302,7 +358,8 @@ fn compose(
             get(move || async move { Json(spec.as_ref().clone()) }),
         )
         .with_state(state)
-        .merge(bff.router());
+        .merge(bff.router())
+        .merge(identity);
     let routes = match web_client {
         Some(client) => {
             routes.fallback(move |request: AxumRequest| client.clone().respond(request))

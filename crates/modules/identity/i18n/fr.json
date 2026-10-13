@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "invalid_client": "Cette application n’est pas enregistrée auprès de Campbooks.",
+    "invalid_redirect_uri": "Cette application a demandé à revenir vers une adresse qu’elle n’a pas enregistrée.",
+    "csrf_check_failed": "Cette requête ne provient pas de Campbooks.",
+    "way_in_belongs_to_another_account": "Ce compte donne déjà accès à un autre compte Campbooks. Connectez-vous avec lui pour utiliser ce compte.",
+    "sign_up_expired": "L’inscription a pris trop de temps. Connectez-vous à nouveau pour recommencer.",
+    "invalid_return_to": "Après la connexion, Campbooks ne peut revenir qu’à l’une de ses propres pages.",
+    "held_grant_not_found": "Aucune boîte mail n’attend d’être connectée.",
+    "invalid_id_token_hint": "Cette demande de déconnexion n’est pas signée par Campbooks pour cette application ; rien n’a été fermé.",
+    "signup_invite_only": "Ce Campbooks n’accueille que les personnes invitées. Demandez à quelqu’un d’inviter cette adresse, puis reconnectez-vous."
+  }
+}

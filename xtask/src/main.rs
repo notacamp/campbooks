@@ -293,6 +293,8 @@ fn operation_owners() -> Result<arch::Owners> {
         .map(|module| (module.name, module.router.into_openapi()))
         .chain([
             (arch::BFF_SCHEMA, campbooks_server::bff::openapi()),
+            // The issuer's protocol endpoints belong to the identity module.
+            ("identity", campbooks_server::identity_protocol_openapi()),
             (
                 campbooks_server::changes::OWNER,
                 campbooks_server::changes::router().into_openapi(),

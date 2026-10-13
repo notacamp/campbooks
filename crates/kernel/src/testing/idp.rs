@@ -100,6 +100,9 @@ struct Shared {
     refreshes: AtomicUsize,
     /// IdP sessions started so far (each sign-in gets a new `sid`).
     sessions: AtomicUsize,
+    /// Whether code exchanges return a refresh token (an upstream provider
+    /// sends none when the person consented before).
+    offline: AtomicBool,
 }
 
 /// The user [`TestIdp::authorize`] signs in.
@@ -185,6 +188,7 @@ impl TestIdp {
             access_lifetime: AtomicU64::new(TOKEN_LIFETIME_SECONDS),
             refreshes: AtomicUsize::new(0),
             sessions: AtomicUsize::new(0),
+            offline: AtomicBool::new(true),
         });
         let app = Router::new()
             .route("/auth/v1/.well-known/openid-configuration", get(discovery))
@@ -207,6 +211,11 @@ impl TestIdp {
     /// The JWKS URL.
     pub fn jwks_url(&self) -> String {
         format!("{}{JWKS_PATH}", self.shared.issuer)
+    }
+
+    /// The JWKS document this IdP publishes (what its JWKS endpoint serves).
+    pub fn jwks_document(&self) -> serde_json::Value {
+        serde_json::json!({ "keys": lock(&self.shared.published).clone() })
     }
 
     /// Settings trusting this IdP, finding the JWKS by discovery.
@@ -331,6 +340,12 @@ impl TestIdp {
     /// `expires_in` of the access tokens the token endpoint issues.
     pub fn set_access_token_lifetime(&self, seconds: u64) {
         self.shared.access_lifetime.store(seconds, Ordering::SeqCst);
+    }
+
+    /// Whether `authorization_code` grants return a refresh token (default
+    /// `true`); `false` plays a provider the person already consented to.
+    pub fn set_offline(&self, offline: bool) {
+        self.shared.offline.store(offline, Ordering::SeqCst);
     }
 
     /// Successful `refresh_token` grants so far.
@@ -576,8 +591,9 @@ async fn token(
     }
     id["name"] = grant.user.name.clone().into();
     id["email"] = grant.user.email.clone().into();
+    id["email_verified"] = true.into();
     let refresh_token = random_token();
-    let body = serde_json::json!({
+    let mut body = serde_json::json!({
         "access_token": idp.token(&access),
         "token_type": "Bearer",
         "expires_in": lifetime,
@@ -585,6 +601,12 @@ async fn token(
         "id_token": idp.id_token(&id),
         "scope": grant.scope,
     });
+    if field("grant_type") == "authorization_code" && !shared.offline.load(Ordering::SeqCst) {
+        if let Some(body) = body.as_object_mut() {
+            body.remove("refresh_token");
+        }
+        return Json(body).into_response();
+    }
     // A refreshed grant carries no nonce (OIDC Core §12.2).
     let next = Grant {
         nonce: None,

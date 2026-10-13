@@ -612,8 +612,31 @@ async fn id_token_yields_the_user() {
             session_id: Some("sid-1".into()),
             name: Some("Ada Lovelace".into()),
             email: Some("ada@example.com".into()),
+            email_verified: false,
+            auth_time: None,
         }
     );
+
+    claims["email_verified"] = true.into();
+    claims["auth_time"] = 1_700_000_000.into();
+    let id = verifier
+        .verify_id_token(&idp.id_token(&claims), CLIENT, nonce())
+        .await
+        .unwrap();
+    assert!(id.email_verified);
+    assert_eq!(id.auth_time, Some(1_700_000_000));
+    claims["email_verified"] = "true".into();
+    let id = verifier
+        .verify_id_token(&idp.id_token(&claims), CLIENT, nonce())
+        .await
+        .unwrap();
+    assert!(id.email_verified);
+    claims["email_verified"] = "yes".into();
+    let id = verifier
+        .verify_id_token(&idp.id_token(&claims), CLIENT, nonce())
+        .await
+        .unwrap();
+    assert!(!id.email_verified);
 
     claims["name"] = "Countess".into();
     let id = verifier
@@ -780,4 +803,122 @@ async fn oidc_tokens_need_a_configured_issuer() {
         verifier.verify_logout_token("a.b.c", CLIENT).await,
         Err(Error::Unauthorized(AuthFailure::NotConfigured))
     ));
+}
+
+// --- an issuer in this process ------------------------------------------------
+
+/// Hands the verifier `idp`'s keys directly, counting reads.
+#[derive(Debug)]
+struct Local {
+    idp: TestIdp,
+    reads: std::sync::atomic::AtomicUsize,
+    broken: std::sync::atomic::AtomicBool,
+}
+
+impl KeySource for Local {
+    fn jwks(&self) -> KeySourceFuture<'_> {
+        use std::sync::atomic::Ordering;
+        self.reads.fetch_add(1, Ordering::SeqCst);
+        let broken = self.broken.load(Ordering::SeqCst);
+        let document = self.idp.jwks_document();
+        Box::pin(async move {
+            if broken {
+                Err("database unavailable".to_owned())
+            } else {
+                Ok(document)
+            }
+        })
+    }
+}
+
+#[tokio::test]
+async fn in_process_issuer_keys_are_read_without_http() {
+    use std::sync::atomic::Ordering;
+    let idp = TestIdp::start().await;
+    let local = Arc::new(Local {
+        idp: idp.clone(),
+        reads: 0.into(),
+        broken: false.into(),
+    });
+    let clock = Arc::new(FixedClock::new(Utc::now()));
+    let verifier = TokenVerifier::in_process_with_clock(
+        &AuthConfig::default(),
+        idp.issuer(),
+        local.clone(),
+        clock.clone(),
+    );
+    assert_eq!(verifier.issuer(), Some(idp.issuer()));
+    let app = app(verifier);
+
+    let reply = call_with(&app, &idp.token(&idp.claims("test:read"))).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+    call_with(&app, &idp.token(&idp.claims("test:read"))).await;
+    assert_eq!(local.reads.load(Ordering::SeqCst), 1, "cached");
+    assert_eq!(idp.jwks_fetches() + idp.discovery_fetches(), 0, "no HTTP");
+
+    // A new key is picked up on the first token that names it.
+    idp.rotate_key();
+    clock.advance(TimeDelta::seconds(31));
+    let reply = call_with(&app, &idp.token(&idp.claims("test:read"))).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+    assert_eq!(local.reads.load(Ordering::SeqCst), 2);
+
+    // A failing source keeps the last good keys.
+    local.broken.store(true, Ordering::SeqCst);
+    clock.advance(TimeDelta::hours(1));
+    let reply = call_with(&app, &idp.token(&idp.claims("test:read"))).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+}
+
+#[tokio::test]
+async fn in_process_issuer_that_never_answered_is_503() {
+    let idp = TestIdp::start().await;
+    let local = Arc::new(Local {
+        idp: idp.clone(),
+        reads: 0.into(),
+        broken: true.into(),
+    });
+    let verifier = TokenVerifier::in_process(&AuthConfig::default(), idp.issuer(), local);
+    let reply = call_with(&app(verifier), &idp.token(&idp.claims("test:read"))).await;
+    assert_eq!(reply.status, StatusCode::SERVICE_UNAVAILABLE);
+}
+
+#[tokio::test]
+async fn the_in_process_issuer_requires_at_jwt_on_access_tokens() {
+    let idp = TestIdp::start().await;
+    let local = Arc::new(Local {
+        idp: idp.clone(),
+        reads: 0.into(),
+        broken: false.into(),
+    });
+    let in_process = app(TokenVerifier::in_process(
+        &AuthConfig::default(),
+        idp.issuer(),
+        local,
+    ));
+    assert_eq!(
+        call_with(&in_process, &idp.token(&idp.claims("test:read")))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    // An ID token (`JWT`), or no `typ` at all, never passes, whatever its aud.
+    call_with(&in_process, &idp.id_token(&idp.claims("test:read")))
+        .await
+        .assert_invalid();
+    let mut untyped = Header::new(Algorithm::EdDSA);
+    untyped.typ = None;
+    untyped.kid = Some(idp.current_kid());
+    call_with(&in_process, &idp.sign(untyped, &idp.claims("test:read")))
+        .await
+        .assert_invalid();
+
+    // An outside identity provider may still say `JWT` (Rauthy 0.36).
+    let (remote, _) = verifier(&idp);
+    assert_eq!(
+        call_with(&app(remote), &idp.id_token(&idp.claims("test:read")))
+            .await
+            .status,
+        StatusCode::OK
+    );
 }

@@ -32,6 +32,7 @@ use std::{borrow::Borrow, collections::BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub use jwks::{KeySource, KeySourceFuture};
 pub use oidc::{BACKCHANNEL_LOGOUT_EVENT, IdToken, LogoutToken};
 pub use scoped::Scoped;
 pub(crate) use scoped::bearer_token;

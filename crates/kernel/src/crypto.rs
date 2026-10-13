@@ -93,6 +93,27 @@ impl SecretKey {
     }
 }
 
+/// A 256-bit secret derived from the instance secret for `purpose`
+/// (HKDF-SHA256, `purpose` as `info`), URL-safe base64. Two parts of the
+/// server that agree on `purpose` derive the same value without storing or
+/// exchanging it (the web BFF's client secret at the in-process issuer).
+/// Never change a label in use.
+pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString {
+    struct Len32;
+    impl hkdf::KeyType for Len32 {
+        fn len(&self) -> usize {
+            32
+        }
+    }
+    let prk = hkdf::Salt::new(hkdf::HKDF_SHA256, &[]).extract(&secret.0);
+    let info = [purpose];
+    let mut bytes = [0_u8; 32];
+    prk.expand(&info, Len32)
+        .and_then(|okm| okm.fill(&mut bytes))
+        .unwrap_or_else(|_| unreachable!("HKDF can expand to 32 bytes"));
+    SecretString::from(URL_SAFE_NO_PAD.encode(bytes))
+}
+
 /// A URL-safe random token of 256 bits.
 pub fn random_token() -> String {
     let mut bytes = [0_u8; 32];
@@ -226,6 +247,24 @@ mod tests {
         assert_eq!(cipher.open(&[], b"row-1:refresh"), Err(OpenError));
         // A fresh nonce every time.
         assert_ne!(sealed, cipher.seal("refresh-token", b"row-1:refresh"));
+    }
+
+    #[test]
+    fn derived_secrets_are_stable_and_per_purpose() {
+        let one = derive_secret(&key(7), b"campbooks one v1");
+        assert_eq!(
+            one.expose_secret(),
+            derive_secret(&key(7), b"campbooks one v1").expose_secret()
+        );
+        assert_ne!(
+            one.expose_secret(),
+            derive_secret(&key(7), b"campbooks two v1").expose_secret()
+        );
+        assert_ne!(
+            one.expose_secret(),
+            derive_secret(&key(8), b"campbooks one v1").expose_secret()
+        );
+        assert_eq!(one.expose_secret().len(), 43);
     }
 
     #[test]

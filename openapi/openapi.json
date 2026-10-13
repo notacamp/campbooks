@@ -10,6 +10,213 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/.well-known/oauth-authorization-server": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "OAuth 2.0 authorization server metadata (RFC 8414): the same document.",
+        "operationId": "identity.authorization_server_metadata",
+        "responses": {
+          "200": {
+            "description": "The issuer's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/.well-known/openid-configuration": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "OIDC Discovery metadata.",
+        "operationId": "identity.openid_configuration",
+        "responses": {
+          "200": {
+            "description": "The issuer's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/held-grants": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the mailboxes waiting to be connected.",
+        "operationId": "identity.list_held_grants",
+        "responses": {
+          "200": {
+            "description": "The caller's held grants.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeldGrants"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.held_grant"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/held-grants/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Discard a held mailbox grant.",
+        "operationId": "identity.discard_held_grant",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The held grant.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Discarded."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.held_grant"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -2151,6 +2358,105 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Connect a held mailbox to this workspace.",
+        "operationId": "identity.adopt_held_grant",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The held grant.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Connected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Adopted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write` or `connectors:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a member of the workspace, or the grant is not the caller's, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The connectors module refused it (e.g. `account_connected_by_another_member`, `mailbox_unsupported`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write",
+              "connectors:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.held_grant"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/inboxes": {
       "get": {
         "tags": [
@@ -3107,6 +3413,333 @@
         }
       }
     },
+    "/auth/callback/{provider}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Finish a round trip.",
+        "operationId": "identity.finish_sign_in",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "`google`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "in": "query",
+            "description": "The authorization code.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "The round trip's `state`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "in": "query",
+            "description": "The provider's error (`access_denied` when the person cancelled).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "iss",
+            "in": "query",
+            "description": "The provider's issuer (RFC 9207), when it sends one.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.upstream_flow",
+            "identity.session",
+            "identity.pending_sign_up"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/new-account": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The new account this browser may create (after a round trip with an\nidentity no account uses).",
+        "operationId": "identity.get_new_account",
+        "responses": {
+          "200": {
+            "description": "The pending account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NewAccount"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing pending for this browser (or it expired)."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.pending_sign_up"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Create the pending account, sign in, and hold its mailbox grant.",
+        "operationId": "identity.create_account",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Created and signed in.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing pending for this browser."
+          },
+          "409": {
+            "description": "`sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.account",
+            "identity.session",
+            "identity.held_grant"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/requests/{id}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The waiting authorization request `id`: who asks, and how one can sign in.",
+        "operationId": "identity.get_sign_in_request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The `request` the sign-in screen was given.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestInfo"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request (or it expired), or another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.authorize_request"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/start/{provider}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start a round trip to `provider`.",
+        "operationId": "identity.start_sign_in",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "description": "`google`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "request",
+            "in": "query",
+            "description": "The waiting authorization request to complete afterwards.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "return_to",
+            "in": "query",
+            "description": "Otherwise, a same-origin path to land on.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To the provider, with a round-trip cookie.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_return_to`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.upstream_flow"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/bff/api/{path}": {
       "get": {
         "tags": [
@@ -3787,6 +4420,421 @@
           "risk": "low"
         }
       }
+    },
+    "/oauth2/authorize": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start (or, for a signed-in browser, complete at once) an authorization.",
+        "operationId": "identity.authorize",
+        "parameters": [
+          {
+            "name": "response_type",
+            "in": "query",
+            "description": "Must be `code`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "The client.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "description": "One of the client's registered redirect URIs.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "Space-separated scopes.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "Returned unchanged to the client.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "nonce",
+            "in": "query",
+            "description": "Echoed in the ID token.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "description": "The PKCE challenge.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "description": "Must be `S256`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "prompt",
+            "in": "query",
+            "description": "`none`, `login`, `consent` or `select_account`.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_age",
+            "in": "query",
+            "description": "Seconds since the person last authenticated, at most.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "303": {
+            "description": "To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_client` or `invalid_redirect_uri`: nothing is redirected.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.authorize_request",
+            "identity.authorization_code"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/oauth2/end_session": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "End the session `id_token_hint` names, then return to its client when it\nregistered `post_logout_redirect_uri`. No confirmation page.",
+        "operationId": "identity.end_session",
+        "parameters": [
+          {
+            "name": "id_token_hint",
+            "in": "query",
+            "description": "An ID token the issuer gave the client for this sign-in.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "query",
+            "description": "The client asking; must be the hint's audience when given.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "post_logout_redirect_uri",
+            "in": "query",
+            "description": "Where to go afterwards; one of the client's registered values.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "Returned unchanged.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Signed out; no registered place to return to."
+          },
+          "303": {
+            "description": "Signed out; back to the client.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_id_token_hint`: nothing was ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.session"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The same, as a form POST (what the web BFF sends, in-process).",
+        "operationId": "identity.end_session_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSession"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Signed out; no registered place to return to."
+          },
+          "303": {
+            "description": "Signed out; back to the client.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_id_token_hint`: nothing was ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/oauth2/jwks": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The issuer's published signing keys (JWKS): the key that signs now, its\nsuccessor once published, and recently retired ones.",
+        "operationId": "identity.jwks",
+        "responses": {
+          "200": {
+            "description": "The JWKS.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.signing_key"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/oauth2/revoke": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Revoke a refresh token and every token rotated from the same sign-in.\nAccess tokens are not tracked: they live ten minutes. Unknown tokens\nanswer 200 too (RFC 7009 §2.2).",
+        "operationId": "identity.revoke",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Revoked, or nothing to revoke."
+          },
+          "401": {
+            "description": "`invalid_client`."
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.refresh_token"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/oauth2/token": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Exchange an authorization code or a refresh token for tokens.",
+        "operationId": "identity.token",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenForm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Tokens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_request`, `invalid_grant` or `unsupported_grant_type`."
+          },
+          "401": {
+            "description": "`invalid_client`."
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.authorization_code",
+            "identity.refresh_token"
+          ],
+          "risk": "low"
+        }
+      }
     }
   },
   "components": {
@@ -3848,6 +4896,19 @@
             ],
             "description": "The display name, when the message gave one.",
             "example": "Ana Lopes"
+          }
+        }
+      },
+      "Adopted": {
+        "type": "object",
+        "description": "The connection the mailbox became.",
+        "required": [
+          "connection"
+        ],
+        "properties": {
+          "connection": {
+            "type": "string",
+            "description": "The connection's id (a `connectors.connection`)."
           }
         }
       },
@@ -4233,6 +5294,19 @@
         },
         "additionalProperties": false
       },
+      "Created": {
+        "type": "object",
+        "description": "Where to go once the account exists.",
+        "required": [
+          "redirect"
+        ],
+        "properties": {
+          "redirect": {
+            "type": "string",
+            "description": "Navigate here: the client's redirect URI with a code, or `return_to`."
+          }
+        }
+      },
       "CreatedInvitation": {
         "allOf": [
           {
@@ -4263,6 +5337,40 @@
           "outbound"
         ]
       },
+      "EndSession": {
+        "type": "object",
+        "description": "`/oauth2/end_session` parameters (query for GET, form for POST).",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client asking; must be the hint's audience when given."
+          },
+          "id_token_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An ID token the issuer gave the client for this sign-in."
+          },
+          "post_logout_redirect_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to go afterwards; one of the client's registered values."
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Returned unchanged."
+          }
+        }
+      },
       "Health": {
         "type": "string",
         "description": "How a connection is doing.",
@@ -4290,6 +5398,59 @@
             "type": "string",
             "description": "Overall status; always `ok` in a 200 response.",
             "example": "ok"
+          }
+        }
+      },
+      "HeldGrant": {
+        "type": "object",
+        "description": "A mailbox waiting to be connected.",
+        "required": [
+          "id",
+          "provider",
+          "address",
+          "expires_at"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The mailbox address."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's display name."
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it stops waiting."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its id."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`google`."
+          }
+        }
+      },
+      "HeldGrants": {
+        "type": "object",
+        "description": "The caller's held mailbox grants.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HeldGrant"
+            },
+            "description": "Oldest first."
           }
         }
       },
@@ -4707,6 +5868,33 @@
         },
         "additionalProperties": false
       },
+      "NewAccount": {
+        "type": "object",
+        "description": "The pending new account, as the new-account screen shows it.",
+        "required": [
+          "provider"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The name it gave."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address it gave."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The provider signed in with."
+          }
+        }
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -4764,6 +5952,61 @@
         "enum": [
           "google"
         ]
+      },
+      "RequestInfo": {
+        "type": "object",
+        "description": "What the sign-in screen shows for a waiting authorization request.",
+        "required": [
+          "client_id",
+          "providers"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The client asking."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers configured on this instance, in display order."
+          }
+        }
+      },
+      "RevokeForm": {
+        "type": "object",
+        "description": "A revocation request (`application/x-www-form-urlencoded`).",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client (`client_secret_post`, or a public client)."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client's secret (`client_secret_post`)."
+          },
+          "token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The token to revoke."
+          },
+          "token_type_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`refresh_token` or `access_token`; a hint only."
+          }
+        }
       },
       "Role": {
         "type": "string",
@@ -5044,6 +6287,104 @@
           }
         }
       },
+      "TokenForm": {
+        "type": "object",
+        "description": "A token request (`application/x-www-form-urlencoded`).",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client (`client_secret_post`, or a public client)."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client's secret (`client_secret_post`)."
+          },
+          "code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The authorization code."
+          },
+          "code_verifier": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The PKCE verifier."
+          },
+          "grant_type": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`authorization_code` or `refresh_token`."
+          },
+          "redirect_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The redirect URI the code was issued for."
+          },
+          "refresh_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The refresh token."
+          }
+        }
+      },
+      "TokenResponse": {
+        "type": "object",
+        "description": "A successful token response (RFC 6749 §5.1).",
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in",
+          "scope"
+        ],
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "description": "The access token, a JWT for the API."
+          },
+          "expires_in": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Seconds until the access token expires."
+          },
+          "id_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The ID token (when `openid` was granted)."
+          },
+          "refresh_token": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new refresh token (rotated on every use)."
+          },
+          "scope": {
+            "type": "string",
+            "description": "The granted scopes."
+          },
+          "token_type": {
+            "type": "string",
+            "description": "Always `Bearer`."
+          }
+        }
+      },
       "UpdateWorkspace": {
         "type": "object",
         "description": "The settings to change; absent fields stay as they are.",
@@ -5188,7 +6529,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -5214,6 +6555,10 @@
     {
       "name": "conversations",
       "description": "Inboxes, conversations and messages on any channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes they are a member of; a client token bound to the workspace sees them all."
+    },
+    {
+      "name": "identity",
+      "description": "Accounts and their ways in, and this instance's OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, sign-in with a provider, and the mailboxes a sign-up granted, waiting for a workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve browsers and OAuth clients; they answer 404 while another identity provider serves the instance."
     },
     {
       "name": "changes",

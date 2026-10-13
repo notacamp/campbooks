@@ -39,6 +39,7 @@ pub mod scopes;
 mod testkit;
 
 pub use deps::{CREDENTIALS_PURPOSE, Deps, GOOGLE_CALLBACK_PATH};
+pub use domain::intake::grant_intake;
 pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
     StreamId, StreamView,

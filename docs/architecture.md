@@ -45,6 +45,11 @@ crates/
     workspaces/            campbooks-workspaces — tenancy: users, workspaces, members
                            and roles, invitations, signup policy, security log;
                            implements the kernel's `Membership` port.
+    connectors/            campbooks-connectors — connections to outside accounts,
+                           credentials, the sync engine and the Gmail adapter;
+                           implements the kernel's `GrantIntake` port.
+    identity/              campbooks-identity — accounts and their ways in, provider
+                           sign-in, and the in-process OAuth 2.1 issuer (ADR 0014).
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
@@ -408,6 +413,24 @@ methods need the `X-Campbooks-CSRF` header and a same-origin request.
 `/bff/session` tells the client who is signed in; `/bff/logout` and the IdP's
 back-channel logout end sessions; `bff.prune_sessions` deletes ended ones.
 Settings are `CAMPBOOKS_BFF__*` (see `deploy/.env.example`).
+
+### Campbooks as its own identity provider (ADR 0014)
+
+The `identity` module is an OAuth 2.1 authorization server and OIDC
+provider inside the server, on the app's origin: discovery at
+`/.well-known/openid-configuration`, keys at `/oauth2/jwks`, and
+`/oauth2/{authorize,token,revoke,end_session}`; provider round trips and the
+sign-in screens' actions under `/auth/*`. It runs while
+`CAMPBOOKS_AUTH__ISSUER` is unset (Rauthy keeps serving installs that name it
+until it is removed). Its protocol endpoints are mounted beside the BFF, not
+in the operation catalogue. The API's verifier reads its Ed25519 keys
+in-process (`kernel::auth::KeySource`), and the BFF reaches its token endpoint
+through its router rather than the network; both are otherwise the same code
+path any outside client and resource server would use. A new person's
+provider sign-in asks for their mailbox in the same consent; `identity` holds
+that grant until they put it in a workspace, then hands it to `connectors`
+through the kernel's `GrantIntake` port (`kernel::connections`), which
+`connectors` implements.
 
 ## Domains and scaling
 

@@ -7,6 +7,25 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Campbooks can be its own identity provider (ADR 0014), replacing Rauthy in
+  a later release. With `CAMPBOOKS_AUTH__ISSUER` unset and
+  `CAMPBOOKS_SECRET_KEY` set, the server is an OAuth 2.1 / OpenID Connect
+  issuer on its own origin (`/.well-known/openid-configuration`,
+  `/oauth2/*`): Ed25519 signing keys generated, encrypted at rest and
+  rotated automatically, authorization code with PKCE only, refresh tokens
+  that rotate and revoke the whole sign-in when one is reused, and the web
+  app signing in through it with nothing to provision. People sign in with
+  Google; a new person's mailbox comes with the same consent and is
+  connected when they create their first workspace. Accounts are linked to
+  a Google account by its id, never by email address. Add
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google` to your Google OAuth client
+  (see `deploy/README.md` → Built-in sign-in). The shipped `compose.yaml`
+  still uses Rauthy, so existing installs see no change yet; the sign-in
+  screens arrive in the next release. The built-in issuer needs an https
+  `CAMPBOOKS_PUBLIC_URL` (http only with `CAMPBOOKS_ENV=development`), refuses
+  to start if `CAMPBOOKS_SECRET_KEY` cannot open its stored signing keys,
+  and on an `invite_only` instance creates accounts only for invited
+  addresses.
 - The new app's first run: a calm signed-out page with one "Sign in" (that
   brings you back to the page you opened), then creating your first
   workspace one question at a time (its name, then Business or Personal,

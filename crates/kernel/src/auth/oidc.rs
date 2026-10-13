@@ -33,6 +33,11 @@ pub struct IdToken {
     pub name: Option<String>,
     /// The user's email address, if the IdP shares it.
     pub email: Option<String>,
+    /// Whether the IdP says it verified [`email`](Self::email)
+    /// (`email_verified`; `false` when absent).
+    pub email_verified: bool,
+    /// When the user authenticated (`auth_time`), if the IdP says.
+    pub auth_time: Option<i64>,
 }
 
 /// A validated back-channel logout token: end the sessions it names.
@@ -57,6 +62,9 @@ struct IdClaims {
     family_name: Option<String>,
     preferred_username: Option<String>,
     email: Option<String>,
+    /// A boolean, or the string `"true"`/`"false"` some providers send.
+    email_verified: Option<serde_json::Value>,
+    auth_time: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -114,6 +122,9 @@ impl TokenVerifier {
                 .or(full_name)
                 .or_else(|| non_blank(claims.preferred_username)),
             email: non_blank(claims.email),
+            email_verified: matches!(claims.email_verified, Some(serde_json::Value::Bool(true)))
+                || matches!(&claims.email_verified, Some(serde_json::Value::String(v)) if v == "true"),
+            auth_time: claims.auth_time,
         })
     }
 

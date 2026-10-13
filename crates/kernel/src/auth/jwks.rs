@@ -3,7 +3,9 @@
 //! Rules (see `openspec/changes/api-resource-server/design.md`):
 //!
 //! - Keys are fetched on first use, from `CAMPBOOKS_AUTH__JWKS_URL` or else
-//!   the `jwks_uri` of the issuer's discovery document.
+//!   the `jwks_uri` of the issuer's discovery document; or, when the issuer
+//!   runs in this process, read from its [`KeySource`] (the same document,
+//!   parsed and cached the same way, with no HTTP request).
 //! - The cache lives as long as the response's `Cache-Control: max-age`
 //!   (default [`DEFAULT_TTL`], at most [`MAX_TTL`]).
 //! - A token whose `kid` is not in the cache triggers a refresh, so a key
@@ -41,11 +43,35 @@ pub const MIN_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 /// Largest discovery or JWKS document accepted.
 const MAX_DOCUMENT_BYTES: usize = 1024 * 1024;
+/// Cache lifetime of keys read from a [`KeySource`].
+pub const LOCAL_TTL: Duration = Duration::from_mins(5);
+
+/// What a [`KeySource`] returns: the issuer's JWKS document, or why it could
+/// not be read (no secrets in the message).
+pub type KeySourceFuture<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<serde_json::Value, String>> + Send + 'a>,
+>;
+
+/// An issuer that runs in this process hands the verifier its published
+/// signing keys directly: the JWKS document it also serves over HTTP. The
+/// verifier parses and caches it exactly like a fetched one.
+pub trait KeySource: std::fmt::Debug + Send + Sync + 'static {
+    /// The current JWKS document (`{"keys": [...]}`).
+    fn jwks(&self) -> KeySourceFuture<'_>;
+}
+
+/// Where the keys come from.
+enum Source {
+    /// Fetched over HTTP from this URL, or from the issuer's discovery.
+    Remote(Option<String>),
+    /// Read from an issuer in this process.
+    Local(Arc<dyn KeySource>),
+}
 
 /// The signing-key cache of one issuer.
 pub(super) struct Jwks {
     issuer: String,
-    configured_url: Option<String>,
+    source: Source,
     clock: Arc<dyn Clock>,
     http: OnceCell<reqwest::Client>,
     cache: RwLock<Arc<KeySet>>,
@@ -90,9 +116,21 @@ impl KeySet {
 
 impl Jwks {
     pub(super) fn new(issuer: &str, configured_url: Option<&str>, clock: Arc<dyn Clock>) -> Self {
+        Self::with_source(
+            issuer,
+            Source::Remote(configured_url.map(ToOwned::to_owned)),
+            clock,
+        )
+    }
+
+    pub(super) fn local(issuer: &str, source: Arc<dyn KeySource>, clock: Arc<dyn Clock>) -> Self {
+        Self::with_source(issuer, Source::Local(source), clock)
+    }
+
+    fn with_source(issuer: &str, source: Source, clock: Arc<dyn Clock>) -> Self {
         Self {
             issuer: issuer.to_owned(),
-            configured_url: configured_url.map(ToOwned::to_owned),
+            source,
             clock,
             http: OnceCell::new(),
             cache: RwLock::default(),
@@ -170,8 +208,15 @@ impl Jwks {
         state: &mut RefreshState,
         now: DateTime<Utc>,
     ) -> Result<KeySet, FetchError> {
+        let configured_url = match &self.source {
+            Source::Local(source) => {
+                let document = source.jwks().await.map_err(FetchError::Local)?;
+                return key_set(serde_json::from_value(document)?, now, LOCAL_TTL);
+            }
+            Source::Remote(url) => url,
+        };
         let http = self.http.get_or_try_init(build_client).await?;
-        let url = match (&self.configured_url, &state.discovered_url) {
+        let url = match (configured_url, &state.discovered_url) {
             (Some(url), _) | (None, Some(url)) => url.clone(),
             (None, None) => {
                 let url = self.discover(http).await?;
@@ -180,15 +225,7 @@ impl Jwks {
             }
         };
         let (headers, body) = get(http, &url).await?;
-        let document: JwksDocument = serde_json::from_slice(&body)?;
-        let keys: Vec<CachedKey> = document.keys.into_iter().filter_map(usable_key).collect();
-        if keys.is_empty() {
-            return Err(FetchError::NoUsableKeys);
-        }
-        Ok(KeySet {
-            keys,
-            expires_at: Some(now + delta(cache_ttl(&headers))),
-        })
+        key_set(serde_json::from_slice(&body)?, now, cache_ttl(&headers))
     }
 
     /// The `jwks_uri` of the issuer's OIDC discovery document,
@@ -207,8 +244,26 @@ impl Jwks {
     }
 }
 
+/// The usable keys of `document`, cached for `ttl` from `now`.
+fn key_set(
+    document: JwksDocument,
+    now: DateTime<Utc>,
+    ttl: Duration,
+) -> Result<KeySet, FetchError> {
+    let keys: Vec<CachedKey> = document.keys.into_iter().filter_map(usable_key).collect();
+    if keys.is_empty() {
+        return Err(FetchError::NoUsableKeys);
+    }
+    Ok(KeySet {
+        keys,
+        expires_at: Some(now + delta(ttl)),
+    })
+}
+
 #[derive(Debug, thiserror::Error)]
 enum FetchError {
+    #[error("the in-process issuer could not read its keys: {0}")]
+    Local(String),
     #[error("HTTP: {0}")]
     Http(#[from] reqwest::Error),
     #[error("response larger than {MAX_DOCUMENT_BYTES} bytes")]
@@ -229,6 +284,7 @@ impl FetchError {
             Self::TooLarge | Self::Json(_) | Self::IssuerMismatch(_) | Self::NoUsableKeys => {
                 "invalid_response"
             }
+            Self::Local(_) => "local_source",
         }
     }
 }

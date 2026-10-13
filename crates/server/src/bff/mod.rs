@@ -120,12 +120,12 @@ impl Bff {
     /// The BFF for `settings` (`None`: web sign-in is off and every endpoint
     /// but `/bff/session` answers 503). `api` is the API router requests to
     /// `/bff/api/*` run through.
-    pub fn new(settings: Option<Settings>, state: &AppState, api: Router) -> Self {
+    pub fn new(settings: Option<Settings>, state: &AppState, api: Router, issuer: Router) -> Self {
         let inner = settings.map(|settings| {
             Arc::new(Inner {
                 db: state.db.clone(),
                 verifier: state.auth.clone(),
-                oidc: Oidc::new(&settings),
+                oidc: Oidc::new(&settings, issuer),
                 cipher: settings.cipher,
                 cookies: Cookies::new(settings.secure_cookies),
                 public_origin: settings.public_origin.into(),

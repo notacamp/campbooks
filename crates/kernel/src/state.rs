@@ -9,10 +9,12 @@ use crate::{
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
+    connections::{GrantIntakePort, NoGrantIntake},
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
+    signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
     tenancy::{MembershipPort, NoMembership},
 };
@@ -50,6 +52,14 @@ pub struct AppState {
     /// inbox, a calendar). Until a module registers one, such changes are
     /// shown to nobody.
     pub visibility: VisibilityPort,
+    /// Takes mailbox grants obtained at sign-in into connections. The
+    /// server registers the `connectors` module's implementation; until
+    /// then no mailbox can be connected that way.
+    pub grants: GrantIntakePort,
+    /// Answers whether an address has a pending invitation. The server
+    /// registers the `workspaces` module's implementation; until then
+    /// nobody is invited.
+    pub invitations: InvitationsPort,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -70,6 +80,8 @@ impl AppState {
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
+            grants: Arc::new(NoGrantIntake),
+            invitations: Arc::new(NoInvitations),
             locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
             operations: Operations::default(),
@@ -80,6 +92,29 @@ impl AppState {
     #[must_use]
     pub fn with_membership(mut self, membership: MembershipPort) -> Self {
         self.membership = membership;
+        self
+    }
+
+    /// The same state, taking mailbox grants into connections through
+    /// `grants`.
+    #[must_use]
+    pub fn with_grant_intake(mut self, grants: GrantIntakePort) -> Self {
+        self.grants = grants;
+        self
+    }
+
+    /// The same state, looking up invitations through `invitations`.
+    #[must_use]
+    pub fn with_invitations(mut self, invitations: InvitationsPort) -> Self {
+        self.invitations = invitations;
+        self
+    }
+
+    /// The same state, validating access tokens with `auth` (the server
+    /// installs the in-process issuer's verifier this way).
+    #[must_use]
+    pub fn with_auth(mut self, auth: TokenVerifier) -> Self {
+        self.auth = auth;
         self
     }
 

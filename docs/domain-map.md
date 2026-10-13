@@ -96,6 +96,7 @@ tenancy).
 | `system` | Health, version. Exists. | M0 |
 | `workspaces` | Tenants, members, roles, invitations, signup policy, security log. | M0 |
 | `connectors` | Links to outside accounts, credentials, sync engine, provider adapters. | M0 |
+| `identity` | Accounts and their ways in (every owned mailbox, passkeys); the instance's OAuth 2.1 issuer (ADR 0014). | M0 |
 | `conversations` | Messages on any channel (email first), inboxes, threads, drafts, streams. | M1 |
 | `parties` | The people, services and organisations the workspace deals with. | M1 |
 | `attention` | What needs someone now, and the log of what Campbooks did. | M1 |
@@ -110,8 +111,7 @@ tenancy).
 | `records` | Custom record types and custom fields on any record. | M5 |
 | `views` | Saved views and dashboards over any record type. | M5 |
 
-Not modules: identity and credentials of *users* live in the **IdP**
-(ADR 0004); plans, billing and entitlements are **cloud-only** and live
+Not modules: plans, billing and entitlements are **cloud-only** and live
 outside this repo; model calls live in **`campbooks-ai`**.
 
 ## How contexts talk

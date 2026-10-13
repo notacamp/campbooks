@@ -120,8 +120,8 @@ fn app(state: AppState, settings: Option<config::Settings>) -> Router {
         .clone()
         .fallback(|| async { campbooks_kernel::Error::NotFound })
         .with_state(state.clone());
-    let bff = Bff::new(settings, &state, api_only);
-    crate::compose(state, routes, Arc::new(spec), &bff)
+    let bff = Bff::new(settings, &state, api_only, Router::new());
+    crate::compose(state, routes, Arc::new(spec), &bff, Router::new())
 }
 
 #[derive(Debug)]

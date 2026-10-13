@@ -37,6 +37,7 @@ mod testkit;
 
 pub use domain::model::{Accent, Kind};
 pub use features::delete_workspace::PurgeWorkspace;
+pub use features::invitations_port::invitations;
 pub use features::locale_preference::locale_preference;
 pub use features::membership::membership;
 
