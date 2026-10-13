@@ -139,6 +139,10 @@ pub struct GoogleConfig {
     /// `CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`: read when a token is
     /// requested, so a rotated secret is picked up without a restart.
     pub client_secret_file: Option<PathBuf>,
+    /// `CAMPBOOKS_GOOGLE__BASE_URL`: serve every Google endpoint from this
+    /// base instead (a local fake Google). Development only
+    /// (`CAMPBOOKS_ENV=development`); refused otherwise.
+    pub base_url: Option<String>,
 }
 
 impl GoogleConfig {

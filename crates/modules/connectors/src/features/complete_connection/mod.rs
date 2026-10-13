@@ -10,33 +10,24 @@
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
-    blobs::{BlobOwner, BlobRef},
-    crypto,
+    AppState, Error, Operation, Problem, Result, Risk, crypto,
     db::BeginFor as _,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use sqlx::{Postgres, Transaction};
 use utoipa::ToSchema;
 
 use crate::{
     MESSAGES,
     deps::Deps,
     domain::{
-        connections::{self, parse_capabilities},
-        credentials,
-        model::{
-            AuthorizationId, Capability, ConnectionId, ConnectionView, InboxId, Phase, Provider,
-            StreamId,
-        },
-        removal::CONNECTION_OWNER,
-        schedule,
+        connections::parse_capabilities,
+        grants::{ProviderGrant, create_or_refresh_connection},
+        model::{AuthorizationId, Capability, ConnectionId, ConnectionView, Provider},
     },
-    events::{ACCOUNT_CONTENT_TYPE, AccountDocument, CapabilityGranted, ConnectionAdded},
     features::start_connection::{acting_member, open_verifier},
-    google::{self, Account, GoogleError, TokenGrant},
+    google::{self, GoogleError},
     scopes::ConnectorsWrite,
 };
 
@@ -134,46 +125,23 @@ pub async fn execute(
     if granted.is_empty() {
         return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
     }
-    let address = account.email.trim().to_lowercase();
-    let document = AccountDocument {
-        version: 1,
-        provider: started.provider,
-        address: address.clone(),
-        display_name: account.name.clone(),
-    };
-    let account_blob = state
-        .blobs
-        .put(
-            &access.workspace.to_string(),
-            serde_json::to_vec(&document).map_err(Error::internal)?,
-            ACCOUNT_CONTENT_TYPE,
-        )
-        .await?;
-
-    let mut tx = state.db.begin_for(access.workspace).await?;
-    let id = save(
-        &mut tx,
+    let view = create_or_refresh_connection(
         state,
         deps,
-        &Saving {
+        &ProviderGrant {
             workspace: access.workspace,
             user,
-            started: &started,
-            account: &account,
-            address: &address,
-            grant: &grant,
-            granted: &granted,
-            account_blob: &account_blob,
-            now,
+            provider: started.provider,
+            account_subject: account.sub,
+            address: account.email.trim().to_lowercase(),
+            display_name: account.name,
+            capabilities: granted,
+            tokens: grant,
+            extending: started.connection,
         },
     )
     .await?;
-    let connection = connections::load(&mut tx, id)
-        .await?
-        .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection).await?;
-    tx.commit().await?;
-    tracing::info!(workspace = %access.workspace, %user, connection = %id, "connection completed");
+    tracing::info!(workspace = %access.workspace, %user, connection = %view.id, "connection completed");
     Ok(view)
 }
 
@@ -213,207 +181,6 @@ async fn take(
         connection: row.connection,
         verifier: row.pkce_verifier,
     }))
-}
-
-/// What [`save`] stores.
-struct Saving<'a> {
-    workspace: WorkspaceId,
-    user: UserId,
-    started: &'a Started,
-    account: &'a Account,
-    address: &'a str,
-    grant: &'a TokenGrant,
-    granted: &'a [Capability],
-    account_blob: &'a BlobRef,
-    now: DateTime<Utc>,
-}
-
-/// Create or extend the connection, store its credentials, create the
-/// streams of new capabilities and start them. Returns the connection.
-async fn save(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &AppState,
-    deps: &Deps,
-    s: &Saving<'_>,
-) -> Result<ConnectionId> {
-    let cipher = deps
-        .cipher
-        .as_deref()
-        .ok_or_else(|| Error::Conflict(MESSAGES.reason("provider_not_configured")))?;
-    let workspace_key = s.workspace.to_string();
-    let existing = existing(tx, s).await?;
-    let had: Vec<Capability> = existing
-        .as_ref()
-        .map(|(_, had)| had.clone())
-        .unwrap_or_default();
-    let id = existing
-        .as_ref()
-        .map_or_else(ConnectionId::new, |(id, _)| *id);
-    let mut capabilities = had.clone();
-    capabilities.extend_from_slice(s.granted);
-    capabilities.sort_unstable();
-    capabilities.dedup();
-    let capability_names: Vec<String> =
-        capabilities.iter().map(|c| c.as_str().to_owned()).collect();
-    sqlx::query!(
-        r#"INSERT INTO connectors.connections
-               (id, workspace_id, provider, account_subject, address, display_name, granted_by,
-                capabilities, scopes, health, health_reason, health_changed_at, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10)
-           ON CONFLICT (id) DO UPDATE
-              SET address = $5, display_name = $6, capabilities = $8, scopes = $9,
-                  health = 'ok', health_reason = NULL,
-                  health_changed_at = CASE WHEN connectors.connections.health = 'ok'
-                                           THEN connectors.connections.health_changed_at ELSE $10 END,
-                  updated_at = $10"#,
-        id as ConnectionId,
-        s.workspace as WorkspaceId,
-        s.started.provider.as_str(),
-        s.account.sub,
-        s.address,
-        s.account.name,
-        s.user as UserId,
-        &capability_names,
-        s.grant.scope.clone().unwrap_or_default(),
-        s.now,
-    )
-    .execute(&mut **tx)
-    .await?;
-    credentials::store(
-        tx,
-        cipher,
-        s.workspace,
-        id,
-        s.grant.refresh_token.as_deref(),
-        s.grant,
-        s.now,
-    )
-    .await?;
-    state
-        .blobs
-        .attach(
-            tx,
-            &workspace_key,
-            s.account_blob,
-            &BlobOwner::new(CONNECTION_OWNER, id),
-        )
-        .await?;
-    if existing.is_none() {
-        state
-            .events
-            .publish(
-                tx,
-                &ConnectionAdded {
-                    workspace: workspace_key.clone(),
-                    connection: id,
-                    provider: s.started.provider,
-                    granted_by: s.user,
-                },
-            )
-            .await?;
-    }
-    start_streams(tx, state, deps, s, id, &had).await?;
-    Ok(id)
-}
-
-/// The workspace's connection of this account (its id and capabilities),
-/// locked, after checking the consent may land on it.
-async fn existing(
-    tx: &mut Transaction<'static, Postgres>,
-    s: &Saving<'_>,
-) -> Result<Option<(ConnectionId, Vec<Capability>)>> {
-    let existing = sqlx::query!(
-        r#"SELECT id AS "id: ConnectionId", granted_by AS "granted_by: UserId", capabilities
-             FROM connectors.connections
-            WHERE workspace_id = $1 AND provider = $2 AND account_subject = $3
-              FOR UPDATE"#,
-        s.workspace as WorkspaceId,
-        s.started.provider.as_str(),
-        s.account.sub,
-    )
-    .fetch_optional(&mut **tx)
-    .await?;
-    if let Some(wanted) = s.started.connection
-        && existing.as_ref().is_none_or(|e| e.id != wanted)
-    {
-        return Err(Error::Conflict(MESSAGES.reason("account_mismatch")));
-    }
-    if existing.as_ref().is_some_and(|e| e.granted_by != s.user) {
-        return Err(Error::Conflict(
-            MESSAGES.reason("account_connected_by_another_member"),
-        ));
-    }
-    if existing.is_none() && s.grant.refresh_token.is_none() {
-        return Err(Error::Denied(MESSAGES.reason("no_offline_access")));
-    }
-    existing
-        .map(|e| Ok((e.id, parse_capabilities(&e.capabilities)?)))
-        .transpose()
-}
-
-/// Resume a reconnected connection's paused streams, and create, announce
-/// and start the streams of capabilities it did not have.
-async fn start_streams(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &AppState,
-    deps: &Deps,
-    s: &Saving<'_>,
-    id: ConnectionId,
-    had: &[Capability],
-) -> Result<()> {
-    let workspace_key = s.workspace.to_string();
-    // A reconnect resumes the paused streams.
-    let resumed = sqlx::query_scalar!(
-        r#"UPDATE connectors.streams SET paused = false, throttled_until = NULL,
-                  consecutive_failures = 0
-            WHERE connection_id = $1
-        RETURNING id AS "id: StreamId""#,
-        id as ConnectionId
-    )
-    .fetch_all(&mut **tx)
-    .await?;
-    for stream in resumed {
-        schedule::run_now(tx, s.workspace, stream, s.now).await?;
-    }
-    let min_interval = i32::try_from(deps.config.poll.min_seconds).unwrap_or(i32::MAX);
-    for &capability in s.granted.iter().filter(|c| !had.contains(c)) {
-        let stream = StreamId::new();
-        let inbox = (capability == Capability::Messages).then(InboxId::new);
-        sqlx::query!(
-            r#"INSERT INTO connectors.streams
-                   (id, workspace_id, connection_id, capability, inbox_id, phase, interval_seconds, created_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-               ON CONFLICT (connection_id, capability) DO NOTHING"#,
-            stream as StreamId,
-            s.workspace as WorkspaceId,
-            id as ConnectionId,
-            capability.as_str(),
-            inbox as Option<InboxId>,
-            Phase::Backfill.as_str(),
-            min_interval,
-            s.now,
-        )
-        .execute(&mut **tx)
-        .await?;
-        // The inbox is announced before any batch can name it: the first
-        // run cannot commit before this transaction does.
-        state
-            .events
-            .publish(
-                tx,
-                &CapabilityGranted {
-                    workspace: workspace_key.clone(),
-                    connection: id,
-                    capability,
-                    granted_by: s.user,
-                    inbox_id: inbox,
-                    account: s.account_blob.clone(),
-                },
-            )
-            .await?;
-        schedule::run_now(tx, s.workspace, stream, s.now).await?;
-    }
-    Ok(())
 }
 
 #[cfg(test)]

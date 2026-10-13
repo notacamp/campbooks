@@ -7,6 +7,7 @@ use std::sync::Arc;
 use campbooks_kernel::{
     Config,
     clock::{Clock, SystemClock},
+    config::Environment,
     crypto::{Cipher, SecretKey},
 };
 use figment::Figment;
@@ -102,6 +103,26 @@ impl Deps {
                     .to_owned(),
             );
         };
+        let endpoints = match google
+            .base_url
+            .as_deref()
+            .map(str::trim)
+            .filter(|u| !u.is_empty())
+        {
+            None => Endpoints::google(),
+            Some(_) if config.env != Environment::Development => {
+                return Err(
+                    "CAMPBOOKS_GOOGLE__BASE_URL points Google at another server: it is for \
+                     development only (CAMPBOOKS_ENV=development)"
+                        .to_owned(),
+                );
+            }
+            Some(base) => {
+                let base = url::Url::parse(&format!("{}/", base.trim_end_matches('/')))
+                    .map_err(|e| format!("CAMPBOOKS_GOOGLE__BASE_URL={base}: {e}"))?;
+                Endpoints::under(&base)
+            }
+        };
         let redirect_uri = format!(
             "{}{GOOGLE_CALLBACK_PATH}",
             config.public_url.trim_end_matches('/')
@@ -110,7 +131,7 @@ impl Deps {
             client_id.to_owned(),
             client_secret,
             redirect_uri,
-            Endpoints::google(),
+            endpoints,
         )?));
         deps.cipher = Some(Arc::new(Cipher::new(&secret, CREDENTIALS_PURPOSE)));
         Ok(deps)
@@ -152,5 +173,24 @@ mod tests {
             "http://localhost:8080/connections/google/callback"
         );
         assert!(deps.cipher.is_some());
+    }
+
+    #[test]
+    fn a_fake_google_is_for_development_only() {
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "google": {"client_id": "client-1", "client_secret": "s3cret",
+                       "base_url": "http://localhost:9999"}
+        })));
+        let key = || Some(SecretKey::from_bytes([1; 32]));
+        let err = Deps::from_figment(&figment, &kernel_config(), key()).unwrap_err();
+        assert!(err.contains("development only"), "{err}");
+        let mut dev = kernel_config();
+        dev.env = Environment::Development;
+        assert!(
+            Deps::from_figment(&figment, &dev, key())
+                .unwrap()
+                .google
+                .is_some()
+        );
     }
 }

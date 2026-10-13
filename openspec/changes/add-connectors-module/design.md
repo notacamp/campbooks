@@ -304,7 +304,20 @@ complete one (no user to bind it to: 403 `connection_needs_user`).
   `…__BATCH_RETENTION_DAYS` (7).
 - Reserved, inert: `CAMPBOOKS_GOOGLE__PUBSUB_TOPIC`.
 - Google's endpoint URLs are constructor parameters of the adapter (the
-  server passes Google's, tests pass the wiremock server's), not settings.
+  server passes Google's, tests pass the wiremock server's).
+  `CAMPBOOKS_GOOGLE__BASE_URL` serves them all from a local fake Google, and
+  is refused unless `CAMPBOOKS_ENV=development`.
+
+## One seam for grants
+
+Every way of obtaining a provider grant ends in
+`domain::grants::create_or_refresh_connection(ProviderGrant)`: workspace,
+member, provider, account subject, verified address, granted capabilities
+and tokens in; the connection created or refreshed, credentials sealed,
+events published and streams started out. `connectors.complete_connection`
+calls it after its PKCE exchange; a sign-in flow that obtains the same
+Google, Microsoft or Zoho grant can call it later without the connector's
+start/callback.
 
 The module is composed by the server with its dependencies
 (`connectors::module(Deps { google: Option<Google>, cipher, clock, config })`,
