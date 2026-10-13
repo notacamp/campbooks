@@ -32,6 +32,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     # Download the checkpoint commit the laya package lists as reviewed.
     LAYA_REVISION=reviewed
 
+# Debian security fixes released after the base image was built (the release
+# pipeline's Trivy gate fails on fixable HIGH/CRITICAL findings).
+RUN apt-get update \
+    && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --gid 10001 laya \
     && useradd --uid 10001 --gid laya --no-create-home --shell /usr/sbin/nologin laya \
     && mkdir -p /models \
