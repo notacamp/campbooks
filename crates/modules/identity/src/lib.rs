@@ -41,6 +41,7 @@ mod prune;
 pub mod scopes;
 pub mod upstream;
 mod web;
+pub mod webauthn;
 
 pub use consent::consent_door;
 pub use deps::Deps;
