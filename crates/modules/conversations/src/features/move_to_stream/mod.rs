@@ -16,12 +16,13 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use campbooks_ai::decide::signals::email::triage;
+
 use crate::{
     domain::paths::ConversationPath,
     domain::{
         access::lock_conversation,
         conversation::{Changed, ConversationSummary, provider_message_ids, request, summary},
-        questions,
     },
     events::{Change, Origin, RequestedChange},
     model::{ConversationId, CorrectionId, DecisionId, MessageId, Stream},
@@ -102,7 +103,7 @@ pub async fn handler(
             r#"SELECT id AS "id: DecisionId" FROM conversations.decisions
                 WHERE conversation_id = $1 AND question = $2 ORDER BY created_at, id"#,
             id as ConversationId,
-            questions::STREAM,
+            triage::STREAM,
         )
         .fetch_all(&mut *tx)
         .await?;
@@ -117,7 +118,7 @@ pub async fn handler(
             access.workspace.as_uuid(),
             id as ConversationId,
             latest_inbound as Option<MessageId>,
-            questions::STREAM,
+            triage::STREAM,
             current.stream,
             body.stream.as_str(),
             current.stream_source,

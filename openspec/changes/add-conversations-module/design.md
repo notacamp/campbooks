@@ -32,7 +32,7 @@ referenced by id.
 | `attachments` | id, message_id, position, filename, content_type, size, inline, blob ref. |
 | `labels` | id, inbox_id, name, provider_key (nullable, for provider-mirrored labels). Unique per inbox by name and by provider key. |
 | `conversation_labels` | conversation_id, label_id. |
-| `decisions` | id, message_id, conversation_id, question, source (`rules`/`model`/`knn`/`cascade`), explanation, value (jsonb), options (jsonb, ordered labels), probabilities (jsonb), confidence, model, model_version, latency_ms, `acted` (bool), state_version, created_at. |
+| `decisions` | id, message_id, conversation_id, question, source (`rules`/`model`/`knn`/`cascade`), reasons (jsonb `[{rule, evidence}]`), value (jsonb), options (jsonb, ordered labels), probabilities (jsonb), confidence, model, model_version, latency_ms, `acted` (bool), state_version, created_at. |
 | `corrections` | id, conversation_id, message_id (latest inbound), question (`stream`), from_value, to_value, stream_source it overrode, decision_ids (the answers on record at the time, rules and model), corrected_by (user id), created_at. |
 
 Indexes for the list queries:
@@ -171,23 +171,25 @@ look-alike domains) live in one place, `campbooks_ai::decide::signals::email`,
 behind the `decide::strategy` trait (rules, k-NN, model, cascade), built and
 measured by #59. Its eval measures exactly the code that sorts mail here.
 
-The module builds a compact **`Envelope`** from the stored message (inbox
-address, from, reply-to, to/cc counts, subject, the headers subset, the
-provider's normalised category, attachment names and types, `sent_at`, the
-first 1,500 characters of the text part) and asks the configured strategy one
-question at a time. Each strategy returns, per question, an `Option<Answer>`
-plus an explanation (the "Why?" a client can show). Every answer, from rules
-or from the model, is stored in `decisions` with its **source**
-(`rules`/`model`/`knn`/`cascade`), probabilities, confidence, model and
-explanation.
+The module builds the shared **`Envelope`**
+(`campbooks_ai::decide::signals::email::Envelope`) from the stored message:
+sender, recipients, subject, the list and automation headers and `Reply-To`,
+attachment names and types, and the start of the text body (16 KiB read; the
+model reads its first 1,500 characters). It asks the triage questions
+(`signals::email::triage_questions`, worded and labelled by #59) of two
+strategies (`campbooks_ai::decide::strategy::Strategy`):
 
-#59 has not merged, so this change holds a minimal trait of the same shape
-(`Strategy`: `Envelope` in, one `Option<Verdict>` per question out, a
-`Verdict` being an `Answer` plus its explanation), with `NoRules` (abstains
-on everything, so every conversation is Primary until #59 lands) and
-`ModelStrategy` (over `Gateway::decide`). A follow-up swaps in #59's types;
-the rules are never forked into this crate. Tests use a stand-in rules
-strategy of their own that is not shipped.
+- **rules**: `EmailSignals`, when a message is stored (no I/O beyond the text
+  blob), so its stream is right when it first appears;
+- **model**: `strategy::Model` over the `decide` role, in
+  `conversations.decide_message`, when the role is configured.
+
+Each returns, per question, an answer (`Decided`: the `Answer` with its
+probabilities and confidence) and its `Reason`s (stable rule id + evidence,
+for the client's "Why?"), or abstains. Every answer is stored in `decisions`
+with its source, strategy name, value, probabilities, confidence, model,
+reasons and the envelope version. k-NN over the workspace's corrections and
+cascades come in when the policy has a measured reason to use them.
 
 ### Questions and the per-question policy
 
@@ -210,7 +212,7 @@ operating point yet and never act.
 | `suspicious` | noul | 98% | record (0.93: 97%, no) | record |
 
 So, shipped as is, **no conversation is sorted out of Primary**: the stream
-answers are kept as suggestions (with their explanation) until a strategy
+answers are kept as suggestions (with their reasons) until a strategy
 holds its target; the placement code runs as soon as the table lets it (the
 tests enable it with a test policy). The other questions' accepted answers
 are marked `acted`, for the consumers that will use them (tasks, attention).
@@ -222,20 +224,18 @@ conversation goes to Primary (`stream_source = default`). The stream is set
 from the conversation's first inbound message; later messages never re-sort
 it, and a member's move sticks (`stream_source = member`);
 `stream_source = rules` marks a rules placement, and the answer's
-explanation in `decisions` names the signal. Question ids match #59's eval
+reasons in `decisions` name the signal. Question ids match #59's eval
 set (`stream`, `needs_reply`, `asks_action`, `has_deadline`, `urgency`,
 `suspicious`).
 
-The model pass (purpose `conversations.message_pass`, role `decide`, all
+The model pass (purpose `conversations.triage`, role `decide`, all
 questions in one call) runs as `conversations.decide_message` on
 `message_received`, only for inbound messages sent within the backfill window
 (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`, default 14; a first sync's
 old mail gets no model call, per "cost follows activity"), only when the
 `decide` role is configured, and once per message (a replayed delivery finds
 the answers stored and asks nothing). Provider errors are retried with only
-their kind in `last_error` (a provider may echo the request). Rules answers are computed in
-`apply_changes` itself (cheap, no I/O beyond the text blob) so the stream is
-right when the message first appears. The model call happens before the job
+their kind in `last_error` (a provider may echo the request). The model call happens before the job
 opens its transaction; answers are written in it. A provider failure retries
 the job; a validation error is fatal.
 
@@ -335,7 +335,7 @@ data in a rules table: that is the automation module (M2). (c) Named rules in
 this module: simple, but a second copy of the signals #59 is evaluating, so
 the eval would measure code that does not sort the mail. (d) **One home in
 `campbooks_ai::decide::signals::email` behind the `decide::strategy` trait
-(chosen)**: rules and model answers share one shape (answer + explanation),
+(chosen)**: rules and model answers share one shape (answer + reasons),
 the eval measures the code in production, and switching a question from rules
 to a cascade is a policy change here, not new code. Workspace rules arrive
 with automation and run after these.

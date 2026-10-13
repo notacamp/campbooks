@@ -51,7 +51,7 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/37.
   consumes `message_received` and asks six typed questions (stream, needs
   reply, asks for something, has a deadline, urgency, suspicious) through
   `campbooks-ai` in one call. Every answer, from rules or the model, is
-  stored in `decisions` with its source, explanation, probabilities,
+  stored in `decisions` with its source, reasons, probabilities,
   confidence and model. A per-question switch says which sources may act;
   model answers are recorded only, so #59 switches a question by changing
   its policy.

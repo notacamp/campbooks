@@ -25,7 +25,13 @@
 
 use std::sync::Arc;
 
-use campbooks_ai::{Gateway, Role};
+use campbooks_ai::{
+    Gateway, Role,
+    decide::{
+        signals::email::EmailSignals,
+        strategy::{Model, Strategy},
+    },
+};
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
@@ -43,9 +49,7 @@ mod testkit;
 
 pub use config::{ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS};
 pub use domain::{
-    decide::{
-        BoxFuture, Envelope, ModelStrategy, NoRules, STATE_VERSION, Source, Strategy, Verdict,
-    },
+    decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
 
@@ -81,13 +85,14 @@ impl std::fmt::Debug for ConversationsDeps {
 }
 
 impl ConversationsDeps {
-    /// Dependencies with `ai` and `config`, and the rules strategy of
-    /// campbooks-cloud#59 once it lands ([`NoRules`] until then).
+    /// Dependencies with `ai` and `config`, sorting with the shared email
+    /// signals ([`EmailSignals`]) under the eval baseline's policy
+    /// ([`Policy::baseline`]).
     pub fn new(ai: Option<Gateway>, config: ConversationsConfig) -> Self {
         Self {
             ai,
             config,
-            rules: Arc::new(NoRules),
+            rules: Arc::new(EmailSignals),
             policy: Policy::baseline(),
         }
     }
@@ -119,7 +124,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
     let model = deps
         .ai
         .filter(|gateway| gateway.config().provider(Role::Decide).is_ok())
-        .map(ModelStrategy::new);
+        .map(|gateway| {
+            Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
+        });
     Module {
         name: NAME,
         scopes: scopes::ALL,

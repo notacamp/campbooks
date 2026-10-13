@@ -27,7 +27,7 @@ campbooks-conversations = { path = "crates/modules/conversations" }
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5.3", features = ["util"] }
-tower-http = { version = "0.7.1", features = ["trace", "request-id", "timeout", "compression-gzip", "compression-br", "util", "fs", "set-header"] }
+tower-http = { version = "0.7.1", features = ["request-id", "timeout", "compression-gzip", "compression-br", "util", "fs", "set-header"] }
 http-body-util = "0.1.5"
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls", "http2", "json", "charset"] }
 url = { version = "2.5.8", features = ["serde"] }
@@ -64,6 +64,20 @@ thiserror = "2.0.21"
 anyhow = "1.0.104"
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+# Telemetry (traces + metrics, see openspec/changes/observability): the
+# OpenTelemetry API for instruments and context propagation, bridged from
+# `tracing` spans. Exporters are off unless configured (`CAMPBOOKS_TELEMETRY__*`).
+opentelemetry = { version = "0.33.0", default-features = false, features = ["trace", "metrics"] }
+opentelemetry_sdk = { version = "0.33.0", default-features = false, features = ["trace", "metrics", "internal-logs"] }
+# OTLP over HTTP/protobuf on the SDK's own export threads (blocking reqwest
+# 0.13, the version already in the graph); no gRPC/tonic.
+opentelemetry-otlp = { version = "0.33.0", default-features = false, features = ["http-proto", "reqwest-blocking-client", "trace", "metrics", "internal-logs"] }
+# The Prometheus text format for the optional scrape endpoint.
+opentelemetry-prometheus = "0.33.0"
+prometheus = { version = "0.14.0", default-features = false }
+tracing-opentelemetry = { version = "0.34.0", default-features = false }
+# sqlx's pool options take a `log` level; already in the graph via sqlx.
+log = "0.4.34"
 uuid = { version = "1.28.0", features = ["v7", "serde"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
 secrecy = { version = "0.10.3", features = ["serde"] }

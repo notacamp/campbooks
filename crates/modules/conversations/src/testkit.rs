@@ -6,7 +6,6 @@
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
-    time::Duration,
 };
 
 use axum::{
@@ -14,7 +13,7 @@ use axum::{
     body::Body,
     http::{Method, Request, header},
 };
-use campbooks_ai::decide::{AnswerValue, Question};
+use campbooks_ai::decide::signals::email::triage;
 use campbooks_kernel::{
     AppState, Error,
     auth::{Principal, PrincipalKind},
@@ -30,9 +29,8 @@ use crate::{
     ConversationsDeps, dev,
     domain::{
         blobs::read_text,
-        decide::{BoxFuture, Envelope, Source, Strategy, Verdict},
+        decide::Source,
         policy::{Policy, Switch},
-        questions,
     },
     ingest::MessageChangeBatch,
     model::{InboxId, InboxRole},
@@ -89,9 +87,7 @@ pub struct Kit {
 }
 
 impl Kit {
-    /// The module sorting with [`HeaderRules`] under a policy that lets
-    /// confident rules place the stream (the shipped baseline does not yet;
-    /// [`Policy::baseline`]), without AI.
+    /// The module under [`sorting_deps`], without AI.
     pub async fn new(db: PgPool) -> Self {
         Self::with_deps(db, sorting_deps()).await
     }
@@ -289,75 +285,18 @@ impl Kit {
     }
 }
 
-/// [`HeaderRules`] with stream placement enabled at 0.8.
+/// The shipped email signals, with stream placement enabled at 0.9 (the
+/// shipped baseline lets no stream answer act yet).
 pub fn sorting_deps() -> ConversationsDeps {
-    ConversationsDeps::offline()
-        .with_rules(Arc::new(HeaderRules))
-        .with_policy(Policy::baseline().with(
-            questions::STREAM,
-            Source::Rules,
-            Switch::ActAbove(0.8),
-        ))
+    ConversationsDeps::offline().with_policy(Policy::baseline().with(
+        triage::STREAM,
+        Source::Rules,
+        Switch::ActAbove(0.9),
+    ))
 }
 
 /// `fixtures/<name>.json`.
 pub fn fixture(name: &str) -> String {
     let path = format!("{}/fixtures/{name}.json", env!("CARGO_MANIFEST_DIR"));
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
-}
-
-/// A stand-in rules strategy for tests, until campbooks-cloud#59's shared
-/// rules land: answers `stream` from a few obvious envelope signals, with a
-/// fixed confidence, and abstains otherwise. Not shipped.
-pub struct HeaderRules;
-
-impl Strategy for HeaderRules {
-    fn name(&self) -> &'static str {
-        "test-rules"
-    }
-
-    fn source(&self) -> Source {
-        Source::Rules
-    }
-
-    fn decide<'a>(
-        &'a self,
-        envelope: &'a Envelope,
-        questions: &'a [Question],
-    ) -> BoxFuture<'a, Result<Vec<Option<Verdict>>, campbooks_ai::Error>> {
-        let stream = if envelope.attachments.iter().any(|(name, _)| {
-            let name = name.to_lowercase();
-            ["fatura", "factura", "recu", "receipt", "invoice"]
-                .iter()
-                .any(|word| name.contains(word))
-        }) {
-            Some(("receipts", "a receipt or invoice attachment"))
-        } else if envelope.headers.list_id.is_some() || envelope.headers.list_unsubscribe.is_some()
-        {
-            Some(("newsletters", "mailing-list headers"))
-        } else if envelope.headers.auto_submitted.is_some() {
-            Some(("updates", "Auto-Submitted header"))
-        } else {
-            None
-        };
-        let verdicts = questions
-            .iter()
-            .map(|q| {
-                let (label, why) = stream.filter(|_| q.id == questions::STREAM)?;
-                Some(Verdict {
-                    answer: campbooks_ai::decide::Answer {
-                        question_id: q.id.clone(),
-                        value: AnswerValue::Choice(label.to_owned()),
-                        probabilities: None,
-                        confidence: Some(0.95),
-                        model: "test-rules".to_owned(),
-                        model_version: None,
-                        latency: Duration::ZERO,
-                    },
-                    explanation: Some(why.to_owned()),
-                })
-            })
-            .collect();
-        Box::pin(async move { Ok(verdicts) })
-    }
 }

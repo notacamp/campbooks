@@ -18,6 +18,19 @@ All notable changes to Campbooks Next are documented here. The format follows
   its answers are recorded as suggestions only and change nothing yet. Mail
   older than `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14) gets
   no AI pass, so importing an old mailbox costs no AI.
+- A way to measure the AI's sorting before it acts: a fictional, labelled set
+  of 320 emails in English, Portuguese, Spanish and French
+  (`crates/ai/evals/decide/mail-triage/`, with its labelling guide), and
+  `cargo xtask eval decide`, which reports for each triage question (stream,
+  needs a reply, asks you to do something, deadline, urgency, suspicious) how
+  often each strategy is right, how much mail it could handle on its own at
+  the confidence needed, its calibration and its speed. Model strategies run
+  against any endpoint set in `CAMPBOOKS_EVAL_LAYA_URL`,
+  `CAMPBOOKS_EVAL_INSTRUCT_URL` or `CAMPBOOKS_EVAL_EMBED_URL` and are reported
+  as not run otherwise.
+- Deterministic email signals, learning from your own corrections (nearest
+  neighbours) and cascades of them behind one interface with the `decide`
+  model, each answer carrying the reasons behind it.
 - The server now answers in your language: error messages from the API are
   in English, European Portuguese, Spanish or French, following the language
   you chose (once accounts can save one) or your browser's language, and say
@@ -180,6 +193,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   whose user cannot create roles, see `deploy/README.md`.
 - API errors for malformed JSON bodies and query strings are now
   problem+json 400s, and unparsable ids in paths are 404s.
+- Monitoring, off unless you turn it on. `CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT`
+  sends traces and metrics over OTLP/HTTP to a collector (with
+  `CAMPBOOKS_TELEMETRY__OTLP_HEADERS` for its credentials and
+  `CAMPBOOKS_TELEMETRY__SAMPLE_RATIO`, default 1, for the share of traces
+  kept). `CAMPBOOKS_TELEMETRY__METRICS_ADDR` serves Prometheus metrics at
+  `/metrics` on a separate port: keep it private. Metrics cover request
+  rates, errors (by their stable `code`) and latency per route, job durations and failures, queue
+  depth and wait, AI call latency and tokens per role, the database pool and
+  the build. Traces follow a request into the jobs it enqueues and the calls
+  it makes to AI providers and the identity provider, and honour an incoming
+  W3C `traceparent`. No message content, token, cookie or email address is
+  ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
 - **API clients:** every problem+json error now carries a stable `code`
@@ -205,8 +230,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 - `/bff/api/*` now requires a signed-in session and calls the API with your
   access token; without a session it answers 401 `session_required`. It
   replaces the interim passthrough.
-- Request logs record the path of each request but no longer its query
-  string, which can carry secrets.
+- Log lines inside a request or a job now carry the W3C `trace_id`, and the
+  request's span records the route template (`http.route`) instead of the
+  full URI, which could carry personal data in its query string. A
+  client-sent `x-request-id` that is not a plain token is logged as
+  `invalid`. The request log line is now `request finished`.
 - The image's default command is now `all` instead of `serve` (same
   behaviour plus the job worker). Each job the worker runs may hold a
   database connection: keep `CAMPBOOKS_DATABASE_MAX_CONNECTIONS` (default 10)

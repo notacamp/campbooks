@@ -23,7 +23,11 @@ use std::{
     sync::Arc,
 };
 
-use campbooks_ai::decide::{AnswerValue, Question};
+use campbooks_ai::decide::{
+    AnswerValue, Question,
+    signals::email::{triage, triage_questions},
+    strategy::{Decided, Strategy},
+};
 use campbooks_kernel::{
     AppState, EventBus, JobContext, JobError, JobHandler,
     blobs::{BlobError, BlobOwner, BlobRef},
@@ -39,10 +43,9 @@ use crate::{
     domain::{
         blobs::{read_bytes, read_text, snippet},
         conversation::{Changed, recount},
-        decide::{BODY_CHARS, Envelope, Source, Strategy, Verdict},
+        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
         policy::Policy,
-        questions,
     },
     events::{Change, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -57,10 +60,6 @@ use crate::{
 
 /// Largest batch document read, in bytes.
 pub const MAX_BATCH_BYTES: usize = 16 * 1024 * 1024;
-
-/// Bytes of the text body read to build an envelope (enough for
-/// [`BODY_CHARS`] characters of any script).
-const ENVELOPE_BODY_BYTES: usize = BODY_CHARS * 4;
 
 /// Characters of a message's snippet.
 pub const SNIPPET_CHARS: usize = 200;
@@ -118,10 +117,8 @@ impl JobHandler for ApplyChanges {
             return Err(JobError::fatal("the change batch names another inbox"));
         }
 
-        let (inbox_address, known) = survey(&state, workspace, &batch).await?;
-        let prepared = self
-            .prepare(&state, &ws, &inbox_address, &batch, known)
-            .await?;
+        let known = survey(&state, workspace, &batch).await?;
+        let prepared = self.prepare(&state, &ws, &batch, known).await?;
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
@@ -151,12 +148,13 @@ impl JobHandler for ApplyChanges {
     }
 }
 
-/// The inbox's address and which of the batch's messages it already has.
+/// Which of the batch's messages the inbox already has; retries while the
+/// inbox does not exist.
 async fn survey(
     state: &AppState,
     workspace: WorkspaceId,
     batch: &MessageChangeBatch,
-) -> Result<(String, HashSet<String>), JobError> {
+) -> Result<HashSet<String>, JobError> {
     let ids: Vec<&str> = batch
         .changes
         .iter()
@@ -166,8 +164,8 @@ async fn survey(
         })
         .collect();
     let mut tx = state.db.begin_for(workspace).await?;
-    let address = sqlx::query_scalar!(
-        "SELECT address FROM conversations.inboxes WHERE id = $1",
+    sqlx::query_scalar!(
+        "SELECT id FROM conversations.inboxes WHERE id = $1",
         batch.inbox as InboxId
     )
     .fetch_optional(&mut *tx)
@@ -184,15 +182,15 @@ async fn survey(
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;
-    Ok((address, known.into_iter().collect()))
+    Ok(known.into_iter().collect())
 }
 
 /// What step 2 found out about a new message.
 struct Prepared {
     participants: BlobRef,
     snippet: String,
-    /// The rules' verdicts on [`questions::all`]; empty for outbound mail.
-    verdicts: Vec<Option<Verdict>>,
+    /// The rules' answers to the triage questions; empty for outbound mail.
+    answers: Vec<Option<Decided>>,
 }
 
 impl ApplyChanges {
@@ -202,11 +200,10 @@ impl ApplyChanges {
         &self,
         state: &AppState,
         ws: &str,
-        inbox_address: &str,
         batch: &MessageChangeBatch,
         mut present: HashSet<String>,
     ) -> Result<HashMap<String, Prepared>, JobError> {
-        let questions = questions::all();
+        let questions = triage_questions();
         let mut prepared = HashMap::new();
         for change in &batch.changes {
             let message = match change {
@@ -245,12 +242,27 @@ impl ApplyChanges {
                 .blobs
                 .put(ws, document, PARTICIPANTS_CONTENT_TYPE)
                 .await?;
-            let verdicts = if message.direction == Direction::Inbound {
-                let envelope = envelope(inbox_address, message, &body);
+            let answers = if message.direction == Direction::Inbound {
+                let attachments: Vec<(String, String)> = message
+                    .attachments
+                    .iter()
+                    .map(|a| (a.filename.clone(), a.content_type.clone()))
+                    .collect();
+                let envelope = envelope(MessageParts {
+                    from: &message.from,
+                    to: &message.to,
+                    cc: &message.cc,
+                    reply_to: &message.reply_to,
+                    subject: &message.subject,
+                    headers: &message.headers,
+                    attachments: &attachments,
+                    body: &body,
+                });
                 self.rules
                     .decide(&envelope, &questions)
                     .await
                     .map_err(|e| JobError::retry(format!("rules strategy failed: {e}")))?
+                    .answers
             } else {
                 Vec::new()
             };
@@ -259,32 +271,11 @@ impl ApplyChanges {
                 Prepared {
                     participants,
                     snippet: snippet(&body, SNIPPET_CHARS),
-                    verdicts,
+                    answers,
                 },
             );
         }
         Ok(prepared)
-    }
-}
-
-/// The envelope strategies read about a message of the batch.
-fn envelope(inbox: &str, message: &NormalizedMessage, body: &str) -> Envelope {
-    Envelope {
-        inbox: inbox.to_owned(),
-        from: Some(message.from.clone()),
-        reply_to: message.reply_to.clone(),
-        to: message.to.clone(),
-        cc_count: message.cc.len(),
-        subject: message.subject.clone(),
-        headers: message.headers.clone(),
-        categories: message.categories.clone(),
-        attachments: message
-            .attachments
-            .iter()
-            .map(|a| (a.filename.clone(), a.content_type.clone()))
-            .collect(),
-        body: body.chars().take(BODY_CHARS).collect(),
-        lang_hint: None,
     }
 }
 
@@ -434,10 +425,10 @@ impl Apply<'_> {
         message: &NormalizedMessage,
         prepared: &Prepared,
     ) -> Result<(), JobError> {
-        let questions = questions::all();
+        let questions = triage_questions();
         let inbound = message.direction == Direction::Inbound;
         let sort_to = if inbound {
-            accepted_stream(&questions, &prepared.verdicts, self.policy)
+            accepted_stream(&questions, &prepared.answers, self.policy)
         } else {
             None
         };
@@ -454,7 +445,7 @@ impl Apply<'_> {
                 source: Source::Rules,
                 strategy: "rules",
                 questions: &questions,
-                verdicts: &prepared.verdicts,
+                answers: &prepared.answers,
                 policy: self.policy,
             };
             recorded.store(tx, self.workspace, sorted).await?;
@@ -755,10 +746,10 @@ impl Apply<'_> {
     }
 }
 
-/// The stream the rules' verdicts may set, if their switch accepts one.
+/// The stream the rules' answers may set, if the policy accepts one.
 fn accepted_stream(
     questions: &[Question],
-    verdicts: &[Option<Verdict>],
+    answers: &[Option<Decided>],
     policy: &Policy,
 ) -> Option<Stream> {
     let recorded = Recorded {
@@ -767,10 +758,10 @@ fn accepted_stream(
         source: crate::domain::decide::Source::Rules,
         strategy: "rules",
         questions,
-        verdicts,
+        answers,
         policy,
     };
-    match &recorded.accepted(questions::STREAM)?.answer.value {
+    match &recorded.accepted(triage::STREAM)?.answer.value {
         AnswerValue::Choice(label) => label.parse().ok(),
         _ => None,
     }

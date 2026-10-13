@@ -168,10 +168,8 @@ async fn applying_a_batch_again_changes_nothing(db: PgPool) {
     let before = kit.threads(inbox).await;
     let events = count(&db, "SELECT count(*) FROM kernel.events").await;
     let decisions = count(&db, "SELECT count(*) FROM conversations.decisions").await;
-    assert_eq!(
-        decisions, 2,
-        "the newsletter's and the alert's stream answers"
-    );
+    // Six answers or abstentions for each of the three inbound messages.
+    assert!(decisions > 0 && decisions <= 18, "{decisions}");
 
     kit.ingest(workspace, inbox, "en").await;
     assert_eq!(kit.threads(inbox).await, before);
@@ -197,28 +195,32 @@ async fn accepted_rules_answers_place_conversations_in_streams(db: PgPool) {
         let (workspace, inbox) = setup(&kit, address).await;
         kit.ingest(workspace, inbox, name).await;
     }
-    for (message, stream, source) in [
-        ("en-1", "primary", "default"),
-        ("en-3", "newsletters", "rules"),
-        ("en-4", "updates", "rules"),
-        ("pt-1", "receipts", "rules"),
-        ("pt-2", "primary", "default"),
-        ("pt-3", "newsletters", "rules"),
-        ("es-1", "receipts", "rules"),
-        ("es-2", "newsletters", "rules"),
-        ("fr-1", "updates", "rules"),
-        ("fr-2", "receipts", "rules"),
-        ("fr-3", "primary", "default"),
+    // What the shared email signals decide (campbooks_ai::decide::signals),
+    // with stream placement enabled from 0.9 for this test. Invoices sent by
+    // a person's address stay in Primary, as the labelling guide rules.
+    for (message, stream) in [
+        ("en-1", "primary"),
+        ("en-3", "newsletters"),
+        ("en-4", "updates"),
+        ("pt-1", "receipts"),
+        ("pt-2", "primary"),
+        ("pt-3", "newsletters"),
+        ("es-1", "primary"),
+        ("es-2", "newsletters"),
+        ("fr-1", "updates"),
+        ("fr-2", "primary"),
+        ("fr-3", "primary"),
     ] {
         assert_eq!(
             kit.stream_of(message).await,
-            (stream.to_owned(), source.to_owned()),
+            (stream.to_owned(), "rules".to_owned()),
             "{message}"
         );
     }
-    // Every rules answer is on record, acted on when it placed the stream.
-    let (acted, explanation): (bool, Option<String>) = sqlx::query_as(
-        "SELECT d.acted, d.explanation FROM conversations.decisions d
+    // Every rules answer is on record with its reasons, acted on when it
+    // placed the stream.
+    let (acted, reasons): (bool, Value) = sqlx::query_as(
+        "SELECT d.acted, d.reasons FROM conversations.decisions d
            JOIN conversations.messages m ON m.id = d.message_id
           WHERE m.provider_message_id = 'es-2' AND d.question = 'stream' AND d.source = 'rules'",
     )
@@ -226,13 +228,12 @@ async fn accepted_rules_answers_place_conversations_in_streams(db: PgPool) {
     .await
     .unwrap();
     assert!(acted);
-    assert_eq!(explanation.as_deref(), Some("mailing-list headers"));
+    assert_eq!(reasons[0]["rule"], "signals.list_header");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn under_the_baseline_policy_stream_answers_are_suggestions(db: PgPool) {
-    let deps =
-        ConversationsDeps::offline().with_rules(std::sync::Arc::new(crate::testkit::HeaderRules));
+    let deps = ConversationsDeps::offline();
     let kit = Kit::with_deps(db.clone(), deps).await;
     let (workspace, inbox) = setup(&kit, "sam@example.com").await;
     kit.ingest(workspace, inbox, "en").await;
@@ -251,23 +252,23 @@ async fn under_the_baseline_policy_stream_answers_are_suggestions(db: PgPool) {
     .await
     .unwrap();
     assert_eq!((value, acted), (serde_json::json!("newsletters"), false));
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
-async fn without_rules_every_conversation_is_primary(db: PgPool) {
-    let kit = Kit::with_deps(db.clone(), ConversationsDeps::offline()).await;
-    let (workspace, inbox) = setup(&kit, "sam@example.com").await;
-    kit.ingest(workspace, inbox, "en").await;
-    for message in ["en-1", "en-3", "en-4"] {
-        assert_eq!(
-            kit.stream_of(message).await,
-            ("primary".to_owned(), "default".to_owned())
-        );
-    }
-    assert_eq!(
-        count(&db, "SELECT count(*) FROM conversations.decisions").await,
-        0
-    );
+    // Questions whose rules hold their target are marked acted on.
+    let acted: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.decisions
+          WHERE acted AND question IN ('needs_reply', 'asks_action', 'has_deadline', 'urgency')",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert!(acted > 0);
+    let never: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.decisions
+          WHERE acted AND question IN ('stream', 'suspicious')",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(never, 0);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

@@ -175,8 +175,9 @@ CREATE TABLE conversations.decisions (
     model text NOT NULL,
     model_version text,
     latency_ms integer NOT NULL DEFAULT 0,
-    -- Why, in words a member can read ("List-Unsubscribe header").
-    explanation text,
+    -- Why: `[{rule, evidence}]`, the stable rule ids the client translates
+    -- for "Why?" and what they matched.
+    reasons jsonb NOT NULL DEFAULT '[]',
     -- Whether the answer changed anything (the per-question switch allowed it).
     acted boolean NOT NULL,
     -- The version of the envelope the answer was given about.

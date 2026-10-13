@@ -1,14 +1,15 @@
 //! Storing the decide pass's answers.
 
-use campbooks_ai::decide::{AnswerValue, Question, QuestionKind};
+use campbooks_ai::decide::{
+    AnswerValue, Question, QuestionKind, signals::email::triage, strategy::Decided,
+};
 use campbooks_kernel::tenancy::WorkspaceId;
 use serde_json::{Value, json};
 use sqlx::PgConnection;
 
 use super::{
-    decide::{STATE_VERSION, Source, Verdict},
+    decide::{STATE_VERSION, Source},
     policy::Policy,
-    questions,
 };
 use crate::model::{ConversationId, DecisionId, MessageId};
 
@@ -25,22 +26,22 @@ pub struct Recorded<'a> {
     pub strategy: &'a str,
     /// The questions asked.
     pub questions: &'a [Question],
-    /// One verdict (or abstention) per question.
-    pub verdicts: &'a [Option<Verdict>],
+    /// One answer (or abstention) per question, with its reasons.
+    pub answers: &'a [Option<Decided>],
     /// Which answers may act.
     pub policy: &'a Policy,
 }
 
 impl Recorded<'_> {
-    /// The verdict for `question` that its switch lets act, if any.
-    pub fn accepted(&self, question: &str) -> Option<&Verdict> {
+    /// The answer to `question` that the policy lets act, if any.
+    pub fn accepted(&self, question: &str) -> Option<&Decided> {
         let switch = self.policy.switch(question, self.source);
         self.questions
             .iter()
-            .zip(self.verdicts)
+            .zip(self.answers)
             .find(|(q, _)| q.id == question)
             .and_then(|(_, verdict)| verdict.as_ref())
-            .filter(|verdict| switch.accepts(&verdict.answer))
+            .filter(|decided| switch.accepts(&decided.answer))
     }
 
     /// Store every non-abstaining verdict. An answer is marked `acted` when
@@ -54,21 +55,26 @@ impl Recorded<'_> {
         workspace: WorkspaceId,
         placed_stream: bool,
     ) -> Result<(), sqlx::Error> {
-        for (question, verdict) in self.questions.iter().zip(self.verdicts) {
-            let Some(verdict) = verdict else { continue };
-            let acted = if question.id == questions::STREAM {
+        for (question, decided) in self.questions.iter().zip(self.answers) {
+            let Some(decided) = decided else { continue };
+            let acted = if question.id == triage::STREAM {
                 placed_stream
             } else {
                 self.accepted(&question.id).is_some()
             };
-            let answer = &verdict.answer;
+            let answer = &decided.answer;
+            let reasons: Vec<_> = decided
+                .reasons
+                .iter()
+                .map(|r| json!({"rule": r.rule, "evidence": r.evidence}))
+                .collect();
             let latency_ms = i32::try_from(answer.latency.as_millis()).unwrap_or(i32::MAX);
             sqlx::query!(
                 r#"
                 INSERT INTO conversations.decisions
                     (id, workspace_id, message_id, conversation_id, question, source, strategy,
                      value, options, probabilities, confidence, model, model_version,
-                     latency_ms, explanation, acted, state_version)
+                     latency_ms, reasons, acted, state_version)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
                 ON CONFLICT (message_id, question, source) DO NOTHING
                 "#,
@@ -86,7 +92,7 @@ impl Recorded<'_> {
                 answer.model,
                 answer.model_version,
                 latency_ms,
-                verdict.explanation,
+                json!(reasons),
                 acted,
                 STATE_VERSION,
             )

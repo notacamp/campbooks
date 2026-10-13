@@ -9,9 +9,12 @@ use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
+use tracing::Instrument as _;
+
 use crate::{
     AiConfig, Error, Protocol, ProviderConfig, Role,
     decide::{self, Answers, DecisionContext, DecisionState, Question},
+    telemetry::{Call, Instruments},
 };
 
 /// Default TCP connect timeout.
@@ -295,6 +298,7 @@ pub struct Gateway {
     config: AiConfig,
     http: Client,
     retry: RetryPolicy,
+    instruments: Instruments,
 }
 
 impl Gateway {
@@ -318,6 +322,7 @@ impl Gateway {
             config,
             http,
             retry: RetryPolicy::default(),
+            instruments: Instruments::new(),
         })
     }
 
@@ -336,6 +341,21 @@ impl Gateway {
     /// Run a chat completion with the provider configured for `role`.
     pub async fn chat(&self, role: Role, request: ChatRequest) -> Result<ChatResponse, Error> {
         let provider = self.config.provider(role)?;
+        let call = Call::start(&self.instruments, "chat", role, provider);
+        let result = self
+            .chat_with(role, provider, request)
+            .instrument(call.span())
+            .await;
+        call.finish(&result, |r| (Some(r.model.as_str()), r.usage));
+        result
+    }
+
+    async fn chat_with(
+        &self,
+        role: Role,
+        provider: &ProviderConfig,
+        request: ChatRequest,
+    ) -> Result<ChatResponse, Error> {
         let body = WireChatRequest {
             model: &provider.model,
             messages: &request.messages,
@@ -366,6 +386,20 @@ impl Gateway {
             return Ok(Vec::new());
         }
         let provider = self.config.provider(Role::Embed)?;
+        let call = Call::start(&self.instruments, "embeddings", Role::Embed, provider);
+        let result = self
+            .embed_with(provider, inputs)
+            .instrument(call.span())
+            .await;
+        call.finish(&result, |_| (None, None));
+        result
+    }
+
+    async fn embed_with(
+        &self,
+        provider: &ProviderConfig,
+        inputs: &[String],
+    ) -> Result<Vec<Vec<f32>>, Error> {
         let body = WireEmbedRequest {
             model: &provider.model,
             input: inputs,
@@ -402,6 +436,22 @@ impl Gateway {
         if questions.is_empty() {
             return Ok(Answers::default());
         }
+        let call = Call::start(&self.instruments, "decide", Role::Decide, provider);
+        let result = self
+            .decide_with(ctx, provider, state, questions)
+            .instrument(call.span())
+            .await;
+        call.finish(&result, |_| (None, None));
+        result
+    }
+
+    async fn decide_with(
+        &self,
+        ctx: &DecisionContext<'_>,
+        provider: &ProviderConfig,
+        state: &DecisionState,
+        questions: &[Question],
+    ) -> Result<Answers, Error> {
         tracing::debug!(
             purpose = ctx.purpose,
             protocol = provider.protocol.as_str(),
@@ -505,9 +555,12 @@ impl Gateway {
         }
     }
 
+    /// A POST to `provider`, carrying the current trace on (`traceparent`).
     fn post(&self, provider: &ProviderConfig, path: &str) -> Result<RequestBuilder, Error> {
         let url = endpoint(&provider.base_url, path)?;
-        let mut request = self.http.post(url);
+        let mut trace = reqwest::header::HeaderMap::new();
+        campbooks_kernel::telemetry::inject(&mut trace);
+        let mut request = self.http.post(url).headers(trace);
         if let Some(key) = &provider.api_key {
             request = request.bearer_auth(key.expose_secret());
         }

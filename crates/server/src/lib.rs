@@ -10,6 +10,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bff;
+pub mod telemetry;
 pub mod web;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
@@ -17,7 +18,8 @@ use std::{fmt::Write as _, sync::Arc, time::Duration};
 use axum::{
     Json, Router,
     extract::Request as AxumRequest,
-    http::{HeaderName, HeaderValue, Request, StatusCode, header},
+    http::{HeaderName, HeaderValue, StatusCode, header},
+    middleware,
     routing::get,
 };
 use campbooks_kernel::{
@@ -31,10 +33,9 @@ use campbooks_kernel::{
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
-    request_id::{MakeRequestUuid, PropagateRequestIdLayer, RequestId, SetRequestIdLayer},
+    request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer},
     set_header::SetResponseHeaderLayer,
     timeout::TimeoutLayer,
-    trace::{DefaultOnResponse, TraceLayer},
 };
 use utoipa::{
     OpenApi as _,
@@ -218,8 +219,9 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// localization layers), `/openapi.json`, the web BFF (`/bff/*`; `bff` is
 /// `None` when web sign-in is off), the web client (when `CAMPBOOKS_WEB_DIR`
 /// is set) or else a problem+json 404 fallback, and the middleware stack
-/// (security headers, request id, tracing, timeout, compression, and
-/// problem+json rendered in the request's locale).
+/// (security headers, request id, tracing and metrics
+/// ([`telemetry::observe`]), timeout, compression, and problem+json rendered
+/// in the request's locale).
 ///
 /// The same module routes are installed in the state's
 /// [`Operations`](operations::Operations), so automation and the assistant
@@ -260,6 +262,7 @@ fn compose(
     // Innermost of the stack below, so fallback 404s (and the BFF's own
     // problems) are localized before compression wraps the body.
     let localize = axum::middleware::from_fn_with_state(state.clone(), i18n::localize);
+    let metrics = state.metrics.clone();
 
     let routes = routes
         .route(
@@ -283,34 +286,13 @@ fn compose(
             SetResponseHeaderLayer::overriding(name, value)
         }
     });
-
     routes.layer(
         ServiceBuilder::new()
             .layer(nosniff)
             .layer(referrer)
             .layer(frame)
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
-            .layer(
-                TraceLayer::new_for_http()
-                    .make_span_with(|request: &Request<_>| {
-                        let id = request
-                            .extensions()
-                            .get::<RequestId>()
-                            .and_then(|id| id.header_value().to_str().ok())
-                            .unwrap_or_default();
-                        // The path only: query strings can carry secrets
-                        // (the authorization code on `/bff/callback`) and
-                        // user content (search terms).
-                        tracing::info_span!(
-                            "http",
-                            method = %request.method(),
-                            path = %request.uri().path(),
-                            request_id = %id,
-                        )
-                    })
-                    // One INFO line per request (status + latency).
-                    .on_response(DefaultOnResponse::new().level(tracing::Level::INFO)),
-            )
+            .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
             .layer(TimeoutLayer::with_status_code(
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -323,7 +305,7 @@ fn compose(
 
 #[cfg(test)]
 mod tests {
-    use axum::body::Body;
+    use axum::{body::Body, http::Request};
     use campbooks_kernel::testing;
     use tower::ServiceExt;
 

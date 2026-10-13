@@ -1,12 +1,19 @@
 //! `conversations.decide_message` — the model pass over each new inbound
-//! message: the six questions in one `decide` call, every answer stored in
-//! `decisions` as a suggestion (the per-question switch lets no model answer
-//! act yet; campbooks-cloud#59).
+//! message: the triage questions in one `decide` call
+//! (`campbooks_ai::decide::strategy::Model`), every answer stored in
+//! `decisions` with the policy applied (no model answer acts under the
+//! baseline policy; campbooks-cloud#59).
 //!
 //! Skipped when the `decide` role is not configured, for messages sent
 //! before the backfill window (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`),
 //! and for messages already answered (a replayed delivery).
 
+use std::sync::Arc;
+
+use campbooks_ai::decide::{
+    signals::email::{Envelope, triage_questions},
+    strategy::Strategy,
+};
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, blobs::BlobRef, db::BeginFor as _,
     tenancy::WorkspaceId,
@@ -16,20 +23,19 @@ use chrono::{TimeDelta, Utc};
 use crate::{
     domain::{
         blobs::read_text,
-        decide::{BODY_CHARS, Envelope, ModelStrategy, Source, Strategy as _},
+        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
         policy::Policy,
-        questions,
     },
     events::MessageReceived,
-    ingest::{Headers, ProviderCategory},
+    ingest::Headers,
     model::{Address, ConversationId, MessageId},
 };
 
 /// The model pass, composed with the module's model strategy (none when the
-/// `decide` role is not configured) and backfill window.
+/// `decide` role is not configured), backfill window and policy.
 pub struct DecideMessage {
-    model: Option<ModelStrategy>,
+    model: Option<Arc<dyn Strategy>>,
     backfill: TimeDelta,
     policy: Policy,
 }
@@ -37,7 +43,7 @@ pub struct DecideMessage {
 impl DecideMessage {
     /// A pass asking `model`, for messages sent within `backfill_days`,
     /// marking the answers `policy` accepts.
-    pub fn new(model: Option<ModelStrategy>, backfill_days: u32, policy: Policy) -> Self {
+    pub fn new(model: Option<Arc<dyn Strategy>>, backfill_days: u32, policy: Policy) -> Self {
         Self {
             model,
             backfill: TimeDelta::days(i64::from(backfill_days)),
@@ -72,9 +78,9 @@ impl EventConsumer for DecideMessage {
             return Ok(());
         };
 
-        let questions = questions::all();
-        let verdicts = match model.decide(&envelope, &questions).await {
-            Ok(verdicts) => verdicts,
+        let questions = triage_questions();
+        let answers = match model.decide(&envelope, &questions).await {
+            Ok(decisions) => decisions.answers,
             Err(error) => return Err(job_error(&error)),
         };
         let recorded = Recorded {
@@ -83,7 +89,7 @@ impl EventConsumer for DecideMessage {
             source: Source::Model,
             strategy: model.name(),
             questions: &questions,
-            verdicts: &verdicts,
+            answers: &answers,
             policy: &self.policy,
         };
         let tx = ctx.tx().await?;
@@ -120,8 +126,8 @@ async fn load(
     let mut tx = state.db.begin_for(workspace).await?;
     let row = sqlx::query!(
         r#"
-        SELECT m.conversation_id AS "conversation: ConversationId", m.direction, i.address,
-               m.sender, m.recipients, m.subject, m.headers, m.categories, m.bodies,
+        SELECT m.conversation_id AS "conversation: ConversationId", m.direction,
+               m.sender, m.recipients, m.subject, m.headers, m.bodies,
                EXISTS (SELECT 1 FROM conversations.decisions d
                         WHERE d.message_id = m.id AND d.source = 'model') AS "answered!",
                ARRAY(SELECT a.filename FROM conversations.attachments a
@@ -129,7 +135,6 @@ async fn load(
                ARRAY(SELECT a.content_type FROM conversations.attachments a
                       WHERE a.message_id = m.id ORDER BY a.position) AS "content_types!"
           FROM conversations.messages m
-          JOIN conversations.inboxes i ON i.id = m.inbox_id
          WHERE m.id = $1
         "#,
         message as MessageId,
@@ -148,30 +153,29 @@ async fn load(
     let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
     let body = match &bodies.text {
         Some(text) => {
-            read_text(&state.blobs, &workspace.to_string(), text, BODY_CHARS * 4)
-                .await?
-                .0
+            read_text(
+                &state.blobs,
+                &workspace.to_string(),
+                text,
+                ENVELOPE_BODY_BYTES,
+            )
+            .await?
+            .0
         }
         None => String::new(),
     };
-    let categories = row
-        .categories
-        .iter()
-        .filter_map(|c| serde_json::from_value::<ProviderCategory>(serde_json::json!(c)).ok())
-        .collect();
-    let envelope = Envelope {
-        inbox: row.address,
-        from: Some(from),
-        reply_to: recipients.reply_to,
-        cc_count: recipients.cc.len(),
-        to: recipients.to,
-        subject: row.subject,
-        headers,
-        categories,
-        attachments: row.filenames.into_iter().zip(row.content_types).collect(),
-        body: body.chars().take(BODY_CHARS).collect(),
-        lang_hint: None,
-    };
+    let attachments: Vec<(String, String)> =
+        row.filenames.into_iter().zip(row.content_types).collect();
+    let envelope = envelope(MessageParts {
+        from: &from,
+        to: &recipients.to,
+        cc: &recipients.cc,
+        reply_to: &recipients.reply_to,
+        subject: &row.subject,
+        headers: &headers,
+        attachments: &attachments,
+        body: &body,
+    });
     Ok(Some((row.conversation, envelope)))
 }
 

@@ -175,6 +175,11 @@ impl LocalizableProblem {
         Self { status, reason }
     }
 
+    /// The stable code clients match on.
+    pub const fn code(&self) -> &'static str {
+        self.reason.code()
+    }
+
     /// The problem document in `locale`: `title` is the status (from the
     /// kernel catalogue, else the English reason phrase) and `detail` the
     /// reason.
@@ -218,6 +223,12 @@ impl IntoResponse for LocalizableProblem {
         response
     }
 }
+
+/// The stable `code` of a problem response, left in its extensions once it
+/// is localized, so telemetry can record it (`error.type`) without reading
+/// the translated text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ProblemCode(pub &'static str);
 
 /// RFC 9457 problem details.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

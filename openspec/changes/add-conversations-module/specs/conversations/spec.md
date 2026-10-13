@@ -102,12 +102,14 @@ never re-sort a conversation, and a member's move SHALL stick.
 
 #### Scenario: A policy that lets rules place the stream
 - **WHEN** the policy accepts rules stream answers from 0.8 and the rules answer `newsletters` at 0.95
-- **THEN** the conversation is in `newsletters` with stream source `rules`, and the answer is stored as acted on with its explanation
+- **THEN** the conversation is in `newsletters` with stream source `rules`, and the answer is stored as acted on with its reasons
 
 ### Requirement: The decide pass records suggestions
 Every answer of every strategy SHALL be stored in `decisions` with its
 question, source, value, options, probabilities, confidence, model, latency,
-explanation, whether it acted, and the envelope version. The model pass
+reasons, whether it acted, and the envelope version. The rules SHALL be the
+shared email signals and the questions the shared triage questions of
+`campbooks_ai::decide`; this module SHALL hold no rules of its own. The model pass
 (`conversations.decide_message`, role `decide`) SHALL ask the six questions
 (`stream`, `needs_reply`, `asks_action`, `has_deadline`, `urgency`,
 `suspicious`) in one call per inbound message, only when the `decide` role is

@@ -10,9 +10,9 @@
 //! reviewed code change citing a newer report (ADR 0009 note); it is not an
 //! operator setting.
 
-use campbooks_ai::decide::Answer;
+use campbooks_ai::decide::{Answer, signals::email::triage as questions};
 
-use super::{decide::Source, questions};
+use super::decide::Source;
 
 /// What an answer of one source may do for one question.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -146,6 +146,54 @@ mod tests {
         ] {
             assert_eq!(policy.switch(question, Source::Model), Switch::Record);
         }
+    }
+
+    /// The table is the eval baseline: for the `signals` run, a question's
+    /// rules act from its operating point exactly when the precision there
+    /// reaches the target on `test`, and only then; no model run is in the
+    /// baseline, so model answers never act.
+    #[test]
+    fn the_baseline_matches_the_committed_eval_report() {
+        let path = format!(
+            "{}/../../ai/evals/decide/mail-triage/reports/baseline.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let report: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        let signals = report["runs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|run| run["name"] == "signals")
+            .expect("the baseline has a `signals` run");
+        let policy = Policy::baseline();
+        let mut seen = 0;
+        for question in signals["questions"].as_array().unwrap() {
+            let id = question["id"].as_str().unwrap();
+            let target = question["target_precision"].as_f64().unwrap();
+            let threshold = question["threshold"].as_f64();
+            let precision = question["groups"]["all"]["at_threshold"]["precision"].as_f64();
+            let holds = matches!((threshold, precision), (Some(_), Some(p)) if p >= target);
+            let expected = match threshold {
+                Some(threshold) if holds => Switch::ActAbove(threshold),
+                _ => Switch::Record,
+            };
+            assert_eq!(policy.switch(id, Source::Rules), expected, "{id}");
+            assert_eq!(policy.switch(id, Source::Model), Switch::Record, "{id}");
+            seen += 1;
+        }
+        assert_eq!(
+            seen,
+            campbooks_ai::decide::signals::email::triage_questions().len()
+        );
+        assert!(
+            report["runs"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|run| run["offline"].as_bool().is_none_or(|offline| offline)),
+            "a model run is in the baseline: give model answers their operating points"
+        );
     }
 
     #[test]
