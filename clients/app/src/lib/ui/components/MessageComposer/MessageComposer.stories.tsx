@@ -156,7 +156,8 @@ export const WriteAndSend: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Show quoted text" }));
     await expect(canvas.getByRole("textbox", { name: "Quoted text" })).toBeVisible();
     await userEvent.click(box);
-    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    // ⌘↵ on Apple platforms, Ctrl+↵ elsewhere: exactly one of them sends.
+    await userEvent.keyboard("{Meta>}{Enter}{/Meta}{Control>}{Enter}{/Control}");
     await expect(args.onSend).toHaveBeenCalledOnce();
   },
 };
