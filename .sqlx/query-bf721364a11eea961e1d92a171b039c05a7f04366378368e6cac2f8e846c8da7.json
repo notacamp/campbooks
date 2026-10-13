@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*) AS \"applied!\",\n                  max(version) AS latest_version,\n                  (SELECT description FROM _sqlx_migrations\n                    WHERE success ORDER BY version DESC LIMIT 1) AS latest_description\n             FROM _sqlx_migrations WHERE success",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "applied!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "latest_version",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "latest_description",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "bf721364a11eea961e1d92a171b039c05a7f04366378368e6cac2f8e846c8da7"
+}

@@ -1,0 +1,24 @@
+[package]
+name = "campbooks-admin"
+description = "Campbooks admin module: instance administrators' profiles and the admin audit trail (ADR 0015). No routes: profiles change only through the server's CLI."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+campbooks-kernel.workspace = true
+chrono.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+campbooks-kernel = { workspace = true, features = ["test-util"] }
+tokio.workspace = true
+
+[lints]
+workspace = true

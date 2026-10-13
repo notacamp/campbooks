@@ -1,7 +1,8 @@
 //! `cargo xtask` — repository automation.
 //!
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
-//! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
+//! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`
+//!   and `openapi/admin.json`.
 //! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
 //! - `cargo xtask eval decide` measures `decide` strategies on a labelled eval set.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
@@ -43,9 +44,11 @@ enum Command {
     /// Check crate dependency directions, migration names and the schemas
     /// they touch, versions, scope and background-work names, that every
     /// OpenAPI operation declares its security and is a complete catalogue
-    /// entry (ADR 0013), and that every consumed event is published.
+    /// entry (ADR 0013), that every consumed event is published, and the
+    /// instance-administration rules of ADR 0015.
     Arch,
-    /// Write openapi/openapi.json from the server's routes.
+    /// Write openapi/openapi.json and openapi/admin.json from the server's
+    /// routes.
     Openapi {
         /// Fail if the committed document is stale instead of writing it.
         #[arg(long)]
@@ -259,9 +262,10 @@ fn run_arch(root: &Path) -> Result<String> {
         bearer: campbooks_server::SECURITY_SCHEME,
         session: campbooks_server::bff::SESSION_SCHEME,
     };
-    let operations = arch::check_operation_security(&spec, schemes, &catalogue);
-    violations.extend(operations);
-    violations.extend(arch::check_operations(&spec, &operation_owners()?));
+    violations.extend(arch::check_operation_security(&spec, schemes, &catalogue));
+    let owners = operation_owners()?;
+    violations.extend(arch::check_operations(&spec, &owners));
+    violations.extend(check_admin(root, &spec, &owners)?);
 
     if violations.is_empty() {
         let modules: Vec<_> = modules.iter().map(String::as_str).collect();
@@ -281,6 +285,103 @@ fn run_arch(root: &Path) -> Result<String> {
         violations.len(),
         list.join("\n")
     )
+}
+
+/// The rules of ADR 0015: the admin module serves nothing, the admin
+/// document's operations are well-formed and stay out of the catalogue, and
+/// only the admin module, the server's CLI and the kernel name what they own.
+fn check_admin(
+    root: &Path,
+    spec: &serde_json::Value,
+    owners: &arch::Owners,
+) -> Result<Vec<String>> {
+    let mut violations = Vec::new();
+    for module in campbooks_server::modules() {
+        if module.name == arch::ADMIN_MODULE {
+            let routes = module.router.into_openapi().paths.paths.len();
+            let admin_routes = module
+                .admin_router
+                .map(|router| router.into_openapi().paths.paths.len());
+            violations.extend(arch::check_admin_module(routes, admin_routes));
+        }
+    }
+    let admin_owners = admin_operation_owners()?;
+    violations.extend(arch::check_no_admin_owner(owners, &admin_owners, spec));
+    let admin_spec = serde_json::to_value(campbooks_server::admin_openapi())
+        .context("serializing the admin OpenAPI document")?;
+    let permissions: BTreeSet<String> = campbooks_kernel::admin::Permission::ALL
+        .iter()
+        .map(|p| p.as_str().to_owned())
+        .collect();
+    let catalogue_ids: BTreeSet<String> = spec["paths"]
+        .as_object()
+        .into_iter()
+        .flat_map(|paths| paths.values())
+        .filter_map(serde_json::Value::as_object)
+        .flat_map(|item| item.values())
+        .filter_map(|op| op.get("operationId").and_then(serde_json::Value::as_str))
+        .map(ToOwned::to_owned)
+        .collect();
+    violations.extend(arch::check_admin_operations(
+        &admin_spec,
+        &admin_owners,
+        &permissions,
+        &catalogue_ids,
+    ));
+    let mut sources = Vec::new();
+    rust_sources(root, &root.join("crates"), &mut sources)?;
+    violations.extend(arch::check_admin_sources(&sources));
+    Ok(violations)
+}
+
+/// `(METHOD, path)` → the module whose admin router declares the operation.
+fn admin_operation_owners() -> Result<arch::Owners> {
+    let mut owners = arch::Owners::new();
+    for module in campbooks_server::modules() {
+        let Some(router) = module.admin_router else {
+            continue;
+        };
+        let spec = serde_json::to_value(router.into_openapi())
+            .with_context(|| format!("serializing `{}`'s admin OpenAPI", module.name))?;
+        for (path, item) in spec["paths"].as_object().cloned().unwrap_or_default() {
+            for method in arch::OPERATION_METHODS {
+                if item.get(method).is_some() {
+                    owners.insert(
+                        (method.to_uppercase(), path.clone()),
+                        module.name.to_owned(),
+                    );
+                }
+            }
+        }
+    }
+    Ok(owners)
+}
+
+/// Every `.rs` file under `dir`, as (path relative to `root`, text).
+fn rust_sources(root: &Path, dir: &Path, out: &mut Vec<(String, String)>) -> Result<()> {
+    for entry in fs::read_dir(dir).with_context(|| format!("reading {}", dir.display()))? {
+        let path = entry?.path();
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if name.starts_with('.') || name == "target" || name == "node_modules" {
+            continue;
+        }
+        if path.is_dir() {
+            rust_sources(root, &path, out)?;
+        } else if path.extension().is_some_and(|ext| ext == "rs") {
+            let text =
+                fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+            let rel = path
+                .strip_prefix(root)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            out.push((rel, text));
+        }
+    }
+    Ok(())
 }
 
 /// `(METHOD, path)` → the module whose router declares the operation,

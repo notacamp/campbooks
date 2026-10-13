@@ -18,10 +18,12 @@ mod config;
 pub mod decide;
 mod error;
 mod gateway;
+mod health;
 mod telemetry;
 
 pub use config::{AiConfig, Protocol, ProviderConfig, Role};
 pub use error::Error;
+pub use health::{PROBE_CACHE, PROBE_TIMEOUT, RoleHealth, unconfigured};
 
 /// The gateway's messages (`i18n/<locale>.json`): the reasons of the errors
 /// it hands to modules.

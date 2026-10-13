@@ -55,5 +55,20 @@
     "invite": "Invitez les personnes avec qui vous travaillez",
     "inviteAction": "Inviter",
     "keyboard": "Clavier"
+  },
+  "admin": {
+    "title": "Administration",
+    "subtitle": "Cette instance de Campbooks",
+    "opening": "Ouverture de l’administration…",
+    "back": "Retour à Campbooks",
+    "sections": {
+      "system": "Système"
+    },
+    "menuEntry": "Administration",
+    "reauthTitle": "Reconnectez-vous pour continuer",
+    "reauthLead": "L’administration demande une connexion datant de moins de 12 heures, pour que personne ne puisse utiliser une ancienne session pour modifier cette instance. Vous reviendrez directement ici.",
+    "reauthAction": "Se reconnecter",
+    "unreachableTitle": "Impossible d’ouvrir l’administration",
+    "unreachableLead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez."
   }
 }
