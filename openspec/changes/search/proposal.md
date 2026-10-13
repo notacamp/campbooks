@@ -28,9 +28,9 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/40.
   `pg_trgm` for partial matches on names and addresses, and, in a later
   change, pgvector embeddings from the `embed` role fused with the lexical
   ranking. No search service, no index outside the database.
-- **Kernel.** A `kernel__search_extensions` migration installs `pg_trgm`,
-  `unaccent` and `vector` (platform extensions, shared by every module that
-  needs them). A new port, `SearchSource` (`kernel::search`), through which
+- **Kernel.** A `kernel__search_extensions` migration installs `pg_trgm`
+  and `unaccent` (platform extensions, shared by every module that needs
+  them; `vector` comes with the semantic layer). A new port, `SearchSource` (`kernel::search`), through which
   a module hands search the current searchable form of its records, and a
   registry of sources on `AppState`. The change-feed `Visibility` port gains
   `visible_containers`, so a query can be limited to the containers a member
@@ -86,8 +86,8 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/40.
 - New ADR 0016. ADR 0011's "search is a projection of the event log" holds;
   0016 adds that the projection pulls current state through a port instead
   of carrying content in events.
-- Postgres needs the `pg_trgm`, `unaccent` and `vector` extensions. The
-  shipped image (`pgvector/pgvector:pg17`) has all three; a self-hoster on
+- Postgres needs the `pg_trgm` and `unaccent` extensions. The
+  shipped image (`pgvector/pgvector:pg17`) has both; a self-hoster on
   managed Postgres needs them allowed (they are on every major provider's
   list). The migration fails with a clear message otherwise.
 - Storage: search keeps its own copy of message text (capped at 32 KiB per

@@ -7,7 +7,7 @@
 
 ## 2. Kernel
 
-- [ ] 2.1 `<ts>_kernel__search_extensions.sql`: `pg_trgm`, `unaccent`, `vector` (`IF NOT EXISTS`), failing with a message naming the missing extension; `cargo xtask arch` still passes
+- [ ] 2.1 `<ts>_kernel__search_extensions.sql`: `pg_trgm`, `unaccent` (`IF NOT EXISTS`), failing with a message naming the missing extension; `cargo xtask arch` still passes
 - [ ] 2.2 `kernel::search`: `SearchSource` trait, `Group`, `Entry`, `Facets`, `Person`, `Page`, `SourceContext`; `AppState::with_search_sources` and lookup by group type (fail closed); unit tests with a fake source
 - [ ] 2.3 `Visibility::visible_containers` (default: none, fail closed); `NoContainers` and the change feed unchanged in behaviour
 - [ ] 2.4 Move the change feed's record-type → read-scope rules (`ReadRules`) to a shared kernel helper used by the feed and by search; feed tests unchanged

@@ -1,6 +1,6 @@
 # 0016 — Search runs inside Postgres, as a projection that pulls through source ports
 
-**Status:** Proposed · 2026-10-13
+**Status:** Accepted · 2026-10-13
 
 ## Context
 Members need one search over everything they may see (`docs/domain-map.md`
@@ -19,7 +19,7 @@ runs on one ARM host.
   layer on pgvector (`embed` role), fused with the lexical ranking and
   optional: without `embed`, search is lexical.
 - **Extensions are platform infrastructure**: a kernel migration installs
-  `pg_trgm`, `unaccent` and `vector`.
+  `pg_trgm` and `unaccent` (and `vector` with the semantic layer).
 - **Ownership: one `search` module owns the index.** It reacts to the
   sources' ordinary domain events (ids only) and pulls the current
   searchable form of a record through a kernel port, `SearchSource`, that
@@ -33,7 +33,7 @@ runs on one ARM host.
 
 ## Consequences
 - Nothing new to run or back up; isolation, purges and freshness come from
-  the database. Self-hosters on managed Postgres need the three extensions
+  the database. Self-hosters on managed Postgres need these extensions
   allowed.
 - Ranking is `ts_rank_cd`, weaker than BM25. Field weights, recency and the
   semantic layer compensate; the next step if that is not enough is BM25

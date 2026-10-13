@@ -224,7 +224,8 @@ occurred_at DESC, id DESC)` on `groups` for newest-first and filters;
 `(group_id)` on `entries`.
 
 Extensions are database-wide platform infrastructure, so a kernel migration
-installs them (`CREATE EXTENSION IF NOT EXISTS pg_trgm, unaccent, vector`);
+installs them (`CREATE EXTENSION IF NOT EXISTS` `pg_trgm` and `unaccent`;
+`vector` arrives with the semantic layer);
 the `search` migration creates its text search configurations.
 
 **Events.** Consumed: `conversations.message_received` v1,
@@ -441,7 +442,8 @@ One OpenSpec change per PR, each archiving itself:
 4. **`search-suggestions`**: `decide` filter suggestions and `from:`/`to:`
    autocomplete (`search.suggest`). Recording: 375 px and desktop.
 
-Slices 2–4 need tracking issues under #40 before they start.
+Tracked as #108 (`search-ui`), #109 (`search-semantic`, after the first
+release, with #20) and #110 (`search-suggestions`).
 
 ## AI use
 
@@ -477,11 +479,16 @@ members already know it.
   never re-read bodies (stamps), and bursts coalesce per group.
 - **ADR numbering.** 0015 is taken on another branch; this change uses 0016.
 
-## Open questions (for the owner)
+## Decisions at the gate (owner, 2026-10-13)
 
-1. Order: results page newest-first with a "Most relevant" toggle, and the
-   instant panel by relevance (recommended), or relevance everywhere?
-2. `decide` for queries only as suggested chips (recommended), not as the
-   parser the issue describes?
-3. Semantic search in M1 (needs an `embed` endpoint on the production host
-   and re-embedding all mail on CPU), or right after M1 (recommended)?
+1. **Order:** the results page sorts newest first with a "Most relevant"
+   toggle; the instant `/` panel sorts by relevance. `search.query`
+   defaults to `relevance`; the results page asks for `newest`.
+2. **`decide`** only suggests filter chips, never parses or applies filters
+   (#110).
+3. **Semantic search** comes after the first release, with AI setup (#20):
+   no `embed` endpoint now (#109). The `vector` extension is therefore not
+   installed by this change; `search-semantic` adds it.
+
+Follow-up changes: `search-ui` (#108), `search-semantic` (#109),
+`search-suggestions` (#110).
