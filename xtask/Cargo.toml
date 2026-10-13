@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-description = "Repository automation: architecture rules, OpenAPI generation and module/feature scaffolding. Run with `cargo xtask`."
+description = "Repository automation: architecture rules, OpenAPI generation, module/feature scaffolding and AI evals. Run with `cargo xtask`."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,15 +10,19 @@ publish.workspace = true
 
 [dependencies]
 anyhow.workspace = true
+campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
 campbooks-server.workspace = true
 chrono.workspace = true
 cargo_metadata.workspace = true
 clap.workspace = true
 regex.workspace = true
+secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 toml.workspace = true
+url.workspace = true
 
 [lints]
 workspace = true

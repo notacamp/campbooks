@@ -235,7 +235,10 @@ pub async fn connect_runtime(
     let _ = probe.close().await;
     let pool = PgPoolOptions::new()
         .max_connections(max_connections)
-        .acquire_timeout(acquire_timeout);
+        .acquire_timeout(acquire_timeout)
+        // One `sqlx::pool::acquire` event per acquire, for the server's
+        // pool-wait metric and span events; log filters keep it out of logs.
+        .acquire_time_level(log::LevelFilter::Debug);
     with_runtime_role(pool, role.filter(|_| privileged))
         .connect_with(options)
         .await

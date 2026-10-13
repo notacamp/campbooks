@@ -207,7 +207,7 @@ pub enum Enqueued {
 }
 
 /// Enqueue `job` inside `tx`: it exists for workers once `tx` commits, and
-/// never if it rolls back.
+/// never if it rolls back. The job's span will link to the current span.
 pub async fn enqueue<J: Job>(
     tx: &mut Transaction<'_, Postgres>,
     job: &J,
@@ -254,8 +254,8 @@ async fn insert(
         r#"
         INSERT INTO kernel.jobs
             (queue, kind, payload, workspace_id, unique_key, ordering_key, priority,
-             run_at, max_attempts)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9)
+             run_at, max_attempts, trace_context)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, coalesce($8, now()), $9, $10)
         ON CONFLICT (kind, unique_key)
             WHERE unique_key IS NOT NULL AND state IN ('pending', 'running')
             DO NOTHING
@@ -270,6 +270,7 @@ async fn insert(
         options.priority,
         options.run_at,
         attempts_to_db(job.max_attempts),
+        crate::telemetry::current_traceparent(),
     )
     .fetch_optional(&mut **tx)
     .await?;

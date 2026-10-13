@@ -15,10 +15,17 @@
 //! each option (when the provider can tell), a confidence and the model that
 //! answered. Callers act on an answer only above a per-question threshold
 //! ([`Answer::accept_if`]) and ask the user otherwise.
+//!
+//! [`strategy`] puts other ways of answering the same questions behind one
+//! interface: deterministic [`signals`], [`knn`] over the workspace's own
+//! corrections, the model, and cascades of them.
 
 mod calibration;
+pub mod knn;
 pub(crate) mod laya;
 pub(crate) mod openai;
+pub mod signals;
+pub mod strategy;
 
 use std::{collections::HashSet, fmt, time::Duration};
 
