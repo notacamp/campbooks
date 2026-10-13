@@ -41,12 +41,26 @@
     "failing": "Pas de synchronisation — nous continuons d’essayer"
   },
   "disconnect": {
-    "question": "Déconnecter {{address}} ? Campbooks arrête de la synchroniser et renonce à son accès chez {{provider}}. Les e-mails déjà dans Campbooks restent, et vous pourrez toujours vous connecter avec ce compte.",
+    "question": "Déconnecter {{address}} ? Campbooks arrête de la synchroniser et renonce à son accès chez {{provider}}.",
     "confirm": "Déconnecter",
     "cancel": "La garder",
     "done": "{{address}} est déconnectée",
-    "doneLead": "Ses e-mails restent ici. Reliez-la de nouveau quand vous voulez.",
-    "failed": "Impossible de déconnecter {{address}}. Réessayez."
+    "failed": "Impossible de déconnecter {{address}}. Réessayez.",
+    "choice": "Ce que deviennent ses e-mails dans Campbooks",
+    "delete": {
+      "title": "Supprimer ses e-mails de Campbooks",
+      "lead": "Ses messages, pièces jointes, résultats de recherche et brouillons quittent Campbooks, pour tout le monde ici."
+    },
+    "keep": {
+      "title": "Garder son historique, en lecture seule",
+      "lead": "Ce qui est déjà ici reste lisible et consultable dans la recherche. Rien de nouveau n’arrive, et rien ne repart vers {{provider}}."
+    },
+    "deleteOnly": "Ses e-mails quittent Campbooks : messages, pièces jointes, résultats de recherche et brouillons. Les garder est réservé à vos propres boîtes mail, ou à un propriétaire ou un administrateur.",
+    "atProvider": "Dans tous les cas, les e-mails restent chez {{provider}} : rien n’y est supprimé.",
+    "signInKept": "Vous pourrez toujours vous connecter à Campbooks avec ce compte.",
+    "signInNever": "Ce n’est pas l’un de vos moyens de connexion, donc rien ne change de ce côté.",
+    "doneDeleted": "Ses e-mails quittent Campbooks. Ils sont toujours chez {{provider}}.",
+    "doneKept": "Son historique reste ici, en lecture seule. Ses e-mails sont toujours chez {{provider}}."
   },
   "connect": {
     "title": "Relier une boîte mail",
@@ -54,7 +68,9 @@
     "provider": "Relier {{provider}}",
     "none": "Ce Campbooks n’a encore aucun fournisseur de messagerie configuré. La personne qui le gère peut ajouter Gmail ou Zoho Mail.",
     "loading": "Chargement des fournisseurs",
-    "loadError": "Les fournisseurs que vous pouvez relier n’ont pas pu être chargés. Rechargez la page pour réessayer."
+    "loadError": "Les fournisseurs que vous pouvez relier n’ont pas pu être chargés. Rechargez la page pour réessayer.",
+    "signIn": "Utiliser aussi ce compte pour se connecter",
+    "signInHint": "Laissez coché pour votre propre boîte mail. Décochez pour une boîte partagée, comme support@ : elle est reliée, mais personne ne se connecte à Campbooks avec."
   },
   "connected": {
     "title": "Votre boîte mail est reliée",

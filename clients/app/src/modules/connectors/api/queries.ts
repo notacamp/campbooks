@@ -21,17 +21,24 @@ export function useConnections(workspaceId: string) {
   });
 }
 
+/** What becomes of a disconnected mailbox's mail in Campbooks. */
+export type MailChoice = Schema<"MailChoice">;
+
 /**
  * `connectors.disconnect`: stops syncing for good and gives up the grant at
- * the provider. The connection leaves the cached list.
+ * the provider; its mail in Campbooks is deleted or kept read-only (`mail`).
+ * Only its grantor may. The connection leaves the cached list.
  */
 export function useDisconnect(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (connectionId: string) => {
+    mutationFn: async ({ connectionId, mail }: { connectionId: string; mail: MailChoice }) => {
       unwrapEmpty(
         await api.DELETE("/api/v1/w/{workspace_id}/connections/{connection_id}", {
-          params: { path: { workspace_id: workspaceId, connection_id: connectionId } },
+          params: {
+            path: { workspace_id: workspaceId, connection_id: connectionId },
+            query: { mail },
+          },
         }),
       );
       return connectionId;

@@ -369,6 +369,47 @@ async fn connecting_a_mailbox_links_it_and_hands_its_grant_over(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_mailbox_is_connected_without_becoming_a_way_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let workspace = uuid::Uuid::now_v7();
+    let connect = async |kit: &Kit| {
+        let started = kit
+            .start_link(
+                &access,
+                &json!({ "purpose": "connect", "provider": "google", "workspace_id": workspace,
+                         "sign_in": false, "return_to": "/w/ws" }),
+            )
+            .await;
+        assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+        let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+        kit.via(Provider::Google, &to_google.location()).await
+    };
+
+    // Unticked for the account you signed up with: it still is yours.
+    let back = connect(&kit).await;
+    assert_eq!(back.location(), "/w/ws?connected=connection-1");
+    assert_eq!(kit.intake.signs_in(), [true]);
+
+    // A shared mailbox: connected, never a way in, nothing announced.
+    kit.google.set_user(user("support"));
+    let back = connect(&kit).await;
+    assert_eq!(back.location(), "/w/ws?connected=connection-1");
+    assert_eq!(kit.intake.adopted()[1].2, "support@example.com");
+    assert_eq!(kit.intake.signs_in(), [true, false]);
+    let ways = kit.ways_in(&access).await;
+    assert_eq!(ways["items"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
+        )
+        .await,
+        0
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_mailbox_declined_at_the_provider_still_proves_the_way_in(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;

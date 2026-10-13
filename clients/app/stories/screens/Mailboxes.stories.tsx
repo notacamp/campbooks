@@ -7,7 +7,12 @@ import { expect, userEvent, within } from "storybook/test";
 import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
-import { CONNECTION, SOFIA_CONNECTION, ZOHO_CONNECTION } from "../../test/demo/identity";
+import {
+  CONNECTION,
+  SHARED_CONNECTION,
+  SOFIA_CONNECTION,
+  ZOHO_CONNECTION,
+} from "../../test/demo/identity";
 import { ANA, DUARTE, HOUSEHOLD, SESSION, SOFIA } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
@@ -57,7 +62,7 @@ function signedIn({
     routes["POST /bff/api/v1/identity/links"] = link;
   }
   if (disconnect !== undefined) {
-    for (const connection of [CONNECTION, ZOHO_CONNECTION, SOFIA_CONNECTION]) {
+    for (const connection of [CONNECTION, ZOHO_CONNECTION, SOFIA_CONNECTION, SHARED_CONNECTION]) {
       routes[`DELETE /bff/api/v1/w/${workspace.id}/connections/${connection.id}`] = disconnect;
     }
   }
@@ -127,7 +132,10 @@ export const ColleagueNeedsToSignIn: Story = {
   },
 };
 
-/** Disconnect, confirmed in place: the mail stays, and so does the way in. */
+/**
+ * Disconnect, confirmed in place: delete its mail (the default) or keep its
+ * history; the mail stays in Gmail, and so does the way in.
+ */
 export const ConfirmDisconnect: Story = {
   args: { path: PAGE, api: signedIn({ disconnect: { status: 204 } }) },
   play: async ({ canvasElement }) => {
@@ -135,7 +143,54 @@ export const ConfirmDisconnect: Story = {
     await userEvent.click(
       await canvas.findByRole("button", { name: "Disconnect ana@example.com" }),
     );
-    await expect(canvas.getByText(/signing in with this account keeps working/u)).toBeVisible();
+    await expect(
+      canvas.getByRole("radio", { name: "Delete its mail from Campbooks" }),
+    ).toBeChecked();
+    await expect(canvas.getByText(/You can still sign in to Campbooks/u)).toBeVisible();
+  },
+};
+
+/** Keep its history, read-only, chosen. */
+export const KeepHistory: Story = {
+  args: { path: PAGE, api: signedIn({ disconnect: { status: 204 } }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Disconnect ana@example.com" }),
+    );
+    await userEvent.click(canvas.getByRole("radio", { name: "Keep its history, read-only" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Disconnect" }));
+    await expect(await canvas.findByText(/Its history stays here, read-only/u)).toBeVisible();
+  },
+};
+
+/** A member's shared mailbox: its mail can only be deleted. */
+export const SharedMailboxMember: Story = {
+  args: {
+    path: `/w/${HOUSEHOLD.id}/settings/mailboxes`,
+    api: signedIn({
+      workspace: HOUSEHOLD,
+      connections: [SHARED_CONNECTION],
+      disconnect: { status: 204 },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Disconnect loja@example.com" }),
+    );
+    await expect(canvas.getByText(/Keeping it is for your own mailboxes/u)).toBeVisible();
+  },
+};
+
+/** Connecting a shared mailbox: "Also use this account to sign in" unticked. */
+export const ConnectShared: Story = {
+  args: { path: PAGE, api: signedIn({}) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const box = await canvas.findByRole("checkbox", { name: "Also use this account to sign in" });
+    await userEvent.click(box);
+    await expect(box).not.toBeChecked();
   },
 };
 

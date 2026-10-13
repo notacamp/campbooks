@@ -9,7 +9,8 @@
 //!    asked), for the connection's account when reconnecting.
 //! 3. [`finish`], at the callback, checks the browser is still signed in as
 //!    that account. A link or a connect links the provider identity (or finds
-//!    it already there) and refuses one that is another account's way in. A
+//!    it already there) and refuses one that is another account's way in; a
+//!    connect asked not to add a way in (a shared mailbox) links nothing. A
 //!    reconnect accepts only the connection's own provider account and never
 //!    links anything. For a connect or a reconnect, the grant then goes to the
 //!    connectors module through the grant-intake port.
@@ -90,6 +91,7 @@ pub(super) async fn start(
         nonce: campbooks_kernel::crypto::random_token(),
         code_verifier: campbooks_kernel::crypto::random_token(),
         consent_retry: false,
+        adds_way_in: ticket.adds_way_in,
     };
     redirect_to_provider(
         ctx,
@@ -151,7 +153,30 @@ pub(super) async fn finish(
             drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
             return Ok(back(&flow.return_to, "link_error", "account_mismatch"));
         }
-        return Ok(hand_over(ctx, upstream, flow, identity, tokens).await);
+        // A reconnect never changes whether the grantor signs in with it.
+        return Ok(hand_over(ctx, upstream, flow, identity, tokens, false).await);
+    }
+    if flow.purpose == Purpose::Connect && !flow.adds_way_in {
+        // A shared mailbox: connected, never made a way in. Still refused
+        // when it is another account's way in; marked as the person's own
+        // when it already is one of theirs.
+        let signs_in = match accounts::find(&ctx.state.db, &identity).await? {
+            Some(linked) if linked.account_id != account => {
+                drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+                tracing::info!(
+                    provider = provider.as_str(),
+                    "refused a mailbox that is another account's way in"
+                );
+                return Ok(back(
+                    &flow.return_to,
+                    "link_error",
+                    "way_in_belongs_to_another_account",
+                ));
+            }
+            Some(_) => true,
+            None => false,
+        };
+        return Ok(hand_over(ctx, upstream, flow, identity, tokens, signs_in).await);
     }
     let via = if flow.purpose == Purpose::Link {
         "link"
@@ -203,17 +228,19 @@ pub(super) async fn finish(
         drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
         return Ok(back(&flow.return_to, "linked", provider.as_str()));
     }
-    Ok(hand_over(ctx, upstream, flow, identity, tokens).await)
+    Ok(hand_over(ctx, upstream, flow, identity, tokens, true).await)
 }
 
 /// Hand the mailbox grant of a connect or reconnect to the connectors
-/// module; where the browser goes next.
+/// module (`signs_in`: the person signs in with this account); where the
+/// browser goes next.
 async fn hand_over(
     ctx: &Ctx,
     upstream: &Upstream,
     flow: Flow,
     identity: ProviderIdentity,
     tokens: Tokens,
+    signs_in: bool,
 ) -> Response {
     let provider = flow.provider;
     let (Some(account), Some(workspace)) = (flow.account_id, flow.workspace_id) else {
@@ -246,6 +273,7 @@ async fn hand_over(
         refresh_token: Some(SecretString::from(refresh.clone())),
         expires_in: tokens.expires_in,
         extending: flow.connection_id,
+        signs_in,
     };
     match ctx.state.grants.adopt(&ctx.state, grant).await {
         Ok(connection) => back(&flow.return_to, "connected", &connection),

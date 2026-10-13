@@ -342,13 +342,28 @@ impl Kit {
 
     /// A consent for `account_subject` coming back through the identity
     /// module's front door, handed to the grant-intake port for `caller`
-    /// in `workspace` (extending `extending`): the connection id.
+    /// in `workspace` (extending `extending`): the connection id. The
+    /// caller signs in with the account (their own mailbox).
     pub async fn adopt(
         &self,
         caller: &Caller,
         workspace: WorkspaceId,
         account_subject: &str,
         extending: Option<String>,
+    ) -> Result<String, Error> {
+        self.adopt_as(caller, workspace, account_subject, extending, true)
+            .await
+    }
+
+    /// [`Self::adopt`], saying whether the caller also signs in with the
+    /// account (`false`: a shared mailbox they only connected).
+    pub async fn adopt_as(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        account_subject: &str,
+        extending: Option<String>,
+        signs_in: bool,
     ) -> Result<String, Error> {
         let (access, refresh) = self.google.grant();
         grant_intake(self.deps.clone())
@@ -372,6 +387,7 @@ impl Kit {
                     refresh_token: Some(SecretString::from(refresh)),
                     expires_in: Some(3599),
                     extending,
+                    signs_in,
                 },
             )
             .await
@@ -407,6 +423,7 @@ impl Kit {
                     refresh_token: Some(SecretString::from(refresh)),
                     expires_in: Some(3600),
                     extending: None,
+                    signs_in: true,
                 },
             )
             .await

@@ -144,8 +144,22 @@ impl DomainEvent for ConnectionNeedsReauth {
     }
 }
 
+/// What becomes of a disconnected mailbox's mail in Campbooks. Its mail at
+/// the provider is never touched.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete it: messages, bodies, attachments, search index, decisions,
+    /// drafts and inbox memberships (the default).
+    #[default]
+    Delete,
+    /// Keep it as read-only history.
+    Keep,
+}
+
 /// A connection was disconnected: its grant is revoked and its streams are
-/// gone. What becomes of the inboxes it fed is their owner's call.
+/// gone. `mail` says what becomes of the inboxes it fed; their owner (the
+/// conversations module) carries it out.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConnectionRemoved {
     /// The workspace.
@@ -154,6 +168,10 @@ pub struct ConnectionRemoved {
     pub connection: ConnectionId,
     /// The inboxes its streams fed.
     pub inbox_ids: Vec<InboxId>,
+    /// Delete their mail or keep it read-only. Absent in events recorded
+    /// before the choice existed, which read as `delete`.
+    #[serde(default)]
+    pub mail: MailChoice,
 }
 
 impl DomainEvent for ConnectionRemoved {

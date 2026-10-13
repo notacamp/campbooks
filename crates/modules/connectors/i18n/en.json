@@ -12,6 +12,8 @@
     "account_connected_by_another_member": "Another member of this workspace already connected this account.",
     "needs_reauth": "This connection needs you to connect the account again before it can sync.",
     "unknown_data_centre": "Campbooks does not know the Zoho data centre of this account. Ask your administrator.",
-    "no_mailbox": "This account has no mailbox Campbooks can read."
+    "no_mailbox": "This account has no mailbox Campbooks can read.",
+    "not_your_connection": "Only the member who connected this mailbox can disconnect it.",
+    "keep_mail_not_allowed": "Keeping this mailbox’s mail is for its owner or a workspace owner or admin. Disconnect it and delete its mail instead."
   }
 }

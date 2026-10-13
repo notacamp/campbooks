@@ -84,6 +84,8 @@ pub struct FakeIntake {
     adopted: Mutex<Vec<Handed>>,
     /// The issuer of each grant handed over, in order.
     issuers: Mutex<Vec<String>>,
+    /// Whether the person signs in with each grant's account, in order.
+    signs_in: Mutex<Vec<bool>>,
     /// Whether the instance syncs Zoho mailboxes too.
     zoho_mail: std::sync::atomic::AtomicBool,
 }
@@ -96,6 +98,14 @@ pub const ZOHO_MAIL_SCOPES: [&str; 3] = [
 ];
 
 impl FakeIntake {
+    /// Whether the person signs in with each grant's account, in order.
+    pub fn signs_in(&self) -> Vec<bool> {
+        self.signs_in
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
     /// The issuer of each grant handed over, in order.
     pub fn issuers(&self) -> Vec<String> {
         self.issuers
@@ -135,6 +145,10 @@ impl GrantIntake for FakeIntake {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(grant.issuer.clone());
+        self.signs_in
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(grant.signs_in);
         self.adopted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

@@ -114,17 +114,3 @@ contract) and the connector calling `labels.create` (5 units), after which
 conversations links the two by name as it already does; (c) ask the member
 the first time. **Recommended:** (b), with a per-inbox switch defaulting to
 on, since members expect a label they add to show on their phone.
-
-## Mail of a disconnected mailbox: keep it or remove it?
-
-Disconnecting a mailbox (`connectors.disconnect`) revokes the grant and
-deletes the connection, its credentials, streams and message index, and
-publishes `connectors.connection_removed` with its inbox ids. Nothing
-consumes that event yet, so the inbox and its conversations stay in
-Campbooks, read-only in effect (no sync, no write-back, no send). Settings
-→ Mailboxes says exactly that: "The mail already in Campbooks stays".
-Options: keep it (as today; a member can still search and read it); keep
-it for a grace period, then purge; or purge at once. **Recommended:** keep
-it for now and add an explicit "Remove its mail too" choice to the
-disconnect confirmation when the conversations module learns to delete an
-inbox; never remove mail silently.

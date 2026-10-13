@@ -28,6 +28,7 @@
 
 use axum::Extension;
 use campbooks_kernel::{Background, Module, i18n::Catalogue};
+use utoipa::OpenApi as _;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod config;
@@ -67,11 +68,17 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The connectors module, composed with `deps`, ready for the server to
 /// mount.
+/// Schemas the routes name only in query parameters, which utoipa does not
+/// collect on its own.
+#[derive(utoipa::OpenApi)]
+#[openapi(components(schemas(events::MailChoice)))]
+struct QuerySchemas;
+
 pub fn module(deps: Deps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: OpenApiRouter::new()
+        router: OpenApiRouter::with_openapi(QuerySchemas::openapi())
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
             .routes(routes!(

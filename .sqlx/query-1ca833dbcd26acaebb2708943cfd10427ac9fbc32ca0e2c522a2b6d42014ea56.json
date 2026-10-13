@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: ConnectionId\", provider, address, address_verified, display_name,\n                  granted_by AS \"granted_by: UserId\", capabilities, health, health_reason,\n                  health_changed_at, created_at\n             FROM connectors.connections\n            WHERE $1::uuid IS NULL OR id = $1\n            ORDER BY created_at, id",
+  "query": "SELECT id AS \"id: ConnectionId\", provider, address, address_verified, display_name,\n                  granted_by AS \"granted_by: UserId\", capabilities, health, health_reason,\n                  health_changed_at, created_at, grantor_signs_in\n             FROM connectors.connections\n            WHERE $1::uuid IS NULL OR id = $1\n            ORDER BY created_at, id",
   "describe": {
     "columns": [
       {
@@ -123,6 +123,17 @@
             "name": "created_at"
           }
         }
+      },
+      {
+        "ordinal": 11,
+        "name": "grantor_signs_in",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "grantor_signs_in"
+          }
+        }
       }
     ],
     "parameters": {
@@ -141,8 +152,9 @@
       false,
       true,
       false,
+      false,
       false
     ]
   },
-  "hash": "4603c7ad0a78536529ceedecf0f1c999778004a109d300d3abe68ee7af587151"
+  "hash": "1ca833dbcd26acaebb2708943cfd10427ac9fbc32ca0e2c522a2b6d42014ea56"
 }

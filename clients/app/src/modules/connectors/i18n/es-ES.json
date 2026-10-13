@@ -41,12 +41,26 @@
     "failing": "No se está sincronizando — seguiremos intentándolo"
   },
   "disconnect": {
-    "question": "¿Desconectar {{address}}? Campbooks deja de sincronizarlo y renuncia a su acceso en {{provider}}. El correo que ya está en Campbooks se queda, y podrás seguir iniciando sesión con esta cuenta.",
+    "question": "¿Desconectar {{address}}? Campbooks deja de sincronizarlo y renuncia a su acceso en {{provider}}.",
     "confirm": "Desconectar",
     "cancel": "Conservarlo",
     "done": "{{address}} se ha desconectado",
-    "doneLead": "Su correo se queda aquí. Vuelve a conectarlo cuando quieras.",
-    "failed": "No se ha podido desconectar {{address}}. Vuelve a intentarlo."
+    "failed": "No se ha podido desconectar {{address}}. Vuelve a intentarlo.",
+    "choice": "Qué pasa con su correo en Campbooks",
+    "delete": {
+      "title": "Borrar su correo de Campbooks",
+      "lead": "Sus mensajes, adjuntos, resultados de búsqueda y borradores salen de Campbooks, para todos aquí."
+    },
+    "keep": {
+      "title": "Conservar su historial, solo lectura",
+      "lead": "Lo que ya está aquí sigue pudiéndose leer y buscar. No llega nada nuevo y no vuelve nada a {{provider}}."
+    },
+    "deleteOnly": "Su correo sale de Campbooks: mensajes, adjuntos, resultados de búsqueda y borradores. Conservarlo es cosa de tus propios buzones, o de un propietario o administrador.",
+    "atProvider": "En cualquier caso, el correo sigue en {{provider}}: allí no se borra nada.",
+    "signInKept": "Podrás seguir iniciando sesión en Campbooks con esta cuenta.",
+    "signInNever": "No es una de tus formas de iniciar sesión, así que ahí no cambia nada.",
+    "doneDeleted": "Su correo está saliendo de Campbooks. Sigue en {{provider}}.",
+    "doneKept": "Su historial se queda aquí, solo lectura. Su correo sigue en {{provider}}."
   },
   "connect": {
     "title": "Conectar un buzón",
@@ -54,7 +68,9 @@
     "provider": "Conectar {{provider}}",
     "none": "Este Campbooks todavía no tiene ningún proveedor de correo configurado. Quien lo gestiona puede añadir Gmail o Zoho Mail.",
     "loading": "Cargando los proveedores",
-    "loadError": "No se han podido cargar los proveedores que puedes conectar. Recarga la página para volver a intentarlo."
+    "loadError": "No se han podido cargar los proveedores que puedes conectar. Recarga la página para volver a intentarlo.",
+    "signIn": "Usar también esta cuenta para iniciar sesión",
+    "signInHint": "Déjalo marcado para tu propio buzón. Desmárcalo para uno compartido, como support@: queda conectado, pero nadie inicia sesión en Campbooks con él."
   },
   "connected": {
     "title": "Tu buzón está conectado",

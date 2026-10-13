@@ -20,7 +20,7 @@ function Door({ leave }: { leave: (url: string) => void }) {
       <button
         type="button"
         onClick={() => {
-          consent.start({ purpose: "connect", provider: "zoho" });
+          consent.start({ purpose: "connect", provider: "zoho", signIn: false });
         }}
       >
         connect
@@ -65,6 +65,7 @@ describe("useMailboxConsent", () => {
     expect(api.calls.find((call) => call.route === LINK)?.body).toEqual({
       purpose: "connect",
       provider: "zoho",
+      sign_in: false,
       workspace_id: DUARTE.id,
       return_to: HERE,
     });

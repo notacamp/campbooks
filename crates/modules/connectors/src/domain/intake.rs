@@ -113,6 +113,7 @@ impl GrantIntake for Intake {
                         .as_deref()
                         .map(|id| id.parse::<ConnectionId>().map_err(|_| Error::NotFound))
                         .transpose()?,
+                    signs_in: grant.signs_in,
                     provider_server,
                     mailboxes,
                 },
@@ -260,6 +261,7 @@ mod tests {
             refresh_token: Some(SecretString::from("fake-refresh")),
             expires_in: Some(3600),
             extending: None,
+            signs_in: true,
         }
     }
 

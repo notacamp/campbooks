@@ -49,6 +49,7 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from "./components/Button/Button";
+export { Checkbox, type CheckboxProps } from "./components/Checkbox/Checkbox";
 export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
 export {
   ChoiceCards,

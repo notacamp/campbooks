@@ -1462,6 +1462,11 @@ export interface components {
             display_name?: string | null;
             /** @description The member who granted it. */
             granted_by: components["schemas"]["UserId"];
+            /**
+             * @description Its grantor also signs in with this account: their own mailbox, not
+             *     a shared one. Decides who may keep its mail when disconnecting.
+             */
+            grantor_signs_in: boolean;
             /** @description How it is doing. */
             health: components["schemas"]["Health"];
             /**
@@ -1971,6 +1976,12 @@ export interface components {
              */
             logout_url?: string | null;
         };
+        /**
+         * @description What becomes of a disconnected mailbox's mail in Campbooks. Its mail at
+         *     the provider is never touched.
+         * @enum {string}
+         */
+        MailChoice: "delete" | "keep";
         /** @description The members, in the order they joined. */
         MemberList: {
             /** @description The members. */
@@ -2436,6 +2447,12 @@ export interface components {
              *     `connected=` or `link_error=` added.
              */
             return_to?: string | null;
+            /**
+             * @description For `connect`: also sign in with the account (default `true`).
+             *     `false` for a shared mailbox (support@): it is connected, never
+             *     added as a way in. Ignored by the other purposes.
+             */
+            sign_in?: boolean | null;
             workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
         /** @description A started consent. */
@@ -3780,7 +3797,15 @@ export interface operations {
     };
     "connectors.disconnect": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): its messages, attachments, search index,
+                 *     decisions and drafts leave Campbooks. `keep`: they stay, read-only;
+                 *     only for the grantor's own mailbox, or a grantor who is an owner or
+                 *     admin. The mail at the provider is never touched.
+                 */
+                mail?: components["schemas"]["MailChoice"];
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -3808,7 +3833,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), another member's connection (`not_your_connection`), or `mail=keep` where it is not allowed (`keep_mail_not_allowed`). */
             403: {
                 headers: {
                     [name: string]: unknown;

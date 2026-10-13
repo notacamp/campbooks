@@ -55,6 +55,10 @@ pub struct ProviderGrant {
     /// The connection this grant re-authorises (a reconnect): the same
     /// account must have consented.
     pub extending: Option<String>,
+    /// The person also signs in with this account: it is their own mailbox,
+    /// not a shared one they only connected. Never turns a connection's
+    /// mark off (a reconnect passes `false`).
+    pub signs_in: bool,
 }
 
 impl std::fmt::Debug for ProviderGrant {
@@ -66,6 +70,7 @@ impl std::fmt::Debug for ProviderGrant {
             .field("scopes", &self.scopes)
             .field("refresh_token", &self.refresh_token.is_some())
             .field("extending", &self.extending)
+            .field("signs_in", &self.signs_in)
             .finish_non_exhaustive()
     }
 }

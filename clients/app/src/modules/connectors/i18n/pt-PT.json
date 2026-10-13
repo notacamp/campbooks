@@ -41,12 +41,26 @@
     "failing": "Sem sincronizar — vamos continuar a tentar"
   },
   "disconnect": {
-    "question": "Desligar {{address}}? O Campbooks deixa de a sincronizar e abdica do acesso no {{provider}}. O correio que já está no Campbooks fica, e continua a poder iniciar sessão com esta conta.",
+    "question": "Desligar {{address}}? O Campbooks deixa de a sincronizar e abdica do acesso no {{provider}}.",
     "confirm": "Desligar",
     "cancel": "Manter",
     "done": "{{address}} foi desligada",
-    "doneLead": "O correio dela fica aqui. Volte a ligá-la quando quiser.",
-    "failed": "Não foi possível desligar {{address}}. Tente novamente."
+    "failed": "Não foi possível desligar {{address}}. Tente novamente.",
+    "choice": "O que acontece ao correio dela no Campbooks",
+    "delete": {
+      "title": "Apagar o correio dela do Campbooks",
+      "lead": "As mensagens, anexos, resultados de pesquisa e rascunhos saem do Campbooks, para todos aqui."
+    },
+    "keep": {
+      "title": "Manter o histórico, só de leitura",
+      "lead": "O que já está aqui continua legível e pesquisável. Nada de novo chega, e nada volta ao {{provider}}."
+    },
+    "deleteOnly": "O correio dela sai do Campbooks: mensagens, anexos, resultados de pesquisa e rascunhos. Mantê-lo é para as suas próprias caixas de correio, ou para um proprietário ou administrador.",
+    "atProvider": "Em qualquer caso, o correio fica no {{provider}}: nada é apagado lá.",
+    "signInKept": "Continua a poder iniciar sessão no Campbooks com esta conta.",
+    "signInNever": "Não é uma das suas formas de iniciar sessão, por isso nada muda aí.",
+    "doneDeleted": "O correio dela está a sair do Campbooks. Continua no {{provider}}.",
+    "doneKept": "O histórico fica aqui, só de leitura. O correio continua no {{provider}}."
   },
   "connect": {
     "title": "Ligar uma caixa de correio",
@@ -54,7 +68,9 @@
     "provider": "Ligar {{provider}}",
     "none": "Este Campbooks ainda não tem nenhum fornecedor de correio configurado. Quem o gere pode adicionar o Gmail ou o Zoho Mail.",
     "loading": "A carregar os fornecedores",
-    "loadError": "Não foi possível carregar os fornecedores que pode ligar. Recarregue a página para tentar novamente."
+    "loadError": "Não foi possível carregar os fornecedores que pode ligar. Recarregue a página para tentar novamente.",
+    "signIn": "Usar também esta conta para iniciar sessão",
+    "signInHint": "Deixe assinalado para a sua própria caixa de correio. Desassinale para uma partilhada, como support@: fica ligada, mas ninguém inicia sessão no Campbooks com ela."
   },
   "connected": {
     "title": "A sua caixa de correio está ligada",

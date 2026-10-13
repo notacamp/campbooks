@@ -28,6 +28,7 @@ export const CONNECTION: Schema<"ConnectionView"> = {
   health: "ok",
   health_changed_at: "2026-10-13T09:00:00Z",
   health_reason: null,
+  grantor_signs_in: true,
   streams: [],
   created_at: "2026-10-13T09:00:00Z",
 };
@@ -63,6 +64,15 @@ export const ZOHO_CONNECTION: Schema<"ConnectionView"> = {
   address: "ana.duarte@example.net",
   health: "needs_reauth",
   health_reason: "grant_revoked",
+};
+
+/** The shop's shared mailbox Ana connected without signing in with it. */
+export const SHARED_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c4",
+  address: "loja@example.com",
+  display_name: "Loja Duarte & Pessoa",
+  grantor_signs_in: false,
 };
 
 /** Sofia's Gmail mailbox, paused by Gmail for a few minutes. */

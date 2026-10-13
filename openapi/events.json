@@ -127,7 +127,7 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. What becomes of the inboxes it fed is their owner's call.",
+        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. `mail` says what becomes of the inboxes it fed; their owner (the\nconversations module) carries it out.",
         "required": [
           "workspace",
           "connection",
@@ -144,6 +144,10 @@
               "$ref": "#/components/schemas/InboxId"
             },
             "description": "The inboxes its streams fed."
+          },
+          "mail": {
+            "$ref": "#/components/schemas/MailChoice",
+            "description": "Delete their mail or keep it read-only. Absent in events recorded\nbefore the choice existed, which read as `delete`."
           },
           "workspace": {
             "type": "string",
@@ -977,6 +981,14 @@
         "type": "string",
         "format": "uuid",
         "description": "LabelId (UUIDv7)"
+      },
+      "MailChoice": {
+        "type": "string",
+        "description": "What becomes of a disconnected mailbox's mail in Campbooks. Its mail at\nthe provider is never touched.",
+        "enum": [
+          "delete",
+          "keep"
+        ]
       },
       "MessageFacts": {
         "type": "object",

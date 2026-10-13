@@ -175,7 +175,11 @@ belongs to (404 otherwise), a provider whose mailbox the instance can sync
 `reconnect` it SHALL need a connection the caller granted in that workspace
 (404 otherwise), and a recent sign-in unless that connection needs
 re-authorisation. Both SHALL ask for identity, mailbox and offline access with
-`prompt=consent`. A connect SHALL link the identity as for `link`. A
+`prompt=consent`. A connect SHALL link the identity as for `link`, unless it
+was started with `sign_in: false` (a shared mailbox): then it SHALL add no
+way in, still refuse an identity that is another account's way in, and hand
+the grant over marked as one the person does not sign in with (unless the
+identity already is one of their ways in). A
 reconnect SHALL accept only the connection's own provider account, refusing
 any other with `link_error=account_mismatch` before writing anything, and
 SHALL never add a way in. Then the grant SHALL go to the grant-intake port
@@ -186,6 +190,10 @@ return it with `connected=<connection id>`.
 #### Scenario: Connect a second Gmail
 - **WHEN** a signed-in member connects a second Google account in their workspace
 - **THEN** that Google account is a way in, and the grant-intake port receives its grant with a refresh token for that workspace
+
+#### Scenario: Connect a shared mailbox
+- **WHEN** a member connects `support@example.com` with `sign_in: false`
+- **THEN** the grant-intake port receives it with `signs_in` false, the member's ways in are unchanged, and no `identity.way_in_added` is published
 
 #### Scenario: Reconnect after a revoked grant
 - **WHEN** a member's connection needs re-authorisation and they reconnect it

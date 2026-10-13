@@ -197,6 +197,9 @@ pub struct ConnectionView {
     pub health_reason: Option<String>,
     /// Since when it has had this health.
     pub health_changed_at: DateTime<Utc>,
+    /// Its grantor also signs in with this account: their own mailbox, not
+    /// a shared one. Decides who may keep its mail when disconnecting.
+    pub grantor_signs_in: bool,
     /// Its change streams.
     pub streams: Vec<StreamView>,
     /// When it was connected.

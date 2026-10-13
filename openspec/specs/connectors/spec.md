@@ -42,10 +42,16 @@ restore `ok`.
 - **THEN** the stream's health is `throttled`, it is next due 120 seconds later, and other streams are unaffected
 
 ### Requirement: Disconnecting
-The grantor, or an owner or admin, SHALL be able to disconnect a
-connection: the grant SHALL be revoked at the provider, credentials, streams
-and indexes deleted, and `connectors.connection_removed` published with the
-inbox ids. When a member leaves a workspace, the connections they granted
+Only the member who granted a connection SHALL be able to disconnect it;
+an owner or admin who can see another member's connection SHALL get 403
+`not_your_connection`. The caller SHALL say what becomes of its mail in
+Campbooks with `mail`: `delete` (the default) or `keep` (read-only
+history). `keep` SHALL be allowed only when the grantor signs in with the
+account (`grantor_signs_in`) or is an owner or admin, and refused otherwise
+with 403 `keep_mail_not_allowed`. The grant SHALL be revoked at the
+provider, credentials, streams and indexes deleted, and
+`connectors.connection_removed` published with the inbox ids and the
+`mail` choice, for the inboxes' owner to carry out. When a member leaves a workspace, the connections they granted
 there SHALL be disconnected the same way. When a workspace is being
 deleted, every grant SHALL be revoked and every connection deleted the same
 way at once.
@@ -53,6 +59,14 @@ way at once.
 #### Scenario: Grantor disconnects
 - **WHEN** the grantor disconnects a Google connection
 - **THEN** Google's revoke endpoint is called, the connection is gone, and `connectors.connection_removed` lists its inbox id
+
+#### Scenario: An admin cannot disconnect a member's mailbox
+- **WHEN** an admin disconnects a connection a member granted
+- **THEN** the response is 403 `not_your_connection` and nothing is revoked
+
+#### Scenario: Keeping a shared mailbox's mail
+- **WHEN** a member disconnects a shared mailbox they connected without signing in with it, asking `mail=keep`
+- **THEN** the response is 403 `keep_mail_not_allowed`; with `mail=delete` the event carries `mail` = `delete`
 
 #### Scenario: Grantor leaves the workspace
 - **WHEN** `workspaces.member_left` arrives for a member who granted a connection
@@ -536,12 +550,17 @@ plain words: `ok` "Syncing", `needs_reauth` "Needs you to sign in again"
 minutes", `failing` "Not syncing — we'll keep trying". The page SHALL offer:
 
 - Connect for each of the server's `mailbox_providers`, through
-  `identity.start_link` with `connect` and this page as `return_to`;
+  `identity.start_link` with `connect` and this page as `return_to`, asking
+  "Also use this account to sign in" (ticked by default, untick it for a
+  shared mailbox), passed as `sign_in`;
 - Reconnect, on the person's own connections that need re-authorisation,
   through `identity.start_link` with `reconnect`;
-- Disconnect (`connectors.disconnect`) behind an inline confirmation saying
-  that syncing stops and access is given up at the provider, that the mail
-  already in Campbooks stays, and that signing in with that account keeps
+- Disconnect (`connectors.disconnect`), only on the person's own
+  connections, behind an inline confirmation saying that syncing stops and
+  access is given up at the provider, asking what becomes of its mail in
+  Campbooks ("Delete its mail from Campbooks", the default, or "Keep its
+  history, read-only" where `keep` is allowed), that the mail stays at the
+  provider either way, and whether signing in with that account keeps
   working;
 - "Sign in again" (a fresh sign-in, back to this page) when starting is
   refused with `step_up_required`.
@@ -570,9 +589,21 @@ empty and error states, fit 375px, and pass axe in light and dark.
 - **WHEN** starting a connect is refused with 403 `step_up_required`
 - **THEN** "Sign in again first" is shown, and its button signs in again with `max_age=600` and comes back to the page
 
-#### Scenario: Disconnect keeps the way in
-- **WHEN** the person disconnects a mailbox and confirms
-- **THEN** `connectors.disconnect` is called, the row is gone, and the person's ways in are unchanged
+#### Scenario: Disconnect deletes the mail by default and keeps the way in
+- **WHEN** the person disconnects their own mailbox and confirms without changing the choice
+- **THEN** `connectors.disconnect` is called with `mail=delete`, the row is gone, and the person's ways in are unchanged
+
+#### Scenario: Keep the history
+- **WHEN** the person chooses "Keep its history, read-only" and confirms
+- **THEN** `connectors.disconnect` is called with `mail=keep`
+
+#### Scenario: A colleague's mailbox
+- **WHEN** an owner sees a member's connection
+- **THEN** the row offers no Disconnect
+
+#### Scenario: A shared mailbox
+- **WHEN** a member opens the disconnect confirmation of a mailbox they connected without signing in with it
+- **THEN** only deleting its mail is offered, and the confirmation says it is not one of their ways to sign in
 
 #### Scenario: A colleague's mailbox needs re-authorisation
 - **WHEN** an owner sees a member's connection with health `needs_reauth`

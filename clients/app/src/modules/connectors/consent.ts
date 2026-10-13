@@ -5,9 +5,13 @@
  * server). `connectors` cannot import `identity`, which imports it.
  */
 
-/** What to start: connecting a new mailbox, or reconnecting one of yours. */
+/**
+ * What to start: connecting a new mailbox (`signIn`: also sign in with that
+ * account; `false` for a shared mailbox), or reconnecting one of yours.
+ */
 export type ConsentStart =
-  { purpose: "connect"; provider: string } | { purpose: "reconnect"; connection: string };
+  | { purpose: "connect"; provider: string; signIn: boolean }
+  | { purpose: "reconnect"; connection: string };
 
 /** Why starting was refused before anyone left the page. */
 export type ConsentRefusal = "step_up" | "unsupported" | "rate_limited" | "failed";

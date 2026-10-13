@@ -103,7 +103,7 @@ No schema change. Nothing is published or consumed that was not before.
 | Operation | Scope | Used for |
 |---|---|---|
 | `connectors.list_connections` | `connectors:read` | the list and health |
-| `connectors.disconnect` | `connectors:write` | Disconnect |
+| `connectors.disconnect` | `connectors:write` | Disconnect (`?mail=delete|keep`, grantor only) |
 | `identity.list_ways_in` | `identity:read` | `mailbox_providers` |
 | `identity.start_link` | `identity:write` | Connect (`connect`), Reconnect (`reconnect`) |
 | `workspaces.list_members` | `workspaces:read` | "Connected by" |
@@ -173,12 +173,64 @@ Inbox), and phones get the same three as chips under the header. Home's
 mailboxes are connected, and the held-mailbox offer offers "Connect a
 different mailbox".
 
+## Owner decisions from the security audit (campbooks-cloud#117)
+
+Three decisions arrived during this change and are built here.
+
+1. **Connect asks "Also use this account to sign in".** `identity.start_link`
+   gains `sign_in` (connect only; omitted means `true`, as before, so
+   `connectors.start_connection` and API callers are unchanged). With
+   `false`, the callback links nothing: an identity that is another
+   account's way in is still refused, one that already is the person's way
+   in counts as theirs, and an unknown one stays unlinked. The choice rides
+   on the link ticket and the upstream flow (`adds_way_in`, migration
+   `identity__connect_without_way_in`). The grant crosses to `connectors`
+   with a new `ProviderGrant.signs_in`, stored as
+   `connectors.connections.grantor_signs_in` (migration
+   `connectors__grantor_signs_in`; existing rows `true`: every earlier
+   connection came with a way in). A later grant only ever sets it (a
+   reconnect passes `false` and changes nothing). The box is ticked by
+   default: before the provider round trip nobody knows which account will
+   come back, so the page defaults to the common case (your own mailbox)
+   and says when to untick it.
+   - *Alternative considered:* a new purpose `connect_shared` instead of a
+     flag. Rejected: it multiplies purposes, check constraints and branches
+     for one boolean.
+2. **Only the grantor disconnects.** `connectors.disconnect` answers 403
+   `not_your_connection` to an owner or admin who can see another member's
+   connection (still 404 for one they cannot see). The page shows
+   Disconnect, and binds ⌫, only on the person's own rows. Member
+   departure and workspace deletion still disconnect on their own (no
+   caller).
+3. **Disconnect asks what happens to the mail.** `connectors.disconnect`
+   takes `?mail=delete|keep` (default `delete`) and publishes it on
+   `connectors.connection_removed` (`mail`, `#[serde(default)]`, so events
+   recorded before it read as `delete`; version unchanged because the field
+   is additive). `keep` is allowed only when the grantor signs in with the
+   account (their own mailbox) or is an owner or admin (403
+   `keep_mail_not_allowed` otherwise). The page offers both as radio cards,
+   delete preselected; it offers only delete when keep is not allowed. It
+   says the mail stays at the provider either way, and whether signing in
+   with that account keeps working. **The purge itself is the conversations
+   module's** and is being built in batch 1 of campbooks-cloud#117: it acts
+   on `connection_removed` with `mail = delete`. Until it lands, nothing
+   consumes the event and the mail stays in Campbooks whatever the choice.
+   The confirmation describes what each choice will do.
+   - *Alternative considered:* a separate `connectors.purge_mail` operation
+     after a disconnect. Rejected: two calls for one decision, and a window
+     where a disconnected mailbox's mail has no stated fate.
+
+Member departure and workspace deletion publish `mail = delete`.
+
 ## Risks
 
-- **Mail after Disconnect.** Nothing deletes a disconnected mailbox's
-  conversations today, so the confirmation says the mail stays. If the
-  conversations module later removes them on `connectors.connection_removed`,
-  this copy changes with it. Recorded in `openspec/decisions-needed.md`.
+- **Mail after Disconnect.** Until #117's purge consumes `mail = delete`,
+  a deleted mailbox's conversations stay. The contract (`mail` on the
+  operation and the event) is what the two pieces agree on.
+- **A way in that came only from a connect** stays after a disconnect
+  today, and the confirmation says so. #117 also decides it should be
+  removed with the connection; when identity does that, the confirmation's
+  sign-in sentence changes with it.
 - **Revoking at Google revokes the person's whole grant to the app**, which
   may include a sign-in's consent; signing in again simply asks again, so
   the way in still works, as the confirmation promises.

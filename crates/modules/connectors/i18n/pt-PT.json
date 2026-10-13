@@ -12,6 +12,8 @@
     "account_connected_by_another_member": "Outro membro deste espaço de trabalho já ligou esta conta.",
     "needs_reauth": "Esta ligação precisa que volte a ligar a conta antes de poder sincronizar.",
     "unknown_data_centre": "O Campbooks não reconhece o centro de dados Zoho desta conta. Fale com o administrador.",
-    "no_mailbox": "Esta conta não tem nenhuma caixa de correio que o Campbooks consiga ler."
+    "no_mailbox": "Esta conta não tem nenhuma caixa de correio que o Campbooks consiga ler.",
+    "not_your_connection": "Só o membro que ligou esta caixa de correio a pode desligar.",
+    "keep_mail_not_allowed": "Manter o correio desta caixa é para o seu dono ou para um proprietário ou administrador do espaço de trabalho. Desligue-a e apague o correio."
   }
 }

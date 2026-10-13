@@ -1607,6 +1607,15 @@
             "schema": {
               "$ref": "#/components/schemas/ConnectionId"
             }
+          },
+          {
+            "name": "mail",
+            "in": "query",
+            "description": "`delete` (the default): its messages, attachments, search index,\ndecisions and drafts leave Campbooks. `keep`: they stay, read-only;\nonly for the grantor's own mailbox, or a grantor who is an owner or\nadmin. The mail at the provider is never touched.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MailChoice"
+            }
           }
         ],
         "responses": {
@@ -1624,7 +1633,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "description": "Missing scope, a client token (`connection_needs_user`), another member's connection (`not_your_connection`), or `mail=keep` where it is not allowed (`keep_mail_not_allowed`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7578,6 +7587,7 @@
           "capabilities",
           "health",
           "health_changed_at",
+          "grantor_signs_in",
           "streams",
           "created_at"
         ],
@@ -7612,6 +7622,10 @@
           "granted_by": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member who granted it."
+          },
+          "grantor_signs_in": {
+            "type": "boolean",
+            "description": "Its grantor also signs in with this account: their own mailbox, not\na shared one. Decides who may keep its mail when disconnecting."
           },
           "health": {
             "$ref": "#/components/schemas/Health",
@@ -8769,6 +8783,14 @@
           }
         }
       },
+      "MailChoice": {
+        "type": "string",
+        "description": "What becomes of a disconnected mailbox's mail in Campbooks. Its mail at\nthe provider is never touched.",
+        "enum": [
+          "delete",
+          "keep"
+        ]
+      },
       "MemberList": {
         "type": "object",
         "description": "The members, in the order they joined.",
@@ -9799,6 +9821,13 @@
               "null"
             ],
             "description": "Same-origin path to come back to (default `/`), with `linked=`,\n`connected=` or `link_error=` added."
+          },
+          "sign_in": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "For `connect`: also sign in with the account (default `true`).\n`false` for a shared mailbox (support@): it is connected, never\nadded as a way in. Ignored by the other purposes."
           },
           "workspace_id": {
             "oneOf": [

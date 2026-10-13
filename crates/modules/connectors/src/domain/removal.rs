@@ -12,7 +12,10 @@ use super::{
     model::{ConnectionId, InboxId, Provider},
     schedule,
 };
-use crate::{deps::Deps, events::ConnectionRemoved};
+use crate::{
+    deps::Deps,
+    events::{ConnectionRemoved, MailChoice},
+};
 
 /// The blob owner type of a connection (its account document).
 pub const CONNECTION_OWNER: &str = "connectors.connection";
@@ -86,6 +89,7 @@ pub async fn delete(
     state: &AppState,
     workspace: WorkspaceId,
     id: ConnectionId,
+    mail: MailChoice,
 ) -> Result<bool> {
     let workspace_key = workspace.to_string();
     let inbox_ids = sqlx::query_scalar!(
@@ -143,6 +147,7 @@ pub async fn delete(
                 workspace: workspace_key,
                 connection: id,
                 inbox_ids,
+                mail,
             },
         )
         .await?;

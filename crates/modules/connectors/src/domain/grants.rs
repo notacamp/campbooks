@@ -50,6 +50,9 @@ pub struct ProviderGrant {
     pub tokens: TokenGrant,
     /// The connection this consent extends, when it was started as one.
     pub extending: Option<ConnectionId>,
+    /// The member also signs in with this account (their own mailbox).
+    /// Kept once set: a later grant without it never clears it.
+    pub signs_in: bool,
     /// The accounts server of a Zoho grant's data centre.
     pub provider_server: Option<String>,
     /// The mailboxes the grant reaches (one for Gmail; a Zoho login's mail
@@ -155,11 +158,12 @@ async fn save(
         r#"INSERT INTO connectors.connections
                (id, workspace_id, provider, account_subject, address, display_name, granted_by,
                 capabilities, scopes, health, health_reason, health_changed_at, created_at, updated_at,
-                address_verified, provider_server)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10, $11, $12)
+                address_verified, provider_server, grantor_signs_in)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10, $11, $12, $13)
            ON CONFLICT (id) DO UPDATE
               SET address = $5, display_name = $6, capabilities = $8, scopes = $9,
                   address_verified = $11, provider_server = $12,
+                  grantor_signs_in = connectors.connections.grantor_signs_in OR $13,
                   health = 'ok', health_reason = NULL,
                   health_changed_at = CASE WHEN connectors.connections.health = 'ok'
                                            THEN connectors.connections.health_changed_at ELSE $10 END,
@@ -176,6 +180,7 @@ async fn save(
         g.now,
         g.grant.address_verified,
         g.grant.provider_server,
+        g.grant.signs_in,
     )
     .execute(&mut **tx)
     .await?;

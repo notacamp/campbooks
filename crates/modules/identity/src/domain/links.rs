@@ -39,6 +39,8 @@ pub struct Ticket {
     pub login_hint: Option<String>,
     /// Same-origin path to come back to.
     pub return_to: String,
+    /// Whether a connect also adds the account as a way in.
+    pub adds_way_in: bool,
 }
 
 /// Store `ticket`; its value and when it expires.
@@ -52,8 +54,8 @@ pub async fn issue(
     sqlx::query(
         "INSERT INTO identity.link_tickets
              (ticket_hash, account_id, provider, purpose, target_workspace_id, connection_id,
-              expected_subject, login_hint, return_to, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+              expected_subject, login_hint, return_to, created_at, expires_at, adds_way_in)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
     )
     .bind(hash(&token))
     .bind(ticket.account_id)
@@ -66,6 +68,7 @@ pub async fn issue(
     .bind(&ticket.return_to)
     .bind(now)
     .bind(expires_at)
+    .bind(ticket.adds_way_in)
     .execute(db)
     .await?;
     Ok((token, expires_at))
@@ -85,12 +88,13 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
         login_hint: Option<String>,
         return_to: String,
         expires_at: DateTime<Utc>,
+        adds_way_in: bool,
     }
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.link_tickets WHERE ticket_hash = $1
          RETURNING account_id, provider, purpose, target_workspace_id AS workspace_id, connection_id,
                    expected_subject, login_hint,
-                   return_to, expires_at",
+                   return_to, expires_at, adds_way_in",
     )
     .bind(hash(token))
     .fetch_optional(db)
@@ -105,6 +109,7 @@ pub async fn take(db: &PgPool, token: &str, now: DateTime<Utc>) -> Result<Option
             expected_subject: row.expected_subject,
             login_hint: row.login_hint,
             return_to: row.return_to,
+            adds_way_in: row.adds_way_in,
         })
     }))
 }

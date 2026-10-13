@@ -39,6 +39,7 @@ export function useMailboxConsent(
         ? {
             purpose: "connect",
             provider: request.provider,
+            sign_in: request.signIn,
             workspace_id: workspaceId,
             return_to: returnTo,
           }

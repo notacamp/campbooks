@@ -100,6 +100,12 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
     await page.keyboard.press("Tab");
     await pause(700);
   }
+  await page.getByRole("checkbox", { name: "Also use this account to sign in" }).waitFor();
+  await caption(
+    page,
+    "“Also use this account to sign in”: ticked for your own; untick it for support@",
+    2600,
+  );
   await page.getByRole("button", { name: /Connect Zoho Mail/u }).click();
   await allowAll(page, "Zoho");
   await page.getByText(/^Zoho Mail .+ is connected$/u).waitFor();
@@ -136,7 +142,7 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
   await page.getByText("Needs you to sign in again").waitFor({ state: "detached" });
   await caption(page, "Reconnected: syncing again", 2000);
 
-  // Disconnect Zoho Mail: confirmed in place; the way in stays.
+  // Disconnect Zoho Mail, keeping its history: the way in stays.
   if (!phone) {
     await caption(page, "J and K choose a mailbox; ⌫ disconnects it", 1600);
   }
@@ -148,15 +154,17 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
     await pause(500);
     await page.keyboard.press("Backspace");
   }
-  await page.getByText(/signing in with this account keeps working/u).waitFor();
+  await page.getByText(/You can still sign in to Campbooks/u).waitFor();
   await caption(
     page,
-    "It says what happens: the mail stays, and so does signing in with Zoho",
-    2800,
+    "It asks what happens to the mail here (delete is the default); Zoho keeps it either way",
+    3000,
   );
+  await page.getByRole("radio", { name: "Keep its history, read-only" }).click();
+  await caption(page, "This time: keep its history, read-only", 1600);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await page.getByText(/is disconnected$/u).waitFor();
-  await caption(page, "Disconnected", 1400);
+  await caption(page, "Disconnected; its history stays, read-only", 1800);
 
   // Ways to sign in: Zoho is still one.
   await page.goto(`/w/${workspace}/settings/sign-in`);
@@ -164,13 +172,18 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
   await page.getByText("Zoho", { exact: true }).waitFor();
   await caption(page, "Ways to sign in: Zoho is still a way in", 2400);
 
-  // Disconnect Gmail too, then Home's "Connect your mail" leads back here.
+  // Disconnect Gmail too, deleting its mail (the default), then Home's
+  // "Connect your mail" leads back here.
   await openMailboxes(page, phone);
   await page
     .getByRole("button", { name: /^Disconnect/u })
     .first()
     .click();
+  await page.getByRole("radio", { name: "Delete its mail from Campbooks" }).waitFor();
+  await caption(page, "Gmail: delete its mail from Campbooks (the default)", 2200);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
+  await page.getByText(/Its mail is leaving Campbooks/u).waitFor();
+  await caption(page, "Its mail leaves Campbooks; it is still in Gmail", 2000);
   await page.getByText("No mailboxes yet").waitFor();
   await page.goto(`/w/${workspace}`);
   await page.getByRole("heading", { name: "Connect your mail" }).waitFor();

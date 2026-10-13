@@ -12,7 +12,7 @@ use campbooks_kernel::{
 use crate::{
     deps::Deps,
     domain::{model::ConnectionId, removal},
-    events::WorkspaceDeleting,
+    events::{MailChoice, WorkspaceDeleting},
     features::send_message::SEND_OWNER,
 };
 
@@ -56,7 +56,7 @@ impl EventConsumer for RevokeWorkspaceGrants {
         }
         let tx = ctx.tx().await?;
         for id in all {
-            removal::delete(tx, &state, workspace, id).await?;
+            removal::delete(tx, &state, workspace, id, MailChoice::Delete).await?;
         }
         // Sends still open will never go out.
         let sends = sqlx::query_scalar!(

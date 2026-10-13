@@ -23,9 +23,14 @@ This change adds **Settings → Mailboxes** and connects Home to it:
   with a success or an explained refusal; "Sign in again" when the last
   sign-in is too old;
 - **Reconnect** for a mailbox of yours that needs it (`reconnect`);
-- **Disconnect** behind an inline confirmation that says what happens: the
-  mail already in Campbooks stays, and signing in with that account keeps
-  working;
+- **Disconnect**, only for the person who connected the mailbox (an owner
+  decision from the security audit, campbooks-cloud#117), behind an inline
+  confirmation that asks what happens to its mail in Campbooks (delete by
+  default, or keep its history read-only where allowed), says the mail
+  stays at the provider either way, and says whether signing in with that
+  account keeps working;
+- Connect asks **"Also use this account to sign in"** (ticked by default;
+  untick it for a shared mailbox, which then never becomes a way in);
 - keyboard: ⇧C connect, J/K choose a mailbox, R reconnect it, ⌫ disconnect
   it (confirmed in place), all shown on the buttons;
 - Home's "Connect your mail" opens the page, and the mail section links to
@@ -35,8 +40,12 @@ This change adds **Settings → Mailboxes** and connects Home to it:
 
 **Modules touched**
 - **identity** (server): `identity.list_ways_in` also lists the providers a
-  mailbox can be connected from (`mailbox_providers`). No new operation, no
-  new scope, no migration.
+  mailbox can be connected from (`mailbox_providers`); `identity.start_link`
+  takes `sign_in` for a connect (migration `identity__connect_without_way_in`).
+- **kernel**: `ProviderGrant.signs_in`.
+- **connectors** (server): `ConnectionView.grantor_signs_in` (migration
+  `connectors__grantor_signs_in`); `connectors.disconnect` is grantor-only
+  and takes `mail=delete|keep`, published on `connectors.connection_removed`.
 - **clients/app**:
   - `connectors`: the Mailboxes page, the disconnect mutation, Home's
     mailboxes section linking to the page;
@@ -59,9 +68,11 @@ mailbox) through its `index.ts`; `identity` already imports `connectors`.
 - Calendar, files or bank capabilities: the page connects mail only.
 - Microsoft mailboxes: there is no Microsoft mail adapter yet; the page
   offers only what the server lists.
-- Deleting a disconnected mailbox's mail from Campbooks: today the
-  conversations stay after a disconnect; whether they should go is a
-  separate decision (see `openspec/decisions-needed.md`).
+- Carrying out the purge of a disconnected mailbox's mail: the conversations
+  module's, in batch 1 of campbooks-cloud#117; this change defines the
+  contract (`mail` on the operation and the event).
+- Removing a way in that came only from a connect when its connection goes
+  (campbooks-cloud#117).
 - Undo for Disconnect: the grant is revoked at the provider, so only a new
   consent brings it back.
 - Choosing which of a Zoho account's several mailboxes sync; per-stream

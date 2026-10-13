@@ -11,7 +11,7 @@ use campbooks_kernel::{
 use crate::{
     deps::Deps,
     domain::{model::ConnectionId, removal},
-    events::MemberLeft,
+    events::{MailChoice, MemberLeft},
 };
 
 /// Disconnects a departed member's connections.
@@ -52,7 +52,7 @@ impl EventConsumer for RevokeDepartedGrants {
         }
         let tx = ctx.tx().await?;
         for id in granted {
-            removal::delete(tx, &state, workspace, id).await?;
+            removal::delete(tx, &state, workspace, id, MailChoice::Delete).await?;
         }
         Ok(())
     }

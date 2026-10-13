@@ -41,12 +41,26 @@
     "failing": "Not syncing — we'll keep trying"
   },
   "disconnect": {
-    "question": "Disconnect {{address}}? Campbooks stops syncing it and gives up its access at {{provider}}. The mail already in Campbooks stays, and signing in with this account keeps working.",
+    "question": "Disconnect {{address}}? Campbooks stops syncing it and gives up its access at {{provider}}.",
     "confirm": "Disconnect",
     "cancel": "Keep it",
     "done": "{{address}} is disconnected",
-    "doneLead": "Its mail stays here. Connect it again whenever you like.",
-    "failed": "{{address}} couldn't be disconnected. Try again."
+    "failed": "{{address}} couldn't be disconnected. Try again.",
+    "choice": "What happens to its mail in Campbooks",
+    "delete": {
+      "title": "Delete its mail from Campbooks",
+      "lead": "Its messages, attachments, search results and drafts leave Campbooks, for everyone here."
+    },
+    "keep": {
+      "title": "Keep its history, read-only",
+      "lead": "What is already here stays readable and searchable. Nothing new arrives, and nothing goes back to {{provider}}."
+    },
+    "deleteOnly": "Its mail leaves Campbooks: messages, attachments, search results and drafts. Keeping it is for your own mailboxes, or for an owner or admin.",
+    "atProvider": "Either way, the mail stays in {{provider}}: nothing is deleted there.",
+    "signInKept": "You can still sign in to Campbooks with this account.",
+    "signInNever": "It isn’t one of your ways to sign in, so nothing changes there.",
+    "doneDeleted": "Its mail is leaving Campbooks. It is still in {{provider}}.",
+    "doneKept": "Its history stays here, read-only. Its mail is still in {{provider}}."
   },
   "connect": {
     "title": "Connect a mailbox",
@@ -54,7 +68,9 @@
     "provider": "Connect {{provider}}",
     "none": "This Campbooks has no mail provider set up yet. Whoever runs it can add Gmail or Zoho Mail.",
     "loading": "Loading the providers",
-    "loadError": "The providers you can connect didn't load. Reload the page to try again."
+    "loadError": "The providers you can connect didn't load. Reload the page to try again.",
+    "signIn": "Also use this account to sign in",
+    "signInHint": "Leave it ticked for your own mailbox. Untick it for a shared one, like support@: it is connected, but nobody signs in to Campbooks with it."
   },
   "connected": {
     "title": "Your mailbox is connected",

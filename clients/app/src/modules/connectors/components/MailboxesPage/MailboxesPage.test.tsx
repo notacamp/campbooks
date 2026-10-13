@@ -1,7 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { CONNECTION, SOFIA_CONNECTION, ZOHO_CONNECTION } from "../../../../../test/demo/identity";
+import {
+  CONNECTION,
+  SHARED_CONNECTION,
+  SOFIA_CONNECTION,
+  ZOHO_CONNECTION,
+} from "../../../../../test/demo/identity";
 import { ANA, DUARTE, HOUSEHOLD, SESSION, SOFIA } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 import type { MailboxConsent } from "../../consent";
@@ -24,12 +29,12 @@ function consent(overrides: Partial<MailboxConsent> = {}): MailboxConsent {
   };
 }
 
-function api(connections: unknown[], extra: Record<string, unknown> = {}) {
+function api(connections: unknown[], extra: Parameters<typeof mockApi>[0] = {}) {
   return mockApi({
     "GET /bff/session": { body: SESSION },
     [CONNECTIONS]: { body: { connections } },
     [MEMBERS]: { body: { members: [ANA, SOFIA] } },
-    ...(extra as Record<string, { status?: number; body?: unknown }>),
+    ...extra,
   });
 }
 
@@ -84,8 +89,23 @@ describe("MailboxesPage", () => {
     const door = renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: /Connect Zoho Mail/u }));
-    expect(door.start).toHaveBeenCalledWith({ purpose: "connect", provider: "zoho" });
+    expect(door.start).toHaveBeenCalledWith({ purpose: "connect", provider: "zoho", signIn: true });
     expect(screen.queryByRole("button", { name: /Connect Microsoft/u })).toBeNull();
+  });
+
+  it("connects a shared mailbox without making it a way in", async () => {
+    api([CONNECTION]);
+    const door = renderPage();
+
+    const box = await screen.findByRole("checkbox", { name: "Also use this account to sign in" });
+    expect(box).toBeChecked();
+    fireEvent.click(box);
+    fireEvent.click(screen.getByRole("button", { name: /Connect Gmail/u }));
+    expect(door.start).toHaveBeenCalledWith({
+      purpose: "connect",
+      provider: "google",
+      signIn: false,
+    });
   });
 
   it("says when no provider is set up", async () => {
@@ -109,22 +129,72 @@ describe("MailboxesPage", () => {
     });
   });
 
-  it("disconnects after an inline confirmation that keeps the way in", async () => {
+  it("disconnects after an inline confirmation, deleting its mail by default", async () => {
+    const asked: string[] = [];
     const calls = api([CONNECTION, ZOHO_CONNECTION], {
-      [DISCONNECT(ZOHO_CONNECTION.id)]: { status: 204 },
+      [DISCONNECT(ZOHO_CONNECTION.id)]: (request: Request) => {
+        asked.push(new URL(request.url).search);
+        return { status: 204 };
+      },
     });
     renderPage();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Disconnect ana.duarte@example.net" }),
     );
+    expect(screen.getByRole("radio", { name: "Delete its mail from Campbooks" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Keep its history, read-only" })).not.toBeChecked();
     expect(
-      screen.getByText(/The mail already in Campbooks stays, and signing in with this account/u),
+      screen.getByText(/the mail stays in Zoho Mail: nothing is deleted there/u),
     ).toBeVisible();
+    expect(screen.getByText(/You can still sign in to Campbooks with this account/u)).toBeVisible();
     expect(calls.calls.map((call) => call.route)).not.toContain(DISCONNECT(ZOHO_CONNECTION.id));
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
     expect(await screen.findByText("ana.duarte@example.net is disconnected")).toBeVisible();
+    expect(screen.getByText(/Its mail is leaving Campbooks/u)).toBeVisible();
+    expect(asked).toEqual(["?mail=delete"]);
     expect(await rows()).toHaveLength(1);
+  });
+
+  it("keeps the history read-only when chosen", async () => {
+    const asked: string[] = [];
+    api([CONNECTION], {
+      [DISCONNECT(CONNECTION.id)]: (request: Request) => {
+        asked.push(new URL(request.url).search);
+        return { status: 204 };
+      },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect ana@example.com" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Keep its history, read-only" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByText(/Its history stays here, read-only/u)).toBeVisible();
+    expect(asked).toEqual(["?mail=keep"]);
+  });
+
+  it("offers no Disconnect on a colleague's mailbox, even to an owner", async () => {
+    api([CONNECTION, SOFIA_CONNECTION]);
+    renderPage();
+
+    await screen.findByRole("button", { name: "Disconnect ana@example.com" });
+    expect(screen.queryByRole("button", { name: "Disconnect sofia@example.com" })).toBeNull();
+  });
+
+  it("only deletes the mail of a shared mailbox a member connected", async () => {
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      [`GET /bff/api/v1/w/${HOUSEHOLD.id}/connections`]: {
+        body: { connections: [SHARED_CONNECTION] },
+      },
+      [`GET /bff/api/v1/w/${HOUSEHOLD.id}/members`]: { body: { members: [ANA] } },
+    });
+    renderWithProviders(<MailboxesPage workspace={HOUSEHOLD} consent={consent()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect loja@example.com" }));
+    expect(screen.queryByRole("radio")).toBeNull();
+    expect(screen.getByText(/Keeping it is for your own mailboxes/u)).toBeVisible();
+    expect(screen.getByText(/isn’t one of your ways to sign in/u)).toBeVisible();
   });
 
   it("asks to disconnect the chosen mailbox with Backspace, after J", async () => {

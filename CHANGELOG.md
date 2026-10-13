@@ -18,13 +18,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   all of them for owners and admins), who connected it and whether it is
   syncing, waiting for someone to sign in again, paused by the provider or
   failing. Connect Gmail or Zoho Mail from there (only the providers your
-  instance has set up for mail), reconnect a mailbox of yours that stopped,
-  or disconnect one: the mail already in Campbooks stays, and signing in
-  with that account keeps working. Keys: ⇧C connect, J/K choose, R
-  reconnect, ⌫ disconnect. Home's "Connect your mail" now opens it, and
-  Settings lists its sections (Members, Mailboxes, Ways to sign in) in the
-  sidebar and, on phones, under the header. `identity.list_ways_in` also
-  returns `mailbox_providers`.
+  instance has set up for mail), choosing whether you also sign in with that
+  account (untick it for a shared mailbox like support@, which then never
+  becomes a way in); reconnect a mailbox of yours that stopped; or
+  disconnect one, choosing whether its mail in Campbooks is deleted (the
+  default) or kept as read-only history. The mail at Gmail or Zoho is never
+  touched. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
+  "Connect your mail" now opens it, and Settings lists its sections
+  (Members, Mailboxes, Ways to sign in) in the sidebar and, on phones,
+  under the header. API: `identity.list_ways_in` returns
+  `mailbox_providers`; `identity.start_link` takes `sign_in` for a connect
+  (default `true`); connections show `grantor_signs_in`.
+
 - Search over your mail (`GET /api/v1/w/{workspace_id}/search`, operation
   `search.query`, new scope `search:read`; screens follow). Words match in
   English, Portuguese, Spanish and French whatever language you type in, with
@@ -448,6 +453,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Only the member who connected a mailbox can disconnect it; owners and
+  admins get 403 `not_your_connection`. `connectors.disconnect` takes
+  `mail=delete|keep` (default `delete`; `keep` only for your own mailbox, or
+  for an owner or admin) and `connectors.connection_removed` carries the
+  choice. Two migrations add the columns these need; nothing to do.
 - The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
   new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes
