@@ -90,6 +90,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   compose network, and refuses to start until you set
   `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env` (`openssl rand -hex 32`).
   `.env.example` now points `decide` at it; see `deploy/README.md`.
+- Contributor tooling: `cargo xtask new-module <name>` scaffolds a module
+  (crate, scopes, events, a scoped read slice with tests, schema migration,
+  OpenSpec change, client module with its four locale files) and registers it
+  in the workspace, the server and the client shell; `cargo xtask new-feature
+  <module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
+  (also run in CI) proves their output passes the gates. Optional local git
+  hooks (`lefthook install`), Claude Code skills for starting a task,
+  developing a feature and adding a module, and a guide to working in
+  parallel worktrees (`docs/parallel-work.md`).
 
 ### Changed
 - The image's default command is now `all` instead of `serve` (same

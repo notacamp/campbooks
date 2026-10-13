@@ -70,6 +70,11 @@ jobs:
       - name: Unused dependencies
         if: always()
         run: cargo machete
+      - name: Generated module and feature pass the gates
+        if: always()
+        # `cargo xtask new-module` + `new-feature` in a temporary copy, then
+        # fmt, OpenAPI, arch, clippy, the generated tests and machete on it.
+        run: cargo xtask scaffold-check
 
   deny:
     runs-on: ubuntu-latest

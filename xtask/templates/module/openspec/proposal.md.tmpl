@@ -1,0 +1,37 @@
+# Proposal
+
+## Why
+
+TODO(new-module): why Campbooks needs the `{{name}}` module now: the user
+problem it solves and what stays impossible without it. Link its entry in
+`docs/domain-map.md`. Tracking issue: {{issue}}.
+
+## What Changes
+
+- New module `{{name}}`, scaffolded by `cargo xtask new-module {{name}}`: crate
+  `campbooks-{{kebab}}` (`crates/modules/{{name}}`), Postgres schema `{{name}}`
+  (`migrations/{{timestamp}}_{{name}}__init.sql`), client module
+  `clients/app/src/modules/{{kebab}}` with a placeholder page at `/{{kebab}}`.
+- New scopes `{{name}}:read` and `{{name}}:write`.
+- TODO(new-module): one bullet per behaviour this change adds.
+
+## Capabilities
+
+### New Capabilities
+
+- `{{name}}`: TODO(new-module): one line on what the capability covers.
+
+### Modified Capabilities
+
+None.
+
+## Impact
+
+- Adds a module: TODO(new-module): link the ADR or the `docs/domain-map.md`
+  entry that approves it. No cross-module dependency, so no
+  `architecture.toml` entry.
+- Self-hosters: TODO(new-module): new settings or services, or "nothing to do".
+
+## Non-goals
+
+- TODO(new-module): what this change deliberately leaves out.
