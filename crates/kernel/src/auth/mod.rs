@@ -24,6 +24,7 @@
 //! Tokens are never logged.
 
 mod jwks;
+mod oidc;
 mod scoped;
 mod verifier;
 
@@ -31,6 +32,7 @@ use std::{borrow::Borrow, collections::BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub use oidc::{BACKCHANNEL_LOGOUT_EVENT, IdToken, LogoutToken};
 pub use scoped::Scoped;
 pub(crate) use scoped::bearer_token;
 pub use verifier::TokenVerifier;

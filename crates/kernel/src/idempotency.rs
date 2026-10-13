@@ -36,8 +36,10 @@ use sqlx::PgPool;
 use std::sync::Arc;
 
 use crate::{
-    AppState, Problem,
+    AppState,
     auth::{AuthenticatedPrincipal, Principal, PrincipalKind, TokenVerifier, bearer_token},
+    error::LocalizableProblem,
+    i18n::MESSAGES,
     jobs::{Job, JobContext, JobError},
     operations::{Catalogue, OperationInfo},
 };
@@ -136,10 +138,7 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
 
     let (mut parts, body) = request.into_parts();
     let Ok(body) = to_bytes(body, MAX_REQUEST_BYTES).await else {
-        return problem(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "the request body is too large to be used with an Idempotency-Key",
-        );
+        return problem(StatusCode::PAYLOAD_TOO_LARGE, "idempotency_body_too_large");
     };
     parts
         .extensions
@@ -150,20 +149,14 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
     match claim(&idem.db, &owner, &key, &operation_id, &hash).await {
         Err(error) => {
             tracing::warn!(%error, "idempotency: cannot claim the key");
-            return problem(StatusCode::SERVICE_UNAVAILABLE, "database unavailable");
+            return problem(StatusCode::SERVICE_UNAVAILABLE, "database_unavailable");
         }
         Ok(Claim::Replay(stored)) => return stored.into_response(),
         Ok(Claim::Mismatch) => {
-            return problem(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                "this Idempotency-Key was already used for a different request",
-            );
+            return problem(StatusCode::UNPROCESSABLE_ENTITY, "idempotency_key_reused");
         }
         Ok(Claim::InFlight) => {
-            return problem(
-                StatusCode::CONFLICT,
-                "a request with this Idempotency-Key is still being processed",
-            );
+            return problem(StatusCode::CONFLICT, "idempotency_key_in_flight");
         }
         Ok(Claim::Acquired) => {}
     }
@@ -172,21 +165,22 @@ pub async fn middleware(State(idem): State<Idempotency>, request: Request, next:
     finish(&idem.db, &owner, &key, response).await
 }
 
-fn valid_key(value: &HeaderValue) -> Result<String, Problem> {
+fn valid_key(value: &HeaderValue) -> Result<String, LocalizableProblem> {
     let key = value.to_str().ok().map(str::trim).unwrap_or_default();
     if key.is_empty() || key.len() > MAX_KEY_LEN || !key.bytes().all(|b| b.is_ascii_graphic()) {
-        return Err(Problem::new(
+        return Err(LocalizableProblem::new(
             StatusCode::BAD_REQUEST,
-            Some(format!(
-                "Idempotency-Key must be 1 to {MAX_KEY_LEN} visible ASCII characters"
-            )),
+            MESSAGES
+                .reason("idempotency_key_invalid")
+                .arg("max", MAX_KEY_LEN),
         ));
     }
     Ok(key.to_owned())
 }
 
-fn problem(status: StatusCode, detail: &str) -> Response {
-    Problem::new(status, Some(detail.to_owned())).into_response()
+/// A problem raised by this layer, with a kernel reason `code`.
+fn problem(status: StatusCode, code: &'static str) -> Response {
+    LocalizableProblem::new(status, MESSAGES.reason(code)).into_response()
 }
 
 /// Keys are per caller: users by subject, clients by client id.
@@ -349,10 +343,7 @@ async fn finish(db: &PgPool, owner: &str, key: &str, response: Response) -> Resp
     let (parts, body) = response.into_parts();
     let Ok(body) = to_bytes(body, usize::MAX).await else {
         release(db, owner, key).await;
-        return problem(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            "the response could not be read",
-        );
+        return problem(StatusCode::INTERNAL_SERVER_ERROR, "internal_error");
     };
     if body.len() > MAX_STORED_RESPONSE_BYTES {
         tracing::warn!(

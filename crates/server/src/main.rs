@@ -15,14 +15,14 @@ use campbooks_kernel::{
     AppState, Config,
     blobs::BlobStore,
     config::BlobBackend,
-    db,
+    db::{self, RoleVerdict},
     events::{EventId, ReplayFrom},
     jobs::Worker,
 };
-use campbooks_server::telemetry::Telemetry;
+use campbooks_server::{bff, telemetry::Telemetry};
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
-use sqlx::{Connection as _, PgConnection, PgPool, postgres::PgPoolOptions};
+use sqlx::{Connection as _, PgConnection, PgPool};
 use tokio::{sync::watch, task::JoinSet};
 
 /// Port used when `CAMPBOOKS_BIND_ADDR` is unset or unparsable.
@@ -195,9 +195,11 @@ async fn run(
     telemetry: &Telemetry,
 ) -> Result<(), Box<dyn std::error::Error>> {
     config.check()?;
-    if role.api() {
-        check_api_config(&config)?;
-    }
+    let bff = if role.api() {
+        check_api_config(&config)?
+    } else {
+        None
+    };
     if role.worker() {
         config.jobs.check()?;
     }
@@ -206,7 +208,7 @@ async fn run(
         migrate(&config).await?;
     }
     let db = connect(&config).await?;
-    warn_if_row_security_is_bypassed(&db).await;
+    check_row_security(&db, &config).await?;
     telemetry.observe_pool(&db, config.database_max_connections);
 
     let blobs = blob_store(&config, &db).await?;
@@ -225,7 +227,7 @@ async fn run(
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
-        let app = campbooks_server::router(state.clone());
+        let app = campbooks_server::router(state.clone(), bff);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
@@ -316,12 +318,19 @@ fn stopped(stop: &watch::Sender<bool>) -> impl Future<Output = ()> + Send + 'sta
     }
 }
 
-/// Apply pending migrations on a connection of its own, as the login user
-/// (the pool runs as the runtime role, which may not change the schema).
+/// Apply pending migrations on a connection of their own, as the migration
+/// login (`CAMPBOOKS_DATABASE_MIGRATION_URL`, else the database URL): the
+/// runtime pool may not change the schema.
 async fn migrate(config: &Config) -> Result<(), String> {
-    let mut conn = PgConnection::connect(config.database_url.expose_secret())
+    let options = if config.split_database_logins() {
+        // The migration URL carries its own credentials.
+        db::connect_options(config.migration_url(), None)?
+    } else {
+        db::connect_options(config.migration_url(), config.database_password_file())?
+    };
+    let mut conn = PgConnection::connect_with(&options)
         .await
-        .map_err(|e| format!("could not connect to the database: {e}"))?;
+        .map_err(|e| format!("could not connect to the database to migrate: {e}"))?;
     sqlx::migrate!("../../migrations")
         .run(&mut conn)
         .await
@@ -331,36 +340,65 @@ async fn migrate(config: &Config) -> Result<(), String> {
     Ok(())
 }
 
-/// The pool every request and job uses: each connection switches to the
-/// runtime role (`CAMPBOOKS_DATABASE_ROLE`), so row-level security applies.
+/// The pool every request and job uses. A privileged login switches each
+/// connection to the runtime role (`CAMPBOOKS_DATABASE_ROLE`), so row-level
+/// security applies; an unprivileged one already is subject to it.
 async fn connect(config: &Config) -> Result<PgPool, String> {
-    let options = PgPoolOptions::new()
-        .max_connections(config.database_max_connections)
-        .acquire_timeout(DB_ACQUIRE_TIMEOUT)
-        // An event per acquire, for the pool-wait metric and span events;
-        // the log filter keeps it out of the logs.
-        .acquire_time_level(log::LevelFilter::Debug);
-    db::with_runtime_role(options, config.database_role())
-        .connect(config.database_url.expose_secret())
-        .await
-        .map_err(|e| match config.database_role() {
-            Some(role) => format!(
-                "could not connect to the database as runtime role `{role}` (run the \
-                 migrations, or check CAMPBOOKS_DATABASE_ROLE): {e}"
-            ),
-            None => format!("could not connect to the database: {e}"),
-        })
+    let options = db::connect_options(
+        config.database_url.expose_secret(),
+        config.database_password_file(),
+    )?;
+    db::connect_runtime(
+        options,
+        config.database_max_connections,
+        DB_ACQUIRE_TIMEOUT,
+        config.database_role(),
+    )
+    .await
+    .map_err(|e| match config.database_role() {
+        Some(role) => format!(
+            "could not connect to the database (as runtime role `{role}` if the login is \
+             privileged; run the migrations, or check CAMPBOOKS_DATABASE_ROLE): {e}"
+        ),
+        None => format!("could not connect to the database: {e}"),
+    })
 }
 
-async fn warn_if_row_security_is_bypassed(db: &PgPool) {
-    match db::bypasses_row_security(db).await {
-        Ok(false) => {}
-        Ok(true) => tracing::warn!(
-            "the database role the server queries as bypasses row-level security (a \
-             superuser or BYPASSRLS): workspace isolation then rests on queries alone; \
-             set CAMPBOOKS_DATABASE_ROLE (default campbooks_app)"
-        ),
-        Err(e) => tracing::warn!(error = %e, "could not check the database role"),
+/// Refuse to serve when row-level security would protect nothing, warn when
+/// it holds only through a switch a SQL injection could undo.
+///
+/// Refusing (rather than warning) is deliberate: workspace isolation is the
+/// product's core promise, and a warning in a log nobody reads is how it
+/// silently stops being true. `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true`
+/// overrides, for setups that cannot create a second login yet.
+async fn check_row_security(db: &PgPool, config: &Config) -> Result<(), String> {
+    let report = match db::inspect_role(db).await {
+        Ok(report) => report,
+        Err(e) => {
+            tracing::warn!(error = %e, "could not check the database role");
+            return Ok(());
+        }
+    };
+    match report.verdict(config.split_database_logins()) {
+        RoleVerdict::Sound => Ok(()),
+        RoleVerdict::Escapable(why) => {
+            tracing::warn!(
+                "{why}. Create a dedicated non-superuser login for CAMPBOOKS_DATABASE_URL \
+                 and move the current URL to CAMPBOOKS_DATABASE_MIGRATION_URL (deploy/README.md)"
+            );
+            Ok(())
+        }
+        RoleVerdict::Unsafe(why) if config.database_allow_rls_bypass => {
+            tracing::warn!(
+                "{why}; starting anyway because CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS is set"
+            );
+            Ok(())
+        }
+        RoleVerdict::Unsafe(why) => Err(format!(
+            "refusing to start: {why}. Use a dedicated non-superuser login (deploy/README.md), \
+             or set CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true to accept that workspace \
+             isolation then rests on the queries alone"
+        )),
     }
 }
 
@@ -418,7 +456,9 @@ fn parse_since(since: Option<&str>) -> Result<ReplayFrom, String> {
         .map_err(|_| format!("--since {since}: expected an event id or an RFC 3339 time"))
 }
 
-fn check_api_config(config: &Config) -> Result<(), String> {
+/// Startup checks of the API role; the web BFF's settings when web sign-in
+/// is on.
+fn check_api_config(config: &Config) -> Result<Option<bff::Settings>, String> {
     config.auth.check()?;
     if let Some(issuer) = config.auth.issuer() {
         tracing::info!(
@@ -440,7 +480,33 @@ fn check_api_config(config: &Config) -> Result<(), String> {
     } else {
         tracing::info!("CAMPBOOKS_WEB_DIR unset: serving the API only");
     }
-    Ok(())
+
+    let scopes: Vec<&str> = campbooks_server::scope_catalogue()
+        .iter()
+        .map(|scope| scope.name)
+        .collect();
+    match bff::config::load(config, &scopes)? {
+        bff::Loaded::Enabled(settings) => {
+            tracing::info!(
+                client_id = %settings.client_id,
+                origin = %settings.public_origin,
+                idp = %settings.internal_issuer,
+                "web sign-in (BFF) enabled"
+            );
+            if !settings.secure_cookies {
+                tracing::warn!(
+                    "CAMPBOOKS_PUBLIC_URL is plain http: the session cookie is sent without \
+                     `Secure` and the `__Host-` prefix. Fine on localhost; serve the app over \
+                     https anywhere else"
+                );
+            }
+            Ok(Some(*settings))
+        }
+        bff::Loaded::Disabled(reason) => {
+            tracing::warn!(reason, "web sign-in (BFF) disabled: /bff/* answers 503");
+            Ok(None)
+        }
+    }
 }
 
 /// Resolves on Ctrl-C or SIGTERM (what `docker stop` sends).
@@ -532,6 +598,88 @@ mod tests {
                 .unwrap_err()
                 .contains("--since")
         );
+    }
+
+    fn config(split: bool, allow: bool) -> Config {
+        let mut config = campbooks_kernel::testing::config("postgres://test@localhost/test");
+        config.database_allow_rls_bypass = allow;
+        if split {
+            config.database_migration_url = Some(secrecy::SecretString::from(
+                "postgres://owner@localhost/test",
+            ));
+        }
+        config
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn startup_refuses_a_login_that_bypasses_row_security(db: PgPool) {
+        use campbooks_kernel::testing;
+
+        // A superuser straight into the pool: nothing protects the rows.
+        let err = check_row_security(&db, &config(false, false))
+            .await
+            .unwrap_err();
+        assert!(err.contains("refusing to start"), "{err}");
+        // ... unless the operator says so.
+        check_row_security(&db, &config(false, true)).await.unwrap();
+
+        // A superuser that switches role: tolerated alone (with a warning),
+        // refused once a separate migration login was configured.
+        let switched = testing::app_role_pool(&db).await;
+        check_row_security(&switched, &config(false, false))
+            .await
+            .unwrap();
+        assert!(
+            check_row_security(&switched, &config(true, false))
+                .await
+                .is_err()
+        );
+
+        // The dedicated login passes either way.
+        let login = testing::runtime_login_pool(&db).await;
+        check_row_security(&login, &config(true, false))
+            .await
+            .unwrap();
+        check_row_security(&login, &config(false, false))
+            .await
+            .unwrap();
+        login.close().await;
+        testing::drop_runtime_login(&db).await;
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_pool_switches_role_only_for_a_privileged_login(db: PgPool) {
+        use campbooks_kernel::testing;
+
+        let timeout = std::time::Duration::from_secs(5);
+        let privileged = db::connect_runtime(
+            (*db.connect_options()).clone(),
+            2,
+            timeout,
+            Some(db::DEFAULT_RUNTIME_ROLE),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            db::inspect_role(&privileged).await.unwrap().user,
+            db::DEFAULT_RUNTIME_ROLE
+        );
+
+        // The dedicated login keeps its own identity: no SET ROLE to undo.
+        let login = testing::runtime_login_pool(&db).await;
+        let pool = db::connect_runtime(
+            (*login.connect_options()).clone(),
+            2,
+            timeout,
+            Some(db::DEFAULT_RUNTIME_ROLE),
+        )
+        .await
+        .unwrap();
+        let report = db::inspect_role(&pool).await.unwrap();
+        assert_eq!(report.user, report.login);
+        pool.close().await;
+        login.close().await;
+        testing::drop_runtime_login(&db).await;
     }
 
     #[test]

@@ -44,6 +44,27 @@ pub struct Config {
     /// usually embeds a password.
     pub database_url: SecretString,
 
+    /// Login used only to apply migrations
+    /// (`CAMPBOOKS_DATABASE_MIGRATION_URL`): the schema owner, or a
+    /// superuser. When set, `database_url` should be a dedicated
+    /// non-superuser login that is a member of the runtime role (see
+    /// [`crate::db`]). Unset, migrations run as `database_url`. Secret.
+    #[serde(default)]
+    pub database_migration_url: Option<SecretString>,
+
+    /// File holding the password for `database_url`
+    /// (`CAMPBOOKS_DATABASE_PASSWORD_FILE`), so the URL can omit it and the
+    /// secret stays out of the environment.
+    #[serde(default)]
+    pub database_password_file: Option<PathBuf>,
+
+    /// Start even though the runtime login bypasses row-level security
+    /// (`CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS`, default `false`). An escape
+    /// hatch for setups that cannot yet create a separate login; workspace
+    /// isolation then rests on the queries alone.
+    #[serde(default)]
+    pub database_allow_rls_bypass: bool,
+
     /// Maximum connections in the database pool.
     #[serde(default = "defaults::database_max_connections")]
     pub database_max_connections: u32,
@@ -108,6 +129,34 @@ pub struct Config {
 }
 
 impl Config {
+    /// Whether a separate migration login is configured.
+    pub fn split_database_logins(&self) -> bool {
+        non_blank(
+            self.database_migration_url
+                .as_ref()
+                .map(SecretString::expose_secret),
+        )
+        .is_some()
+    }
+
+    /// The URL migrations connect with: the migration login when one is
+    /// configured, otherwise the runtime URL.
+    pub fn migration_url(&self) -> &str {
+        non_blank(
+            self.database_migration_url
+                .as_ref()
+                .map(SecretString::expose_secret),
+        )
+        .unwrap_or_else(|| self.database_url.expose_secret())
+    }
+
+    /// The runtime password file, `None` when unset or blank.
+    pub fn database_password_file(&self) -> Option<&std::path::Path> {
+        self.database_password_file
+            .as_deref()
+            .filter(|p| !p.as_os_str().is_empty())
+    }
+
     /// The runtime database role; `None` when unset or blank (query as the
     /// login user).
     pub fn database_role(&self) -> Option<&str> {
@@ -688,6 +737,30 @@ mod tests {
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
+        );
+    }
+
+    #[test]
+    fn migrations_use_their_own_login_when_one_is_set() {
+        let config =
+            Config::from_figment(&figment(&[("database_url", "postgres://rt@h/d")])).unwrap();
+        assert!(!config.split_database_logins());
+        assert_eq!(config.migration_url(), "postgres://rt@h/d");
+        assert_eq!(config.database_password_file(), None);
+        assert!(!config.database_allow_rls_bypass);
+
+        let config = Config::from_figment(&figment(&[
+            ("database_url", "postgres://rt@h/d"),
+            ("database_migration_url", "postgres://owner:pw@h/d"),
+            ("database_password_file", ""),
+        ]))
+        .unwrap();
+        assert!(config.split_database_logins());
+        assert_eq!(config.migration_url(), "postgres://owner:pw@h/d");
+        assert_eq!(
+            config.database_password_file(),
+            None,
+            "blank counts as unset"
         );
     }
 

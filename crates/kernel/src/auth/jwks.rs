@@ -118,7 +118,7 @@ impl Jwks {
         }
         if !keys.loaded() {
             return Err(Error::Unavailable(
-                "the identity provider's signing keys are unavailable".to_owned(),
+                crate::i18n::MESSAGES.reason("idp_unavailable"),
             ));
         }
         Ok(keys.find(kid, alg))
@@ -242,31 +242,14 @@ async fn build_client() -> Result<reqwest::Client, FetchError> {
 
 /// GET a document from the IdP, in a client span carrying the trace on.
 async fn get(http: &reqwest::Client, url: &str) -> Result<(HeaderMap, Vec<u8>), FetchError> {
-    let address = reqwest::Url::parse(url)
-        .ok()
-        .and_then(|url| url.host_str().map(str::to_owned))
-        .unwrap_or_default();
-    let span = tracing::info_span!(
-        "idp",
-        otel.name = "GET idp",
-        otel.kind = "client",
-        otel.status_code = tracing::field::Empty,
-        server.address = %address,
-        http.response.status_code = tracing::field::Empty,
-        error.type = tracing::field::Empty,
-    );
     async {
-        let mut trace = HeaderMap::new();
-        telemetry::inject(&mut trace);
-        let result = fetch_document(http, url, trace).await;
+        let result = fetch_document(http, url, telemetry::trace_headers()).await;
         if let Err(e) = &result {
-            let span = tracing::Span::current();
-            span.record("otel.status_code", "error");
-            span.record("error.type", e.kind());
+            telemetry::record_error(e.kind());
         }
         result
     }
-    .instrument(span)
+    .instrument(telemetry::client_span("GET idp", url))
     .await
 }
 

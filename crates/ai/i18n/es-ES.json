@@ -1,0 +1,5 @@
+{
+  "errors": {
+    "ai_role_not_configured": "Esta instancia no tiene ningún modelo de IA configurado para el rol {{role}}. Un administrador puede configurarlo."
+  }
+}

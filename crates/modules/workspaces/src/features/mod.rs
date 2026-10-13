@@ -11,6 +11,7 @@ pub mod list_invitations;
 pub mod list_members;
 pub mod list_security_events;
 pub mod list_workspaces;
+pub mod locale_preference;
 pub mod membership;
 pub mod remove_member;
 pub mod update_workspace;

@@ -1,0 +1,36 @@
+{
+  "status": {
+    "400": "Requête incorrecte",
+    "401": "Non authentifié",
+    "403": "Accès refusé",
+    "404": "Introuvable",
+    "409": "Conflit",
+    "413": "Contenu trop volumineux",
+    "422": "Contenu impossible à traiter",
+    "500": "Erreur interne du serveur",
+    "503": "Service indisponible"
+  },
+  "errors": {
+    "not_found": "Cette ressource n’existe pas, ou vous n’avez pas le droit de la voir.",
+    "forbidden": "Vous n’avez pas le droit de faire cela.",
+    "internal_error": "Un problème est survenu de notre côté. Veuillez réessayer.",
+    "insufficient_scope": "Ce jeton d’accès n’a pas l’autorisation {{scope}}.",
+    "auth_not_configured": "Aucune connexion n’est configurée sur ce serveur : il ne peut donc pas accepter de jetons d’accès.",
+    "missing_token": "Connectez-vous pour continuer : la requête ne contient aucun jeton d’accès.",
+    "invalid_token": "Le jeton d’accès n’est pas valide. Reconnectez-vous.",
+    "token_expired": "Votre session a expiré. Reconnectez-vous.",
+    "idp_unavailable": "Le service de connexion est injoignable pour le moment. Réessayez dans un instant.",
+    "missing_json_content_type": "Le corps de la requête doit être en JSON (Content-Type: application/json).",
+    "invalid_json": "Le corps de la requête n’est pas du JSON valide : {{reason}}",
+    "invalid_body": "Le corps de la requête ne correspond pas à ce qu’attend cette opération : {{reason}}",
+    "invalid_query": "Les paramètres de la requête ne correspondent pas à ce qu’attend cette opération : {{reason}}",
+    "idempotency_key_invalid": "L’Idempotency-Key doit comporter de 1 à {{max}} caractères ASCII visibles.",
+    "idempotency_key_reused": "Cette Idempotency-Key a déjà servi pour une autre requête.",
+    "idempotency_key_in_flight": "Une requête avec cette Idempotency-Key est encore en cours de traitement.",
+    "idempotency_body_too_large": "Le corps de la requête est trop volumineux pour être utilisé avec une Idempotency-Key.",
+    "database_unavailable": "La base de données est indisponible pour le moment. Réessayez dans un instant.",
+    "file_too_large": "Le fichier dépasse la limite de {{limit}} octets.",
+    "upload_mismatch": "Le fichier envoyé ne correspond pas à ce qui était attendu. Envoyez-le à nouveau.",
+    "upload_failed": "La lecture de l’envoi a échoué. Réessayez."
+  }
+}

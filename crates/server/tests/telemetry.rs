@@ -142,7 +142,7 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
             .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
             .with_registry(registry().unwrap()),
     );
-    let app = router(state.clone());
+    let app = router(state.clone(), None);
     let mut claims = idp.claims("workspaces:read workspaces:write workspaces:admin");
     claims["email"] = ALICE.into();
     claims["email_verified"] = true.into();
@@ -344,7 +344,7 @@ async fn the_metrics_page_has_low_cardinality_series(db: PgPool) {
         .with_registry(registry().unwrap()),
     );
 
-    let app = router(state.clone());
+    let app = router(state.clone(), None);
     let ids = [
         "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
         "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c",
@@ -382,6 +382,10 @@ async fn the_metrics_page_has_low_cardinality_series(db: PgPool) {
     assert!(
         requests.contains(r#"http_request_method="GET""#),
         "{requests}"
+    );
+    assert!(
+        requests.contains(r#"error_type="auth_not_configured""#),
+        "the problem's code: {requests}"
     );
     assert!(requests.ends_with(" 2"), "{requests}");
     for id in ids {

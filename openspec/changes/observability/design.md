@@ -10,7 +10,7 @@ role as replicas and has a telemetry collector. Nothing measures anything yet.
 
 ## Data ownership and events
 
-- **Schema `kernel`**: migration `20261013180000_kernel__job_trace_context.sql` adds
+- **Schema `kernel`**: migration `20261013220000_kernel__job_trace_context.sql` adds
   `kernel.jobs.trace_context text NULL`, the W3C `traceparent` of the span
   that enqueued the job (or published the event a delivery carries). It is
   55 ASCII characters of ids and flags: no user data. Written by
@@ -109,7 +109,7 @@ only).
 
 | Instrument | Kind, unit | Attributes |
 | --- | --- | --- |
-| `http.server.request.duration` | histogram, s | `http.request.method`, `http.route`, `http.response.status_code` |
+| `http.server.request.duration` | histogram, s | `http.request.method`, `http.route`, `http.response.status_code`, `error.type` (the problem's stable `code`, e.g. `not_found`, on 4xx/5xx; never its translated text) |
 | `campbooks.job.duration` | histogram, s | `job.kind`, `job.queue`, `job.outcome` (`succeeded`, `retried`, `failed`, `lost`) |
 | `campbooks.job.wait` | histogram, s | `job.kind`, `job.queue` (from ready to claimed) |
 | `campbooks.jobs` | gauge | `job.queue`, `job.state` (`ready`, `scheduled`, `running`, `failed`) |

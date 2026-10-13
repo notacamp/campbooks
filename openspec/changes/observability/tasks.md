@@ -4,7 +4,7 @@
 
 - [x] 1.1 `TelemetryConfig` (`CAMPBOOKS_TELEMETRY__*`) with startup checks naming the bad setting; verify defaults, parsing, header redaction
 - [x] 1.2 `kernel::telemetry`: field names, W3C helpers (`set_parent_from`, `inject`, `current_traceparent`, `link_to`, `record_trace_id`), `Metrics` with the HTTP and job instruments in `AppState`; verify the propagator round-trip
-- [x] 1.3 Migration `20261013180000_kernel__job_trace_context.sql`; enqueue, event publish and claim carry `trace_context`
+- [x] 1.3 Migration `20261013220000_kernel__job_trace_context.sql`; enqueue, event publish and claim carry `trace_context`
 - [x] 1.4 Worker: `job` span with `otel.*`, outcome and link; duration and wait histograms; queue-depth sampling while metrics are on
 - [x] 1.5 `Scoped` / `Workspace` record `principal.kind` / `workspace.id` into the current span; IdP fetch span with `traceparent`
 

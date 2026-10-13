@@ -132,6 +132,46 @@ pub fn record_trace_id(span: &Span) {
     }
 }
 
+/// A client span for a call to another system (`otel.name` = `name`, e.g.
+/// `GET idp`), recording only the host of `url`: never its path or query.
+/// Fill `http.response.status_code` with [`record_status`] and end it with
+/// [`record_error`] on failure.
+pub fn client_span(name: &'static str, url: &str) -> Span {
+    let address = reqwest::Url::parse(url)
+        .ok()
+        .and_then(|url| url.host_str().map(str::to_owned))
+        .unwrap_or_default();
+    tracing::info_span!(
+        "client",
+        otel.name = name,
+        otel.kind = "client",
+        otel.status_code = tracing::field::Empty,
+        server.address = %address,
+        http.response.status_code = tracing::field::Empty,
+        error.type = tracing::field::Empty,
+    )
+}
+
+/// The current client span's response status.
+pub fn record_status(status: u16) {
+    Span::current().record("http.response.status_code", status);
+}
+
+/// Mark the current span failed, with a fixed-word `error.type`.
+pub fn record_error(error_type: &'static str) {
+    let span = Span::current();
+    span.record("otel.status_code", "error");
+    span.record("error.type", error_type);
+}
+
+/// The current span's trace context as headers, for a call to another
+/// system (see [`inject`]).
+pub fn trace_headers() -> HeaderMap {
+    let mut headers = HeaderMap::new();
+    inject(&mut headers);
+    headers
+}
+
 /// The `error.type` of a failed HTTP call: a fixed word, never the error's
 /// message (it can hold a URL).
 pub fn http_error_type(error: &reqwest::Error) -> &'static str {
@@ -269,14 +309,25 @@ impl Metrics {
         self.exported
     }
 
-    /// One HTTP request served. `route` is the matched route template.
-    pub fn http_request(&self, method: &str, route: Option<&str>, status: u16, elapsed: Duration) {
+    /// One HTTP request served. `route` is the matched route template,
+    /// `error` the problem's stable code when it failed.
+    pub fn http_request(
+        &self,
+        method: &str,
+        route: Option<&str>,
+        status: u16,
+        error: Option<&'static str>,
+        elapsed: Duration,
+    ) {
         let mut attributes = vec![
             KeyValue::new("http.request.method", method.to_owned()),
             KeyValue::new("http.response.status_code", i64::from(status)),
         ];
         if let Some(route) = route {
             attributes.push(KeyValue::new("http.route", route.to_owned()));
+        }
+        if let Some(error) = error {
+            attributes.push(KeyValue::new("error.type", error));
         }
         self.instruments
             .http_duration

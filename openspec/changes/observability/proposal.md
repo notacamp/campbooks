@@ -65,7 +65,7 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/30.
   outbound requests), `campbooks-server` (subscriber, SDK and exporters,
   request middleware, `/metrics` listener, pool instruments). No domain
   module changes, no new module, no `architecture.toml` entry.
-- Data: schema `kernel`, migration `20261013180000_kernel__job_trace_context.sql`
+- Data: schema `kernel`, migration `20261013220000_kernel__job_trace_context.sql`
   (one nullable column).
 - Dependencies (Apache-2.0 unless noted): `opentelemetry` 0.33.0,
   `opentelemetry_sdk` 0.33.0, `opentelemetry-otlp` 0.33.0 (HTTP/protobuf,

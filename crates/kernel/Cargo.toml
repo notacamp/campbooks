@@ -10,19 +10,24 @@ publish.workspace = true
 
 [features]
 # Helpers for module tests (`campbooks_kernel::testing`). Enable as a dev-dependency only.
-test-util = ["dep:http-body-util"]
+test-util = ["dep:http-body-util", "dep:base64"]
 
 [dependencies]
 # SHA-256 of blobs and of idempotent requests; already the crypto backend of
 # rustls and jsonwebtoken.
 aws-lc-rs.workspace = true
 axum.workspace = true
+base64 = { workspace = true, optional = true }
 bytes.workspace = true
 chrono.workspace = true
 figment.workspace = true
 futures-util.workspace = true
+icu_locale_core.workspace = true
+icu_plurals.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
+# sqlx's pool options take a `log` level (`db::connect_runtime`).
+log.workspace = true
 object_store.workspace = true
 opentelemetry.workspace = true
 # The W3C trace-context propagator (`telemetry`).

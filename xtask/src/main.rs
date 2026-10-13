@@ -3,6 +3,7 @@
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
 //! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
+//! - `cargo xtask i18n` checks that every server message catalogue is at parity.
 //! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
 //!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
 //!   their output passes the gates.
@@ -11,6 +12,7 @@
 
 mod arch;
 mod events;
+mod i18n;
 mod openapi;
 mod scaffold;
 
@@ -53,6 +55,10 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Check that every server message catalogue (`crates/**/i18n/`) has
+    /// `en`, `pt-PT`, `es-ES` and `fr` with the same messages, plural forms
+    /// and placeholders, and no empty values.
+    I18n,
     /// Scaffold a domain module: crate (scopes, events, an `overview` read
     /// slice), schema migration, OpenSpec change, client module with i18n,
     /// registered in the workspace, the server and the client shell.
@@ -88,6 +94,7 @@ fn main() -> ExitCode {
         Command::Arch => run_arch(&root),
         Command::Openapi { check } => openapi::run(&root, check),
         Command::Events { check } => events::run(&root, check),
+        Command::I18n => i18n::run(&root),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
         Command::ScaffoldCheck { full } => scaffold::check::run(&root, full),
@@ -226,8 +233,11 @@ fn run_arch(root: &Path) -> Result<String> {
     let catalogue: BTreeSet<String> = scopes.iter().map(|s| s.name.clone()).collect();
     let spec = serde_json::to_value(campbooks_server::openapi())
         .context("serializing the OpenAPI document")?;
-    let operations =
-        arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
+    let schemes = arch::Schemes {
+        bearer: campbooks_server::SECURITY_SCHEME,
+        session: campbooks_server::bff::SESSION_SCHEME,
+    };
+    let operations = arch::check_operation_security(&spec, schemes, &catalogue);
     violations.extend(operations);
     violations.extend(arch::check_operations(&spec, &operation_owners()?));
 
@@ -251,13 +261,18 @@ fn run_arch(root: &Path) -> Result<String> {
     )
 }
 
-/// `(METHOD, path)` → the module whose router declares the operation.
+/// `(METHOD, path)` → the module whose router declares the operation, or
+/// `bff` for the web BFF's own `/bff/*` operations (no module may take that
+/// name).
 fn operation_owners() -> Result<arch::Owners> {
     let mut owners = arch::Owners::new();
-    for module in campbooks_server::modules() {
-        let name = module.name;
-        let spec = serde_json::to_value(module.router.into_openapi())
-            .with_context(|| format!("serializing module `{name}`'s OpenAPI"))?;
+    let documents = campbooks_server::modules()
+        .into_iter()
+        .map(|module| (module.name, module.router.into_openapi()))
+        .chain([(arch::BFF_SCHEMA, campbooks_server::bff::openapi())]);
+    for (name, document) in documents {
+        let spec = serde_json::to_value(document)
+            .with_context(|| format!("serializing `{name}`'s OpenAPI"))?;
         let paths = spec["paths"].as_object().cloned().unwrap_or_default();
         for (path, item) in paths {
             for method in arch::OPERATION_METHODS {

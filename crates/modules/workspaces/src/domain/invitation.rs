@@ -11,6 +11,8 @@ use chrono::TimeDelta;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 use super::model::InvitationId;
 use campbooks_kernel::tenancy::{Role, UserId};
 use chrono::{DateTime, Utc};
@@ -62,9 +64,7 @@ pub fn normalize_email(raw: &str) -> Result<String> {
     if valid {
         Ok(email)
     } else {
-        Err(Error::BadRequest(
-            "email must be an email address".to_owned(),
-        ))
+        Err(Error::BadRequest(MESSAGES.reason("invalid_email")))
     }
 }
 

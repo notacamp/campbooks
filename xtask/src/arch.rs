@@ -200,21 +200,35 @@ pub fn check_allowlist(allow: &[Allow], modules: &BTreeSet<String>) -> Vec<Strin
 /// named after it.
 pub const KERNEL_SCHEMA: &str = "kernel";
 
+/// The Postgres schema of the server's web BFF (sessions). Its migrations are
+/// `<ts>_bff__<desc>.sql`; no module may be named after it.
+pub const BFF_SCHEMA: &str = "bff";
+
+/// Schemas owned by infrastructure rather than a module.
+pub const INFRASTRUCTURE_SCHEMAS: [&str; 2] = [KERNEL_SCHEMA, BFF_SCHEMA];
+
+fn is_infrastructure(schema: &str) -> bool {
+    INFRASTRUCTURE_SCHEMAS.contains(&schema)
+}
+
 static MIGRATION_NAME: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^(\d{14})_([a-z0-9_]+?)__([a-z0-9_]+)\.sql$")
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
 /// Migration files are `<14-digit timestamp>_<owner>__<description>.sql`,
-/// where the owner is an existing module or the kernel, and have unique
-/// timestamps. No module may take the kernel's name.
+/// where the owner is an existing module or an infrastructure schema
+/// (`kernel`, `bff`), and have unique timestamps. No module may take an
+/// infrastructure schema's name.
 pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Vec<String> {
     let mut violations = Vec::new();
     let mut versions: BTreeMap<&str, &str> = BTreeMap::new();
-    if modules.contains(KERNEL_SCHEMA) {
-        violations.push(format!(
-            "crates/modules/{KERNEL_SCHEMA}: `{KERNEL_SCHEMA}` is reserved for the kernel's schema"
-        ));
+    for reserved in INFRASTRUCTURE_SCHEMAS {
+        if modules.contains(reserved) {
+            violations.push(format!(
+                "crates/modules/{reserved}: `{reserved}` is reserved for an infrastructure schema"
+            ));
+        }
     }
 
     for name in file_names {
@@ -229,10 +243,11 @@ pub fn check_migrations(file_names: &[String], modules: &BTreeSet<String>) -> Ve
             caps.get(1).map_or("", |m| m.as_str()),
             caps.get(2).map_or("", |m| m.as_str()),
         );
-        if module != KERNEL_SCHEMA && !modules.contains(module) {
+        if !is_infrastructure(module) && !modules.contains(module) {
             let known: Vec<_> = modules.iter().map(String::as_str).collect();
             violations.push(format!(
-                "migrations/{name}: `{module}` is not a module or `{KERNEL_SCHEMA}` (known: {})",
+                "migrations/{name}: `{module}` is not a module, `{KERNEL_SCHEMA}` or \
+                 `{BFF_SCHEMA}` (known modules: {})",
                 known.join(", ")
             ));
         }
@@ -295,7 +310,7 @@ pub fn check_migration_schemas(
         }
         for caps in QUALIFIED_NAME.captures_iter(&sql) {
             let schema = caps.get(1).map_or("", |m| m.as_str());
-            let known = schema == KERNEL_SCHEMA || modules.contains(schema);
+            let known = is_infrastructure(schema) || modules.contains(schema);
             if known && schema != owner {
                 touched.insert(schema.to_owned());
             }
@@ -346,13 +361,29 @@ pub const OPERATION_METHODS: [&str; 8] = [
     "get", "put", "post", "delete", "options", "head", "patch", "trace",
 ];
 
+/// The security schemes an operation may name.
+#[derive(Debug, Clone, Copy)]
+pub struct Schemes<'a> {
+    /// The OAuth bearer scheme; requirements list scopes of the catalogue.
+    pub bearer: &'a str,
+    /// The web BFF's session-cookie scheme; scope-less, and only on `/bff/`
+    /// paths.
+    pub session: &'a str,
+}
+
+/// Path prefix of the web BFF's operations, the only ones that may use the
+/// session-cookie scheme.
+const BFF_PATH_PREFIX: &str = "/bff/";
+
 /// Every operation of the generated OpenAPI document states its security
-/// explicitly: either public (`security(())`, i.e. `[{}]`), or the `bearer`
-/// scheme with exactly the scope from the catalogue that its `Scoped<S>`
-/// extractor requires. Nothing is left to a document-wide default.
+/// explicitly: public (`security(())`, i.e. `[{}]`), the `bearer` scheme
+/// with exactly the scope from the catalogue that its `Scoped<S>` extractor
+/// requires, or — for the web BFF's `/bff/*` operations only — the `session`
+/// cookie scheme, which has no scopes. Nothing is left to a document-wide
+/// default.
 pub fn check_operation_security(
     spec: &serde_json::Value,
-    scheme: &str,
+    schemes: Schemes<'_>,
     catalogue: &BTreeSet<String>,
 ) -> Vec<String> {
     let mut violations = Vec::new();
@@ -365,17 +396,25 @@ pub fn check_operation_security(
                 continue;
             };
             let name = format!("{} {path}", method.to_uppercase());
+            let bearer = schemes.bearer;
             match operation
                 .get("security")
                 .and_then(serde_json::Value::as_array)
             {
                 None => violations.push(format!(
                     "OpenAPI operation `{name}` declares no `security`: require a scope with \
-                     `security((\"{scheme}\" = [\"<module>:<action>\"]))` and the \
+                     `security((\"{bearer}\" = [\"<module>:<action>\"]))` and the \
                      `Scoped<S>` extractor, or mark it public with `security(())`"
                 )),
                 Some(requirements) => {
-                    violations.extend(check_requirements(&name, requirements, scheme, catalogue));
+                    let on_bff = path.starts_with(BFF_PATH_PREFIX);
+                    violations.extend(check_requirements(
+                        &name,
+                        requirements,
+                        schemes,
+                        on_bff,
+                        catalogue,
+                    ));
                 }
             }
         }
@@ -386,9 +425,11 @@ pub fn check_operation_security(
 fn check_requirements(
     operation: &str,
     requirements: &[serde_json::Value],
-    scheme: &str,
+    schemes: Schemes<'_>,
+    on_bff: bool,
     catalogue: &BTreeSet<String>,
 ) -> Vec<String> {
+    let scheme = schemes.bearer;
     let mut violations = Vec::new();
     for requirement in requirements {
         let Some(requirement) = requirement.as_object() else {
@@ -398,17 +439,33 @@ fn check_requirements(
             continue;
         };
         for (name, scopes) in requirement {
-            if name != scheme {
-                violations.push(format!(
-                    "OpenAPI operation `{operation}` uses security scheme `{name}`; only \
-                     `{scheme}` exists"
-                ));
-                continue;
-            }
             let scopes: Vec<&str> = scopes
                 .as_array()
                 .map(|list| list.iter().filter_map(serde_json::Value::as_str).collect())
                 .unwrap_or_default();
+            if name == schemes.session {
+                if !on_bff {
+                    violations.push(format!(
+                        "OpenAPI operation `{operation}` uses the `{name}` cookie scheme, which \
+                         only the web BFF's `{BFF_PATH_PREFIX}*` operations may use; the API \
+                         takes bearer tokens"
+                    ));
+                }
+                if !scopes.is_empty() {
+                    violations.push(format!(
+                        "OpenAPI operation `{operation}`: the `{name}` scheme takes no scopes"
+                    ));
+                }
+                continue;
+            }
+            if name != scheme {
+                violations.push(format!(
+                    "OpenAPI operation `{operation}` uses security scheme `{name}`; only \
+                     `{scheme}` and `{}` exist",
+                    schemes.session
+                ));
+                continue;
+            }
             if scopes.is_empty() {
                 violations.push(format!(
                     "OpenAPI operation `{operation}` requires a `{scheme}` token but no scope; \
@@ -868,20 +925,47 @@ mod tests {
         .map(String::from);
         let v = check_migrations(&names, &modules);
         assert_eq!(v.len(), 6, "{v:#?}");
-        assert!(v[0].contains("`billing` is not a module or `kernel`"));
+        assert!(v[0].contains("`billing` is not a module, `kernel` or `bff`"));
         assert!(v.iter().any(|m| m.contains("already used")));
     }
 
     #[test]
-    fn kernel_owns_its_migrations_and_its_name() {
+    fn infrastructure_owns_its_migrations_and_its_names() {
         let modules: BTreeSet<String> = ["system"].map(String::from).into();
-        let names = ["20261012100000_kernel__events_and_jobs.sql".to_owned()];
+        let names = [
+            "20261012100000_kernel__events_and_jobs.sql".to_owned(),
+            "20261013000000_bff__sessions.sql".to_owned(),
+        ];
         assert!(check_migrations(&names, &modules).is_empty());
 
-        let clash: BTreeSet<String> = ["kernel"].map(String::from).into();
+        let clash: BTreeSet<String> = ["kernel", "bff"].map(String::from).into();
         let v = check_migrations(&[], &clash);
-        assert_eq!(v.len(), 1, "{v:?}");
-        assert!(v[0].contains("reserved"));
+        assert_eq!(v.len(), 2, "{v:?}");
+        assert!(v.iter().all(|m| m.contains("reserved")));
+    }
+
+    #[test]
+    fn bff_migrations_touch_only_bff() {
+        let modules: BTreeSet<String> = ["system"].map(String::from).into();
+        let ok = [sql(
+            "20261013000000_bff__sessions.sql",
+            "CREATE SCHEMA bff; CREATE TABLE bff.sessions (id uuid);",
+        )];
+        assert!(check_migration_schemas(&ok, &modules).is_empty());
+        let bad = [
+            sql(
+                "20261013000001_bff__oops.sql",
+                "CREATE TABLE bff.s (id uuid DEFAULT kernel.uuid_v7());",
+            ),
+            sql(
+                "20261013000002_system__oops.sql",
+                "DROP TABLE bff.sessions;",
+            ),
+        ];
+        let v = check_migration_schemas(&bad, &modules);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v[0].contains("touches schema `kernel`"));
+        assert!(v[1].contains("touches schema `bff`"));
     }
 
     fn sql(name: &str, body: &str) -> (String, String) {
@@ -948,6 +1032,11 @@ mod tests {
         ["mail:read".to_owned()].into()
     }
 
+    const SCHEMES: Schemes<'static> = Schemes {
+        bearer: "bearer",
+        session: "session",
+    };
+
     #[test]
     fn explicit_security_passes() {
         let spec = serde_json::json!({ "paths": {
@@ -957,10 +1046,10 @@ mod tests {
                 "parameters": [],
             },
         }});
-        assert!(check_operation_security(&spec, "bearer", &catalogue()).is_empty());
+        assert!(check_operation_security(&spec, SCHEMES, &catalogue()).is_empty());
         let public_by_empty_list =
             serde_json::json!({ "paths": { "/x": { "get": { "security": [] } } } });
-        assert!(check_operation_security(&public_by_empty_list, "bearer", &catalogue()).is_empty());
+        assert!(check_operation_security(&public_by_empty_list, SCHEMES, &catalogue()).is_empty());
     }
 
     #[test]
@@ -968,7 +1057,7 @@ mod tests {
         let spec = serde_json::json!({ "paths": {
             "/api/v1/mail/threads": { "get": {}, "post": { "security": [{}] } },
         }});
-        let v = check_operation_security(&spec, "bearer", &catalogue());
+        let v = check_operation_security(&spec, SCHEMES, &catalogue());
         assert_eq!(v.len(), 1, "{v:?}");
         assert!(v[0].contains("`GET /api/v1/mail/threads` declares no `security`"));
     }
@@ -981,7 +1070,7 @@ mod tests {
             "post": { "security": [{ "apiKey": ["mail:read"] }] },
             "delete": { "security": ["bearer"] },
         }}});
-        let v = check_operation_security(&spec, "bearer", &catalogue());
+        let v = check_operation_security(&spec, SCHEMES, &catalogue());
         assert_eq!(v.len(), 4, "{v:#?}");
         assert!(v.iter().any(|m| m.contains("but no scope")));
         assert!(
@@ -990,6 +1079,24 @@ mod tests {
         );
         assert!(v.iter().any(|m| m.contains("scheme `apiKey`")));
         assert!(v.iter().any(|m| m.contains("malformed")));
+    }
+
+    #[test]
+    fn the_session_scheme_is_for_scope_less_bff_operations_only() {
+        let spec = serde_json::json!({ "paths": {
+            "/bff/session": { "get": { "security": [{}, { "session": [] }] } },
+            "/bff/api/{path}": { "post": { "security": [{ "session": [] }] } },
+        }});
+        assert!(check_operation_security(&spec, SCHEMES, &catalogue()).is_empty());
+
+        let spec = serde_json::json!({ "paths": {
+            "/api/v1/mail/threads": { "get": { "security": [{ "session": [] }] } },
+            "/bff/logout": { "post": { "security": [{ "session": ["mail:read"] }] } },
+        }});
+        let v = check_operation_security(&spec, SCHEMES, &catalogue());
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v.iter().any(|m| m.contains("only the web BFF")));
+        assert!(v.iter().any(|m| m.contains("takes no scopes")));
     }
 
     fn meta(mutates: bool) -> serde_json::Value {

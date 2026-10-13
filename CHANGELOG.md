@@ -7,6 +7,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The server now answers in your language: error messages from the API are
+  in English, European Portuguese, Spanish or French, following the language
+  you chose (once accounts can save one) or your browser's language, and say
+  which one they use in `Content-Language`. Translations are checked in CI
+  (`cargo xtask i18n`).
 - Design system for the new app: light, dark and system themes; three
   workspace accents (business in ink, personal in terracotta, forest) and a
   compact density, remembered on each device and applied before the page
@@ -34,14 +39,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   set `CAMPBOOKS_WEB_DIR` to a built client (the image does this for you).
   Deep links fall back to the app, hashed assets are cached for a year, and
   every response carries security headers (a strict CSP on pages).
-- Interim `/bff/api/*` passthrough to the API so the web app works from the
-  image before the session-based BFF lands. It adds no credentials.
 - Self-hosting: `docker compose up` now also starts the identity provider
   (Rauthy) on port 8081, with no setup. Its secrets are generated on first boot
   into the new `idp-data` volume, and Campbooks' scopes and sign-in clients are
   registered automatically. Read the first admin password with
   `docker compose run --rm idp-init cat /app/data/campbooks/initial-admin-password`;
-  see `deploy/README.md`. Sign-in is not wired into the app yet.
+  see `deploy/README.md`.
 - The API is now an OAuth 2.1 resource server. It validates JWT access tokens
   from your identity provider (signature against its JWKS, issuer, audience,
   expiry) and can require a scope on each endpoint. Rejected tokens get a 401,
@@ -76,6 +79,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS` (8),
   `CAMPBOOKS_JOBS__RETRY_BASE_MS` (1000) and
   `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` (3600).
+- Web sign-in. The web app now signs you in through the identity provider,
+  and your browser never holds a token: the server keeps them (encrypted, in
+  Postgres schema `bff`) and gives the browser a single `HttpOnly`,
+  `SameSite=Strict` session cookie. Sessions end after 48 hours unused or 30
+  days at most, on sign-out, or when you sign out at the identity provider
+  (over https). Opening the app while signed out sends you to sign in and
+  back to the same page. New settings: `CAMPBOOKS_SECRET_KEY` /
+  `CAMPBOOKS_SECRET_KEY_FILE` (required once sign-in is configured; docker
+  compose generates one for you into the new `server-secrets` volume) and the
+  optional `CAMPBOOKS_BFF__*` block in `deploy/.env.example`. Changing the
+  secret key signs everyone out of the web app and loses nothing else.
+- `docker compose up` starts a one-shot `server-init` service that prepares the
+  `server-secrets` volume; the web client's sign-in secret is now saved there
+  (it used to be in `idp-data`).
 - Storage for message bodies, attachments and files, outside Postgres. Each
   file is stored once per workspace however many messages carry it, checked
   against its SHA-256 on the way in and out, and deleted by an hourly sweep
@@ -158,7 +175,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_TELEMETRY__SAMPLE_RATIO`, default 1, for the share of traces
   kept). `CAMPBOOKS_TELEMETRY__METRICS_ADDR` serves Prometheus metrics at
   `/metrics` on a separate port: keep it private. Metrics cover request
-  rates, errors and latency per route, job durations and failures, queue
+  rates, errors (by their stable `code`) and latency per route, job durations and failures, queue
   depth and wait, AI call latency and tokens per role, the database pool and
   the build. Traces follow a request into the jobs it enqueues and the calls
   it makes to AI providers and the identity provider, and honour an incoming
@@ -166,6 +183,29 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- **API clients:** every problem+json error now carries a stable `code`
+  (`not_found`, `invalid_token`, `last_owner`, …); `detail` is now a
+  sentence in the caller's language instead of that code. Match on `code`.
+- A user's saved language (`workspaces.users.locale`) is now empty until
+  they choose one, so the browser's language applies meanwhile. The
+  migration runs on startup; nothing to do.
+- **Separate database logins.** The server now queries as a dedicated
+  non-superuser login (`campbooks_runtime`) that cannot bypass row-level
+  security or switch back to a more powerful role, and the owner login is used
+  only to run migrations. New settings: `CAMPBOOKS_DATABASE_MIGRATION_URL`,
+  `CAMPBOOKS_DATABASE_PASSWORD_FILE` and `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS`.
+  **Upgrading with the bundled compose file needs no manual step**: the new
+  `db-init` service creates the login and its password on the first
+  `docker compose up -d` (existing data is untouched). With your own
+  Postgres nothing breaks either: a single privileged `CAMPBOOKS_DATABASE_URL`
+  keeps working, with a startup warning recommending the split (see "Database
+  logins" in `deploy/README.md`). The server now refuses to start when the
+  login it queries as is a superuser or has `BYPASSRLS` (for example with
+  `CAMPBOOKS_DATABASE_ROLE=` set empty on a superuser URL); set
+  `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to opt out.
+- `/bff/api/*` now requires a signed-in session and calls the API with your
+  access token; without a session it answers 401 `session_required`. It
+  replaces the interim passthrough.
 - Log lines inside a request or a job now carry the W3C `trace_id`, and the
   request's span records the route template (`http.route`) instead of the
   full URI, which could carry personal data in its query string. A

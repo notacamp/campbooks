@@ -1,0 +1,16 @@
+{
+  "errors": {
+    "invalid_role": "El rol debe ser administrador o miembro.",
+    "invalid_email": "Introduce una dirección de correo electrónico válida.",
+    "invalid_name": "El nombre debe tener entre 1 y {{max}} caracteres.",
+    "invalid_limit": "El límite debe estar entre 1 y {{max}}.",
+    "already_a_member": "Esta persona ya es miembro del espacio de trabajo.",
+    "invitation_used": "Esta invitación ya se ha utilizado.",
+    "invitation_expired": "Esta invitación ha caducado. Pide una nueva.",
+    "invitation_email_mismatch": "Esta invitación se envió a otra dirección de correo electrónico. Inicia sesión con esa dirección para aceptarla.",
+    "signup_invite_only": "En esta instancia solo se pueden crear cuentas por invitación.",
+    "signup_requires_approval": "Se ha enviado tu solicitud de acceso. Un administrador tiene que aprobarla antes de que puedas crear un espacio de trabajo.",
+    "signup_code_invalid": "Este código de registro no es válido.",
+    "last_owner": "Un espacio de trabajo necesita al menos un propietario. Haz propietaria a otra persona primero."
+  }
+}

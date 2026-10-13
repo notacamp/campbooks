@@ -16,6 +16,7 @@ use axum::{
 };
 use campbooks_kernel::{
     config::{LogFormat, TelemetryConfig},
+    error::ProblemCode,
     telemetry::{self, Metrics},
 };
 use opentelemetry::{
@@ -412,6 +413,7 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
         http.request.method = %method,
         http.route = route.as_deref(),
         http.response.status_code = Empty,
+        error.type = Empty,
         request_id = %request_id,
         trace_id = Empty,
         workspace.id = Empty,
@@ -424,7 +426,16 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
     let response = next.run(request).instrument(span.clone()).await;
     let status = response.status();
     let elapsed = started.elapsed();
+    // The problem's stable code, never its (translated) text.
+    let error = response
+        .extensions()
+        .get::<ProblemCode>()
+        .map(|code| code.0)
+        .filter(|_| status.is_client_error() || status.is_server_error());
     span.record("http.response.status_code", status.as_u16());
+    if let Some(error) = error {
+        span.record("error.type", error);
+    }
     if status.is_server_error() {
         span.record("otel.status_code", "error");
     }
@@ -435,7 +446,7 @@ pub async fn observe(State(metrics): State<Metrics>, request: Request, next: Nex
             "request finished"
         );
     });
-    metrics.http_request(&method, route.as_deref(), status.as_u16(), elapsed);
+    metrics.http_request(&method, route.as_deref(), status.as_u16(), error, elapsed);
     response
 }
 

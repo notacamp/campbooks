@@ -10,6 +10,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 campbooks_kernel::define_id!(
     /// An invitation to join a workspace.
     InvitationId
@@ -104,9 +106,9 @@ pub fn workspace_name(raw: &str) -> Result<String, Error> {
     let name = raw.trim();
     let chars = name.chars().count();
     if chars == 0 || chars > MAX_NAME_CHARS {
-        return Err(Error::BadRequest(format!(
-            "name must be 1 to {MAX_NAME_CHARS} characters"
-        )));
+        return Err(Error::BadRequest(
+            MESSAGES.reason("invalid_name").arg("max", MAX_NAME_CHARS),
+        ));
     }
     Ok(name.to_owned())
 }
