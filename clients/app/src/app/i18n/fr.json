@@ -5,5 +5,58 @@
     "title": "Page introuvable",
     "body": "Cette page n’existe pas ou a été déplacée.",
     "home": "Aller à la page d’accueil"
+  },
+  "landing": {
+    "title": "Ce qui a besoin de vous, en un seul endroit calme",
+    "lead": "Campbooks lit vos e-mails et ne vous apporte que ce qui a besoin de vous.",
+    "signIn": "Se connecter",
+    "invitedTitle": "Vous êtes invité dans un espace de travail",
+    "invitedLead": "Connectez-vous avec l’adresse e-mail à laquelle l’invitation a été envoyée, et vous le rejoindrez aussitôt.",
+    "ended": "Vous avez été déconnecté.",
+    "endedDetail": "Reconnectez-vous pour reprendre là où vous en étiez.",
+    "footer": "Open source. Vos e-mails restent dans votre espace de travail."
+  },
+  "gate": {
+    "opening": "Ouverture de Campbooks…",
+    "unreachableTitle": "Impossible de joindre Campbooks",
+    "unreachableLead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez.",
+    "retry": "Réessayer"
+  },
+  "workspace": {
+    "unavailableTitle": "Cet espace de travail n’est pas disponible",
+    "unavailableLead": "Il a peut-être été supprimé, ou vous n’en êtes plus membre.",
+    "openMine": "Ouvrir mes espaces de travail",
+    "loadErrorTitle": "Impossible de charger vos espaces de travail",
+    "loadErrorLead": "Campbooks n’a pas répondu. Rien n’a été perdu."
+  },
+  "account": {
+    "label": "Compte",
+    "theme": "Thème",
+    "themes": {
+      "system": "Système",
+      "light": "Clair",
+      "dark": "Sombre"
+    },
+    "density": "Densité",
+    "densities": {
+      "comfortable": "Confortable",
+      "compact": "Compacte"
+    },
+    "language": "Langue",
+    "signOut": "Se déconnecter",
+    "signingOut": "Déconnexion…"
+  },
+  "home": {
+    "title": "Rien n’a encore besoin de vous",
+    "subline": "Quand Campbooks aura quelque chose pour vous, cela apparaîtra ici.",
+    "connectTitle": "Connectez votre messagerie",
+    "connectLead": "Campbooks lira vos e-mails et apportera sur cette page ce qui a besoin de vous. Les connexions de messagerie sont encore en construction : vous ne pouvez pas encore connecter de boîte aux lettres.",
+    "connect": "Connecter votre messagerie",
+    "soon": "Bientôt",
+    "context": "Premiers pas",
+    "start": "Premiers pas",
+    "invite": "Invitez les personnes avec qui vous travaillez",
+    "inviteAction": "Inviter",
+    "keyboard": "Clavier"
   }
 }

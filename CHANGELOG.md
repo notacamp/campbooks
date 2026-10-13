@@ -7,6 +7,25 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The new app's first run: a calm signed-out page with one "Sign in" (that
+  brings you back to the page you opened), then creating your first
+  workspace one question at a time (its name, then Business or Personal,
+  which picks its colour), with Skip where a default works. Instances that
+  require a signup code, an invitation or an administrator's approval each
+  say so plainly.
+- Workspaces in the address (`/w/<id>/…`), a sidebar (a header and tab bar
+  on phones), the workspace switcher (⌘⇧W, Ctrl+Shift+W elsewhere) with each
+  workspace in its own colour, and an account menu with theme, density,
+  language and Sign out. The app reopens the workspace you used last on that
+  device.
+- An empty Home ("Nothing needs you yet") with the shortcuts that work today;
+  "Connect your mail" says it is coming, because mail connections are not
+  built yet.
+- Settings → Members: owners and admins change roles (with Undo), remove
+  members after confirming in place, invite people by email and see pending
+  invitations. Invitation links open a page that signs you in if needed and
+  joins the workspace. Campbooks does not email invitations yet: whoever runs
+  the instance passes the link on.
 - The server now answers in your language: error messages from the API are
   in English, European Portuguese, Spanish or French, following the language
   you chose (once accounts can save one) or your browser's language, and say

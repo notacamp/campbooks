@@ -54,6 +54,9 @@ export const COMPONENT_TOKENS = [
   "content-max",
   "toast-height",
   "overlay-width",
+  "popover-width",
+  "narrow-width",
+  "row-text-min",
 ] as const;
 
 export type SemanticToken = (typeof SEMANTIC_TOKENS)[keyof typeof SEMANTIC_TOKENS][number];

@@ -1,10 +1,13 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { createRootRouteWithContext, Outlet, useNavigate } from "@tanstack/react-router";
+import { createRootRouteWithContext, Outlet, useNavigate, useParams } from "@tanstack/react-router";
 import { Suspense, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
-import { CommandMenu, IconButton, KbdHint, ShortcutSheet, Spacer, Text } from "~/lib/ui";
+import { readPref } from "~/lib/storage/prefs";
+import { CommandMenu, ShortcutSheet, Text, ThemeProvider } from "~/lib/ui";
+
+import { SessionGate } from "../session/SessionGate";
 
 import { NotFound } from "./not-found";
 
@@ -14,8 +17,8 @@ export interface RouterContext {
 
 function RootLayout() {
   const { t } = useTranslation();
-  const { t: tShortcuts } = useTranslation("shortcuts");
   const navigate = useNavigate();
+  const { workspaceId } = useParams({ strict: false });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -32,27 +35,13 @@ function RootLayout() {
   });
 
   return (
-    <div className="flex min-h-dvh flex-col bg-surface-base text-primary">
-      <header className="flex items-center gap-2 border-b border-subtle px-4 py-2">
-        <Text as="span" weight="semibold">
-          {t("appName")}
-        </Text>
-        <Spacer />
-        <KbdHint shortcut="sheet.open" />
-        <IconButton
-          icon="keyboard"
-          label={tShortcuts("sheet.open")}
-          shortcut="sheet.open"
-          onClick={() => {
-            setSheetOpen(true);
-          }}
-        />
-      </header>
-      <main className="flex-1 px-4 py-6">
-        <Suspense fallback={<Text tone="tertiary">{t("loading")}</Text>}>
+    // The accent follows the open workspace; outside one, the last one opened.
+    <ThemeProvider workspaceId={workspaceId ?? readPref("workspace") ?? undefined}>
+      <Suspense fallback={<Text tone="tertiary">{t("loading")}</Text>}>
+        <SessionGate>
           <Outlet />
-        </Suspense>
-      </main>
+        </SessionGate>
+      </Suspense>
       <ShortcutSheet
         open={sheetOpen}
         onClose={() => {
@@ -65,7 +54,7 @@ function RootLayout() {
           setMenuOpen(false);
         }}
       />
-    </div>
+    </ThemeProvider>
   );
 }
 

@@ -3,7 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { ApiError, useSession } from "./index";
+import { ApiError, signOut, signOutAndLeave, useSession } from "./index";
 
 function wrapper({ children }: { children: ReactNode }) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -52,5 +52,39 @@ describe("useSession", () => {
     await waitFor(() => {
       expect(result.current.error).toBeInstanceOf(ApiError);
     });
+  });
+});
+
+describe("signOut", () => {
+  it("posts to the BFF with the CSRF header and returns the end-session URL", async () => {
+    const fetchSpy = vi.fn((request: Request) => {
+      expect(new URL(request.url).pathname).toBe("/bff/logout");
+      expect(request.method).toBe("POST");
+      expect(request.headers.get("x-campbooks-csrf")).toBe("1");
+      return Promise.resolve(Response.json({ logout_url: "https://id.example.com/logout" }));
+    });
+    vi.stubGlobal("fetch", fetchSpy);
+
+    await expect(signOut()).resolves.toBe("https://id.example.com/logout");
+  });
+
+  it("returns null when the identity provider has no end-session URL", async () => {
+    vi.stubGlobal("fetch", () => Promise.resolve(Response.json({ logout_url: null })));
+
+    await expect(signOut()).resolves.toBeNull();
+  });
+});
+
+describe("signOutAndLeave", () => {
+  it("goes to the end-session URL, or to the root without one", async () => {
+    const leave = vi.fn();
+    vi.stubGlobal("fetch", () =>
+      Promise.resolve(Response.json({ logout_url: "https://id.example.com/logout" })),
+    );
+    await signOutAndLeave(leave);
+    vi.stubGlobal("fetch", () => Promise.resolve(Response.json({ logout_url: null })));
+    await signOutAndLeave(leave);
+
+    expect(leave.mock.calls).toEqual([["https://id.example.com/logout"], ["/"]]);
   });
 });

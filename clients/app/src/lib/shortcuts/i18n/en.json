@@ -5,7 +5,8 @@
     "schedule": "Schedule",
     "tasks": "Tasks",
     "documents": "Documents",
-    "money": "Money"
+    "money": "Money",
+    "settings": "Settings"
   },
   "list": {
     "next": "Next item",

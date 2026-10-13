@@ -57,6 +57,26 @@ const ICONS = {
     ),
   ],
   event: [path("M3.5 5h17v15h-17zM3.5 10h17M8 3v4M16 3v4")],
+  settings: [
+    <circle key="i" cx="12" cy="12" r="2.8" />,
+    <circle key="o" cx="12" cy="12" r="6.5" />,
+    path(
+      "M12 2.8v2.7M12 18.5v2.7M2.8 12h2.7M18.5 12h2.7M5.5 5.5l1.9 1.9M16.6 16.6l1.9 1.9M5.5 18.5l1.9-1.9M16.6 7.4l1.9-1.9",
+    ),
+  ],
+  people: [
+    <circle key="a" cx="9" cy="8.5" r="3.2" />,
+    path("M3.5 19.5a5.5 5.5 0 0 1 11 0"),
+    path("M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.4a5.5 5.5 0 0 1 3 5.1"),
+  ],
+  plus: [path("M12 5v14M5 12h14")],
+  "sign-out": [
+    path("M10 4.5H6.5A1.5 1.5 0 0 0 5 6v12a1.5 1.5 0 0 0 1.5 1.5H10"),
+    path("m15 8 4 4-4 4M19 12h-9"),
+  ],
+  mail: [<rect key="r" x="3.5" y="5.5" width="17" height="13" rx="2" />, path("m4 7 8 6 8-6")],
+  "chevron-right": [path("m9 6 6 6-6 6")],
+  "chevron-up-down": [path("m8 9.5 4-4 4 4M8 14.5l4 4 4-4")],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

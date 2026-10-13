@@ -30,12 +30,16 @@ const BFF_PREFIX = "/bff";
  */
 export const CSRF_HEADER = "X-Campbooks-CSRF";
 
-/** The BFF's problem `detail` when a request has no live session. */
+/** The BFF's problem `code` when a request has no live session. */
 const SESSION_REQUIRED = "session_required";
 
 /** Where to start signing in, coming back to `returnTo` (a path on this site). */
 export function loginUrl(returnTo: string): string {
   return `${BFF_PREFIX}/login?return_to=${encodeURIComponent(returnTo)}`;
+}
+
+function uiLanguage(): string {
+  return typeof document === "undefined" ? "" : document.documentElement.lang;
 }
 
 function currentPage(): string {
@@ -52,8 +56,8 @@ async function isSessionRequired(response: Response): Promise<boolean> {
     return (
       typeof problem === "object" &&
       problem !== null &&
-      "detail" in problem &&
-      problem.detail === SESSION_REQUIRED
+      "code" in problem &&
+      problem.code === SESSION_REQUIRED
     );
   } catch {
     return false;
@@ -82,6 +86,12 @@ export function createWebTransport(
       const headers = new Headers(request.headers);
       headers.delete("authorization");
       headers.set(CSRF_HEADER, "1");
+      // Problem titles and details come back in the UI's language, which the
+      // app mirrors onto <html lang> (it may differ from the browser's).
+      const language = uiLanguage();
+      if (language !== "") {
+        headers.set("accept-language", language);
+      }
       const response = await send(
         new Request(request, { headers, credentials: "same-origin", mode: "same-origin" }),
       );

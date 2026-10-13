@@ -1,0 +1,152 @@
+{
+  "kind": {
+    "business": "Business",
+    "personal": "Personal"
+  },
+  "role": {
+    "owner": "Owner",
+    "admin": "Admin",
+    "member": "Member"
+  },
+  "shortcuts": {
+    "create": "Create a workspace",
+    "invite": "Invite someone"
+  },
+  "create": {
+    "step": "Step {{step}} of {{total}}",
+    "defaultName": "My workspace",
+    "continue": "Continue",
+    "skip": "Skip",
+    "back": "Back",
+    "cancel": "Cancel",
+    "signOut": "Sign out",
+    "required": "Campbooks needs one workspace to hold your mail, people and documents. Everything else can wait.",
+    "name": {
+      "title": "What should we call your workspace?",
+      "titleAnother": "What should we call the new workspace?",
+      "lead": "Your company’s name works well, or something like “Household” for personal things.",
+      "label": "Workspace name",
+      "placeholder": "Duarte & Pessoa",
+      "skipHint": "If you skip, it’s called “{{name}}”.",
+      "tooLong": "Keep it to 100 characters or fewer."
+    },
+    "kind": {
+      "title": "What is it for?",
+      "lead": "This picks its colour, so you can tell your workspaces apart at a glance. If you skip, it’s a business workspace.",
+      "label": "What the workspace is for",
+      "business": "Clients, suppliers, invoices and a team.",
+      "personal": "Your household, bills and appointments.",
+      "submit": "Create workspace",
+      "creating": "Creating…"
+    },
+    "done": {
+      "title": "{{name}} is ready",
+      "lead": "Nothing needs you yet. Invite the people you work with, or have a look around.",
+      "open": "Open {{name}}",
+      "invite": "Invite people"
+    },
+    "code": {
+      "title": "Do you have a signup code?",
+      "lead": "This Campbooks asks for a code before someone creates their first workspace. Whoever runs it can give you one.",
+      "label": "Signup code",
+      "invalid": "That code didn’t work. Check it and try again.",
+      "submit": "Create workspace"
+    },
+    "inviteOnly": {
+      "title": "You need an invitation",
+      "lead": "This Campbooks only lets people in by invitation. Ask someone who uses it to invite you, then open the link they give you."
+    },
+    "approval": {
+      "title": "Your request is waiting",
+      "lead": "Someone who runs this Campbooks approves new accounts. Your request is with them; check again later.",
+      "retry": "Check again"
+    },
+    "failed": {
+      "title": "Couldn’t create the workspace",
+      "lead": "Campbooks didn’t answer. Nothing was created.",
+      "retry": "Try again"
+    }
+  },
+  "members": {
+    "title": "Members",
+    "lead": "Everyone in {{workspace}} and what they can do.",
+    "list": "Members of {{workspace}}",
+    "you": "You",
+    "joined": "Joined {{date}}",
+    "roleOf": "Role of {{name}}",
+    "remove": "Remove",
+    "removeLabel": "Remove {{name}}",
+    "confirmRemove": "Remove {{name}} from {{workspace}}? They lose access right away. To bring them back, invite them again.",
+    "cancel": "Cancel",
+    "roleChanged": "{{name}}: {{role}}",
+    "readOnly": "Only owners and admins can invite people or change roles.",
+    "loading": "Loading members",
+    "errors": {
+      "lastOwner": "A workspace needs at least one owner. Make someone else an owner first.",
+      "forbidden": "Only owners can change or remove an owner.",
+      "generic": "That didn’t work, and nothing changed. Try again."
+    },
+    "loadError": {
+      "title": "Couldn’t load the members",
+      "lead": "Campbooks didn’t answer. Nothing was lost.",
+      "retry": "Try again"
+    }
+  },
+  "invite": {
+    "title": "Invite someone",
+    "lead": "An invitation lasts 7 days. Campbooks doesn’t email invitations yet, so whoever runs this Campbooks needs to pass the link on.",
+    "email": "Email",
+    "placeholder": "name@example.com",
+    "role": "Role",
+    "submit": "Invite",
+    "sending": "Inviting…",
+    "sent": "Invited {{email}} as {{role}}.",
+    "errors": {
+      "email": "Enter a full email address, like name@example.com.",
+      "alreadyMember": "{{email}} is already a member.",
+      "generic": "The invitation wasn’t created. Try again."
+    },
+    "pending": "Pending invitations",
+    "none": "No pending invitations.",
+    "expires": "{{role}} · expires {{date}}",
+    "expired": "{{role}} · expired {{date}}",
+    "resend": "Invite again",
+    "resendLabel": "Invite {{email}} again",
+    "loadError": "Couldn’t load the pending invitations."
+  },
+  "accept": {
+    "joining": "Joining the workspace…",
+    "joined": {
+      "title": "You’re in {{name}}",
+      "lead": "You joined as {{role}}.",
+      "open": "Open {{name}}"
+    },
+    "home": "Go to my workspaces",
+    "signOut": "Sign out",
+    "retry": "Try again",
+    "used": {
+      "title": "This invitation was already used",
+      "lead": "If you accepted it, the workspace is already in your list."
+    },
+    "expired": {
+      "title": "This invitation has expired",
+      "lead": "Ask whoever invited you to invite you again."
+    },
+    "alreadyMember": {
+      "title": "You’re already a member",
+      "lead": "This workspace is already in your list."
+    },
+    "mismatch": {
+      "title": "This invitation is for another email address",
+      "lead": "You’re signed in as {{email}}. Sign out, then sign in with the address the invitation was sent to."
+    },
+    "notFound": {
+      "title": "This invitation link doesn’t work",
+      "lead": "Check that you copied the whole link, or ask for a new invitation."
+    },
+    "failed": {
+      "title": "Couldn’t accept the invitation",
+      "lead": "Campbooks didn’t answer. Nothing changed."
+    }
+  }
+}

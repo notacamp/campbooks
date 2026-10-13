@@ -1,0 +1,152 @@
+{
+  "kind": {
+    "business": "Empresa",
+    "personal": "Pessoal"
+  },
+  "role": {
+    "owner": "Proprietário",
+    "admin": "Administrador",
+    "member": "Membro"
+  },
+  "shortcuts": {
+    "create": "Criar um espaço de trabalho",
+    "invite": "Convidar alguém"
+  },
+  "create": {
+    "step": "Passo {{step}} de {{total}}",
+    "defaultName": "O meu espaço de trabalho",
+    "continue": "Continuar",
+    "skip": "Saltar",
+    "back": "Voltar",
+    "cancel": "Cancelar",
+    "signOut": "Terminar sessão",
+    "required": "O Campbooks precisa de um espaço de trabalho para guardar o seu correio, as suas pessoas e os seus documentos. O resto pode esperar.",
+    "name": {
+      "title": "Que nome damos ao seu espaço de trabalho?",
+      "titleAnother": "Que nome damos ao novo espaço de trabalho?",
+      "lead": "O nome da sua empresa funciona bem, ou algo como «Casa» para assuntos pessoais.",
+      "label": "Nome do espaço de trabalho",
+      "placeholder": "Duarte & Pessoa",
+      "skipHint": "Se saltar, chama-se «{{name}}».",
+      "tooLong": "Use 100 caracteres ou menos."
+    },
+    "kind": {
+      "title": "Para que é?",
+      "lead": "Isto define a cor, para distinguir os seus espaços de trabalho num relance. Se saltar, fica como espaço de trabalho de empresa.",
+      "label": "Para que serve o espaço de trabalho",
+      "business": "Clientes, fornecedores, faturas e uma equipa.",
+      "personal": "A sua casa, contas e compromissos.",
+      "submit": "Criar espaço de trabalho",
+      "creating": "A criar…"
+    },
+    "done": {
+      "title": "{{name}} está pronto",
+      "lead": "Ainda nada precisa de si. Convide as pessoas com quem trabalha, ou dê uma vista de olhos.",
+      "open": "Abrir {{name}}",
+      "invite": "Convidar pessoas"
+    },
+    "code": {
+      "title": "Tem um código de registo?",
+      "lead": "Este Campbooks pede um código antes de alguém criar o primeiro espaço de trabalho. Quem o gere pode dar-lhe um.",
+      "label": "Código de registo",
+      "invalid": "Esse código não funcionou. Verifique-o e tente novamente.",
+      "submit": "Criar espaço de trabalho"
+    },
+    "inviteOnly": {
+      "title": "Precisa de um convite",
+      "lead": "Este Campbooks só deixa entrar pessoas convidadas. Peça a alguém que o use para o convidar e depois abra a ligação que lhe derem."
+    },
+    "approval": {
+      "title": "O seu pedido está a aguardar",
+      "lead": "Quem gere este Campbooks aprova as novas contas. O seu pedido já lhes chegou; volte a verificar mais tarde.",
+      "retry": "Verificar novamente"
+    },
+    "failed": {
+      "title": "Não foi possível criar o espaço de trabalho",
+      "lead": "O Campbooks não respondeu. Nada foi criado.",
+      "retry": "Tentar novamente"
+    }
+  },
+  "members": {
+    "title": "Membros",
+    "lead": "Todas as pessoas em {{workspace}} e o que podem fazer.",
+    "list": "Membros de {{workspace}}",
+    "you": "Você",
+    "joined": "Entrou a {{date}}",
+    "roleOf": "Função de {{name}}",
+    "remove": "Remover",
+    "removeLabel": "Remover {{name}}",
+    "confirmRemove": "Remover {{name}} de {{workspace}}? Perde o acesso de imediato. Para voltar, terá de ser convidado novamente.",
+    "cancel": "Cancelar",
+    "roleChanged": "{{name}}: {{role}}",
+    "readOnly": "Só proprietários e administradores podem convidar pessoas ou mudar funções.",
+    "loading": "A carregar os membros",
+    "errors": {
+      "lastOwner": "Um espaço de trabalho precisa de pelo menos um proprietário. Torne outra pessoa proprietária primeiro.",
+      "forbidden": "Só proprietários podem alterar ou remover um proprietário.",
+      "generic": "Não funcionou e nada mudou. Tente novamente."
+    },
+    "loadError": {
+      "title": "Não foi possível carregar os membros",
+      "lead": "O Campbooks não respondeu. Nada se perdeu.",
+      "retry": "Tentar novamente"
+    }
+  },
+  "invite": {
+    "title": "Convidar alguém",
+    "lead": "Um convite dura 7 dias. O Campbooks ainda não envia convites por email, por isso quem gere este Campbooks tem de fazer chegar a ligação.",
+    "email": "Email",
+    "placeholder": "nome@example.com",
+    "role": "Função",
+    "submit": "Convidar",
+    "sending": "A convidar…",
+    "sent": "{{email}} foi convidado como {{role}}.",
+    "errors": {
+      "email": "Introduza um endereço de email completo, como nome@example.com.",
+      "alreadyMember": "{{email}} já é membro.",
+      "generic": "O convite não foi criado. Tente novamente."
+    },
+    "pending": "Convites pendentes",
+    "none": "Não há convites pendentes.",
+    "expires": "{{role}} · expira a {{date}}",
+    "expired": "{{role}} · expirou a {{date}}",
+    "resend": "Convidar novamente",
+    "resendLabel": "Convidar {{email}} novamente",
+    "loadError": "Não foi possível carregar os convites pendentes."
+  },
+  "accept": {
+    "joining": "A entrar no espaço de trabalho…",
+    "joined": {
+      "title": "Já está em {{name}}",
+      "lead": "Entrou como {{role}}.",
+      "open": "Abrir {{name}}"
+    },
+    "home": "Ir para os meus espaços de trabalho",
+    "signOut": "Terminar sessão",
+    "retry": "Tentar novamente",
+    "used": {
+      "title": "Este convite já foi usado",
+      "lead": "Se foi você a aceitá-lo, o espaço de trabalho já está na sua lista."
+    },
+    "expired": {
+      "title": "Este convite expirou",
+      "lead": "Peça a quem o convidou que o convide novamente."
+    },
+    "alreadyMember": {
+      "title": "Já é membro",
+      "lead": "Este espaço de trabalho já está na sua lista."
+    },
+    "mismatch": {
+      "title": "Este convite é para outro endereço de email",
+      "lead": "Tem sessão iniciada como {{email}}. Termine a sessão e inicie-a com o endereço para o qual o convite foi enviado."
+    },
+    "notFound": {
+      "title": "Esta ligação de convite não funciona",
+      "lead": "Verifique se copiou a ligação completa, ou peça um novo convite."
+    },
+    "failed": {
+      "title": "Não foi possível aceitar o convite",
+      "lead": "O Campbooks não respondeu. Nada mudou."
+    }
+  }
+}
