@@ -49,7 +49,10 @@ get 409 `draft_changed`.
 - **THEN** the response is 404
 
 ### Requirement: Sending with undo
-`conversations.send_draft` SHALL refuse a draft with no recipient (400
+`conversations.send_draft` SHALL name the draft version it sends and SHALL
+answer 409 `draft_changed` when that is not the saved one, so what is sent
+is what the member last saw saved; the client SHALL send only once its last
+save of what is on screen succeeded. It SHALL refuse a draft with no recipient (400
 `no_recipients`), a malformed address (400 `invalid_address`) or more than
 25 MiB of attachments (400 `attachments_too_large`); otherwise it SHALL schedule the
 draft and answer 202 with the time it will be released, after
@@ -87,7 +90,9 @@ On `connectors.send_completed` v1
 and publish `conversations.draft_sent`; or mark a failed draft `failed` with
 the reason and publish `conversations.send_failed`. A failed draft SHALL be
 editable and may be sent again. The sent message SHALL reach its
-conversation through the connector's change batch, like any message.
+conversation through the connector's change batch, like any message. A
+released send that hears nothing back for an hour SHALL fail with
+`unknown_outcome`, and a late outcome for it SHALL still be recorded.
 
 #### Scenario: The reply appears in its conversation
 - **WHEN** a reply is sent

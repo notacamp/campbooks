@@ -193,10 +193,13 @@
       "too_large": "This message is too large for Gmail to send.",
       "unavailable": "Gmail could not be reached, so nothing was sent. Try again.",
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
-      "unknown": "Something went wrong. Try again."
+      "unknown": "Something went wrong. Try again.",
+      "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
+      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version."
     },
     "shortcuts": {
       "newMessage": "New message"
-    }
+    },
+    "tooLate": "Too late to undo: it was sent."
   }
 }

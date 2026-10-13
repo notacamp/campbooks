@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: DraftId\", inbox_id AS \"inbox: InboxId\",\n                      conversation_id AS \"conversation: ConversationId\"\n                 FROM conversations.drafts WHERE send_id = $1 AND state = 'sending'\n                  FOR UPDATE",
+  "query": "SELECT id AS \"id: DraftId\", inbox_id AS \"inbox: InboxId\",\n                      conversation_id AS \"conversation: ConversationId\"\n                 FROM conversations.drafts\n                WHERE send_id = $1 AND state IN ('sending', 'failed')\n                  FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       true
     ]
   },
-  "hash": "539e604e28d6a79e38442e8a271a0d0d60528697cc8aed44809856497f49edef"
+  "hash": "da3286d6d1b705da9b79da395646c8acad71704fa2475c43de4d9d2f6bc374cf"
 }

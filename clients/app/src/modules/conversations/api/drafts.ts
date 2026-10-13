@@ -108,11 +108,19 @@ export async function fetchDraft(workspaceId: string, draftId: string): Promise<
   );
 }
 
-/** `conversations.send_draft`: scheduled, leaving at `send_at` unless cancelled. */
-export async function sendDraft(workspaceId: string, draftId: string): Promise<Draft> {
+/**
+ * `conversations.send_draft` of the saved `version` (409 `draft_changed` if
+ * it is not the latest): scheduled, leaving at `send_at` unless cancelled.
+ */
+export async function sendDraft(
+  workspaceId: string,
+  draftId: string,
+  version: number,
+): Promise<Draft> {
   return unwrap(
     await api.POST("/api/v1/w/{workspace_id}/drafts/{draft_id}/send", {
       params: draftPath(workspaceId, draftId),
+      body: { version },
     }),
   );
 }

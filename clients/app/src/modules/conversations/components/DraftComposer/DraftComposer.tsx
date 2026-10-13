@@ -25,6 +25,8 @@ export interface DraftComposerProps {
 }
 
 const KNOWN_ERRORS = new Set([
+  "not_saved",
+  "draft_changed",
   "no_recipients",
   "invalid_address",
   "attachments_too_large",
@@ -60,12 +62,20 @@ export function DraftComposer({
       return;
     }
     const first = scheduled.to[0] ?? scheduled.cc[0] ?? scheduled.bcc[0];
+    // Undo stays on offer for the whole window the server gives.
+    const window =
+      scheduled.send_at === null || scheduled.send_at === undefined
+        ? undefined
+        : Math.max(1000, new Date(scheduled.send_at).getTime() - Date.now());
     undoToast.push({
       label: t("compose.sending", { name: first === undefined ? "" : displayName(first) }),
+      durationMs: window,
       undo: () => {
         void editor.undo().then((inTime) => {
           if (inTime) {
             onUndone?.();
+          } else {
+            undoToast.notify(t("compose.tooLate"));
           }
         });
       },

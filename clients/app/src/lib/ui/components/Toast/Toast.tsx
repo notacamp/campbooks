@@ -52,6 +52,8 @@ export interface UndoableAction {
   undo: () => void;
   /** Lets the history offer Redo after an undo. */
   redo?: (() => void) | undefined;
+  /** How long its toast stays up, when the action has a window of its own (a send). */
+  durationMs?: number | undefined;
 }
 
 export interface UndoEntry extends UndoableAction {
@@ -66,6 +68,8 @@ export interface UndoApi {
   undo: () => void;
   /** Undo or redo one entry of the history. */
   toggle: (id: number) => void;
+  /** Say something without Undo (that an undo came too late, say). */
+  notify: (text: string) => void;
   /** Newest first, for the session. */
   history: readonly UndoEntry[];
 }
@@ -76,6 +80,8 @@ interface ToastState {
   key: number;
   text: string;
   undoable: boolean;
+  /** Its own duration, if not the provider's. */
+  ms?: number | undefined;
 }
 
 export interface UndoProviderProps {
@@ -101,8 +107,8 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
     setHistory(next);
   }, []);
 
-  const show = useCallback((text: string, undoable: boolean) => {
-    setToast((current) => ({ key: (current?.key ?? 0) + 1, text, undoable }));
+  const show = useCallback((text: string, undoable: boolean, ms?: number) => {
+    setToast((current) => ({ key: (current?.key ?? 0) + 1, text, undoable, ms }));
   }, []);
 
   const setUndone = useCallback(
@@ -128,7 +134,10 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
         const entry: UndoEntry = { ...action, id: nextId.current, undone: false };
         nextId.current += 1;
         commit([entry, ...historyRef.current]);
-        show(action.label, true);
+        show(action.label, true, action.durationMs);
+      },
+      notify: (text) => {
+        show(text, false);
       },
       undo: () => {
         const latest = historyRef.current.find((entry) => !entry.undone);
@@ -163,7 +172,7 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
     }
     const timer = setTimeout(() => {
       setToast(null);
-    }, toastMs);
+    }, toast.ms ?? toastMs);
     return () => {
       clearTimeout(timer);
     };

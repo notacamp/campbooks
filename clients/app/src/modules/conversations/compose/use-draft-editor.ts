@@ -77,8 +77,11 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     [draft.id, queryClient, workspaceId],
   );
 
-  /** Save what is there now, after any save already running. */
-  const flush = useCallback(async (): Promise<void> => {
+  /**
+   * Save what is there now, after any save already running. Resolves with
+   * whether what is there now is saved.
+   */
+  const flush = useCallback(async (): Promise<boolean> => {
     if (timer.current !== null) {
       clearTimeout(timer.current);
       timer.current = null;
@@ -88,7 +91,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     }
     const current = latest.current;
     if (current === saved.current) {
-      return;
+      return true;
     }
     const run = async () => {
       setSaveState("saving");
@@ -115,6 +118,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     inFlight.current = run();
     await inFlight.current;
     inFlight.current = null;
+    return saved.current === current;
   }, [draft.id, workspaceId]);
 
   const update = useCallback(
@@ -147,8 +151,13 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
   const send = useCallback(async (): Promise<Draft | undefined> => {
     setSending(true);
     try {
-      await flush();
-      const scheduled = await sendDraft(workspaceId, draft.id);
+      // Send only what the member sees: the server sends the saved version.
+      const current = latest.current;
+      if (!(await flush()) || latest.current !== current) {
+        setError("not_saved");
+        return undefined;
+      }
+      const scheduled = await sendDraft(workspaceId, draft.id, version.current);
       replace(scheduled);
       void refresh();
       return scheduled;

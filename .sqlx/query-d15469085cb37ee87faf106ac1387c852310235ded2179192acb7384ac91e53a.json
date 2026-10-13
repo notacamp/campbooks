@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.attempts, s.unclear,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
+  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.unclear, s.attempted_at,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -38,23 +38,23 @@
       },
       {
         "ordinal": 3,
-        "name": "attempts",
-        "type_info": "Int4",
-        "origin": {
-          "Table": {
-            "table": "connectors.sends",
-            "name": "attempts"
-          }
-        }
-      },
-      {
-        "ordinal": 4,
         "name": "unclear",
         "type_info": "Bool",
         "origin": {
           "Table": {
             "table": "connectors.sends",
             "name": "unclear"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "attempted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "attempted_at"
           }
         }
       },
@@ -146,7 +146,7 @@
       false,
       false,
       false,
-      false,
+      true,
       true,
       true,
       true,
@@ -156,5 +156,5 @@
       true
     ]
   },
-  "hash": "b148410e0ac82bc00ba813f1daefc0cf2365bdfd0b762623f94c0f20fc3235d9"
+  "hash": "d15469085cb37ee87faf106ac1387c852310235ded2179192acb7384ac91e53a"
 }

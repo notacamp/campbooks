@@ -193,10 +193,13 @@
       "too_large": "Este mensaje es demasiado grande para que Gmail lo envíe.",
       "unavailable": "No se ha podido contactar con Gmail, así que no se ha enviado nada. Inténtalo de nuevo.",
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
-      "unknown": "Algo ha salido mal. Inténtalo de nuevo."
+      "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
+      "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
+      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión."
     },
     "shortcuts": {
       "newMessage": "Mensaje nuevo"
-    }
+    },
+    "tooLate": "Ya es tarde para deshacer: se ha enviado."
   }
 }

@@ -193,10 +193,13 @@
       "too_large": "Ce message est trop lourd pour que Gmail l’envoie.",
       "unavailable": "Gmail était injoignable, rien n’a été envoyé. Réessayez.",
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
-      "unknown": "Un problème est survenu. Réessayez."
+      "unknown": "Un problème est survenu. Réessayez.",
+      "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
+      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version."
     },
     "shortcuts": {
       "newMessage": "Nouveau message"
-    }
+    },
+    "tooLate": "Trop tard pour annuler : il a été envoyé."
   }
 }

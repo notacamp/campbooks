@@ -10,7 +10,7 @@ import { pause, type ScenarioContext } from "../context.ts";
 // connectors module's Gmail adapter, and the sent message comes back into
 // the thread.
 //
-//   pnpm --dir clients fake-google --port 9081
+//   pnpm --dir clients/app exec node scripts/fake-provider.ts --provider google --port 9081
 //   CAMPBOOKS_ENV=development CAMPBOOKS_PUBLIC_URL=http://localhost:5191 \
 //   CAMPBOOKS_BIND_ADDR=127.0.0.1:8201 CAMPBOOKS_SECRET_KEY=$(openssl rand -base64 32) \
 //   CAMPBOOKS_GOOGLE__CLIENT_ID=demo-client CAMPBOOKS_GOOGLE__CLIENT_SECRET=demo-secret \

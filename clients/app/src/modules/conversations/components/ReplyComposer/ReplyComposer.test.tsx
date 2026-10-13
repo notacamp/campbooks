@@ -142,6 +142,47 @@ describe("ReplyComposer", () => {
     ).toMatch(/^---------- Forwarded message ----------/u);
   });
 
+  it("sends nothing when the last changes could not be saved", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [REPLY] } },
+      [`PATCH ${D}/${REPLY.id}`]: { status: 503, body: { code: "unavailable" } },
+      [`POST ${D}/${REPLY.id}/send`]: { status: 202, body: { ...REPLY, state: "scheduled" } },
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    const box = await screen.findByRole("textbox", { name: "Message" });
+    // Leo was removed just before sending, but the save failed: the server
+    // still has him, so nothing may be sent.
+    fireEvent.change(box, { target: { value: "Without Leo." } });
+    fireEvent.click(screen.getByRole("button", { name: /Send/u }));
+    expect(
+      await screen.findByText(
+        "Your last changes could not be saved, so nothing was sent. Try again.",
+      ),
+    ).toBeVisible();
+    expect(api.calls.some((call) => call.route.endsWith("/send"))).toBe(false);
+  });
+
+  it("sends the version it saved, and says when Undo came too late", async () => {
+    const api = mockApi({
+      [`GET ${D}`]: { body: { drafts: [{ ...REPLY, version: 4 }] } },
+      [`POST ${D}/${REPLY.id}/send`]: {
+        status: 202,
+        body: {
+          ...REPLY,
+          version: 4,
+          state: "scheduled",
+          send_at: new Date(Date.now() + 10_000).toISOString(),
+        },
+      },
+      [`POST ${D}/${REPLY.id}/cancel_send`]: problem(409, "too_late"),
+    });
+    renderWithProviders(slot({ mode: "reply", messageId: FIRST, nonce: 1 }));
+    fireEvent.click(await screen.findByRole("button", { name: /Send/u }));
+    fireEvent.click(await screen.findByRole("button", { name: /^Undo/u }));
+    expect(await screen.findByText("Too late to undo: it was sent.")).toBeVisible();
+    expect(api.calls.find((call) => call.route.endsWith("/send"))?.body).toEqual({ version: 4 });
+  });
+
   it("says so when a draft cannot be started", async () => {
     mockApi({
       [`GET ${D}`]: { body: { drafts: [] } },

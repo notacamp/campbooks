@@ -3113,6 +3113,16 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendDraft"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "202": {
             "description": "Scheduled: it leaves at `send_at` unless cancelled.",
@@ -3165,7 +3175,7 @@
             }
           },
           "409": {
-            "description": "Already on its way (`draft_not_editable`).",
+            "description": "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7528,6 +7538,21 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "SendDraft": {
+        "type": "object",
+        "description": "Which version of the draft to send: the one the member last saw saved.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The draft's version as last saved by the caller; any other answers\n409 `draft_changed`, so what is sent is what the member saw.",
+            "minimum": 0
           }
         }
       },

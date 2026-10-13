@@ -193,10 +193,13 @@
       "too_large": "Esta mensagem é demasiado grande para o Gmail a enviar.",
       "unavailable": "Não foi possível contactar o Gmail, por isso nada foi enviado. Tente de novo.",
       "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",
-      "unknown": "Algo correu mal. Tente de novo."
+      "unknown": "Algo correu mal. Tente de novo.",
+      "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
+      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente."
     },
     "shortcuts": {
       "newMessage": "Nova mensagem"
-    }
+    },
+    "tooLate": "Já não é possível anular: a mensagem foi enviada."
   }
 }
