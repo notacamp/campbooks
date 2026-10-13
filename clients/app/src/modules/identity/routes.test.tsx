@@ -42,8 +42,9 @@ describe("buildIdentityRoutes", () => {
   it("mounts /sign-in and /sign-in/new with their query", async () => {
     mockApi({ [REQUEST_INFO]: { body: { client_id: "campbooks-web", providers: ["google"] } } });
     const root = createRootRoute({ component: Outlet });
+    const routes = buildIdentityRoutes({ public: root, workspace: root });
     const router = createRouter({
-      routeTree: root.addChildren(buildIdentityRoutes(root)),
+      routeTree: root.addChildren([...routes.public]),
       history: createMemoryHistory({ initialEntries: [`/sign-in?request=${REQUEST}`] }),
     });
     renderWithProviders(<RouterProvider router={router} />);

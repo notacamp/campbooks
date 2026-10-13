@@ -29,7 +29,7 @@ const { values } = parseArgs({
 const provider = values.provider as Provider;
 const DEFAULT_PORTS: Record<Provider, string> = { google: "9050", microsoft: "9051", zoho: "9052" };
 if (!(provider in DEFAULT_PORTS)) {
-  throw new Error(`--provider must be google, microsoft or zoho, not ${String(values.provider)}`);
+  throw new Error(`--provider must be google, microsoft or zoho, not ${values.provider}`);
 }
 const port = Number(values.port ?? DEFAULT_PORTS[provider]);
 const base = `http://127.0.0.1:${String(port)}`;
@@ -60,7 +60,12 @@ const layout = {
     keys: "/common/discovery/v2.0/keys",
     issuer: `${base}/${TENANT}/v2.0`,
   },
-  zoho: { authorize: "/oauth/v2/auth", token: "/oauth/v2/token", keys: "/oauth/v2/keys", issuer: base },
+  zoho: {
+    authorize: "/oauth/v2/auth",
+    token: "/oauth/v2/token",
+    keys: "/oauth/v2/keys",
+    issuer: base,
+  },
 }[provider];
 
 const b64url = (data: Buffer | string) => Buffer.from(data).toString("base64url");
@@ -163,7 +168,7 @@ const server = createServer((request, response) => {
     const url = new URL(request.url ?? "/", base);
     if (url.pathname === layout.authorize) {
       const q = url.searchParams;
-      const cookie = new RegExp(`(?:^|;\\s*)${COOKIE}=([\\w-]+)`, "u").exec(
+      const cookie = new RegExp(String.raw`(?:^|;\s*)${COOKIE}=([\w-]+)`, "u").exec(
         request.headers.cookie ?? "",
       )?.[1];
       if (q.get("decision") !== "allow") {

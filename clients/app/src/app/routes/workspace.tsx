@@ -130,6 +130,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
 
   const base = `/w/${workspace.id}`;
   const membersPath = `${base}/settings/members`;
+  const waysInPath = `${base}/settings/sign-in`;
   const inSettings = pathname.startsWith(`${base}/settings`);
   const atHome = !inSettings;
 
@@ -164,7 +165,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             onClick={openSwitcher}
           />
           <Spacer />
-          <AccountMenu compact />
+          <AccountMenu compact waysIn={link(waysInPath)} />
         </PhoneHeader>
         <Sidebar>
           <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
@@ -198,7 +199,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             >
               {tNav("sheet.open")}
             </Button>
-            <AccountMenu />
+            <AccountMenu waysIn={link(waysInPath)} />
           </SidebarFooter>
         </Sidebar>
         <Outlet />
