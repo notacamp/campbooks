@@ -166,6 +166,9 @@ fn principal(scopes: &[&str]) -> Principal {
         client_id: None,
         scopes: scopes.iter().map(|s| Scope::new(*s)).collect(),
         workspace: None,
+        email: None,
+        email_verified: false,
+        name: None,
     }
 }
 

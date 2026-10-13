@@ -1,8 +1,194 @@
 {
   "description": "Domain events Campbooks publishes (ADR 0012, ADR 0013): the triggers automation rules listen to and the inputs projections read. Generated from the modules' DomainEvent types; do not edit.",
   "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
-  "events": [],
+  "events": [
+    {
+      "name": "workspaces.member_joined",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A user became a member: by creating the workspace or accepting an\ninvitation.",
+        "required": [
+          "workspace",
+          "user",
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their role."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The new member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_left",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A user stopped being a member: they left, or were removed.",
+        "required": [
+          "workspace",
+          "user"
+        ],
+        "properties": {
+          "removed_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "Who removed them; `None` when they left."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The former member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_role_changed",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's role changed.",
+        "required": [
+          "workspace",
+          "user",
+          "from",
+          "to",
+          "changed_by"
+        ],
+        "properties": {
+          "changed_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who changed it."
+          },
+          "from": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their previous role."
+          },
+          "to": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their new role."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.workspace_created",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A workspace was created; its creator is its first owner.",
+        "required": [
+          "workspace",
+          "owner",
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/Kind",
+            "description": "Business or personal."
+          },
+          "owner": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who created it (its owner)."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.workspace_deleting",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A workspace was deleted. Every module purges its data for it; the\nworkspace's own records are purged at `purge_after`.",
+        "required": [
+          "workspace",
+          "purge_after",
+          "deleted_by"
+        ],
+        "properties": {
+          "deleted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who deleted it."
+          },
+          "purge_after": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its records are hard-deleted."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    }
+  ],
   "components": {
-    "schemas": {}
+    "schemas": {
+      "Kind": {
+        "type": "string",
+        "description": "What a workspace is for.",
+        "enum": [
+          "business",
+          "personal"
+        ]
+      },
+      "Role": {
+        "type": "string",
+        "description": "A member's role in a workspace.",
+        "enum": [
+          "owner",
+          "admin",
+          "member"
+        ]
+      },
+      "UserId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UserId (UUIDv7)"
+      }
+    }
   }
 }

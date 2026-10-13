@@ -26,3 +26,8 @@ CREATE TABLE kernel.idempotency (
 
 -- Pruning scans by expiry.
 CREATE INDEX idempotency_expires_at_idx ON kernel.idempotency (expires_at);
+
+-- The runtime role (see `kernel__runtime_role`) reads and writes keys through
+-- the kernel's idempotency layer. Keys are per caller, not per workspace, so
+-- the table carries no row-level security policy.
+GRANT SELECT, INSERT, UPDATE, DELETE ON kernel.idempotency TO campbooks_app;

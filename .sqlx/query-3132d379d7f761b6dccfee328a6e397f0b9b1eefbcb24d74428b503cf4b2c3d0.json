@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (run_at - now() > interval '29 days') AS \"later!\"\n                 FROM kernel.jobs WHERE kind = 'workspaces.purge_workspace' AND workspace_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "later!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3132d379d7f761b6dccfee328a6e397f0b9b1eefbcb24d74428b503cf4b2c3d0"
+}

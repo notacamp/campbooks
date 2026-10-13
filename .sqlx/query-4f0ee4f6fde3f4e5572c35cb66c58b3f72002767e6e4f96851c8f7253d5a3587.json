@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: WorkspaceId\" FROM workspaces.workspaces\n            WHERE id = $1 AND deleted_at IS NULL\n              FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: WorkspaceId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.workspaces",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4f0ee4f6fde3f4e5572c35cb66c58b3f72002767e6e4f96851c8f7253d5a3587"
+}

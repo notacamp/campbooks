@@ -135,6 +135,15 @@ pub struct Principal {
     /// token root or under `custom`). `None` for users: their workspaces are
     /// resolved by Campbooks from `subject`.
     pub workspace: Option<String>,
+    /// The user's email address (`email`), when the token carries one.
+    /// Always `None` for clients.
+    pub email: Option<String>,
+    /// Whether the identity provider verified [`email`](Self::email)
+    /// (`email_verified`). `false` when absent.
+    pub email_verified: bool,
+    /// The user's display name (`name`, else `preferred_username`), when the
+    /// token carries one. Always `None` for clients.
+    pub name: Option<String>,
 }
 
 impl Principal {

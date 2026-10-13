@@ -17,6 +17,8 @@
 - [x] 3.1 `Catalogue`, `Operations`, `compose`, `invoke`; `Scoped` accepts the in-process principal; tests: disallowed caller refused, missing scope 403, unconfirmed high-risk and keyless writes refused, query and path input, replay through invoke
 - [x] 3.2 Migration `kernel__idempotency`, middleware, `kernel.prune_idempotency` hourly; DB tests: replay, 422, 409 and takeover, release on 5xx, reads ignore the header, bad keys 400, keys per caller, anonymous pass-through, expiry and pruning
 - [x] 3.3 Server composes through `compose`; server test that invoke is gated by metadata
+- [x] 3.4 `workspaces`: `x-campbooks` on every operation, events declared; test that `workspaces.get` invoked by id applies the membership check (member 200, stranger 404)
+- [x] 3.5 Generators: the feature template emits `operationId` + `x-campbooks`; `cargo xtask scaffold-check` passes
 
 ## 4. Wrap-up
 

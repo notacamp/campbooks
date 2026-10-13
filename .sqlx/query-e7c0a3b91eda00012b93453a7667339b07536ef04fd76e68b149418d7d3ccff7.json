@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.users SET email = 'old@example.com' WHERE idp_subject = 'bea'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e7c0a3b91eda00012b93453a7667339b07536ef04fd76e68b149418d7d3ccff7"
+}

@@ -9,8 +9,10 @@ pub mod auth;
 pub mod blobs;
 pub mod clock;
 pub mod config;
+pub mod db;
 pub mod error;
 pub mod events;
+pub mod extract;
 pub mod idempotency;
 pub mod ids;
 pub mod jobs;
@@ -18,6 +20,7 @@ pub mod module;
 pub mod operations;
 pub mod records;
 pub mod state;
+pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]
 pub mod testing;
 

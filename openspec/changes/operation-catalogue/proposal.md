@@ -68,7 +68,12 @@ None. `system` keeps its behaviour; only its operation ids change.
   `Background::publishes`; `DomainEvent::WORKSPACE_SCOPED`;
   `ConsumerInfo.event_version`), `campbooks-server` (`compose`,
   `events_catalogue`, `events catalogue` command), `campbooks-system` (ids and
-  metadata), `xtask` (`check_operations`, `check_events`, `events`).
+  metadata), `campbooks-workspaces` (`x-campbooks` on its 13 operations: reads
+  of the workspace and its members open to the assistant, every membership,
+  role, invitation and deletion change high-risk and closed to rules and the
+  assistant; its five events declared with `publishes` and `ToSchema`),
+  `xtask` (`check_operations`, `check_events`, `events`, and the feature
+  template emitting `operationId` + `x-campbooks`).
 - No new module and no cross-module dependency.
 - Data: table `kernel.idempotency`, owned by the kernel.
 - Dependencies: no new crate. The kernel now uses `aws-lc-rs` (SHA-256;

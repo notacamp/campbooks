@@ -343,7 +343,8 @@ impl BlobStore {
 
     /// Delete every blob of `workspace` — objects, catalogue rows and
     /// references — whoever holds them. For workspace deletion only (the
-    /// `workspaces` module calls it on `WorkspaceDeleting`); idempotent, so
+    /// `workspaces` module's purge job calls it once the grace period of a
+    /// deleted workspace is over); idempotent, so
     /// a failed purge is simply run again. Returns how many objects it
     /// deleted.
     pub async fn purge_workspace(&self, workspace: &str) -> Result<u64, BlobError> {

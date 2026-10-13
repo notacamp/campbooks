@@ -81,10 +81,1213 @@
           "risk": "low"
         }
       }
+    },
+    "/api/v1/w/{workspace_id}": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Read a workspace.",
+        "operationId": "workspaces.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Delete a workspace.",
+        "operationId": "workspaces.delete",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Deleted; its records are purged after the grace period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceDeletion"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not an owner.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "high"
+        }
+      },
+      "patch": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Update a workspace.",
+        "operationId": "workspaces.update",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateWorkspace"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The updated workspace.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid name or body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not an owner or admin.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/invitations": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List pending invitations.",
+        "operationId": "workspaces.list_invitations",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending invitations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not an owner or admin.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Invite someone.",
+        "operationId": "workspaces.invite_member",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InviteMember"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Invited. A previous pending invitation to the same address is replaced.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid email, role or body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not an owner or admin.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`already_a_member`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/members": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List a workspace's members.",
+        "operationId": "workspaces.list_members",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/members/{user_id}": {
+      "delete": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Remove a member.",
+        "operationId": "workspaces.remove_member",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, not an owner or admin, or an admin removing an owner.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`last_owner`: the workspace would have no owner.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
+      },
+      "patch": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Change a member's role.",
+        "operationId": "workspaces.change_role",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The member.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeRole"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The member with their new role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, not an owner or admin, or an admin acting on the owner role.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`last_owner`: the workspace would have no owner.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/membership": {
+      "delete": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Leave a workspace.",
+        "operationId": "workspaces.leave",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "You are no longer a member."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or a client token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`last_owner`: you are its only owner.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/security-events": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Read the security log.",
+        "operationId": "workspaces.list_security_events",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, newest first: 1 to 200, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newest events.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityEventList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not an owner or admin.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:admin"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.security_event"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/workspaces": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List my workspaces.",
+        "operationId": "workspaces.list",
+        "responses": {
+          "200": {
+            "description": "The workspaces you belong to.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a user token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Create a workspace.",
+        "operationId": "workspaces.create",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateWorkspace"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created; you are its owner.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid name or body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/workspaces/invitations/accept": {
+      "post": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "Accept an invitation.",
+        "operationId": "workspaces.accept_invitation",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "You are a member; the workspace with your role.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, a client token, or `invitation_email_mismatch`: your verified email is not the invited one.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such invitation.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`invitation_used`, `invitation_expired` or `already_a_member`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "Accent": {
+        "type": "string",
+        "description": "The workspace's colour, one of the design system's accent presets.",
+        "enum": [
+          "business",
+          "personal",
+          "forest"
+        ]
+      },
+      "AcceptInvitation": {
+        "type": "object",
+        "description": "The invitation to accept.",
+        "required": [
+          "token"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "The token from the invitation link."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ChangeRole": {
+        "type": "object",
+        "description": "The new role.",
+        "required": [
+          "role"
+        ],
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The member's new role."
+          }
+        },
+        "additionalProperties": false
+      },
+      "CreateWorkspace": {
+        "type": "object",
+        "description": "A new workspace.",
+        "required": [
+          "name",
+          "kind"
+        ],
+        "properties": {
+          "accent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Accent",
+                "description": "Its colour; defaults to the kind's preset."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind",
+            "description": "What it is for."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name, 1 to 100 characters (trimmed).",
+            "example": "Household"
+          },
+          "signup_code": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The signup code, when the instance's policy is `code` and this is the\ncaller's first workspace."
+          }
+        },
+        "additionalProperties": false
+      },
       "HealthResponse": {
         "type": "object",
         "description": "The instance is healthy.",
@@ -102,6 +1305,149 @@
             "type": "string",
             "description": "Overall status; always `ok` in a 200 response.",
             "example": "ok"
+          }
+        }
+      },
+      "InvitationId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "InvitationId (UUIDv7)"
+      },
+      "InvitationList": {
+        "type": "object",
+        "description": "Pending (not yet accepted) invitations, expired ones included.",
+        "required": [
+          "invitations"
+        ],
+        "properties": {
+          "invitations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InvitationView"
+            },
+            "description": "The invitations."
+          }
+        }
+      },
+      "InvitationView": {
+        "type": "object",
+        "description": "A pending invitation, as owners and admins see it. Never carries the\ntoken.",
+        "required": [
+          "id",
+          "email",
+          "role",
+          "invited_by",
+          "created_at",
+          "expires_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          },
+          "email": {
+            "type": "string",
+            "description": "The invited address.",
+            "example": "someone@example.com"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it stops working."
+          },
+          "id": {
+            "$ref": "#/components/schemas/InvitationId",
+            "description": "Its id."
+          },
+          "invited_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who invited them."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The role they get on accepting."
+          }
+        }
+      },
+      "InviteMember": {
+        "type": "object",
+        "description": "Whom to invite.",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Their email address; the invitation can only be accepted by a user\nwhose verified email is this one.",
+            "example": "someone@example.com"
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The role they get: `admin` or `member` (the default). Owners are made\nby promotion, never by invitation."
+          }
+        },
+        "additionalProperties": false
+      },
+      "Kind": {
+        "type": "string",
+        "description": "What a workspace is for.",
+        "enum": [
+          "business",
+          "personal"
+        ]
+      },
+      "MemberList": {
+        "type": "object",
+        "description": "The members, in the order they joined.",
+        "required": [
+          "members"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            },
+            "description": "The members."
+          }
+        }
+      },
+      "MemberView": {
+        "type": "object",
+        "description": "A member of a workspace.",
+        "required": [
+          "user_id",
+          "role",
+          "joined_at"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name, as their identity provider gives it."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their email address, as their identity provider gives it."
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When they joined."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their role."
+          },
+          "user_id": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user."
           }
         }
       },
@@ -142,6 +1488,106 @@
           "type": "about:blank"
         }
       },
+      "Role": {
+        "type": "string",
+        "description": "A member's role in a workspace.",
+        "enum": [
+          "owner",
+          "admin",
+          "member"
+        ]
+      },
+      "SecurityEventId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "SecurityEventId (UUIDv7)"
+      },
+      "SecurityEventList": {
+        "type": "object",
+        "description": "The log.",
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SecurityEventView"
+            },
+            "description": "The events, newest first."
+          }
+        }
+      },
+      "SecurityEventView": {
+        "type": "object",
+        "description": "One entry of the security log.",
+        "required": [
+          "id",
+          "kind",
+          "at",
+          "metadata"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "id": {
+            "$ref": "#/components/schemas/SecurityEventId",
+            "description": "Its id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "What happened: `workspace_created`, `role_changed`, `invitation_created`,\n`invitation_accepted`, `member_removed`, `member_left`, `workspace_deleted`.",
+            "example": "role_changed"
+          },
+          "metadata": {
+            "description": "Ids and roles involved; never secrets."
+          },
+          "user_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "Who did it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "UpdateWorkspace": {
+        "type": "object",
+        "description": "The settings to change; absent fields stay as they are.",
+        "properties": {
+          "accent": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Accent",
+                "description": "A new colour."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A new name, 1 to 100 characters (trimmed)."
+          }
+        },
+        "additionalProperties": false
+      },
+      "UserId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UserId (UUIDv7)"
+      },
       "VersionResponse": {
         "type": "object",
         "description": "The running build.",
@@ -163,6 +1609,92 @@
             "example": "0.1.0"
           }
         }
+      },
+      "WorkspaceDeletion": {
+        "type": "object",
+        "description": "A deleted workspace.",
+        "required": [
+          "id",
+          "purge_after"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          },
+          "purge_after": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its records will be purged for good."
+          }
+        }
+      },
+      "WorkspaceId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "WorkspaceId (UUIDv7)"
+      },
+      "WorkspaceList": {
+        "type": "object",
+        "description": "The caller's workspaces, oldest first, each with their role.",
+        "required": [
+          "workspaces"
+        ],
+        "properties": {
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceView"
+            },
+            "description": "The workspaces."
+          }
+        }
+      },
+      "WorkspaceView": {
+        "type": "object",
+        "description": "A workspace, as its members see it.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "accent",
+          "created_at"
+        ],
+        "properties": {
+          "accent": {
+            "$ref": "#/components/schemas/Accent",
+            "description": "Its colour."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          },
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "Its id."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind",
+            "description": "What it is for."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "Household"
+          },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Role",
+                "description": "The caller's role in it; absent for a client token."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       }
     },
     "securitySchemes": {
@@ -170,7 +1702,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `system:read`: Read operational status."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       }
     }
   },
@@ -178,6 +1710,10 @@
     {
       "name": "system",
       "description": "Instance health and version."
+    },
+    {
+      "name": "workspaces",
+      "description": "Workspaces, members and roles, invitations and the security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a caller who is not a member (or a client token bound to another workspace) gets 404."
     }
   ]
 }

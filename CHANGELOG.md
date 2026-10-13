@@ -128,6 +128,30 @@ All notable changes to Campbooks Next are documented here. The format follows
   hooks (`lefthook install`), Claude Code skills for starting a task,
   developing a feature and adding a module, and a guide to working in
   parallel worktrees (`docs/parallel-work.md`).
+- Workspaces. People who sign in get a Campbooks user; they create workspaces
+  (business or personal, with an accent colour), invite others by email as
+  admins or members, change roles, remove members or leave, and owners can
+  delete a workspace: it disappears at once and its data is purged after 30
+  days. A workspace always keeps at least one owner. Owners and admins can
+  read a security log (sign-ins, role changes, invitations, removals,
+  deletion). The API lives under `/api/v1/workspaces` and
+  `/api/v1/w/{workspace_id}/…`, with new scopes `workspaces:read`,
+  `workspaces:write` and `workspaces:admin` (registered in the bundled IdP;
+  add them to sign-in clients provisioned earlier). Invitations are not
+  emailed yet; set `CAMPBOOKS_ENV=development` to have the server log the
+  link.
+- `CAMPBOOKS_SIGNUP__POLICY` decides who may create a first workspace:
+  `open` (default), `invite_only`, `approval` (requests are recorded and
+  refused for now) or `code` (with `CAMPBOOKS_SIGNUP__CODES`). The instance's
+  first user can always create one.
+- Each workspace's data is also isolated by Postgres row-level security. The
+  server now runs migrations as your database user and then queries as the
+  role `campbooks_app` (created by the migrations; `CAMPBOOKS_DATABASE_ROLE`
+  to change it), and warns at startup if that role would bypass the
+  policies. Nothing to do with the bundled Postgres; on a managed Postgres
+  whose user cannot create roles, see `deploy/README.md`.
+- API errors for malformed JSON bodies and query strings are now
+  problem+json 400s, and unparsable ids in paths are 404s.
 
 ### Changed
 - The image's default command is now `all` instead of `serve` (same

@@ -15,11 +15,8 @@ use crate::{
     AppState,
     auth::{AuthenticatedPrincipal, Principal},
     idempotency,
+    tenancy::WORKSPACE_PATH_PARAM,
 };
-
-/// The path parameter that carries the workspace an operation works in;
-/// [`Invocation::in_workspace`] fills it.
-pub const WORKSPACE_PATH_PARAM: &str = "workspace_id";
 
 /// Largest response body [`invoke`] reads.
 const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
@@ -97,7 +94,9 @@ pub struct Invocation {
     pub operation_id: String,
     /// Path parameters, query and body, as one object.
     pub input: Value,
-    /// The workspace to run in, for operations under `{workspace_id}`.
+    /// The workspace to run in, filling the operation's
+    /// [`WORKSPACE_PATH_PARAM`] (`{workspace_id}`); membership is then checked
+    /// by its `Workspace<S>` extractor.
     pub workspace: Option<String>,
     /// Required for mutating operations: the same key replays the first
     /// result instead of running twice (e.g. a rule's job id).

@@ -54,9 +54,7 @@ use utoipa_axum::router::OpenApiRouter;
 use crate::{AppState, idempotency};
 
 pub use catalogue::{Catalogue, OperationInfo};
-pub use invoke::{
-    Caller, Invocation, InvokeError, Operations, Output, WORKSPACE_PATH_PARAM, invoke,
-};
+pub use invoke::{Caller, Invocation, InvokeError, Operations, Output, invoke};
 
 /// Name of the OpenAPI vendor extension that carries an [`Operation`].
 pub const EXTENSION: &str = "x-campbooks";
