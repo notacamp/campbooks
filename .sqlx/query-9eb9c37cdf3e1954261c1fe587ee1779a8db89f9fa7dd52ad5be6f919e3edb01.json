@@ -1,0 +1,101 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT operation_id, request_hash, state, response_status,\n                   response_content_type, response_location, response_body\n              FROM kernel.idempotency\n             WHERE principal = $1 AND key = $2 AND expires_at > now()\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "operation_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "operation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "request_hash",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "request_hash"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "response_status",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "response_status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "response_content_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "response_content_type"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "response_location",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "response_location"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "response_body",
+        "type_info": "Bytea",
+        "origin": {
+          "Table": {
+            "table": "kernel.idempotency",
+            "name": "response_body"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "9eb9c37cdf3e1954261c1fe587ee1779a8db89f9fa7dd52ad5be6f919e3edb01"
+}

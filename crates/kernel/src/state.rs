@@ -4,7 +4,9 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::{auth::TokenVerifier, config::Config, events::EventBus, jobs::Registry};
+use crate::{
+    auth::TokenVerifier, config::Config, events::EventBus, jobs::Registry, operations::Operations,
+};
 
 /// What every handler can reach. Cheap to clone.
 #[derive(Debug, Clone)]
@@ -17,6 +19,9 @@ pub struct AppState {
     pub events: EventBus,
     /// Validates access tokens for [`Scoped`](crate::auth::Scoped) handlers.
     pub auth: TokenVerifier,
+    /// The composed API, for running operations by id
+    /// ([`invoke`](crate::operations::invoke)). Installed by the server.
+    pub operations: Operations,
 }
 
 impl AppState {
@@ -29,6 +34,7 @@ impl AppState {
             auth: TokenVerifier::new(&config.auth),
             config: Arc::new(config),
             events: EventBus::default(),
+            operations: Operations::default(),
         }
     }
 
@@ -36,6 +42,14 @@ impl AppState {
     #[must_use]
     pub fn with_registry(mut self, registry: Registry) -> Self {
         self.events = EventBus::new(Arc::new(registry));
+        self
+    }
+
+    /// The same state, able to [`invoke`](crate::operations::invoke) the
+    /// operations of `operations`.
+    #[must_use]
+    pub fn with_operations(mut self, operations: Operations) -> Self {
+        self.operations = operations;
         self
     }
 }

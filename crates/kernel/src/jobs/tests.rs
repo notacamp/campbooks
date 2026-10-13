@@ -11,7 +11,7 @@ use utoipa_axum::router::OpenApiRouter;
 use super::*;
 use crate::{
     AppState, Module,
-    events::{DomainEvent, Event, EventHandler, EventId, ReplayError, ReplayFrom},
+    events::{DomainEvent, Event, EventCatalogue, EventHandler, EventId, ReplayError, ReplayFrom},
     testing,
 };
 
@@ -78,7 +78,7 @@ async fn log(ctx: &mut JobContext, kind: &str, note: &str, attempt: i32) -> Resu
     Ok(())
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
 struct Pinged {
     workspace: Option<String>,
     n: u32,
@@ -908,8 +908,8 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
         enqueued_at.elapsed()
     );
     stop.send(()).unwrap();
-    // The probe, and the kernel's prune scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 2);
+    // The probe, and the kernel's two prunes scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 3);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -950,8 +950,8 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's prune scheduled at start-up.
-    assert_eq!((stats.succeeded, stats.released), (2, 1));
+    // The quick probe and the kernel's two prunes scheduled at start-up.
+    assert_eq!((stats.succeeded, stats.released), (3, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -979,13 +979,17 @@ fn registry_collects_kernel_and_module_work() {
     assert_eq!(
         registry.kind_names(),
         [
+            "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "test.count_a",
             "test.count_b",
             "test.probe"
         ]
     );
-    assert_eq!(registry.schedule_names(), ["kernel.prune_jobs"]);
+    assert_eq!(
+        registry.schedule_names(),
+        ["kernel.prune_jobs", "kernel.prune_idempotency"]
+    );
     assert_eq!(registry.queues(), ["default", "events", "maintenance"]);
     let consumers: Vec<_> = registry
         .consumers_of("test.pinged")
@@ -994,8 +998,97 @@ fn registry_collects_kernel_and_module_work() {
         .collect();
     assert_eq!(consumers, ["test.count_a", "test.count_b"]);
     assert_eq!(
-        registry.consumer("test.count_b").map(|c| c.event),
-        Some("test.pinged")
+        registry
+            .consumer("test.count_b")
+            .map(|c| (c.event, c.event_version)),
+        Some(("test.pinged", 1))
+    );
+}
+
+/// An instance-wide event with a nested payload type.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+struct Rotated {
+    /// Which key.
+    key: KeyInfo,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+struct KeyInfo {
+    kid: String,
+}
+
+impl DomainEvent for Rotated {
+    const NAME: &'static str = "test.rotated";
+    const VERSION: u16 = 3;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+struct Foreign;
+
+impl DomainEvent for Foreign {
+    const NAME: &'static str = "other.foreign";
+    const VERSION: u16 = 0;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+#[test]
+fn published_events_form_the_catalogue() {
+    let registry = Registry::build(&[module(
+        background().publishes::<Rotated>().publishes::<Pinged>(),
+    )])
+    .unwrap();
+    let names: Vec<_> = registry.published().iter().map(|e| e.name).collect();
+    assert_eq!(names, ["test.rotated", "test.pinged"]);
+
+    let catalogue = serde_json::to_value(EventCatalogue::new(&registry)).unwrap();
+    let events = catalogue["events"].as_array().unwrap();
+    assert_eq!(events.len(), 2);
+    // Sorted by name.
+    assert_eq!(events[0]["name"], "test.pinged");
+    assert_eq!(events[0]["module"], "test");
+    assert_eq!(events[0]["version"], 1);
+    assert_eq!(events[0]["workspaceScoped"], true);
+    assert_eq!(events[0]["payload"]["type"], "object");
+    assert!(events[0]["payload"]["properties"]["n"].is_object());
+    assert_eq!(events[1]["name"], "test.rotated");
+    assert_eq!(events[1]["version"], 3);
+    assert_eq!(events[1]["workspaceScoped"], false);
+    assert_eq!(
+        events[1]["payload"]["properties"]["key"]["$ref"],
+        "#/components/schemas/KeyInfo"
+    );
+    assert_eq!(
+        catalogue["components"]["schemas"]["KeyInfo"]["properties"]["kid"]["type"],
+        "string"
+    );
+}
+
+#[test]
+fn published_events_are_owned_versioned_and_unique() {
+    let err = Registry::build(&[module(
+        Background::new()
+            .publishes::<Pinged>()
+            .publishes::<Pinged>()
+            .publishes::<Foreign>(),
+    )])
+    .unwrap_err();
+    let all = err.0.join("\n");
+    assert!(all.contains("`test.pinged` is declared twice"), "{all}");
+    assert!(
+        all.contains("published event `other.foreign`: must be `test.<name>`"),
+        "{all}"
+    );
+    assert!(
+        all.contains("`other.foreign`: VERSION must be at least 1"),
+        "{all}"
     );
 }
 

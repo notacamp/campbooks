@@ -43,8 +43,10 @@ crates/
                            copy its shape for every new module.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema
-openapi/openapi.json       generated, committed; the contract for every client
-xtask/                     `cargo xtask arch | openapi [--check]`
+openapi/openapi.json       generated, committed; the operation catalogue and the
+                           contract for every client (ADR 0013)
+openapi/events.json        generated, committed; the events catalogue
+xtask/                     `cargo xtask arch | openapi [--check] | events [--check]`
 clients/                   pnpm workspace
   app/                     the one UI (React + TypeScript + Vite)
     src/app/               shell: entry, router, providers, module manifest
@@ -107,11 +109,72 @@ read it may not see answers 404. `campbooks-server scopes` prints the
 catalogue the IdP mirrors. Module tests sign their own tokens with
 `kernel::testing::TestIdp`.
 
+### Operations: the catalogue (ADR 0013)
+
+The generated OpenAPI document is the one list of what Campbooks can do.
+There is no other registry: the command menu, the assistant's tools,
+automation steps and MCP all read it. An operation is an ordinary handler
+whose `#[utoipa::path]` carries three things besides its route and
+responses:
+
+```rust
+#[utoipa::path(
+    post,
+    path = "/api/v1/conversations/threads/{id}/archive",
+    operation_id = "conversations.archive",            // <module>.<verb>[_<noun>], never renamed
+    security(("bearer" = ["conversations:write"])),    // or security(()) when public
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
+        .undo("conversations.unarchive")               // the inverse, itself an operation
+        .automation()                                  // rules may call it
+        .assistant()                                   // the assistant may call it
+        .records(["conversations.thread"])))),         // the record types it touches
+    responses(…),
+)]
+```
+
+`Operation::query()` starts a read (no mutation, low risk) and
+`Operation::command(risk)` a write; both expose nothing to automation or the
+assistant until opted in. High-risk operations always need the user's
+confirmation. Undo is an operation, named in `undo`, which the activity log
+offers; shortcuts and labels belong to the client, keyed by `operationId`.
+`cargo xtask arch` fails unless every operation has an `operationId`
+prefixed by the module whose router serves it (and unique), a complete
+`x-campbooks` block whose `records` are the module's own, explicit security,
+`mutates` matching the method (POST/PUT/PATCH/DELETE vs GET/HEAD), and an
+`undo` naming an existing mutating operation.
+
+**Calling an operation from inside.** Automation, the assistant and MCP run
+built-in behaviour with `kernel::operations::invoke(&state, Invocation)`:
+the `operationId`, the input (path parameters by name; the rest is the JSON
+body, or the query for operations without one), the principal it acts for,
+the caller kind and, for `{workspace_id}` routes, the workspace. The kernel
+refuses operations that do not opt the caller in, unconfirmed high-risk
+calls, and mutating calls without an idempotency key; then it dispatches a
+request through the very router HTTP traffic reaches, with the principal
+attached in-process (nothing outside the process can set it), so the
+handler's scope, membership and record checks apply unchanged. The server
+builds that router with `kernel::operations::compose`.
+
+**Idempotency.** One layer in front of every module route honours
+`Idempotency-Key` on mutating operations (decided by the catalogue; no
+per-operation opt-out): the first request's response is stored in
+`kernel.idempotency` for 24 hours and replayed for an identical retry
+(`Idempotency-Replayed: true`); a different request with the same key is
+422, one still running is 409. Keys belong to the authenticated caller;
+server errors and auth failures release the key. GET and HEAD ignore the
+header. The kernel's `kernel.prune_idempotency` schedule deletes expired
+keys hourly.
+
+**Record references.** A module that points at another module's record
+stores a `kernel::RecordRef { type, id }`, with `type` =
+`<module>.<record>`, never a foreign key.
+
 ### Cross-module communication
 
 1. **Events (default).** A module declares its events as `DomainEvent` types
    (`NAME` = `<module>.<event>`, an explicit schema `VERSION`, the
-   `workspace` they belong to) and publishes them **in the transaction that
+   `workspace` they belong to, and `WORKSPACE_SCOPED` when they are
+   instance-wide) and publishes them **in the transaction that
    makes the change**: `state.events.publish(&mut tx, &event)`. That writes
    the event to the retained log `kernel.events` and one job per registered
    consumer to `kernel.jobs` (fan-out at publish time), so an event exists
@@ -120,7 +183,13 @@ catalogue the IdP mirrors. Module tests sign their own tokens with
    `<module>.<handler>`, registered in the module's `background`
    (`Background::new().on_event::<H>()`). Its database work goes through
    `ctx.tx()`, which carries the workspace (`campbooks.workspace_id`) and
-   commits together with the delivery being marked done. To rebuild a
+   commits together with the delivery being marked done. The publisher
+   declares each event type with `Background::new().publishes::<E>()` (`E`
+   also derives `utoipa::ToSchema`); that lists it in the generated
+   `openapi/events.json` (name, version, workspace-scoped, payload JSON
+   Schema), which `cargo xtask events --check` keeps current. `cargo xtask
+   arch` fails when a handler consumes an event no module publishes, or at
+   another version. To rebuild a
    projection, `campbooks-server events replay <consumer> --since …`
    re-delivers logged events.
 2. **Allowlisted dependency (exception).** If a module truly needs another's

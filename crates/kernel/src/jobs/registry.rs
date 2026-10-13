@@ -11,7 +11,8 @@ use serde_json::Value;
 use super::{Job, JobContext, JobError, PruneJobs};
 use crate::{
     Module,
-    events::{DomainEvent, Event, EventHandler, EventId},
+    events::{DomainEvent, Event, EventHandler, EventId, PublishedEvent},
+    idempotency::PruneIdempotency,
 };
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -21,11 +22,13 @@ pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 pub(crate) type RunFn =
     for<'a> fn(&'a mut JobContext, Value) -> BoxFuture<'a, Result<(), JobError>>;
 
-/// A module's background work: the jobs it runs, the events it consumes and
-/// its recurring schedules. Part of its [`Module`] descriptor.
+/// A module's background work: the events it publishes, the jobs it runs,
+/// the events it consumes and its recurring schedules. Part of its
+/// [`Module`] descriptor.
 ///
 /// ```ignore
 /// Background::new()
+///     .publishes::<MessageReceived>()
 ///     .job::<SyncMailbox>()
 ///     .on_event::<TrackSender>()
 ///     .schedule::<RefreshTokens>(Duration::from_secs(15 * 60))
@@ -34,6 +37,7 @@ pub(crate) type RunFn =
 pub struct Background {
     kinds: Vec<KindSpec>,
     schedules: Vec<ScheduleSpec>,
+    publishes: Vec<EventSpec>,
 }
 
 impl std::fmt::Debug for Background {
@@ -47,8 +51,26 @@ impl std::fmt::Debug for Background {
                 "schedules",
                 &self.schedules.iter().map(|s| s.name).collect::<Vec<_>>(),
             )
+            .field(
+                "publishes",
+                &self.publishes.iter().map(|e| e.name).collect::<Vec<_>>(),
+            )
             .finish()
     }
+}
+
+#[derive(Clone, Copy)]
+struct EventSpec {
+    name: &'static str,
+    version: u16,
+    workspace_scoped: bool,
+    schema: fn() -> utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+    schemas: fn(
+        &mut Vec<(
+            String,
+            utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+        )>,
+    ),
 }
 
 #[derive(Clone)]
@@ -71,6 +93,22 @@ impl Background {
     /// Nothing in the background.
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Declare that the module publishes events of type `E`: they are listed,
+    /// with their payload schema, in the events catalogue
+    /// (`openapi/events.json`), and other modules may consume them. `E`'s
+    /// name must be `<module>.<event>` of this module.
+    #[must_use]
+    pub fn publishes<E: DomainEvent + utoipa::ToSchema>(mut self) -> Self {
+        self.publishes.push(EventSpec {
+            name: E::NAME,
+            version: E::VERSION,
+            workspace_scoped: E::WORKSPACE_SCOPED,
+            schema: <E as utoipa::PartialSchema>::schema,
+            schemas: <E as utoipa::ToSchema>::schemas,
+        });
+        self
     }
 
     /// Run jobs of type `J` (enqueued with [`enqueue`](super::enqueue)).
@@ -190,6 +228,8 @@ pub struct ConsumerInfo {
     pub name: &'static str,
     /// The event it consumes (`DomainEvent::NAME`).
     pub event: &'static str,
+    /// The payload version it reads (`DomainEvent::VERSION`).
+    pub event_version: u16,
     /// The queue its deliveries run on.
     pub queue: &'static str,
     /// Attempts per delivery.
@@ -213,6 +253,7 @@ pub struct Registry {
     kinds: BTreeMap<&'static str, KindInfo>,
     consumers: Vec<ConsumerInfo>,
     schedules: Vec<ScheduleInfo>,
+    published: Vec<PublishedEvent>,
 }
 
 impl std::fmt::Debug for Registry {
@@ -221,6 +262,10 @@ impl std::fmt::Debug for Registry {
             .field("kinds", &self.kinds.keys().collect::<Vec<_>>())
             .field("consumers", &self.consumers)
             .field("schedules", &self.schedules)
+            .field(
+                "published",
+                &self.published.iter().map(|e| e.name).collect::<Vec<_>>(),
+            )
             .finish()
     }
 }
@@ -233,16 +278,19 @@ pub struct RegistryError(pub Vec<String>);
 /// Owner name of the kernel's own background work.
 pub const KERNEL_OWNER: &str = "kernel";
 
-/// How often the kernel prunes succeeded jobs.
+/// How often the kernel prunes succeeded jobs and expired idempotency keys.
 pub const PRUNE_EVERY: Duration = Duration::from_hours(1);
 
 impl Registry {
     /// Collect `modules`' registrations and the kernel's maintenance. Names
-    /// must be `<owner>.<name>` (lower-case snake case) of the declaring
-    /// module and unique; queues lower-case snake case; attempts at least
+    /// (of jobs, handlers and published events) must be `<owner>.<name>`
+    /// (lower-case snake case) of the declaring module and unique; queues
+    /// lower-case snake case; attempts at least one; event versions at least
     /// one; schedules at least a second apart.
     pub fn build(modules: &[Module]) -> Result<Self, RegistryError> {
-        let kernel = Background::new().schedule::<PruneJobs>(PRUNE_EVERY);
+        let kernel = Background::new()
+            .schedule::<PruneJobs>(PRUNE_EVERY)
+            .schedule::<PruneIdempotency>(PRUNE_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))
             .chain(modules.iter().map(|m| (m.name, &m.background)));
 
@@ -254,6 +302,9 @@ impl Registry {
             }
             for schedule in &background.schedules {
                 errors.extend(registry.add_schedule(owner, schedule));
+            }
+            for event in &background.publishes {
+                errors.extend(registry.add_published(owner, event));
             }
         }
         if errors.is_empty() {
@@ -318,10 +369,41 @@ impl Registry {
                 self.consumers.push(ConsumerInfo {
                     name: kind.name,
                     event,
+                    event_version: kind.consumes.map_or(0, |(_, version)| version),
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
                 });
             }
+        }
+        errors
+    }
+
+    fn add_published(&mut self, owner: &'static str, event: &EventSpec) -> Vec<String> {
+        let mut errors = Vec::new();
+        if let Err(e) = check_owned_name(owner, event.name) {
+            errors.push(format!("published event `{}`: {e}", event.name));
+        }
+        if event.version == 0 {
+            errors.push(format!(
+                "published event `{}`: VERSION must be at least 1",
+                event.name
+            ));
+        }
+        if self.published.iter().any(|e| e.name == event.name) {
+            errors.push(format!(
+                "published event `{}` is declared twice ({owner})",
+                event.name
+            ));
+        }
+        if errors.is_empty() {
+            self.published.push(PublishedEvent {
+                module: owner,
+                name: event.name,
+                version: event.version,
+                workspace_scoped: event.workspace_scoped,
+                schema: event.schema,
+                schemas: event.schemas,
+            });
         }
         errors
     }
@@ -382,6 +464,11 @@ impl Registry {
     /// Every consumer, by name.
     pub fn consumers(&self) -> &[ConsumerInfo] {
         &self.consumers
+    }
+
+    /// Every event type a module declared it publishes.
+    pub fn published(&self) -> &[PublishedEvent] {
+        &self.published
     }
 
     /// Every job kind (jobs and event handlers), sorted.

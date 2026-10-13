@@ -60,6 +60,14 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   `cargo xtask arch` reject misnamed or duplicate registrations.)*
 - **Every HTTP endpoint is in the OpenAPI document** (`utoipa`), which is
   generated to `openapi/openapi.json` and committed. *(CI: `cargo xtask openapi --check`.)*
+- **The OpenAPI document is the operation catalogue (ADR 0013); there is no
+  other action registry.** Every operation declares `operation_id =
+  "<module>.<verb>[_<noun>]"` and an `x-campbooks` extension built from
+  `kernel::Operation`; automation and the assistant call it by id through
+  `kernel::operations::invoke`. Published events are declared with
+  `Background::publishes` and listed in `openapi/events.json`. *(CI: `cargo
+  xtask arch` checks ids, metadata, `mutates` vs method and undo targets;
+  `cargo xtask events --check`.)*
 - **Errors are RFC 9457 problem+json** via `kernel::Error`. Permission failures
   on reads return 404, not 403.
 - **Clients mirror the server.** `clients/app/src/modules/<domain>` maps 1:1 to

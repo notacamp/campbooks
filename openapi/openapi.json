@@ -16,7 +16,7 @@
           "system"
         ],
         "summary": "Report instance health.",
-        "operationId": "system_health",
+        "operationId": "system.health",
         "responses": {
           "200": {
             "description": "The instance and its database are up.",
@@ -41,7 +41,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/system/version": {
@@ -50,7 +57,7 @@
           "system"
         ],
         "summary": "Report the server version.",
-        "operationId": "system_version",
+        "operationId": "system.version",
         "responses": {
           "200": {
             "description": "The running build.",
@@ -65,7 +72,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     }
   },

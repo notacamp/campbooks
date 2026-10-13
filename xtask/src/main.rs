@@ -2,10 +2,12 @@
 //!
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
+//! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
 
 #![forbid(unsafe_code)]
 
 mod arch;
+mod events;
 mod openapi;
 
 use std::{
@@ -30,12 +32,19 @@ struct Cli {
 #[derive(Debug, Subcommand)]
 enum Command {
     /// Check crate dependency directions, migration names and the schemas
-    /// they touch, versions, scope and background-work names, and that every
-    /// OpenAPI operation declares its security.
+    /// they touch, versions, scope and background-work names, that every
+    /// OpenAPI operation declares its security and is a complete catalogue
+    /// entry (ADR 0013), and that every consumed event is published.
     Arch,
     /// Write openapi/openapi.json from the server's routes.
     Openapi {
         /// Fail if the committed document is stale instead of writing it.
+        #[arg(long)]
+        check: bool,
+    },
+    /// Write openapi/events.json from the modules' published events.
+    Events {
+        /// Fail if the committed catalogue is stale instead of writing it.
         #[arg(long)]
         check: bool,
     },
@@ -47,6 +56,7 @@ fn main() -> ExitCode {
     let result = match cli.command {
         Command::Arch => run_arch(&root),
         Command::Openapi { check } => openapi::run(&root, check),
+        Command::Events { check } => events::run(&root, check),
     };
     match result {
         Ok(message) => {
@@ -96,11 +106,34 @@ fn run_arch(root: &Path) -> Result<String> {
     violations.extend(arch::check_dependencies(&crates, &arch_file.allow));
     violations.extend(arch::check_migrations(&migrations, &modules));
     violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
-    let background = campbooks_server::registry()
+    let registry = campbooks_server::registry();
+    let background = registry
+        .as_ref()
         .err()
-        .map(|e| e.0)
+        .map(|e| e.0.clone())
         .unwrap_or_default();
     violations.extend(arch::check_background(&background));
+    if let Ok(registry) = &registry {
+        let published: Vec<arch::EventDecl> = registry
+            .published()
+            .iter()
+            .map(|e| arch::EventDecl {
+                by: e.module.to_owned(),
+                name: e.name.to_owned(),
+                version: e.version,
+            })
+            .collect();
+        let consumed: Vec<arch::EventDecl> = registry
+            .consumers()
+            .iter()
+            .map(|c| arch::EventDecl {
+                by: c.name.to_owned(),
+                name: c.event.to_owned(),
+                version: c.event_version,
+            })
+            .collect();
+        violations.extend(arch::check_events(&published, &consumed));
+    }
     violations.extend(arch::check_versions(&version, &crates));
 
     let scopes: Vec<arch::DeclaredScope> = campbooks_server::modules()
@@ -120,12 +153,13 @@ fn run_arch(root: &Path) -> Result<String> {
     let operations =
         arch::check_operation_security(&spec, campbooks_server::SECURITY_SCHEME, &catalogue);
     violations.extend(operations);
+    violations.extend(arch::check_operations(&spec, &operation_owners()?));
 
     if violations.is_empty() {
         let modules: Vec<_> = modules.iter().map(String::as_str).collect();
         return Ok(format!(
             "architecture OK: {} crates, {} module(s) [{}], {} migration(s), {} scope(s), \
-             every operation declares its security",
+             every operation declares its security and catalogue metadata",
             crates.len(),
             modules.len(),
             modules.join(", "),
@@ -139,6 +173,25 @@ fn run_arch(root: &Path) -> Result<String> {
         violations.len(),
         list.join("\n")
     )
+}
+
+/// `(METHOD, path)` → the module whose router declares the operation.
+fn operation_owners() -> Result<arch::Owners> {
+    let mut owners = arch::Owners::new();
+    for module in campbooks_server::modules() {
+        let name = module.name;
+        let spec = serde_json::to_value(module.router.into_openapi())
+            .with_context(|| format!("serializing module `{name}`'s OpenAPI"))?;
+        let paths = spec["paths"].as_object().cloned().unwrap_or_default();
+        for (path, item) in paths {
+            for method in arch::OPERATION_METHODS {
+                if item.get(method).is_some() {
+                    owners.insert((method.to_uppercase(), path.clone()), name.to_owned());
+                }
+            }
+        }
+    }
+    Ok(owners)
 }
 
 fn load_crates(root: &Path) -> Result<Vec<arch::Crate>> {

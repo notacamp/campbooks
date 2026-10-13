@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM kernel.idempotency WHERE principal = $1 AND key = $2 AND state = 'pending'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "74289b47b890f2885f69ddb79d6118ef2efe65dbb7fada072c4f38e1ec9b6541"
+}
