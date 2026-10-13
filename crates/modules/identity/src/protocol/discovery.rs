@@ -10,7 +10,7 @@ use axum::{
 use campbooks_kernel::{Operation, Result};
 
 use super::Ctx;
-use crate::deps::Issuer;
+use crate::{deps::Issuer, domain::clients::third_party_scopes};
 
 /// How long others may cache the JWKS: an hour, well inside the week a new
 /// key is published before it signs.
@@ -24,19 +24,21 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
     let scopes: Vec<&str> = OIDC_SCOPES
         .iter()
         .copied()
-        .chain(issuer.api_scopes.iter().map(String::as_str))
+        .chain(issuer.api_scopes.iter().map(|s| s.name))
         .collect();
     serde_json::json!({
         "issuer": url,
         "authorization_endpoint": format!("{url}/oauth2/authorize"),
         "token_endpoint": format!("{url}/oauth2/token"),
         "revocation_endpoint": format!("{url}/oauth2/revoke"),
+        "registration_endpoint": format!("{url}/oauth2/register"),
         "end_session_endpoint": format!("{url}/oauth2/end_session"),
         "jwks_uri": format!("{url}/oauth2/jwks"),
         "scopes_supported": scopes,
+        "client_id_metadata_document_supported": true,
         "response_types_supported": ["code"],
         "response_modes_supported": ["query"],
-        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "grant_types_supported": ["authorization_code", "refresh_token", "client_credentials"],
         "code_challenge_methods_supported": ["S256"],
         "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         "revocation_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
@@ -107,4 +109,68 @@ pub async fn jwks(State(ctx): State<Ctx>) -> Result<Response> {
         .headers_mut()
         .insert(header::CACHE_CONTROL, HeaderValue::from_static(JWKS_CACHE));
     Ok(response)
+}
+
+/// RFC 9728 protected-resource metadata of the API: its resource
+/// identifier, the issuer that protects it and the scopes a third party may
+/// ask for.
+fn resource_metadata(issuer: &Issuer) -> serde_json::Value {
+    let mut scopes: Vec<String> = OIDC_SCOPES.iter().map(|s| (*s).to_owned()).collect();
+    scopes.extend(third_party_scopes(&issuer.api_scopes));
+    serde_json::json!({
+        "resource": issuer.resource,
+        "authorization_servers": [issuer.url],
+        "scopes_supported": scopes,
+        "bearer_methods_supported": ["header"],
+        "resource_name": "Campbooks API",
+    })
+}
+
+/// The URL of the API's protected-resource metadata (RFC 9728 §3.1: the
+/// well-known path inserted before the resource's path), for
+/// `WWW-Authenticate: Bearer resource_metadata=`.
+pub fn resource_metadata_url(issuer: &Issuer) -> String {
+    format!(
+        "{}{RESOURCE_METADATA_PATH}{}",
+        issuer.url,
+        crate::deps::API_RESOURCE_PATH
+    )
+}
+
+/// The well-known path of protected-resource metadata.
+const RESOURCE_METADATA_PATH: &str = "/.well-known/oauth-protected-resource";
+
+/// The API's protected-resource metadata (RFC 9728), at the path RFC 9728
+/// §3.1 derives from its resource identifier, `<origin>/api`.
+#[utoipa::path(
+    get,
+    path = "/.well-known/oauth-protected-resource/api",
+    tag = "identity",
+    operation_id = "identity.protected_resource_metadata",
+    extensions(("x-campbooks" = json!(Operation::query()))),
+    security(()),
+    responses(
+        (status = 200, description = "The API's metadata.", body = Object),
+        (status = 404, description = "Another identity provider serves this instance."),
+    ),
+)]
+pub async fn protected_resource(State(ctx): State<Ctx>) -> Result<Json<serde_json::Value>> {
+    Ok(Json(resource_metadata(ctx.issuer()?)))
+}
+
+/// The same document at the root, for clients that look there.
+#[utoipa::path(
+    get,
+    path = "/.well-known/oauth-protected-resource",
+    tag = "identity",
+    operation_id = "identity.protected_resource_metadata_root",
+    extensions(("x-campbooks" = json!(Operation::query()))),
+    security(()),
+    responses(
+        (status = 200, description = "The API's metadata.", body = Object),
+        (status = 404, description = "Another identity provider serves this instance."),
+    ),
+)]
+pub async fn protected_resource_root(State(ctx): State<Ctx>) -> Result<Json<serde_json::Value>> {
+    Ok(Json(resource_metadata(ctx.issuer()?)))
 }

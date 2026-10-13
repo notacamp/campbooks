@@ -47,13 +47,13 @@ clients             client_id text PK · kind (workspace|dynamic|metadata_docume
                     allowed_scopes text[] · created_by uuid? (account) ·
                     created_at · secret_rotated_at? · last_used_at? ·
                     metadata_expires_at? (metadata documents: when to fetch again)
-consents            id uuid PK · account_id → accounts · client_id · bound_workspace uuid? ·
+consents            id uuid PK · account_id → accounts · client_id · bound_workspace_id uuid? ·
                     bound_member uuid? (the workspaces UserId at grant time) ·
                     scopes text[] · remembered bool · granted_at · last_used_at? ·
                     revoked_at?   UNIQUE (account_id, client_id) WHERE revoked_at IS NULL
-authorize_requests  + resource · bound_workspace? · consent_due (bool)
-authorization_codes + resource · bound_workspace?
-refresh_families    + resource · bound_workspace?
+authorize_requests  + resource · bound_workspace_id? · consent_due (bool)
+authorization_codes + resource · bound_workspace_id?
+refresh_families    + resource · bound_workspace_id?
 ```
 
 **Row-level security.**
@@ -69,7 +69,7 @@ refresh_families    + resource · bound_workspace?
   `LOCAL` to its transaction (`domain::clients::begin_as_server`).
 - The server's "every workspace-owned table has forced RLS" test passes.
 
-**`bound_workspace`, not `workspace_id`, on consents, codes and families.**
+**`bound_workspace_id`, not `workspace_id`, on consents, codes and families.**
 
 - These rows belong to an account, not to a workspace: Settings lists
   every consent of a person across all their workspaces, and the token
@@ -242,7 +242,7 @@ the app and presses Allow after a recent sign-in.
 
 ### Workspace-bound tokens
 
-- A code and its refresh family carry `bound_workspace`. Access tokens
+- A code and its refresh family carry `bound_workspace_id`. Access tokens
   minted from them carry `workspace_id`.
 - The in-process verifier (strict mode) keeps `workspace_id` on **user**
   tokens. An outside IdP's user claims stay ignored, as before, because a

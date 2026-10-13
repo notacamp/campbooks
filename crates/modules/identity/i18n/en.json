@@ -12,6 +12,16 @@
     "step_up_required": "Sign in again first: changing how you sign in needs a sign-in from the last ten minutes.",
     "last_way_in": "This is the only way you can sign in, so it can't be removed. Add another way first.",
     "link_incomplete": "Say which provider, workspace or mailbox this is for.",
-    "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet."
+    "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet.",
+    "invalid_target": "This app asked for access to something Campbooks does not serve.",
+    "consent_request_not_found": "This request to allow an app expired or was already answered. Start again from the app.",
+    "consent_needs_workspace": "Choose the workspace this app may use.",
+    "consent_wrong_workspace": "This app belongs to another workspace and can only be allowed there.",
+    "not_workspace_admin": "Only the workspace's owners and admins can manage its apps.",
+    "client_not_found": "There is no such app in this workspace.",
+    "invalid_client_metadata": "The app's details are not acceptable: {{reason}}",
+    "client_needs_redirect": "A sign-in app needs at least one https or loopback return address.",
+    "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
+    "client_is_public": "This app signs people in and has no secret to rotate."
   }
 }

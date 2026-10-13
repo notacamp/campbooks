@@ -12,6 +12,16 @@
     "step_up_required": "Vuelve a iniciar sesión primero: para cambiar cómo inicias sesión hace falta haber iniciado sesión en los últimos diez minutos.",
     "last_way_in": "Es la única forma de iniciar sesión, así que no se puede quitar. Añade otra primero.",
     "link_incomplete": "Indica el proveedor, el espacio de trabajo o el buzón al que se refiere.",
-    "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia."
+    "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia.",
+    "invalid_target": "Esta aplicación ha pedido acceso a algo que Campbooks no ofrece.",
+    "consent_request_not_found": "Esta solicitud para autorizar una aplicación ha caducado o ya se ha respondido. Vuelve a empezar desde la aplicación.",
+    "consent_needs_workspace": "Elige el espacio de trabajo que puede usar esta aplicación.",
+    "consent_wrong_workspace": "Esta aplicación pertenece a otro espacio de trabajo y solo se puede autorizar allí.",
+    "not_workspace_admin": "Solo los propietarios y administradores del espacio de trabajo pueden gestionar sus aplicaciones.",
+    "client_not_found": "No existe esa aplicación en este espacio de trabajo.",
+    "invalid_client_metadata": "Los datos de la aplicación no son aceptables: {{reason}}",
+    "client_needs_redirect": "Una aplicación de inicio de sesión necesita al menos una dirección de retorno https o de loopback.",
+    "client_scope_not_allowed": "No se puede dar el permiso {{scope}} a aplicaciones.",
+    "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar."
   }
 }

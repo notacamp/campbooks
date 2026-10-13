@@ -42,6 +42,11 @@ pub struct Grant {
     pub scope: String,
     /// When the person authenticated.
     pub auth_time: DateTime<Utc>,
+    /// The resource the tokens are for (RFC 8707): their `aud`.
+    pub resource: String,
+    /// The workspace the tokens are bound to (`workspace_id`), when the
+    /// person allowed a third party in one.
+    pub workspace: Option<Uuid>,
 }
 
 /// Why a code or refresh token was refused. All are `invalid_grant` on the
@@ -75,8 +80,8 @@ pub async fn create_code(
     sqlx::query(
         "INSERT INTO identity.authorization_codes
              (code_hash, client_id, account_id, session_id, redirect_uri, scope, nonce,
-              code_challenge, auth_time, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+              code_challenge, auth_time, expires_at, resource, bound_workspace_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
     )
     .bind(hash(&code))
     .bind(&grant.client_id)
@@ -88,6 +93,8 @@ pub async fn create_code(
     .bind(code_challenge)
     .bind(grant.auth_time)
     .bind(now + CODE_LIFETIME)
+    .bind(&grant.resource)
+    .bind(grant.workspace)
     .execute(conn)
     .await?;
     Ok(code)
@@ -106,6 +113,8 @@ struct CodeRow {
     expires_at: DateTime<Utc>,
     redeemed_at: Option<DateTime<Utc>>,
     family_id: Option<Uuid>,
+    resource: Option<String>,
+    bound_workspace_id: Option<Uuid>,
 }
 
 /// A redeemed code: its grant and the nonce of the sign-in.
@@ -119,18 +128,20 @@ pub struct Redeemed {
 
 /// Redeem `code` for `client_id` at `redirect_uri` with the PKCE
 /// `verifier`. On success the code is spent; the caller records the family
-/// it creates with [`attach_family`].
+/// it creates with [`attach_family`]. A code from before resource
+/// indicators existed is for `default_resource`.
 pub async fn redeem_code(
     conn: &mut PgConnection,
     code: &str,
     client_id: &str,
     redirect_uri: &str,
     verifier: &str,
+    default_resource: &str,
     now: DateTime<Utc>,
 ) -> Result<Result<Redeemed, Refusal>> {
     let row: Option<CodeRow> = sqlx::query_as(
         "SELECT client_id, account_id, session_id, redirect_uri, scope, nonce, code_challenge,
-                auth_time, expires_at, redeemed_at, family_id
+                auth_time, expires_at, redeemed_at, family_id, resource, bound_workspace_id
            FROM identity.authorization_codes WHERE code_hash = $1 FOR UPDATE",
     )
     .bind(hash(code))
@@ -171,6 +182,8 @@ pub async fn redeem_code(
             session_id: Some(row.session_id),
             scope: row.scope,
             auth_time: row.auth_time,
+            resource: row.resource.unwrap_or_else(|| default_resource.to_owned()),
+            workspace: row.bound_workspace_id,
         },
         nonce: row.nonce,
     }))
@@ -196,8 +209,9 @@ pub async fn create_family(
     let family = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO identity.refresh_families
-             (id, client_id, account_id, session_id, scope, auth_time, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+             (id, client_id, account_id, session_id, scope, auth_time, created_at, expires_at,
+              resource, bound_workspace_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
     .bind(family)
     .bind(&grant.client_id)
@@ -207,6 +221,8 @@ pub async fn create_family(
     .bind(grant.auth_time)
     .bind(now)
     .bind(now + client.refresh_absolute)
+    .bind(&grant.resource)
+    .bind(grant.workspace)
     .execute(&mut *conn)
     .await?;
     let token = insert_refresh_token(conn, family, client, now).await?;
@@ -246,20 +262,25 @@ struct RefreshRow {
     expires_at: DateTime<Utc>,
     revoked_at: Option<DateTime<Utc>>,
     disabled: bool,
+    resource: Option<String>,
+    bound_workspace_id: Option<Uuid>,
 }
 
 /// Exchange refresh token `token` of `client` for its successor. A rotated
-/// token presented again revokes its family.
+/// token presented again revokes its family. A family from before resource
+/// indicators existed is for `default_resource`.
 pub async fn rotate(
     conn: &mut PgConnection,
     token: &str,
     client: &Client,
+    default_resource: &str,
     now: DateTime<Utc>,
 ) -> Result<Result<(Grant, String), Refusal>> {
     let row: Option<RefreshRow> = sqlx::query_as(
         "SELECT t.family_id, t.idle_expires_at, t.rotated_at,
                 f.client_id, f.account_id, f.session_id, f.scope, f.auth_time, f.expires_at,
-                f.revoked_at, a.disabled_at IS NOT NULL AS disabled
+                f.revoked_at, a.disabled_at IS NOT NULL AS disabled, f.resource,
+                f.bound_workspace_id
            FROM identity.refresh_tokens t
            JOIN identity.refresh_families f ON f.id = t.family_id
            JOIN identity.accounts a ON a.id = f.account_id
@@ -303,6 +324,8 @@ pub async fn rotate(
             session_id: row.session_id,
             scope: row.scope,
             auth_time: row.auth_time,
+            resource: row.resource.unwrap_or_else(|| default_resource.to_owned()),
+            workspace: row.bound_workspace_id,
         },
         next,
     )))
@@ -366,10 +389,29 @@ struct AccessClaims<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     sid: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    workspace_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     email: Option<&'a str>,
     email_verified: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     name: Option<&'a str>,
+}
+
+/// A `client_credentials` access token's claims: the client acting on its
+/// own behalf, in its workspace.
+#[derive(Serialize)]
+struct ClientClaims<'a> {
+    iss: &'a str,
+    sub: &'a str,
+    aud: &'a str,
+    azp: &'a str,
+    client_id: &'a str,
+    scope: &'a str,
+    iat: i64,
+    nbf: i64,
+    exp: i64,
+    jti: String,
+    workspace_id: String,
 }
 
 #[derive(Serialize)]
@@ -397,8 +439,6 @@ struct IdClaims<'a> {
 pub struct Mint<'a> {
     /// The issuer identifier.
     pub issuer: &'a str,
-    /// The access tokens' audience.
-    pub audience: &'a str,
     /// The key that signs.
     pub signer: &'a Signer,
     /// What was granted.
@@ -409,13 +449,48 @@ pub struct Mint<'a> {
     pub now: DateTime<Utc>,
 }
 
+fn sign(signer: &Signer, typ: &str, claims: &impl Serialize) -> Result<String> {
+    let mut header = Header::new(Algorithm::EdDSA);
+    header.typ = Some(typ.to_owned());
+    header.kid = Some(signer.kid.clone());
+    jsonwebtoken::encode(&header, claims, &signer.key)
+        .map_err(|e| Error::internal(format!("signing a token: {e}")))
+}
+
+/// A `client_credentials` access token (RFC 9068) for workspace client
+/// `client_id` in `workspace`, for `resource`.
+pub fn client_access_token(
+    issuer: &str,
+    signer: &Signer,
+    client_id: &str,
+    scope: &str,
+    workspace: Uuid,
+    resource: &str,
+    now: DateTime<Utc>,
+) -> Result<String> {
+    let at = now.timestamp();
+    sign(
+        signer,
+        "at+jwt",
+        &ClientClaims {
+            iss: issuer,
+            sub: client_id,
+            aud: resource,
+            azp: client_id,
+            client_id,
+            scope,
+            iat: at,
+            nbf: at,
+            exp: at + TOKEN_LIFETIME.num_seconds(),
+            jti: random_token(),
+            workspace_id: workspace.to_string(),
+        },
+    )
+}
+
 impl Mint<'_> {
     fn sign(&self, typ: &str, claims: &impl Serialize) -> Result<String> {
-        let mut header = Header::new(Algorithm::EdDSA);
-        header.typ = Some(typ.to_owned());
-        header.kid = Some(self.signer.kid.clone());
-        jsonwebtoken::encode(&header, claims, &self.signer.key)
-            .map_err(|e| Error::internal(format!("signing a token: {e}")))
+        sign(self.signer, typ, claims)
     }
 
     /// The access token (RFC 9068). First-party clients get the person's
@@ -429,7 +504,7 @@ impl Mint<'_> {
             &AccessClaims {
                 iss: self.issuer,
                 sub: self.grant.account_id.to_string(),
-                aud: self.audience,
+                aud: &self.grant.resource,
                 azp: &self.grant.client_id,
                 client_id: &self.grant.client_id,
                 scope: &self.grant.scope,
@@ -439,6 +514,7 @@ impl Mint<'_> {
                 jti: random_token(),
                 auth_time: self.grant.auth_time.timestamp(),
                 sid: self.grant.session_id.map(|id| id.to_string()),
+                workspace_id: self.grant.workspace.map(|id| id.to_string()),
                 email: wants("email")
                     .then_some(self.profile.primary_email.as_deref())
                     .flatten(),
