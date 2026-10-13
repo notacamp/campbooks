@@ -155,11 +155,9 @@ export default async function firstRun({ page }: ScenarioContext): Promise<void>
   await page.route("**/bff/**", (route) => bff.handle(route));
   // Each viewport records in a fresh browser context: a clean device.
 
-  // Signed out: the landing.
+  // Signed out: the app goes through sign-in (the fake BFF signs straight
+  // in; the sign-in screens have their own scenario, `sign-in`).
   await page.goto("/");
-  await page.getByRole("link", { name: "Sign in" }).waitFor();
-  await pause(1800);
-  await page.getByRole("link", { name: "Sign in" }).click();
 
   // First run: name, kind (with its accent), done.
   const name = page.getByRole("textbox", { name: "Workspace name" });
@@ -267,6 +265,5 @@ export default async function firstRun({ page }: ScenarioContext): Promise<void>
   await page.getByRole("button", { name: "Dark" }).click();
   await pause(1500);
   await click(page, "Sign out");
-  await page.getByRole("link", { name: "Sign in" }).waitFor();
   await pause(1800);
 }

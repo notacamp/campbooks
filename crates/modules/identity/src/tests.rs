@@ -26,7 +26,10 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     let request = to_sign_in.location_query()["request"].clone();
     let shown = kit.get(&format!("/auth/requests/{request}")).await;
     assert_eq!(shown.json["client_id"], WEB_CLIENT_ID);
-    assert_eq!(shown.json["providers"], serde_json::json!(["google"]));
+    assert_eq!(
+        shown.json["providers"],
+        serde_json::json!(["google", "microsoft", "zoho"])
+    );
 
     // One consent: identity, the mailbox the instance can sync, offline.
     let to_google = kit
@@ -343,6 +346,47 @@ async fn round_trips_are_single_use_and_bound_to_their_browser(db: PgPool) {
     assert!(first.location().starts_with("/sign-in/new"), "{first:?}");
     let replay = kit.get(&callback).await;
     assert_eq!(replay.location(), "/sign-in?error=invalid_state");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn google_is_sent_the_route_campbooks_serves_unless_a_redirect_path_is_set(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let to_google = kit.get("/auth/start/google").await;
+    assert_eq!(
+        query(&to_google.location())["redirect_uri"],
+        format!("{ORIGIN}/auth/callback/google")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_configured_redirect_path_is_sent_in_both_the_authorization_and_the_exchange(db: PgPool) {
+    let kit = Kit::with_google_redirect_path(db, "/oauth/gmail/callback").await;
+    let to_google = kit.get("/auth/start/google").await;
+    assert_eq!(
+        query(&to_google.location())["redirect_uri"],
+        format!("{ORIGIN}/oauth/gmail/callback")
+    );
+
+    println!(
+        "authorize  redirect_uri = {}",
+        query(&to_google.location())["redirect_uri"]
+    );
+    // Google redirects the browser to the registered path; the proxy rewrites
+    // it to the route Campbooks serves.
+    let registered = kit.google.authorize(&to_google.location());
+    assert!(
+        registered.starts_with(&format!("{ORIGIN}/oauth/gmail/callback?")),
+        "{registered}"
+    );
+    let proxied = registered.replace("/oauth/gmail/callback", "/auth/callback/google");
+    // The fake Google redeems the code only when the exchange repeats the
+    // authorization's redirect_uri, as the real one does.
+    let back = kit.get(&proxied).await;
+    assert!(back.location().starts_with("/sign-in/new"), "{back:?}");
+    println!(
+        "exchange   redirect_uri = same, fake Google redeemed the code -> {}",
+        back.location()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

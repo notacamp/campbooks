@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT applied_from, applied_to FROM connectors.outbound_changes",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "applied_from",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_from"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "applied_to",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_to"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true,
+      true
+    ]
+  },
+  "hash": "b549ae301dba53709d09840cdfe63c0a424b78660d2c32f6f8acf5f7b48445c9"
+}

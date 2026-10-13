@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.gmail_messages SET reemit = true\n                WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "73ffe57989c0c76c139d526dbc593798dba363210fc5d7f670845438cbbd99e7"
+}

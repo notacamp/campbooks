@@ -3,6 +3,17 @@
     "invalid_limit": "The limit must be between 1 and {{max}}.",
     "invalid_cursor": "This page link is not valid. Start again from the first page.",
     "invalid_label_name": "A label name must be 1 to {{max}} characters long.",
-    "inbox_read_only": "You can read this inbox but not change its conversations. Ask its manager for sender access."
+    "inbox_read_only": "You can read this inbox but not change its conversations. Ask its manager for sender access.",
+    "draft_needs_inbox": "A new message needs the inbox to send it from.",
+    "draft_needs_message": "A reply or forward needs the message it answers.",
+    "too_many_recipients": "A message can have at most {{max}} recipients.",
+    "invalid_subject": "A subject is one line of at most {{max}} characters.",
+    "draft_too_long": "This message is too long to send.",
+    "draft_changed": "This draft was changed somewhere else. Reload it to see the latest version.",
+    "draft_not_editable": "This message is on its way and can no longer be changed.",
+    "no_recipients": "Add at least one recipient.",
+    "invalid_address": "This address is not valid: {{address}}",
+    "attachments_too_large": "Attachments can add up to {{max}} MB at most.",
+    "too_late": "It is too late to undo: the message has already left."
   }
 }

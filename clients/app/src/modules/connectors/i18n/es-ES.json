@@ -1,4 +1,13 @@
 {
   "title": "Cuentas conectadas",
-  "summary": "Este módulo aún no tiene pantallas."
+  "summary": "Este módulo aún no tiene pantallas.",
+  "mail": {
+    "title": "Tu correo",
+    "health": {
+      "ok": "Conectado",
+      "needs_reauth": "Necesita que vuelvas a iniciar sesión",
+      "throttled": "En pausa un momento",
+      "failing": "Sin sincronizar"
+    }
+  }
 }

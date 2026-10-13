@@ -1,4 +1,205 @@
 {
-  "title": "Conversations",
-  "summary": "This module has no screens yet."
+  "title": "Inbox",
+  "streams": {
+    "label": "Streams",
+    "primary": "Primary",
+    "updates": "Updates",
+    "receipts": "Receipts",
+    "newsletters": "Newsletters"
+  },
+  "list": {
+    "label": "Conversations",
+    "show": "Show",
+    "all": "All",
+    "unread": "Unread",
+    "more": "Show more",
+    "loadingMore": "Loading more conversations"
+  },
+  "empty": {
+    "streamTitle": "Nothing in {{stream}}",
+    "streamBody": "Mail Campbooks sorts into {{stream}} lands here.",
+    "unreadTitle": "Nothing unread in {{stream}}",
+    "unreadBody": "You have read everything here.",
+    "noInboxTitle": "No mailbox yet",
+    "noInboxBody": "Connect a mailbox and its mail appears here, sorted into streams.",
+    "readerTitle": "Pick a conversation",
+    "readerBody": "Choose one from the list, or use the keyboard:"
+  },
+  "error": {
+    "listTitle": "Could not load {{stream}}",
+    "listBody": "Campbooks could not reach the server. Nothing was lost.",
+    "conversationTitle": "Could not open this conversation",
+    "conversationBody": "Campbooks could not reach the server. Nothing was lost.",
+    "goneTitle": "This conversation is gone",
+    "goneBody": "It was removed, or you can no longer see it.",
+    "body": "Could not load this message.",
+    "retry": "Try again",
+    "action": "Could not change “{{subject}}”. Try again."
+  },
+  "reader": {
+    "label": "Conversation",
+    "back": "Back to {{stream}}",
+    "actions": "Conversation actions",
+    "messages_one": "{{count}} message",
+    "messages_other": "{{count}} messages",
+    "to": "To {{names}}",
+    "cc": "cc {{names}}",
+    "noSubject": "(no subject)",
+    "frameTitle": "Message from {{name}}",
+    "truncated": "This message is long: Campbooks shows the first part.",
+    "older_one": "{{count}} older message",
+    "older_other": "{{count}} older messages",
+    "showOlder": "Show",
+    "attachments": "Attachments"
+  },
+  "actions": {
+    "star": "Star",
+    "unstar": "Unstar",
+    "read": "Mark read",
+    "unread": "Mark unread",
+    "move": "Move",
+    "moveTo": "Move to",
+    "replyAll": "Reply all",
+    "forward": "Forward",
+    "showImages": "Show images",
+    "imagesHidden_one": "{{count}} remote image hidden, so the sender cannot see when you read this.",
+    "imagesHidden_other": "{{count}} remote images hidden, so the sender cannot see when you read this.",
+    "imagesShown": "Remote images shown."
+  },
+  "toast": {
+    "done": "Done · {{subject}}",
+    "starred": "Starred · {{subject}}",
+    "unstarred": "Unstarred · {{subject}}",
+    "read": "Marked read · {{subject}}",
+    "unread": "Marked unread · {{subject}}",
+    "moved": "Moved to {{stream}} · {{subject}}"
+  },
+  "scout": {
+    "label": "Where things stand",
+    "suggestion": "Suggests {{stream}}",
+    "suggestionSure": "Suggests {{stream}}, {{confidence}}% sure",
+    "suggestionNote": "Campbooks thinks this belongs in {{stream}}. It is a suggestion: nothing moves until you say so.",
+    "prompt": "Move it?",
+    "accept": "Move to {{stream}}",
+    "keep": "Keep in {{stream}}",
+    "sortedRule": "Sorted into {{stream}} by a rule",
+    "sortedRuleSure": "Sorted into {{stream}} by a rule, {{confidence}}% sure",
+    "sortedModel": "Sorted into {{stream}} by Campbooks",
+    "sortedMember": "You put this in {{stream}}",
+    "sortedDefault": "In {{stream}}: nothing moved it",
+    "read": "Campbooks’ read, as suggestions: {{list}}.",
+    "nothing": "Nothing here seems to ask anything of you.",
+    "needsReply": "it needs a reply",
+    "asksAction": "it asks you to do something",
+    "hasDeadline": "it mentions a date to meet",
+    "urgent": "it looks urgent",
+    "suspicious": "it looks suspicious, so check the sender before you open a link",
+    "whyStream": "Stream",
+    "whyNeedsReply": "Needs a reply",
+    "whyAsksAction": "Asks you to do something",
+    "whyHasDeadline": "Mentions a date",
+    "whyUrgent": "Urgent",
+    "whySuspicious": "Suspicious"
+  },
+  "reasons": {
+    "signals": {
+      "reply_to_mismatch": "Replies would go to another domain ({{evidence}}).",
+      "lookalike_domain": "The sender’s domain looks like a better-known one ({{evidence}}).",
+      "link_elsewhere": "A link goes somewhere other than it says ({{evidence}}).",
+      "phishing_phrase": "It asks for what phishing mail asks for (“{{evidence}}”).",
+      "pressure": "It pushes you to act fast (“{{evidence}}”).",
+      "auto_reply": "It is an automatic reply (“{{evidence}}”).",
+      "list_header": "It carries a mailing-list header ({{evidence}}).",
+      "unsubscribe_text": "It has an unsubscribe link (“{{evidence}}”).",
+      "money_words": "It talks about money (“{{evidence}}”).",
+      "notification_words": "It reads like a notification (“{{evidence}}”).",
+      "calendar_invite": "It is a calendar invitation ({{evidence}}).",
+      "automated_sender": "It comes from an automated address ({{evidence}}).",
+      "person_sender": "A person wrote it.",
+      "service_sender": "A service sent it, not a person.",
+      "reply_asked": "It asks you to reply (“{{evidence}}”).",
+      "question": "It asks a question.",
+      "no_question": "It asks no question.",
+      "list_mail": "It was sent to a list.",
+      "payment_due": "A payment is due (“{{evidence}}”).",
+      "already_paid": "It says it is already paid (“{{evidence}}”).",
+      "action_asked": "It asks you to do something (“{{evidence}}”).",
+      "conditional_ask": "It asks only if something applies (“{{evidence}}”).",
+      "notice": "It is a notice: nothing to do.",
+      "request": "It makes a request (“{{evidence}}”).",
+      "no_request": "It makes no request.",
+      "deadline": "It names a date (“{{evidence}}”).",
+      "no_date": "It names no date.",
+      "today": "It is about today (“{{evidence}}”).",
+      "no_today": "Nothing in it is for today.",
+      "no_phishing_tell": "Nothing in it looks like phishing."
+    },
+    "model": {
+      "decide": "The decide model answered ({{evidence}})."
+    },
+    "knn": {
+      "neighbours": "Mail like this was sorted this way before."
+    },
+    "other": "{{rule}} ({{evidence}})"
+  },
+  "shortcuts": {
+    "primary": "Go to Primary",
+    "updates": "Go to Updates",
+    "receipts": "Go to Receipts",
+    "newsletters": "Go to Newsletters",
+    "star": "Star or unstar",
+    "unread": "Mark read or unread",
+    "move": "Move to a stream",
+    "replyAll": "Reply all",
+    "forward": "Forward",
+    "showImages": "Show images"
+  },
+  "compose": {
+    "title": {
+      "reply": "Reply to {{name}}",
+      "reply_all": "Reply all",
+      "forward": "Forward",
+      "new": "New message"
+    },
+    "newMessage": "New message",
+    "noInbox": "Connect a mailbox to send from it.",
+    "readOnly": "You can read this inbox but not send from it.",
+    "from": "From",
+    "sending": "Sending to {{name}}",
+    "sendingNoName": "Sending",
+    "draftSaved": "Draft saved",
+    "saveState": {
+      "saved": "Saved",
+      "saving": "Saving…",
+      "unsaved": "Not saved yet",
+      "failed": "Could not save. Campbooks will try again."
+    },
+    "quote": {
+      "wrote": "On {{date}}, {{name}} wrote:",
+      "forwarded": "Forwarded message",
+      "from": "From",
+      "date": "Date",
+      "subject": "Subject",
+      "to": "To"
+    },
+    "errors": {
+      "no_recipients": "Add at least one recipient.",
+      "invalid_address": "One of the addresses is not valid.",
+      "attachments_too_large": "The attachments are too large to send (25 MB at most).",
+      "draft_not_editable": "This message is already on its way.",
+      "not_connected": "This mailbox is no longer connected. Reconnect it, then send again.",
+      "needs_reauth": "Campbooks needs your permission again to send from this mailbox. Reconnect it, then send again.",
+      "rejected": "Gmail refused this message. Check the addresses and try again.",
+      "too_large": "This message is too large for Gmail to send.",
+      "unavailable": "Gmail could not be reached, so nothing was sent. Try again.",
+      "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
+      "unknown": "Something went wrong. Try again.",
+      "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
+      "draft_changed": "This draft changed somewhere else. Close it and open it again to see the latest version."
+    },
+    "shortcuts": {
+      "newMessage": "New message"
+    },
+    "tooLate": "Too late to undo: it was sent."
+  }
 }

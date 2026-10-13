@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends\n              SET attempts = attempts + 1, attempted_at = $2, unclear = true, updated_at = now()\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "94ec6311ac90404f93ad597e43db3f0ef67bb450ea9df8fc06280485dcb2a2de"
+}

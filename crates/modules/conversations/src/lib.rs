@@ -25,6 +25,7 @@
 
 use std::sync::Arc;
 
+use axum::Extension;
 use campbooks_ai::{
     Gateway, Role,
     decide::{
@@ -43,6 +44,7 @@ pub mod events;
 mod features;
 pub mod ingest;
 pub mod model;
+pub mod outgoing;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
@@ -138,12 +140,20 @@ pub fn module(deps: ConversationsDeps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: router(),
+        router: router().layer(Extension(features::send_draft::SendSettings {
+            undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
+        })),
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
             .publishes::<events::ConversationChanged>()
             .publishes::<events::ChangesRequested>()
+            .publishes::<events::SendRequested>()
+            .publishes::<events::DraftSent>()
+            .publishes::<events::SendFailed>()
+            .handler(features::release_send::ReleaseSend)
+            .handler(features::check_send::CheckSend)
+            .consumer(features::record_send::RecordSend)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -163,11 +173,13 @@ pub fn module(deps: ConversationsDeps) -> Module {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        archive, get_conversation, get_message_body, labels, list_conversations, list_inboxes,
-        mark_read, move_to_stream, star,
+        archive, create_draft, get_conversation, get_message_body, labels, list_conversations,
+        list_drafts, list_inboxes, list_streams, mark_read, move_to_stream, send_draft, star,
+        update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
+        .routes(routes!(list_streams::handler))
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
         .routes(routes!(get_message_body::handler))
@@ -180,6 +192,14 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(move_to_stream::handler))
         .routes(routes!(labels::add))
         .routes(routes!(labels::remove))
+        .routes(routes!(list_drafts::list, create_draft::handler))
+        .routes(routes!(
+            list_drafts::get,
+            update_draft::update,
+            update_draft::delete
+        ))
+        .routes(routes!(send_draft::send))
+        .routes(routes!(send_draft::cancel))
 }
 
 #[cfg(test)]
@@ -209,6 +229,9 @@ mod tests {
             "conversations.decide_message",
             "conversations.schedule_workspace_purge",
             "conversations.purge_workspace",
+            "conversations.release_send",
+            "conversations.record_send",
+            "conversations.check_send",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }

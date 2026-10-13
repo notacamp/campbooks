@@ -7,14 +7,10 @@
     "home": "Ir para a página inicial"
   },
   "landing": {
-    "title": "O que precisa de si, num só lugar tranquilo",
-    "lead": "O Campbooks lê o seu correio e traz-lhe apenas o que precisa de si.",
-    "signIn": "Iniciar sessão",
-    "invitedTitle": "Foi convidado para um espaço de trabalho",
-    "invitedLead": "Inicie sessão com o endereço de email para o qual o convite foi enviado e entra logo.",
     "ended": "A sua sessão terminou.",
     "endedDetail": "Inicie sessão novamente para continuar onde estava.",
-    "footer": "Código aberto. O seu correio fica no seu espaço de trabalho."
+    "signInAgain": "Iniciar sessão novamente",
+    "footer": "Código disponível. O seu correio fica no seu espaço de trabalho."
   },
   "gate": {
     "opening": "A abrir o Campbooks…",
@@ -44,13 +40,14 @@
     },
     "language": "Idioma",
     "signOut": "Terminar sessão",
-    "signingOut": "A terminar sessão…"
+    "signingOut": "A terminar sessão…",
+    "waysIn": "Formas de iniciar sessão"
   },
   "home": {
     "title": "Ainda nada precisa de si",
     "subline": "Quando o Campbooks tiver algo para si, aparece aqui.",
     "connectTitle": "Ligar o seu correio",
-    "connectLead": "O Campbooks vai ler o seu correio e trazer para esta página o que precisa de si. As ligações de correio ainda estão a ser construídas, por isso ainda não pode ligar uma caixa de correio.",
+    "connectLead": "O Campbooks vai ler o seu correio e trazer para esta página o que precisa de si. Ligar uma caixa de correio a partir daqui ainda está a ser construído.",
     "connect": "Ligar o seu correio",
     "soon": "Brevemente",
     "context": "Primeiros passos",

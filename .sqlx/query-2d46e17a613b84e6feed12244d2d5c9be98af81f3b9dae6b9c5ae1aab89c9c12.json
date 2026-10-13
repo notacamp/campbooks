@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.connections SET health = 'needs_reauth'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "2d46e17a613b84e6feed12244d2d5c9be98af81f3b9dae6b9c5ae1aab89c9c12"
+}

@@ -1,10 +1,12 @@
-//! A browser, a fake Google and the issuer, wired together for tests.
+//! A browser, fake providers and the issuer, wired together for tests.
 //!
-//! The fake Google is the kernel's [`TestIdp`]: it approves an authorization
-//! request as if the person had signed in, redeems codes with PKCE, and signs
-//! ID tokens with keys it publishes. The grant-intake port is a fake that
-//! records what it was handed, and every user is a member of every
-//! workspace.
+//! Each fake provider is the kernel's [`TestIdp`]: it approves an
+//! authorization request as if the person had signed in, redeems codes with
+//! PKCE, and signs ID tokens with keys it publishes. The fake Microsoft
+//! issues ID tokens for tenant [`TENANT`] (its `iss` and `tid`); the fake
+//! Zoho has two data centres, `.com` and `.eu`. The grant-intake port is a
+//! fake that records what it was handed and knows one reconnectable
+//! connection, and every user is a member of every workspace.
 
 use std::{
     collections::HashMap,
@@ -18,16 +20,17 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
-    AppState,
+    AppState, Error,
     auth::{Principal, TokenVerifier},
     clock::SystemClock,
     config::SignupPolicy,
-    connections::{AdoptFuture, GrantIntake, ProviderGrant},
+    connections::{AdoptFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture},
     crypto::{SecretKey, pkce_challenge, random_token},
     signup::{Invitations, InvitedFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{
-        self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
+        self, TestIdp, TestUser, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT,
+        WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
     },
 };
 use figment::{Figment, providers::Serialized};
@@ -40,17 +43,40 @@ use url::Url;
 use crate::{
     deps::{ClientSecret, Deps, WEB_CLIENT_SECRET_PURPOSE},
     domain::{clients::WEB_CLIENT_ID, keys::LocalKeys},
-    upstream::google::{Google, GoogleEndpoints},
+    upstream::{
+        Provider,
+        client::{
+            Endpoints, IssuerRule, MICROSOFT_ISSUER_PREFIX, MICROSOFT_ISSUER_SUFFIX, Server,
+            Upstream,
+        },
+        redirect_uri,
+    },
 };
 
 /// The instance under test.
 pub const ORIGIN: &str = "http://localhost:8080";
 /// The scope the fake intake asks for.
 pub const MAIL_SCOPE: &str = "https://mail.example.com/modify";
+/// The fake Microsoft's tenant.
+pub const TENANT: &str = "2b5a2c1e-6f1d-4c8e-9a3b-7d4e5f6a7b8c";
+/// The connection the fake intake lets its grantor reconnect: its grant
+/// stopped working, and it is the fake Google's default account's.
+pub const RECONNECTABLE: &str = "connection-1";
+/// A connection whose grant still works, of the same account.
+pub const HEALTHY: &str = "connection-healthy";
+/// That connection's address.
+pub const RECONNECTABLE_ADDRESS: &str = "test-user@example.com";
 
 /// What the fake intake was handed: workspace, subject, address, refresh
-/// token, scopes.
-pub type Handed = (WorkspaceId, String, String, Option<String>, Vec<String>);
+/// token, scopes, the connection extended.
+pub type Handed = (
+    WorkspaceId,
+    String,
+    String,
+    Option<String>,
+    Vec<String>,
+    Option<String>,
+);
 
 /// Records the grants it is handed.
 #[derive(Debug, Default)]
@@ -90,8 +116,33 @@ impl GrantIntake for FakeIntake {
                     .as_ref()
                     .map(|t| t.expose_secret().to_owned()),
                 grant.scopes,
+                grant.extending,
             ));
         Box::pin(async { Ok("connection-1".to_owned()) })
+    }
+
+    fn reconnect_target<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subject: &'a str,
+        _workspace: WorkspaceId,
+        connection: &'a str,
+    ) -> TargetFuture<'a> {
+        let needs_reauth = match connection {
+            RECONNECTABLE => Some(true),
+            HEALTHY => Some(false),
+            _ => None,
+        };
+        Box::pin(async move {
+            needs_reauth
+                .map(|needs_reauth| ReconnectTarget {
+                    provider: "google".to_owned(),
+                    address: RECONNECTABLE_ADDRESS.to_owned(),
+                    account_subject: TestUser::default().subject,
+                    needs_reauth,
+                })
+                .ok_or(Error::NotFound)
+        })
     }
 }
 
@@ -154,6 +205,27 @@ impl Response {
     }
 }
 
+/// `callback` with Zoho's `accounts-server` parameter (the fake's issuer).
+fn with_accounts_server(callback: &str, server: &str) -> String {
+    let mut url = Url::parse(callback).unwrap_or_else(|e| panic!("{callback}: {e}"));
+    url.query_pairs_mut()
+        .append_pair("location", "test")
+        .append_pair("accounts-server", server);
+    url.into()
+}
+
+/// `callback` without its `iss` parameter.
+fn without_iss(callback: &str) -> String {
+    let mut url = Url::parse(callback).unwrap_or_else(|e| panic!("{callback}: {e}"));
+    let kept: Vec<(String, String)> = url
+        .query_pairs()
+        .into_owned()
+        .filter(|(name, _)| name != "iss")
+        .collect();
+    url.query_pairs_mut().clear().extend_pairs(kept);
+    url.into()
+}
+
 /// The query parameters of `url` (absolute or a path).
 pub fn query(url: &str) -> HashMap<String, String> {
     Url::parse(url)
@@ -164,16 +236,57 @@ pub fn query(url: &str) -> HashMap<String, String> {
         .collect()
 }
 
+/// A fake provider's token endpoint and keys.
+fn server_of(idp: &TestIdp) -> Server {
+    let base = idp.issuer();
+    let url = |path: &str| Url::parse(&format!("{base}{path}")).unwrap_or_else(|e| panic!("{e}"));
+    Server {
+        issuer: base.to_owned(),
+        token: url("oidc/token"),
+        jwks: Url::parse(&idp.jwks_url()).unwrap_or_else(|e| panic!("{e}")),
+    }
+}
+
+/// The client of `provider`, talking to the fake `idp`, registered with
+/// callback path `redirect_path` (the default when `None`).
+fn fake(
+    provider: Provider,
+    idp: &TestIdp,
+    issuers: IssuerRule,
+    redirect_path: Option<&str>,
+) -> Upstream {
+    Upstream::new(
+        provider,
+        FAKE_GOOGLE_CLIENT.to_owned(),
+        ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
+        redirect_uri(provider, ORIGIN, redirect_path).unwrap_or_else(|e| panic!("{e}")),
+        Endpoints {
+            authorize: Url::parse(&format!("{}oidc/authorize", idp.issuer()))
+                .unwrap_or_else(|e| panic!("{e}")),
+            issuers,
+        },
+    )
+    .unwrap_or_else(|e| panic!("{}: {e}", provider.as_str()))
+}
+
 /// The world.
 pub struct Kit {
     /// The issuer's protocol endpoints and the module's API.
     pub app: Router,
     /// The fake Google.
     pub google: TestIdp,
+    /// The fake Microsoft.
+    pub microsoft: TestIdp,
+    /// The fake Zoho's `.com` data centre (where every authorization starts).
+    pub zoho: TestIdp,
+    /// The fake Zoho's `.eu` data centre.
+    pub zoho_eu: TestIdp,
     /// The state (database, ports).
     pub state: AppState,
     /// What the grant-intake port was handed.
     pub intake: Arc<FakeIntake>,
+    /// The module's dependencies.
+    pub deps: Deps,
     /// The browser's cookies.
     cookies: Mutex<HashMap<String, String>>,
 }
@@ -188,7 +301,25 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
+        Self::build(db, policy, invited, None).await
+    }
+
+    /// A fresh world whose Google client was registered with the callback
+    /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
+    pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
+        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path)).await
+    }
+
+    async fn build(
+        db: PgPool,
+        policy: SignupPolicy,
+        invited: &[&str],
+        redirect_path: Option<&str>,
+    ) -> Self {
         let google = TestIdp::start().await;
+        let microsoft = TestIdp::start().await;
+        let zoho = TestIdp::start().await;
+        let zoho_eu = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
         let mut config = testing::config("postgres://test@localhost/test");
         // Plain-http public URL (the tests' localhost): development only.
@@ -212,23 +343,38 @@ impl Kit {
             .as_mut()
             .and_then(Arc::get_mut)
             .unwrap_or_else(|| panic!("issuer"));
-        let base = google.issuer();
-        issuer.google = Some(
-            Google::new(
-                FAKE_GOOGLE_CLIENT.to_owned(),
-                ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
-                ORIGIN,
-                GoogleEndpoints {
-                    issuer: base.to_owned(),
-                    authorize: Url::parse(&format!("{base}oidc/authorize"))
-                        .unwrap_or_else(|e| panic!("{e}")),
-                    token: Url::parse(&format!("{base}oidc/token"))
-                        .unwrap_or_else(|e| panic!("{e}")),
-                    jwks: Url::parse(&google.jwks_url()).unwrap_or_else(|e| panic!("{e}")),
+        microsoft.set_id_token_claims(serde_json::json!({
+            "iss": format!("{MICROSOFT_ISSUER_PREFIX}{TENANT}{MICROSOFT_ISSUER_SUFFIX}"),
+            "tid": TENANT,
+            // Microsoft sends no `email_verified`.
+            "email_verified": null,
+        }));
+        issuer.upstreams = vec![
+            fake(
+                Provider::Google,
+                &google,
+                IssuerRule::Fixed(server_of(&google)),
+                redirect_path,
+            ),
+            fake(
+                Provider::Microsoft,
+                &microsoft,
+                IssuerRule::Tenant {
+                    server: server_of(&microsoft),
+                    prefix: MICROSOFT_ISSUER_PREFIX.to_owned(),
+                    suffix: MICROSOFT_ISSUER_SUFFIX.to_owned(),
+                    only: None,
+                    except: None,
                 },
-            )
-            .unwrap_or_else(|e| panic!("google: {e}")),
-        );
+                None,
+            ),
+            fake(
+                Provider::Zoho,
+                &zoho,
+                IssuerRule::Servers(vec![server_of(&zoho), server_of(&zoho_eu)]),
+                None,
+            ),
+        ];
         let intake = Arc::new(FakeIntake::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
         let state = AppState::new(pool.clone(), config.clone())
@@ -250,8 +396,12 @@ impl Kit {
         Self {
             app,
             google,
+            microsoft,
+            zoho,
+            zoho_eu,
             state,
             intake,
+            deps,
             cookies: Mutex::default(),
         }
     }
@@ -408,6 +558,123 @@ impl Kit {
     pub async fn via_google(&self, url: &str) -> Response {
         let callback = self.google.authorize(url);
         self.get(&callback).await
+    }
+
+    /// The fake of `provider`.
+    pub fn idp(&self, provider: Provider) -> &TestIdp {
+        match provider {
+            Provider::Google => &self.google,
+            Provider::Microsoft => &self.microsoft,
+            Provider::Zoho => &self.zoho,
+        }
+    }
+
+    /// [`round_trip`](Self::round_trip) with `provider`.
+    pub async fn round_trip_with(&self, provider: Provider, request: Option<&str>) -> Response {
+        let start = match request {
+            Some(request) => format!("/auth/start/{}?request={request}", provider.as_str()),
+            None => format!("/auth/start/{}", provider.as_str()),
+        };
+        let to_provider = self.get(&start).await;
+        assert_eq!(to_provider.status, StatusCode::SEE_OTHER, "{to_provider:?}");
+        self.via(provider, &to_provider.location()).await
+    }
+
+    /// Approve `url` at the fake `provider` and follow its redirect back.
+    /// Zoho's callback names its `.com` accounts server.
+    pub async fn via(&self, provider: Provider, url: &str) -> Response {
+        let callback = self.idp(provider).authorize(url);
+        let callback = match provider {
+            Provider::Zoho => with_accounts_server(&callback, self.zoho.issuer()),
+            // Microsoft sends no RFC 9207 `iss`.
+            Provider::Microsoft => without_iss(&callback),
+            Provider::Google => callback,
+        };
+        self.get(&callback).await
+    }
+
+    /// Approve `url` (Zoho's global authorization endpoint) as a person of
+    /// the `.eu` data centre, and follow the redirect back.
+    pub async fn via_zoho_eu(&self, url: &str) -> Response {
+        let at_eu = url.replacen(self.zoho.issuer(), self.zoho_eu.issuer(), 1);
+        let callback = with_accounts_server(&self.zoho_eu.authorize(&at_eu), self.zoho_eu.issuer());
+        self.get(&callback).await
+    }
+
+    /// Sign up as a new person through the web client and redeem the code:
+    /// the access token (this browser keeps the issuer session).
+    pub async fn signed_up(&self) -> String {
+        let (code, verifier) = self.sign_up().await;
+        let tokens = self.redeem(&code, &verifier).await;
+        assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
+        tokens.json["access_token"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned()
+    }
+
+    /// An access token for the account `access` names whose sign-in is an
+    /// hour old (as if the person had signed in long ago).
+    pub async fn stale(&self, access: &str) -> String {
+        let (_, claims) = Self::decode(access);
+        let account: uuid::Uuid = claims["sub"]
+            .as_str()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or_else(|| panic!("sub"));
+        let stale = chrono::Utc::now() - chrono::TimeDelta::hours(1);
+        for sql in [
+            "UPDATE identity.sessions SET auth_time = $2 WHERE account_id = $1",
+            "UPDATE identity.refresh_families SET auth_time = $2 WHERE account_id = $1",
+        ] {
+            sqlx::query(sql)
+                .bind(account)
+                .bind(stale)
+                .execute(&self.state.db)
+                .await
+                .unwrap_or_else(|e| panic!("{sql}: {e}"));
+        }
+        let (url, verifier) = Self::web_authorize();
+        let back = self.get(&url).await;
+        let tokens = self.redeem(&back.location_query()["code"], &verifier).await;
+        tokens.json["access_token"]
+            .as_str()
+            .unwrap_or_else(|| panic!("no token: {tokens:?}"))
+            .to_owned()
+    }
+
+    /// Call the API with `access_token` and a JSON `body`.
+    pub async fn api_json(
+        &self,
+        method: Method,
+        path: &str,
+        access_token: &str,
+        body: &serde_json::Value,
+    ) -> Response {
+        self.request(
+            method,
+            path,
+            &[
+                ("authorization", &format!("Bearer {access_token}")),
+                ("content-type", "application/json"),
+            ],
+            Some(body.to_string()),
+        )
+        .await
+    }
+
+    /// `identity.start_link` with `body`.
+    pub async fn start_link(&self, access_token: &str, body: &serde_json::Value) -> Response {
+        self.api_json(Method::POST, "/api/v1/identity/links", access_token, body)
+            .await
+    }
+
+    /// The caller's ways in.
+    pub async fn ways_in(&self, access_token: &str) -> serde_json::Value {
+        let listed = self
+            .api(Method::GET, "/api/v1/identity/ways-in", access_token)
+            .await;
+        assert_eq!(listed.status, StatusCode::OK, "{listed:?}");
+        listed.json
     }
 
     /// The full web sign-up as a new person: authorize, round trip, create.

@@ -99,6 +99,9 @@ fn oidc_failure(err: &OidcError) -> Response {
 pub struct LoginQuery {
     /// Where to land after signing in: a path on this site (default `/`).
     return_to: Option<String>,
+    /// Sign in again unless the person did within this many seconds: the
+    /// step-up an operation asks for with `step_up_required`.
+    max_age: Option<u32>,
 }
 
 /// Start signing in.
@@ -130,7 +133,7 @@ pub async fn login(State(bff): State<Bff>, Query(query): Query<LoginQuery>) -> R
     let Some(return_to) = return_to(query.return_to.as_deref()) else {
         return problem(StatusCode::BAD_REQUEST, code::INVALID_RETURN_TO);
     };
-    no_store(inner.start_login(return_to).await)
+    no_store(inner.start_login(return_to, query.max_age).await)
 }
 
 /// A same-origin path to land on: `/`-rooted, not protocol-relative, no
@@ -154,7 +157,7 @@ pub(super) fn return_to(value: Option<&str>) -> Option<String> {
 }
 
 impl Inner {
-    async fn start_login(&self, return_to: String) -> Response {
+    async fn start_login(&self, return_to: String, max_age: Option<u32>) -> Response {
         let state = crypto::random_token();
         let nonce = crypto::random_token();
         let verifier = crypto::random_token();
@@ -166,6 +169,7 @@ impl Inner {
                 state: &state,
                 nonce: &nonce,
                 code_challenge: &challenge,
+                max_age,
             })
             .await
         {

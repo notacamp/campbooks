@@ -103,6 +103,10 @@ struct Shared {
     /// Whether code exchanges return a refresh token (an upstream provider
     /// sends none when the person consented before).
     offline: AtomicBool,
+    /// Requests to the token endpoint, of any grant, valid or not.
+    token_requests: AtomicUsize,
+    /// Claims merged into issued ID tokens (`null` removes one).
+    id_token_claims: Mutex<serde_json::Map<String, serde_json::Value>>,
 }
 
 /// The user [`TestIdp::authorize`] signs in.
@@ -189,6 +193,8 @@ impl TestIdp {
             refreshes: AtomicUsize::new(0),
             sessions: AtomicUsize::new(0),
             offline: AtomicBool::new(true),
+            token_requests: AtomicUsize::new(0),
+            id_token_claims: Mutex::default(),
         });
         let app = Router::new()
             .route("/auth/v1/.well-known/openid-configuration", get(discovery))
@@ -346,6 +352,25 @@ impl TestIdp {
     /// `true`); `false` plays a provider the person already consented to.
     pub fn set_offline(&self, offline: bool) {
         self.shared.offline.store(offline, Ordering::SeqCst);
+    }
+
+    /// Merge `claims` (an object) into every ID token the token endpoint
+    /// issues from now on; a `null` value removes that claim. Plays a
+    /// provider with its own claims or issuer rule (a tenant's `iss` and
+    /// `tid`, no `email_verified`).
+    ///
+    /// # Panics
+    /// If `claims` is not a JSON object.
+    pub fn set_id_token_claims(&self, claims: serde_json::Value) {
+        let serde_json::Value::Object(claims) = claims else {
+            panic!("ID token claims must be an object");
+        };
+        *lock(&self.shared.id_token_claims) = claims;
+    }
+
+    /// Requests to the token endpoint so far, valid or not.
+    pub fn token_requests(&self) -> usize {
+        self.shared.token_requests.load(Ordering::SeqCst)
     }
 
     /// Successful `refresh_token` grants so far.
@@ -544,6 +569,7 @@ async fn token(
     State(shared): State<Arc<Shared>>,
     Form(form): Form<HashMap<String, String>>,
 ) -> Response {
+    shared.token_requests.fetch_add(1, Ordering::SeqCst);
     let field = |name: &str| form.get(name).map(String::as_str).unwrap_or_default();
     if field("client_id") != WEB_CLIENT_ID || field("client_secret") != WEB_CLIENT_SECRET {
         return oauth_error(StatusCode::UNAUTHORIZED, "invalid_client");
@@ -592,6 +618,15 @@ async fn token(
     id["name"] = grant.user.name.clone().into();
     id["email"] = grant.user.email.clone().into();
     id["email_verified"] = true.into();
+    if let Some(id) = id.as_object_mut() {
+        for (name, value) in lock(&shared.id_token_claims).iter() {
+            if value.is_null() {
+                id.remove(name);
+            } else {
+                id.insert(name.clone(), value.clone());
+            }
+        }
+    }
     let refresh_token = random_token();
     let mut body = serde_json::json!({
         "access_token": idp.token(&access),

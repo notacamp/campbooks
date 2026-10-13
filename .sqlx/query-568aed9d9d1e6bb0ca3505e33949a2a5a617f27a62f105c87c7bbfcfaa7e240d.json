@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends SET state = 'failed', failure_reason = $2, updated_at = now()\n            WHERE id = $1 AND state = 'pending'\n        RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "568aed9d9d1e6bb0ca3505e33949a2a5a617f27a62f105c87c7bbfcfaa7e240d"
+}

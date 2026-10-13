@@ -1,17 +1,24 @@
 //! The kernel's grant-intake port (ADR 0014): a mailbox grant the identity
-//! module obtained at sign-in becomes a connection through the same seam as
-//! this module's own consent flow ([`create_or_refresh_connection`]).
+//! module obtained (at sign-up, or through its front door for a connect or
+//! a reconnect) becomes a connection through the one seam,
+//! [`create_or_refresh_connection`]. The port also tells the identity module
+//! which connection a reconnect is for, and refuses anyone but its grantor.
 
 use campbooks_kernel::{
     AppState, Error,
     auth::{Principal, PrincipalKind},
-    connections::{AdoptFuture, GrantIntake, GrantIntakePort, ProviderGrant as Grant},
+    connections::{
+        AdoptFuture, GrantIntake, GrantIntakePort, ProviderGrant as Grant, ReconnectTarget,
+        TargetFuture,
+    },
+    db::BeginFor as _,
+    tenancy::{Access, UserId, WorkspaceId},
 };
 use secrecy::ExposeSecret as _;
 
 use super::{
     grants::{ProviderGrant, create_or_refresh_connection},
-    model::{Capability, Provider},
+    model::{Capability, ConnectionId, Health, Provider},
 };
 use crate::{MESSAGES, deps::Deps, google};
 
@@ -50,22 +57,7 @@ impl GrantIntake for Intake {
             if capabilities.is_empty() {
                 return Err(Error::Denied(MESSAGES.reason("consent_incomplete")));
             }
-            let principal = Principal {
-                subject: grant.subject.clone(),
-                kind: PrincipalKind::User,
-                client_id: None,
-                scopes: std::collections::BTreeSet::new(),
-                workspace: None,
-                email: None,
-                email_verified: false,
-                name: None,
-                expires_at: None,
-            };
-            let access = state
-                .membership
-                .resolve(&state.db, &principal, grant.workspace)
-                .await?
-                .ok_or(Error::NotFound)?;
+            let access = member(state, &grant.subject, grant.workspace).await?;
             let user = access.user.ok_or(Error::NotFound)?;
             let view = create_or_refresh_connection(
                 state,
@@ -88,7 +80,11 @@ impl GrantIntake for Intake {
                             .map(|t| t.expose_secret().to_owned()),
                         scope: Some(grant.scopes.join(" ")),
                     },
-                    extending: None,
+                    extending: grant
+                        .extending
+                        .as_deref()
+                        .map(|id| id.parse::<ConnectionId>().map_err(|_| Error::NotFound))
+                        .transpose()?,
                 },
             )
             .await?;
@@ -96,6 +92,61 @@ impl GrantIntake for Intake {
             Ok(view.id.to_string())
         })
     }
+
+    fn reconnect_target<'a>(
+        &'a self,
+        state: &'a AppState,
+        subject: &'a str,
+        workspace: WorkspaceId,
+        connection: &'a str,
+    ) -> TargetFuture<'a> {
+        Box::pin(async move {
+            let id: ConnectionId = connection.parse().map_err(|_| Error::NotFound)?;
+            let access = member(state, subject, workspace).await?;
+            let user = access.user.ok_or(Error::NotFound)?;
+            let mut tx = state.db.begin_for(workspace).await?;
+            let found = sqlx::query!(
+                r#"SELECT provider, address, account_subject, health
+                     FROM connectors.connections
+                    WHERE id = $1 AND granted_by = $2"#,
+                id as ConnectionId,
+                user as UserId,
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            // Only the grantor consents to their grant again.
+            let found = found.ok_or(Error::NotFound)?;
+            Ok(ReconnectTarget {
+                provider: found.provider,
+                address: found.address,
+                account_subject: found.account_subject,
+                needs_reauth: found.health == Health::NeedsReauth.as_str(),
+            })
+        })
+    }
+}
+
+/// The membership of the person with token subject `subject` in
+/// `workspace`; 404 when they are not a member.
+async fn member(state: &AppState, subject: &str, workspace: WorkspaceId) -> Result<Access, Error> {
+    let principal = Principal {
+        subject: subject.to_owned(),
+        kind: PrincipalKind::User,
+        client_id: None,
+        scopes: std::collections::BTreeSet::new(),
+        workspace: None,
+        email: None,
+        email_verified: false,
+        name: None,
+        expires_at: None,
+        auth_time: None,
+    };
+    state
+        .membership
+        .resolve(&state.db, &principal, workspace)
+        .await?
+        .ok_or(Error::NotFound)
 }
 
 #[cfg(test)]
@@ -128,6 +179,7 @@ mod tests {
             access_token: SecretString::from("fake-access"),
             refresh_token: Some(SecretString::from("fake-refresh")),
             expires_in: Some(3600),
+            extending: None,
         }
     }
 

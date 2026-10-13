@@ -149,10 +149,11 @@ list the caller's inboxes with their role and unread count.
 conversations newest first, by stream and inbox, in the inbox or archived,
 with an opaque cursor and a limit of 1 to 100 (else 400).
 `GET …/conversations/{conversation_id}` (`conversations.get`) SHALL return the
-conversation and up to its 100 newest messages with their plain-text bodies.
+conversation, up to its 100 newest messages with their plain-text bodies, and
+the decide pass's answers about its newest inbound message.
 `GET …/messages/{message_id}/body` (`conversations.get_message_body`) SHALL
-return the text and HTML bodies as JSON; HTML SHALL never be served as
-`text/html`.
+return the text and the sanitised HTML bodies as JSON; HTML SHALL never be
+served as `text/html`.
 
 #### Scenario: Paging
 - **WHEN** a member lists three conversations two at a time
@@ -227,3 +228,161 @@ workspace's rows when its grace period ends.
 #### Scenario: Purge
 - **WHEN** a workspace is deleted with its grace period over
 - **THEN** its inboxes, conversations and messages are gone and other workspaces' are kept
+
+### Requirement: Sanitised email HTML
+`conversations.get_message_body` SHALL sanitise the HTML body before
+returning it: only an allow-list of tags and attributes survives; `script`
+and `style` elements are removed with their content, as are forms, frames,
+objects, `base` and `meta` elements, event-handler attributes and comments;
+links keep only `http`, `https`, `mailto` and `tel` URLs, relative URLs are
+dropped, and every link opens in a new tab with `rel="noopener noreferrer"`;
+`style` attributes keep only declarations that load nothing (no `url(`,
+`image-set(`, `@import`, `expression`, `behavior`, `-moz-binding` or CSS
+escapes). Images of at most 2×2 pixels, or hidden by their style, SHALL be
+removed. Other remote images SHALL lose their source unless the request asks
+`show_images=true`, and the response SHALL say how many remote images the
+message has (`remote_images`) and whether they were kept (`images_shown`).
+
+#### Scenario: A newsletter with a script, a style sheet and a tracking pixel
+- **WHEN** a member reads the HTML body of a message that has a `<script>`, a `<style>` with a remote `url()`, an `onclick` handler, a 1×1 image and a remote logo
+- **THEN** the HTML has no script, style sheet, handler or tracking pixel, the logo has no source, and `remote_images` is 1
+
+#### Scenario: Show images
+- **WHEN** the same body is read with `show_images=true`
+- **THEN** the logo keeps its `https` source, the tracking pixel is still removed, and `images_shown` is true
+
+### Requirement: Stream counts
+`GET /api/v1/w/{workspace_id}/streams` (`conversations.list_streams`,
+`conversations:read`) SHALL list the four built-in streams in display order,
+each with the number of the caller's conversations in it that are still in
+the inbox and how many of those have an unread message, optionally for one
+inbox (`inbox`, 404 when the caller cannot see it). Streams with nothing in
+them SHALL be listed with zero.
+
+#### Scenario: Counting
+- **WHEN** a member with three conversations, one unread in Primary, lists the streams
+- **THEN** the response lists primary, updates, receipts and newsletters in that order, their conversations add up to three, and Primary has one unread
+
+#### Scenario: Someone else's inbox
+- **WHEN** a member who is not in an inbox lists the streams
+- **THEN** its conversations are not counted
+
+### Requirement: Suggestions with their reasons
+A conversation summary SHALL carry `suggestion` when the newest stream answer
+on record for it (the model's before the rules' for the same message) did
+not act, names another stream than the conversation's, and no member placed
+the conversation; the suggestion SHALL carry the stream, its source, its
+confidence (0 to 100, when known) and its stored reasons. A conversation's
+detail SHALL carry `decisions`: for each question, the answer about its newest
+inbound message, with its source, confidence, reasons and whether it acted.
+Neither SHALL change where a conversation is.
+
+#### Scenario: The shipped policy
+- **WHEN** the rules answer `newsletters` for a message under `Policy::baseline`
+- **THEN** the conversation stays in `primary`, its summary suggests `newsletters` with the rules' reasons, and its detail lists the stream answer with `acted = false`
+
+#### Scenario: A member moved it
+- **WHEN** a member moves that conversation to `newsletters`
+- **THEN** the summary the move returns has no suggestion
+
+### Requirement: Sending scope and roles
+The `conversations` module SHALL declare the scope `conversations:send`, and
+every draft operation SHALL require it. A user SHALL also need the `sender`
+or `manager` role on the draft's inbox: a `reader` SHALL get 403
+`inbox_read_only`, and a user who is not a member of the inbox SHALL get 404.
+
+#### Scenario: A token without the scope
+- **WHEN** a client with only `conversations:read conversations:write` creates a draft
+- **THEN** the response is 403 as `application/problem+json`
+
+#### Scenario: The composer
+- **WHEN** a member presses Reply, Reply all or Forward in the reader, or `c` for a new message
+- **THEN** a composer opens From the inbox, with To, Cc and Bcc as chips, the quoted history folded under the text, forwarded attachments listed, ⌘↵ to send, ⌘B and ⌘I to format and Esc to close, and Undo in a toast after sending
+
+#### Scenario: A reader replies
+- **WHEN** a member with the `reader` role on an inbox creates a reply draft to one of its messages
+- **THEN** the response is 403 with code `inbox_read_only` and no draft exists
+
+### Requirement: Drafts
+A draft SHALL belong to one inbox and to its author, and SHALL be visible
+only to its author (a client token: only to client tokens); anyone else
+SHALL get 404. Creating a reply, reply-all or forward draft of a message
+SHALL fill on the server: the recipients (reply: the message's `Reply-To`,
+else its sender, or for a message the inbox sent its `To`; reply all: also
+its `To` and `Cc`, never the inbox's own address, no duplicates; forward:
+none), the subject with `Re: ` or `Fwd: ` unless already there, the
+`In-Reply-To`, the `References` (the message's plus its `Message-ID`, at most
+20), the provider thread key, and for a forward every non-inline attachment
+of the message, whose blobs the draft holds. A draft SHALL be saved by
+partial updates that name the `version` they change; a stale version SHALL
+get 409 `draft_changed`.
+
+#### Scenario: Reply all leaves the inbox out
+- **WHEN** Sam replies all to a message from Maya to Sam and Leo, copying Ana
+- **THEN** the draft is to Maya and copies Leo and Ana, and Sam's own address is in neither list
+
+#### Scenario: Forward keeps the attachments
+- **WHEN** Sam forwards a message with a PDF attachment
+- **THEN** the draft has no recipients, its subject starts with `Fwd: `, and it lists the PDF, which stays stored even if the original message is removed
+
+#### Scenario: Two saves of the same version
+- **WHEN** two updates name the same version
+- **THEN** the first is saved and the second answers 409 `draft_changed`
+
+#### Scenario: Another member's draft
+- **WHEN** a second sender of the inbox reads Sam's draft
+- **THEN** the response is 404
+
+### Requirement: Sending with undo
+`conversations.send_draft` SHALL name the draft version it sends and SHALL
+answer 409 `draft_changed` when that is not the saved one, so what is sent
+is what the member last saw saved; the client SHALL send only once its last
+save of what is on screen succeeded. It SHALL refuse a draft with no recipient (400
+`no_recipients`), a malformed address (400 `invalid_address`) or more than
+25 MiB of attachments (400 `attachments_too_large`); otherwise it SHALL schedule the
+draft and answer 202 with the time it will be released, after
+`CAMPBOOKS_CONVERSATIONS__UNDO_SEND_SECONDS` (default 10). Until then
+`conversations.cancel_send` SHALL put it back to an editable draft; after
+release it SHALL answer 409 `too_late`. A scheduled or sending draft SHALL
+not be edited, deleted or sent again (409 `draft_not_editable`).
+
+#### Scenario: Undo within the window
+- **WHEN** Sam sends a reply and cancels it before the window ends
+- **THEN** the draft is editable again and nothing is ever published for that send
+
+#### Scenario: Sending again after an undo
+- **WHEN** Sam cancels a send, edits the draft and sends it again
+- **THEN** only the second send is released, once
+
+### Requirement: The outbound intent
+When the window ends, the job `conversations.release_send` SHALL write an
+outgoing message document (`contracts/outgoing-message.v1.schema.json`, a
+blob holding the addresses, subject, plain text, the HTML rendered from the
+text's basic formatting with everything else escaped, and the forwarded
+attachments' blob references), mint a send id and a `Message-ID`, and
+publish `conversations.send_requested` v1
+(`contracts/conversations.send_requested.v1.schema.json`, ids and the blob
+only) in the transaction that marks the draft as sending.
+
+#### Scenario: Formatting cannot inject HTML
+- **WHEN** the body contains `<script>` and `**done**`
+- **THEN** the HTML part shows `&lt;script&gt;` as text and `done` in bold
+
+### Requirement: The send outcome
+On `connectors.send_completed` v1
+(`contracts/connectors.send_completed.v1.schema.json`), the consumer
+`conversations.record_send` SHALL delete a sent draft, releasing its blobs,
+and publish `conversations.draft_sent`; or mark a failed draft `failed` with
+the reason and publish `conversations.send_failed`. A failed draft SHALL be
+editable and may be sent again. The sent message SHALL reach its
+conversation through the connector's change batch, like any message. A
+released send that hears nothing back for an hour SHALL fail with
+`unknown_outcome`, and a late outcome for it SHALL still be recorded.
+
+#### Scenario: The reply appears in its conversation
+- **WHEN** a reply is sent
+- **THEN** the conversation gains one outbound message and the draft is gone
+
+#### Scenario: Gmail refuses the message
+- **WHEN** the connector reports `rejected`
+- **THEN** the draft is `failed` with reason `rejected` and can be edited and sent again

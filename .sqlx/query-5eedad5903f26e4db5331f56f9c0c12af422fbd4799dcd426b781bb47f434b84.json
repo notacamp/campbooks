@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: DraftId\" FROM conversations.drafts\n            WHERE author IS NOT DISTINCT FROM $1 AND inbox_id = ANY($2)\n              AND ($3::uuid IS NULL OR conversation_id = $3)\n            ORDER BY updated_at DESC, id DESC\n            LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: DraftId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "UuidArray",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5eedad5903f26e4db5331f56f9c0c12af422fbd4799dcd426b781bb47f434b84"
+}

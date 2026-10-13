@@ -9,33 +9,6 @@ apply (ADR 0010).
 
 ## Requirements
 
-### Requirement: Connecting an account
-A member SHALL start a connection by naming a provider and capabilities and
-SHALL receive the provider's authorize URL, which uses the authorization
-code flow with PKCE (S256), offline access and incremental consent. The
-started authorization SHALL expire after ten minutes. The connection SHALL
-be completed only by an authenticated call, from the member who started it
-and in the same workspace, carrying the `state` and `code` from the
-redirect; any other caller SHALL get 404 and the code SHALL NOT be
-exchanged. A provider that is not configured SHALL answer 409
-`provider_not_configured`.
-
-#### Scenario: Member connects Gmail
-- **WHEN** a member starts a Google connection for `messages` and completes it with the returned state and the code Google issued
-- **THEN** a connection exists with the member as grantor, health `ok`, capability `messages`, and a messages stream that is due now
-
-#### Scenario: Someone else completes it
-- **WHEN** a different user completes an authorization another member started
-- **THEN** the response is 404, no token is requested from Google, and no connection is created
-
-#### Scenario: Expired authorization
-- **WHEN** the member completes an authorization more than ten minutes after starting it
-- **THEN** the response is 404 and no connection is created
-
-#### Scenario: Same account again
-- **WHEN** the member connects the same Google account again in the same workspace, asking for a capability it lacks
-- **THEN** the existing connection gains the capability and its credentials are replaced; no second connection exists
-
 ### Requirement: Credentials stay secret
 Refresh and access tokens SHALL be stored only encrypted (AES-256-GCM, key
 derived from the instance secret with a purpose label, bound to table,
@@ -170,13 +143,13 @@ before any batch for that inbox.
 - **THEN** `connectors.capability_granted` with the new inbox id and an account blob is published in the completing transaction, before the stream's first batch
 
 ### Requirement: Connections operations
-The module SHALL expose start, complete, list, get, disconnect and sync-now
+The module SHALL expose start, list, get, disconnect and sync-now
 operations under `/api/v1/w/{workspace_id}/connections`, each with an
 `operationId` prefixed `connectors.`, an `x-campbooks` block and the scope
 `connectors:read` or `connectors:write`. A member SHALL see the
 connections they granted; owners and admins SHALL see all of the
-workspace's; any other read SHALL be 404. A client token SHALL NOT start or
-complete a connection.
+workspace's; any other read SHALL be 404. A client token SHALL NOT start a
+connection.
 
 #### Scenario: Member lists connections
 - **WHEN** a member lists connections in a workspace with their own and a colleague's connection
@@ -185,3 +158,210 @@ complete a connection.
 #### Scenario: Client token starts a connection
 - **WHEN** a client token calls start connection
 - **THEN** the response is 403 `connection_needs_user`
+
+### Requirement: Connecting an account through the front door
+A member SHALL start a connection by naming a provider and capabilities (and
+optionally a connection of theirs to extend), and SHALL receive the URL of
+the identity module's front door for that consent. The provider round trip,
+its PKCE (S256), offline access and expiry are the identity module's, and
+the grant SHALL arrive through the grant-intake port, which creates or
+refreshes the connection through the one seam
+(`create_or_refresh_connection`). Extending a connection SHALL refuse any
+other account (`account_mismatch`). With no in-process identity issuer, or a
+provider that is not configured, the answer SHALL be 409
+`provider_not_configured`. The grant-intake port SHALL tell the identity
+module, for a connection to reconnect, its provider and address, and SHALL
+answer 404 unless the caller granted it.
+
+#### Scenario: Member connects Gmail
+- **WHEN** a member starts a Google connection for `messages`
+- **THEN** the answer's `authorize_url` is a `/auth/start/google?link=` URL of this instance, and the grant that comes back through the intake becomes a connection with the member as grantor, health `ok` and a messages stream due now
+
+#### Scenario: Reconnecting someone else's connection
+- **WHEN** the identity module asks for the reconnect target of a connection another member granted
+- **THEN** the answer is 404
+
+#### Scenario: Same account again
+- **WHEN** the member connects the same Google account again in the same workspace, asking for a capability it lacks
+- **THEN** the existing connection gains the capability and its credentials are replaced; no second connection exists
+
+#### Scenario: Reconnecting with another account
+- **WHEN** a grant extending a connection comes back for a different Google account
+- **THEN** it is refused with `account_mismatch` and the connection is unchanged
+
+### Requirement: Outbound changes to Gmail
+The module SHALL consume `conversations.changes_requested` v1 and make each
+item's change at Gmail for the stream that feeds the event's inbox: read and
+unread through `UNREAD`, star and unstar through `STARRED`, archive and
+unarchive through `INBOX`, a provider label by its Gmail label id, and a move
+to the Primary, Updates or Newsletters stream through the matching Gmail
+category (`CATEGORY_PERSONAL`, `CATEGORY_UPDATES`, `CATEGORY_PROMOTIONS`, the
+other categories removed). A change SHALL be recorded durably, with Gmail's
+history id at that moment, before it is attempted, and SHALL be made by the
+stream's next run before it reads, with `users.messages.modify`, or
+`users.messages.batchModify` for more than ten messages with the same change.
+Changes recorded before a run SHALL be merged per message and label, the
+latest winning. Every recorded change SHALL end `applied`, `superseded`,
+`skipped` or `failed` with a stable reason code and no message content. A
+label without a provider key, or that Gmail no longer has, and a move to the
+Receipts stream, SHALL be recorded as `skipped`. Only `UNREAD`, `STARRED`,
+`INBOX`, the categories and user labels SHALL ever be written; a label change
+naming a system label SHALL be skipped. A change that would bring a message
+Gmail holds in the trash or spam back to the inbox or a category SHALL be
+recorded `skipped` (`in_trash`). A change still pending after the batch
+retention period SHALL be recorded `failed` (`expired`) before any run takes
+it, and never made.
+
+#### Scenario: Archive reaches Gmail
+- **WHEN** a member archives a conversation whose message is in Gmail's inbox
+- **THEN** the stream runs, Gmail's message loses `INBOX`, and the change is recorded `applied`
+
+#### Scenario: Every intent kind
+- **WHEN** members mark read and unread, star and unstar, archive and unarchive, add and remove a Gmail label, and move conversations to Primary, Updates, Newsletters and Receipts
+- **THEN** Gmail's labels change as mapped, and the label without a provider key and the move to Receipts are recorded `skipped`
+
+#### Scenario: Undo before the run
+- **WHEN** a member archives and unarchives a conversation before the stream runs
+- **THEN** no write is made, the archive is recorded `superseded` (`replaced`) and the unarchive `applied`
+
+#### Scenario: A stale change
+- **WHEN** a change recorded ten days ago is still pending when the stream runs
+- **THEN** it is recorded `failed` (`expired`), no write is made, and the message's Gmail state is emitted again
+
+#### Scenario: In the trash
+- **WHEN** a member unarchives a message, or moves one to Primary, that Gmail holds in the trash or spam
+- **THEN** no write is made and the change is recorded `skipped` (`in_trash`)
+
+#### Scenario: Many messages, one call
+- **WHEN** one intent marks twelve messages read
+- **THEN** a single `batchModify` makes the change
+
+### Requirement: Write-backs never echo
+Changes that came from Gmail SHALL never be written back to Gmail. After a
+write, the adapter's index SHALL hold the labels it set, so that Gmail's
+history record of that write produces no change in the next batch. While a
+member's change is pending, a run that emits that message SHALL emit it with
+the change applied.
+
+#### Scenario: The next sync after a write-back
+- **WHEN** a member's star has been written to Gmail and the stream runs again
+- **THEN** no `connectors.messages_changed` batch carries that message, and no new outbound change is recorded
+
+#### Scenario: A Gmail change still arrives
+- **WHEN** a member's archive is written while the same message was starred in Gmail and not yet read
+- **THEN** the next batch carries the message starred and archived
+
+### Requirement: Last writer wins in Gmail's order
+Per message and label, the later write in Gmail's history order SHALL win. A
+member's change SHALL be placed at the history id stamped when it was
+recorded: a Gmail change to the same label after that point SHALL win (the
+write is dropped as `superseded`, `changed_at_provider`, and the message's
+Gmail state is emitted again), and a Gmail change before it SHALL be
+overwritten. A change SHALL be made whole or not at all: when any label it
+would write was changed at Gmail later, none of it is written. History
+records inside the write window of one of the module's own runs SHALL count
+as its own writes; a window the run could not close (Gmail's history id after
+the write could not be read) SHALL be closed at the history id the next read
+reaches, and SHALL cover nothing once open for ten minutes. Without a stamp, or when Gmail no
+longer has the history, a change SHALL apply in arrival order.
+
+#### Scenario: Changed in Gmail after the member
+- **WHEN** a member stars a message and, before the write-back, it is starred and unstarred again in Gmail
+- **THEN** Gmail stays unstarred, the change is `superseded` (`changed_at_provider`), and the next batch tells conversations the message is not starred
+
+#### Scenario: A move overtaken in part
+- **WHEN** a member moves a conversation to Newsletters and, before the write-back, it is moved to Social in Gmail
+- **THEN** no category is written, Gmail keeps Social only, and the change is `superseded` (`changed_at_provider`)
+
+#### Scenario: Changed in Gmail before the member
+- **WHEN** a message is archived in Gmail, and then a member who has not yet seen it unarchives it in Campbooks
+- **THEN** the message is back in Gmail's inbox
+
+#### Scenario: Undo after the write
+- **WHEN** a member archives a message, the archive is written, and the member unarchives it while that write was being made
+- **THEN** the unarchive is applied, not mistaken for a change made in Gmail
+
+### Requirement: Write-back retries and failures
+Provider trouble while writing (429, 5xx, a network failure, a refused
+token) SHALL stop the push, keep the unwritten changes pending, and use the
+run's backoff, throttling and health rules; writes SHALL take Gmail quota
+from the shared provider budget. A change Gmail refuses for good, or that
+has met trouble eight times, SHALL be recorded `failed` with a reason code
+and no content, and the message's Gmail state SHALL be emitted again. A
+message Gmail no longer has SHALL be recorded `skipped` (`message_gone`).
+
+#### Scenario: Throttled, then written
+- **WHEN** Gmail answers 429 with `Retry-After` to a write
+- **THEN** the change stays pending, the stream is throttled until then, and the next run writes it
+
+#### Scenario: A message that refuses changes
+- **WHEN** Gmail refuses the change for one message of a conversation
+- **THEN** the other messages are changed, that one is recorded `failed` (`refused`), and conversations is told its Gmail state
+
+### Requirement: Sending through Gmail
+On `conversations.send_requested` v1 the consumer `connectors.queue_send`
+SHALL record the send, keyed by its send id (a repeated delivery adds
+nothing), hold the outgoing message document, and enqueue
+`connectors.send_message`. That job SHALL build an RFC 5322 message from
+the document (From the connection's account, To, Cc, Bcc, Subject, Date,
+`Message-ID`, `In-Reply-To`, `References`, a plain-text part, an HTML
+alternative when given, and the attachments) and send it with
+`users.messages.send` in the document's thread. When the inbox has no
+connected stream, or its grant needs the member again, the send SHALL fail
+with `not_connected` or `needs_reauth` without calling Gmail.
+
+#### Scenario: A reply goes into its Gmail thread
+- **WHEN** a reply's document names a thread key
+- **THEN** Gmail receives one `messages.send` with that `threadId`, and the raw message carries the `In-Reply-To`, `References` and `Message-ID` of the document
+
+### Requirement: Sends are idempotent
+Every call to Gmail SHALL be preceded by an attempt committed on its own,
+which marks the send unclear (it may be out) until Gmail gives a definite
+answer: an acceptance, or a refusal of the send itself (any 4xx; a 2xx whose
+answer cannot be read counts as unclear, never as a refusal). While a send
+is unclear, the next attempt SHALL look the message up by its `Message-ID`
+first, recording it as sent if Gmail has it and clearing the mark if it does
+not; no attempt SHALL call Gmail sooner than the HTTP timeout plus 30
+seconds after the previous one. A definite refusal SHALL fail the send with
+`rejected` at once. Any failure while the send is unclear SHALL be
+`unknown_outcome`. A send whose attempts run out, or that cannot go on,
+SHALL be settled: `unknown_outcome` if unclear, else `unavailable`; and a
+check enqueued behind each send (it runs only once no earlier job for the
+send is alive, 30 minutes on) SHALL settle a send whose job died the same
+way, after a lookup when it is unclear.
+
+#### Scenario: A timeout after Gmail accepted the message
+- **WHEN** Gmail accepts a message but the answer never arrives, and the job runs again
+- **THEN** the job finds the message by its `Message-ID` and Gmail receives no second `messages.send`
+
+#### Scenario: The same intent delivered twice
+- **WHEN** `conversations.send_requested` is delivered twice for one send id
+- **THEN** one send is recorded and Gmail receives one `messages.send`
+
+#### Scenario: A refused message
+- **WHEN** Gmail answers 400 to `messages.send`
+- **THEN** the send fails with `rejected` and is never retried
+
+#### Scenario: An answer that cannot be read
+- **WHEN** Gmail accepts a message but its answer does not parse
+- **THEN** the next attempt finds it by its `Message-ID` and Gmail receives one `messages.send`
+
+#### Scenario: The worker died after the call
+- **WHEN** an attempt was recorded with no outcome, and the grant then needs the member
+- **THEN** the send fails with `unknown_outcome`, never as not sent
+
+#### Scenario: Out of attempts before any call
+- **WHEN** a send's last attempt cannot call Gmail (no budget, no token)
+- **THEN** it fails with `unavailable` and its draft is editable again
+
+### Requirement: The sent message comes back once
+After Gmail accepts a message, the job SHALL, in one transaction, index it
+like a synced message, store and announce a `MessageChangeBatch` holding it
+(`connectors.messages_changed`), mark the send sent, release its document,
+publish `connectors.send_completed` v1 with the provider's id, and make the
+stream due at once. The next sync SHALL recognise the message and not emit
+it as new.
+
+#### Scenario: Sync after a send
+- **WHEN** the stream syncs after a send and Gmail's history lists the sent message as added
+- **THEN** no second upsert of that message is emitted as new and the conversation still has one copy

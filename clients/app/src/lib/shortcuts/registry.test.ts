@@ -87,6 +87,11 @@ describe("findConflicts", () => {
     );
     expect(findConflicts([define("a", "h", "item"), define("b", "g h")])).toEqual([]);
   });
+
+  it("keeps a focus page's keys apart from lists and items, but not from global ones", () => {
+    expect(findConflicts([define("a", "1", "focus"), define("b", "1", "item")])).toEqual([]);
+    expect(findConflicts([define("a", "1", "focus"), define("b", "1")])).toHaveLength(1);
+  });
 });
 
 describe("ShortcutRegistry", () => {

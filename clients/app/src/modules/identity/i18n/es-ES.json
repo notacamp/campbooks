@@ -1,0 +1,251 @@
+{
+  "provider": {
+    "google": "Google",
+    "microsoft": "Microsoft",
+    "zoho": "Zoho"
+  },
+  "shortcuts": {
+    "choice1": "Iniciar sesión con la primera opción",
+    "choice2": "Iniciar sesión con la segunda opción",
+    "choice3": "Iniciar sesión con la tercera opción",
+    "passkey": "Iniciar sesión con una llave de acceso",
+    "addWayIn": "Añadir una forma de iniciar sesión"
+  },
+  "signIn": {
+    "title": "Inicia sesión en Campbooks",
+    "lead": "Lo que te necesita, en un solo sitio y con calma. Campbooks lee tu correo y te trae solo lo que te necesita.",
+    "invitedTitle": "Inicia sesión para unirte al espacio de trabajo",
+    "invitedLead": "Usa la dirección de correo a la que se envió la invitación y entrarás enseguida.",
+    "waysIn": "Formas de iniciar sesión",
+    "with": {
+      "google": "Continuar con Google",
+      "microsoft": "Continuar con Microsoft",
+      "zoho": "Continuar con Zoho"
+    },
+    "passkey": "Usar una llave de acceso",
+    "gmail": {
+      "summary": "Google también te pedirá permiso para que Campbooks use tu Gmail, así tu primer buzón estará listo cuando tú lo estés.",
+      "details": "Qué lee y guarda Campbooks",
+      "keeps": "Campbooks guarda tu nombre, tu dirección y el permiso que Google le da. Nunca ve tu contraseña de Google.",
+      "reads": "Ese permiso deja que Campbooks lea y organice el correo de esta cuenta de Gmail. No se conecta nada a ningún espacio de trabajo hasta que tú lo digas, y un permiso que no uses se borra a los 7 días.",
+      "optional": "Puedes desmarcar el acceso al correo en la pantalla de Google. Iniciarás sesión igualmente; tu correo simplemente no se conectará.",
+      "existing": "Si ya tienes cuenta, iniciar sesión no cambia ningún buzón que hayas conectado."
+    },
+    "unverified": "Puede que Google avise de que aún no ha verificado esta aplicación. Google revisa todas las aplicaciones que pueden leer Gmail, y esa revisión todavía no ha terminado. Para seguir, elige «Configuración avanzada» y continúa a la aplicación.",
+    "footer": "Código disponible. Tu correo se queda en tu espacio de trabajo.",
+    "starting": "Abriendo el inicio de sesión…",
+    "loading": "Cargando las formas de iniciar sesión…",
+    "startAgain": "Empezar de nuevo",
+    "retry": "Reintentar",
+    "noWayIn": {
+      "title": "El inicio de sesión aún no está configurado",
+      "lead": "Este Campbooks no tiene activada ninguna forma de iniciar sesión. Pide a quien lo gestiona que configure el inicio de sesión con Google."
+    },
+    "expired": {
+      "title": "Esta página de inicio de sesión ha caducado",
+      "lead": "Ha esperado demasiado. Empieza de nuevo; no se ha perdido nada."
+    },
+    "failed": {
+      "title": "No se han podido cargar las formas de iniciar sesión",
+      "lead": "Campbooks no ha respondido. Comprueba tu conexión y vuelve a intentarlo."
+    }
+  },
+  "errors": {
+    "cancelled_at_provider": {
+      "title": "Has cancelado en la pantalla de inicio de sesión.",
+      "lead": "No se ha creado nada. Elige una forma de iniciar sesión cuando quieras."
+    },
+    "invalid_state": {
+      "title": "Ese inicio de sesión no se puede terminar.",
+      "lead": "Ha tardado demasiado o se abrió en otro navegador. Empieza de nuevo en este."
+    },
+    "provider_unavailable": {
+      "title": "El proveedor de inicio de sesión no ha respondido.",
+      "lead": "No ha cambiado nada. Espera un momento y vuelve a intentarlo."
+    },
+    "login_failed": {
+      "title": "El proveedor de inicio de sesión no ha podido confirmar quién eres.",
+      "lead": "Vuelve a intentarlo o inicia sesión de otra forma."
+    },
+    "account_disabled": {
+      "title": "Esta cuenta está desactivada.",
+      "lead": "Pide a quien gestiona este Campbooks que la vuelva a activar."
+    },
+    "way_in_belongs_to_another_account": {
+      "title": "Esta cuenta ya da acceso a otra cuenta de Campbooks.",
+      "lead": "Inicia sesión con ella para usar esa cuenta."
+    },
+    "signup_invite_only": {
+      "title": "Este Campbooks solo admite personas por invitación.",
+      "lead": "Nadie ha invitado todavía a esta dirección, y no se ha guardado nada. Pide a alguien que lo use que te invite y luego inicia sesión con la dirección invitada."
+    },
+    "unknown": {
+      "title": "Algo ha fallado al iniciar sesión.",
+      "lead": "No ha cambiado nada. Empieza de nuevo."
+    }
+  },
+  "newAccount": {
+    "eyebrow": "Cuenta nueva",
+    "title": "Crea tu cuenta de Campbooks",
+    "lead": "Ninguna cuenta de Campbooks usa {{email}} todavía.",
+    "leadNoEmail": "Ninguna cuenta de Campbooks usa esta cuenta de {{provider}} todavía.",
+    "identity": "Tu cuenta nueva",
+    "from": "{{provider}}",
+    "nameNote": "Es el nombre que nos ha dado {{provider}}. Lo verán las personas de tus espacios de trabajo.",
+    "nextTitle": "Qué pasa ahora",
+    "next1": "Se crea tu cuenta e inicias sesión con esta cuenta de {{provider}}.",
+    "next2": "Le pones nombre a tu primer espacio de trabajo.",
+    "next3": "Si dejas que Campbooks use tu correo, eliges si conectarlo a ese espacio de trabajo.",
+    "create": "Crear cuenta",
+    "creating": "Creando…",
+    "another": "Iniciar sesión de otra forma",
+    "footer": "¿Ya usas Campbooks con otra cuenta? Inicia sesión con esa.",
+    "loading": "Cargando tu cuenta nueva…",
+    "retry": "Reintentar",
+    "signInAgain": "Volver a iniciar sesión",
+    "gone": {
+      "title": "Este registro ya no está esperando",
+      "lead": "Ha tardado demasiado o se empezó en otro navegador. Vuelve a iniciar sesión para empezar de nuevo."
+    },
+    "failed": {
+      "title": "No se ha podido crear la cuenta.",
+      "lead": "No se ha creado nada. Vuelve a intentarlo."
+    },
+    "loadFailed": {
+      "title": "No se ha podido cargar tu cuenta nueva",
+      "lead": "Campbooks no ha respondido. Comprueba tu conexión y vuelve a intentarlo."
+    }
+  },
+  "mailbox": {
+    "loading": "Buscando tu buzón…",
+    "eyebrow": "{{workspace}} está listo",
+    "title": "Tu Gmail {{address}} se conectará a este espacio de trabajo",
+    "titleOther": "Tu buzón {{address}} se conectará a este espacio de trabajo",
+    "lead": "Campbooks lee el correo de ese buzón, guarda una copia de lo que lee para enseñártelo aquí y sigue pendiente del correo nuevo.",
+    "later": "Si eliges «Ahora no», seguirá esperando en Inicio hasta el {{date}}.",
+    "signIn": "Si lo desconectas más adelante, podrás seguir iniciando sesión con esta cuenta.",
+    "formLabel": "Conectar tu buzón",
+    "connect": "Conectar",
+    "connecting": "Conectando…",
+    "notNow": "Ahora no",
+    "continue": "Continuar a Inicio",
+    "errors": {
+      "gone": {
+        "title": "Ese buzón ya no está esperando.",
+        "lead": "Su permiso ha caducado o ya se usó, así que no se puede conectar desde aquí."
+      },
+      "taken": {
+        "title": "Otra persona de aquí ya lo ha conectado.",
+        "lead": "Otro miembro de este espacio de trabajo ha conectado {{address}}."
+      },
+      "unsupported": {
+        "title": "Campbooks todavía no puede leer este buzón.",
+        "lead": "No se ha conectado nada."
+      },
+      "failed": {
+        "title": "No se ha conectado.",
+        "lead": "No ha cambiado nada. Vuelve a intentarlo."
+      }
+    }
+  },
+  "offer": {
+    "title": "Conectar {{address}}",
+    "lead": "Este buzón está esperando desde que te registraste. Conéctalo a {{workspace}} y Campbooks te traerá aquí lo que te necesita.",
+    "waits": "Esperando hasta el {{date}}",
+    "connect": "Conectar",
+    "forget": "No conectarlo",
+    "confirmForget": "¿Olvidar {{address}}? Campbooks borra el permiso que le dio Google. Podrás seguir iniciando sesión con esta cuenta.",
+    "confirm": "Olvidarlo",
+    "cancel": "Conservarlo",
+    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo."
+  },
+  "waysIn": {
+    "title": "Formas de iniciar sesión",
+    "lead": "Puedes iniciar sesión en Campbooks con cualquiera de estas cuentas. Cada buzón que conectes pasa a ser una más.",
+    "list": "Tus formas de iniciar sesión",
+    "loading": "Cargando tus formas de iniciar sesión…",
+    "loadError": {
+      "title": "No se han podido cargar tus formas de iniciar sesión",
+      "lead": "Campbooks no ha respondido. Comprueba la conexión e inténtalo de nuevo.",
+      "retry": "Reintentar"
+    },
+    "signedUpWith": "Te registraste con esta",
+    "added": "Añadida el {{date}}",
+    "lastUsed": "Último uso el {{date}}",
+    "remove": "Quitar",
+    "removeLabel": "Quitar {{provider}} ({{address}})",
+    "confirm": "Quitar",
+    "cancel": "Mantener",
+    "confirmRemove": "¿Dejar de iniciar sesión con {{provider}} ({{address}})? Los buzones que conectaste con esta cuenta siguen conectados.",
+    "confirmRemoveOnly": "¿Dejar de iniciar sesión con {{provider}} ({{address}})? Los buzones que conectaste con esta cuenta siguen conectados. Antes necesitas otra forma de iniciar sesión.",
+    "lastWayIn": {
+      "title": "Es tu única forma de iniciar sesión.",
+      "lead": "Añade primero otra forma y luego quita esta."
+    },
+    "removeFailed": {
+      "title": "No se ha podido quitar.",
+      "lead": "No ha cambiado nada. Inténtalo de nuevo."
+    },
+    "needsReconnect": "El buzón de esta cuenta en este espacio de trabajo ha dejado de sincronizarse. Vuelve a conectarlo para continuar.",
+    "reconnect": "Volver a conectar",
+    "reconnectLabel": "Volver a conectar el buzón {{address}}",
+    "addTitle": "Añadir una forma de iniciar sesión",
+    "addLead": "Inicia sesión con otra cuenta tuya. La confirmas en el proveedor y queda añadida aquí.",
+    "addNone": "Este Campbooks no ofrece ningún proveedor de inicio de sesión. Pide a quien lo gestiona que configure uno.",
+    "add": {
+      "google": "Añadir una cuenta de Google",
+      "microsoft": "Añadir una cuenta de Microsoft",
+      "zoho": "Añadir una cuenta de Zoho"
+    },
+    "startFailed": "No se ha podido empezar. Inténtalo de nuevo.",
+    "stepUp": {
+      "title": "Vuelve a iniciar sesión primero",
+      "lead": "Por seguridad, cambiar cómo inicias sesión requiere haber iniciado sesión en los últimos 10 minutos.",
+      "action": "Volver a iniciar sesión"
+    },
+    "linked": "Ya puedes iniciar sesión con {{provider}}.",
+    "connected": "El buzón vuelve a estar conectado.",
+    "errors": {
+      "way_in_belongs_to_another_account": {
+        "title": "Esa cuenta ya inicia sesión en otra cuenta de Campbooks.",
+        "lead": "No se ha movido ni fusionado nada. Inicia sesión con ella para usar esa cuenta."
+      },
+      "sign_in_again": {
+        "title": "Vuelve a iniciar sesión para hacerlo.",
+        "lead": "Este navegador ya no tiene tu sesión iniciada. Inicia sesión e inténtalo de nuevo."
+      },
+      "link_expired": {
+        "title": "Ha tardado demasiado.",
+        "lead": "No ha cambiado nada. Empieza de nuevo."
+      },
+      "cancelled_at_provider": {
+        "title": "Has cancelado en el proveedor.",
+        "lead": "No ha cambiado nada."
+      },
+      "login_failed": {
+        "title": "El proveedor no ha podido confirmar la cuenta.",
+        "lead": "No ha cambiado nada. Inténtalo de nuevo."
+      },
+      "provider_unavailable": {
+        "title": "El proveedor no ha respondido.",
+        "lead": "No ha cambiado nada. Espera un momento e inténtalo de nuevo."
+      },
+      "consent_incomplete": {
+        "title": "No se ha permitido el acceso al correo.",
+        "lead": "Ya puedes iniciar sesión con esa cuenta, pero su buzón no se ha conectado. Inténtalo de nuevo y permite el acceso al correo."
+      },
+      "account_mismatch": {
+        "title": "Esa es otra cuenta.",
+        "lead": "Vuelve a conectar con la cuenta a la que pertenece este buzón."
+      },
+      "account_connected_by_another_member": {
+        "title": "Otra persona de aquí ya lo ha conectado.",
+        "lead": "Otro miembro de este espacio de trabajo conectó ese buzón."
+      },
+      "unknown": {
+        "title": "Algo ha salido mal.",
+        "lead": "No ha cambiado nada. Inténtalo de nuevo."
+      }
+    }
+  }
+}

@@ -22,7 +22,8 @@ export const WORKSPACES_SHORTCUTS = [
   },
   {
     id: "invitation.copy_link",
-    keys: "c",
+    // `c` writes a new message, everywhere.
+    keys: "y",
     scope: "item",
     group: "item",
     label: "workspaces:shortcuts.copyLink",

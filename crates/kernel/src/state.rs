@@ -9,7 +9,7 @@ use crate::{
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
-    connections::{GrantIntakePort, NoGrantIntake},
+    connections::{ConsentDoorPort, GrantIntakePort, NoConsentDoor, NoGrantIntake},
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
@@ -57,6 +57,9 @@ pub struct AppState {
     /// server registers the `connectors` module's implementation; until
     /// then no mailbox can be connected that way.
     pub grants: GrantIntakePort,
+    /// Starts provider consents for other modules (the identity module's
+    /// front door). Until the server registers it, none can start.
+    pub consent: ConsentDoorPort,
     /// Answers whether an address has a pending invitation. The server
     /// registers the `workspaces` module's implementation; until then
     /// nobody is invited.
@@ -86,6 +89,7 @@ impl AppState {
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
             grants: Arc::new(NoGrantIntake),
+            consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
             locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
@@ -106,6 +110,13 @@ impl AppState {
     #[must_use]
     pub fn with_grant_intake(mut self, grants: GrantIntakePort) -> Self {
         self.grants = grants;
+        self
+    }
+
+    /// The same state, starting provider consents through `consent`.
+    #[must_use]
+    pub fn with_consent_door(mut self, consent: ConsentDoorPort) -> Self {
+        self.consent = consent;
         self
     }
 

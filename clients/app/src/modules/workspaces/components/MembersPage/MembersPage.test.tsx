@@ -181,13 +181,13 @@ describe("MembersPage", () => {
     const pending = screen.getByRole("list", { name: "Pending invitations" });
     expect(within(pending).getByText("bea@example.com")).toBeVisible();
 
-    // The link is shown once, to copy and send on (C copies it).
+    // The link is shown once, to copy and send on (Y copies it).
     const link = screen.getByRole("textbox", { name: "Invitation link for bea@example.com" });
     expect(link).toHaveValue("https://campbooks.example.com/invitations/accept?token=demo");
     expect(screen.getByText(/doesn’t email invitations yet/u)).toBeVisible();
     const writeText = vi.fn(() => Promise.resolve());
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-    fireEvent.keyDown(document.body, { key: "c" });
+    fireEvent.keyDown(document.body, { key: "y" });
     expect(await screen.findByText(/Link copied/u)).toBeVisible();
     expect(writeText).toHaveBeenCalledWith(
       "https://campbooks.example.com/invitations/accept?token=demo",

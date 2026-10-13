@@ -187,7 +187,8 @@ impl RateLimits {
 }
 
 /// The address of the caller: the socket peer, or, when the peer is a
-/// trusted proxy, the right-most `X-Forwarded-For` address that is not.
+/// trusted proxy, the right-most readable `X-Forwarded-For` address that is
+/// not a trusted proxy (the peer when there is none).
 /// Never rejects. `None` for a request with no socket address: one the
 /// server sends itself (the web BFF's in-process calls, operations invoked
 /// by id). Every request from the network has one.
@@ -204,22 +205,22 @@ impl ClientIp {
         if !trusted.contains(peer) {
             return Self(Some(peer));
         }
-        let hops: Vec<IpAddr> = headers
+        // Walk from the right: each trusted proxy appends the address it saw,
+        // so the right-most hop that is not one of them is the client; what
+        // lies further left is the client's to forge, and an unreadable hop
+        // is skipped rather than ending the walk. With no such hop (no
+        // header, or only proxies), the peer is the best we know.
+        let hops: Vec<&str> = headers
             .get_all("x-forwarded-for")
             .iter()
             .filter_map(|value| value.to_str().ok())
             .flat_map(|value| value.split(','))
-            .map_while(|hop| hop.trim().parse::<IpAddr>().ok())
-            .map(canonical)
             .collect();
         let client = hops
-            .iter()
+            .into_iter()
             .rev()
-            .copied()
+            .filter_map(|hop| hop.trim().parse::<IpAddr>().ok().map(canonical))
             .find(|hop| !trusted.contains(*hop))
-            // Every hop is a proxy we trust (or none was sent): the
-            // left-most is the closest thing to a client.
-            .or_else(|| hops.first().copied())
             .unwrap_or(peer);
         Self(Some(client))
     }
@@ -367,6 +368,33 @@ mod tests {
             ClientIp::resolve(Some(ip("10.1.2.3")), &chain, &proxies).0,
             Some(ip("203.0.113.9"))
         );
+        // A forged, unreadable hop neither ends the walk nor sends everyone
+        // to the proxy's bucket.
+        let forged = forwarded("1.1.1.1, not-an-address, 203.0.113.9, 192.0.2.1");
+        assert_eq!(
+            ClientIp::resolve(Some(ip("10.1.2.3")), &forged, &proxies).0,
+            Some(ip("203.0.113.9"))
+        );
+        let garbage_first = forwarded("garbage, 203.0.113.9");
+        assert_eq!(
+            ClientIp::resolve(Some(ip("10.1.2.3")), &garbage_first, &proxies).0,
+            Some(ip("203.0.113.9"))
+        );
+        // Several header lines read as one list, in order.
+        let mut lines = forwarded("1.1.1.1");
+        lines.append("x-forwarded-for", HeaderValue::from_static("203.0.113.7"));
+        assert_eq!(
+            ClientIp::resolve(Some(ip("10.1.2.3")), &lines, &proxies).0,
+            Some(ip("203.0.113.7"))
+        );
+        // Only proxies, or nothing readable: the peer.
+        for only in ["192.0.2.1, 10.9.9.9", "nonsense"] {
+            assert_eq!(
+                ClientIp::resolve(Some(ip("10.1.2.3")), &forwarded(only), &proxies).0,
+                Some(ip("10.1.2.3")),
+                "{only}"
+            );
+        }
         // A proxy that sent no header is the client as far as we know.
         assert_eq!(
             ClientIp::resolve(Some(ip("10.1.2.3")), &HeaderMap::new(), &proxies).0,

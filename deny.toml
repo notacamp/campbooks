@@ -25,7 +25,12 @@ allow = [
     "Zlib",                # foldhash (via hashbrown <- sqlx-core)
     "CDLA-Permissive-2.0", # Mozilla CA root data: webpki-roots (sqlx), webpki-root-certs (reqwest)
 ]
-exceptions = []
+exceptions = [
+    # MPL-2.0 (file-level copyleft), used unmodified, only through ammonia
+    # (the email HTML sanitiser): scoped to these crates, not allowed globally.
+    { crate = "cssparser", allow = ["MPL-2.0"] },
+    { crate = "dtoa-short", allow = ["MPL-2.0"] },
+]
 
 [licenses.private]
 # All workspace crates are `publish = false` under LicenseRef-Sustainable-Use;
