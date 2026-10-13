@@ -187,6 +187,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// administrator, and keeps the trail of what they do.
 pub fn with_ports(state: AppState) -> AppState {
     state
+        .with_resources(resource_catalogue())
         .with_admin(campbooks_admin::profiles(), campbooks_admin::audit())
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
@@ -238,7 +239,21 @@ pub fn registry_with(composition: &Composition) -> Result<Registry, RegistryErro
     Registry::build_with(
         &modules_with(composition),
         &[(bff::OWNER, &bff::background())],
-    )
+    )?
+    .with_resources(&[
+        (changes::OWNER, changes::resources()),
+        (bff::OWNER, bff::resources()),
+    ])
+}
+
+/// The access catalogue (ADR 0017): every resource type the modules, the
+/// change feed and the web BFF declare, with the ports answering their
+/// facts. (A registration error leaves it empty, so everything is denied;
+/// startup reports the error.)
+pub fn resource_catalogue() -> campbooks_kernel::authz::Catalogue {
+    registry()
+        .map(|registry| registry.resources().clone())
+        .unwrap_or_default()
 }
 
 /// Every event the modules publish, with its payload schema: what
@@ -586,7 +601,8 @@ mod tests {
                 "automation": false,
                 "assistant": false,
                 "risk": "low",
-                "records": []
+                "records": [],
+                "access": {"resource": "system.instance", "action": "read"}
             })
         );
         assert!(spec["components"]["schemas"]["Problem"].is_object());
@@ -686,6 +702,8 @@ mod tests {
     /// Row-level security can only protect tables that have it: every table
     /// with a `workspace_id` column (and the workspaces themselves) must
     /// enable and force it and carry a policy, so a new module cannot forget.
+    /// The kernel's tables too (the change feed, blobs, the event log and
+    /// the queue): a workspace transaction sees only its own rows there.
     #[sqlx::test(migrations = "../../migrations")]
     async fn every_workspace_owned_table_has_row_level_security(db: sqlx::PgPool) {
         let unprotected = sqlx::query_scalar!(
@@ -694,7 +712,7 @@ mod tests {
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE c.relkind IN ('r', 'p')
-               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public', 'kernel')
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public')
                AND (EXISTS (SELECT 1 FROM pg_attribute a
                              WHERE a.attrelid = c.oid AND a.attname = 'workspace_id'
                                AND NOT a.attisdropped)
@@ -710,6 +728,46 @@ mod tests {
         assert!(
             unprotected.is_empty(),
             "no forced row-level security: {unprotected:?}"
+        );
+    }
+
+    /// A transaction that sets no workspace (the scheduler's dispatcher) may
+    /// only read and lease the scheduling index, never insert or delete
+    /// rows of any workspace's: its maintenance policies are `FOR SELECT`
+    /// and `FOR UPDATE`, and no other policy admits a transaction without a
+    /// workspace on a module's table.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
+        let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+            "SELECT tablename::text, policyname::text, cmd::text, coalesce(qual, '')
+               FROM pg_policies
+              WHERE schemaname NOT IN ('kernel', 'admin', 'pg_catalog')
+              ORDER BY 1, 2",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        // Policies admitting a transaction that set no workspace.
+        let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
+        let policies: Vec<(String, String, String)> = rows
+            .into_iter()
+            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .map(|(table, name, cmd, _)| (table, name, cmd))
+            .collect();
+        assert_eq!(
+            policies,
+            [
+                (
+                    "sync_due".to_owned(),
+                    "maintenance_leases_schedule".to_owned(),
+                    "UPDATE".to_owned()
+                ),
+                (
+                    "sync_due".to_owned(),
+                    "maintenance_reads_schedule".to_owned(),
+                    "SELECT".to_owned()
+                ),
+            ]
         );
     }
 

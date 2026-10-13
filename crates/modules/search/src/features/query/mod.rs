@@ -24,6 +24,8 @@ use sqlx::Row as _;
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
+use crate::RESULT_RECORD;
+
 use self::sql::{Order, Scope};
 use crate::{
     domain::{
@@ -215,6 +217,13 @@ pub async fn handler(
     workspace: Workspace<SearchRead>,
     extract::Query(params): extract::Query<SearchParams>,
 ) -> Result<Json<SearchResults>> {
+    campbooks_kernel::authz::require_type(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Read,
+        RESULT_RECORD,
+        || Error::Forbidden,
+    )?;
     let caller = match &workspace.principal.client_id {
         Some(client) if workspace.access.user.is_none() => format!("client:{client}"),
         _ => format!("subject:{}", workspace.principal.subject),
@@ -247,7 +256,7 @@ pub async fn handler(
     let cursors = Cursors {
         state: &state,
         caller: &caller,
-        binding: binding(&params, sort),
+        binding: binding(&params, sort, workspace.id),
     };
     let order = match params.cursor.as_deref() {
         Some(cursor) => cursors.decode(cursor, sort)?,
@@ -565,11 +574,12 @@ impl Cursor {
 /// The signing context of cursors.
 const CURSOR_CONTEXT: &[u8] = b"search.cursor";
 
-/// What a cursor is bound to besides its caller: the query text, prefix
-/// mode, time zone and order.
-fn binding(params: &SearchParams, sort: Sort) -> String {
+/// What a cursor is bound to besides its caller: the workspace, the query
+/// text, prefix mode, time zone and order. (Bound to the workspace too: the
+/// same caller's cursor from one workspace never pages another.)
+fn binding(params: &SearchParams, sort: Sort, workspace: WorkspaceId) -> String {
     format!(
-        "{}\0{}\0{}\0{}",
+        "{workspace}\0{}\0{}\0{}\0{}",
         params.q.trim(),
         params.prefix,
         params.tz.as_deref().unwrap_or_default(),

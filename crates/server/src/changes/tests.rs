@@ -43,8 +43,14 @@ impl Replica {
         config.auth = idp.auth_config();
         config.changes.poll_interval_ms = 200;
         tweak(&mut config.changes);
+        let pool = testing::app_role_pool(db).await;
+        let blobs = campbooks_kernel::blobs::BlobStore::memory(
+            &campbooks_kernel::config::BlobsConfig::default(),
+            pool.clone(),
+        );
         let state = crate::with_ports(
-            AppState::new(testing::app_role_pool(db).await, config)
+            AppState::new(pool, config)
+                .with_blobs(blobs)
                 .with_registry(crate::registry().expect("valid registrations")),
         );
         let operations::Composed { routes, state, .. } = operations::compose(crate::api(), state);
@@ -206,6 +212,12 @@ impl Feed {
                 return frame;
             }
         }
+    }
+
+    /// Read whatever arrives until nothing has for `window` (it stays in
+    /// `raw`).
+    async fn drain(&mut self, window: Duration) {
+        while let Ok(Some(_)) = tokio::time::timeout(window, self.read()).await {}
     }
 
     /// Nothing but comments arrives within `window`.
@@ -724,10 +736,8 @@ async fn a_removed_member_is_revoked_and_then_refused(db: PgPool) {
     assert_eq!(status, StatusCode::NO_CONTENT);
     world.server.sequence().await;
 
-    assert_eq!(
-        record_of(&feed.next_event().await),
-        ("workspaces.member".into(), bea.to_string(), "delete".into())
-    );
+    // Membership is resolved again before the page is shown: a former
+    // member gets nothing more, not even the change that removed her.
     assert!(feed.next_event().await.is("revoked"));
     assert!(feed.next().await.is_none(), "the stream ends");
     let (status, _) = world
@@ -858,4 +868,170 @@ async fn cursors_mean_the_same_on_every_replica(db: PgPool) {
     world.rename(&ana, &ws, "Shop three").await;
     world.server.sequence().await;
     assert_eq!(live.next_event().await.id.as_deref(), Some("4"));
+}
+
+// --- inboxes and private records (campbooks-cloud#117) ---------------------------
+
+/// Scopes that read every record type these tests change.
+const READ_ALL: &str = "workspaces:read conversations:read conversations:send connectors:read";
+
+const EN: &str = include_str!("../../../modules/conversations/fixtures/en.json");
+const FR: &str = include_str!("../../../modules/conversations/fixtures/fr.json");
+
+impl World {
+    async fn ingest(&self, workspace: &str, inbox: campbooks_conversations::model::InboxId, json: &str) {
+        let workspace = workspace.parse().unwrap();
+        let recorded: Value = serde_json::from_str(json).unwrap();
+        let batch = campbooks_conversations::dev::record(&self.server.state, workspace, inbox, &recorded)
+            .await
+            .unwrap();
+        campbooks_conversations::dev::submit(&self.server.state, workspace, &batch)
+            .await
+            .unwrap();
+        self.server.sequence().await;
+    }
+
+    async fn publish<E: campbooks_kernel::DomainEvent>(&self, event: &E) {
+        let mut tx = self.db.begin().await.unwrap();
+        self.server.state.events.publish(&mut tx, event).await.unwrap();
+        tx.commit().await.unwrap();
+        self.server.sequence().await;
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_member_taken_out_of_an_inbox_stops_getting_its_ids(db: PgPool) {
+    use campbooks_conversations::{dev, events::InboxChanged, model::InboxRole};
+
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let ana_id = world.user_id("ana").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    let inbox = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager), (bea_id, InboxRole::Reader)],
+    )
+    .await
+    .unwrap();
+    world.server.sequence().await;
+    let bea = world.token("bea", READ_ALL);
+    let mut feed = world.server.subscribe(Some(&bea), &ws, None).await.unwrap();
+    assert!(feed.next_event().await.is("ready"));
+
+    world.ingest(&ws, inbox, EN).await;
+    let (record_type, _, _) = record_of(&feed.next_event().await);
+    assert!(record_type.starts_with("conversations."), "{record_type}");
+    // Drain what the first batch announced.
+    feed.drain(Duration::from_millis(300)).await;
+
+    // Bea is taken out of the inbox; its next mail must not reach her.
+    sqlx::query("DELETE FROM conversations.inbox_members WHERE user_id = $1")
+        .bind(bea_id.as_uuid())
+        .execute(&world.db)
+        .await
+        .unwrap();
+    world
+        .publish(&InboxChanged {
+            workspace: ws.clone(),
+            inbox,
+        })
+        .await;
+    world.ingest(&ws, inbox, FR).await;
+    let reset = feed.next_event().await;
+    assert!(reset.is("reset"), "{reset:?}");
+    assert_eq!(reset.json()["reason"], "access_changed");
+    let seen = feed.raw.clone();
+    feed.drain(Duration::from_millis(500)).await;
+    let new_messages: Vec<String> = sqlx::query_scalar(
+        "SELECT id::text FROM conversations.messages WHERE provider_message_id LIKE 'fr-%'",
+    )
+    .fetch_all(&world.db)
+    .await
+    .unwrap();
+    assert!(!new_messages.is_empty());
+    for id in new_messages {
+        assert!(!feed.raw.contains(&id), "{id} reached a former inbox member");
+        assert!(!seen.contains(&id));
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
+    use campbooks_connectors::{ConnectionId, Provider, events::ConnectionAdded};
+    use campbooks_conversations::{
+        dev,
+        events::DraftSent,
+        model::{DraftId, InboxRole},
+    };
+
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let ana_id = world.user_id("ana").await;
+    let (_, bea_id) = world.add_member(&ws, "bea", "member").await;
+    world.add_member(&ws, "cid", "admin").await;
+    world.add_member(&ws, "dan", "member").await;
+    let inbox = dev::create_inbox(
+        &world.server.state,
+        ws.parse().unwrap(),
+        "ana@example.com",
+        &[(ana_id, InboxRole::Manager), (bea_id, InboxRole::Sender)],
+    )
+    .await
+    .unwrap();
+    world.server.sequence().await;
+    let mut feeds = Vec::new();
+    for sub in ["ana", "bea", "cid", "dan"] {
+        let token = world.token(sub, READ_ALL);
+        let mut feed = world.server.subscribe(Some(&token), &ws, None).await.unwrap();
+        assert!(feed.next_event().await.is("ready"));
+        feeds.push(feed);
+    }
+    let draft = DraftId::new();
+    world
+        .publish(&DraftSent {
+            workspace: ws.clone(),
+            inbox,
+            draft,
+            conversation: None,
+            author: Some(bea_id),
+        })
+        .await;
+    let connection = ConnectionId::new();
+    world
+        .publish(&ConnectionAdded {
+            workspace: ws.clone(),
+            connection,
+            provider: Provider::Google,
+            granted_by: bea_id,
+        })
+        .await;
+    let [ana_feed, bea_feed, cid_feed, dan_feed] = &mut feeds[..] else {
+        unreachable!()
+    };
+    // Bea: her draft, then her connection.
+    assert_eq!(
+        record_of(&bea_feed.next_event().await),
+        ("conversations.draft".into(), draft.to_string(), "delete".into())
+    );
+    let connection_change = (
+        "connectors.connection".to_owned(),
+        connection.to_string(),
+        "upsert".to_owned(),
+    );
+    assert_eq!(record_of(&bea_feed.next_event().await), connection_change);
+    // The inbox's manager and the workspace's owner and admins see the
+    // connection, never another member's draft.
+    for feed in [ana_feed, cid_feed] {
+        assert_eq!(record_of(&feed.next_event().await), connection_change);
+        feed.drain(Duration::from_millis(300)).await;
+        assert!(!feed.raw.contains(&draft.to_string()));
+    }
+    // Another member sees neither.
+    dan_feed.drain(Duration::from_millis(500)).await;
+    assert!(!dan_feed.raw.contains(&draft.to_string()));
+    assert!(!dan_feed.raw.contains(&connection.to_string()));
 }

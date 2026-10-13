@@ -409,6 +409,10 @@ impl Kit {
         let intake = Arc::new(FakeIntake::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
         let state = AppState::new(pool.clone(), config.clone())
+            .with_resources(
+                campbooks_kernel::authz::Catalogue::new([&crate::resources::resources()])
+                    .unwrap_or_else(|e| panic!("{e}")),
+            )
             .with_membership(Arc::new(Everyone))
             .with_grant_intake(intake.clone())
             .with_invitations(Arc::new(Invited(

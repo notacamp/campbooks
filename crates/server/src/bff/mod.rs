@@ -187,6 +187,52 @@ impl Bff {
     }
 }
 
+/// The BFF's part of the access catalogue (ADR 0017). Signing in is public;
+/// a session belongs to the person signed in, who alone reads and ends it
+/// (the cookie proves it); the proxies forward to the API, whose own
+/// operations authorize each request.
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 3] = {
+    use campbooks_kernel::authz::{
+        Action::{Delete, Read, Write},
+        Grant, Grantee, Owner, ResourceType, Tenancy,
+    };
+    [
+        ResourceType {
+            grants: &[Grant::new(Grantee::Anyone, &[Read, Write, Delete])],
+            ..ResourceType::new(
+                "bff.login",
+                "A web sign-in in progress (the OIDC round trip) and the identity provider's \
+                 back-channel logout: public, each step proving the one before.",
+                Tenancy::Public,
+            )
+        },
+        ResourceType {
+            owner: Owner::Account,
+            owner_actions: &[Read, Delete],
+            ..ResourceType::new(
+                "bff.session",
+                "A browser's session: its cookie's holder reads and ends it.",
+                Tenancy::Account,
+            )
+        },
+        ResourceType {
+            owner: Owner::Account,
+            owner_actions: &[Read, Write],
+            ..ResourceType::new(
+                "bff.proxy",
+                "The API and admin API as the signed-in person: forwarded with their own \
+                 token, so every operation there authorizes the request itself.",
+                Tenancy::Account,
+            )
+        },
+    ]
+};
+
+/// The BFF's resource types.
+pub fn resources() -> campbooks_kernel::authz::Resources {
+    campbooks_kernel::authz::Resources::declared(&RESOURCES)
+}
+
 /// The BFF's background work: pruning ended sessions.
 pub fn background() -> Background {
     Background::new().schedule::<PruneSessions>(PRUNE_EVERY)

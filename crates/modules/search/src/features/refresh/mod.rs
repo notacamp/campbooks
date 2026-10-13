@@ -8,7 +8,7 @@ use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::Works
 
 use crate::{
     domain::index,
-    events::{CONVERSATION_RECORD, ConversationChanged, MessageReceived, MessageSent},
+    events::{CONVERSATION_RECORD, ConversationChanged, InboxRemoved, MessageReceived, MessageSent},
 };
 
 /// Refresh `group` (of `group_type`) in `workspace`.
@@ -87,5 +87,38 @@ impl EventHandler for OnConversationChanged {
             conversation,
         } = event.payload;
         refresh(ctx, &workspace, CONVERSATION_RECORD, &conversation).await
+    }
+}
+
+/// The record type of an inbox, the container of conversations.
+const INBOX_RECORD: &str = "conversations.inbox";
+
+/// `conversations.inbox_removed` → forget every group in the inbox (entries
+/// go with their groups).
+pub struct OnInboxRemoved;
+
+impl EventHandler for OnInboxRemoved {
+    type Event = InboxRemoved;
+    const NAME: &'static str = "search.on_inbox_removed";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(ctx: &mut JobContext, event: Event<InboxRemoved>) -> Result<(), JobError> {
+        let InboxRemoved { workspace, inbox } = event.payload;
+        let workspace: WorkspaceId = workspace
+            .parse()
+            .map_err(|_| JobError::fatal("event with a malformed workspace"))?;
+        let tx = ctx.tx().await?;
+        let groups = sqlx::query!(
+            "DELETE FROM search.groups
+              WHERE workspace_id = $1 AND container_type = $2 AND container_id = $3",
+            workspace.as_uuid(),
+            INBOX_RECORD,
+            inbox,
+        )
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        tracing::info!(groups, "search forgot a removed inbox");
+        Ok(())
     }
 }

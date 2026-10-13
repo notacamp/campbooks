@@ -31,6 +31,34 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 /// take the name.
 pub const OWNER: &str = "changes";
 
+/// The change feed's part of the access catalogue (ADR 0017): every member
+/// and client token of a workspace may follow it; each frame is then shown
+/// only to whoever may read its record (scopes, container, audience).
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 1] = {
+    use campbooks_kernel::{
+        authz::{Action, Grant, Grantee, ResourceType, Tenancy},
+        tenancy::Role,
+    };
+    [ResourceType {
+        grants: &[
+            Grant::new(Grantee::WorkspaceRole(Role::Member), &[Action::Read]),
+            Grant::new(Grantee::Clients, &[Action::Read]),
+        ],
+        ..ResourceType::new(
+            "changes.feed",
+            "A workspace's change feed: ids of changed records, each frame shown only to \
+             callers who may read that record (its type's read scope, its container, its \
+             audience).",
+            Tenancy::Workspace,
+        )
+    }]
+};
+
+/// The change feed's resource types.
+pub fn resources() -> campbooks_kernel::authz::Resources {
+    campbooks_kernel::authz::Resources::declared(&RESOURCES)
+}
+
 /// The SSE resume header.
 const LAST_EVENT_ID: &str = "last-event-id";
 
@@ -95,6 +123,13 @@ pub async fn stream(
     Query(query): Query<StreamQuery>,
     headers: HeaderMap,
 ) -> Result<Response> {
+    campbooks_kernel::authz::require_type(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Read,
+        "changes.feed",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let after = headers
         .get(LAST_EVENT_ID)
         .and_then(|value| value.to_str().ok())
