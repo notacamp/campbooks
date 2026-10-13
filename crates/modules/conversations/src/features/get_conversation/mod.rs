@@ -23,6 +23,7 @@ use crate::{
         access::visible_inboxes,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
+        suggestions::{self, DecisionView},
     },
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
@@ -89,12 +90,15 @@ pub struct MessageView {
 }
 
 /// A conversation and its newest messages, oldest first.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, ToSchema)]
 pub struct ConversationDetail {
     /// The conversation.
     pub conversation: ConversationSummary,
     /// Up to the 100 newest messages, oldest first.
     pub messages: Vec<MessageView>,
+    /// The decide pass's answers about the newest inbound message, with
+    /// their reasons: suggestions, except an answer marked `acted`.
+    pub decisions: Vec<DecisionView>,
 }
 
 /// `messages.recipients`.
@@ -177,32 +181,17 @@ pub async fn handler(
     .fetch_all(&mut *tx)
     .await?;
     rows.reverse();
+    let newest_inbound = rows
+        .iter()
+        .rev()
+        .find(|r| r.direction == crate::model::Direction::Inbound.as_str())
+        .map(|r| r.id);
+    let decisions = match newest_inbound {
+        Some(message) => suggestions::for_message(&mut tx, message).await?,
+        None => Vec::new(),
+    };
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
-    let mut attachments: HashMap<MessageId, Vec<AttachmentView>> = HashMap::new();
-    for a in sqlx::query!(
-        r#"
-        SELECT id AS "id: AttachmentId", message_id AS "message_id: MessageId", filename,
-               content_type, size, inline
-          FROM conversations.attachments
-         WHERE message_id = ANY($1)
-         ORDER BY message_id, position
-        "#,
-        &ids as &[MessageId],
-    )
-    .fetch_all(&mut *tx)
-    .await?
-    {
-        attachments
-            .entry(a.message_id)
-            .or_default()
-            .push(AttachmentView {
-                id: a.id,
-                filename: a.filename,
-                content_type: a.content_type,
-                size: u64::try_from(a.size).unwrap_or_default(),
-                inline: a.inline,
-            });
-    }
+    let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
 
     let ws = access.workspace.to_string();
@@ -240,7 +229,41 @@ pub async fn handler(
     Ok(Json(ConversationDetail {
         conversation,
         messages,
+        decisions,
     }))
+}
+
+/// The attachments of `ids`, by message, in order.
+async fn attachments_of(
+    conn: &mut sqlx::PgConnection,
+    ids: &[MessageId],
+) -> Result<HashMap<MessageId, Vec<AttachmentView>>> {
+    let mut attachments: HashMap<MessageId, Vec<AttachmentView>> = HashMap::new();
+    for a in sqlx::query!(
+        r#"
+        SELECT id AS "id: AttachmentId", message_id AS "message_id: MessageId", filename,
+               content_type, size, inline
+          FROM conversations.attachments
+         WHERE message_id = ANY($1)
+         ORDER BY message_id, position
+        "#,
+        ids as &[MessageId],
+    )
+    .fetch_all(conn)
+    .await?
+    {
+        attachments
+            .entry(a.message_id)
+            .or_default()
+            .push(AttachmentView {
+                id: a.id,
+                filename: a.filename,
+                content_type: a.content_type,
+                size: u64::try_from(a.size).unwrap_or_default(),
+                inline: a.inline,
+            });
+    }
+    Ok(attachments)
 }
 
 #[cfg(test)]

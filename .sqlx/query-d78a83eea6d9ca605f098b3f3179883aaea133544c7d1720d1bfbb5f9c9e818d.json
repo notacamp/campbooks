@@ -1,0 +1,95 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT DISTINCT ON (d.conversation_id)\n               d.conversation_id AS \"conversation_id: ConversationId\", d.question, d.value,\n               d.source, round(d.confidence * 100)::smallint AS confidence, d.acted, d.reasons\n          FROM conversations.decisions d\n          JOIN conversations.messages m ON m.id = d.message_id\n         WHERE d.conversation_id = ANY($1) AND d.question = 'stream'\n         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'model') DESC, d.created_at DESC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "conversation_id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "conversation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "question",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "question"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "value",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "value"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "source"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "confidence",
+        "type_info": "Int2",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "acted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "acted"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "reasons",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "reasons"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      null,
+      false,
+      false
+    ]
+  },
+  "hash": "d78a83eea6d9ca605f098b3f3179883aaea133544c7d1720d1bfbb5f9c9e818d"
+}

@@ -601,6 +601,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/streams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the streams and their counts. */
+        get: operations["conversations.list_streams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces": {
         parameters: {
             query?: never;
@@ -1018,6 +1035,8 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
+        /** @description An answer's value: a label (choice), a level (score) or yes/no. */
+        AnswerView: boolean | number | string;
         /**
          * Format: uuid
          * @description AttachmentId (UUIDv7)
@@ -1105,6 +1124,11 @@ export interface components {
         ConversationDetail: {
             /** @description The conversation. */
             conversation: components["schemas"]["ConversationSummary"];
+            /**
+             * @description The decide pass's answers about the newest inbound message, with
+             *     their reasons: suggestions, except an answer marked `acted`.
+             */
+            decisions: components["schemas"]["DecisionView"][];
             /** @description Up to the 100 newest messages, oldest first. */
             messages: components["schemas"]["MessageView"][];
         };
@@ -1151,6 +1175,7 @@ export interface components {
             stream_source: components["schemas"]["StreamSource"];
             /** @description The first message's subject. */
             subject: string;
+            suggestion?: components["schemas"]["StreamSuggestion"] | null;
             /**
              * Format: int32
              * @description Unread inbound messages.
@@ -1186,6 +1211,36 @@ export interface components {
              * @example https://campbooks.example.com/invitations/accept?token=…
              */
             accept_url: string;
+        };
+        /**
+         * @description What kind of strategy gave an answer.
+         * @enum {string}
+         */
+        DecisionSource: "rules" | "model" | "knn" | "cascade";
+        /** @description One answer of the decide pass about the newest inbound message. */
+        DecisionView: {
+            /**
+             * @description Whether it changed anything. In this version only a confident rules
+             *     stream answer may; every other answer is a suggestion.
+             */
+            acted: boolean;
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /**
+             * @description The question: `stream`, `needs_reply`, `asks_action`,
+             *     `has_deadline`, `urgency` or `suspicious`.
+             * @example needs_reply
+             */
+            question: string;
+            /** @description Why. */
+            reasons: components["schemas"]["ReasonView"][];
+            /** @description Who answered. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The answer. */
+            value: components["schemas"]["AnswerView"];
         };
         /**
          * @description Whether a message came in or went out.
@@ -1384,8 +1439,16 @@ export interface components {
         };
         /** @description A message's bodies. */
         MessageBody: {
-            /** @description The HTML part: untrusted, to be shown only in a sandboxed frame. */
+            /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
+            /** @description Whether the remote images were kept. */
+            images_shown: boolean;
+            /**
+             * Format: int32
+             * @description Remote images in the HTML part: held back (their `src` removed)
+             *     unless `show_images` was asked for.
+             */
+            remote_images: number;
             /** @description The plain-text part. */
             text?: string | null;
             /** @description Whether either part was cut short. */
@@ -1493,6 +1556,19 @@ export interface components {
          * @enum {string}
          */
         Provider: "google";
+        /**
+         * @description One reason behind an answer: a stable rule id the client translates,
+         *     and what it matched.
+         */
+        ReasonView: {
+            /** @description What it matched (a header name, a word), possibly empty. */
+            evidence: string;
+            /**
+             * @description `<strategy>.<rule>`, e.g. `signals.list_header`.
+             * @example signals.list_header
+             */
+            rule: string;
+        };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
@@ -1621,11 +1697,48 @@ export interface components {
          * @enum {string}
          */
         Stream: "primary" | "updates" | "receipts" | "newsletters";
+        /** @description A stream and what it holds. */
+        StreamCount: {
+            /**
+             * Format: int32
+             * @description Conversations in it that are still in the inbox.
+             */
+            conversations: number;
+            /** @description The stream. */
+            stream: components["schemas"]["Stream"];
+            /**
+             * Format: int32
+             * @description Of those, the ones with an unread message.
+             */
+            unread: number;
+        };
+        /** @description Every built-in stream, in display order (Primary first). */
+        StreamCounts: {
+            /** @description The streams, each listed even when empty. */
+            streams: components["schemas"]["StreamCount"][];
+        };
         /**
          * @description Who put a conversation in its stream.
          * @enum {string}
          */
         StreamSource: "default" | "rules" | "model" | "member";
+        /**
+         * @description Where the decide pass would put a conversation, when that is not where it
+         *     is: a suggestion the member can take or leave.
+         */
+        StreamSuggestion: {
+            /**
+             * Format: int32
+             * @description How sure, 0 to 100, when the source says.
+             */
+            confidence?: number | null;
+            /** @description Why. */
+            reasons: components["schemas"]["ReasonView"][];
+            /** @description Who suggested it. */
+            source: components["schemas"]["DecisionSource"];
+            /** @description The suggested stream. */
+            stream: components["schemas"]["Stream"];
+        };
         /** @description A change stream as the API shows it. */
         StreamView: {
             /** @description The capability it reads. */
@@ -2993,7 +3106,13 @@ export interface operations {
     };
     "conversations.get_message_body": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `true` to keep remote images (the member chose "Show images");
+                 *     tracking pixels are removed either way.
+                 */
+                show_images?: boolean;
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -3895,6 +4014,59 @@ export interface operations {
                 };
             };
             /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_streams": {
+        parameters: {
+            query?: {
+                /** @description Only this inbox; every inbox you can read when absent. */
+                inbox?: components["schemas"]["InboxId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The streams. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamCounts"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or inbox, or you cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
