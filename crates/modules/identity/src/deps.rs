@@ -24,7 +24,7 @@ use crate::{
     domain::{clients::Clients, keys::Keys},
     upstream::{
         Provider,
-        client::{Endpoints, Upstream},
+        client::{Endpoints, Upstream, ZOHO_DEFAULT_ACCOUNTS_SERVER},
         redirect_uri,
     },
     web::Cookies,
@@ -109,6 +109,9 @@ struct ProviderConfig {
     redirect_path: Option<String>,
     /// Microsoft only: `common`, `organizations`, `consumers` or a tenant id.
     tenant: Option<String>,
+    /// Zoho only: the data centre's accounts server the sign-in request goes
+    /// to (one of Zoho's; default `https://accounts.zoho.com`).
+    accounts_server: Option<String>,
 }
 
 /// Where a provider's client secret comes from.
@@ -215,6 +218,10 @@ fn upstream_client(
         (_, Some(secret)) => Some(ClientSecret::Inline(secret)),
         _ => None,
     };
+    let accounts_server = present(settings.accounts_server);
+    if provider != Provider::Zoho && accounts_server.is_some() {
+        return Err(format!("{prefix}ACCOUNTS_SERVER is a Zoho setting"));
+    }
     let (Some(client_id), Some(secret)) = (client_id, secret) else {
         return Ok(None);
     };
@@ -223,7 +230,12 @@ fn upstream_client(
         None => match provider {
             Provider::Google => Endpoints::google(),
             Provider::Microsoft => Endpoints::microsoft(&tenant)?,
-            Provider::Zoho => Endpoints::zoho(),
+            Provider::Zoho => Endpoints::zoho(
+                accounts_server
+                    .as_deref()
+                    .unwrap_or(ZOHO_DEFAULT_ACCOUNTS_SERVER),
+            )
+            .map_err(|e| format!("{prefix}ACCOUNTS_SERVER={e}"))?,
         },
         Some(_) if config.env != Environment::Development => {
             return Err(format!(
@@ -432,6 +444,28 @@ mod tests {
         )
         .unwrap_err();
         assert!(err.contains("CAMPBOOKS_ZOHO__REDIRECT_PATH"), "{err}");
+    }
+
+    #[test]
+    fn zoho_accounts_server_is_validated_at_load() {
+        let config = config("http://localhost:8080", None);
+        let zoho = |server: &str| {
+            deps_with(
+                &config,
+                KEY,
+                &serde_json::json!({ "zoho": { "client_id": "z", "client_secret": "s", "accounts_server": server } }),
+            )
+        };
+        assert!(zoho("https://accounts.zoho.eu").is_ok());
+        assert!(zoho("").is_ok(), "blank means the default");
+        for bad in [
+            "https://accounts.example.com",
+            "http://accounts.zoho.eu",
+            "https://accounts.zoho.eu/oauth",
+        ] {
+            let err = zoho(bad).unwrap_err();
+            assert!(err.contains("CAMPBOOKS_ZOHO__ACCOUNTS_SERVER"), "{err}");
+        }
     }
 
     #[test]

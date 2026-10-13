@@ -6,6 +6,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+- `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
+  accounts server sign-in sends people to. A Zoho app registered in one data centre
+  only (for example the EU console) is rejected as an invalid client by
+  `accounts.zoho.com`; set this to your app's data centre (`https://accounts.zoho.eu`).
+  It must be one of Zoho's accounts servers, or Campbooks refuses to start.
+
 ### Added
 - What you do to mail in Campbooks now happens in Gmail too: marking read or
   unread, starring, archiving and moving back to the inbox, adding or
