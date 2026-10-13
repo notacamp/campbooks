@@ -33,6 +33,7 @@
     "file_too_large": "El archivo supera el límite de {{limit}} bytes.",
     "upload_mismatch": "El archivo subido no coincide con lo esperado. Vuelve a subirlo.",
     "upload_failed": "No se ha podido leer la subida. Vuelve a intentarlo.",
-    "too_many_streams": "Tienes demasiadas conexiones de actualización en directo abiertas. Cierra algunas pestañas o ventanas y vuelve a intentarlo."
+    "too_many_streams": "Tienes demasiadas conexiones de actualización en directo abiertas. Cierra algunas pestañas o ventanas y vuelve a intentarlo.",
+    "mailbox_unsupported": "Conectar este tipo de buzón no está disponible en esta instancia."
   }
 }

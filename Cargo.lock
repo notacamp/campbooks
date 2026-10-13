@@ -358,6 +358,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "campbooks-identity"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "campbooks-kernel",
+ "serde",
+ "sqlx",
+ "tokio",
+ "utoipa",
+ "utoipa-axum",
+]
+
+[[package]]
 name = "campbooks-kernel"
 version = "0.1.0"
 dependencies = [
@@ -398,6 +411,7 @@ dependencies = [
  "aws-lc-rs",
  "axum",
  "base64 0.22.1",
+ "campbooks-identity",
  "campbooks-kernel",
  "campbooks-system",
  "campbooks-workspaces",

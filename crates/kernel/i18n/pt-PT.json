@@ -33,6 +33,7 @@
     "file_too_large": "O ficheiro excede o limite de {{limit}} bytes.",
     "upload_mismatch": "O ficheiro enviado não corresponde ao esperado. Envie-o novamente.",
     "upload_failed": "Não foi possível ler o envio. Tente novamente.",
-    "too_many_streams": "Tem demasiadas ligações de atualização em direto abertas. Feche alguns separadores ou janelas e tente novamente."
+    "too_many_streams": "Tem demasiadas ligações de atualização em direto abertas. Feche alguns separadores ou janelas e tente novamente.",
+    "mailbox_unsupported": "Ligar este tipo de caixa de correio não está disponível nesta instância."
   }
 }

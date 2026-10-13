@@ -209,6 +209,11 @@ impl TestIdp {
         format!("{}{JWKS_PATH}", self.shared.issuer)
     }
 
+    /// The JWKS document this IdP publishes (what its JWKS endpoint serves).
+    pub fn jwks_document(&self) -> serde_json::Value {
+        serde_json::json!({ "keys": lock(&self.shared.published).clone() })
+    }
+
     /// Settings trusting this IdP, finding the JWKS by discovery.
     pub fn auth_config(&self) -> AuthConfig {
         AuthConfig {
