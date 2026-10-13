@@ -69,7 +69,8 @@ export const AgentOnThisDevice: Story = {
     await expect(await canvas.findByText("Only if you just started this")).toBeVisible();
     const allow = canvas.getByRole("button", { name: /Allow/u });
     await expect(allow).toBeDisabled();
-    await expect(allow).toHaveAttribute("aria-keyshortcuts", "Control+Enter");
+    // ⌘↵ on a Mac, Ctrl+↵ elsewhere.
+    await expect(allow.getAttribute("aria-keyshortcuts")).toMatch(/^(Control|Meta)\+Enter$/u);
     await userEvent.click(canvas.getByRole("radio", { name: "Duarte & Pessoa" }));
     await expect(allow).toBeEnabled();
   },
