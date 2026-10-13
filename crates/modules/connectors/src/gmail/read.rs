@@ -422,100 +422,16 @@ impl Reader<'_> {
         user_labels: &HashMap<String, String>,
         generation: i32,
     ) -> Result<(NormalizedMessage, IndexOp), ReadError> {
-        let workspace = self.workspace_key();
-        let parsed = normalize::parse(&raw.raw);
-        let internal_date = raw
-            .meta
-            .internal_date
-            .as_deref()
-            .and_then(|ms| ms.parse::<i64>().ok())
-            .and_then(DateTime::from_timestamp_millis)
-            .unwrap_or(self.now);
-        let mut blobs = Vec::new();
-        let raw_blob = self
-            .blobs
-            .put(&workspace, raw.raw, "message/rfc822")
-            .await?;
-        blobs.push(raw_blob.clone());
-        let text = match parsed.text {
-            Some(text) => {
-                let blob = self
-                    .blobs
-                    .put(&workspace, text.into_bytes(), "text/plain; charset=utf-8")
-                    .await?;
-                blobs.push(blob.clone());
-                Some(blob)
-            }
-            None => None,
-        };
-        let html = match parsed.html {
-            Some(html) => {
-                let blob = self
-                    .blobs
-                    .put(&workspace, html.into_bytes(), "text/html; charset=utf-8")
-                    .await?;
-                blobs.push(blob.clone());
-                Some(blob)
-            }
-            None => None,
-        };
-        let mut attachments = Vec::with_capacity(parsed.attachments.len());
-        for attachment in parsed.attachments {
-            let blob = self
-                .blobs
-                .put(&workspace, attachment.bytes, &attachment.content_type)
-                .await?;
-            blobs.push(blob.clone());
-            attachments.push(Attachment {
-                filename: attachment.filename,
-                content_type: attachment.content_type,
-                blob,
-                inline: attachment.inline,
-            });
-        }
-        let flags = normalize::flags(&raw.meta.label_ids, user_labels);
-        let message = NormalizedMessage {
-            provider_message_id: id.to_owned(),
-            thread_key: Some(raw.meta.thread_id.clone()),
-            rfc_message_id: parsed.rfc_message_id,
-            in_reply_to: parsed.in_reply_to,
-            references: parsed.references,
-            from: parsed.from,
-            to: parsed.to,
-            cc: parsed.cc,
-            reply_to: parsed.reply_to,
-            subject: parsed.subject,
-            sent_at: parsed.sent_at.unwrap_or(internal_date),
-            direction: flags.direction,
-            headers: parsed.headers,
-            raw: Some(raw_blob),
-            text,
-            html,
-            attachments,
-            mailbox: flags.mailbox,
-            labels: flags.labels,
-            categories: flags.categories,
-            read: flags.read,
-            starred: flags.starred,
-        };
-        let document_bytes = serde_json::to_vec(&message)
-            .map_err(|e| ReadError::Corrupt(format!("encoding a message document: {e}")))?;
-        let document = self
-            .blobs
-            .put(&workspace, document_bytes, "application/json")
-            .await?;
-        blobs.push(document.clone());
-        let op = IndexOp::Insert {
-            row: Uuid::now_v7(),
-            provider_message_id: id.to_owned(),
-            thread_id: raw.meta.thread_id,
-            label_ids: raw.meta.label_ids,
-            internal_date,
-            document,
-            blobs,
+        store_message(
+            self.blobs,
+            &self.workspace_key(),
+            self.now,
+            id,
+            raw,
+            user_labels,
             generation,
-        };
-        Ok((message, op))
+        )
+        .await
     }
 
     /// A stored message document.
@@ -683,4 +599,104 @@ fn apply_flags(message: &mut NormalizedMessage, flags: &Flags) {
     message.direction = flags.direction;
     message.categories.clone_from(&flags.categories);
     message.labels.clone_from(&flags.labels);
+}
+
+/// Store message `id`'s blobs (its raw bytes, bodies, attachments and
+/// normalised document) in `workspace` and build its upsert and index row:
+/// for a message read from Gmail, or one just sent through it.
+pub async fn store_message(
+    store: &BlobStore,
+    workspace: &str,
+    now: DateTime<Utc>,
+    id: &str,
+    raw: MessageRaw,
+    user_labels: &HashMap<String, String>,
+    generation: i32,
+) -> Result<(NormalizedMessage, IndexOp), ReadError> {
+    let parsed = normalize::parse(&raw.raw);
+    let internal_date = raw
+        .meta
+        .internal_date
+        .as_deref()
+        .and_then(|ms| ms.parse::<i64>().ok())
+        .and_then(DateTime::from_timestamp_millis)
+        .unwrap_or(now);
+    let mut blobs = Vec::new();
+    let raw_blob = store.put(workspace, raw.raw, "message/rfc822").await?;
+    blobs.push(raw_blob.clone());
+    let text = match parsed.text {
+        Some(text) => {
+            let blob = store
+                .put(workspace, text.into_bytes(), "text/plain; charset=utf-8")
+                .await?;
+            blobs.push(blob.clone());
+            Some(blob)
+        }
+        None => None,
+    };
+    let html = match parsed.html {
+        Some(html) => {
+            let blob = store
+                .put(workspace, html.into_bytes(), "text/html; charset=utf-8")
+                .await?;
+            blobs.push(blob.clone());
+            Some(blob)
+        }
+        None => None,
+    };
+    let mut attachments = Vec::with_capacity(parsed.attachments.len());
+    for attachment in parsed.attachments {
+        let blob = store
+            .put(workspace, attachment.bytes, &attachment.content_type)
+            .await?;
+        blobs.push(blob.clone());
+        attachments.push(Attachment {
+            filename: attachment.filename,
+            content_type: attachment.content_type,
+            blob,
+            inline: attachment.inline,
+        });
+    }
+    let flags = normalize::flags(&raw.meta.label_ids, user_labels);
+    let message = NormalizedMessage {
+        provider_message_id: id.to_owned(),
+        thread_key: Some(raw.meta.thread_id.clone()),
+        rfc_message_id: parsed.rfc_message_id,
+        in_reply_to: parsed.in_reply_to,
+        references: parsed.references,
+        from: parsed.from,
+        to: parsed.to,
+        cc: parsed.cc,
+        reply_to: parsed.reply_to,
+        subject: parsed.subject,
+        sent_at: parsed.sent_at.unwrap_or(internal_date),
+        direction: flags.direction,
+        headers: parsed.headers,
+        raw: Some(raw_blob),
+        text,
+        html,
+        attachments,
+        mailbox: flags.mailbox,
+        labels: flags.labels,
+        categories: flags.categories,
+        read: flags.read,
+        starred: flags.starred,
+    };
+    let document_bytes = serde_json::to_vec(&message)
+        .map_err(|e| ReadError::Corrupt(format!("encoding a message document: {e}")))?;
+    let document = store
+        .put(workspace, document_bytes, "application/json")
+        .await?;
+    blobs.push(document.clone());
+    let op = IndexOp::Insert {
+        row: Uuid::now_v7(),
+        provider_message_id: id.to_owned(),
+        thread_id: raw.meta.thread_id,
+        label_ids: raw.meta.label_ids,
+        internal_date,
+        document,
+        blobs,
+        generation,
+    };
+    Ok((message, op))
 }

@@ -62,6 +62,8 @@ pub struct Endpoints {
     pub userinfo: Url,
     /// The Gmail API base, up to `/gmail/v1/`.
     pub gmail: Url,
+    /// The Gmail upload base, up to `/upload/gmail/v1/` (sending).
+    pub gmail_upload: Url,
 }
 
 impl Endpoints {
@@ -74,6 +76,7 @@ impl Endpoints {
             revoke: parse("https://oauth2.googleapis.com/revoke"),
             userinfo: parse("https://openidconnect.googleapis.com/v1/userinfo"),
             gmail: parse("https://gmail.googleapis.com/gmail/v1/"),
+            gmail_upload: parse("https://gmail.googleapis.com/upload/gmail/v1/"),
         }
     }
 
@@ -89,6 +92,7 @@ impl Endpoints {
             revoke: join("revoke"),
             userinfo: join("v1/userinfo"),
             gmail: join("gmail/v1/"),
+            gmail_upload: join("upload/gmail/v1/"),
         }
     }
 }
@@ -213,7 +217,12 @@ impl Google {
 
     /// The Gmail API with `access_token`.
     pub fn gmail<'a>(&'a self, access_token: &'a str) -> Gmail<'a> {
-        Gmail::new(&self.http, &self.endpoints.gmail, access_token)
+        Gmail::new(
+            &self.http,
+            &self.endpoints.gmail,
+            &self.endpoints.gmail_upload,
+            access_token,
+        )
     }
 
     /// Where to send the browser: authorization code with PKCE (S256),

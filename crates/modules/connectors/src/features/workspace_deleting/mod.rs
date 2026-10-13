@@ -5,13 +5,15 @@
 //! the grant.
 
 use campbooks_kernel::{
-    Event, EventConsumer, JobContext, JobError, db::BeginFor as _, tenancy::WorkspaceId,
+    Event, EventConsumer, JobContext, JobError, blobs::BlobOwner, db::BeginFor as _,
+    tenancy::WorkspaceId,
 };
 
 use crate::{
     deps::Deps,
     domain::{model::ConnectionId, removal},
     events::WorkspaceDeleting,
+    features::send_message::SEND_OWNER,
 };
 
 /// Revokes and deletes a deleted workspace's connections.
@@ -62,6 +64,20 @@ impl EventConsumer for RevokeWorkspaceGrants {
         )
         .execute(&mut **tx)
         .await?;
+        // Sends still open will never go out.
+        let sends = sqlx::query_scalar!(
+            "DELETE FROM connectors.sends WHERE workspace_id = $1 RETURNING id",
+            workspace as WorkspaceId
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        let key = workspace.to_string();
+        for send in sends {
+            state
+                .blobs
+                .detach_owner(tx, &key, &BlobOwner::new(SEND_OWNER, send))
+                .await?;
+        }
         tracing::info!(%workspace, "connections of a deleted workspace revoked");
         Ok(())
     }

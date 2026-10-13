@@ -38,9 +38,10 @@
         "needs_reauth",
         "rejected",
         "too_large",
+        "unavailable",
         "unknown_outcome"
       ],
-      "description": "Why it failed (failed only). `unknown_outcome`: the provider may have sent it."
+      "description": "Why it failed (failed only). `unavailable`: the provider could not be reached and nothing was sent; `unknown_outcome`: the provider may have sent it."
     }
   },
   "allOf": [

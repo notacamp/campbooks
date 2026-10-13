@@ -92,7 +92,9 @@ clap = { version = "4.6.7", features = ["derive", "env"] }
 cargo_metadata = "0.23.1"
 regex = "1.13.1"
 
-# Email: MIME parsing of raw messages (connectors' email adapters).
+# Email: MIME building of messages to send and parsing of raw messages
+# (connectors' email adapters).
+mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
 
 # Tests

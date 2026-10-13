@@ -10,7 +10,7 @@
 
 use campbooks_kernel::{
     JobContext, JobError,
-    blobs::{BlobOwner, BlobRef},
+    blobs::BlobOwner,
     db::BeginFor as _,
     jobs::{EnqueueOptions, JobHandler},
     tenancy::{UserId, WorkspaceId},
@@ -23,13 +23,12 @@ use crate::{
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
-        health,
+        emit, health,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
-        removal::{BATCH_OWNER, GMAIL_MESSAGE_OWNER},
+        removal::BATCH_OWNER,
         schedule::{self, LEASE, SYNC_STREAM, SyncStreamPayload},
     },
-    events::MessagesChanged,
-    gmail::{self, Cursor, IndexOp, Page, Reader},
+    gmail::{self, Cursor, Page, Reader},
     google::GoogleError,
 };
 
@@ -203,16 +202,16 @@ impl SyncStream {
                 .await?;
             }
         }
-        apply_index(tx, &state, workspace, target.stream, page.index).await?;
+        emit::apply_index(tx, &state, workspace, target.stream, page.index).await?;
         if let Some(batch) = &batch {
-            store_batch(
+            emit::store_batch(
                 tx,
                 &state,
                 workspace,
-                target,
+                target.stream,
                 inbox,
                 batch,
-                &page.cursor,
+                &page.cursor.token(),
                 change_count,
                 now,
             )
@@ -446,150 +445,6 @@ async fn load(
         consecutive_failures: row.consecutive_failures,
         throttled_until: row.throttled_until,
     }))
-}
-
-/// Apply the adapter's index updates, holding and releasing blobs.
-async fn apply_index(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &campbooks_kernel::AppState,
-    workspace: WorkspaceId,
-    stream: StreamId,
-    ops: Vec<IndexOp>,
-) -> Result<(), JobError> {
-    let key = workspace.to_string();
-    for op in ops {
-        match op {
-            IndexOp::Insert {
-                row,
-                provider_message_id,
-                thread_id,
-                label_ids,
-                internal_date,
-                document,
-                blobs,
-                generation,
-            } => {
-                let inserted = sqlx::query_scalar!(
-                    r#"INSERT INTO connectors.gmail_messages
-                           (id, workspace_id, stream_id, provider_message_id, thread_id, label_ids,
-                            internal_date, document_hash, document_size, listed_generation)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                       ON CONFLICT (stream_id, provider_message_id) DO UPDATE
-                          SET label_ids = EXCLUDED.label_ids,
-                              listed_generation = EXCLUDED.listed_generation
-                    RETURNING id"#,
-                    row,
-                    workspace as WorkspaceId,
-                    stream as StreamId,
-                    provider_message_id,
-                    thread_id,
-                    &label_ids,
-                    internal_date,
-                    document.hash.to_string(),
-                    i64::try_from(document.size).unwrap_or(i64::MAX),
-                    generation,
-                )
-                .fetch_one(&mut **tx)
-                .await?;
-                let owner = BlobOwner::new(GMAIL_MESSAGE_OWNER, inserted);
-                for blob in &blobs {
-                    state.blobs.attach(tx, &key, blob, &owner).await?;
-                }
-            }
-            IndexOp::Update {
-                row,
-                label_ids,
-                generation,
-            } => {
-                sqlx::query!(
-                    r#"UPDATE connectors.gmail_messages
-                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3)
-                        WHERE id = $1"#,
-                    row,
-                    &label_ids,
-                    generation,
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
-            IndexOp::Remove { row } => {
-                state
-                    .blobs
-                    .detach_owner(tx, &key, &BlobOwner::new(GMAIL_MESSAGE_OWNER, row))
-                    .await?;
-                sqlx::query!("DELETE FROM connectors.gmail_messages WHERE id = $1", row)
-                    .execute(&mut **tx)
-                    .await?;
-            }
-            IndexOp::Oversized {
-                provider_message_id,
-            } => {
-                sqlx::query!(
-                    r#"INSERT INTO connectors.gmail_oversized (workspace_id, stream_id, provider_message_id)
-                       VALUES ($1, $2, $3)
-                       ON CONFLICT DO NOTHING"#,
-                    workspace as WorkspaceId,
-                    stream as StreamId,
-                    provider_message_id,
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Record a batch, hold its blob and announce it.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one call site; the values are distinct"
-)]
-async fn store_batch(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &campbooks_kernel::AppState,
-    workspace: WorkspaceId,
-    target: &Target,
-    inbox: InboxId,
-    batch: &BlobRef,
-    cursor: &Cursor,
-    changes: usize,
-    now: DateTime<Utc>,
-) -> Result<(), JobError> {
-    let id = uuid::Uuid::now_v7();
-    sqlx::query!(
-        r#"INSERT INTO connectors.batches
-               (id, workspace_id, stream_id, batch_hash, batch_size, cursor, changes, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
-        id,
-        workspace as WorkspaceId,
-        target.stream as StreamId,
-        batch.hash.to_string(),
-        i64::try_from(batch.size).unwrap_or(i64::MAX),
-        cursor.token(),
-        i32::try_from(changes).unwrap_or(i32::MAX),
-        now,
-    )
-    .execute(&mut **tx)
-    .await?;
-    let key = workspace.to_string();
-    state
-        .blobs
-        .attach(tx, &key, batch, &BlobOwner::new(BATCH_OWNER, id))
-        .await?;
-    state
-        .events
-        .publish(
-            tx,
-            &MessagesChanged {
-                workspace: key,
-                inbox_id: inbox,
-                batch: batch.clone(),
-                cursor: cursor.token(),
-            },
-        )
-        .await?;
-    Ok(())
 }
 
 /// Release the batches of `stream` older than `before`.
