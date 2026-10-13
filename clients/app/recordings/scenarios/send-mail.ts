@@ -1,86 +1,20 @@
 import type { Page } from "playwright";
 
 import { pause, type ScenarioContext } from "../context.ts";
+import { caption, signedIn } from "./inbox.ts";
 
-// Replying, forwarding and writing a new message on the real stack: the Vite
-// dev server, the real server (API, BFF and worker) on a scratch database,
-// and the fake Google with its demo Gmail mailbox, which stores what is sent
-// as SENT and delivers nothing. Nothing is intercepted: drafts are saved by
-// the conversations module, the send leaves after its undo window through the
-// connectors module's Gmail adapter, and the sent message comes back into
-// the thread.
+// Replying, forwarding and writing a new message on the real stack, as the
+// `inbox` scenario runs it (see its header for the commands: the fake Google
+// of `scripts/fake-provider.ts` with the demo Gmail of `scripts/fake-gmail.ts`,
+// which stores what is sent as SENT and delivers nothing). Nothing is
+// intercepted: drafts are saved by the conversations module, the send leaves
+// after its undo window through the connectors module's Gmail adapter, and
+// the sent message comes back into the thread.
 //
-//   pnpm --dir clients/app exec node scripts/fake-provider.ts --provider google --port 9081
-//   CAMPBOOKS_ENV=development CAMPBOOKS_PUBLIC_URL=http://localhost:5191 \
-//   CAMPBOOKS_BIND_ADDR=127.0.0.1:8201 CAMPBOOKS_SECRET_KEY=$(openssl rand -base64 32) \
-//   CAMPBOOKS_GOOGLE__CLIENT_ID=demo-client CAMPBOOKS_GOOGLE__CLIENT_SECRET=demo-secret \
-//   CAMPBOOKS_GOOGLE__BASE_URL=http://127.0.0.1:9081 CAMPBOOKS_BLOBS__PATH=/tmp/blobs \
-//   CAMPBOOKS_DATABASE_URL=postgres://…/scratch cargo run -p campbooks-server -- all
-//   CAMPBOOKS_API_URL=http://127.0.0.1:8201 pnpm --dir clients/app exec vite --port 5191
-//   pnpm --dir clients record send-mail --base-url http://localhost:5191
+//   INBOX_BASE_URL=http://localhost:5191 pnpm --dir clients record send-mail \
+//     --base-url http://localhost:5191
 //
 // Fictional people and addresses only (`example.com`); no token is shown.
-
-/** A caption pinned to the bottom of the page, so the video explains itself. */
-async function caption(page: Page, text: string, ms = 1600): Promise<void> {
-  // A script string: the recordings are type-checked without the DOM types.
-  await page.evaluate(`(() => {
-    const box = document.getElementById("recording-caption") ?? document.createElement("div");
-    box.id = "recording-caption";
-    box.textContent = ${JSON.stringify(text)};
-    const phone = window.innerWidth < 768;
-    Object.assign(box.style, {
-      position: "fixed", zIndex: "2147483647", pointerEvents: "none",
-      left: phone ? "8px" : "auto", right: "8px", top: phone ? "4px" : "auto",
-      bottom: phone ? "auto" : "16px", maxWidth: phone ? "none" : "520px",
-      padding: phone ? "6px 10px" : "10px 14px", borderRadius: "10px",
-      background: "rgba(20, 20, 24, 0.9)", color: "#fff",
-      font: phone ? "500 12px/1.35 system-ui, sans-serif" : "500 15px/1.4 system-ui, sans-serif",
-    });
-    document.body.append(box);
-  })()`);
-  await pause(ms);
-}
-
-/** Call the API through the BFF from the page, as the app does. */
-async function api(page: Page, method: string, path: string): Promise<unknown> {
-  return page.evaluate(`fetch(${JSON.stringify(path)}, {
-    method: ${JSON.stringify(method)},
-    headers: { "x-campbooks-csrf": "1", "content-type": "application/json" },
-  }).then((response) => response.status === 204 ? null : response.json())`);
-}
-
-/** Sign up with the fake Google, make a workspace and connect its Gmail. */
-async function setUp(page: Page): Promise<string> {
-  await page.goto("/");
-  await page.waitForURL(/\/sign-in\?request=/u);
-  await page.getByRole("link", { name: /Continue with Google/u }).click();
-  await page.getByRole("link", { name: "Allow" }).click();
-  await page.getByRole("button", { name: /Create account/u }).click();
-  const name = page.getByRole("textbox", { name: "Workspace name" });
-  await name.waitFor();
-  await name.fill("Rivera Studio");
-  await page.keyboard.press("Enter");
-  await page.getByRole("radio", { name: "Business" }).click();
-  await page.getByRole("button", { name: "Create workspace" }).click();
-  await page.getByRole("button", { name: /^Connect/u }).click();
-  await page.waitForURL(/\/w\//u);
-  const { workspaces } = (await api(page, "GET", "/bff/api/v1/workspaces")) as {
-    workspaces: { id: string }[];
-  };
-  const workspace = workspaces[0]?.id ?? "";
-  // The first sync: the backfill reads the demo mailbox.
-  for (let attempt = 0; attempt < 90; attempt += 1) {
-    const list = (await api(page, "GET", `/bff/api/v1/w/${workspace}/conversations`)) as {
-      conversations?: unknown[];
-    };
-    if ((list.conversations?.length ?? 0) >= 7) {
-      break;
-    }
-    await pause(1000);
-  }
-  return workspace;
-}
 
 /** Desktop and phone differ only where the screens do: one pane or two. */
 function isPhone(page: Page): boolean {
@@ -97,7 +31,7 @@ async function act(page: Page, phone: boolean, name: string, key: string): Promi
 const Q4 = "Q4 plan: can you review by Friday?";
 
 export default async function sendMail({ page }: ScenarioContext): Promise<void> {
-  const workspace = await setUp(page);
+  const workspace = await signedIn(page);
   const phone = isPhone(page);
 
   await page.goto(`/w/${workspace}/inbox/primary`);
@@ -139,7 +73,14 @@ export default async function sendMail({ page }: ScenarioContext): Promise<void>
     ? composer.getByRole("button", { name: /^Send/u }).click()
     : body.press("ControlOrMeta+Enter"));
   await page.getByText(/^Sending to Maya Okafor/u).waitFor();
-  await caption(page, "Send again, and let it go", 1200);
+  await caption(page, "Send again, and let it go: Undo stays up for the whole window", 2000);
+  await page.getByText(/^Sending to Maya Okafor/u).waitFor({ state: "hidden", timeout: 20_000 });
+  // Once it has left (the release runs as the window ends).
+  await pause(4000);
+  await caption(page, "Z after the window has passed…", 1000);
+  await page.keyboard.press("z");
+  await page.getByText("Too late to undo: it was sent.").waitFor();
+  await caption(page, "…says so: it was sent", 1800);
   // The sent message, in the thread (its body in the sandboxed frame).
   await page
     .locator('iframe[title*="Sam Rivera"]')
