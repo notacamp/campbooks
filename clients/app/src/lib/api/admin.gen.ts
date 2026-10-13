@@ -274,6 +274,11 @@ export interface components {
         };
         /** @description A stream's sync state, as an administrator sees it. */
         AdminStream: {
+            /**
+             * @description The mailbox it reads (`messages`): one connection can reach several
+             *     (a Zoho login's mail accounts).
+             */
+            address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
             /**
@@ -607,7 +612,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google";
+        Provider: "google" | "zoho";
         /**
          * @description A member's role in a workspace.
          * @enum {string}

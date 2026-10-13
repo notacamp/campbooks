@@ -28,6 +28,9 @@ use crate::domain::{
 pub struct AdminStream {
     /// The capability it reads.
     pub capability: Capability,
+    /// The mailbox it reads (`messages`): one connection can reach several
+    /// (a Zoho login's mail accounts).
+    pub address: Option<String>,
     /// Where it is in its reading.
     pub phase: Phase,
     /// Paused until the member connects again.
@@ -126,11 +129,11 @@ pub async fn execute(
     .await?;
     let ids: Vec<ConnectionId> = rows.iter().map(|row| row.id).collect();
     let streams = sqlx::query!(
-        r#"SELECT connection_id AS "connection_id: ConnectionId", capability, phase, paused,
-                  last_synced_at, consecutive_failures
+        r#"SELECT connection_id AS "connection_id: ConnectionId", capability, address, phase,
+                  paused, last_synced_at, consecutive_failures
              FROM connectors.streams
             WHERE connection_id = ANY($1)
-            ORDER BY capability"#,
+            ORDER BY capability, mailbox_key"#,
         &ids as &[ConnectionId],
     )
     .fetch_all(&mut *conn)
@@ -144,6 +147,7 @@ pub async fn execute(
                 .map(|stream| {
                     Ok(AdminStream {
                         capability: Capability::parse(&stream.capability)?,
+                        address: stream.address.clone(),
                         phase: Phase::parse(&stream.phase)?,
                         paused: stream.paused,
                         last_synced_at: stream.last_synced_at,

@@ -24,7 +24,8 @@
     },
     "since": "since {{date}}",
     "provider": {
-      "google": "Google"
+      "google": "Google",
+      "zoho": "Zoho"
     },
     "capability": {
       "messages": "Mail",

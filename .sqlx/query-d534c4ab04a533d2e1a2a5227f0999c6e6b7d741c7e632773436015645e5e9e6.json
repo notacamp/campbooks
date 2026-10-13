@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT connection_id AS \"connection_id: ConnectionId\", capability, phase, paused,\n                  last_synced_at, consecutive_failures\n             FROM connectors.streams\n            WHERE connection_id = ANY($1)\n            ORDER BY capability",
+  "query": "SELECT connection_id AS \"connection_id: ConnectionId\", capability, address, phase,\n                  paused, last_synced_at, consecutive_failures\n             FROM connectors.streams\n            WHERE connection_id = ANY($1)\n            ORDER BY capability, mailbox_key",
   "describe": {
     "columns": [
       {
@@ -27,6 +27,17 @@
       },
       {
         "ordinal": 2,
+        "name": "address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
         "name": "phase",
         "type_info": "Text",
         "origin": {
@@ -37,7 +48,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 4,
         "name": "paused",
         "type_info": "Bool",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "last_synced_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "consecutive_failures",
         "type_info": "Int4",
         "origin": {
@@ -78,11 +89,12 @@
     "nullable": [
       false,
       false,
+      true,
       false,
       false,
       true,
       false
     ]
   },
-  "hash": "d9bb43d09d41a9d4d5e82626150d2c2ddfcf27db0b81edc1621bd3b2e5e31984"
+  "hash": "d534c4ab04a533d2e1a2a5227f0999c6e6b7d741c7e632773436015645e5e9e6"
 }

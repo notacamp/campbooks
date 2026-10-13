@@ -24,7 +24,8 @@
     },
     "since": "desde el {{date}}",
     "provider": {
-      "google": "Google"
+      "google": "Google",
+      "zoho": "Zoho"
     },
     "capability": {
       "messages": "Correo",

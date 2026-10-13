@@ -880,6 +880,13 @@
           "consecutive_failures"
         ],
         "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The mailbox it reads (`messages`): one connection can reach several\n(a Zoho login's mail accounts)."
+          },
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability it reads."
@@ -1542,7 +1549,8 @@
         "type": "string",
         "description": "An outside provider.",
         "enum": [
-          "google"
+          "google",
+          "zoho"
         ]
       },
       "Role": {
