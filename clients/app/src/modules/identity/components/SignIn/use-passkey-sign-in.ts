@@ -6,7 +6,7 @@ import { signInWithPasskey } from "../../api/queries";
 import { autofillSupported, ceremonyFailure, getPasskey, passkeysSupported } from "../../webauthn";
 
 /** Why a passkey sign-in didn't go through, as the screen explains it. */
-export type PasskeyProblem = "cancelled" | "not_accepted" | "expired" | "rate_limited" | "failed";
+type PasskeyProblem = "cancelled" | "not_accepted" | "expired" | "rate_limited" | "failed";
 
 export interface PasskeySignIn {
   /** Whether this browser can use passkeys at all. */

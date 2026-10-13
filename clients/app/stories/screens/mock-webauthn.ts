@@ -3,7 +3,7 @@
 // fails as a story says, and autofill waits until the page aborts it.
 
 /** How the pretend browser answers a dialog ceremony. */
-export type MockCeremony = "ok" | "cancel" | "exists";
+type MockCeremony = "ok" | "cancel" | "exists";
 
 export interface MockWebAuthn {
   /** Whether a field's autofill offers passkeys (conditional UI). */

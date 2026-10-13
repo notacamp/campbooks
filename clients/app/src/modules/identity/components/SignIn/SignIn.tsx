@@ -48,7 +48,7 @@ const WITH = {
 } as const satisfies Record<Provider, string>;
 
 /** Where the passkey-only sign-up starts for `request`. */
-export function passkeySignUpUrl(request: string): string {
+function passkeySignUpUrl(request: string): string {
   return `/sign-in/passkey?request=${encodeURIComponent(request)}`;
 }
 
