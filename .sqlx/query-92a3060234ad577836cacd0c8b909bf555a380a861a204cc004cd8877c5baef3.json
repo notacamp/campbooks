@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT message_id AS \"message_id: MessageId\", filename\n             FROM conversations.attachments\n            WHERE message_id = ANY($1) AND NOT inline ORDER BY message_id, position",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "message_id: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "filename",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.attachments",
+            "name": "filename"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "92a3060234ad577836cacd0c8b909bf555a380a861a204cc004cd8877c5baef3"
+}

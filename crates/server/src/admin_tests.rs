@@ -246,6 +246,8 @@ const CONTENT_TABLES: &[&str] = &[
     "kernel.blobs",
     "kernel.blob_refs",
     "identity.held_grants",
+    "search.entries",
+    "search.groups",
 ];
 
 #[sqlx::test(migrations = "../../migrations")]

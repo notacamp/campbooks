@@ -11,11 +11,13 @@ use crate::{
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
     connections::{ConsentDoorPort, GrantIntakePort, NoConsentDoor, NoGrantIntake},
+    crypto::Signer,
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
     rate_limit::RateLimits,
+    search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
     tenancy::{MembershipPort, NoMembership},
@@ -54,6 +56,9 @@ pub struct AppState {
     /// inbox, a calendar). Until a module registers one, such changes are
     /// shown to nobody.
     pub visibility: VisibilityPort,
+    /// The modules' records as the `search` module reads them (ADR 0016).
+    /// Until the server registers them, search indexes nothing.
+    pub search_sources: SearchSources,
     /// Takes mailbox grants obtained at sign-in into connections. The
     /// server registers the `connectors` module's implementation; until
     /// then no mailbox can be connected that way.
@@ -69,6 +74,10 @@ pub struct AppState {
     /// The server installs one keyed by the instance secret, shared by all
     /// its processes; until then it counts per process.
     pub rate_limits: RateLimits,
+    /// Signs opaque values the server hands out (cursors). The server
+    /// installs one keyed by the instance secret; until then it signs per
+    /// process.
+    pub signer: Signer,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -90,6 +99,7 @@ impl AppState {
         Self {
             changes: ChangeHub::new(db.clone(), &config.changes),
             visibility: Arc::new(NoContainers),
+            search_sources: SearchSources::default(),
             metrics,
             db,
             auth: TokenVerifier::new(&config.auth),
@@ -105,6 +115,7 @@ impl AppState {
             admin_profiles: Arc::new(NoAdmins),
             admin_audit: Arc::new(NoAudit),
             rate_limits: RateLimits::default(),
+            signer: Signer::default(),
         }
     }
 
@@ -162,6 +173,13 @@ impl AppState {
         self
     }
 
+    /// The same state, with the modules' search sources.
+    #[must_use]
+    pub fn with_search_sources(mut self, sources: SearchSources) -> Self {
+        self.search_sources = sources;
+        self
+    }
+
     /// The same state, reading users' chosen locales through `locales`.
     #[must_use]
     pub fn with_locales(mut self, locales: LocalePreferencePort) -> Self {
@@ -173,6 +191,13 @@ impl AppState {
     #[must_use]
     pub fn with_rate_limits(mut self, rate_limits: RateLimits) -> Self {
         self.rate_limits = rate_limits;
+        self
+    }
+
+    /// The same state, signing with `signer`.
+    #[must_use]
+    pub fn with_signer(mut self, signer: Signer) -> Self {
+        self.signer = signer;
         self
     }
 

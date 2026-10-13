@@ -1,0 +1,32 @@
+[package]
+name = "campbooks-search"
+description = "Campbooks search module: one index over every record a member may see, kept current from domain events through source ports (ADR 0016)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+# Opaque result cursors.
+base64.workspace = true
+campbooks-kernel.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+uuid.workspace = true
+# Which of the four shipped languages an entry is written in.
+whatlang.workspace = true
+
+[dev-dependencies]
+campbooks-kernel = { workspace = true, features = ["test-util"] }
+tokio.workspace = true
+
+[lints]
+workspace = true

@@ -4,7 +4,7 @@
 //!
 //! See `openspec/changes/observability/design.md`.
 
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, io::Write as _, time::Duration};
 
 use axum::{
     Router,
@@ -378,6 +378,33 @@ fn metrics_router(registry: prometheus::Registry) -> Router {
             }
         }),
     )
+}
+
+// --- panics -----------------------------------------------------------------------
+
+/// What is reported about a panic: where it happened, never its message. A
+/// panic message can quote the data that caused it (a search query, an
+/// address), and the default hook prints it to stderr.
+pub fn withheld_panic_report(info: &std::panic::PanicHookInfo<'_>) -> String {
+    let location = info.location().map_or_else(
+        || "an unknown location".to_owned(),
+        |l| format!("{}:{}", l.file(), l.line()),
+    );
+    format!("panicked at {location} (message withheld: it may hold personal data)")
+}
+
+/// Replace the default panic hook with one that logs
+/// [`withheld_panic_report`] (as an error event, and on stderr when no
+/// subscriber is installed). Installed first thing by the binary.
+pub fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| {
+        let report = withheld_panic_report(info);
+        if tracing::dispatcher::has_been_set() {
+            tracing::error!(target: "campbooks_server::panic", "{report}");
+        } else {
+            let _ = writeln!(std::io::stderr(), "{report}");
+        }
+    }));
 }
 
 // --- the request middleware -----------------------------------------------------
