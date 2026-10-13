@@ -183,13 +183,17 @@ services:
   # --- Local AI (open-weight models) --------------------------------------------
   # Optional: `docker compose --profile ai up -d`. See README.md → Local AI.
   #
-  # laya: the `decide` role (typed decisions, ADR 0009). Built locally from
-  # ./laya (there is no official image); downloads the multilingual checkpoint
+  # laya: the `decide` role (typed decisions, ADR 0009). The image is built
+  # from ./laya by the release pipeline (linux/amd64 + linux/arm64, scanned,
+  # same tags as the server image); it downloads the multilingual checkpoint
   # (~680 MB) into the `laya-models` volume on first start. Runs well on CPU.
   # No published port: only the server reaches it, on the compose network.
   laya:
     profiles: ["ai"]
-    build: ./laya
+    image: ghcr.io/notacamp/campbooks-laya:next
+    # To build it yourself instead (e.g. after editing ./laya), swap the line
+    # above for this one and run `docker compose --profile ai build laya`:
+    # build: ./laya
     restart: unless-stopped
     environment:
       # laya-serve answers anyone when its key is empty, so the container
