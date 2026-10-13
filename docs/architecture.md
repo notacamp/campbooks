@@ -44,7 +44,7 @@ crates/
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema
 openapi/openapi.json       generated, committed; the contract for every client
-xtask/                     `cargo xtask arch | openapi [--check]`
+xtask/                     `cargo xtask arch | openapi [--check] | new-module | new-feature`
 clients/                   pnpm workspace
   app/                     the one UI (React + TypeScript + Vite)
     src/app/               shell: entry, router, providers, module manifest
@@ -66,7 +66,10 @@ A module is a Rust crate that hands the server one value:
 pub fn module() -> campbooks_kernel::Module { … }   // name, scopes, router, background work
 ```
 
-Inside it, code is sliced **by use case**, not by layer:
+`cargo xtask new-module <name>` scaffolds one (crate, schema migration,
+OpenSpec change, client module) and `cargo xtask new-feature <module>
+<feature>` adds a slice. Inside it, code is sliced **by use case**, not by
+layer:
 
 ```
 crates/modules/mail/src/

@@ -5,5 +5,8 @@ import { buildSystemRoutes } from "~/modules/system";
 import type { rootRoute } from "./routes/root";
 
 export function buildModuleRoutes(root: typeof rootRoute) {
-  return [...buildSystemRoutes(root)] as const;
+  return [
+    ...buildSystemRoutes(root),
+    // `cargo xtask new-module` inserts above this line.
+  ] as const;
 }

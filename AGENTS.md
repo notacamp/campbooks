@@ -63,7 +63,8 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 - **Errors are RFC 9457 problem+json** via `kernel::Error`. Permission failures
   on reads return 404, not 403.
 - **Clients mirror the server.** `clients/app/src/modules/<domain>` maps 1:1 to
-  `crates/modules/<domain>`. Modules import each other only through `index.ts`;
+  `crates/modules/<domain>` (a multi-word `snake_case` module is kebab-case
+  on the client, as its file-name lint requires). Modules import each other only through `index.ts`;
   `lib/` never imports `modules/`. *(CI: dependency-cruiser.)*
 - **Clients never hand-write API types**; they come from `openapi/openapi.json`.
   *(CI: `pnpm api:check`.)*
@@ -142,6 +143,12 @@ plurals). Every string a user can see exists in all four before it ships.
   Commit; it becomes the squash commit. Commits must be signed.
 - Tasks are tracked as GitHub issues in the private cloud repo; reference the
   issue URL in the PR body and in the change's `.openspec.yaml`.
+- One task = one worktree with its own branch and test database; never
+  migrate the shared dev database from a worktree; keep up with `next` by
+  merging, never rebasing a pushed branch. See `docs/parallel-work.md`.
+- Scaffold modules and slices with `cargo xtask new-module` /
+  `cargo xtask new-feature` rather than copying by hand. *(CI:
+  `cargo xtask scaffold-check` keeps their output passing the gates.)*
 - Update `CHANGELOG.md` `[Unreleased]` for user-visible changes.
 - UI work: get a visual prototype approved before implementing it, then verify
   at **375px and desktop** before calling it done.

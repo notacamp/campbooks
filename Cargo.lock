@@ -3314,6 +3314,7 @@ dependencies = [
  "anyhow",
  "campbooks-server",
  "cargo_metadata",
+ "chrono",
  "clap",
  "regex",
  "serde",

@@ -2,14 +2,19 @@
 //!
 //! - `cargo xtask arch` enforces the architecture rules in `AGENTS.md`.
 //! - `cargo xtask openapi [--check]` regenerates (or verifies) `openapi/openapi.json`.
+//! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
+//!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
+//!   their output passes the gates.
 
 #![forbid(unsafe_code)]
 
 mod arch;
 mod openapi;
+mod scaffold;
 
 use std::{
     collections::BTreeSet,
+    fmt::Write as _,
     fs,
     io::Write as _,
     path::{Path, PathBuf},
@@ -39,6 +44,37 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Scaffold a domain module: crate (scopes, events, an `overview` read
+    /// slice), schema migration, OpenSpec change, client module with i18n,
+    /// registered in the workspace, the server and the client shell.
+    NewModule {
+        /// The module's `snake_case` name; also its schema and OAuth scope prefix.
+        name: String,
+        /// The tracking issue URL, recorded in the OpenSpec change.
+        #[arg(long)]
+        issue: Option<String>,
+    },
+    /// Scaffold a feature slice in a module: a scoped `GET` handler with its
+    /// OpenAPI path and tests, mounted on the module's router.
+    NewFeature {
+        /// The module (directory under crates/modules).
+        module: String,
+        /// The feature's `snake_case` name.
+        feature: String,
+    },
+    /// Generate a module and a feature in a temporary copy of the repository
+    /// and run the gates on them.
+    ScaffoldCheck {
+        /// Also run the client gates and check that OpenSpec rejects the
+        /// unfinished change (needs `pnpm install` in clients/ and npx).
+        #[arg(long)]
+        full: bool,
+        /// Cargo target directory for the copy (default:
+        /// `target/scaffold-check`). Sharing the checkout's `target` is cheaper
+        /// but overwrites its `xtask` and server binaries.
+        #[arg(long)]
+        target_dir: Option<PathBuf>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -47,6 +83,11 @@ fn main() -> ExitCode {
     let result = match cli.command {
         Command::Arch => run_arch(&root),
         Command::Openapi { check } => openapi::run(&root, check),
+        Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
+        Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
+        Command::ScaffoldCheck { full, target_dir } => {
+            scaffold::check::run(&root, full, target_dir)
+        }
     };
     match result {
         Ok(message) => {
@@ -63,6 +104,48 @@ fn main() -> ExitCode {
 fn workspace_root() -> PathBuf {
     let xtask_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
     xtask_dir.parent().unwrap_or(xtask_dir).to_path_buf()
+}
+
+fn run_new_module(root: &Path, name: &str, issue: Option<String>) -> Result<String> {
+    let options = scaffold::ModuleOptions {
+        issue,
+        now: chrono::Utc::now(),
+    };
+    let plan = scaffold::new_module(root, name, &options)?;
+    let warnings = plan.apply(root)?;
+    let kebab = name.replace('_', "-");
+    Ok(format!(
+        "module `{name}` scaffolded:\n{}{}\nNext:\n  \
+         1. cargo xtask openapi && pnpm --dir clients api:generate\n  \
+         2. Fill in every TODO(new-module) (`git grep -n 'TODO(new-module)'`). Until the spec \
+         delta states real requirements, `openspec validate add-{kebab}-module --strict` fails, \
+         so the change cannot merge unfinished.\n  \
+         3. Add use cases with `cargo xtask new-feature {name} <feature>`.\n  \
+         4. Run the gates (AGENTS.md -> Code quality) and commit Cargo.lock with the rest.",
+        plan.report(),
+        format_warnings(&warnings),
+    ))
+}
+
+fn run_new_feature(root: &Path, module: &str, feature: &str) -> Result<String> {
+    let plan = scaffold::new_feature(root, module, feature)?;
+    let warnings = plan.apply(root)?;
+    Ok(format!(
+        "feature `{module}::{feature}` scaffolded:\n{}{}\nNext:\n  \
+         1. Replace the placeholder response and every TODO(new-feature); describe the \
+         behaviour in the module's OpenSpec change.\n  \
+         2. cargo xtask openapi && pnpm --dir clients api:generate\n  \
+         3. Run the gates (AGENTS.md -> Code quality).",
+        plan.report(),
+        format_warnings(&warnings),
+    ))
+}
+
+fn format_warnings(warnings: &[String]) -> String {
+    warnings.iter().fold(String::new(), |mut out, w| {
+        let _ = writeln!(out, "  warning: {w}");
+        out
+    })
 }
 
 fn run_arch(root: &Path) -> Result<String> {
