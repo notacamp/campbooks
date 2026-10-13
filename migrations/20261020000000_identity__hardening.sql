@@ -14,3 +14,10 @@ CREATE TABLE identity.notices (
 CREATE INDEX notices_account_idx ON identity.notices (account_id);
 
 GRANT SELECT, INSERT, DELETE ON identity.notices TO campbooks_app;
+
+-- An authorization request belongs to the browser that made it: the SHA-256
+-- of that browser's `__Host-campbooks_browser` cookie. Requests waiting at
+-- upgrade time (at most 15 minutes old) have none and are dropped: those
+-- sign-ins start again from the app.
+DELETE FROM identity.authorize_requests;
+ALTER TABLE identity.authorize_requests ADD COLUMN browser_hash bytea NOT NULL;

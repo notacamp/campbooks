@@ -561,6 +561,19 @@ async fn sign_in_refusals_one_by_one(db: PgPool) {
     .await;
     assert_eq!(phished.json["code"], "passkey_not_accepted", "{phished:?}");
 
+    // An account an operator disabled: its passkey opens nothing.
+    sqlx::query("UPDATE identity.accounts SET disabled_at = now()")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let disabled = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
+    assert_eq!(disabled.status, StatusCode::FORBIDDEN, "{disabled:?}");
+    assert_eq!(
+        disabled.json["code"], "passkey_not_accepted",
+        "{disabled:?}"
+    );
+
     // Nothing of it reached a session.
     assert_eq!(
         count(
@@ -897,36 +910,53 @@ async fn waiting_registrations_are_capped_per_account(db: PgPool) {
     assert_eq!(capped.json["code"], "rate_limited");
 }
 
-#[sqlx::test(migrations = "../../../migrations")]
-async fn passkey_only_accounts_are_capped_instance_wide(db: PgPool) {
-    let kit = Kit::new(db).await;
-    for _ in 0..30 {
-        kit.new_browser();
-        let mut device = device();
-        let options = screen(
-            &kit,
-            "/auth/passkey/sign-up/options",
-            &json!({ "display_name": "Ana" }),
-        )
-        .await;
-        let made = device.create(&options.json, Alg::Ed25519);
-        let created = screen(&kit, "/auth/passkey/sign-up", &made).await;
-        assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
-    }
+/// Create an account with a passkey alone in a new browser: the status.
+async fn passkey_sign_up(kit: &Kit) -> StatusCode {
     kit.new_browser();
     let mut device = device();
     let options = screen(
-        &kit,
+        kit,
         "/auth/passkey/sign-up/options",
         &json!({ "display_name": "Ana" }),
     )
     .await;
+    assert_eq!(options.status, StatusCode::OK, "{options:?}");
     let made = device.create(&options.json, Alg::Ed25519);
-    let capped = screen(&kit, "/auth/passkey/sign-up", &made).await;
-    assert_eq!(capped.status, StatusCode::TOO_MANY_REQUESTS, "{capped:?}");
+    screen(kit, "/auth/passkey/sign-up", &made).await.status
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn passkey_only_accounts_are_capped_per_address_and_instance_wide(db: PgPool) {
+    use campbooks_kernel::rate_limit::RateKey;
+
+    use crate::protocol::passkey::{INSTANCE, SIGN_UP_LIMIT};
+
+    let kit = Kit::new(db).await;
+    kit.send_from(Some("203.0.113.7:50000"));
+    for _ in 0..5 {
+        assert_eq!(passkey_sign_up(&kit).await, StatusCode::CREATED);
+    }
+    assert_eq!(
+        passkey_sign_up(&kit).await,
+        StatusCode::TOO_MANY_REQUESTS,
+        "five per address an hour"
+    );
+    kit.send_from(Some("198.51.100.2:50000"));
+    assert_eq!(
+        passkey_sign_up(&kit).await,
+        StatusCode::CREATED,
+        "another address has its own budget"
+    );
+    // Many addresses together reach the instance's ceiling.
+    kit.state
+        .rate_limits
+        .exhaust(&kit.state.db, &SIGN_UP_LIMIT, &RateKey::text(INSTANCE))
+        .await;
+    kit.send_from(Some("192.0.2.9:50000"));
+    assert_eq!(passkey_sign_up(&kit).await, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(
         count(&kit, "SELECT count(*) FROM identity.accounts").await,
-        30
+        6
     );
 }
 

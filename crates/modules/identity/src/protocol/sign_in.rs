@@ -103,13 +103,18 @@ pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
     security(()),
     responses(
         (status = 200, description = "The request.", body = RequestInfo),
-        (status = 404, description = "No such request (or it expired), or another identity \
-            provider serves this instance."),
+        (status = 404, description = "No such request (or it expired, or another browser \
+            made it), or another identity provider serves this instance."),
     ),
 )]
-pub async fn request(State(ctx): State<Ctx>, Path(id): Path<String>) -> Result<Json<RequestInfo>> {
+pub async fn request(
+    State(ctx): State<Ctx>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<RequestInfo>> {
     let issuer = ctx.issuer()?;
-    let request = authorize::load(&ctx.state.db, &id, issuer.now())
+    let browser = authorize::browser(issuer, &headers);
+    let request = authorize::load(&ctx.state.db, &id, browser.as_deref(), issuer.now())
         .await?
         .ok_or(Error::NotFound)?;
     Ok(Json(RequestInfo {
@@ -568,6 +573,7 @@ async fn sign_in_known(
     let location = continue_after_sign_in(
         ctx,
         issuer,
+        headers,
         flow.request_id.as_deref(),
         &flow.return_to,
         &started.session,
@@ -711,14 +717,23 @@ async fn signed_in(
 pub(super) async fn continue_after_sign_in(
     ctx: &Ctx,
     issuer: &Issuer,
+    headers: &HeaderMap,
     request: Option<&str>,
     return_to: &str,
     session: &Session,
     now: DateTime<Utc>,
 ) -> Result<String> {
+    let browser = authorize::browser(issuer, headers);
     if let Some(request) = request
-        && let Some(location) =
-            authorize::complete_stored(&ctx.state.db, issuer, request, session, now).await?
+        && let Some(location) = authorize::complete_stored(
+            &ctx.state.db,
+            issuer,
+            request,
+            browser.as_deref(),
+            session,
+            now,
+        )
+        .await?
     {
         return Ok(location);
     }
@@ -875,6 +890,7 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         pending.request_id.as_deref(),
         &pending.return_to,
         &started.session,
