@@ -31,7 +31,13 @@ pub struct ParsedAttachment {
     pub content_type: String,
     pub bytes: Vec<u8>,
     pub inline: bool,
+    /// Its `Content-ID`, without angle brackets: what `cid:` images name.
+    pub content_id: Option<String>,
 }
+
+/// Longest `Content-ID` kept, in characters (the `MessageChangeBatch` v1
+/// limit); a longer one names no image anyone wrote, and is left out.
+pub const MAX_CONTENT_ID_CHARS: usize = 255;
 
 /// What a message without a usable `From` is attributed to (RFC 2606's
 /// reserved `.invalid` domain: never a real address).
@@ -81,6 +87,10 @@ pub fn parse(raw: &[u8]) -> Parsed {
                 inline: part
                     .content_disposition()
                     .is_some_and(|d| d.ctype().eq_ignore_ascii_case("inline")),
+                content_id: part
+                    .content_id()
+                    .map(strip_angles)
+                    .filter(|id| !id.is_empty() && id.chars().count() <= MAX_CONTENT_ID_CHARS),
             }
         })
         .collect();
@@ -245,6 +255,42 @@ mod tests {
         assert_eq!(pdf.content_type, "application/pdf");
         assert_eq!(pdf.bytes, b"%PDF-1.4\n");
         assert!(!pdf.inline);
+        assert_eq!(pdf.content_id, None);
+    }
+
+    #[test]
+    fn inline_parts_keep_their_content_id() {
+        let raw = concat!(
+            "From: Ana <ana@example.com>\r\n",
+            "Subject: Logo\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/related; boundary=\"r1\"\r\n",
+            "\r\n",
+            "--r1\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p><img src=\"cid:logo@example.com\"></p>\r\n",
+            "--r1\r\n",
+            "Content-Type: image/png; name=\"logo.png\"\r\n",
+            "Content-Disposition: inline; filename=\"logo.png\"\r\n",
+            "Content-ID: <logo@example.com>\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "iVBORw0KGgo=\r\n",
+            "--r1--\r\n",
+        );
+        let parsed = parse(raw.as_bytes());
+        assert_eq!(parsed.attachments.len(), 1);
+        let logo = &parsed.attachments[0];
+        assert!(logo.inline);
+        assert_eq!(logo.content_id.as_deref(), Some("logo@example.com"));
+
+        let long = raw.replace(
+            "logo@example.com>",
+            &format!("{}@example.com>", "x".repeat(300)),
+        );
+        assert_eq!(parse(long.as_bytes()).attachments[0].content_id, None);
+        assert_eq!(logo.content_type, "image/png");
     }
 
     #[test]

@@ -34,7 +34,8 @@
     "goneBody": "Se ha eliminado o ya no tienes acceso a ella.",
     "body": "No se ha podido cargar este mensaje.",
     "retry": "Reintentar",
-    "action": "No se ha podido cambiar «{{subject}}». Inténtalo de nuevo."
+    "action": "No se ha podido cambiar «{{subject}}». Inténtalo de nuevo.",
+    "attachment": "No se ha podido abrir {{name}}. Inténtalo de nuevo."
   },
   "reader": {
     "label": "Conversación",
@@ -152,7 +153,8 @@
     "move": "Mover a un flujo",
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
-    "showImages": "Mostrar imágenes"
+    "showImages": "Mostrar imágenes",
+    "nextAttachment": "Siguiente adjunto"
   },
   "compose": {
     "title": {

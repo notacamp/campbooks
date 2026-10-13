@@ -163,6 +163,7 @@ pub async fn store_message(
             content_type: attachment.content_type,
             blob,
             inline: attachment.inline,
+            content_id: attachment.content_id,
         });
     }
     let flags = fetched.flags;

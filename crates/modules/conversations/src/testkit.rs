@@ -11,7 +11,7 @@ use std::{
 use axum::{
     Router,
     body::Body,
-    http::{Method, Request, header},
+    http::{HeaderMap, Method, Request, StatusCode, header},
 };
 use campbooks_ai::decide::signals::email::triage;
 use campbooks_kernel::{
@@ -25,6 +25,7 @@ use campbooks_kernel::{
 };
 use serde_json::Value;
 use sqlx::PgPool;
+use tower::ServiceExt as _;
 
 use crate::{
     ConversationsDeps, dev,
@@ -211,6 +212,18 @@ impl Kit {
     /// `GET uri` with `token`.
     pub async fn get(&self, token: &str, uri: &str) -> TestResponse {
         self.call(Method::GET, token, uri, None).await
+    }
+
+    /// `GET uri` with `token`, whole: status, headers and body bytes.
+    pub async fn get_raw(&self, token: &str, uri: &str) -> (StatusCode, HeaderMap, Vec<u8>) {
+        let request = Request::get(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap();
+        let response = self.app.clone().oneshot(request).await.unwrap();
+        let (parts, body) = response.into_parts();
+        let bytes = axum::body::to_bytes(body, 64 << 20).await.unwrap();
+        (parts.status, parts.headers, bytes.to_vec())
     }
 
     /// `POST uri` with a JSON body (or none).

@@ -34,7 +34,8 @@
     "goneBody": "It was removed, or you can no longer see it.",
     "body": "Could not load this message.",
     "retry": "Try again",
-    "action": "Could not change “{{subject}}”. Try again."
+    "action": "Could not change “{{subject}}”. Try again.",
+    "attachment": "Could not open {{name}}. Try again."
   },
   "reader": {
     "label": "Conversation",
@@ -152,7 +153,8 @@
     "move": "Move to a stream",
     "replyAll": "Reply all",
     "forward": "Forward",
-    "showImages": "Show images"
+    "showImages": "Show images",
+    "nextAttachment": "Next attachment"
   },
   "compose": {
     "title": {

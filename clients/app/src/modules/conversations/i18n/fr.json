@@ -34,7 +34,8 @@
     "goneBody": "Elle a été supprimée, ou vous n’y avez plus accès.",
     "body": "Impossible de charger ce message.",
     "retry": "Réessayer",
-    "action": "Impossible de modifier « {{subject}} ». Réessayez."
+    "action": "Impossible de modifier « {{subject}} ». Réessayez.",
+    "attachment": "Impossible d’ouvrir {{name}}. Réessayez."
   },
   "reader": {
     "label": "Conversation",
@@ -152,7 +153,8 @@
     "move": "Déplacer vers un flux",
     "replyAll": "Répondre à tous",
     "forward": "Transférer",
-    "showImages": "Afficher les images"
+    "showImages": "Afficher les images",
+    "nextAttachment": "Pièce jointe suivante"
   },
   "compose": {
     "title": {
