@@ -7,6 +7,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- `CAMPBOOKS_GOOGLE__REDIRECT_PATH` (default `/auth/callback/google`): the callback
+  path Campbooks sends to Google when your OAuth app registered another one, with a
+  reverse proxy rewriting it to `/auth/callback/google`. The same
+  `CAMPBOOKS_<PROVIDER>__REDIRECT_PATH` pattern applies to future sign-in providers.
 - Campbooks can be its own identity provider (ADR 0014), replacing Rauthy in
   a later release. With `CAMPBOOKS_AUTH__ISSUER` unset and
   `CAMPBOOKS_SECRET_KEY` set, the server is an OAuth 2.1 / OpenID Connect
