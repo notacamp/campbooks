@@ -59,6 +59,8 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::AccountCreated>()
             .publishes::<events::SignedIn>()
             .publishes::<events::RefreshReuseDetected>()
+            .publishes::<events::WayInAdded>()
+            .publishes::<events::WayInRemoved>()
             .schedule::<Prune>(PRUNE_EVERY),
     }
 }
