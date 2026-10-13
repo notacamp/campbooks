@@ -46,6 +46,7 @@ use crate::{
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
         policy::Policy,
+        redact,
     },
     events::{Change, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -68,6 +69,9 @@ pub const SNIPPET_CHARS: usize = 200;
 pub const MESSAGE_RECORD: &str = "conversations.message";
 /// Record type of an attachment, for blob references.
 pub const ATTACHMENT_RECORD: &str = "conversations.attachment";
+/// Record type holding a pending change batch (owner id: its inbox), so the
+/// blob sweep keeps it while its job waits or retries.
+pub const BATCH_RECORD: &str = "conversations.change_batch";
 
 /// Applies change batches, sorting new conversations with the rules
 /// strategy the module was composed with.
@@ -105,8 +109,12 @@ impl JobHandler for ApplyChanges {
         if cut {
             return Err(JobError::fatal("the change batch is larger than the limit"));
         }
-        let batch: MessageChangeBatch = serde_json::from_slice(&bytes)
-            .map_err(|e| JobError::fatal(format!("the change batch does not parse: {e}")))?;
+        let batch: MessageChangeBatch = serde_json::from_slice(&bytes).map_err(|e| {
+            JobError::fatal(format!(
+                "the change batch does not parse: {}",
+                redact::json(&e)
+            ))
+        })?;
         if batch.version != BATCH_VERSION {
             return Err(JobError::fatal(format!(
                 "change batch version {} is not supported (expected {BATCH_VERSION})",
@@ -144,7 +152,19 @@ impl JobHandler for ApplyChanges {
                 } => apply.remove(tx, provider_message_id).await?,
             }
         }
-        apply.finish(tx).await
+        apply.finish(tx).await?;
+        // Applied: the batch is no longer needed (the sweep removes it once
+        // nothing else holds it).
+        state
+            .blobs
+            .detach(
+                tx,
+                &ws,
+                &payload.batch.hash,
+                &BlobOwner::new(BATCH_RECORD, payload.inbox),
+            )
+            .await?;
+        Ok(())
     }
 }
 
@@ -237,7 +257,7 @@ impl ApplyChanges {
                 subject: message.subject.clone(),
             };
             let document =
-                serde_json::to_vec(&document).map_err(|e| JobError::fatal(e.to_string()))?;
+                serde_json::to_vec(&document).map_err(|e| JobError::fatal(redact::json(&e)))?;
             let participants = state
                 .blobs
                 .put(ws, document, PARTICIPANTS_CONTENT_TYPE)
@@ -261,7 +281,7 @@ impl ApplyChanges {
                 self.rules
                     .decide(&envelope, &questions)
                     .await
-                    .map_err(|e| JobError::retry(format!("rules strategy failed: {e}")))?
+                    .map_err(|e| redact::ai(&e))?
                     .answers
             } else {
                 Vec::new()
@@ -891,10 +911,16 @@ pub async fn submit(
     batch: &MessageChangeBatch,
 ) -> campbooks_kernel::Result<BlobRef> {
     let ws = workspace.to_string();
-    let bytes = serde_json::to_vec(batch).map_err(campbooks_kernel::Error::internal)?;
+    let bytes = serde_json::to_vec(batch)
+        .map_err(|e| campbooks_kernel::Error::internal(redact::json(&e)))?;
     let blob = state
         .blobs
         .put(&ws, bytes, crate::ingest::BATCH_CONTENT_TYPE)
+        .await?;
+    // Held until the job has applied it, so a retry still finds it.
+    state
+        .blobs
+        .attach(tx, &ws, &blob, &BlobOwner::new(BATCH_RECORD, batch.inbox))
         .await?;
     let payload = ApplyChangesPayload {
         inbox: batch.inbox,

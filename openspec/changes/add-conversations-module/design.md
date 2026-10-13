@@ -138,6 +138,12 @@ MessageChangeBatch v1  (JSON document, stored as a blob, content type
   validates what it produces against the same file. This module's Rust types
   (`campbooks_conversations::ingest`) read it, and a contract test validates
   every recorded fixture batch against the schema.
+- The batch blob is attached to a `conversations.change_batch` record (owner
+  id: the inbox) when it is enqueued and detached once applied, so the blob
+  sweep cannot remove it while its job waits or retries; a batch whose job
+  failed for good stays held for inspection until the workspace is purged.
+- Job errors and logs never carry content: JSON decoding errors keep only
+  their class and position, and provider errors only their kind.
 - A batch for an inbox that does not exist yet is **retried**, not failed:
   the connector announces the inbox (`connectors.capability_granted`) and its
   first batch independently. A batch of another version, or naming another
@@ -258,7 +264,10 @@ content is not duplicated.
 `Workspace<S>` resolves the workspace (404 otherwise). Within it, a user sees
 the inboxes they have an `inbox_members` row for; a client token (no user)
 sees every inbox of its bound workspace. A conversation or message in an
-inbox the caller cannot see answers 404. Inbox-level access is checked in the
+inbox the caller cannot see answers 404. Changing a conversation (read,
+star, archive, labels, stream) takes the `sender` role or above: a
+`reader` sees it but gets 403 `inbox_read_only`. A client token changes
+through its `conversations:write` scope. Inbox-level access is checked in the
 queries (jobs have no user); row-level security stays the workspace line.
 
 ## Endpoints and scopes

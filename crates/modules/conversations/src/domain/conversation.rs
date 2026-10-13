@@ -91,9 +91,10 @@ impl TryFrom<SummaryRow> for ConversationSummary {
                 .sender
                 .map(serde_json::from_value)
                 .transpose()
-                .map_err(Error::internal)?,
+                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             snippet: row.snippet.unwrap_or_default(),
-            labels: serde_json::from_value(row.labels).map_err(Error::internal)?,
+            labels: serde_json::from_value(row.labels)
+                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
         })
     }
 }

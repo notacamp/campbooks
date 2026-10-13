@@ -93,6 +93,7 @@ pub async fn unarchive(
 
 #[cfg(test)]
 mod tests {
+    use axum::http::StatusCode;
     use sqlx::PgPool;
 
     use crate::testkit::Kit;
@@ -128,5 +129,37 @@ mod tests {
                 .len(),
             3
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn readers_see_but_cannot_change(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, _) = kit.sams_inbox().await;
+        let (ana, ana_id) = kit.member("ana", workspace);
+        sqlx::query(
+            "INSERT INTO conversations.inbox_members (workspace_id, inbox_id, user_id, role)
+             VALUES ($1, $2, $3, 'reader')",
+        )
+        .bind(workspace.as_uuid())
+        .bind(inbox)
+        .bind(ana_id.as_uuid())
+        .execute(&db)
+        .await
+        .unwrap();
+        let id = kit.conversation_of("en-1").await;
+        let base = format!("/api/v1/w/{workspace}/conversations/{id}");
+        assert_eq!(kit.get(&ana, &base).await.status, StatusCode::OK);
+        for (action, body) in [
+            ("archive", None),
+            ("read", None),
+            ("stream", Some(serde_json::json!({"stream": "updates"}))),
+            ("labels", Some(serde_json::json!({"name": "Mine"}))),
+        ] {
+            let denied = kit.post(&ana, &format!("{base}/{action}"), body).await;
+            assert_eq!(denied.status, StatusCode::FORBIDDEN, "{action}");
+            assert_eq!(denied.json["code"], "inbox_read_only", "{action}");
+        }
+        let unchanged = kit.get(&ana, &base).await;
+        assert_eq!(unchanged.json["conversation"]["archived"], false);
     }
 }

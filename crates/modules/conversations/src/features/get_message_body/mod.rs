@@ -81,7 +81,8 @@ pub async fn handler(
     .await?
     .ok_or(Error::NotFound)?;
     tx.commit().await?;
-    let bodies: Bodies = serde_json::from_value(bodies).map_err(Error::internal)?;
+    let bodies: Bodies = serde_json::from_value(bodies)
+        .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
     let ws = access.workspace.to_string();
     let (text, text_cut) = read(&state, &ws, bodies.text.as_ref()).await?;
     let (html, html_cut) = read(&state, &ws, bodies.html.as_ref()).await?;

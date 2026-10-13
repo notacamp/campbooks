@@ -26,6 +26,7 @@ use crate::{
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
         policy::Policy,
+        redact,
     },
     events::MessageReceived,
     ingest::Headers,
@@ -81,7 +82,7 @@ impl EventConsumer for DecideMessage {
         let questions = triage_questions();
         let answers = match model.decide(&envelope, &questions).await {
             Ok(decisions) => decisions.answers,
-            Err(error) => return Err(job_error(&error)),
+            Err(error) => return Err(redact::ai(&error)),
         };
         let recorded = Recorded {
             message: facts.message,
@@ -97,21 +98,6 @@ impl EventConsumer for DecideMessage {
         // was stored.
         recorded.store(tx, workspace, false).await?;
         Ok(())
-    }
-}
-
-/// A model failure as a job outcome. Provider errors can echo the request
-/// (message content), so only their kind is kept.
-fn job_error(error: &campbooks_ai::Error) -> JobError {
-    use campbooks_ai::Error as E;
-    match error {
-        E::Status { status, .. } => JobError::retry(format!("decide provider answered {status}")),
-        E::Transport(_) => JobError::retry("decide provider unreachable"),
-        E::InvalidResponse(_) => JobError::retry("decide provider gave an unexpected answer"),
-        E::RoleNotConfigured(_) | E::Config(_) => {
-            JobError::fatal("the decide role is not configured")
-        }
-        E::InvalidQuestion(detail) => JobError::fatal(format!("invalid decide question: {detail}")),
     }
 }
 
@@ -146,7 +132,8 @@ async fn load(
     if row.answered || row.direction != "inbound" {
         return Ok(None);
     }
-    let decode = |e: serde_json::Error| JobError::fatal(format!("stored message: {e}"));
+    let decode =
+        |e: serde_json::Error| JobError::fatal(format!("stored message: {}", redact::json(&e)));
     let from: Address = serde_json::from_value(row.sender).map_err(decode)?;
     let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
     let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;

@@ -208,9 +208,10 @@ pub async fn handler(
     let ws = access.workspace.to_string();
     let mut messages = Vec::with_capacity(rows.len());
     for row in rows {
-        let recipients: Recipients =
-            serde_json::from_value(row.recipients).map_err(Error::internal)?;
-        let bodies: Bodies = serde_json::from_value(row.bodies).map_err(Error::internal)?;
+        let recipients: Recipients = serde_json::from_value(row.recipients)
+            .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
+        let bodies: Bodies = serde_json::from_value(row.bodies)
+            .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
         let text = match &bodies.text {
             Some(blob) => {
                 let (content, truncated) =
@@ -222,7 +223,8 @@ pub async fn handler(
         messages.push(MessageView {
             id: row.id,
             direction: row.direction.parse()?,
-            from: serde_json::from_value(row.sender).map_err(Error::internal)?,
+            from: serde_json::from_value(row.sender)
+                .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             to: recipients.to,
             cc: recipients.cc,
             reply_to: recipients.reply_to,

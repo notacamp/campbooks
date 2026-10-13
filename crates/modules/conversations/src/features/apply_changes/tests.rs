@@ -143,8 +143,15 @@ async fn a_batch_threads_messages_stores_bodies_and_announces_them(db: PgPool) {
     )
     .await;
     // en-1: participants, raw, text, html + 1 attachment; en-2: participants,
-    // text; en-3: participants, text, html; en-4: participants, text.
+    // text; en-3: participants, text, html; en-4: participants, text. The
+    // batch itself is let go once applied.
     assert_eq!(held, 12);
+    let batches = count(
+        &db,
+        "SELECT count(*) FROM kernel.blob_refs WHERE owner_type = 'conversations.change_batch'",
+    )
+    .await;
+    assert_eq!(batches, 0);
 
     let (unread, count_msgs, labels): (i32, i32, i64) = sqlx::query_as(
         "SELECT c.unread_count, c.message_count,
@@ -378,6 +385,68 @@ async fn a_batch_for_an_inbox_not_created_yet_waits(db: PgPool) {
         error.as_deref(),
         Some("the change batch's inbox does not exist yet")
     );
+    // The batch stays held, so the blob sweep cannot remove it meanwhile.
+    let held = count(
+        &db,
+        "SELECT count(*) FROM kernel.blob_refs WHERE owner_type = 'conversations.change_batch'",
+    )
+    .await;
+    assert_eq!(held, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_malformed_batch_fails_without_its_content_in_the_error(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox) = setup(&kit, "sam@example.com").await;
+    let ws = workspace.to_string();
+    let document = serde_json::json!({
+        "version": 1,
+        "inbox": inbox,
+        "changes": [{"op": "upsert", "message": {
+            "provider_message_id": "bad-1",
+            "from": "Maya Okafor <maya@northwind-studio.example>",
+            "subject": "Q4 plan",
+            "sent_at": "2026-10-05T08:30:00Z",
+            "direction": "inbound",
+            "mailbox": {"in_inbox": true}
+        }}]
+    });
+    let blob = kit
+        .state
+        .blobs
+        .put(
+            &ws,
+            serde_json::to_vec(&document).unwrap(),
+            "application/json",
+        )
+        .await
+        .unwrap();
+    let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::jobs::enqueue_to::<super::ApplyChanges>(
+        &mut tx,
+        &crate::ingest::ApplyChangesPayload { inbox, batch: blob },
+        campbooks_kernel::jobs::EnqueueOptions::for_workspace(ws),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let stats = campbooks_kernel::jobs::Worker::new(kit.state.clone())
+        .run_until_idle()
+        .await;
+    assert_eq!(stats.failed, 1);
+    let error: String = sqlx::query_scalar(
+        "SELECT last_error FROM kernel.jobs WHERE kind = 'conversations.apply_changes'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert!(
+        error.starts_with("the change batch does not parse: Data error at line"),
+        "{error}"
+    );
+    for leaked in ["maya", "Maya", "northwind", "Q4"] {
+        assert!(!error.contains(leaked), "{error}");
+    }
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

@@ -8,3 +8,4 @@ pub mod decisions;
 pub mod flags;
 pub mod paths;
 pub mod policy;
+pub mod redact;

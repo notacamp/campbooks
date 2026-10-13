@@ -26,11 +26,17 @@ Every table of the `conversations` schema SHALL be isolated per workspace by
 forced row-level security. Within a workspace, a user SHALL see only the
 inboxes they are a member of (`reader`, `sender` or `manager`), and a client
 token bound to the workspace SHALL see every inbox. A conversation, message or
-inbox the caller cannot see SHALL answer 404.
+inbox the caller cannot see SHALL answer 404. Changing a conversation SHALL
+take the `sender` role or above (or a client token); a `reader` SHALL get
+403 `inbox_read_only`.
 
 #### Scenario: A member of another inbox
 - **WHEN** a member who is not in Sam's inbox reads one of its conversations
 - **THEN** the response is 404
+
+#### Scenario: A reader changes a conversation
+- **WHEN** a member with the `reader` role on an inbox archives, marks read, labels or moves one of its conversations
+- **THEN** the response is 403 with code `inbox_read_only` and nothing changes
 
 #### Scenario: Another workspace
 - **WHEN** a transaction set to one workspace counts the messages of another
@@ -58,7 +64,11 @@ batch of another version or naming another inbox SHALL fail for good.
 
 #### Scenario: The inbox is not there yet
 - **WHEN** a batch arrives for an inbox this module has not created
-- **THEN** the job is retried rather than failed
+- **THEN** the job is retried rather than failed, and the batch blob stays held
+
+#### Scenario: A malformed batch
+- **WHEN** a batch does not parse
+- **THEN** the job fails for good and its stored error names only the kind and position of the error, never content from the batch
 
 ### Requirement: Threading
 A new message SHALL join, in order: the conversation with the provider's

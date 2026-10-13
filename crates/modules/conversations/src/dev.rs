@@ -105,7 +105,7 @@ pub async fn record(
         }
     }
     let batch = json!({ "version": BATCH_VERSION, "inbox": inbox, "changes": changes });
-    serde_json::from_value(batch).map_err(|e| bad(&e.to_string()))
+    serde_json::from_value(batch).map_err(|e| bad(&crate::domain::redact::json(&e)))
 }
 
 /// Store `batch` and enqueue its application, as a connector does.
