@@ -6,14 +6,6 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
-### Changed
-- Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
-  audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
-  applies to an outside identity provider. Nothing to do: tokens last ten minutes, and
-  the next refresh gets the new one.
-- The token endpoint, client registration and the consent answer are rate-limited per
-  client address (`CAMPBOOKS_TRUSTED_PROXIES` behind a reverse proxy).
-
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
@@ -438,6 +430,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
+  audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
+  applies to an outside identity provider. Nothing to do: tokens last ten minutes, and
+  the next refresh gets the new one.
+- The token endpoint, client registration and the consent answer are rate-limited per
+  client address (`CAMPBOOKS_TRUSTED_PROXIES` behind a reverse proxy).
 - The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
   new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes
