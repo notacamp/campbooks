@@ -20,5 +20,9 @@ serde.workspace = true
 serde_json.workspace = true
 toml.workspace = true
 
+[dev-dependencies]
+tokio.workspace = true
+wiremock.workspace = true
+
 [lints]
 workspace = true
