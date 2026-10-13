@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 anyhow.workspace = true
 campbooks-ai.workspace = true
+campbooks-kernel.workspace = true
 campbooks-server.workspace = true
 chrono.workspace = true
 cargo_metadata.workspace = true

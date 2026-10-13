@@ -81,6 +81,24 @@ mod tests {
 
         let last = kit.delete(&ana, &uri).await;
         assert_eq!(last.status, StatusCode::CONFLICT);
-        assert_eq!(last.json["detail"], "last_owner");
+        assert_eq!(last.json["code"], "last_owner");
+        assert_eq!(last.json["title"], "Conflict");
+
+        // Once Ana saves a language, her errors speak it; the code stays.
+        sqlx::query("UPDATE workspaces.users SET locale = 'pt-PT' WHERE idp_subject = 'ana'")
+            .execute(&kit.db)
+            .await
+            .unwrap();
+        let last = kit.delete(&ana, &uri).await;
+        assert_eq!(last.json["code"], "last_owner");
+        assert_eq!(last.json["title"], "Conflito");
+        assert_eq!(
+            last.json["detail"],
+            crate::MESSAGES.t(
+                campbooks_kernel::i18n::Locale::PtPt,
+                "errors.last_owner",
+                &[]
+            )
+        );
     }
 }

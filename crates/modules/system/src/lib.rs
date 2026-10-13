@@ -13,7 +13,7 @@
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::{Background, Module};
+use campbooks_kernel::{Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod features;
@@ -21,6 +21,9 @@ pub mod scopes;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
+
+/// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
+pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module, ready for the server to mount.
 pub fn module() -> Module {
@@ -41,6 +44,11 @@ mod tests {
     #[test]
     fn module_is_named_after_its_schema() {
         assert_eq!(super::module().name, "system");
+    }
+
+    #[test]
+    fn catalogue_is_at_parity() {
+        assert_eq!(super::MESSAGES.check(), Vec::<String>::new());
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

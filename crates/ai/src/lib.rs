@@ -21,6 +21,10 @@ mod gateway;
 
 pub use config::{AiConfig, Protocol, ProviderConfig, Role};
 pub use error::Error;
+
+/// The gateway's messages (`i18n/<locale>.json`): the reasons of the errors
+/// it hands to modules.
+pub static MESSAGES: campbooks_kernel::i18n::Catalogue = campbooks_kernel::catalogue!("ai");
 pub use gateway::{
     ChatRequest, ChatResponse, Content, ContentPart, DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_REQUEST_TIMEOUT, Gateway, ImageUrl, JsonSchemaFormat, Message, MessageRole,

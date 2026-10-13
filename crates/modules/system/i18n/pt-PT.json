@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "database_unreachable": "Não é possível contactar a base de dados. A instância não está pronta para responder a pedidos.",
+    "database_timeout": "A base de dados não respondeu a tempo. A instância não está pronta para responder a pedidos."
+  }
+}

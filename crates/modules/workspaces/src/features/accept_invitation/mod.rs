@@ -12,6 +12,8 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 use crate::{
     domain::{
         db::set_user,
@@ -93,10 +95,10 @@ pub async fn execute(
     .await?
     .ok_or(Error::NotFound)?;
     if found.used {
-        return Err(Error::Conflict("invitation_used".to_owned()));
+        return Err(Error::Conflict(MESSAGES.reason("invitation_used")));
     }
     if found.expired {
-        return Err(Error::Conflict("invitation_expired".to_owned()));
+        return Err(Error::Conflict(MESSAGES.reason("invitation_expired")));
     }
     let email_matches = principal.email_verified
         && principal
@@ -104,7 +106,7 @@ pub async fn execute(
             .as_deref()
             .is_some_and(|email| email.trim().to_lowercase() == found.email);
     if !email_matches {
-        return Err(Error::Denied("invitation_email_mismatch"));
+        return Err(Error::Denied(MESSAGES.reason("invitation_email_mismatch")));
     }
     let role: Role = found.role.parse()?;
     let joined = sqlx::query!(
@@ -118,7 +120,7 @@ pub async fn execute(
     .await?
     .rows_affected();
     if joined == 0 {
-        return Err(Error::Conflict("already_a_member".to_owned()));
+        return Err(Error::Conflict(MESSAGES.reason("already_a_member")));
     }
     sqlx::query!(
         "UPDATE workspaces.invitations SET accepted_at = now(), accepted_by = $2 WHERE id = $1",
@@ -197,7 +199,7 @@ mod tests {
             .post(&bea, ACCEPT, serde_json::json!({ "token": token }))
             .await;
         assert_eq!(again.status, StatusCode::CONFLICT);
-        assert_eq!(again.json["detail"], "invitation_used");
+        assert_eq!(again.json["code"], "invitation_used");
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
@@ -216,7 +218,7 @@ mod tests {
             .post(&bea, ACCEPT, serde_json::json!({ "token": token }))
             .await;
         assert_eq!(response.status, StatusCode::CONFLICT);
-        assert_eq!(response.json["detail"], "invitation_expired");
+        assert_eq!(response.json["code"], "invitation_expired");
         assert_eq!(
             kit.get(&bea, &format!("/api/v1/w/{ws}")).await.status,
             StatusCode::NOT_FOUND
@@ -237,7 +239,7 @@ mod tests {
                 .post(caller, ACCEPT, serde_json::json!({ "token": token }))
                 .await;
             assert_eq!(response.status, StatusCode::FORBIDDEN);
-            assert_eq!(response.json["detail"], "invitation_email_mismatch");
+            assert_eq!(response.json["code"], "invitation_email_mismatch");
         }
         // Still usable by the right person.
         let bea = kit.user("bea");
@@ -293,7 +295,7 @@ mod tests {
             .post(&bea, ACCEPT, serde_json::json!({ "token": token }))
             .await;
         assert_eq!(response.status, StatusCode::CONFLICT);
-        assert_eq!(response.json["detail"], "already_a_member");
+        assert_eq!(response.json["code"], "already_a_member");
 
         let client = kit.client(Some(ws), "workspaces:write");
         let response = kit

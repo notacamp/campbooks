@@ -21,7 +21,7 @@ to start and name the setting.
 
 #### Scenario: Issuer not configured
 - **WHEN** `CAMPBOOKS_AUTH__ISSUER` is unset and a client calls a scoped endpoint, with or without a token
-- **THEN** the response is 401 as `application/problem+json` with `detail` = `auth_not_configured`
+- **THEN** the response is 401 as `application/problem+json` with `code` = `auth_not_configured`
 
 #### Scenario: Malformed issuer
 - **WHEN** the server starts with `CAMPBOOKS_AUTH__ISSUER` set to a value that is not an http(s) URL
@@ -45,7 +45,7 @@ meets all of these conditions:
 Any other token SHALL be refused with 401 as `application/problem+json` and
 `WWW-Authenticate: Bearer error="invalid_token"`. A request with no bearer
 credentials SHALL be refused with 401 and a bare `WWW-Authenticate: Bearer`
-challenge. Response details SHALL be a short reason code and SHALL NOT
+challenge. The problem `code` SHALL be a short reason code, and no member SHALL
 include the token or its claims. The server SHALL NOT log tokens.
 
 #### Scenario: Valid token
@@ -54,27 +54,27 @@ include the token or its claims. The server SHALL NOT log tokens.
 
 #### Scenario: No token
 - **WHEN** a client calls a scoped endpoint without an `Authorization` header
-- **THEN** the response is 401 with `detail` = `missing_token` and `WWW-Authenticate: Bearer`
+- **THEN** the response is 401 with `code` = `missing_token` and `WWW-Authenticate: Bearer`
 
 #### Scenario: Wrong issuer or audience
 - **WHEN** the token's `iss` differs from the configured issuer, or its `aud` does not contain the configured audience
-- **THEN** the response is 401 with `detail` = `invalid_token` and `WWW-Authenticate: Bearer error="invalid_token"`
+- **THEN** the response is 401 with `code` = `invalid_token` and `WWW-Authenticate: Bearer error="invalid_token"`
 
 #### Scenario: Expired token
 - **WHEN** the token's `exp` is further in the past than the leeway
-- **THEN** the response is 401 with `detail` = `token_expired` and `WWW-Authenticate: Bearer error="invalid_token"`
+- **THEN** the response is 401 with `code` = `token_expired` and `WWW-Authenticate: Bearer error="invalid_token"`
 
 #### Scenario: Token not yet valid
 - **WHEN** the token's `nbf` or `iat` is further in the future than the leeway
-- **THEN** the response is 401 with `detail` = `invalid_token`
+- **THEN** the response is 401 with `code` = `invalid_token`
 
 #### Scenario: Disallowed or mismatched algorithm
 - **WHEN** the token's header names `none`, an HMAC algorithm, or an algorithm that does not fit the key its `kid` names
-- **THEN** the response is 401 with `detail` = `invalid_token`
+- **THEN** the response is 401 with `code` = `invalid_token`
 
 #### Scenario: Unknown signing key
 - **WHEN** the token's `kid` is not in the identity provider's JWKS, even after a refresh
-- **THEN** the response is 401 with `detail` = `invalid_token`
+- **THEN** the response is 401 with `code` = `invalid_token`
 
 ### Requirement: Signing key cache
 The server SHALL fetch the identity provider's signing keys on first use and
@@ -131,7 +131,7 @@ workspace ids, SHALL be refused as invalid.
 ### Requirement: Scope per endpoint
 Every protected endpoint SHALL require exactly one scope from the catalogue.
 A valid token that does not grant that scope SHALL be refused with 403 as
-`application/problem+json`, `detail` = `insufficient_scope`, and
+`application/problem+json`, `code` = `insufficient_scope`, and
 `WWW-Authenticate: Bearer error="insufficient_scope", scope="<scope>"`.
 Whether the caller may see a particular record SHALL be decided by the owning
 module, and a read the caller may not see SHALL answer 404, not 403.

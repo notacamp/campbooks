@@ -13,11 +13,11 @@ web sign-in is configured, the server SHALL refuse to start without an
 instance secret key (`CAMPBOOKS_SECRET_KEY` or `CAMPBOOKS_SECRET_KEY_FILE`,
 32 bytes, base64) and SHALL name the setting. When web sign-in is not
 configured, every `/bff/*` endpoint except `/bff/session` SHALL answer 503 as
-`application/problem+json` with `detail` = `bff_not_configured`.
+`application/problem+json` with `code` = `bff_not_configured`.
 
 #### Scenario: No identity provider
 - **WHEN** `CAMPBOOKS_AUTH__ISSUER` is unset and a browser requests `/bff/login`
-- **THEN** the response is 503 with `detail` = `bff_not_configured`
+- **THEN** the response is 503 with `code` = `bff_not_configured`
 
 #### Scenario: Missing secret key
 - **WHEN** the server starts with an issuer and a client secret but no `CAMPBOOKS_SECRET_KEY`
@@ -39,7 +39,7 @@ browser with an `HttpOnly`, `SameSite=Lax` login cookie. The optional
 
 #### Scenario: Open redirect refused
 - **WHEN** `return_to` is `//evil.example.com`, an absolute URL, or contains a backslash
-- **THEN** the response is 400 with `detail` = `invalid_return_to` and no sign-in is started
+- **THEN** the response is 400 with `code` = `invalid_return_to` and no sign-in is started
 
 ### Requirement: Finishing a sign-in
 `GET /bff/callback` SHALL accept a `state` only once, only before the sign-in
@@ -58,11 +58,11 @@ that moves on to `return_to`, never with a redirect.
 
 #### Scenario: Replayed or foreign state
 - **WHEN** the same callback URL is used a second time, or by a browser that did not start the sign-in
-- **THEN** the response is 400 with `detail` = `invalid_state` and no session is created
+- **THEN** the response is 400 with `code` = `invalid_state` and no session is created
 
 #### Scenario: Nonce mismatch
 - **WHEN** the ID token's nonce differs from the sign-in's
-- **THEN** the response is 400 with `detail` = `invalid_id_token` and no session is created
+- **THEN** the response is 400 with `code` = `invalid_id_token` and no session is created
 
 ### Requirement: Session cookie
 The session cookie SHALL hold only an opaque random value of at least 256 bits
@@ -126,7 +126,7 @@ cause one refresh. A refused refresh SHALL end the session.
 
 #### Scenario: No session
 - **WHEN** a browser without a live session requests `/bff/api/v1/system/version`
-- **THEN** the response is 401 with `detail` = `session_required`
+- **THEN** the response is 401 with `code` = `session_required`
 
 ### Requirement: CSRF protection
 Every request with an unsafe method (anything but GET, HEAD, OPTIONS, TRACE) to
@@ -137,7 +137,7 @@ refused with 403 `csrf_check_failed` before any other processing.
 
 #### Scenario: Cross-site write refused
 - **WHEN** a request to `/bff/api/*` or `/bff/logout` uses POST without the header, or with `Sec-Fetch-Site: cross-site`, or with a foreign `Origin`
-- **THEN** the response is 403 with `detail` = `csrf_check_failed`
+- **THEN** the response is 403 with `code` = `csrf_check_failed`
 
 ### Requirement: Logout
 `POST /bff/logout` SHALL end the session, revoke its refresh token at the

@@ -20,6 +20,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 - Deterministic email signals, learning from your own corrections (nearest
   neighbours) and cascades of them behind one interface with the `decide`
   model, each answer carrying the reasons behind it.
+- The server now answers in your language: error messages from the API are
+  in English, European Portuguese, Spanish or French, following the language
+  you chose (once accounts can save one) or your browser's language, and say
+  which one they use in `Content-Language`. Translations are checked in CI
+  (`cargo xtask i18n`).
 - Design system for the new app: light, dark and system themes; three
   workspace accents (business in ink, personal in terracotta, forest) and a
   compact density, remembered on each device and applied before the page
@@ -179,6 +184,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   problem+json 400s, and unparsable ids in paths are 404s.
 
 ### Changed
+- **API clients:** every problem+json error now carries a stable `code`
+  (`not_found`, `invalid_token`, `last_owner`, …); `detail` is now a
+  sentence in the caller's language instead of that code. Match on `code`.
+- A user's saved language (`workspaces.users.locale`) is now empty until
+  they choose one, so the browser's language applies meanwhile. The
+  migration runs on startup; nothing to do.
 - **Separate database logins.** The server now queries as a dedicated
   non-superuser login (`campbooks_runtime`) that cannot bypass row-level
   security or switch back to a more powerful role, and the owner login is used

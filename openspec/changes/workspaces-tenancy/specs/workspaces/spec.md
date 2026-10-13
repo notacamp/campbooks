@@ -82,7 +82,7 @@ allowed under every policy.
 
 #### Scenario: Invite-only instance
 - **WHEN** the policy is `invite_only` and a second user with no workspace tries to create one
-- **THEN** the response is 403 with detail `signup_invite_only`
+- **THEN** the response is 403 with code `signup_invite_only`
 
 #### Scenario: Bootstrap
 - **WHEN** the policy is `invite_only` and the instance's first user creates a workspace
@@ -102,7 +102,7 @@ actions by a client token SHALL be refused with 403.
 
 #### Scenario: Last owner
 - **WHEN** the only owner demotes themself, removes themself or leaves
-- **THEN** the response is 409 with detail `last_owner` and nothing changes
+- **THEN** the response is 409 with code `last_owner` and nothing changes
 
 #### Scenario: Admin cannot touch an owner
 - **WHEN** an admin changes an owner's role or removes an owner

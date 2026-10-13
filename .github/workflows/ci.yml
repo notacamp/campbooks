@@ -63,6 +63,9 @@ jobs:
       - name: decide eval holds its baseline (offline strategies, no network)
         if: always()
         run: cargo xtask eval decide --offline --check
+      - name: Translations at parity (server)
+        if: always()
+        run: cargo xtask i18n
       - name: Tests
         if: always()
         run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc

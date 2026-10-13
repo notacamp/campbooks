@@ -1,0 +1,6 @@
+{
+  "errors": {
+    "database_unreachable": "La base de données est injoignable. L’instance n’est pas prête à traiter des requêtes.",
+    "database_timeout": "La base de données n’a pas répondu à temps. L’instance n’est pas prête à traiter des requêtes."
+  }
+}

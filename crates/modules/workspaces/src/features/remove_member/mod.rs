@@ -106,7 +106,7 @@ mod tests {
         assert_eq!(kit.delete(&bea, &uri).await.status, StatusCode::FORBIDDEN);
         let last = kit.delete(&ana, &uri).await;
         assert_eq!(last.status, StatusCode::CONFLICT);
-        assert_eq!(last.json["detail"], "last_owner");
+        assert_eq!(last.json["code"], "last_owner");
         let member = kit.join(&ana, ws, "cid", "member").await;
         let bea_id = kit.user_id("bea").await;
         assert_eq!(
