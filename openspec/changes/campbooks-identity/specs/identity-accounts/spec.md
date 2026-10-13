@@ -42,12 +42,21 @@ provider tokens SHALL be revoked.
 Sign-in with a configured provider SHALL use the authorization code flow
 with a `state` bound to the browser, a `nonce`, and PKCE S256. It SHALL
 validate the provider's ID token signature against the provider's published
-keys, plus its issuer, audience, `azp`, expiry and nonce. For Microsoft the
-issuer SHALL equal the tenant-specific issuer of the token's own `tid`. For
+keys, plus its issuer, audience, `azp`, expiry and nonce. Microsoft sign-in
+SHALL accept personal, work and school accounts (the `common` endpoint), and
+the issuer SHALL equal the tenant-specific issuer of the token's own `tid`. For
 Zoho the accounts server SHALL be one of the known Zoho data-centre servers,
 and any other value SHALL be refused before any request is made. A
 known identity SHALL start a session for its account. An unknown identity
 SHALL lead to a new-account confirmation before any account is created.
+
+#### Scenario: Microsoft personal account
+- **WHEN** a person signs in with a personal Microsoft account
+- **THEN** the sign-in succeeds, the identity is keyed by the issuer of the consumer tenant, and its email is recorded as unverified unless Microsoft states the domain owner verified it
+
+#### Scenario: Issuer from another tenant
+- **WHEN** a Microsoft ID token's `iss` names a tenant other than its `tid`
+- **THEN** the sign-in fails with `code` = `login_failed`
 
 #### Scenario: Forged Zoho accounts server
 - **WHEN** a Zoho callback names an `accounts-server` that is not a Zoho data centre
@@ -60,7 +69,9 @@ SHALL lead to a new-account confirmation before any account is created.
 ### Requirement: The first mailbox comes with sign-up
 A sign-in round trip SHALL ask the provider, in the same consent, for the
 identity scopes, the mailbox scopes the instance's connectors can use for
-that provider, and offline access. When a new account is created from a
+that provider, and offline access. There SHALL be no separate second
+consent for mail, including while the provider shows its unverified-app
+warning. When a new account is created from a
 round trip that granted mailbox scopes and a refresh token, the grant SHALL
 be held sealed for that account for at most 7 days. When the person adopts
 it into a workspace, it SHALL be handed to the connectors through the grant
@@ -86,6 +97,10 @@ through the identity round trip, link the provider identity to the signed-in
 account (or refuse as above), and hand the grant to the connectors for the
 current workspace. Disconnecting a mailbox SHALL NOT remove the way in, and
 removing a way in SHALL NOT disconnect a mailbox.
+
+#### Scenario: Disconnecting keeps the sign-in
+- **WHEN** a person disconnects the Google mailbox they signed up with from their workspace
+- **THEN** they can still sign in with that Google account
 
 #### Scenario: Second mailbox becomes a way in
 - **WHEN** a signed-in person connects a Zoho mailbox to their workspace, signs out and signs in with that Zoho account

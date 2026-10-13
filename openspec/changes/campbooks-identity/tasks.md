@@ -58,7 +58,7 @@ group is one slice and one PR (see design → Slicing plan).
 
 - [ ] 6.1 `deploy/compose.yaml`: drop `idp`, `idp-init`, `idp-provision`, `idp-data`; server env simplified; `docker compose config -q`
 - [ ] 6.2 Delete `deploy/idp/`, `xtask/tests/idp_provision.rs`; settings rename `CAMPBOOKS_IDP_<P>_*` → `CAMPBOOKS_<P>__*` with a one-release fallback and warning
-- [ ] 6.3 `deploy/README.md`, `.env.example`, `docs/architecture.md`, `docs/domain-map.md`, `openspec/config.yaml` context line; withdraw `openspec/changes/upstream-sign-in`; resolve the Rauthy entries in `decisions-needed.md`; ADR 0014 → Accepted
+- [ ] 6.3 `deploy/README.md`, `.env.example`, `docs/architecture.md`, `docs/domain-map.md`, `openspec/config.yaml` context line; withdraw `openspec/changes/upstream-sign-in`; resolve the Rauthy entries in `decisions-needed.md`
 - [ ] 6.4 `workspaces` migration deleting users with no membership
 - [ ] 6.5 CHANGELOG (what self-hosters see), gates green, recording
 

@@ -44,6 +44,20 @@ What exists today on `next`:
 | Postgres storage | schema `identity` |
 | Zero-manual-step upgrades | migrations + keys generated at start; nothing to provision |
 
+## Owner decisions (2026-10-13)
+
+The design was approved with these answers, recorded here and in the spec
+deltas:
+
+1. **Microsoft accepts personal, work and school accounts** (`common`). The
+   issuer is checked against each token's own `tid`.
+2. **Disconnecting a mailbox keeps its sign-in.** Mailbox connections and
+   ways in are independent lifecycles.
+3. **Passkey-only accounts are allowed.**
+4. **Gmail stays in the sign-up consent.** The unverified-app warning is
+   accepted until Google's verification (campbooks-cloud#53) passes. There
+   is no fallback switch to a second consent.
+
 ## Data ownership
 
 Schema **`identity`**, owned by the new module and migrated by
@@ -465,7 +479,7 @@ Unicode-3.0, Zlib, CDLA-Permissive-2.0; OpenSSL banned):
   any request, which closes the SSRF and token-exfiltration route. Users of
   every data centre can sign in, unlike with Rauthy.
 - **Microsoft** uses the `common` endpoint: work, school and personal
-  accounts (owner question 1). The audience of young professionals and
+  accounts (owner decision, 2026-10-13). The audience of young professionals and
   small businesses includes outlook.com users.
 - **Providers whose adapter isn't built yet** (Microsoft, Zoho today):
   `GrantIntake::scopes` returns no mail scopes, so sign-in asks for identity
@@ -757,7 +771,8 @@ production.
   reopens if its OpenSSL dependency goes away.
 - **Google sign-up shows the unverified-app screen until #53**, and Google
   apps left in "Testing" issue refresh tokens that expire after 7 days; the
-  self-host docs must say to publish the app (owner question 4).
+  self-host docs must say to publish the app. The owner accepted the warning
+  (2026-10-13): one consent, no second-consent fallback switch.
 - **Accounts are created freely**, while the signup policy gates workspaces
   (as today). A stranger can create an account that can do nothing. It is
   rate-limited, and an account with no workspace and no sign-in for 30 days

@@ -1,6 +1,6 @@
 # 0014 — Campbooks owns identity: every owned mailbox is a way in, and Campbooks issues the tokens
 
-**Status:** Proposed · 2026-10-13 · supersedes [0004](0004-oauth-dedicated-idp-bff.md)
+**Status:** Accepted · 2026-10-13 · supersedes [0004](0004-oauth-dedicated-idp-bff.md)
 
 ## Context
 ADR 0004 put sign-in and token issuance in a dedicated identity provider,
@@ -89,6 +89,7 @@ The design, alternatives and slicing are in
 - Signing up with Google asks for a restricted Gmail scope in the same
   consent. Until the app passes Google's verification (#53), new users see
   Google's "unverified app" screen at sign-up, not only when connecting mail.
+  The owner accepted this: one consent, no fallback switch.
 - There is no Campbooks password. People sign in with a provider or a
   passkey; providers keep their own MFA, passkeys are phishing-resistant.
 - `workspaces.users.idp_subject` now holds a Campbooks account id; the
