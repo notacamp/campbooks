@@ -10,7 +10,8 @@ name: Release next
 #
 #   1. sees `next-vX.Y.Z` does not exist yet and the changelog section does
 #   2. builds + scans + attests the image as :next-vX.Y.Z and :next-vX.Y
-#      (image.yml, the same recipe as every push to next)
+#      (image.yml, the same recipe as every push to next), and the Laya model
+#      server image (ghcr.io/notacamp/campbooks-laya) under the same tags
 #   3. creates the tag and a GitHub PRERELEASE with the changelog as notes
 #
 # It never commits to `next`: the branch ruleset needs checks on every commit,
@@ -95,8 +96,25 @@ jobs:
       id-token: write
       attestations: write
 
+  laya-image:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ needs.plan.outputs.ref }}
+      image: campbooks-laya
+      context: deploy/laya
+      tags: |
+        ${{ needs.plan.outputs.tag }}
+        next-v${{ needs.plan.outputs.minor }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
   release:
-    needs: [plan, image]
+    needs: [plan, image, laya-image]
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -112,12 +130,15 @@ jobs:
           VERSION: ${{ needs.plan.outputs.version }}
           REF: ${{ needs.plan.outputs.ref }}
           DIGEST: ${{ needs.image.outputs.digest }}
+          LAYA_DIGEST: ${{ needs.laya-image.outputs.digest }}
           IMAGE: ghcr.io/${{ github.repository }}
         run: |
           {
             .github/scripts/release-notes.sh "$VERSION"
             printf '\n---\n\nImage: `%s:%s` (`%s@%s`), linux/amd64 + linux/arm64.\n' \
               "$IMAGE" "$TAG" "$IMAGE" "$DIGEST"
+            printf 'Laya model server (optional, the `decide` role): `%s-laya:%s` (`%s-laya@%s`).\n' \
+              "$IMAGE" "$TAG" "$IMAGE" "$LAYA_DIGEST"
             printf 'Verify: `gh attestation verify oci://%s:%s --repo %s`\n' \
               "$IMAGE" "$TAG" "$GITHUB_REPOSITORY"
           } > "$RUNNER_TEMP/notes.md"

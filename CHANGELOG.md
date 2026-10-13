@@ -14,6 +14,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- A ready-made image for the local `decide` model: `ghcr.io/notacamp/campbooks-laya`,
+  published for linux/amd64 and linux/arm64 with the same tags as the Campbooks image
+  and scanned the same way. `docker compose --profile ai` now pulls it instead of
+  building `deploy/laya` on your machine (the `build:` line is still there, commented,
+  if you prefer to build it). The model checkpoint still downloads into the
+  `laya-models` volume on first start. Pin it to the same tag as the server image.
 - Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
   asks a second time, for the mail, only when the account is new; signing
   in again never asks), and members can connect more Zoho logins; every
