@@ -22,7 +22,7 @@ import { pause, type ScenarioContext } from "../context.ts";
 // Fictional person and mail only; no token is ever shown.
 
 /** A caption pinned to the bottom of the page, so the video explains itself. */
-async function caption(page: Page, text: string, ms = 1600): Promise<void> {
+export async function caption(page: Page, text: string, ms = 1600): Promise<void> {
   // A script string: the recordings are type-checked without the DOM types.
   await page.evaluate(`(() => {
     const box = document.getElementById("recording-caption") ?? document.createElement("div");
@@ -43,7 +43,7 @@ async function caption(page: Page, text: string, ms = 1600): Promise<void> {
 }
 
 /** Call the API through the BFF from the page, as the app does. */
-async function api(page: Page, method: string, path: string): Promise<unknown> {
+export async function api(page: Page, method: string, path: string): Promise<unknown> {
   return page.evaluate(`fetch(${JSON.stringify(path)}, {
     method: ${JSON.stringify(method)},
     headers: { "x-campbooks-csrf": "1", "content-type": "application/json" },
@@ -95,7 +95,7 @@ function isPhone(page: Page): boolean {
  * Run `setUp` in a context of its own (not recorded) and hand its session
  * cookie to the recorded page, so the video starts in the inbox.
  */
-async function signedIn(page: Page): Promise<string> {
+export async function signedIn(page: Page): Promise<string> {
   const browser = page.context().browser();
   if (browser === null) {
     return setUp(page);

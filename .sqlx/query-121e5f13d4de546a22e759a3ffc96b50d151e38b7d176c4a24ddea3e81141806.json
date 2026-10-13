@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.outbound_changes\n               (id, workspace_id, stream_id, request_id, provider_message_id, kind, add_labels)\n           VALUES ($1, $2, $3, $4, $5, 'unarchive', '{INBOX}')",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "121e5f13d4de546a22e759a3ffc96b50d151e38b7d176c4a24ddea3e81141806"
+}

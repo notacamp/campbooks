@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.id AS \"stream: StreamId\", s.connection_id AS \"connection: ConnectionId\",\n                      c.provider, s.paused, c.health\n                 FROM connectors.streams s\n                 JOIN connectors.connections c ON c.id = s.connection_id\n                WHERE s.inbox_id = $1 AND s.capability = 'messages'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "connection: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "connection_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "provider",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "health",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "f3d0dd5c348ba2d0127af4db15982d715c9d517a98955786389b05dc98fa5ca4"
+}

@@ -121,6 +121,9 @@ pub struct HistoryPage {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryRecord {
+    /// Its history id (Gmail's order of writes).
+    #[serde(default)]
+    pub id: String,
     /// Messages added.
     #[serde(default)]
     pub messages_added: Vec<HistoryMessage>,
@@ -137,9 +140,13 @@ pub struct HistoryRecord {
 
 /// The message a history record is about.
 #[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct HistoryMessage {
     /// The message.
     pub message: MessageRef,
+    /// The labels added or removed (label records only).
+    #[serde(default)]
+    pub label_ids: Vec<String>,
 }
 
 impl<'a> Gmail<'a> {
@@ -178,6 +185,54 @@ impl<'a> Gmail<'a> {
             .await
             .map_err(transport)?;
         json(response).await
+    }
+
+    async fn post(
+        &self,
+        path: &str,
+        body: &serde_json::Value,
+    ) -> Result<reqwest::Response, GoogleError> {
+        let response = self
+            .http
+            .post(self.url(path)?)
+            .bearer_auth(self.token)
+            .json(body)
+            .send()
+            .await
+            .map_err(transport)?;
+        if response.status().is_success() {
+            Ok(response)
+        } else {
+            Err(failure(response).await)
+        }
+    }
+
+    /// `users.messages.modify`: put `add` on message `id` and take `remove`
+    /// off. Returns its labels afterwards.
+    pub async fn modify(
+        &self,
+        id: &str,
+        add: &[String],
+        remove: &[String],
+    ) -> Result<MessageMeta, GoogleError> {
+        let body = serde_json::json!({"addLabelIds": add, "removeLabelIds": remove});
+        let response = self
+            .post(&format!("users/me/messages/{id}/modify"), &body)
+            .await?;
+        json(response).await
+    }
+
+    /// `users.messages.batchModify`: the same change for up to 1,000
+    /// messages. Gmail answers nothing per message.
+    pub async fn batch_modify(
+        &self,
+        ids: &[String],
+        add: &[String],
+        remove: &[String],
+    ) -> Result<(), GoogleError> {
+        let body = serde_json::json!({"ids": ids, "addLabelIds": add, "removeLabelIds": remove});
+        self.post("users/me/messages/batchModify", &body).await?;
+        Ok(())
     }
 
     /// `users.getProfile`.

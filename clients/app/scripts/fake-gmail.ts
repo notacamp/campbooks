@@ -1,6 +1,7 @@
 // The Gmail API of the fake Google (scripts/fake-google.ts): a demo mailbox
 // per fake Google account, served as the connectors module's Gmail adapter
-// reads it (users.me only: profile, labels, messages list/get, history).
+// reads it (users.me only: profile, labels, messages list/get, history) and
+// writes to it (messages modify and batchModify, recorded in history).
 // Development and recordings only. Every person, company and address here is
 // fictional; domains are `.example`.
 import { randomBytes } from "node:crypto";
@@ -17,10 +18,18 @@ interface StoredMessage {
   raw: string;
 }
 
+/** A message as history records name it. */
+interface HistoryMessage {
+  message: { id: string; threadId: string; labelIds: string[] };
+  labelIds?: string[];
+}
+
 /** One history record (`users.history.list`). */
 interface HistoryRecord {
   id: number;
-  messagesAdded?: { message: { id: string; threadId: string; labelIds: string[] } }[];
+  messagesAdded?: HistoryMessage[];
+  labelsAdded?: HistoryMessage[];
+  labelsRemoved?: HistoryMessage[];
 }
 
 export interface Mailbox {
@@ -370,6 +379,83 @@ const meta = (message: StoredMessage) => ({
   labelIds: message.labelIds,
   internalDate: String(message.internalDate),
 });
+
+/** Change a message's labels as Gmail does: only real changes reach history. */
+function modifyLabels(mailbox: Mailbox, message: StoredMessage, add: string[], remove: string[]) {
+  const added = add.filter((label) => !message.labelIds.includes(label));
+  const removed = remove.filter(
+    (label) => message.labelIds.includes(label) && !add.includes(label),
+  );
+  if (added.length === 0 && removed.length === 0) {
+    return;
+  }
+  message.labelIds = [...message.labelIds, ...added].filter((label) => !removed.includes(label));
+  const ref = { id: message.id, threadId: message.threadId, labelIds: message.labelIds };
+  mailbox.historyId += 1;
+  mailbox.history.push({
+    id: mailbox.historyId,
+    ...(added.length > 0 ? { labelsAdded: [{ message: ref, labelIds: added }] } : {}),
+    ...(removed.length > 0 ? { labelsRemoved: [{ message: ref, labelIds: removed }] } : {}),
+  });
+  console.log(`fake Gmail: ${message.id} +[${added.join(",")}] -[${removed.join(",")}]`);
+}
+
+const strings = (value: unknown): string[] =>
+  Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+
+/**
+ * Answer a Gmail write (`POST …/messages/{id}/modify`, `…/messages/batchModify`)
+ * for `mailbox`. Returns false when the path is not one this fake serves.
+ */
+export async function writeGmail(
+  request: IncomingMessage,
+  url: URL,
+  response: ServerResponse,
+  mailbox: Mailbox,
+): Promise<boolean> {
+  const path = url.pathname.replace(/^\/gmail\/v1\/users\/me\//u, "");
+  if (request.method !== "POST") {
+    return false;
+  }
+  let text = "";
+  for await (const chunk of request) text += String(chunk);
+  const body = (text === "" ? {} : JSON.parse(text)) as Record<string, unknown>;
+  const add = strings(body["addLabelIds"]);
+  const remove = strings(body["removeLabelIds"]);
+  if (path === "messages/batchModify") {
+    for (const id of strings(body["ids"])) {
+      const message = mailbox.messages.find((candidate) => candidate.id === id);
+      if (message !== undefined) {
+        modifyLabels(mailbox, message, add, remove);
+      }
+    }
+    response.writeHead(204);
+    response.end();
+    return true;
+  }
+  const id = /^messages\/(\w+)\/modify$/u.exec(path)?.[1];
+  if (id === undefined) {
+    return false;
+  }
+  const message = mailbox.messages.find((candidate) => candidate.id === id);
+  if (message === undefined) {
+    json(response, 404, { error: { code: 404, message: "Not Found" } });
+    return true;
+  }
+  modifyLabels(mailbox, message, add, remove);
+  json(response, 200, meta(message));
+  return true;
+}
+
+/** What `mailbox` holds, newest first: each message's subject and labels. */
+export function describeMailbox(mailbox: Mailbox): { subject: string; labels: string[] }[] {
+  return mailbox.messages
+    .toSorted((a, b) => b.internalDate - a.internalDate)
+    .map((message) => ({
+      subject: /^Subject: (.*)$/mu.exec(message.raw)?.[1]?.trim() ?? "",
+      labels: message.labelIds.toSorted(),
+    }));
+}
 
 /**
  * Answer a Gmail API request (`/gmail/v1/users/me/…`) for `mailbox`.

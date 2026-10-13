@@ -15,6 +15,7 @@
 pub mod compose;
 pub mod normalize;
 mod read;
+pub mod write;
 
 use campbooks_kernel::blobs::BlobRef;
 use chrono::{DateTime, Utc};

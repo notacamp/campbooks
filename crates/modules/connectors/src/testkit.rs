@@ -548,6 +548,12 @@ struct Mailbox {
     /// What goes wrong with the next send.
     send_fault: Option<SendFault>,
     calls: Vec<String>,
+    /// Messages whose labels Gmail refuses to change (400).
+    refusing: Vec<String>,
+    /// The next this many Gmail calls answer 503.
+    unavailable_next: u32,
+    /// The next this many `getProfile` calls answer 503.
+    profile_unavailable_next: u32,
 }
 
 /// What goes wrong with a send.
@@ -700,6 +706,43 @@ impl FakeGoogle {
         self.lock().rate_limit_next = Some(seconds);
     }
 
+    /// The next `calls` Gmail calls answer 503.
+    pub fn unavailable_next(&self, calls: u32) {
+        self.lock().unavailable_next = calls;
+    }
+
+    /// The next `getProfile` answers 503.
+    pub fn profile_unavailable_next(&self) {
+        self.lock().profile_unavailable_next = 1;
+    }
+
+    /// Gmail refuses every change to message `id` (400).
+    pub fn refuse_changes(&self, id: &str) {
+        self.lock().refusing.push(id.to_owned());
+    }
+
+    /// The labels of message `id` at Gmail now, sorted.
+    pub fn labels_of(&self, id: &str) -> Vec<String> {
+        let mut labels = self.lock().messages[id].labels.clone();
+        labels.sort();
+        labels
+    }
+
+    /// Forget the calls seen so far.
+    pub fn clear_calls(&self) {
+        self.lock().calls.clear();
+    }
+
+    /// The Gmail write calls seen (`modify`, `batchModify`), in order.
+    pub fn writes(&self) -> Vec<String> {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| c.starts_with("POST /gmail/"))
+            .cloned()
+            .collect()
+    }
+
     /// The next Gmail call answers 401.
     pub fn unauthorized_next(&self) {
         self.lock().unauthorized_next = true;
@@ -725,11 +768,6 @@ impl FakeGoogle {
     /// Calls seen, as `METHOD path?format` (no tokens).
     pub fn calls(&self) -> Vec<String> {
         self.lock().calls.clone()
-    }
-
-    /// Forget the calls seen so far.
-    pub fn clear_calls(&self) {
-        self.lock().calls.clear();
     }
 
     /// The next send answers `status` and sends nothing.
@@ -818,7 +856,7 @@ impl Respond for Responder {
                 }
                 send(&mut mailbox, request)
             }
-            ("GET", gmail) if gmail.starts_with("/gmail/v1/users/me/") => {
+            (method @ ("GET" | "POST"), gmail) if gmail.starts_with("/gmail/v1/users/me/") => {
                 if let Some(seconds) = mailbox.rate_limit_next.take() {
                     return json(
                         429,
@@ -830,7 +868,21 @@ impl Respond for Responder {
                 {
                     return json(401, &serde_json::json!({"error": {"code": 401}}));
                 }
-                gmail_api(&mailbox, &gmail["/gmail/v1/users/me/".len()..], &query)
+                if gmail.ends_with("/profile") && mailbox.profile_unavailable_next > 0 {
+                    mailbox.profile_unavailable_next -= 1;
+                    return json(503, &serde_json::json!({"error": {"code": 503}}));
+                }
+                if mailbox.unavailable_next > 0 {
+                    mailbox.unavailable_next -= 1;
+                    return json(503, &serde_json::json!({"error": {"code": 503}}));
+                }
+                let path = &gmail["/gmail/v1/users/me/".len()..];
+                if method == "POST" {
+                    let body: serde_json::Value =
+                        serde_json::from_slice(&request.body).unwrap_or_default();
+                    return gmail_write(&mut mailbox, path, &body);
+                }
+                gmail_api(&mailbox, path, &query)
             }
             _ => ResponseTemplate::new(404),
         }
@@ -1035,6 +1087,93 @@ fn gmail_api(mailbox: &Mailbox, path: &str, query: &HashMap<String, String>) -> 
         }
         _ => ResponseTemplate::new(404),
     }
+}
+
+/// The strings of `value[key]`.
+fn strings(value: &serde_json::Value, key: &str) -> Vec<String> {
+    value[key]
+        .as_array()
+        .map(|list| {
+            list.iter()
+                .filter_map(|v| v.as_str().map(ToOwned::to_owned))
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// Change message `id`'s labels as Gmail does: only real changes are
+/// recorded in history.
+fn modify_labels(mailbox: &mut Mailbox, id: &str, add: &[String], remove: &[String]) {
+    let Some(message) = mailbox.messages.get_mut(id) else {
+        return;
+    };
+    let added: Vec<String> = add
+        .iter()
+        .filter(|l| !message.labels.contains(l))
+        .cloned()
+        .collect();
+    let removed: Vec<String> = remove
+        .iter()
+        .filter(|l| message.labels.contains(l) && !add.contains(l))
+        .cloned()
+        .collect();
+    message.labels.extend(added.iter().cloned());
+    message.labels.retain(|l| !removed.contains(l));
+    let message = message.clone();
+    let mut record = serde_json::Map::new();
+    if !added.is_empty() {
+        record.insert(
+            "labelsAdded".into(),
+            serde_json::json!([{"message": minimal(&message), "labelIds": added}]),
+        );
+    }
+    if !removed.is_empty() {
+        record.insert(
+            "labelsRemoved".into(),
+            serde_json::json!([{"message": minimal(&message), "labelIds": removed}]),
+        );
+    }
+    if !record.is_empty() {
+        push_history(mailbox, serde_json::Value::Object(record));
+    }
+}
+
+fn gmail_write(mailbox: &mut Mailbox, path: &str, body: &serde_json::Value) -> ResponseTemplate {
+    let refused = || {
+        json(
+            400,
+            &serde_json::json!({"error": {"code": 400, "errors": [{"reason": "failedPrecondition"}]}}),
+        )
+    };
+    let add = strings(body, "addLabelIds");
+    let remove = strings(body, "removeLabelIds");
+    if path == "messages/batchModify" {
+        let ids = strings(body, "ids");
+        if ids
+            .iter()
+            .any(|id| !mailbox.messages.contains_key(id) || mailbox.refusing.contains(id))
+        {
+            return refused();
+        }
+        for id in &ids {
+            modify_labels(mailbox, id, &add, &remove);
+        }
+        return ResponseTemplate::new(204);
+    }
+    let Some(id) = path
+        .strip_prefix("messages/")
+        .and_then(|rest| rest.strip_suffix("/modify"))
+    else {
+        return ResponseTemplate::new(404);
+    };
+    if !mailbox.messages.contains_key(id) {
+        return json(404, &serde_json::json!({"error": {"code": 404}}));
+    }
+    if mailbox.refusing.iter().any(|r| r == id) {
+        return refused();
+    }
+    modify_labels(mailbox, id, &add, &remove);
+    json(200, &minimal(&mailbox.messages[id]))
 }
 
 /// A fictional message number `n` from `example.com`.

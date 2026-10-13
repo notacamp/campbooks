@@ -18,7 +18,10 @@ use super::{
 };
 use crate::{
     contract::{Attachment, MessageChange, NormalizedMessage},
-    domain::model::{Phase, StreamId},
+    domain::{
+        model::{Phase, StreamId},
+        outbound,
+    },
     google::{Gmail, GoogleError, LabelInfo, MessageMeta, MessageRaw, RawFetch},
 };
 
@@ -37,6 +40,9 @@ pub enum ReadError {
     /// Stored data did not decode.
     #[error("{0}")]
     Corrupt(String),
+    /// A query of the module failed.
+    #[error(transparent)]
+    Kernel(#[from] campbooks_kernel::Error),
 }
 
 /// Everything a run needs to read one page.
@@ -262,7 +268,10 @@ impl Reader<'_> {
     /// the caller keeps its cursor, so the next run picks up the rest (what
     /// was stored is in the index by then and is not fetched again).
     /// Messages over the size limit are skipped and recorded as oversized.
-    async fn run(&self, work: Work, generation: i32) -> Result<Page, ReadError> {
+    async fn run(&self, mut work: Work, generation: i32) -> Result<Page, ReadError> {
+        let forced = self.reemits(&mut work).await?;
+        let rechecked: Vec<String> = work.recheck.iter().map(|(id, _)| id.clone()).collect();
+        let overlay = outbound::overlay(self.pool, self.workspace, self.stream, &rechecked).await?;
         let mut names = self.label_names().await?;
         let mut fresh_labels = None;
         let mut changes = Vec::new();
@@ -315,12 +324,15 @@ impl Reader<'_> {
             labels.sort_unstable();
             let mut before = known.label_ids.clone();
             before.sort_unstable();
-            if labels != before {
+            if labels != before || forced.contains(&id) {
                 let mut message = self.document(&known.document).await?;
-                apply_flags(
-                    &mut message,
-                    &normalize::flags(&meta.label_ids, &names.user),
+                // A member's change still waiting to be made shows as
+                // they left it.
+                let shown = overlay.get(&id).map_or_else(
+                    || meta.label_ids.clone(),
+                    |changes| outbound::apply_labels(&meta.label_ids, changes),
                 );
+                apply_flags(&mut message, &normalize::flags(&shown, &names.user));
                 changes.push(MessageChange::Upsert {
                     message: Box::new(message),
                 });
@@ -445,6 +457,36 @@ impl Reader<'_> {
             .map_err(|e| ReadError::Corrupt(format!("a stored message document: {e}")))
     }
 
+    /// Add the messages flagged for re-emitting (a member's change to them
+    /// was overtaken or refused) to `work`'s re-checks; returns them.
+    async fn reemits(&self, work: &mut Work) -> Result<HashSet<String>, ReadError> {
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows = sqlx::query!(
+            r#"SELECT id, provider_message_id, label_ids, document_hash, document_size
+                 FROM connectors.gmail_messages
+                WHERE stream_id = $1 AND reemit
+                ORDER BY internal_date LIMIT $2"#,
+            self.stream as StreamId,
+            i64::try_from(MAX_CHANGED).unwrap_or(100),
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        let mut forced = HashSet::new();
+        for row in rows {
+            let id = row.provider_message_id;
+            let listed = work.recheck.iter().any(|(r, _)| *r == id)
+                || work.removed.iter().any(|(r, _)| *r == id);
+            if !listed {
+                let indexed =
+                    indexed_row(row.id, row.label_ids, &row.document_hash, row.document_size)?;
+                work.recheck.push((id.clone(), indexed));
+            }
+            forced.insert(id);
+        }
+        Ok(forced)
+    }
+
     /// Which of `ids` were skipped as oversized before.
     async fn oversized(&self, ids: &[String]) -> Result<HashSet<String>, ReadError> {
         if ids.is_empty() {
@@ -481,22 +523,9 @@ impl Reader<'_> {
         tx.commit().await?;
         rows.into_iter()
             .map(|row| {
-                let hash = row
-                    .document_hash
-                    .parse()
-                    .map_err(|_| ReadError::Corrupt("an index row's document hash".into()))?;
-                Ok((
-                    row.provider_message_id,
-                    Indexed {
-                        row: row.id,
-                        label_ids: row.label_ids,
-                        document: BlobRef {
-                            hash,
-                            size: u64::try_from(row.document_size).unwrap_or(0),
-                            content_type: "application/json".to_owned(),
-                        },
-                    },
-                ))
+                let indexed =
+                    indexed_row(row.id, row.label_ids, &row.document_hash, row.document_size)?;
+                Ok((row.provider_message_id, indexed))
             })
             .collect()
     }
@@ -558,6 +587,27 @@ impl Reader<'_> {
         }
         Ok(names)
     }
+}
+
+/// An index row, decoded.
+fn indexed_row(
+    row: Uuid,
+    label_ids: Vec<String>,
+    document_hash: &str,
+    document_size: i64,
+) -> Result<Indexed, ReadError> {
+    let hash = document_hash
+        .parse()
+        .map_err(|_| ReadError::Corrupt("an index row's document hash".into()))?;
+    Ok(Indexed {
+        row,
+        label_ids,
+        document: BlobRef {
+            hash,
+            size: u64::try_from(document_size).unwrap_or(0),
+            content_type: "application/json".to_owned(),
+        },
+    })
 }
 
 /// What a run has to fetch.

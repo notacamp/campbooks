@@ -74,7 +74,8 @@ pub async fn apply_index(
             } => {
                 sqlx::query!(
                     r#"UPDATE connectors.gmail_messages
-                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3)
+                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3),
+                              reemit = false
                         WHERE id = $1"#,
                     row,
                     &label_ids,

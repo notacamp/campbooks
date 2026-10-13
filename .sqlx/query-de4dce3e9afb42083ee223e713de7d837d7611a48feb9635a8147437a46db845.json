@@ -1,0 +1,89 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_message_id, add_labels, remove_labels,\n                  applied_from AS \"from!\", applied_to, done_at\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND state = 'applied' AND applied_from IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "add_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "add_labels"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "remove_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "remove_labels"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "from!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_from"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "applied_to",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_to"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "done_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "done_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "de4dce3e9afb42083ee223e713de7d837d7611a48feb9635a8147437a46db845"
+}

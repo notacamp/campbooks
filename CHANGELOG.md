@@ -19,6 +19,22 @@ All notable changes to Campbooks Next are documented here. The format follows
   or `manager` role on the inbox and the new `conversations:send` scope,
   which the web app asks for by itself; mailboxes already connected need no
   new consent.
+- What you do to mail in Campbooks now happens in Gmail too: marking read or
+  unread, starring, archiving and moving back to the inbox, adding or
+  removing a Gmail label, and moving a conversation to Primary, Updates or
+  Newsletters (Gmail's Primary, Updates and Promotions tabs). Changes reach
+  Gmail on the mailbox's next sync, normally within a second, and never come
+  back as new changes. If the same thing was changed in Gmail after you
+  changed it in Campbooks, the later change wins and Campbooks shows it.
+  Throttling and outages are retried with backoff within the shared Google
+  quota; a change Gmail refuses is recorded (without any message content)
+  and Campbooks shows the message as Gmail has it. A change that could not
+  reach Gmail within 7 days (a long pause, a reconnect) is dropped rather
+  than made late, mail in Gmail's trash or spam is never brought back to the
+  inbox, and only read, star, inbox, category and your own labels are ever
+  touched. Labels you create in
+  Campbooks and the Receipts stream stay in Campbooks for now. New table
+  `connectors.outbound_changes` (migration applied on start).
 - The inbox: the four streams (Primary, Updates, Receipts, Newsletters) under
   Inbox with their unread counts, each stream's conversations newest first,
   and a reader with the thread (older messages folded, attachments listed).
