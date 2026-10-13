@@ -59,7 +59,7 @@ pub const ZOHO_ACCOUNTS_SERVERS: [&str; 8] = [
 ];
 
 fn parse(url: &str) -> Url {
-    Url::parse(url).unwrap_or_else(|e| unreachable!("{url}: {e}"))
+    Url::parse(url).unwrap_or_else(|e| unreachable!("a built-in URL does not parse: {e}"))
 }
 
 /// Where codes are redeemed and whose ID tokens are accepted.
