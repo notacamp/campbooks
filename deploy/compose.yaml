@@ -98,7 +98,8 @@ services:
   # Rauthy (ADR 0004). Three services, no manual steps:
   #   idp-init       one-shot: generates secrets on first boot, writes config
   #   idp            the IdP itself; issuer = ${CAMPBOOKS_IDP_URL}/auth/v1/
-  #   idp-provision  one-shot: registers Campbooks' scopes and clients
+  #   idp-provision  one-shot: registers Campbooks' scopes and clients, and the
+  #                  sign-in providers (Google, Microsoft, Zoho) you configure
   # Admin UI: ${CAMPBOOKS_IDP_URL}/auth/v1/admin — see README.md for first login.
   idp-init:
     image: busybox:1.37.0-musl
@@ -147,11 +148,27 @@ services:
       # Where Rauthy delivers back-channel logouts; empty means the public URL
       # (https only: Rauthy refuses plain http). See README.md.
       CAMPBOOKS_BACKCHANNEL_LOGOUT_URL: ${CAMPBOOKS_BACKCHANNEL_LOGOUT_URL:-}
+      # Sign in with Google, Microsoft or Zoho: a provider is registered when
+      # its client ID is set; its secret is the file secrets/<provider>-client-secret.
+      # See README.md -> "Sign in with Google, Microsoft or Zoho".
+      CAMPBOOKS_IDP_URL: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}
+      CAMPBOOKS_SIGNUP__POLICY: ${CAMPBOOKS_SIGNUP__POLICY:-open}
+      CAMPBOOKS_IDP_PROVIDER_SIGNUP: ${CAMPBOOKS_IDP_PROVIDER_SIGNUP:-auto}
+      CAMPBOOKS_IDP_GOOGLE_CLIENT_ID: ${CAMPBOOKS_IDP_GOOGLE_CLIENT_ID:-}
+      CAMPBOOKS_IDP_GOOGLE_CLIENT_SECRET_FILE: /run/secrets/campbooks/google-client-secret
+      CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID: ${CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID:-}
+      CAMPBOOKS_IDP_MICROSOFT_CLIENT_SECRET_FILE: /run/secrets/campbooks/microsoft-client-secret
+      CAMPBOOKS_IDP_MICROSOFT_TENANT: ${CAMPBOOKS_IDP_MICROSOFT_TENANT:-common}
+      CAMPBOOKS_IDP_ZOHO_CLIENT_ID: ${CAMPBOOKS_IDP_ZOHO_CLIENT_ID:-}
+      CAMPBOOKS_IDP_ZOHO_CLIENT_SECRET_FILE: /run/secrets/campbooks/zoho-client-secret
+      CAMPBOOKS_IDP_ZOHO_ISSUER: ${CAMPBOOKS_IDP_ZOHO_ISSUER:-https://accounts.zoho.eu}
     volumes:
       - ./idp:/idp:ro
       - idp-data:/app/data
       # Writes the web client's secret here for the server.
       - server-secrets:/secrets
+      # The sign-in providers' client secrets (files readable by uid 10001).
+      - ./secrets:/run/secrets/campbooks:ro
     depends_on:
       idp:
         condition: service_healthy

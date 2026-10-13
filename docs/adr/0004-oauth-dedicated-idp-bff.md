@@ -62,7 +62,7 @@ upstream docs or source at the pinned tag.
 | API-driven client registration | ✅ admin API with a scoped API key (create, configure, read secret); RFC 7591 DCR available but off | ran | ✅ admin API + DCR |
 | Per-client custom claims | ✅ `claims` on a client land in its client_credentials tokens (e.g. `workspace_id`) | ran | ⚠️ via token hook |
 | Themable login + passkeys | ✅ passkey registration over `http://localhost` and admin login with it; per-client logo/favicon/colours — ⚠️ UI languages: en, de, fr, ko, nb, nl, ru, uk, zh (no pt, es) | ran (passkey), docs (themes) | ❌ headless: we build login/consent, passkeys need Ory Kratos + its UI |
-| Social upstream (Google / Microsoft) | ⚠️ Google is a built-in provider type, Microsoft only as generic OIDC; upstream login is labelled beta; not exercised (needs real credentials) | docs/source | ❌ needs Kratos |
+| Social upstream (Google / Microsoft) | ⚠️ Google is a built-in provider type, Microsoft (and Zoho) only as generic OIDC; upstream login is labelled beta; not exercised (needs real credentials); one provider per account (see Findings) | docs/source | ❌ needs Kratos |
 | Postgres storage | ✅ supported (`HIQLITE=false` + `PG_*`), one-shot migration between the two (`MIGRATE_DB_FROM`); we use the embedded DB | docs | ✅ (Postgres, MySQL, CockroachDB) |
 | arm64 + amd64 image | ✅ multi-arch index, distroless, non-root | ran (`imagetools inspect`) | ✅ |
 | Zero-manual-step upgrades | ✅ migrations run on start; 0.36.2 → 0.37.1 on the same volume needed nothing — ⚠️ 0.x minors rename config keys, so every bump is a reviewed PR here, not a self-hoster task | ran | ⚠️ `hydra migrate sql` must run before each start (init container) |
@@ -104,6 +104,15 @@ the embedded database. Switching later is a supported one-shot migration
   pinned 0.36.2 only the port-less URI and the custom scheme match (0.36
   applies RFC 8252 to dynamic clients only, and 0.37 rejects the `:*`
   wildcard 0.36 needed). Bump to ≥ 0.37.1 before the Tauri sign-in lands.
+- **Upstream sign-in (Google, Microsoft, Zoho; #71):** registered by
+  `idp-provision` from settings through the admin API (`AuthProviders` group).
+  Redirect URI `${CAMPBOOKS_IDP_URL}/auth/v1/providers/callback`. An account
+  links to **one** upstream provider at most; `auto_link` (linking an existing
+  account by email) ignores `email_verified`, so it stays off and linking is
+  explicit from the account page; `auto_onboarding` follows the signup policy.
+  Microsoft sends no `email_verified`, so its accounts start unverified. The
+  API and fields are unchanged in 0.37.x. See
+  `openspec/changes/upstream-sign-in/design.md`.
 - **Client secrets:** `idp-provision` stores the `campbooks-web` secret in the
   `idp-data` volume (`campbooks/campbooks-web.client-secret`); the server will
   mount it read-only. M2M clients must authenticate with
