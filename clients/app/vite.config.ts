@@ -31,6 +31,11 @@ export default defineConfig({
       "/bff": {
         target: process.env["CAMPBOOKS_API_URL"] ?? "http://localhost:8080",
       },
+      // The server's own identity provider (ADR 0014), when it runs in-process:
+      // its issuer is CAMPBOOKS_PUBLIC_URL, so its endpoints live here too.
+      "^/(oauth2|auth|\\.well-known)/": {
+        target: process.env["CAMPBOOKS_API_URL"] ?? "http://localhost:8080",
+      },
     },
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],

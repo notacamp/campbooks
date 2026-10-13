@@ -51,7 +51,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
 
     // Create: signed in, and the code goes back to the web client.
     let created = kit.create_account().await;
-    assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+    assert_eq!(created.status, StatusCode::CREATED, "creating the account");
     let back = query(created.json["redirect"].as_str().unwrap());
     assert_eq!(back["state"], "client-state");
     assert_eq!(back["iss"], ORIGIN);

@@ -377,7 +377,7 @@ impl Kit {
         let to_new = self.round_trip(Some(&request)).await;
         assert!(to_new.location().starts_with("/sign-in/new"), "{to_new:?}");
         let created = self.create_account().await;
-        assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+        assert_eq!(created.status, StatusCode::CREATED, "creating the account");
         let redirect = created.json["redirect"]
             .as_str()
             .unwrap_or_default()
