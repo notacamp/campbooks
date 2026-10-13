@@ -12,6 +12,7 @@ publish.workspace = true
 campbooks-kernel.workspace = true
 figment.workspace = true
 opentelemetry.workspace = true
+regex.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true

@@ -334,6 +334,19 @@ type, option count) temperature, from config today and refitted from user
 corrections later. A module acts on an answer only through
 `answer.accept_if(threshold)` and asks the user below it.
 
+The model is one **strategy** among several behind
+`campbooks_ai::decide::strategy::Strategy`, which all return the same
+`Answer` plus the reasons for it (for the UI's "Why?"): deterministic email
+signals (`decide::signals::email`, the single home of the triage rules: bulk
+headers, senders, attachments, cue phrases in en/pt-PT/es-ES/fr), k nearest
+neighbours over the workspace's own corrections (`decide::knn`, on the
+`embed` role or a model-free lexical embedder), the `decide` model, and a
+`Cascade` of them that asks each later stage only the questions still open.
+Which strategy answers which question, and from which confidence, is measured
+by `cargo xtask eval decide` on a fictional labelled set
+(`crates/ai/evals/decide/mail-triage/`); CI checks that the offline strategies
+hold the committed baseline.
+
 ## Clients
 
 One React/TypeScript UI, three delivery targets (ADR 0003):

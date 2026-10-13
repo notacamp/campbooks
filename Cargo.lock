@@ -343,6 +343,7 @@ dependencies = [
  "figment",
  "opentelemetry",
  "opentelemetry_sdk",
+ "regex",
  "reqwest",
  "secrecy",
  "serde",
@@ -3758,15 +3759,19 @@ name = "xtask"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "campbooks-ai",
  "campbooks-kernel",
  "campbooks-server",
  "cargo_metadata",
  "chrono",
  "clap",
  "regex",
+ "secrecy",
  "serde",
  "serde_json",
+ "tokio",
  "toml",
+ "url",
 ]
 
 [[package]]
