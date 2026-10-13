@@ -37,19 +37,61 @@
    until you add the scopes to them in the IdP admin UI (or re-provision them,
    see "Identity provider").
 10. Workspace isolation: every workspace's rows are guarded by Postgres
-   row-level security as well as by the queries. The server connects with the
-   database user from `CAMPBOOKS_DATABASE_URL`, runs migrations as that user,
-   and then switches each connection to the role `campbooks_app`, which the
-   migrations create (superusers would skip the policies). Nothing to do with
-   the bundled Postgres. On a managed Postgres where your user cannot create
-   roles, ask the administrator once for
-   `CREATE ROLE campbooks_app NOLOGIN; GRANT campbooks_app TO <your user>;`.
-   The server warns at startup if the role it queries as bypasses row-level
-   security.
+   row-level security as well as by the queries. The server queries as a
+   dedicated login that cannot bypass the policies, and refuses to start if
+   it could. With the bundled Postgres this is automatic; see "Database
+   logins" below for your own Postgres.
 
 CPU inference works but is slow for `complete`. Use a GPU host or a hosted provider
 serving open-weight models for it (set its URL in `.env`). `decide` (Laya) and `embed`
 run fine on CPU.
+
+## Database logins
+
+Postgres skips row-level security for superusers and `BYPASSRLS` roles, and
+a query that can `RESET ROLE` can climb back to the login's own power. So the
+server uses two logins:
+
+| Login | Setting | Used for | Must be |
+|---|---|---|---|
+| runtime | `CAMPBOOKS_DATABASE_URL` (+ optional `CAMPBOOKS_DATABASE_PASSWORD_FILE`) | every request and job | `LOGIN`, not superuser, no `BYPASSRLS`, owns nothing, member of `campbooks_app` |
+| migration | `CAMPBOOKS_DATABASE_MIGRATION_URL` | applying migrations on startup, nothing else | the schema owner (or a superuser) |
+
+**Bundled Postgres (compose).** Nothing to do. The one-shot `db-init` service
+creates the `campbooks_runtime` login on every `up` (idempotent; it also
+upgrades an existing installation), generates its password once into the
+`db-secrets` volume and the server reads it from `/run/db/runtime-password`.
+The owner login stays `campbooks` / `POSTGRES_PASSWORD`, used for migrations
+only. To rotate the runtime password, delete the file in the volume
+(`docker compose run --rm --entrypoint rm db-init /run/db/runtime-password`)
+and `docker compose up -d`.
+
+**Your own or a managed Postgres.** Create the login once, as an administrator
+(the migrations then grant `campbooks_app` what each table needs):
+
+```sql
+CREATE ROLE campbooks_app NOLOGIN;            -- skip if it exists
+CREATE ROLE campbooks_runtime LOGIN PASSWORD '...' NOSUPERUSER NOBYPASSRLS
+  NOCREATEDB NOCREATEROLE;
+GRANT campbooks_app TO campbooks_runtime;
+-- Allow the migration user to run the first migration's grants:
+GRANT campbooks_app TO <migration user>;      -- skip for a superuser
+```
+
+Then set `CAMPBOOKS_DATABASE_URL=postgres://campbooks_runtime:<password>@host/db`
+(or omit the password and point `CAMPBOOKS_DATABASE_PASSWORD_FILE` at a file
+holding it) and `CAMPBOOKS_DATABASE_MIGRATION_URL` to the owner's URL. On
+managed services the "owner" is the user that created the database; do not
+reuse it as the runtime login.
+
+**Startup checks.** The server refuses to start (and says why) when the role
+it queries as is a superuser, has `BYPASSRLS`, is a member of such a role, or
+owns tables with row-level security; and, when a migration login is
+configured, when the runtime login could still switch to a privileged role.
+Only the old single-URL setup (a privileged login that `SET ROLE campbooks_app`)
+keeps working, with a warning to split the logins. If you cannot yet, set
+`CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to start anyway; workspace
+isolation then rests on the queries alone.
 
 ## Local AI
 
