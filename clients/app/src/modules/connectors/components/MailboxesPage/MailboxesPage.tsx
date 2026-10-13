@@ -542,7 +542,7 @@ function ConnectSection({
             {providers.map((provider, index) => (
               <Button
                 key={provider}
-                variant={index === 0 ? "primary" : "secondary"}
+                variant="secondary"
                 icon="plus"
                 disabled={consent.starting}
                 shortcut={index === 0 ? "mailboxes.connect" : undefined}
