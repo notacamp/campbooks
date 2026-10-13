@@ -8,7 +8,8 @@
     "choice1": "Iniciar sessão com a primeira opção",
     "choice2": "Iniciar sessão com a segunda opção",
     "choice3": "Iniciar sessão com a terceira opção",
-    "passkey": "Iniciar sessão com uma chave de acesso"
+    "passkey": "Iniciar sessão com uma chave de acesso",
+    "addWayIn": "Adicionar uma forma de iniciar sessão"
   },
   "signIn": {
     "title": "Iniciar sessão no Campbooks",
@@ -157,5 +158,94 @@
     "confirm": "Esquecer",
     "cancel": "Manter",
     "forgetFailed": "Não foi possível esquecê-la. Tente novamente."
+  },
+  "waysIn": {
+    "title": "Formas de iniciar sessão",
+    "lead": "Pode iniciar sessão no Campbooks com qualquer uma destas contas. Cada caixa de correio que ligar passa também a ser uma.",
+    "list": "As suas formas de iniciar sessão",
+    "loading": "A carregar as suas formas de iniciar sessão…",
+    "loadError": {
+      "title": "Não foi possível carregar as suas formas de iniciar sessão",
+      "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente.",
+      "retry": "Tentar novamente"
+    },
+    "signedUpWith": "Registou-se com esta",
+    "added": "Adicionada a {{date}}",
+    "lastUsed": "Última utilização a {{date}}",
+    "remove": "Remover",
+    "removeLabel": "Remover {{provider}} ({{address}})",
+    "confirm": "Remover",
+    "cancel": "Manter",
+    "confirmRemove": "Deixar de iniciar sessão com {{provider}} ({{address}})? As caixas de correio que ligou com esta conta continuam ligadas.",
+    "confirmRemoveOnly": "Deixar de iniciar sessão com {{provider}} ({{address}})? As caixas de correio que ligou com esta conta continuam ligadas. Primeiro precisa de outra forma de iniciar sessão.",
+    "lastWayIn": {
+      "title": "Esta é a sua única forma de iniciar sessão.",
+      "lead": "Adicione primeiro outra forma e depois remova esta."
+    },
+    "removeFailed": {
+      "title": "Não foi possível remover.",
+      "lead": "Nada mudou. Tente novamente."
+    },
+    "needsReconnect": "A caixa de correio desta conta neste espaço de trabalho deixou de sincronizar. Volte a ligá-la para continuar.",
+    "reconnect": "Voltar a ligar",
+    "reconnectLabel": "Voltar a ligar a caixa de correio {{address}}",
+    "addTitle": "Adicionar uma forma de iniciar sessão",
+    "addLead": "Inicie sessão com outra conta sua. Confirma-a no fornecedor e fica adicionada aqui.",
+    "addNone": "Este Campbooks não tem nenhum fornecedor de início de sessão. Peça a quem o gere para configurar um.",
+    "add": {
+      "google": "Adicionar uma conta Google",
+      "microsoft": "Adicionar uma conta Microsoft",
+      "zoho": "Adicionar uma conta Zoho"
+    },
+    "startFailed": "Não foi possível começar. Tente novamente.",
+    "stepUp": {
+      "title": "Inicie sessão novamente primeiro",
+      "lead": "Por segurança, mudar a forma como inicia sessão exige um início de sessão nos últimos 10 minutos.",
+      "action": "Iniciar sessão novamente"
+    },
+    "linked": "Já pode iniciar sessão com {{provider}}.",
+    "connected": "A caixa de correio voltou a estar ligada.",
+    "errors": {
+      "way_in_belongs_to_another_account": {
+        "title": "Essa conta já inicia sessão noutra conta Campbooks.",
+        "lead": "Nada foi movido nem fundido. Inicie sessão com ela para usar essa conta."
+      },
+      "sign_in_again": {
+        "title": "Inicie sessão novamente para fazer isso.",
+        "lead": "Este navegador já não tem a sua sessão iniciada. Inicie sessão e tente novamente."
+      },
+      "link_expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Nada mudou. Comece de novo."
+      },
+      "cancelled_at_provider": {
+        "title": "Cancelou no fornecedor.",
+        "lead": "Nada mudou."
+      },
+      "login_failed": {
+        "title": "O fornecedor não conseguiu confirmar a conta.",
+        "lead": "Nada mudou. Tente novamente."
+      },
+      "provider_unavailable": {
+        "title": "O fornecedor não respondeu.",
+        "lead": "Nada mudou. Aguarde um momento e tente novamente."
+      },
+      "consent_incomplete": {
+        "title": "O acesso ao correio não foi permitido.",
+        "lead": "Já pode iniciar sessão com essa conta, mas a caixa de correio não ficou ligada. Tente novamente e permita o acesso ao correio."
+      },
+      "account_mismatch": {
+        "title": "Essa é outra conta.",
+        "lead": "Volte a ligar com a conta a que esta caixa de correio pertence."
+      },
+      "account_connected_by_another_member": {
+        "title": "Outra pessoa aqui já a ligou.",
+        "lead": "Outro membro deste espaço de trabalho ligou essa caixa de correio."
+      },
+      "unknown": {
+        "title": "Algo correu mal.",
+        "lead": "Nada mudou. Tente novamente."
+      }
+    }
   }
 }

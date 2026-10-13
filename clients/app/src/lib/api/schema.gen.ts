@@ -72,6 +72,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/identity/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start adding a way in, connecting or reconnecting a mailbox. */
+        post: operations["identity.start_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/ways-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List how you sign in. */
+        get: operations["identity.list_ways_in"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/ways-in/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a way in. */
+        delete: operations["identity.remove_way_in"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -184,23 +235,6 @@ export interface paths {
         put?: never;
         /** Start connecting an account. */
         post: operations["connectors.start_connection"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Complete a connection. */
-        post: operations["connectors.complete_connection"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1005,11 +1039,6 @@ export interface components {
              */
             size: number;
         };
-        /**
-         * Format: uuid
-         * @description AuthorizationId (UUIDv7)
-         */
-        AuthorizationId: string;
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
@@ -1029,13 +1058,6 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
-        /** @description What Google redirected the browser with. */
-        CompleteConnection: {
-            /** @description The `code` query parameter. */
-            code: string;
-            /** @description The `state` query parameter. */
-            state: string;
-        };
         /**
          * Format: uuid
          * @description ConnectionId (UUIDv7)
@@ -1326,6 +1348,11 @@ export interface components {
             /** @description Its name. */
             name: string;
         };
+        /**
+         * @description What the round trip is for.
+         * @enum {string}
+         */
+        LinkPurpose: "link" | "connect" | "reconnect";
         /** @description Where to send the browser to sign out of the identity provider too. */
         LogoutResponse: {
             /**
@@ -1546,17 +1573,47 @@ export interface components {
             /** @description The provider. */
             provider: components["schemas"]["Provider"];
         };
+        /** @description The round trip to start. */
+        StartLink: {
+            /** @description The connection, for `reconnect`. */
+            connection_id?: string | null;
+            /**
+             * @description `google`, `microsoft` or `zoho`; for `link` and `connect`. A
+             *     reconnect uses the connection's.
+             */
+            provider?: string | null;
+            /** @description What for. */
+            purpose: components["schemas"]["LinkPurpose"];
+            /**
+             * @description Same-origin path to come back to (default `/`), with `linked=`,
+             *     `connected=` or `link_error=` added.
+             */
+            return_to?: string | null;
+            workspace_id?: components["schemas"]["WorkspaceId"] | null;
+        };
         /** @description A started consent. */
         StartedConnection: {
-            /** @description The started authorization. */
-            authorization: components["schemas"]["AuthorizationId"];
-            /** @description Where to send the browser. */
+            /**
+             * @description Where to send the browser: this instance's front door
+             *     (`/auth/start/{provider}?link=…`), which comes back with
+             *     `connected=<connection id>` or `link_error=<code>`.
+             */
             authorize_url: string;
             /**
              * Format: date-time
-             * @description When the consent must be completed by.
+             * @description When the consent must be started by.
              */
             expires_at: string;
+        };
+        /** @description A started round trip. */
+        StartedLink: {
+            /**
+             * Format: date-time
+             * @description It stops working then.
+             */
+            expires_at: string;
+            /** @description Send the browser here (same origin). */
+            url: string;
         };
         /**
          * @description The one place Campbooks sorts a conversation into. The built-in set; the
@@ -1660,6 +1717,42 @@ export interface components {
              * @example 0.1.0
              */
             version: string;
+        };
+        /** @description A provider account the caller signs in with. */
+        WayIn: {
+            /**
+             * @description The address the provider gave when it was added (shown, never used
+             *     to find an account).
+             */
+            email?: string | null;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /** @description `provider` (passkeys are listed with the passkeys). */
+            kind: string;
+            /**
+             * Format: date-time
+             * @description When it was last used to sign in.
+             */
+            last_used_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was added.
+             */
+            linked_at: string;
+            /** @description `sign_up`, `link` or `connect`. */
+            linked_via: string;
+            /** @description `google`, `microsoft` or `zoho`. */
+            provider: string;
+        };
+        /** @description The caller's ways in. */
+        WaysIn: {
+            /** @description Oldest first. */
+            items: components["schemas"]["WayIn"][];
+            /** @description The providers this instance offers, in display order. */
+            providers: string[];
         };
         /** @description A deleted workspace. */
         WorkspaceDeletion: {
@@ -1850,6 +1943,188 @@ export interface operations {
             };
             /** @description Not the caller's, or gone. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartLink"];
+            };
+        };
+        responses: {
+            /** @description Send the browser to `url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedLink"];
+                };
+            };
+            /** @description A field the purpose needs is missing (`link_incomplete`), or `invalid_return_to`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or adding a way in or connecting needs a sign-in in the last ten minutes (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unconfigured provider, a workspace the caller is not in, a connection the caller did not grant, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance cannot connect that provider's mailbox (`mailbox_unsupported`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.list_ways_in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's provider ways in. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WaysIn"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_way_in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The way in. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; the sessions signed in with it ended. Mailbox connections are untouched. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's way in, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is the account's last way in (`last_way_in`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2233,7 +2508,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old for a new connection (`step_up_required`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -2251,80 +2526,8 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The provider is not configured on this instance (`provider_not_configured`). */
+            /** @description The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`). */
             409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    "connectors.complete_connection": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["CompleteConnection"];
-            };
-        };
-        responses: {
-            /** @description The connection, syncing. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConnectionView"];
-                };
-            };
-            /** @description No valid access token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such started connection of yours in this workspace, or it expired. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The provider could not be reached (`provider_unavailable`). */
-            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3871,17 +4074,19 @@ export interface operations {
                 error?: string;
                 /** @description The provider's issuer (RFC 9207), when it sends one. */
                 iss?: string;
+                /** @description Zoho's accounts server of the person's data centre. */
+                "accounts-server"?: string;
             };
             header?: never;
             path: {
-                /** @description `google`. */
+                /** @description `google`, `microsoft` or `zoho`. */
                 provider: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. */
+            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. A signed-in round trip returns to its `return_to` with `linked=`, `connected=` or `link_error=`. */
             303: {
                 headers: {
                     location?: string;
@@ -3896,6 +4101,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -4012,17 +4226,19 @@ export interface operations {
                 request?: string;
                 /** @description Otherwise, a same-origin path to land on. */
                 return_to?: string;
+                /** @description A signed-in round trip's ticket (from `identity.start_link`). */
+                link?: string;
             };
             header?: never;
             path: {
-                /** @description `google`. */
+                /** @description `google`, `microsoft` or `zoho`. */
                 provider: string;
             };
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description To the provider, with a round-trip cookie. */
+            /** @description To the provider, with a round-trip cookie; or, for a `link` ticket that is spent, expired or opened by a browser not signed in to its account, back with `link_error=`. */
             303: {
                 headers: {
                     location?: string;
@@ -4046,6 +4262,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -4382,6 +4607,11 @@ export interface operations {
             query?: {
                 /** @description Where to land after signing in: a path on this site (default `/`). */
                 return_to?: string | null;
+                /**
+                 * @description Sign in again unless the person did within this many seconds: the
+                 *     step-up an operation asks for with `step_up_required`.
+                 */
+                max_age?: number | null;
             };
             header?: never;
             path?: never;

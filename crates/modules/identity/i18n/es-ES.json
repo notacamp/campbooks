@@ -8,6 +8,10 @@
     "invalid_return_to": "Después de iniciar sesión, Campbooks solo puede volver a una de sus propias páginas.",
     "held_grant_not_found": "No hay ningún buzón esperando a que lo conectes.",
     "invalid_id_token_hint": "Esta solicitud de cierre de sesión no está firmada por Campbooks para esta aplicación; no se ha cerrado nada.",
-    "signup_invite_only": "Este Campbooks solo acepta a personas invitadas. Pide a alguien que invite esta dirección y vuelve a iniciar sesión."
+    "signup_invite_only": "Este Campbooks solo acepta a personas invitadas. Pide a alguien que invite esta dirección y vuelve a iniciar sesión.",
+    "step_up_required": "Vuelve a iniciar sesión primero: para cambiar cómo inicias sesión hace falta haber iniciado sesión en los últimos diez minutos.",
+    "last_way_in": "Es la única forma de iniciar sesión, así que no se puede quitar. Añade otra primero.",
+    "link_incomplete": "Indica el proveedor, el espacio de trabajo o el buzón al que se refiere.",
+    "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia."
   }
 }

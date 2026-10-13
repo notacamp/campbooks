@@ -5,7 +5,7 @@ import { pause, type ScenarioContext } from "../context.ts";
 // Signing up and in through Campbooks' own identity provider (ADR 0014,
 // slice S1a), end to end on the real stack: the Vite dev server, the real
 // server and BFF on a scratch database, and the fake Google from
-// `recordings/fake-google.ts`. Nothing is intercepted.
+// `scripts/fake-provider.ts`. Nothing is intercepted.
 //
 //   pnpm --dir clients fake-google                        # :9050
 //   CAMPBOOKS_ENV=development CAMPBOOKS_PUBLIC_URL=http://localhost:5173 \

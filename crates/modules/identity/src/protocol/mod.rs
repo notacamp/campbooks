@@ -14,18 +14,22 @@
 pub mod authorize;
 pub mod discovery;
 pub mod end_session;
+mod link;
 pub mod sign_in;
 pub mod token;
 
 use std::sync::Arc;
 
-use axum::{Router, http::HeaderMap};
+use axum::{Router, extract::FromRef, http::HeaderMap};
 use campbooks_kernel::{AppState, Error, Result};
 use chrono::{DateTime, Utc};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
-use crate::deps::{Deps, Issuer};
+use crate::{
+    deps::{Deps, Issuer},
+    upstream::{Provider, client::Upstream},
+};
 
 /// The web client's sign-in screen.
 pub const SIGN_IN_PATH: &str = "/sign-in";
@@ -48,7 +52,18 @@ impl Ctx {
     }
 }
 
+impl FromRef<Ctx> for AppState {
+    fn from_ref(ctx: &Ctx) -> Self {
+        ctx.state.clone()
+    }
+}
+
 impl Issuer {
+    /// The client of `provider`, when this instance has one.
+    pub fn upstream(&self, provider: Provider) -> Option<&Upstream> {
+        self.upstreams.iter().find(|u| u.provider() == provider)
+    }
+
     /// The time.
     pub fn now(&self) -> DateTime<Utc> {
         self.clock.now()

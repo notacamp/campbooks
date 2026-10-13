@@ -22,13 +22,12 @@ async fn visible(conn: &mut sqlx::PgConnection) -> Vec<i64> {
                   (SELECT count(*) FROM connectors.streams) AS "s!",
                   (SELECT count(*) FROM connectors.gmail_messages) AS "m!",
                   (SELECT count(*) FROM connectors.gmail_labels) AS "l!",
-                  (SELECT count(*) FROM connectors.batches) AS "b!",
-                  (SELECT count(*) FROM connectors.authorizations) AS "a!""#
+                  (SELECT count(*) FROM connectors.batches) AS "b!""#
     )
     .fetch_one(conn)
     .await
     .unwrap();
-    vec![row.c, row.k, row.s, row.m, row.l, row.b, row.a]
+    vec![row.c, row.k, row.s, row.m, row.l, row.b]
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -44,7 +43,6 @@ async fn a_workspace_transaction_sees_only_its_workspace(db: PgPool) {
     kit.join(&ana, a, Role::Member);
     kit.connect(&ana, a).await;
     kit.run_jobs().await;
-    kit.consent(&ana, a).await;
     let b = WorkspaceId::new();
 
     let app = testing::app_role_pool(&kit.db).await;
@@ -53,7 +51,7 @@ async fn a_workspace_transaction_sees_only_its_workspace(db: PgPool) {
     tx.rollback().await.unwrap();
 
     let mut tx = app.begin_for(b).await.unwrap();
-    assert_eq!(visible(&mut tx).await, [0; 7]);
+    assert_eq!(visible(&mut tx).await, [0; 6]);
     let due: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.sync_due"#)
         .fetch_one(&mut *tx)
         .await
@@ -69,7 +67,7 @@ async fn a_workspace_transaction_sees_only_its_workspace(db: PgPool) {
     // Without a workspace, only the scheduling index is visible (ids and
     // times, for the dispatcher).
     let mut tx = app.begin().await.unwrap();
-    assert_eq!(visible(&mut tx).await, [0; 7]);
+    assert_eq!(visible(&mut tx).await, [0; 6]);
     let due: i64 = sqlx::query_scalar!(r#"SELECT count(*) AS "n!" FROM connectors.sync_due"#)
         .fetch_one(&mut *tx)
         .await

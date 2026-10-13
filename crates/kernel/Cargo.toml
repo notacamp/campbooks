@@ -25,6 +25,7 @@ figment.workspace = true
 futures-util.workspace = true
 icu_locale_core.workspace = true
 icu_plurals.workspace = true
+ipnet.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
 # sqlx's pool options take a `log` level (`db::connect_runtime`).

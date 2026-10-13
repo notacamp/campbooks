@@ -143,9 +143,13 @@ pub fn with_ports(state: AppState) -> AppState {
 /// sign-in, and when the issuer runs in this process the API validates
 /// tokens with its keys, read in-process (ADR 0014).
 pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppState {
-    let state = with_ports(state).with_grant_intake(campbooks_connectors::grant_intake(
-        composition.connectors.clone(),
-    ));
+    let state = with_ports(state)
+        .with_grant_intake(campbooks_connectors::grant_intake(
+            composition.connectors.clone(),
+        ))
+        .with_consent_door(campbooks_identity::consent_door(
+            composition.identity.clone(),
+        ));
     match &composition.identity.issuer {
         Some(issuer) => {
             let keys = campbooks_identity::LocalKeys {
@@ -648,6 +652,7 @@ mod tests {
             email_verified: false,
             name: None,
             expires_at: None,
+            auth_time: None,
         };
         // Probes opt neither automation nor the assistant in.
         let refused = operations::invoke(
