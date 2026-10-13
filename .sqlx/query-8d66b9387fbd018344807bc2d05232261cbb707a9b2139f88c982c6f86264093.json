@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT t.schemaname || '.' || t.tablename AS \"table!\"\n              FROM pg_tables t\n             WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema', 'public', $2)\n               AND NOT (has_schema_privilege($1, t.schemaname, 'USAGE')\n                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'SELECT')\n                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'INSERT')\n                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'UPDATE')\n                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'DELETE'))\n             ORDER BY 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "table!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Name",
+        "Name"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8d66b9387fbd018344807bc2d05232261cbb707a9b2139f88c982c6f86264093"
+}

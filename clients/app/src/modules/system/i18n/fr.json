@@ -7,5 +7,121 @@
   "unreachable": "Injoignable",
   "versionWithCommit": "{{version}} ({{commit}})",
   "healthDetail": "Service {{status}}, base de données {{database}}",
-  "errorHint": "Impossible de joindre l’API Campbooks pour le moment. Vérifiez que le serveur est lancé, puis rechargez la page."
+  "errorHint": "Impossible de joindre l’API Campbooks pour le moment. Vérifiez que le serveur est lancé, puis rechargez la page.",
+  "admin": {
+    "title": "Système",
+    "lead": "Comment cette instance fonctionne. Rien ici n’affiche de mot de passe, de clé ni le courrier de quiconque.",
+    "refresh": "Actualiser",
+    "loading": "Chargement de la vue d’ensemble du système",
+    "loadError": {
+      "title": "Impossible de charger la vue d’ensemble du système",
+      "lead": "Le serveur n’a pas répondu. Réessayez dans un instant.",
+      "retry": "Réessayer"
+    },
+    "server": {
+      "title": "Ce serveur",
+      "version": "Version",
+      "commit": "Build",
+      "commitUnknown": "Non enregistré",
+      "started": "Démarré",
+      "uptime": "En marche depuis"
+    },
+    "database": {
+      "title": "Base de données",
+      "status": "Connexion",
+      "reachable": "Répond",
+      "unreachable": "Ne répond pas",
+      "latency": "A répondu en {{ms}} ms",
+      "migrations": "Migrations appliquées",
+      "latest": "Dernière : {{version}} {{description}}",
+      "unknown": "Inconnu"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "environment": "Environnement",
+      "publicOrigin": "Adresse publique",
+      "notSet": "Non définie",
+      "signupPolicy": "Qui peut s’inscrire",
+      "blobStore": "Stockage des fichiers",
+      "databaseLogins": "Identifiants de la base de données",
+      "migrations": "Exécution des migrations",
+      "webClient": "Application web",
+      "telemetry": "Traces et métriques",
+      "metricsEndpoint": "Point d’accès des métriques"
+    },
+    "values": {
+      "environment": {
+        "production": "Production",
+        "development": "Développement"
+      },
+      "signupPolicy": {
+        "open": "Toute personne qui peut se connecter",
+        "invite_only": "Personnes invitées uniquement",
+        "approval": "Après l’accord d’un administrateur",
+        "code": "Toute personne avec un code d’inscription"
+      },
+      "blobStore": {
+        "fs": "Disque local",
+        "s3": "Bucket compatible S3"
+      },
+      "databaseLogins": {
+        "single": "Un seul identifiant pour tout",
+        "split": "Identifiants séparés pour l’exécution et les migrations"
+      },
+      "migrations": {
+        "on_start": "Au démarrage du serveur",
+        "separately": "À part, par l’opérateur"
+      },
+      "webClient": {
+        "on": "Servie par ce serveur",
+        "off": "Non servie"
+      },
+      "telemetry": {
+        "on": "Exportées",
+        "off": "Désactivées"
+      },
+      "metricsEndpoint": {
+        "on": "Ouvert",
+        "off": "Désactivé"
+      },
+      "identityProvider": {
+        "built_in": "Celui de Campbooks",
+        "external": "Un autre fournisseur d’identité",
+        "none": "Aucun configuré"
+      },
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "zoho": "Zoho"
+      },
+      "none": "Aucun"
+    },
+    "services": {
+      "title": "Connexion et courrier",
+      "identityProvider": "Service de connexion",
+      "signInProviders": "Se connecter avec",
+      "mailProviders": "Boîtes mail de"
+    },
+    "ai": {
+      "title": "IA",
+      "lead": "Chaque rôle est un type de travail. Un rôle sans modèle configuré n’est tout simplement pas utilisé.",
+      "role": {
+        "decide": "Décisions",
+        "embed": "Embeddings",
+        "complete": "Rédaction",
+        "vision": "Images et numérisations"
+      },
+      "notConfigured": "Non configuré",
+      "answering": "Répond",
+      "notAnswering": "Ne répond pas",
+      "protocol": {
+        "openai": "Compatible OpenAI",
+        "laya": "Laya"
+      },
+      "detail": "{{model}} sur {{endpoint}} · {{protocol}}"
+    },
+    "duration": {
+      "lessThanAMinute": "Moins d’une minute"
+    }
+  }
 }

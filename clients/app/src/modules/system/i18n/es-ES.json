@@ -7,5 +7,121 @@
   "unreachable": "Inaccesible",
   "versionWithCommit": "{{version}} ({{commit}})",
   "healthDetail": "Servicio {{status}}, base de datos {{database}}",
-  "errorHint": "No se puede contactar con la API de Campbooks ahora mismo. Comprueba que el servidor está en marcha y recarga la página."
+  "errorHint": "No se puede contactar con la API de Campbooks ahora mismo. Comprueba que el servidor está en marcha y recarga la página.",
+  "admin": {
+    "title": "Sistema",
+    "lead": "Cómo funciona esta instancia. Aquí no se muestra ninguna contraseña, clave ni el correo de nadie.",
+    "refresh": "Actualizar",
+    "loading": "Cargando el resumen del sistema",
+    "loadError": {
+      "title": "No se ha podido cargar el resumen del sistema",
+      "lead": "El servidor no ha respondido. Inténtalo de nuevo en un momento.",
+      "retry": "Reintentar"
+    },
+    "server": {
+      "title": "Este servidor",
+      "version": "Versión",
+      "commit": "Compilación",
+      "commitUnknown": "No registrada",
+      "started": "Iniciado",
+      "uptime": "En marcha desde hace"
+    },
+    "database": {
+      "title": "Base de datos",
+      "status": "Conexión",
+      "reachable": "Responde",
+      "unreachable": "No responde",
+      "latency": "Ha respondido en {{ms}} ms",
+      "migrations": "Migraciones aplicadas",
+      "latest": "Última: {{version}} {{description}}",
+      "unknown": "Desconocido"
+    },
+    "configuration": {
+      "title": "Configuración",
+      "environment": "Entorno",
+      "publicOrigin": "Dirección pública",
+      "notSet": "Sin definir",
+      "signupPolicy": "Quién puede registrarse",
+      "blobStore": "Almacenamiento de archivos",
+      "databaseLogins": "Usuarios de la base de datos",
+      "migrations": "Ejecución de las migraciones",
+      "webClient": "Aplicación web",
+      "telemetry": "Trazas y métricas",
+      "metricsEndpoint": "Endpoint de métricas"
+    },
+    "values": {
+      "environment": {
+        "production": "Producción",
+        "development": "Desarrollo"
+      },
+      "signupPolicy": {
+        "open": "Cualquiera que pueda iniciar sesión",
+        "invite_only": "Solo personas invitadas",
+        "approval": "Tras la aprobación de un administrador",
+        "code": "Cualquiera con un código de registro"
+      },
+      "blobStore": {
+        "fs": "Disco local",
+        "s3": "Bucket compatible con S3"
+      },
+      "databaseLogins": {
+        "single": "Un usuario para todo",
+        "split": "Usuarios separados para la ejecución y las migraciones"
+      },
+      "migrations": {
+        "on_start": "Al arrancar el servidor",
+        "separately": "Aparte, por el operador"
+      },
+      "webClient": {
+        "on": "Servida por este servidor",
+        "off": "No servida"
+      },
+      "telemetry": {
+        "on": "Exportadas",
+        "off": "Desactivadas"
+      },
+      "metricsEndpoint": {
+        "on": "Abierto",
+        "off": "Desactivado"
+      },
+      "identityProvider": {
+        "built_in": "El de Campbooks",
+        "external": "Otro proveedor de identidad",
+        "none": "Ninguno configurado"
+      },
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "zoho": "Zoho"
+      },
+      "none": "Ninguno"
+    },
+    "services": {
+      "title": "Inicio de sesión y correo",
+      "identityProvider": "Servicio de inicio de sesión",
+      "signInProviders": "Iniciar sesión con",
+      "mailProviders": "Buzones de"
+    },
+    "ai": {
+      "title": "IA",
+      "lead": "Cada función es un tipo de trabajo. Una función sin modelo configurado simplemente no se usa.",
+      "role": {
+        "decide": "Decisiones",
+        "embed": "Embeddings",
+        "complete": "Redacción",
+        "vision": "Imágenes y escaneos"
+      },
+      "notConfigured": "Sin configurar",
+      "answering": "Responde",
+      "notAnswering": "No responde",
+      "protocol": {
+        "openai": "Compatible con OpenAI",
+        "laya": "Laya"
+      },
+      "detail": "{{model}} en {{endpoint}} · {{protocol}}"
+    },
+    "duration": {
+      "lessThanAMinute": "Menos de un minuto"
+    }
+  }
 }

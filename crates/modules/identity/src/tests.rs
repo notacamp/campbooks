@@ -101,6 +101,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     assert_eq!(handed[0].1, claims["sub"].as_str().unwrap());
     assert!(handed[0].3.is_some(), "the refresh token went along");
     assert!(handed[0].4.contains(&MAIL_SCOPE.to_owned()));
+    assert_eq!(kit.intake.issuers(), [kit.google.issuer()]);
     let after = kit
         .api(Method::GET, "/api/v1/identity/held-grants", &access)
         .await;
@@ -457,6 +458,30 @@ async fn two_people_with_the_same_email_get_two_accounts(db: PgPool) {
             .unwrap(),
     );
     assert_ne!(ana["sub"], other["sub"]);
+
+    // The operator's CLI finds both by the address, so it refuses to guess.
+    let mut conn = kit.state.db.acquire().await.unwrap();
+    let found = crate::domain::accounts::operator_lookup(&mut conn, " Test-User@Example.com")
+        .await
+        .unwrap();
+    let mut expected = [ana["sub"].as_str().unwrap(), other["sub"].as_str().unwrap()];
+    expected.sort_unstable();
+    let found: Vec<String> = found.iter().map(ToString::to_string).collect();
+    assert_eq!(found, expected);
+    let (name, email) = crate::domain::accounts::describe(&mut conn, found[0].parse().unwrap())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (name.as_deref(), email.as_deref()),
+        (Some("Test User"), Some("test-user@example.com"))
+    );
+    assert!(
+        crate::domain::accounts::operator_lookup(&mut conn, "nobody@example.com")
+            .await
+            .unwrap()
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

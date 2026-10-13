@@ -216,9 +216,10 @@ impl Client {
     }
 }
 
-/// Whether a client other than Campbooks' own may ever hold `scope`.
+/// Whether a client other than Campbooks' own may ever hold `scope`: never
+/// an `identity:*` scope, nor `admin:access` (ADR 0015).
 pub fn third_party_may_hold(scope: &str) -> bool {
-    !scope.starts_with(FIRST_PARTY_ONLY_PREFIX)
+    !scope.starts_with(FIRST_PARTY_ONLY_PREFIX) && scope != campbooks_kernel::admin::ACCESS_SCOPE
 }
 
 /// The scopes of `catalogue` a client other than Campbooks' own may hold.
@@ -604,6 +605,22 @@ mod tests {
         let native = clients.first_party_client(NATIVE_CLIENT_ID).unwrap();
         assert!(native.may_ask_for("identity:read", &catalogue));
         assert_eq!(third_party_scopes(&catalogue), ["system:read"]);
+    }
+
+    #[test]
+    fn only_first_party_clients_may_hold_admin_access() {
+        assert!(!third_party_may_hold("admin:access"));
+        assert!(third_party_may_hold("conversations:read"));
+        let catalogue = [ScopeInfo {
+            name: "admin:access",
+            description: "",
+        }];
+        let clients = clients();
+        let web = clients.first_party_client(WEB_CLIENT_ID).unwrap();
+        assert!(web.may_ask_for("admin:access", &catalogue));
+        let mut agent = public(&[]);
+        agent.allowed_scopes = Some(vec!["admin:access".to_owned()]);
+        assert!(!agent.may_ask_for("admin:access", &catalogue));
     }
 
     #[test]

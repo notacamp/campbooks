@@ -287,12 +287,18 @@ pub async fn authorize(
 
 /// The requested scopes when `client` may ask for every one (the OIDC
 /// scopes and, for Campbooks' own clients, the API's catalogue; for anyone
-/// else what they registered, never `identity:*`), deduplicated; `None`
+/// else what they registered, never `identity:*`), deduplicated, without
+/// `admin:access` unless `client` is first-party (ADR 0015); `None`
 /// otherwise. Missing means `openid`.
 fn allowed_scope(issuer: &Issuer, client: &Client, requested: Option<&str>) -> Option<String> {
     let requested = requested.unwrap_or("openid");
     let mut scopes: Vec<&str> = Vec::new();
     for scope in requested.split_whitespace() {
+        // `admin:access` is dropped, not refused, for anyone but Campbooks'
+        // own apps (ADR 0015): the app gets what it may have.
+        if scope == campbooks_kernel::admin::ACCESS_SCOPE && !client.is_first_party() {
+            continue;
+        }
         if !client.may_ask_for(scope, &issuer.api_scopes) {
             return None;
         }

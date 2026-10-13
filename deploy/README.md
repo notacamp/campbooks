@@ -461,7 +461,8 @@ With the built-in issuer:
   `https://<host>` with no path, or Campbooks refuses to start. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
-  forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
+  forged callback cannot send the code anywhere else. The same app connects Zoho Mail:
+  see Connected accounts.
 - **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks,
   starting a link, the token endpoint, client registration and the consent screen are
   rate-limited per client address. Behind a proxy every request
@@ -498,9 +499,54 @@ With the built-in issuer:
   - Access tokens now name `${CAMPBOOKS_PUBLIC_URL}/api` as their audience;
     `CAMPBOOKS_AUTH__AUDIENCE` only applies to an outside identity provider.
 
+## Administrators
+
+An administrator is a person whose account has an **admin profile** (ADR 0015). They see
+the **Admin** section of the app (account menu → Admin, or `/admin`): today the System
+panel, with the version, uptime, database and migrations, the effective configuration
+(never a secret) and whether each AI role's provider answers. Signups, people, workspaces
+and jobs follow.
+
+Profiles exist only through the server's command line, never through the app or the API,
+so becoming an administrator needs shell access to the server. The command connects with
+the migration login (`CAMPBOOKS_DATABASE_MIGRATION_URL`); the login every request uses
+cannot write a profile.
+
+**The first super admin.** Sign in to the app once, then on the server:
+
+```sh
+docker compose exec server campbooks-server admin grant --email you@example.com --permission super
+```
+
+It names the account it found and asks before changing anything (`--yes` skips the
+question). `--email` must be a verified address of exactly one account; when two accounts
+share it, or with another identity provider (the shipped `compose.yaml` still uses
+Rauthy), pass `--account <id>` instead: the id is the `sub` that
+`https://<your instance>/bff/session` shows to the signed-in person.
+
+```sh
+docker compose exec server campbooks-server admin list            # who, with what, since when
+docker compose exec server campbooks-server admin revoke --email you@example.com   # all of it
+docker compose exec server campbooks-server admin revoke --account <id> --permission jobs.retry
+docker compose exec server campbooks-server admin log             # the audit trail
+```
+
+Permissions are `super` (everything), `system.read`, `signups.review`, `users.read`,
+`users.suspend`, `workspaces.read`, `jobs.read` and `jobs.retry`; the dashboard shows only to
+`super` for now. Changes apply on the person's next request.
+
+- Every admin request and every command above is recorded (`admin log`).
+- The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks
+  the administrator to sign in again.
+- Admin views show metadata only (counts, states, providers, addresses people signed in
+  with), never messages or documents, and nobody can act as another person.
+- With another identity provider (`CAMPBOOKS_AUTH__ISSUER`), give the `admin:access` scope
+  only to the web app's client, and make sure access tokens carry `auth_time`; without it
+  every admin request asks to sign in again. Campbooks' built-in sign-in does both.
+
 ## Connected accounts
 
-Members connect outside accounts (Gmail today); Campbooks asks Google for consent through
+Members connect outside accounts (Gmail and Zoho Mail); Campbooks asks Google for consent through
 its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
 encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
@@ -521,6 +567,18 @@ hours when nothing changes. Nothing is connected until you register an OAuth cli
 A connection belongs to the workspace and records the member who granted it. When that
 member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
 Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
+
+**Zoho Mail** uses the Zoho app of Sign in with Zoho (above): the same client, secret and
+redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
+that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can
+connect more Zoho logins. The app must allow the scopes `openid`, `email`, `profile`,
+`ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and `ZohoMail.messages.ALL` (a
+server-based Zoho app takes its scopes with each request, so there is nothing more to
+register). Each mail account of a Zoho login becomes its own
+inbox. Campbooks reads and writes each account's mail at its own data centre
+(`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
+`CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
+synced yet.
 
 Connecting needs the built-in sign-in: an install still on Rauthy (`CAMPBOOKS_AUTH__ISSUER`
 set) cannot connect mail until it switches. `connectors.start_connection` answers with the

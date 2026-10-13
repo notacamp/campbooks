@@ -34,7 +34,8 @@
     "goneBody": "It was removed, or you can no longer see it.",
     "body": "Could not load this message.",
     "retry": "Try again",
-    "action": "Could not change “{{subject}}”. Try again."
+    "action": "Could not change “{{subject}}”. Try again.",
+    "attachment": "Could not open {{name}}. Try again."
   },
   "reader": {
     "label": "Conversation",
@@ -152,7 +153,8 @@
     "move": "Move to a stream",
     "replyAll": "Reply all",
     "forward": "Forward",
-    "showImages": "Show images"
+    "showImages": "Show images",
+    "nextAttachment": "Next attachment"
   },
   "compose": {
     "title": {
@@ -189,9 +191,9 @@
       "draft_not_editable": "This message is already on its way.",
       "not_connected": "This mailbox is no longer connected. Reconnect it, then send again.",
       "needs_reauth": "Campbooks needs your permission again to send from this mailbox. Reconnect it, then send again.",
-      "rejected": "Gmail refused this message. Check the addresses and try again.",
-      "too_large": "This message is too large for Gmail to send.",
-      "unavailable": "Gmail could not be reached, so nothing was sent. Try again.",
+      "rejected": "Your mail provider refused this message. Check the addresses and try again.",
+      "too_large": "This message is too large for your mail provider to send.",
+      "unavailable": "Your mail provider could not be reached, so nothing was sent. Try again.",
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",

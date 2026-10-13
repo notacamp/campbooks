@@ -2,6 +2,8 @@
 
 #![forbid(unsafe_code)]
 
+mod admin_cli;
+
 use std::{
     io::{Read as _, Write as _},
     net::{SocketAddr, TcpStream},
@@ -60,6 +62,13 @@ enum Command {
     Events {
         #[command(subcommand)]
         command: EventsCommand,
+    },
+    /// Manage instance administrators (ADR 0015): `grant`, `revoke`, `list`
+    /// and the audit `log`. The only way to make someone an administrator;
+    /// runs on the migration login.
+    Admin {
+        #[command(subcommand)]
+        command: admin_cli::AdminCommand,
     },
     /// Print the OpenAPI document as JSON.
     Openapi,
@@ -135,6 +144,7 @@ fn main() -> ExitCode {
             Ok(catalogue) => print_json(&catalogue, "events catalogue"),
             Err(e) => fail(&e.to_string()),
         },
+        Command::Admin { command } => admin_cli::run(command),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -537,6 +547,11 @@ fn log_composition(composition: &campbooks_server::Composition) {
         tracing::info!("Google accounts can be connected");
     } else {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
+    }
+    if composition.connectors.zoho.is_some() {
+        tracing::info!("Zoho Mail accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_ZOHO__CLIENT_ID unset: Zoho Mail accounts cannot be connected");
     }
     if let Some(issuer) = &composition.identity.issuer {
         let providers: Vec<&str> = issuer

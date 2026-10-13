@@ -3,7 +3,9 @@
 //! This is the only crate that knows the full list of modules. Adding a module
 //! means adding one line to [`modules`]. Their background work (jobs, event
 //! handlers, schedules, published events) is collected by [`registry`]; their
-//! operations form the catalogue of [`openapi`] (ADR 0013).
+//! operations form the catalogue of [`openapi`] (ADR 0013). Their admin
+//! operations form a separate API, [`admin_openapi`], outside that catalogue
+//! (ADR 0015).
 
 #![forbid(unsafe_code)]
 
@@ -12,6 +14,8 @@ pub mod changes;
 pub mod telemetry;
 pub mod web;
 
+#[cfg(test)]
+mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
 
@@ -85,6 +89,9 @@ pub struct Composition {
     /// The identity module's in-process issuer, when it serves this
     /// instance (ADR 0014).
     pub identity: campbooks_identity::Deps,
+    /// The system module's AI gateway and the facts of this composition,
+    /// for the admin system overview.
+    pub system: campbooks_system::Deps,
 }
 
 impl Composition {
@@ -97,14 +104,55 @@ impl Composition {
         } else {
             Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
         };
+        let connectors = campbooks_connectors::Deps::from_env(config)?;
+        let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
+        let system = campbooks_system::Deps {
+            ai: gateway.clone(),
+            facts: facts(config, &identity, &connectors),
+            started_at: chrono::Utc::now(),
+        };
         Ok(Self {
-            connectors: campbooks_connectors::Deps::from_env(config)?,
-            identity: campbooks_identity::Deps::from_env(config, &scope_catalogue())?,
+            connectors,
+            identity,
             conversations: campbooks_conversations::ConversationsDeps::new(
                 gateway,
                 campbooks_conversations::ConversationsConfig::from_env()?,
             ),
+            system,
         })
+    }
+}
+
+/// Who signs people in and which providers are set up, by name only: what
+/// the admin system overview shows.
+fn facts(
+    config: &campbooks_kernel::Config,
+    identity: &campbooks_identity::Deps,
+    connectors: &campbooks_connectors::Deps,
+) -> campbooks_system::Facts {
+    use campbooks_system::IdentityProvider;
+
+    let (identity_provider, sign_in_providers) = match &identity.issuer {
+        Some(issuer) => (
+            IdentityProvider::BuiltIn,
+            issuer
+                .upstreams
+                .iter()
+                .map(|upstream| upstream.provider().as_str().to_owned())
+                .collect(),
+        ),
+        None if config.auth.issuer().is_some() => (IdentityProvider::External, Vec::new()),
+        None => (IdentityProvider::None, Vec::new()),
+    };
+    campbooks_system::Facts {
+        identity_provider,
+        sign_in_providers,
+        mail_providers: connectors
+            .google
+            .is_some()
+            .then(|| "google".to_owned())
+            .into_iter()
+            .collect(),
     }
 }
 
@@ -116,11 +164,12 @@ pub fn modules() -> Vec<Module> {
 /// Every module, in mount order, composed with `composition`.
 pub fn modules_with(composition: &Composition) -> Vec<Module> {
     vec![
-        campbooks_system::module(),
+        campbooks_system::module_with(composition.system.clone()),
         campbooks_workspaces::module(),
         campbooks_connectors::module(composition.connectors.clone()),
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
+        campbooks_admin::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -128,9 +177,11 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// `state` with the ports modules implement for the kernel registered: the
 /// `workspaces` module answers who belongs to which workspace and which
 /// language each user chose; the `conversations` module, who may see the
-/// change feed's records inside an inbox.
+/// change feed's records inside an inbox; the `admin` module, who is an
+/// administrator, and keeps the trail of what they do.
 pub fn with_ports(state: AppState) -> AppState {
     state
+        .with_admin(campbooks_admin::profiles(), campbooks_admin::audit())
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
@@ -242,7 +293,7 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
-        (name = "connectors", description = "Connections to outside accounts (Gmail first): \
+        (name = "connectors", description = "Connections to outside accounts (Gmail, Zoho Mail): \
             connect with the provider's consent, see their health, sync now, disconnect. \
             Credentials are never returned."),
         (name = "conversations", description = "Inboxes, conversations and messages on any \
@@ -262,8 +313,88 @@ fn security_scheme() -> SecurityScheme {
 )]
 struct ApiDoc;
 
+/// The admin API's document (`openapi/admin.json`, ADR 0015).
+#[derive(utoipa::OpenApi)]
+#[openapi(
+    info(
+        title = "Campbooks admin API",
+        description = "Instance administration. Every operation answers 404 (as for a route that \
+            does not exist) unless the caller is a user whose bearer token carries the \
+            `admin:access` scope and whose admin profile grants the operation's permission \
+            (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last \
+            sign-in (`auth_time`) is more than 12 hours old answers 401 \
+            `admin_reauth_required`. Every request past the profile check is recorded in the \
+            audit trail. These operations are not part of the operation catalogue \
+            (`/openapi.json`): automation and the assistant cannot call them. Admin profiles \
+            are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. \
+            The web app reaches this API through `/bff/admin/*`.",
+        license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
+    ),
+    components(schemas(Problem)),
+    tags(
+        (name = "system", description = "The instance's version, health and configuration."),
+    ),
+)]
+struct AdminDoc;
+
 fn api() -> OpenApiRouter<AppState> {
     api_with(&Composition::default())
+}
+
+/// Every module's admin routes, under `/admin/v1/<module>/`.
+fn admin_api_with(composition: &Composition) -> OpenApiRouter<AppState> {
+    let mut doc = AdminDoc::openapi();
+    env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
+    doc.components
+        .get_or_insert_with(Default::default)
+        .add_security_scheme(
+            campbooks_kernel::admin::SECURITY_SCHEME,
+            admin_security_scheme(),
+        );
+    modules_with(composition)
+        .into_iter()
+        .filter_map(|module| module.admin_router)
+        .fold(OpenApiRouter::with_openapi(doc), OpenApiRouter::merge)
+}
+
+/// The `admin` security scheme: a user's bearer token carrying
+/// `admin:access`.
+fn admin_security_scheme() -> SecurityScheme {
+    SecurityScheme::Http(
+        HttpBuilder::new()
+            .scheme(HttpAuthScheme::Bearer)
+            .bearer_format("JWT")
+            .description(Some(format!(
+                "An OAuth 2.1 access token for a person (not a client), issued to one of \
+                 Campbooks' own apps with the `{}` scope, whose account has an admin profile.",
+                campbooks_kernel::admin::ACCESS_SCOPE
+            )))
+            .build(),
+    )
+}
+
+/// The admin API (`/admin/v1/*`) over `state`: not composed into the
+/// operation catalogue, so [`invoke`](operations::invoke) and the
+/// idempotency layer never see it; every route behind the audit middleware,
+/// problems in the caller's language.
+fn admin_routes(state: &AppState, composition: &Composition) -> Router<AppState> {
+    let (routes, spec) = admin_api_with(composition).split_for_parts();
+    routes
+        .route_layer(middleware::from_fn_with_state(
+            campbooks_kernel::admin::AuditLayer::new(state, &spec),
+            campbooks_kernel::admin::audit,
+        ))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            i18n::localize,
+        ))
+}
+
+/// The admin API's document: every module's admin operations
+/// (`openapi/admin.json`). Never served over HTTP, and never merged into
+/// [`openapi`].
+pub fn admin_openapi() -> utoipa::openapi::OpenApi {
+    admin_api_with(&Composition::default()).into_openapi()
 }
 
 fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
@@ -338,10 +469,16 @@ pub fn router_with(
         .clone()
         .fallback(|| async { Error::NotFound })
         .with_state(state.clone());
-    let bff = bff::Bff::new(bff, &state, api_only, identity.clone());
+    let admin_routes = admin_routes(&state, composition);
+    let admin_only: Router = admin_routes
+        .clone()
+        .fallback(|| async { Error::NotFound })
+        .with_state(state.clone());
+    let bff = bff::Bff::new(bff, &state, api_only, admin_only, identity.clone());
 
     // RFC 9728: every Bearer challenge of the API names its metadata, so an
     // agent that knows only the API's URL finds the issuer.
+    let routes = routes.merge(admin_routes);
     let routes = match &composition.identity.issuer {
         Some(issuer) => routes.layer(axum::middleware::from_fn_with_state(
             Arc::<str>::from(
@@ -420,6 +557,16 @@ mod tests {
 
     fn app() -> Router {
         router(testing::state(testing::unreachable_pool()), None)
+    }
+
+    #[test]
+    fn identity_and_connectors_know_the_same_zoho_data_centres() {
+        // Identity validates the accounts server a Zoho grant comes from;
+        // connectors maps that server to the data centre's mail host.
+        assert_eq!(
+            campbooks_identity::upstream::client::ZOHO_ACCOUNTS_SERVERS,
+            campbooks_connectors::ZOHO_ACCOUNTS_SERVERS
+        );
     }
 
     #[test]
@@ -570,7 +717,10 @@ mod tests {
     }
 
     /// Every table of every module (and the kernel) is usable by the runtime
-    /// role the server queries as: each migration grants its own.
+    /// role the server queries as: each migration grants its own. The
+    /// `admin` module's tables are the deliberate exception (ADR 0015): the
+    /// runtime role may only read profiles and append to the trail, which
+    /// the `admin` crate's own tests pin.
     #[sqlx::test(migrations = "../../migrations")]
     async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
         let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
@@ -578,7 +728,7 @@ mod tests {
             r#"
             SELECT t.schemaname || '.' || t.tablename AS "table!"
               FROM pg_tables t
-             WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema', 'public')
+             WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema', 'public', $2)
                AND NOT (has_schema_privilege($1, t.schemaname, 'USAGE')
                         AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'SELECT')
                         AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'INSERT')
@@ -586,7 +736,8 @@ mod tests {
                         AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'DELETE'))
              ORDER BY 1
             "#,
-            role
+            role,
+            campbooks_admin::NAME
         )
         .fetch_all(&db)
         .await

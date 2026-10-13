@@ -796,6 +796,390 @@ pub fn check_scopes(scopes: &[DeclaredScope]) -> Vec<String> {
     violations
 }
 
+// --- instance administration (ADR 0015) ------------------------------------
+
+/// The module that owns admin profiles and the audit trail. It serves no
+/// operation, and only it (and the server's CLI) may name its schema.
+pub const ADMIN_MODULE: &str = "admin";
+
+/// Path prefix of every admin operation; then the owning module's name.
+pub const ADMIN_PATH_PREFIX: &str = "/admin/v1/";
+
+/// The admin document's security scheme and the scope it requires.
+pub const ADMIN_SCHEME: &str = "admin";
+
+/// The scope every admin operation requires.
+pub const ADMIN_SCOPE: &str = "admin:access";
+
+/// The extension naming an admin operation's permission.
+pub const ADMIN_EXTENSION: &str = "x-campbooks-admin";
+
+/// The transaction setting that opens cross-workspace reads; only the
+/// kernel may name it.
+pub const ADMIN_READS_SETTING: &str = "campbooks.admin_reads";
+
+/// Files besides the admin module allowed to name schema `admin`: the
+/// server's CLI.
+pub const ADMIN_CLI_FILES: [&str; 2] = [
+    "crates/server/src/main.rs",
+    "crates/server/src/admin_cli.rs",
+];
+
+/// The admin module serves nothing: `routes` is how many paths its API
+/// router has and `admin_routes` its admin router's (`None`: it has none).
+pub fn check_admin_module(routes: usize, admin_routes: Option<usize>) -> Vec<String> {
+    let mut violations = Vec::new();
+    if routes > 0 {
+        violations.push(format!(
+            "crates/modules/{ADMIN_MODULE}: the admin module serves no route ({routes} found); \
+             admin profiles change only through `campbooks-server admin` (ADR 0015)"
+        ));
+    }
+    if admin_routes.is_some() {
+        violations.push(format!(
+            "crates/modules/{ADMIN_MODULE}: the admin module has no admin router; admin \
+             profiles are never read or written over HTTP (ADR 0015)"
+        ));
+    }
+    violations
+}
+
+/// No operation of either document belongs to the admin module, and the
+/// operation catalogue holds no admin path or admin metadata.
+pub fn check_no_admin_owner(
+    owners: &Owners,
+    admin_owners: &Owners,
+    catalogue: &serde_json::Value,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    for ((method, path), owner) in owners.iter().chain(admin_owners) {
+        if owner == ADMIN_MODULE {
+            violations.push(format!(
+                "operation `{method} {path}` is served by the admin module, which serves \
+                 nothing: admin profiles are never read or written over HTTP (ADR 0015)"
+            ));
+        }
+    }
+    if let Some(paths) = catalogue
+        .get("paths")
+        .and_then(serde_json::Value::as_object)
+    {
+        for (path, item) in paths {
+            for method in OPERATION_METHODS {
+                let Some(operation) = item.get(method) else {
+                    continue;
+                };
+                let name = format!("{} {path}", method.to_uppercase());
+                if path.starts_with(ADMIN_PATH_PREFIX)
+                    || path == ADMIN_PATH_PREFIX.trim_end_matches('/')
+                {
+                    violations.push(format!(
+                        "OpenAPI operation `{name}` is an admin path in the operation catalogue; \
+                         serve it from the module's `admin_router` (openapi/admin.json)"
+                    ));
+                }
+                if operation.get(ADMIN_EXTENSION).is_some() {
+                    violations.push(format!(
+                        "OpenAPI operation `{name}` carries `{ADMIN_EXTENSION}` in the operation \
+                         catalogue; admin operations belong to the admin document"
+                    ));
+                }
+            }
+        }
+    }
+    violations
+}
+
+/// Every operation of the admin document (`openapi/admin.json`): served by
+/// a module's admin router, under `/admin/v1/<module>/`, with an
+/// `operationId` `<module>.<verb>[_<noun>]` unique across both documents,
+/// the `admin` security scheme with exactly `admin:access`, and an
+/// `x-campbooks-admin` naming a known permission and whether it mutates
+/// (matching the method), and no `x-campbooks` (it is not in the
+/// catalogue).
+pub fn check_admin_operations(
+    spec: &serde_json::Value,
+    owners: &Owners,
+    permissions: &BTreeSet<String>,
+    catalogue_ids: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let Some(paths) = spec.get("paths").and_then(serde_json::Value::as_object) else {
+        return violations;
+    };
+    let mut ids: BTreeMap<String, String> = BTreeMap::new();
+    for (path, item) in paths {
+        for method in OPERATION_METHODS {
+            let Some(operation) = item.get(method) else {
+                continue;
+            };
+            let method = method.to_uppercase();
+            let name = format!("{method} {path}");
+            let owner = owners.get(&(method.clone(), path.clone()));
+            match owner {
+                None => violations.push(format!(
+                    "admin operation `{name}` is not served by any module's admin router"
+                )),
+                Some(owner) if !path.starts_with(&format!("{ADMIN_PATH_PREFIX}{owner}/")) => {
+                    violations.push(format!(
+                        "admin operation `{name}` must live under `{ADMIN_PATH_PREFIX}{owner}/`, \
+                         the module that serves it"
+                    ));
+                }
+                Some(_) => {}
+            }
+            match operation
+                .get("operationId")
+                .and_then(serde_json::Value::as_str)
+            {
+                None => violations.push(format!("admin operation `{name}` has no `operationId`")),
+                Some(id) => {
+                    match (OPERATION_ID.captures(id), owner) {
+                        (None, _) => violations.push(format!(
+                            "admin operation `{name}`: operationId `{id}` must be \
+                             `<module>.<verb>[_<noun>]`, lower-case snake case"
+                        )),
+                        (Some(caps), Some(owner))
+                            if caps.get(1).map(|m| m.as_str()) != Some(owner.as_str()) =>
+                        {
+                            violations.push(format!(
+                                "admin operation `{name}`: operationId `{id}` must start with \
+                                 `{owner}.`, the module that serves it"
+                            ));
+                        }
+                        _ => {}
+                    }
+                    if catalogue_ids.contains(id) {
+                        violations.push(format!(
+                            "admin operation `{name}`: operationId `{id}` is also an operation \
+                             of the catalogue; ids are unique across both documents"
+                        ));
+                    }
+                    if let Some(other) = ids.insert(id.to_owned(), name.clone()) {
+                        violations.push(format!(
+                            "operationId `{id}` is used by both `{other}` and `{name}`"
+                        ));
+                    }
+                }
+            }
+            let expected = serde_json::json!([{ ADMIN_SCHEME: [ADMIN_SCOPE] }]);
+            if operation.get("security") != Some(&expected) {
+                violations.push(format!(
+                    "admin operation `{name}` must declare exactly \
+                     `security((\"{ADMIN_SCHEME}\" = [\"{ADMIN_SCOPE}\"]))`"
+                ));
+            }
+            if operation.get("x-campbooks").is_some() {
+                violations.push(format!(
+                    "admin operation `{name}` carries `x-campbooks`: admin operations are not \
+                     part of the operation catalogue"
+                ));
+            }
+            violations.extend(check_admin_meta(&name, &method, operation, permissions));
+        }
+    }
+    violations
+}
+
+fn check_admin_meta(
+    name: &str,
+    method: &str,
+    operation: &serde_json::Value,
+    permissions: &BTreeSet<String>,
+) -> Vec<String> {
+    let mut violations = Vec::new();
+    let Some(meta) = operation
+        .get(ADMIN_EXTENSION)
+        .and_then(serde_json::Value::as_object)
+    else {
+        return vec![format!(
+            "admin operation `{name}` has no `{ADMIN_EXTENSION}` object: add \
+             `extensions((\"{ADMIN_EXTENSION}\" = json!(AdminOperation::query::<P>())))`"
+        )];
+    };
+    for key in meta.keys() {
+        if key != "permission" && key != "mutates" {
+            violations.push(format!(
+                "admin operation `{name}`: unknown key `{ADMIN_EXTENSION}.{key}`"
+            ));
+        }
+    }
+    match meta.get("permission").and_then(serde_json::Value::as_str) {
+        Some(permission) if permissions.contains(permission) => {}
+        Some(permission) => violations.push(format!(
+            "admin operation `{name}`: `{ADMIN_EXTENSION}.permission` `{permission}` is not a \
+             permission (known: {})",
+            permissions.iter().cloned().collect::<Vec<_>>().join(", ")
+        )),
+        None => violations.push(format!(
+            "admin operation `{name}`: `{ADMIN_EXTENSION}.permission` is missing"
+        )),
+    }
+    match meta.get("mutates").and_then(serde_json::Value::as_bool) {
+        None => violations.push(format!(
+            "admin operation `{name}`: `{ADMIN_EXTENSION}.mutates` must be a boolean"
+        )),
+        Some(true) if !matches!(method, "POST" | "PUT" | "PATCH" | "DELETE") => {
+            violations.push(format!(
+                "admin operation `{name}` mutates, so it must be POST, PUT, PATCH or DELETE"
+            ));
+        }
+        Some(false) if !matches!(method, "GET" | "HEAD") => violations.push(format!(
+            "admin operation `{name}` does not mutate, so it must be GET or HEAD"
+        )),
+        Some(_) => {}
+    }
+    violations
+}
+
+/// The Rust sources of the workspace crates, as `(path relative to the
+/// root, text)`: only the admin module and the server's CLI name schema
+/// `admin` (in SQL inside string literals), and only the kernel names the
+/// `campbooks.admin_reads` setting (anywhere).
+pub fn check_admin_sources(files: &[(String, String)]) -> Vec<String> {
+    let mut violations = Vec::new();
+    for (path, text) in files {
+        let in_admin = path.starts_with(&format!("crates/modules/{ADMIN_MODULE}/"));
+        let in_cli = ADMIN_CLI_FILES.contains(&path.as_str());
+        if !in_admin && !in_cli {
+            for literal in string_literals(text) {
+                if names_schema(&literal, ADMIN_MODULE) {
+                    violations.push(format!(
+                        "{path}: names schema `{ADMIN_MODULE}`; only crates/modules/{ADMIN_MODULE} \
+                         and the server's CLI may read or write admin profiles (ADR 0015)"
+                    ));
+                    break;
+                }
+            }
+        }
+        if !path.starts_with("crates/kernel/") && text.to_lowercase().contains(ADMIN_READS_SETTING)
+        {
+            violations.push(format!(
+                "{path}: names `{ADMIN_READS_SETTING}`; only the kernel may (use \
+                 `kernel::db::begin_admin` / `ADMIN_READS_SETTING`)"
+            ));
+        }
+    }
+    violations
+}
+
+/// Whether the SQL in `literal` names `schema`: a qualified name
+/// `<schema>.<x>` or a `CREATE`/`ALTER`/`DROP SCHEMA <schema>` (comments and
+/// quoted values ignored).
+fn names_schema(literal: &str, schema: &str) -> bool {
+    let sql = SQL_NOISE
+        .replace_all(literal, " ")
+        .to_lowercase()
+        .replace('"', "");
+    QUALIFIED_NAME
+        .captures_iter(&sql)
+        .chain(SCHEMA_STATEMENT.captures_iter(&sql))
+        .any(|caps| caps.get(1).is_some_and(|m| m.as_str() == schema))
+}
+
+/// The contents of every string literal of the Rust source `text` (plain,
+/// raw and byte strings), skipping comments and character literals.
+pub fn string_literals(text: &str) -> Vec<String> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut literals = Vec::new();
+    let mut i = 0;
+    while i < chars.len() {
+        let c = chars[i];
+        let next = chars.get(i + 1).copied();
+        match c {
+            '/' if next == Some('/') => {
+                while i < chars.len() && chars[i] != '\n' {
+                    i += 1;
+                }
+            }
+            '/' if next == Some('*') => {
+                i += 2;
+                while i + 1 < chars.len() && !(chars[i] == '*' && chars[i + 1] == '/') {
+                    i += 1;
+                }
+                i += 2;
+            }
+            'r' | 'b' if is_raw_string_start(&chars, i) => {
+                let mut j = i + 1;
+                if chars.get(j) == Some(&'r') {
+                    j += 1;
+                }
+                let mut hashes = 0;
+                while chars.get(j) == Some(&'#') {
+                    hashes += 1;
+                    j += 1;
+                }
+                j += 1; // the opening quote
+                let start = j;
+                loop {
+                    if j >= chars.len() {
+                        break;
+                    }
+                    if chars[j] == '"' && (1..=hashes).all(|k| chars.get(j + k) == Some(&'#')) {
+                        break;
+                    }
+                    j += 1;
+                }
+                literals.push(chars[start..j.min(chars.len())].iter().collect());
+                i = j + 1 + hashes;
+            }
+            '"' => {
+                let mut j = i + 1;
+                let mut literal = String::new();
+                while j < chars.len() && chars[j] != '"' {
+                    if chars[j] == '\\' {
+                        if let Some(escaped) = chars.get(j + 1) {
+                            literal.push(*escaped);
+                        }
+                        j += 2;
+                        continue;
+                    }
+                    literal.push(chars[j]);
+                    j += 1;
+                }
+                literals.push(literal);
+                i = j + 1;
+            }
+            '\'' => {
+                // A character literal ('x', '\n', '\u{1F600}') or a lifetime.
+                if next == Some('\\') {
+                    let mut j = i + 3;
+                    while j < chars.len() && chars[j] != '\'' {
+                        j += 1;
+                    }
+                    i = j + 1;
+                } else if chars.get(i + 2) == Some(&'\'') {
+                    i += 3;
+                } else {
+                    i += 1;
+                }
+            }
+            _ => i += 1,
+        }
+    }
+    literals
+}
+
+/// Whether a raw (or byte raw / byte) string starts at `i`: `r"`, `r#`,
+/// `br"`, `br#` or `b"`, not inside an identifier.
+fn is_raw_string_start(chars: &[char], i: usize) -> bool {
+    let preceded_by_ident = i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_');
+    if preceded_by_ident {
+        return false;
+    }
+    match (chars.get(i), chars.get(i + 1), chars.get(i + 2)) {
+        (Some('r'), Some('"' | '#'), _) | (Some('b'), Some('r'), Some('"' | '#')) => {
+            // `r#ident` raw identifiers are not strings.
+            let mut j = if chars[i] == 'b' { i + 2 } else { i + 1 };
+            while chars.get(j) == Some(&'#') {
+                j += 1;
+            }
+            chars.get(j) == Some(&'"')
+        }
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1359,6 +1743,207 @@ mod tests {
         assert!(v[0].contains("declared by module `mail`"));
         assert!(v.iter().any(|m| m.contains("needs a description")));
         assert!(v.iter().any(|m| m.contains("declared twice")));
+    }
+
+    // --- ADR 0015 -----------------------------------------------------------
+
+    #[test]
+    fn the_admin_module_serves_nothing() {
+        assert!(check_admin_module(0, None).is_empty());
+        let v = check_admin_module(2, Some(1));
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(v[0].contains("serves no route (2 found)"));
+        assert!(v[1].contains("has no admin router"));
+    }
+
+    #[test]
+    fn no_operation_belongs_to_the_admin_module() {
+        let main = owners(&[("GET", "/api/v1/mail/threads", "mail")]);
+        let admin = owners(&[("GET", "/admin/v1/system/overview", "system")]);
+        let clean = serde_json::json!({ "paths": { "/api/v1/mail/threads": { "get": {} } } });
+        assert!(check_no_admin_owner(&main, &admin, &clean).is_empty());
+
+        let main = owners(&[("GET", "/api/v1/admin/profiles", "admin")]);
+        let admin = owners(&[("POST", "/admin/v1/admin/profiles", "admin")]);
+        let leaky = serde_json::json!({ "paths": {
+            "/admin/v1/system/overview": { "get": {} },
+            "/api/v1/mail/x": { "get": { "x-campbooks-admin": { "permission": "super" } } },
+        }});
+        let v = check_no_admin_owner(&main, &admin, &leaky);
+        assert_eq!(v.len(), 4, "{v:#?}");
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`GET /api/v1/admin/profiles` is served by the admin module"))
+        );
+        assert!(
+            v.iter().any(
+                |m| m.contains("`POST /admin/v1/admin/profiles` is served by the admin module")
+            )
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("admin path in the operation catalogue"))
+        );
+        assert!(
+            v.iter()
+                .any(|m| m.contains("carries `x-campbooks-admin` in the operation catalogue"))
+        );
+    }
+
+    fn admin_op(permission: &str, mutates: bool) -> serde_json::Value {
+        serde_json::json!({
+            "operationId": "system.admin_overview",
+            "security": [{ "admin": ["admin:access"] }],
+            "x-campbooks-admin": { "permission": permission, "mutates": mutates },
+        })
+    }
+
+    fn permissions() -> BTreeSet<String> {
+        ["super", "system.read"].map(String::from).into()
+    }
+
+    #[test]
+    fn well_formed_admin_operations_pass() {
+        let spec = serde_json::json!({ "paths": {
+            "/admin/v1/system/overview": { "get": admin_op("system.read", false) },
+        }});
+        let owners = owners(&[("GET", "/admin/v1/system/overview", "system")]);
+        let v = check_admin_operations(&spec, &owners, &permissions(), &BTreeSet::new());
+        assert!(v.is_empty(), "{v:#?}");
+    }
+
+    #[test]
+    fn admin_operations_need_their_prefix_owner_permission_and_security() {
+        let mut wrong_owner = admin_op("system.read", false);
+        wrong_owner["operationId"] = serde_json::json!("jobs.overview");
+        let mut public = admin_op("system.read", false);
+        public["operationId"] = serde_json::json!("system.public_thing");
+        public["security"] = serde_json::json!([{}]);
+        let mut bearer = admin_op("system.read", false);
+        bearer["operationId"] = serde_json::json!("system.bearer_thing");
+        bearer["security"] = serde_json::json!([{ "bearer": ["system:read"] }]);
+        let mut unknown = admin_op("root", false);
+        unknown["operationId"] = serde_json::json!("system.unknown_permission");
+        let mut bare = admin_op("system.read", false);
+        bare["operationId"] = serde_json::json!("system.bare");
+        bare.as_object_mut().unwrap().remove("x-campbooks-admin");
+        bare["x-campbooks"] = serde_json::json!({});
+        let mut posting = admin_op("super", false);
+        posting["operationId"] = serde_json::json!("system.restart");
+        let mut catalogued = admin_op("super", false);
+        catalogued["operationId"] = serde_json::json!("system.version");
+        let spec = serde_json::json!({ "paths": {
+            "/admin/v1/system/a": { "get": wrong_owner },
+            "/admin/v1/system/b": { "get": public },
+            "/admin/v1/system/c": { "get": bearer },
+            "/admin/v1/system/d": { "get": unknown },
+            "/admin/v1/system/e": { "get": bare },
+            "/admin/v1/system/f": { "post": posting },
+            "/admin/v1/system/g": { "get": catalogued },
+            "/admin/v1/jobs/h": { "get": admin_op("system.read", false) },
+            "/admin/v1/system/i": { "get": admin_op("system.read", false) },
+            "/api/v1/system/j": { "get": { "operationId": "system.misplaced",
+                "security": [{ "admin": ["admin:access"] }],
+                "x-campbooks-admin": { "permission": "super", "mutates": false } } },
+        }});
+        let owners = owners(&[
+            ("GET", "/admin/v1/system/a", "system"),
+            ("GET", "/admin/v1/system/b", "system"),
+            ("GET", "/admin/v1/system/c", "system"),
+            ("GET", "/admin/v1/system/d", "system"),
+            ("GET", "/admin/v1/system/e", "system"),
+            ("POST", "/admin/v1/system/f", "system"),
+            ("GET", "/admin/v1/system/g", "system"),
+            ("GET", "/admin/v1/jobs/h", "system"),
+            ("GET", "/api/v1/system/j", "system"),
+        ]);
+        let catalogue: BTreeSet<String> = ["system.version".to_owned()].into();
+        let v = check_admin_operations(&spec, &owners, &permissions(), &catalogue);
+        for expected in [
+            "`jobs.overview` must start with `system.`",
+            "`GET /admin/v1/system/b` must declare exactly `security((\"admin\" = [\"admin:access\"]))`",
+            "`GET /admin/v1/system/c` must declare exactly",
+            "`root` is not a permission",
+            "`GET /admin/v1/system/e` has no `x-campbooks-admin`",
+            "`GET /admin/v1/system/e` carries `x-campbooks`",
+            "`POST /admin/v1/system/f` does not mutate, so it must be GET",
+            "`system.version` is also an operation of the catalogue",
+            "`GET /admin/v1/jobs/h` must live under `/admin/v1/system/`",
+            "operationId `system.admin_overview` is used by both",
+            "`GET /admin/v1/system/i` is not served by any module's admin router",
+            "`GET /api/v1/system/j` must live under `/admin/v1/system/`",
+        ] {
+            assert!(v.iter().any(|m| m.contains(expected)), "{expected}: {v:#?}");
+        }
+    }
+
+    fn source(path: &str, text: &str) -> (String, String) {
+        (path.to_owned(), text.to_owned())
+    }
+
+    #[test]
+    fn only_the_admin_module_and_the_cli_name_the_admin_schema() {
+        let ok = [
+            source(
+                "crates/modules/admin/src/lib.rs",
+                r#"sqlx::query!("SELECT permissions FROM admin.profiles WHERE account_id = $1")"#,
+            ),
+            source(
+                "crates/server/src/admin_cli.rs",
+                r#"let _ = "DELETE FROM admin.profiles";"#,
+            ),
+            source(
+                "crates/modules/workspaces/src/model.rs",
+                "// admin.profiles is not ours\nlet role = \"admin\"; let x = state.admin.profiles; \
+                 let q = \"UPDATE workspaces.members SET role = 'admin.x' WHERE c = '\\\"'\";\n\
+                 fn f<'a>(c: char) -> bool { c == '\"' || c == '\\'' }",
+            ),
+        ];
+        assert!(
+            check_admin_sources(&ok).is_empty(),
+            "{:#?}",
+            check_admin_sources(&ok)
+        );
+
+        let bad = [
+            source(
+                "crates/server/src/bff/handlers.rs",
+                r#"sqlx::query("UPDATE admin.profiles SET permissions = '{super}'")"#,
+            ),
+            source(
+                "crates/modules/identity/src/x.rs",
+                "let q = r#\"SELECT 1 FROM \"admin\" . actions\"#;",
+            ),
+            source(
+                "crates/modules/system/src/x.rs",
+                r#"let q = "DROP SCHEMA admin CASCADE";"#,
+            ),
+            source(
+                "crates/modules/workspaces/src/x.rs",
+                r#"let q = "CREATE POLICY p ON workspaces.users USING (current_setting('campbooks.admin_reads', true) = 'on')";"#,
+            ),
+            source(
+                "crates/kernel/src/db.rs",
+                r#"pub const ADMIN_READS_SETTING: &str = "campbooks.admin_reads";"#,
+            ),
+        ];
+        let v = check_admin_sources(&bad);
+        assert_eq!(v.len(), 4, "{v:#?}");
+        assert!(v[0].contains("crates/server/src/bff/handlers.rs: names schema `admin`"));
+        assert!(v[1].contains("crates/modules/identity/src/x.rs: names schema `admin`"));
+        assert!(v[2].contains("crates/modules/system/src/x.rs: names schema `admin`"));
+        assert!(v[3].contains("crates/modules/workspaces/src/x.rs: names `campbooks.admin_reads`"));
+    }
+
+    #[test]
+    fn string_literals_are_found_in_every_form() {
+        let text = "let a = \"x\\\"y\"; // \"comment\"\n/* \"block\" */ let b = r#\"raw \"q\" \"#; \
+                    let c = br\"bytes\"; let d = b\"plain\"; let e = 'z'; let f: &'static str = \"s\"; \
+                    let r#type = 1;";
+        assert_eq!(
+            string_literals(text),
+            ["x\"y", "raw \"q\" ", "bytes", "plain", "s"]
+        );
     }
 
     #[test]

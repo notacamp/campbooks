@@ -143,6 +143,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
         router: router().layer(Extension(features::send_draft::SendSettings {
             undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
         })),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
             .publishes::<events::MessageSent>()
@@ -173,9 +174,9 @@ pub fn module(deps: ConversationsDeps) -> Module {
 /// Every route of the module, one per feature.
 fn router() -> OpenApiRouter<AppState> {
     use features::{
-        archive, create_draft, get_conversation, get_message_body, labels, list_conversations,
-        list_drafts, list_inboxes, list_streams, mark_read, move_to_stream, send_draft, star,
-        update_draft,
+        archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
+        list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
+        send_draft, star, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -183,6 +184,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
         .routes(routes!(get_message_body::handler))
+        .routes(routes!(get_attachment::handler))
         .routes(routes!(mark_read::read))
         .routes(routes!(mark_read::unread))
         .routes(routes!(star::star))

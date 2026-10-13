@@ -6,8 +6,10 @@
 //! single-page-app fallback to `index.html`. The rules (see
 //! `openspec/changes/serve-web-client/design.md`):
 //!
-//! - `/api`, `/api/*`, `/bff`, `/bff/*` and `/openapi.json` are reserved for
-//!   the API and never answered with web client files.
+//! - `/api`, `/api/*`, `/admin/v1`, `/admin/v1/*` (the admin API),
+//!   `/bff`, `/bff/*` and `/openapi.json` are reserved for the API and never
+//!   answered with web client files. `/admin` and its other pages are the
+//!   web client's admin section.
 //! - Only `GET`/`HEAD` are served; anything else is a 404.
 //! - A missing file under `/assets/` is a 404 (hashed URLs must fail loudly).
 //! - Any other missing file gets `index.html` only when the request accepts
@@ -53,9 +55,10 @@ pub const CACHE_REVALIDATE: &str = "no-cache";
 /// `style-src-attr 'unsafe-inline'` for its inline `style` attributes (style
 /// sheets stay blocked, and the server strips them anyway) and `https:`
 /// images for "Show images" (the frame's own policy blocks remote images
-/// until the member asks for them).
+/// until the member asks for them). `blob:` images are an attachment's
+/// preview: bytes fetched through the API, shown only as an `<img>`.
 pub const CONTENT_SECURITY_POLICY: &str = "default-src 'self'; script-src 'self'; \
-     style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: https:; \
+     style-src 'self'; style-src-attr 'unsafe-inline'; img-src 'self' data: blob: https:; \
      connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; \
      form-action 'self'";
 
@@ -89,7 +92,7 @@ pub fn check_dir(dir: &Path) -> Result<(), String> {
 /// web client files.
 pub fn is_reserved(path: &str) -> bool {
     path == "/openapi.json"
-        || ["/api", "/bff"]
+        || ["/api", "/admin/v1", "/bff"]
             .iter()
             .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
 }
@@ -207,11 +210,22 @@ mod tests {
             "/api/v1/nope",
             "/bff",
             "/bff/api/v1/x",
+            "/admin/v1",
+            "/admin/v1/system/overview",
             "/openapi.json",
         ] {
             assert!(is_reserved(path), "{path}");
         }
-        for path in ["/", "/apis", "/bffs/x", "/some/route", "/assets/x.js"] {
+        for path in [
+            "/",
+            "/apis",
+            "/bffs/x",
+            "/some/route",
+            "/assets/x.js",
+            "/admin",
+            "/admin/system",
+            "/admin/v10",
+        ] {
             assert!(!is_reserved(path), "{path}");
         }
     }

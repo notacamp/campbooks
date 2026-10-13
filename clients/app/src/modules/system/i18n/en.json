@@ -7,5 +7,121 @@
   "unreachable": "Unreachable",
   "versionWithCommit": "{{version}} ({{commit}})",
   "healthDetail": "Service {{status}}, database {{database}}",
-  "errorHint": "Can’t reach the Campbooks API right now. Check that the server is running, then reload."
+  "errorHint": "Can’t reach the Campbooks API right now. Check that the server is running, then reload.",
+  "admin": {
+    "title": "System",
+    "lead": "How this instance is running. Nothing here shows a password, key or anyone’s mail.",
+    "refresh": "Refresh",
+    "loading": "Loading the system overview",
+    "loadError": {
+      "title": "Couldn’t load the system overview",
+      "lead": "The server didn’t answer. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "server": {
+      "title": "This server",
+      "version": "Version",
+      "commit": "Build",
+      "commitUnknown": "Not recorded",
+      "started": "Started",
+      "uptime": "Running for"
+    },
+    "database": {
+      "title": "Database",
+      "status": "Connection",
+      "reachable": "Answering",
+      "unreachable": "Not answering",
+      "latency": "Answered in {{ms}} ms",
+      "migrations": "Migrations applied",
+      "latest": "Latest: {{version}} {{description}}",
+      "unknown": "Unknown"
+    },
+    "configuration": {
+      "title": "Configuration",
+      "environment": "Environment",
+      "publicOrigin": "Public address",
+      "notSet": "Not set",
+      "signupPolicy": "Who can sign up",
+      "blobStore": "File storage",
+      "databaseLogins": "Database logins",
+      "migrations": "Migrations run",
+      "webClient": "Web app",
+      "telemetry": "Traces and metrics",
+      "metricsEndpoint": "Metrics endpoint"
+    },
+    "values": {
+      "environment": {
+        "production": "Production",
+        "development": "Development"
+      },
+      "signupPolicy": {
+        "open": "Anyone who can sign in",
+        "invite_only": "Invited people only",
+        "approval": "After an administrator approves",
+        "code": "Anyone with a signup code"
+      },
+      "blobStore": {
+        "fs": "Local disk",
+        "s3": "S3-compatible bucket"
+      },
+      "databaseLogins": {
+        "single": "One login for everything",
+        "split": "Separate runtime and migration logins"
+      },
+      "migrations": {
+        "on_start": "When the server starts",
+        "separately": "Separately, by the operator"
+      },
+      "webClient": {
+        "on": "Served by this server",
+        "off": "Not served"
+      },
+      "telemetry": {
+        "on": "Exported",
+        "off": "Off"
+      },
+      "metricsEndpoint": {
+        "on": "Open",
+        "off": "Off"
+      },
+      "identityProvider": {
+        "built_in": "Campbooks’ own",
+        "external": "Another identity provider",
+        "none": "None set up"
+      },
+      "provider": {
+        "google": "Google",
+        "microsoft": "Microsoft",
+        "zoho": "Zoho"
+      },
+      "none": "None"
+    },
+    "services": {
+      "title": "Sign-in and mail",
+      "identityProvider": "Sign-in service",
+      "signInProviders": "Sign in with",
+      "mailProviders": "Mailboxes from"
+    },
+    "ai": {
+      "title": "AI",
+      "lead": "Each role is a kind of work. A role with no model set up is simply not used.",
+      "role": {
+        "decide": "Decisions",
+        "embed": "Embeddings",
+        "complete": "Writing",
+        "vision": "Images and scans"
+      },
+      "notConfigured": "Not set up",
+      "answering": "Answering",
+      "notAnswering": "Not answering",
+      "protocol": {
+        "openai": "OpenAI-compatible",
+        "laya": "Laya"
+      },
+      "detail": "{{model}} at {{endpoint}} · {{protocol}}"
+    },
+    "duration": {
+      "lessThanAMinute": "Less than a minute"
+    }
+  }
 }

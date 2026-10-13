@@ -42,8 +42,12 @@ use crate::{
     config::ConnectorsConfig,
     deps::CREDENTIALS_PURPOSE,
     domain::intake::grant_intake,
-    google::{ClientSecret, Endpoints, GMAIL_SCOPE, Google},
+    google::{Endpoints, GMAIL_SCOPE, Google},
+    provider::ClientSecret,
+    zoho::{Centres, MAIL_SCOPES as ZOHO_SCOPES, Zoho},
 };
+
+pub use crate::testkit_zoho::FakeZoho;
 
 /// Every scope of this module.
 const ALL_SCOPES: &str = "connectors:read connectors:write";
@@ -141,6 +145,8 @@ pub struct Kit {
     pub clock: Arc<FixedClock>,
     /// The fake Google.
     pub google: FakeGoogle,
+    /// The fake Zoho (one data centre).
+    pub zoho: FakeZoho,
     /// What the module was composed with.
     pub deps: Deps,
     /// The identity module's front door, faked.
@@ -151,9 +157,13 @@ pub struct Kit {
 }
 
 impl Kit {
-    /// The module with Google configured against the fake.
+    /// The module with Google and Zoho configured against the fakes. The
+    /// database's clock is real while the module's is fixed, so Zoho's
+    /// per-login budget is set high enough never to wait in a test.
     pub async fn new(db: PgPool) -> Self {
-        Self::with_config(db, ConnectorsConfig::default()).await
+        let mut config = ConnectorsConfig::default();
+        config.zoho.requests_per_minute = 1_000_000;
+        Self::with_config(db, config).await
     }
 
     /// The module with `config`.
@@ -162,6 +172,7 @@ impl Kit {
         let clock = Arc::new(FixedClock::new(
             DateTime::from_timestamp(Utc::now().timestamp(), 0).unwrap(),
         ));
+        let zoho = FakeZoho::start(clock.clone()).await;
         let deps = Deps {
             config: Arc::new(config),
             google: Some(Arc::new(
@@ -172,27 +183,42 @@ impl Kit {
                 )
                 .unwrap(),
             )),
+            zoho: Some(Arc::new(
+                Zoho::new(
+                    "zoho-client-1".into(),
+                    ClientSecret::Inline("test-zoho-secret".into()),
+                    Centres::Fake(zoho.base()),
+                )
+                .unwrap(),
+            )),
             cipher: Some(Arc::new(Cipher::new(
                 &SecretKey::from_bytes([3; 32]),
                 CREDENTIALS_PURPOSE,
             ))),
             clock: clock.clone(),
         };
-        Self::assemble(db, deps, clock, google).await
+        Self::assemble(db, deps, clock, google, zoho).await
     }
 
     /// The module with no provider configured.
     pub async fn inert(db: PgPool) -> Self {
         let google = FakeGoogle::start().await;
         let clock = Arc::new(FixedClock::new(Utc::now()));
+        let zoho = FakeZoho::start(clock.clone()).await;
         let deps = Deps {
             clock: clock.clone(),
             ..Deps::default()
         };
-        Self::assemble(db, deps, clock, google).await
+        Self::assemble(db, deps, clock, google, zoho).await
     }
 
-    async fn assemble(db: PgPool, deps: Deps, clock: Arc<FixedClock>, google: FakeGoogle) -> Self {
+    async fn assemble(
+        db: PgPool,
+        deps: Deps,
+        clock: Arc<FixedClock>,
+        google: FakeGoogle,
+        zoho: FakeZoho,
+    ) -> Self {
         let idp = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
@@ -210,6 +236,7 @@ impl Kit {
             state,
             clock,
             google,
+            zoho,
             deps,
             door,
             app,
@@ -332,6 +359,7 @@ impl Kit {
                     subject: caller.subject.clone(),
                     provider: "google".to_owned(),
                     account_subject: account_subject.to_owned(),
+                    issuer: "https://accounts.google.com".to_owned(),
                     address: "Sam@Example.com".to_owned(),
                     address_verified: self.google.email_verified(),
                     display_name: Some("Sam Rivera".to_owned()),
@@ -347,6 +375,55 @@ impl Kit {
                 },
             )
             .await
+    }
+
+    /// A Zoho consent for login `account_subject` (whose mail accounts the
+    /// fake lists), from the data centre `issuer`, handed to the
+    /// grant-intake port for `caller` in `workspace`: the connection id.
+    pub async fn adopt_zoho(
+        &self,
+        caller: &Caller,
+        workspace: WorkspaceId,
+        account_subject: &str,
+        issuer: &str,
+    ) -> Result<String, Error> {
+        let (access, refresh) = self.zoho.grant();
+        let mut scopes = vec!["openid".to_owned(), "email".to_owned()];
+        scopes.extend(ZOHO_SCOPES.map(str::to_owned));
+        grant_intake(self.deps.clone())
+            .adopt(
+                &self.state,
+                ProviderGrant {
+                    workspace,
+                    subject: caller.subject.clone(),
+                    provider: "zoho".to_owned(),
+                    account_subject: account_subject.to_owned(),
+                    issuer: issuer.to_owned(),
+                    address: crate::testkit_zoho::LOGIN.to_owned(),
+                    address_verified: true,
+                    display_name: Some("Sam Rivera".to_owned()),
+                    scopes,
+                    access_token: SecretString::from(access),
+                    refresh_token: Some(SecretString::from(refresh)),
+                    expires_in: Some(3600),
+                    extending: None,
+                },
+            )
+            .await
+    }
+
+    /// Connect the fake Zoho login as `caller` in `workspace`; the
+    /// connection JSON.
+    pub async fn connect_zoho(&self, caller: &Caller, workspace: WorkspaceId) -> serde_json::Value {
+        let id = self
+            .adopt_zoho(caller, workspace, "zoho-zuid-7001", &self.zoho.issuer())
+            .await
+            .unwrap_or_else(|e| panic!("adopting: {e:?}"));
+        let read = self
+            .get(caller, &format!("/api/v1/w/{workspace}/connections/{id}"))
+            .await;
+        assert_eq!(read.status.as_u16(), 200, "{:?}", read.json);
+        read.json
     }
 
     /// Connect Gmail as `caller` in `workspace`, end to end from the

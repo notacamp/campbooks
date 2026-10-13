@@ -13,7 +13,7 @@ use crate::{
     contract::{Address, OUTGOING_CONTENT_TYPE, OutgoingMessage},
     domain::model::{InboxId, SendId},
     events::SendRequested,
-    gmail::normalize,
+    mail::parse as normalize,
     testkit::{Kit, assert_contract, synthetic},
 };
 

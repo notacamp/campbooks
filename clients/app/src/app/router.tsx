@@ -1,7 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { createRoute, createRouter, Navigate, type RouterHistory } from "@tanstack/react-router";
 
-import { buildModuleRoutes } from "./modules";
+import { AdminLayout } from "./admin/AdminLayout";
+import { buildModuleAdminRoutes, buildModuleRoutes } from "./modules";
 import { EmptyHome } from "./routes/home";
 import { gatedRoute, rootRoute } from "./routes/root";
 import { Start } from "./routes/start";
@@ -35,6 +36,22 @@ const settingsRoute = createRoute({
   },
 });
 
+/** `/admin`: instance administration, outside any workspace (ADR 0015). */
+const adminRoute = createRoute({
+  getParentRoute: () => gatedRoute,
+  path: "/admin",
+  component: AdminLayout,
+});
+
+/** Administration opens on its first panel: System. */
+const adminIndexRoute = createRoute({
+  getParentRoute: () => adminRoute,
+  path: "/",
+  component: function AdminIndex() {
+    return <Navigate to="/admin/system" replace />;
+  },
+});
+
 const moduleRoutes = buildModuleRoutes({
   public: rootRoute,
   root: gatedRoute,
@@ -45,6 +62,7 @@ const routeTree = rootRoute.addChildren([
   gatedRoute.addChildren([
     startRoute,
     workspaceRoute.addChildren([homeRoute, settingsRoute, ...moduleRoutes.workspace]),
+    adminRoute.addChildren([adminIndexRoute, ...buildModuleAdminRoutes(adminRoute)]),
     ...moduleRoutes.root,
   ]),
   ...moduleRoutes.public,

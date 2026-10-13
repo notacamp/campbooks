@@ -432,6 +432,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/attachments/{attachment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download one attachment of a message. */
+        get: operations["conversations.get_attachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
         parameters: {
             query?: never;
@@ -937,6 +954,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bff/admin/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read from the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        get: operations["bff.admin_get"];
+        /**
+         * PUT to the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        put: operations["bff.admin_put"];
+        /**
+         * POST to the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        post: operations["bff.admin_post"];
+        /**
+         * DELETE in the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        delete: operations["bff.admin_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        patch: operations["bff.admin_patch"];
+        trace?: never;
+    };
     "/bff/api/{path}": {
         parameters: {
             query?: never;
@@ -1284,6 +1372,12 @@ export interface components {
             redirect: string;
         };
         /**
+         * Format: binary
+         * @description An attachment's bytes, as the OpenAPI document describes them (a binary
+         *     string); the handler streams them.
+         */
+        AttachmentBytes: string;
+        /**
          * Format: uuid
          * @description AttachmentId (UUIDv7)
          */
@@ -1296,6 +1390,11 @@ export interface components {
             filename: string;
             /** @description The attachment. */
             id: components["schemas"]["AttachmentId"];
+            /**
+             * @description Shown by the HTML body (an inline raster image its `cid:` source
+             *     names), so a reader need not list it with the files.
+             */
+            in_body: boolean;
             /** @description Shown inside the body rather than attached. */
             inline: boolean;
             /**
@@ -2048,7 +2147,7 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google";
+        Provider: "google" | "zoho";
         /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
@@ -2304,6 +2403,11 @@ export interface components {
         };
         /** @description A change stream as the API shows it. */
         StreamView: {
+            /**
+             * @description The mailbox it reads (`messages`): one connection can reach several
+             *     (a Zoho login's mail accounts).
+             */
+            address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
             inbox_id?: components["schemas"]["InboxId"] | null;
@@ -3846,6 +3950,69 @@ export interface operations {
                 };
             };
             /** @description No such conversation, or the label is not on it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_attachment": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `true` to show it in the browser (`Content-Disposition: inline`):
+                 *     honoured for raster images and PDFs only; anything else is still a
+                 *     download.
+                 */
+                inline?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+                /** @description The attachment. */
+                attachment_id: components["schemas"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bytes, as a download. `Content-Type` is the stored type when it is on the safe list (raster images, PDF, plain text, CSV, calendar, archives, office documents, common audio and video), else `application/octet-stream`; `Content-Disposition` carries the sanitised file name. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": components["schemas"]["AttachmentBytes"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such attachment, or you cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5952,6 +6119,246 @@ export interface operations {
             };
         };
     };
+    "bff.admin_get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "bff.api_get": {
         parameters: {
             query?: never;
@@ -6287,7 +6694,8 @@ export interface operations {
                 return_to?: string | null;
                 /**
                  * @description Sign in again unless the person did within this many seconds: the
-                 *     step-up an operation asks for with `step_up_required`.
+                 *     step-up an operation asks for with `step_up_required`, or `0` after
+                 *     the admin API's `admin_reauth_required`.
                  */
                 max_age?: number | null;
             };

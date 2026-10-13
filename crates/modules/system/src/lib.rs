@@ -1,4 +1,5 @@
-//! `campbooks-system` — instance health and version.
+//! `campbooks-system` — instance health and version, and the admin
+//! dashboard's System panel (`GET /admin/v1/system/overview`, ADR 0015).
 //!
 //! This is the **reference vertical slice**: copy its shape for every new
 //! module. `lib.rs` only assembles [`module`]; each use case lives in its own
@@ -13,11 +14,15 @@
 
 #![forbid(unsafe_code)]
 
+use axum::Extension;
 use campbooks_kernel::{Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod deps;
 mod features;
 pub mod scopes;
+
+pub use deps::{Deps, Facts, IdentityProvider};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
@@ -25,14 +30,24 @@ pub const NAME: &str = "system";
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
-/// The system module, ready for the server to mount.
+/// The system module composed with nothing (for catalogues and tests).
 pub fn module() -> Module {
+    module_with(Deps::default())
+}
+
+/// The system module composed with `deps`, ready for the server to mount.
+pub fn module_with(deps: Deps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
         router: OpenApiRouter::new()
             .routes(routes!(features::health::handler))
             .routes(routes!(features::version::handler)),
+        admin_router: Some(
+            OpenApiRouter::new()
+                .routes(routes!(features::admin_overview::handler))
+                .layer(Extension(deps)),
+        ),
         background: Background::new(),
     }
 }

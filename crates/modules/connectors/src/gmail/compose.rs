@@ -78,7 +78,7 @@ mod tests {
     use chrono::{DateTime, Utc};
 
     use super::*;
-    use crate::{contract::OutgoingAttachment, domain::model::InboxId, gmail::normalize};
+    use crate::{contract::OutgoingAttachment, domain::model::InboxId, mail::parse as normalize};
 
     fn person(name: Option<&str>, address: &str) -> Address {
         Address {
