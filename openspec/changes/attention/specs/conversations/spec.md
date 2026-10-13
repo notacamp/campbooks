@@ -51,7 +51,11 @@ from the provider or from members alike.
 
 #### Scenario: Archiving a bill
 - **WHEN** a member archives a conversation with a `pay` need
-- **THEN** the need stays open
+- **THEN** the need stays open until a member chooses Done or Not needed
+
+#### Scenario: Done in a shared inbox
+- **WHEN** Ana chooses Done on a need in an inbox she shares with Leo
+- **THEN** the need is cleared for both of them
 
 ### Requirement: Need changes are published
 Every change to a need SHALL publish `conversations.need_changed` v1

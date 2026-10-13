@@ -5,7 +5,8 @@ When the user can see at least one inbox, Home SHALL show their open
 attention items (`attention.list`) in groups, in the order Review, Reply,
 Decide, Do, Pay, leaving out empty groups, each item in the list's order. The
 hero SHALL say how many things need the user, with the Visor `alert` when
-Review has an item. Each item SHALL show who it is from, its sentence (from a
+Review has an item. The selected item SHALL be shown by the selected background and a full focus
+ring, never by a coloured stripe on one edge. Each item SHALL show who it is from, its sentence (from a
 template chosen by reason and by the rule that decided it, in the user's
 language), the sender's sentence quoted on one line, and its chips (due date
 or overdue, urgent, how long it has waited). Rows SHALL come from the owning

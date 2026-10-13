@@ -1492,6 +1492,7 @@ impl EmailSignals {
     pub fn answer(envelope: &Envelope, questions: &[Question]) -> Decisions {
         let started = Instant::now();
         let read = Read::new(envelope);
+        let fresh = new_text(&envelope.body);
         let asks = asks_action(&read);
         let answers = questions
             .iter()
@@ -1514,7 +1515,11 @@ impl EmailSignals {
                     (triage::SUSPICIOUS, QuestionKind::Noul { .. }) => suspicious(&read),
                     _ => None,
                 };
-                ruled.map(|(index, confidence, reasons)| Decided {
+                ruled.map(|(index, confidence, mut reasons)| {
+                    for reason in &mut reasons {
+                        reason.sentence = quoted_sentence(&fresh, reason);
+                    }
+                    Decided {
                     answer: local_answer(
                         q,
                         peaked(q.option_count(), index, confidence),
@@ -1522,6 +1527,7 @@ impl EmailSignals {
                         started,
                     ),
                     reasons,
+                    }
                 })
             })
             .collect();
@@ -1530,6 +1536,70 @@ impl EmailSignals {
             remote_calls: 0,
         }
     }
+}
+
+/// Rules whose evidence is a phrase from the message's text, so the
+/// sentence around it is what the sender wrote.
+const QUOTED_RULES: [&str; 9] = [
+    "signals.reply_asked",
+    "signals.request",
+    "signals.question",
+    "signals.payment_due",
+    "signals.action_asked",
+    "signals.deadline",
+    "signals.today",
+    "signals.phishing_phrase",
+    "signals.pressure",
+];
+
+/// Longest quoted sentence, in characters.
+pub const SENTENCE_CHARS: usize = 240;
+
+/// The sentence of `fresh` (the new text, quoted history dropped) holding
+/// `reason`'s evidence, whitespace collapsed and cut at a word past
+/// [`SENTENCE_CHARS`]; `None` for rules that read headers or addresses, or
+/// when the evidence is not in the text (it came from the subject).
+fn quoted_sentence(fresh: &str, reason: &Reason) -> Option<String> {
+    if !QUOTED_RULES.contains(&reason.rule) || reason.evidence.is_empty() {
+        return None;
+    }
+    let needle = reason.evidence.to_lowercase().replace('\u{2019}', "'");
+    let mut start = 0;
+    for (i, c) in fresh.char_indices() {
+        let ends = matches!(c, '.' | '!' | '?' | '\n');
+        if !ends {
+            continue;
+        }
+        let end = i + c.len_utf8();
+        if let Some(found) = sentence_at(&fresh[start..end], &needle) {
+            return Some(found);
+        }
+        start = end;
+    }
+    sentence_at(&fresh[start..], &needle)
+}
+
+fn sentence_at(candidate: &str, needle: &str) -> Option<String> {
+    let flat = candidate.split_whitespace().collect::<Vec<_>>().join(" ");
+    let normalised = flat.to_lowercase().replace('\u{2019}', "'");
+    if flat.is_empty() || !normalised.contains(needle) {
+        return None;
+    }
+    if flat.chars().count() <= SENTENCE_CHARS {
+        return Some(flat);
+    }
+    let mut cut = String::new();
+    for word in flat.split(' ') {
+        if cut.chars().count() + word.chars().count() + 1 > SENTENCE_CHARS {
+            break;
+        }
+        if !cut.is_empty() {
+            cut.push(' ');
+        }
+        cut.push_str(word);
+    }
+    cut.push('…');
+    Some(cut)
 }
 
 impl Strategy for EmailSignals {
@@ -1579,6 +1649,42 @@ mod tests {
 
     fn choice(label: &str) -> AnswerValue {
         AnswerValue::Choice(label.into())
+    }
+
+    #[test]
+    fn reasons_quote_the_senders_sentence() {
+        let env = mail(
+            "marta@casa-lume.example",
+            "Walkthrough",
+            "Hope the move went well. Could you confirm Thursday\u{2019}s walkthrough? Thanks!\n\n\
+             On Mon, 12 Oct 2026 Ana wrote:\n> Could you send the plan?",
+        );
+        let d = ask(&env, triage::NEEDS_REPLY).unwrap();
+        assert_eq!(
+            d.reasons[0].sentence.as_deref(),
+            Some("Could you confirm Thursday\u{2019}s walkthrough?")
+        );
+    }
+
+    #[test]
+    fn header_reasons_quote_nothing() {
+        let env = with_header(
+            mail("news@shop.example", "Autumn sale", "Big savings this week."),
+            "List-Unsubscribe",
+            "<mailto:u@shop.example>",
+        );
+        let d = ask(&env, triage::STREAM).unwrap();
+        assert!(d.reasons.iter().all(|r| r.sentence.is_none()));
+    }
+
+    #[test]
+    fn long_sentences_are_cut_at_a_word() {
+        let long = format!("Could you {} confirm?", "please ".repeat(60));
+        let env = mail("jonas@example.com", "Lunch", &long);
+        let d = ask(&env, triage::NEEDS_REPLY).unwrap();
+        let sentence = d.reasons[0].sentence.clone().unwrap();
+        assert!(sentence.chars().count() <= SENTENCE_CHARS + 1);
+        assert!(sentence.ends_with('…'));
     }
 
     #[test]

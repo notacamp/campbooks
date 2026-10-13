@@ -1,5 +1,20 @@
 # Design
 
+## Owner decisions (2026-10-13)
+
+The owner approved this design and the prototype, answering the three open
+questions:
+
+1. **Archiving keeps Do and Pay.** Archiving a bill or an ask keeps it on Home
+   until the member chooses Done or Not needed.
+2. **Phishing warnings show** in Review even while `suspicious` is below its
+   98 % precision target: a warning moves and hides nothing.
+3. **Done in a shared inbox clears the need for everyone**: it is a fact about
+   the conversation.
+
+From the review: the selected item has no coloured stripe on its left edge;
+selection is the selected background with a full focus ring.
+
 ## Context
 
 - **The decide pass** (`conversations`, `campbooks_ai::decide`). Every new
@@ -116,8 +131,8 @@ state change, and publishes the result. The table:
 
 Two rows are judgement calls. **Archiving keeps Do and Pay**: archiving says
 you have read it, not that you signed or paid; Home remembering is the point.
-**Replying keeps Pay**: bills are not paid by email. Both are owner questions
-(see the end).
+**Replying keeps Pay**: bills are not paid by email. The owner confirmed the
+first (Owner decisions, 1).
 
 Only messages sent in the last `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS`
 (default 14) raise a need, so a first sync of years of mail does not fill
@@ -476,10 +491,4 @@ notifications module exists), the drafts and summaries that fill the seam
 
 ## Open questions for the owner
 
-1. Archiving a bill or an ask: keep it on Home until Done (recommended), or
-   clear it with the archive?
-2. Phishing warnings while `suspicious` is still below its precision target:
-   show them in Review (recommended, a warning moves nothing), or wait for the
-   eval to hold?
-3. Done in a shared inbox: clear the need for everyone (recommended, it is a
-   fact about the conversation), or only for the member who chose it?
+None: answered on 2026-10-13 (see Owner decisions).
