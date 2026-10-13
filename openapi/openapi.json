@@ -2640,11 +2640,11 @@
         },
         "responses": {
           "201": {
-            "description": "Invited. A previous pending invitation to the same address is replaced.",
+            "description": "Invited, with the accept link to pass on (shown only in this response). A previous pending invitation to the same address is replaced.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/InvitationView"
+                  "$ref": "#/components/schemas/CreatedInvitation"
                 }
               }
             }
@@ -5229,6 +5229,28 @@
             "description": "Navigate here: the client's redirect URI with a code, or `return_to`."
           }
         }
+      },
+      "CreatedInvitation": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/InvitationView",
+            "description": "The invitation."
+          },
+          {
+            "type": "object",
+            "required": [
+              "accept_url"
+            ],
+            "properties": {
+              "accept_url": {
+                "type": "string",
+                "description": "The link that accepts it (it carries the token). Returned only here,\nonce: no other endpoint, log or event ever shows it.",
+                "example": "https://campbooks.example.com/invitations/accept?token=…"
+              }
+            }
+          }
+        ],
+        "description": "A new invitation, as the inviter sees it once: with the link to pass on."
       },
       "Direction": {
         "type": "string",

@@ -5,6 +5,7 @@ import { useShortcutDefinitions, type ShortcutGroup } from "~/lib/shortcuts";
 import { Overlay } from "../../internal/Overlay";
 import { useTranslateKey } from "../../internal/translate-key";
 import { Icon } from "../Icon/Icon";
+import { IconButton } from "../IconButton/IconButton";
 import { Kbd, KbdHint } from "../Kbd/Kbd";
 
 import styles from "./ShortcutSheet.module.css";
@@ -27,6 +28,9 @@ export function ShortcutSheet({ open, onClose }: ShortcutSheetProps) {
         <Icon name="keyboard" />
         <h2 className={styles["title"]}>{t("shortcutSheet.title")}</h2>
         <Kbd>Esc</Kbd>
+        {/* A control in the dialog: it closes it on touch, and lets the
+            keyboard reach (and scroll) a long sheet. */}
+        <IconButton icon="close" label={t("close")} onClick={onClose} />
       </div>
       <div className={styles["groups"]}>
         {GROUP_ORDER.map((group) => {

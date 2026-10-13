@@ -7,7 +7,10 @@ export function ConversationsHome() {
   const { t } = useTranslation("conversations");
 
   return (
-    <section aria-labelledby="conversations-home-title" className="max-w-xl space-y-4">
+    <section
+      aria-labelledby="conversations-home-title"
+      className="flex max-w-measure flex-col gap-4 p-6"
+    >
       <Heading level={1} size="page" id="conversations-home-title">
         {t("title")}
       </Heading>

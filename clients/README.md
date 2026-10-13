@@ -50,7 +50,9 @@ cargo run -p campbooks-server
 Any API call without a session answers `401 session_required`, and the web transport sends
 the browser to `/bff/login`, coming back to the same page afterwards.
 
-Without a running API the home page shows a "can't reach the API" state instead of crashing.
+Without a running API the app shows a "Can't reach Campbooks" page instead of crashing. To see
+the signed-in screens without any server, record (or just run) the `first-run` scenario below:
+it answers `/bff/*` in the browser from demo data.
 
 ## Screen recordings for PRs
 
@@ -59,7 +61,7 @@ UI pull requests include a screen recording at 375px and desktop width.
 ```sh
 pnpm --dir clients --filter @campbooks/app exec playwright install chromium   # once
 pnpm --dir clients dev                                # the UI on http://localhost:5173
-pnpm --dir clients record home                        # [--base-url http://localhost:5173]
+pnpm --dir clients record first-run                   # [--base-url http://localhost:5173]
 ```
 
 This writes `app/recordings/out/<scenario>-375.webm` and `<scenario>-desktop.webm`

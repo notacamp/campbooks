@@ -7,7 +7,10 @@ export function ConnectorsHome() {
   const { t } = useTranslation("connectors");
 
   return (
-    <section aria-labelledby="connectors-home-title" className="max-w-xl space-y-4">
+    <section
+      aria-labelledby="connectors-home-title"
+      className="flex max-w-measure flex-col gap-4 p-6"
+    >
       <Heading level={1} size="page" id="connectors-home-title">
         {t("title")}
       </Heading>

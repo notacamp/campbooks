@@ -1157,6 +1157,15 @@ export interface components {
             /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
             redirect: string;
         };
+        /** @description A new invitation, as the inviter sees it once: with the link to pass on. */
+        CreatedInvitation: components["schemas"]["InvitationView"] & {
+            /**
+             * @description The link that accepts it (it carries the token). Returned only here,
+             *     once: no other endpoint, log or event ever shows it.
+             * @example https://campbooks.example.com/invitations/accept?token=…
+             */
+            accept_url: string;
+        };
         /**
          * @description Whether a message came in or went out.
          * @enum {string}
@@ -3325,13 +3334,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Invited. A previous pending invitation to the same address is replaced. */
+            /** @description Invited, with the accept link to pass on (shown only in this response). A previous pending invitation to the same address is replaced. */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["InvitationView"];
+                    "application/json": components["schemas"]["CreatedInvitation"];
                 };
             };
             /** @description Invalid email, role or body. */

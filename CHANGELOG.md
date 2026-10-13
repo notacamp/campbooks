@@ -22,6 +22,26 @@ All notable changes to Campbooks Next are documented here. The format follows
   (see `deploy/README.md` → Built-in sign-in). The shipped `compose.yaml`
   still uses Rauthy, so existing installs see no change yet; the sign-in
   screens arrive in the next release.
+- The new app's first run: a calm signed-out page with one "Sign in" (that
+  brings you back to the page you opened), then creating your first
+  workspace one question at a time (its name, then Business or Personal,
+  which picks its colour), with Skip where a default works. Instances that
+  require a signup code, an invitation or an administrator's approval each
+  say so plainly.
+- Workspaces in the address (`/w/<id>/…`), a sidebar (a header and tab bar
+  on phones), the workspace switcher (⌘⇧W, Ctrl+Shift+W elsewhere) with each
+  workspace in its own colour, and an account menu with theme, density,
+  language and Sign out. The app reopens the workspace you used last on that
+  device.
+- An empty Home ("Nothing needs you yet") with the shortcuts that work today;
+  "Connect your mail" says it is coming, because mail connections are not
+  built yet.
+- Settings → Members: owners and admins change roles (with Undo), remove
+  members after confirming in place, invite people by email and see pending
+  invitations. Campbooks does not email invitations yet, so right after
+  inviting you get the invitation link once, with a Copy button (C), to send
+  it on yourself; inviting again gives a fresh link. The link opens a page
+  that signs you in if needed and joins the workspace.
 - Conversations, the first piece of the inbox: inboxes, conversations and
   messages (email first), threaded by the provider's thread or by replies,
   with bodies and attachments kept in blob storage. Conversations are sorted
@@ -261,6 +281,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- **API clients:** `POST /api/v1/w/{workspace_id}/invitations` now answers
+  with `accept_url`, the invitation's accept link, built from
+  `CAMPBOOKS_PUBLIC_URL`. It is returned only in that response (never listed,
+  logged or sent in an event); inviting the same address again returns a
+  fresh link. Development servers no longer log invitation links.
 - **API clients:** every problem+json error now carries a stable `code`
   (`not_found`, `invalid_token`, `last_owner`, …); `detail` is now a
   sentence in the caller's language instead of that code. Match on `code`.

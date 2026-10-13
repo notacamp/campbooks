@@ -5,5 +5,58 @@
     "title": "Page not found",
     "body": "This page doesn't exist or was moved.",
     "home": "Go to the home page"
+  },
+  "landing": {
+    "title": "What needs you, in one calm place",
+    "lead": "Campbooks reads your mail and brings you only what needs you.",
+    "signIn": "Sign in",
+    "invitedTitle": "You’ve been invited to a workspace",
+    "invitedLead": "Sign in with the email address the invitation was sent to, and you’ll join straight away.",
+    "ended": "You were signed out.",
+    "endedDetail": "Sign in again to carry on where you were.",
+    "footer": "Open source. Your mail stays in your workspace."
+  },
+  "gate": {
+    "opening": "Opening Campbooks…",
+    "unreachableTitle": "Can’t reach Campbooks",
+    "unreachableLead": "The server didn’t answer. Check your connection, then try again.",
+    "retry": "Try again"
+  },
+  "workspace": {
+    "unavailableTitle": "This workspace isn’t available",
+    "unavailableLead": "It may have been deleted, or you’re no longer a member.",
+    "openMine": "Open my workspaces",
+    "loadErrorTitle": "Couldn’t load your workspaces",
+    "loadErrorLead": "Campbooks didn’t answer. Nothing was lost."
+  },
+  "account": {
+    "label": "Account",
+    "theme": "Theme",
+    "themes": {
+      "system": "System",
+      "light": "Light",
+      "dark": "Dark"
+    },
+    "density": "Density",
+    "densities": {
+      "comfortable": "Comfortable",
+      "compact": "Compact"
+    },
+    "language": "Language",
+    "signOut": "Sign out",
+    "signingOut": "Signing out…"
+  },
+  "home": {
+    "title": "Nothing needs you yet",
+    "subline": "When Campbooks has something for you, it shows up here.",
+    "connectTitle": "Connect your mail",
+    "connectLead": "Campbooks will read your mail and bring what needs you to this page. Mail connections are still being built, so you can’t connect a mailbox yet.",
+    "connect": "Connect your mail",
+    "soon": "Coming soon",
+    "context": "Getting started",
+    "start": "Getting started",
+    "invite": "Invite the people you work with",
+    "inviteAction": "Invite",
+    "keyboard": "Keyboard"
   }
 }

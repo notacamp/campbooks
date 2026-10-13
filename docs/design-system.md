@@ -103,6 +103,11 @@ Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
 | Item, ConversationRow, NavItem, Segmented, Chip, TabBar, ActionBar | rows and navigation |
 | Shell, Sidebar, ListPane, ReaderPane, PaneHeader, HomeLayout, PageHero, QueueGroup, AsideSection, Line, Figure, MessageCard, Composer | layout and screen pieces |
 | CommandMenu (⌘K), ShortcutSheet (?) | modal dialogs that read the shortcut registry |
+| TextField, Select, ChoiceCards | labelled form controls with help and errors; ChoiceCards are native radios with a sentence each |
+| FocusPage, Brand | a centred page that asks one thing (signing in, each first-run step); can preview an accent with `accent` |
+| Popover, PopoverSection | a small non-modal panel on its trigger (the account menu); Escape and outside clicks close it |
+| WorkspaceMenu, WorkspaceMark, AccountButton, PhoneHeader | the workspace switcher (⌘⇧W) with each workspace in its own accent, who is signed in, the phone's top bar |
+| List, ListRow, InlineConfirm | rows of people or invitations; risky actions confirm in place, not in a modal |
 | Heading, Text, VisuallyHidden, Icon | typography and icons for modules |
 
 ## Keyboard shortcuts
@@ -131,7 +136,7 @@ the `?` sheet and the ⌘K menu format keys from the registry, so a hint cannot
 drift from its binding. The menu lists every shortcut that currently has a
 handler, plus the screen's own commands.
 
-The defaults are in `lib/shortcuts/catalog.ts`: G then H/I/S/T/D/M to go
+The defaults are in `lib/shortcuts/catalog.ts`: G then H/I/S/T/D/M/, to go
 places, J/K/↵ in lists, R/E/L/H/P/1/2 on the selected item, ⌘J/⌘↵ while
 writing, ⌘K, Z (undo), ⌘⇧W (switch workspace), ? and Esc.
 

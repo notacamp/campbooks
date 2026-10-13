@@ -1,6 +1,7 @@
 .segmented {
   display: inline-flex;
   flex: none;
+  align-self: flex-start;
   gap: var(--space-0-5);
   padding: var(--space-0-5);
   border-radius: var(--radius-md);

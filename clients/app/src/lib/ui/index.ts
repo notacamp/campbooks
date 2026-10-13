@@ -42,17 +42,31 @@ export {
 } from "./components/Button/Button";
 export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
 export {
+  ChoiceCards,
+  type ChoiceCardOption,
+  type ChoiceCardsProps,
+} from "./components/ChoiceCards/ChoiceCards";
+export {
   CommandMenu,
   type Command,
   type CommandMenuProps,
 } from "./components/CommandMenu/CommandMenu";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
+export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {
   ConversationRow,
   type ConversationRowProps,
 } from "./components/ConversationRow/ConversationRow";
 export { Dot, type DotProps } from "./components/Dot/Dot";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
+export {
+  Select,
+  TextField,
+  type SelectOption,
+  type SelectProps,
+  type TextFieldProps,
+} from "./components/Field/Field";
+export { Brand, FocusPage, type FocusPageProps } from "./components/FocusPage/FocusPage";
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
@@ -62,7 +76,9 @@ export {
   type ItemDetailProps,
   type ItemProps,
 } from "./components/Item/Item";
+export { InlineConfirm, type InlineConfirmProps } from "./components/InlineConfirm/InlineConfirm";
 export { Kbd, KbdHint, type KbdHintProps } from "./components/Kbd/Kbd";
+export { List, ListRow, type ListRowProps } from "./components/List/List";
 export {
   Attachment,
   MessageCard,
@@ -78,6 +94,12 @@ export {
   type NoteProps,
 } from "./components/Note/Note";
 export { Pill, type PillProps } from "./components/Pill/Pill";
+export {
+  Popover,
+  PopoverSection,
+  type PopoverProps,
+  type PopoverTriggerProps,
+} from "./components/Popover/Popover";
 export {
   AsideSection,
   Figure,
@@ -97,8 +119,10 @@ export {
   type SegmentedProps,
 } from "./components/Segmented/Segmented";
 export {
+  AccountButton,
   ListPane,
   PaneHeader,
+  PhoneHeader,
   ReaderBody,
   ReaderPane,
   SearchButton,
@@ -107,7 +131,9 @@ export {
   SidebarFooter,
   Spacer,
   StatusLine,
+  WorkspaceMark,
   WorkspaceSwitcher,
+  type AccountButtonProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
@@ -133,3 +159,8 @@ export {
   type TextTone,
 } from "./components/Typography/Typography";
 export { Visor, VISOR_STATES, type VisorProps, type VisorState } from "./components/Visor/Visor";
+export {
+  WorkspaceMenu,
+  type WorkspaceMenuItem,
+  type WorkspaceMenuProps,
+} from "./components/WorkspaceMenu/WorkspaceMenu";

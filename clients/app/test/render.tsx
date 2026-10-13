@@ -3,32 +3,70 @@ import { render, type RenderResult } from "@testing-library/react";
 import { Suspense, type ReactNode } from "react";
 import { I18nextProvider } from "react-i18next";
 
-import { createI18n, loadersFromGlob, type Locale, type Messages } from "~/lib/i18n";
+import { createI18n, type Locale, type Messages } from "~/lib/i18n";
 import { ShortcutProvider, ShortcutRegistry, DEFAULT_SHORTCUTS } from "~/lib/shortcuts";
-import { UI_NAMESPACES } from "~/lib/ui";
+import { UI_NAMESPACES, UndoProvider } from "~/lib/ui";
+
+import { MODULE_SHORTCUTS } from "../src/app/modules";
 
 import en from "../src/app/i18n/en.json";
 
-const moduleMessages = import.meta.glob<Messages>("../src/modules/*/i18n/*.json", {
+// Module namespaces are bundled eagerly in tests: the app loads them lazily
+// (src/lib/i18n covers that path), but a lazy load per test would only add
+// seconds of Suspense to every screen test on a busy runner.
+const moduleFiles = import.meta.glob<Messages>("../src/modules/*/i18n/*.json", {
   import: "default",
+  eager: true,
 });
+const moduleNamespaces: Record<string, Record<Locale, Messages>> = {};
+for (const [path, messages] of Object.entries(moduleFiles)) {
+  const match = /modules\/([^/]+)\/i18n\/([^/]+)\.json$/u.exec(path);
+  if (match !== null) {
+    const [, namespace = "", locale = ""] = match;
+    moduleNamespaces[namespace] = {
+      ...moduleNamespaces[namespace],
+      [locale]: messages,
+    } as Record<Locale, Messages>;
+  }
+}
 
-/** Renders `ui` with a fresh query cache (no retries) and real, lazily loaded i18n. */
-export function renderWithProviders(ui: ReactNode, locale: Locale = "en"): RenderResult {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+/** The app's shortcuts: the defaults plus every module's (as in providers.tsx). */
+const appShortcuts = () => new ShortcutRegistry([...DEFAULT_SHORTCUTS, ...MODULE_SHORTCUTS]);
+
+/**
+ * Renders `ui` like the app does: a fresh query cache (no retries), real
+ * i18n, the app's shortcuts (non-Apple keys) and the undo stack.
+ */
+export function renderWithProviders(
+  ui: ReactNode,
+  locale: Locale = "en",
+): RenderResult & { queryClient: QueryClient } {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
   const i18n = createI18n({
     locale,
     shell: { en, "pt-PT": en, "es-ES": en, fr: en },
-    bundled: UI_NAMESPACES,
-    loaders: loadersFromGlob(moduleMessages),
+    bundled: { ...UI_NAMESPACES, ...moduleNamespaces },
+    loaders: {},
   });
-  return render(
-    <I18nextProvider i18n={i18n}>
-      <QueryClientProvider client={queryClient}>
-        <Suspense fallback={<p>loading translations</p>}>{ui}</Suspense>
-      </QueryClientProvider>
-    </I18nextProvider>,
-  );
+  const registry = appShortcuts();
+  // Providers go in a wrapper so `rerender` keeps them.
+  function Providers({ children }: { children: ReactNode }) {
+    return (
+      <I18nextProvider i18n={i18n}>
+        <ShortcutProvider registry={registry} platform="other">
+          <UndoProvider>
+            <QueryClientProvider client={queryClient}>
+              <Suspense fallback={<p>loading translations</p>}>{children}</Suspense>
+            </QueryClientProvider>
+          </UndoProvider>
+        </ShortcutProvider>
+      </I18nextProvider>
+    );
+  }
+  const result = render(ui, { wrapper: Providers });
+  return { ...result, queryClient };
 }
 
 /**
@@ -68,5 +106,55 @@ export function stubApi(routes: Record<string, { status?: number; body: unknown 
       return Promise.reject(new TypeError(`Network error: no stub for ${url.pathname}`));
     }
     return Promise.resolve(Response.json(route.body, { status: route.status ?? 200 }));
+  };
+}
+
+/** What a mocked endpoint answers: a fixed response, or one computed from the request. */
+interface MockAnswer {
+  status?: number;
+  body?: unknown;
+}
+type MockHandler = MockAnswer | ((request: Request, body: unknown) => MockAnswer);
+
+export interface MockedApi {
+  /** Every request made, as "METHOD /path" with its JSON body. */
+  calls: { route: string; body: unknown }[];
+}
+
+/**
+ * Stubs `fetch` per method and path: keys are "GET /bff/api/v1/workspaces",
+ * "PATCH /bff/api/v1/w/w1/members/u2", ... An unknown route is a network error.
+ */
+export function mockApi(routes: Record<string, MockHandler>): MockedApi {
+  const mocked: MockedApi = { calls: [] };
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const request = input instanceof Request ? input : new Request(input, init);
+    const route = `${request.method} ${new URL(request.url).pathname}`;
+    const text = await request.text();
+    const body: unknown = text === "" ? undefined : JSON.parse(text);
+    mocked.calls.push({ route, body });
+    const handler = routes[route];
+    if (handler === undefined) {
+      throw new TypeError(`Network error: no mock for ${route}`);
+    }
+    const answer = typeof handler === "function" ? handler(request, body) : handler;
+    const status = answer.status ?? 200;
+    return answer.body === undefined
+      ? new Response(null, { status })
+      : Response.json(answer.body, {
+          status,
+          headers: {
+            "content-type": status >= 400 ? "application/problem+json" : "application/json",
+          },
+        });
+  };
+  return mocked;
+}
+
+/** A problem+json body as the API sends it. */
+export function problem(status: number, code: string): MockAnswer {
+  return {
+    status,
+    body: { type: "about:blank", title: "Problem", status, detail: "Localized detail", code },
   };
 }

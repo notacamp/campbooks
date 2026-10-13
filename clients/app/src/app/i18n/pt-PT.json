@@ -5,5 +5,58 @@
     "title": "Página não encontrada",
     "body": "Esta página não existe ou foi movida.",
     "home": "Ir para a página inicial"
+  },
+  "landing": {
+    "title": "O que precisa de si, num só lugar tranquilo",
+    "lead": "O Campbooks lê o seu correio e traz-lhe apenas o que precisa de si.",
+    "signIn": "Iniciar sessão",
+    "invitedTitle": "Foi convidado para um espaço de trabalho",
+    "invitedLead": "Inicie sessão com o endereço de email para o qual o convite foi enviado e entra logo.",
+    "ended": "A sua sessão terminou.",
+    "endedDetail": "Inicie sessão novamente para continuar onde estava.",
+    "footer": "Código aberto. O seu correio fica no seu espaço de trabalho."
+  },
+  "gate": {
+    "opening": "A abrir o Campbooks…",
+    "unreachableTitle": "Não foi possível contactar o Campbooks",
+    "unreachableLead": "O servidor não respondeu. Verifique a ligação e tente novamente.",
+    "retry": "Tentar novamente"
+  },
+  "workspace": {
+    "unavailableTitle": "Este espaço de trabalho não está disponível",
+    "unavailableLead": "Pode ter sido eliminado, ou já não é membro.",
+    "openMine": "Abrir os meus espaços de trabalho",
+    "loadErrorTitle": "Não foi possível carregar os seus espaços de trabalho",
+    "loadErrorLead": "O Campbooks não respondeu. Nada se perdeu."
+  },
+  "account": {
+    "label": "Conta",
+    "theme": "Tema",
+    "themes": {
+      "system": "Sistema",
+      "light": "Claro",
+      "dark": "Escuro"
+    },
+    "density": "Densidade",
+    "densities": {
+      "comfortable": "Confortável",
+      "compact": "Compacta"
+    },
+    "language": "Idioma",
+    "signOut": "Terminar sessão",
+    "signingOut": "A terminar sessão…"
+  },
+  "home": {
+    "title": "Ainda nada precisa de si",
+    "subline": "Quando o Campbooks tiver algo para si, aparece aqui.",
+    "connectTitle": "Ligar o seu correio",
+    "connectLead": "O Campbooks vai ler o seu correio e trazer para esta página o que precisa de si. As ligações de correio ainda estão a ser construídas, por isso ainda não pode ligar uma caixa de correio.",
+    "connect": "Ligar o seu correio",
+    "soon": "Brevemente",
+    "context": "Primeiros passos",
+    "start": "Primeiros passos",
+    "invite": "Convide as pessoas com quem trabalha",
+    "inviteAction": "Convidar",
+    "keyboard": "Teclado"
   }
 }

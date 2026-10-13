@@ -112,6 +112,7 @@
   --focus-offset: 2px;
   --dot-size: 7px;
   --z-sticky: 5;
+  --z-popover: 10;
   --z-toast: 20;
   --z-overlay: 30;
   --opacity-dim: 0.5;
@@ -292,6 +293,9 @@
   --toast-height: 44px;
   --toast-offset: var(--space-6);
   --overlay-width: 560px;
+  --popover-width: 300px;
+  --narrow-width: 30rem;
+  --row-text-min: 12rem;
   --size-sheet-column: 220px;
   --home-min: 640px;
   --home-main-min: 520px;
