@@ -1,7 +1,7 @@
 # visor Specification
 
 ## Purpose
-TBD - created by archiving change visor-emotions. Update Purpose after archive.
+The assistant's face in the client design system: which states it has (calm ones and the dizzy, starry and hearts emotions), how its eyes move and are tinted, and how it stays accessible and still under reduced motion.
 
 ## Requirements
 
