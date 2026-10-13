@@ -35,3 +35,11 @@
 - [x] 5.1 OpenAPI and events regenerated, client types regenerated
 - [x] 5.2 `deploy/README.md` → Passkeys; CHANGELOG
 - [x] 5.3 Gates green; recording at 375px and desktop with Chrome's virtual authenticator; vhs clip of the relying-party tests
+
+## 6. Security review of #465
+
+- [x] 6.1 `request` ids checked (≤64 URL-safe, a waiting request) before anything is stored; 16 KiB body limit on the passkey routes; migration `identity__passkey_limits` with length CHECKs; tests
+- [x] 6.2 Ed25519 small-order/non-canonical and off-curve P-256 keys refused; credential ids under 16 bytes refused; tests
+- [x] 6.3 Strict CBOR for the attestation object (no duplicate keys, definite, shortest) and CTAP2-canonical credential public keys; tests
+- [x] 6.4 Caps: ten waiting challenges per address, ten registrations per account, 30 passkey-only accounts an hour instance-wide; tests
+- [x] 6.5 One ceremony cookie per browser for all its ceremonies (autofill and the dialog); test

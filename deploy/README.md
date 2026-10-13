@@ -486,7 +486,9 @@ With the built-in issuer:
   email address, so on an `invite_only` instance passkeys can't create accounts (they
   still sign in, and can be added once you are in). A passkey that reports an
   authenticator counter going backwards (a possible clone) is allowed and recorded in
-  `identity.audit_events` as `passkey_sign_count_regressed`.
+  `identity.audit_events` as `passkey_sign_count_regressed`. Passkey ceremonies are
+  rate-limited per client address (set `CAMPBOOKS_TRUSTED_PROXIES` behind a proxy, as
+  above), and at most 30 passkey-only accounts are created per hour on the instance.
 
 ## Administrators
 

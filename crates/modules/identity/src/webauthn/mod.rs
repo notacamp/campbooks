@@ -19,6 +19,7 @@
 //! credential, the challenge or any other input.
 
 mod auth_data;
+mod cbor;
 mod cose;
 mod options;
 mod verify;

@@ -754,3 +754,231 @@ fn rewrite_credential_id(credential: &mut Value, id: &str) -> Value {
     credential["rawId"] = json!(id);
     credential.clone()
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_ceremony_names_only_a_waiting_request_and_reads_a_small_body(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, _) = waiting_request(&kit).await;
+    for start in [
+        "/auth/passkey/sign-in/options",
+        "/auth/passkey/sign-up/options",
+    ] {
+        for bad in [
+            "not-a-request".to_owned(),
+            "x".repeat(65),
+            "has spaces".to_owned(),
+            String::new(),
+        ] {
+            let refused = screen(
+                &kit,
+                start,
+                &json!({ "display_name": "Ana", "request": bad }),
+            )
+            .await;
+            assert_eq!(
+                refused.status,
+                StatusCode::NOT_FOUND,
+                "{start} {bad:?}: {refused:?}"
+            );
+        }
+        // An expired request is refused too.
+        sqlx::query(
+            "UPDATE identity.authorize_requests SET expires_at = now() - interval '1 second'",
+        )
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+        let expired = screen(
+            &kit,
+            start,
+            &json!({ "display_name": "Ana", "request": request }),
+        )
+        .await;
+        assert_eq!(
+            expired.status,
+            StatusCode::NOT_FOUND,
+            "{start}: {expired:?}"
+        );
+        sqlx::query(
+            "UPDATE identity.authorize_requests SET expires_at = now() + interval '10 minutes'",
+        )
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+        // A body over 16 KiB is not read.
+        let huge = screen(
+            &kit,
+            start,
+            &json!({ "display_name": "Ana", "request": "a".repeat(20_000) }),
+        )
+        .await;
+        assert_eq!(huge.status, StatusCode::BAD_REQUEST, "{start}: {huge:?}");
+        assert_eq!(huge.json["code"], "invalid_body");
+    }
+    // Nothing of it was stored.
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.webauthn_challenges").await,
+        0
+    );
+
+    // The table refuses an oversized request id whatever the code does.
+    let stored = sqlx::query(
+        "INSERT INTO identity.webauthn_challenges
+             (challenge_hash, purpose, browser_hash, request_id, return_to, created_at, expires_at)
+         VALUES ('\\x01', 'sign_in', '\\x02', $1, '/', now(), now())",
+    )
+    .bind("r".repeat(65))
+    .execute(&kit.state.db)
+    .await;
+    assert!(stored.is_err(), "the CHECK refuses it");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn autofill_and_the_dialog_keep_their_own_challenges(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (request, _) = waiting_request(&kit).await;
+    let mut device = device();
+    sign_up_with_passkey(&kit, &mut device, &request).await;
+    kit.new_browser();
+
+    // The page opens (autofill starts), then the person presses P.
+    let (request, _) = waiting_request(&kit).await;
+    let autofill = screen(
+        &kit,
+        "/auth/passkey/sign-in/options",
+        &json!({ "request": request }),
+    )
+    .await;
+    let dialog = screen(
+        &kit,
+        "/auth/passkey/sign-in/options",
+        &json!({ "request": request }),
+    )
+    .await;
+    assert_ne!(autofill.json["challenge"], dialog.json["challenge"]);
+
+    // Either answers in this browser: here, the autofill pick that was
+    // already under way.
+    let picked = screen(
+        &kit,
+        "/auth/passkey/sign-in",
+        &device.get(&autofill.json, 0),
+    )
+    .await;
+    assert_eq!(picked.status, StatusCode::OK, "{picked:?}");
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.webauthn_challenges").await,
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn waiting_registrations_are_capped_per_account(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    for _ in 0..10 {
+        let started = kit
+            .api(
+                Method::POST,
+                "/api/v1/identity/passkeys/registrations",
+                &access,
+            )
+            .await;
+        assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    }
+    let capped = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &access,
+        )
+        .await;
+    assert_eq!(capped.status, StatusCode::TOO_MANY_REQUESTS, "{capped:?}");
+    assert_eq!(capped.json["code"], "rate_limited");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn passkey_only_accounts_are_capped_instance_wide(db: PgPool) {
+    let kit = Kit::new(db).await;
+    for _ in 0..30 {
+        kit.new_browser();
+        let mut device = device();
+        let options = screen(
+            &kit,
+            "/auth/passkey/sign-up/options",
+            &json!({ "display_name": "Ana" }),
+        )
+        .await;
+        let made = device.create(&options.json, Alg::Ed25519);
+        let created = screen(&kit, "/auth/passkey/sign-up", &made).await;
+        assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
+    }
+    kit.new_browser();
+    let mut device = device();
+    let options = screen(
+        &kit,
+        "/auth/passkey/sign-up/options",
+        &json!({ "display_name": "Ana" }),
+    )
+    .await;
+    let made = device.create(&options.json, Alg::Ed25519);
+    let capped = screen(&kit, "/auth/passkey/sign-up", &made).await;
+    assert_eq!(capped.status, StatusCode::TOO_MANY_REQUESTS, "{capped:?}");
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.accounts").await,
+        30
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn waiting_challenges_are_capped_per_address(db: PgPool) {
+    use axum::{body::Body, extract::ConnectInfo, http::Request};
+    use tower::ServiceExt as _;
+
+    let kit = Kit::new(db).await;
+    let from = |address: [u8; 4]| {
+        let mut request = Request::builder()
+            .method(Method::POST)
+            .uri("/auth/passkey/sign-in/options")
+            .header("x-campbooks-csrf", "1")
+            .header("sec-fetch-site", "same-origin")
+            .header("content-type", "application/json")
+            .body(Body::from("{}"))
+            .unwrap();
+        request
+            .extensions_mut()
+            .insert(ConnectInfo(std::net::SocketAddr::from((address, 50_000))));
+        request
+    };
+    for _ in 0..10 {
+        let answer = kit
+            .app
+            .clone()
+            .oneshot(from([203, 0, 113, 7]))
+            .await
+            .unwrap();
+        assert_eq!(answer.status(), StatusCode::OK);
+    }
+    let capped = kit
+        .app
+        .clone()
+        .oneshot(from([203, 0, 113, 7]))
+        .await
+        .unwrap();
+    assert_eq!(capped.status(), StatusCode::TOO_MANY_REQUESTS);
+    let elsewhere = kit
+        .app
+        .clone()
+        .oneshot(from([198, 51, 100, 2]))
+        .await
+        .unwrap();
+    assert_eq!(
+        elsewhere.status(),
+        StatusCode::OK,
+        "another address has its own budget"
+    );
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.webauthn_challenges").await,
+        11
+    );
+}

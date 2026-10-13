@@ -523,6 +523,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "`rate_limited`: ten registrations are already waiting for this account.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5010,6 +5020,16 @@
               }
             }
           },
+          "400": {
+            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "403": {
             "description": "`csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account).",
             "content": {
@@ -5105,7 +5125,7 @@
             }
           },
           "400": {
-            "description": "`invalid_return_to`.",
+            "description": "`invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5125,10 +5145,10 @@
             }
           },
           "404": {
-            "description": "This instance offers no passkeys (not https), or another identity provider serves it."
+            "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it."
           },
           "429": {
-            "description": "`rate_limited`.",
+            "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5199,6 +5219,16 @@
               }
             }
           },
+          "400": {
+            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "403": {
             "description": "`csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`.",
             "content": {
@@ -5223,7 +5253,7 @@
             }
           },
           "429": {
-            "description": "`rate_limited`.",
+            "description": "`rate_limited`: too many ceremonies from this address, or too many passkey-only accounts made on this instance in the last hour.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5296,7 +5326,7 @@
             }
           },
           "400": {
-            "description": "`display_name_required` or `invalid_return_to`.",
+            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5316,10 +5346,10 @@
             }
           },
           "404": {
-            "description": "This instance offers no passkeys, or another identity provider serves it."
+            "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it."
           },
           "429": {
-            "description": "`rate_limited`.",
+            "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
             "content": {
               "application/problem+json": {
                 "schema": {

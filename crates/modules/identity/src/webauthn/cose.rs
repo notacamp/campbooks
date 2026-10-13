@@ -7,8 +7,8 @@
 //! coordinates), RSA (2048 bits or more) with RS256.
 
 use aws_lc_rs::signature::{
-    ECDSA_P256_SHA256_ASN1, ED25519, RSA_PKCS1_2048_8192_SHA256, RsaPublicKeyComponents,
-    UnparsedPublicKey,
+    ECDSA_P256_SHA256_ASN1, ED25519, ParsedPublicKey, RSA_PKCS1_2048_8192_SHA256,
+    RsaPublicKeyComponents, UnparsedPublicKey,
 };
 use coset::{
     CborSerializable as _, CoseKey, Label, RegisteredLabel, RegisteredLabelWithPrivate,
@@ -76,6 +76,59 @@ fn int(key: &CoseKey, label: i64) -> Option<i64> {
     })
 }
 
+/// The Ed25519 points of small order (libsodium's list, compared on the
+/// first 31 bytes and the last without its sign bit): the identity, the
+/// points of order 2, 4 and 8, and the non-canonical encodings of 0 and 1.
+/// A key among them would verify signatures nobody made.
+const ED25519_SMALL_ORDER: [[u8; 32]; 7] = [
+    [0; 32],
+    [
+        1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0,
+    ],
+    [
+        0x26, 0xe8, 0x95, 0x8f, 0xc2, 0xb2, 0x27, 0xb0, 0x45, 0xc3, 0xf4, 0x89, 0xf2, 0xef, 0x98,
+        0xf0, 0xd5, 0xdf, 0xac, 0x05, 0xd3, 0xc6, 0x33, 0x39, 0xb1, 0x38, 0x02, 0x88, 0x6d, 0x53,
+        0xfc, 0x05,
+    ],
+    [
+        0xc7, 0x17, 0x6a, 0x70, 0x3d, 0x4d, 0xd8, 0x4f, 0xba, 0x3c, 0x0b, 0x76, 0x0d, 0x10, 0x67,
+        0x0f, 0x2a, 0x20, 0x53, 0xfa, 0x2c, 0x39, 0xcc, 0xc6, 0x4e, 0xc7, 0xfd, 0x77, 0x92, 0xac,
+        0x03, 0x7a,
+    ],
+    [
+        0xec, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x7f,
+    ],
+    [
+        0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x7f,
+    ],
+    [
+        0xee, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0x7f,
+    ],
+];
+
+/// Whether `point` is an acceptable Ed25519 public key: a canonical
+/// encoding (y < 2^255 - 19), not of small order, that `aws-lc` parses.
+fn ed25519_acceptable(point: &[u8]) -> bool {
+    let Ok(point) = <[u8; 32]>::try_from(point) else {
+        return false;
+    };
+    let small_order = ED25519_SMALL_ORDER
+        .iter()
+        .any(|bad| bad[..31] == point[..31] && bad[31] == point[31] & 0x7f);
+    // y >= p: the 254-bit value is p..2^255 - 1, i.e. every byte 0xff but
+    // the first (>= 0xed) and the top one (0x7f without the sign bit).
+    let non_canonical =
+        point[0] >= 0xed && point[1..31].iter().all(|b| *b == 0xff) && point[31] & 0x7f == 0x7f;
+    !small_order && !non_canonical && ParsedPublicKey::new(&ED25519, point).is_ok()
+}
+
 fn without_leading_zeros(value: &[u8]) -> Vec<u8> {
     let start = value.iter().position(|b| *b != 0).unwrap_or(value.len());
     value[start..].to_vec()
@@ -108,7 +161,13 @@ pub fn parse(encoded: &[u8]) -> Result<PublicKey, Refusal> {
             let curve = int(&key, iana::OkpKeyParameter::Crv.to_i64());
             let x = bytes(&key, iana::OkpKeyParameter::X.to_i64());
             match (curve, x) {
-                (Some(6), Some(x)) if x.len() == 32 => Ok(PublicKey::Ed25519(x.to_vec())),
+                (Some(6), Some(x)) if x.len() == 32 => {
+                    if ed25519_acceptable(x) {
+                        Ok(PublicKey::Ed25519(x.to_vec()))
+                    } else {
+                        refuse("cose_key_weak_ed25519")
+                    }
+                }
                 _ => refuse("cose_key_bad_okp"),
             }
         }
@@ -122,7 +181,13 @@ pub fn parse(encoded: &[u8]) -> Result<PublicKey, Refusal> {
                     point.push(0x04);
                     point.extend_from_slice(x);
                     point.extend_from_slice(y);
-                    Ok(PublicKey::P256(point))
+                    // On the curve, not the point at infinity: `aws-lc`
+                    // parses (and so validates) it.
+                    if ParsedPublicKey::new(&ECDSA_P256_SHA256_ASN1, &point).is_ok() {
+                        Ok(PublicKey::P256(point))
+                    } else {
+                        refuse("cose_key_not_on_curve")
+                    }
                 }
                 _ => refuse("cose_key_bad_ec2"),
             }
@@ -179,7 +244,7 @@ mod tests {
         assert_eq!(parse(&ed), Ok(PublicKey::Ed25519(vec![1; 32])));
         assert_eq!(parse(&ed).unwrap().alg(), -8);
 
-        let no_alg = key(iana::KeyType::OKP, None, okp(6, vec![1; 32]));
+        let no_alg = key(iana::KeyType::OKP, None, okp(6, vec![9; 32]));
         assert_eq!(parse(&no_alg), refuse("cose_key_without_algorithm"));
         let ed448 = key(
             iana::KeyType::OKP,
@@ -214,10 +279,53 @@ mod tests {
             ],
         );
         assert_eq!(parse(&small_rsa), refuse("cose_key_bad_rsa"));
-        let mut private = okp(6, vec![1; 32]);
+        let mut private = okp(6, vec![9; 32]);
         private.push((Label::Int(-4), Value::Bytes(vec![2; 32])));
         let leaked = key(iana::KeyType::OKP, Some(iana::Algorithm::EdDSA), private);
         assert_eq!(parse(&leaked), refuse("cose_key_has_private_part"));
         assert_eq!(parse(&[0xff]), refuse("cose_key_malformed"));
+    }
+
+    #[test]
+    fn weak_and_invalid_points_are_refused() {
+        let ed = |x: Vec<u8>| key(iana::KeyType::OKP, Some(iana::Algorithm::EdDSA), okp(6, x));
+        for weak in ED25519_SMALL_ORDER {
+            assert_eq!(
+                parse(&ed(weak.to_vec())),
+                refuse("cose_key_weak_ed25519"),
+                "{weak:?}"
+            );
+            // The same with the sign bit set.
+            let mut signed = weak;
+            signed[31] |= 0x80;
+            assert_eq!(parse(&ed(signed.to_vec())), refuse("cose_key_weak_ed25519"));
+        }
+        // y = p + 5: not canonical.
+        let mut big = [0xff; 32];
+        big[0] = 0xf2;
+        big[31] = 0x7f;
+        assert_eq!(parse(&ed(big.to_vec())), refuse("cose_key_weak_ed25519"));
+
+        let ec = |x: Vec<u8>, y: Vec<u8>| {
+            key(
+                iana::KeyType::EC2,
+                Some(iana::Algorithm::ES256),
+                vec![
+                    (Label::Int(-1), Value::Integer(1.into())),
+                    (Label::Int(-2), Value::Bytes(x)),
+                    (Label::Int(-3), Value::Bytes(y)),
+                ],
+            )
+        };
+        let mut one = vec![0; 32];
+        one[31] = 1;
+        assert_eq!(
+            parse(&ec(one.clone(), one)),
+            refuse("cose_key_not_on_curve")
+        );
+        assert_eq!(
+            parse(&ec(vec![0; 32], vec![0; 32])),
+            refuse("cose_key_not_on_curve")
+        );
     }
 }

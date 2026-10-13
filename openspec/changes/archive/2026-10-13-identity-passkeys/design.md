@@ -285,7 +285,24 @@ providers (S1a).
 - Binding: sign-in and sign-up ceremonies are bound to the browser's
   `Strict` cookie. Registration is bound to the account and needs step-up.
 - Rate limits: the kernel limiter (S4) caps 30 ceremony calls per minute
-  per client address on the four `/auth/passkey/*` endpoints.
+  per client address on the four `/auth/passkey/*` endpoints; at most ten
+  challenges waiting per address and ten registrations per account (per
+  five minutes, a challenge's lifetime); at most 30 passkey-only accounts an
+  hour instance-wide.
+- Bounded storage (security review of #465): the ceremony endpoints read at
+  most 16 KiB of body; a `request` id must be at most 64 URL-safe characters
+  and name a waiting authorization request before anything is stored; the
+  migration `identity__passkey_limits` adds length CHECKs on every
+  free-form column of `webauthn_challenges` and on `passkeys.public_key` and
+  `transports`.
+- Key and encoding checks: an Ed25519 key must be a canonical point not of
+  small order (libsodium's list) that `aws-lc` parses, and a P-256 key a point
+  `aws-lc` accepts (on the curve); credential ids are at least 16 bytes; the
+  attestation object is strict CBOR (no duplicate keys, definite lengths,
+  shortest heads) and the credential public key CTAP2-canonical (§6.5.1.1).
+- One ceremony cookie per browser, reused by every ceremony it starts: the
+  autofill ceremony and the dialog's keep their own challenges instead of the
+  second orphaning the first.
 - Logs and events hold no credential, challenge, client data or address,
   only passkey ids and refusal labels.
 - Tests cover every refusal path, in Rust (RP and endpoints) and in the
@@ -293,7 +310,9 @@ providers (S1a).
 - Left for the security review (#57):
   - review of the hand-rolled verification against the WebAuthn L3 test
     vectors and a second browser (Safari/Firefox) by hand;
-  - per-account rate limits on sign-in;
+  - per-credential rate limits on sign-in;
+  - notifying the person, or refusing, on a counter regression of a
+    device-bound passkey;
   - recovery when the last passkey is lost;
   - an operator view of `passkey_sign_count_regressed`.
 

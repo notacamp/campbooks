@@ -10,7 +10,7 @@ use uuid::Uuid;
 use super::{
     ALGORITHMS, Refusal, RelyingParty,
     auth_data::{self, AuthData},
-    cose, refuse,
+    cbor, cose, refuse,
 };
 
 /// The transports worth remembering (`AuthenticatorTransport`); others are
@@ -153,7 +153,7 @@ fn credential_id(kind: &str, id: &str, raw_id: &str) -> Result<Vec<u8>, Refusal>
         return refuse("credential_id_mismatch");
     }
     let raw = decode(raw_id, "credential_id_not_base64url")?;
-    if raw.is_empty() || raw.len() > auth_data::MAX_CREDENTIAL_ID {
+    if !(auth_data::MIN_CREDENTIAL_ID..=auth_data::MAX_CREDENTIAL_ID).contains(&raw.len()) {
         return refuse("credential_id_length");
     }
     Ok(raw)
@@ -247,12 +247,8 @@ struct AttestationObject {
 
 /// The attestation object's `fmt`, `attStmt` and `authData` (§6.5).
 fn attestation_object(bytes: &[u8]) -> Result<AttestationObject, Refusal> {
-    let mut rest = bytes;
-    let value: ciborium::Value =
-        ciborium::de::from_reader(&mut rest).map_err(|_| Refusal("attestation_not_cbor"))?;
-    if !rest.is_empty() {
-        return refuse("attestation_trailing_bytes");
-    }
+    // One strict data item: no key twice, definite lengths, shortest heads.
+    let value = cbor::strict(bytes)?;
     let ciborium::Value::Map(map) = value else {
         return refuse("attestation_not_a_map");
     };

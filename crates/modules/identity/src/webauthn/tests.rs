@@ -347,3 +347,41 @@ fn counters_and_user_handles_are_reported() {
         refuse("user_handle_not_an_account")
     );
 }
+
+#[test]
+fn an_attestation_object_with_a_key_twice_is_refused() {
+    let mut device = Authenticator::new(ORIGIN, "app.example.com");
+    let mut made = device.create(&creation(Uuid::now_v7()), Alg::Ed25519);
+    let object = URL_SAFE_NO_PAD
+        .decode(made["response"]["attestationObject"].as_str().unwrap())
+        .unwrap();
+    let mut value: ciborium::Value = ciborium::de::from_reader(object.as_slice()).unwrap();
+    if let ciborium::Value::Map(entries) = &mut value {
+        // A second `fmt`: two parsers could disagree on which one counts.
+        entries.push((
+            ciborium::Value::Text("fmt".into()),
+            ciborium::Value::Text("packed".into()),
+        ));
+    }
+    let mut encoded = Vec::new();
+    ciborium::ser::into_writer(&value, &mut encoded).unwrap();
+    made["response"]["attestationObject"] = serde_json::json!(URL_SAFE_NO_PAD.encode(&encoded));
+    assert_eq!(
+        rp().verify_registration(CHALLENGE, &registration(made))
+            .map(|_| ()),
+        refuse("cbor_duplicate_key")
+    );
+}
+
+#[test]
+fn a_credential_id_under_128_bits_is_refused() {
+    let (mut device, _) = registered(false);
+    let mut signed = device.get(&request(), 0);
+    let short = URL_SAFE_NO_PAD.encode([7_u8; 15]);
+    signed["id"] = serde_json::json!(short);
+    signed["rawId"] = serde_json::json!(short);
+    assert_eq!(
+        assertion(signed).credential_id(),
+        refuse("credential_id_length")
+    );
+}

@@ -3,8 +3,14 @@
 //! with a single-use, five-minute challenge bound to the account. Needs a
 //! recent sign-in.
 
+use std::time::Duration;
+
 use axum::{Extension, Json, extract::State, http::StatusCode};
-use campbooks_kernel::{AppState, Error, Operation, Problem, Result, Risk, auth::Scoped};
+use campbooks_kernel::{
+    AppState, Error, Operation, Problem, Result, Risk,
+    auth::Scoped,
+    rate_limit::{Limit, RateKey},
+};
 
 use crate::{
     deps::Deps,
@@ -17,6 +23,11 @@ use crate::{
     scopes::IdentityWrite,
     webauthn::CreationOptions,
 };
+
+/// Registrations one account may start per five minutes (a challenge's
+/// lifetime): at most this many waiting at once.
+const REGISTRATION_LIMIT: Limit =
+    Limit::new("identity.passkey_registration", 10, Duration::from_mins(5));
 
 /// Start adding a passkey.
 #[utoipa::path(
@@ -38,6 +49,9 @@ use crate::{
         (status = NOT_FOUND, description = "This instance offers no passkeys (not https), or \
             another identity provider serves it.", body = Problem,
             content_type = "application/problem+json"),
+        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: ten registrations are \
+            already waiting for this account.", body = Problem,
+            content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(
@@ -49,6 +63,16 @@ pub async fn handler(
     let rp = passkey::relying_party(&issuer).ok_or(Error::NotFound)?;
     let now = issuer.now();
     step_up::require_recent(&principal, now)?;
+    // At most ten registrations waiting per account (a challenge lives five
+    // minutes).
+    state
+        .rate_limits
+        .check(
+            &state.db,
+            &REGISTRATION_LIMIT,
+            &RateKey::text(&format!("account:{account}")),
+        )
+        .await?;
     let profile = accounts::profile(&state.db, account)
         .await?
         .ok_or(Error::NotFound)?;

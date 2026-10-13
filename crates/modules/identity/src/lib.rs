@@ -82,6 +82,13 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .merge(passkey_routes())
+}
+
+/// The passkey operations: their bodies (a credential, a name) are a few
+/// kilobytes at most.
+fn passkey_routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
         .routes(routes!(
             features::list_passkeys::handler,
             features::register_passkey::handler
@@ -90,6 +97,9 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(
             features::rename_passkey::handler,
             features::remove_passkey::handler
+        ))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            protocol::passkey::MAX_BODY,
         ))
 }
 

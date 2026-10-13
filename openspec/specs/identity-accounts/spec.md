@@ -343,6 +343,26 @@ challenge started by another account, spent or expired SHALL be 409
 - **WHEN** a credential made for one account's registration challenge is submitted by another account
 - **THEN** the response is 409 with `code` = `passkey_expired` and nothing is stored
 
+### Requirement: Passkey ceremonies store little and wait in small numbers
+The ceremony endpoints SHALL read at most 16 KiB of body (else 400
+`invalid_body`). A `request` they are given SHALL be at most 64 URL-safe
+characters and name a waiting authorization request, or the answer SHALL be
+404 and nothing stored. One client address SHALL start at most ten
+ceremonies, and one account at most ten registrations, per five minutes (a
+challenge's lifetime), and the instance SHALL create at most 30 passkey-only
+accounts an hour; beyond that the answer SHALL be 429 `rate_limited`. A
+browser SHALL keep one ceremony cookie for all its waiting ceremonies, so a
+ceremony started later (the passkey dialog after autofill) leaves earlier
+ones valid.
+
+#### Scenario: An unknown or oversized request id
+- **WHEN** sign-in options are asked for with a `request` that is unknown, expired, longer than 64 characters or in a 20 KB body
+- **THEN** the answer is 404 (400 for the body) and no challenge is stored
+
+#### Scenario: Autofill, then the dialog
+- **WHEN** the sign-in screen starts an autofill ceremony and the person then presses `P`
+- **THEN** both challenges are valid in that browser, and the autofill pick still signs in
+
 ### Requirement: Signing in with a passkey
 `POST /auth/passkey/sign-in/options` (CSRF header) SHALL return request
 options for any of the site's passkeys (no `allowCredentials`, user
@@ -399,12 +419,15 @@ profile:
   origin, and no `crossOrigin` true and no `topOrigin`;
 - `rpIdHash` is SHA-256 of the relying-party id, user presence and user
   verification are set, and BS is set only with BE;
-- a registration's attestation object is well-formed CBOR with a registered
+- a registration's attestation object is one strict CBOR data item
+  (definite lengths, shortest encodings, no map key twice) with a registered
   `fmt` (`none` with an empty statement; other formats' statements are not
   trusted);
-- its credential id is at most 1023 bytes and equals `rawId`;
-- its COSE key states one of the three algorithms, matching its key type and
-  curve, with no private part, and RSA keys are at least 2048 bits;
+- its credential id is 16 to 1023 bytes and equals `rawId`;
+- its COSE key is CTAP2-canonical CBOR, states one of the three algorithms,
+  matching its key type and curve, with no private part; an Ed25519 key is a
+  canonical point not of small order, a P-256 key a point on the curve, and
+  RSA keys are at least 2048 bits;
 - an assertion carries no attested credential data, keeps the BE it was
   registered with, and is signed over `authData || SHA-256(clientDataJSON)`
   by the stored key.
@@ -412,6 +435,10 @@ profile:
 A signature counter that does not increase while either it or the stored
 one is non-zero SHALL be audited (`passkey_sign_count_regressed`), not
 refused, and the stored counter SHALL never decrease.
+
+#### Scenario: A weak or malformed key
+- **WHEN** a registration carries an Ed25519 identity point, a P-256 point off the curve, an attestation object with `fmt` twice, or a credential id of 15 bytes
+- **THEN** it is refused with `passkey_not_accepted` and nothing is stored
 
 #### Scenario: Every algorithm
 - **WHEN** passkeys with EdDSA, ES256 and RS256 keys are registered and used

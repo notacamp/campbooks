@@ -8,12 +8,17 @@
 //! [ extensions (CBOR map), when ED ]
 //! ```
 //!
-//! Parsing is strict: every byte must belong to a field the flags announce.
+//! Parsing is strict: every byte must belong to a field the flags announce,
+//! the credential public key must be CTAP2-canonical CBOR (§6.5.1.1) and the
+//! extensions strict CBOR (see [`super::cbor`]).
 
-use super::{Refusal, refuse};
+use super::{Refusal, cbor, refuse};
 
 /// Longest credential id WebAuthn allows (§5.8.3 / §6.5.1).
 pub const MAX_CREDENTIAL_ID: usize = 1023;
+/// Shortest credential id accepted: 128 bits, as CTAP2 credential ids and
+/// every platform authenticator's are; a shorter one could be guessed.
+pub const MIN_CREDENTIAL_ID: usize = 16;
 
 /// The flags byte.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,14 +83,6 @@ pub struct AuthData {
     pub attested: Option<AttestedCredential>,
 }
 
-/// Read one CBOR data item from the front of `bytes`; how many bytes it
-/// took. `None` when `bytes` does not start with a well-formed item.
-fn cbor_item_len(bytes: &[u8]) -> Option<usize> {
-    let mut rest = bytes;
-    let _: ciborium::Value = ciborium::de::from_reader(&mut rest).ok()?;
-    Some(bytes.len() - rest.len())
-}
-
 /// Parse authenticator data.
 pub fn parse(bytes: &[u8]) -> Result<AuthData, Refusal> {
     if bytes.len() < 37 {
@@ -104,11 +101,11 @@ pub fn parse(bytes: &[u8]) -> Result<AuthData, Refusal> {
         aaguid.copy_from_slice(&rest[..16]);
         let id_len = usize::from(u16::from_be_bytes([rest[16], rest[17]]));
         rest = &rest[18..];
-        if id_len == 0 || id_len > MAX_CREDENTIAL_ID || rest.len() < id_len {
+        if !(MIN_CREDENTIAL_ID..=MAX_CREDENTIAL_ID).contains(&id_len) || rest.len() < id_len {
             return refuse("credential_id_length");
         }
         let (credential_id, after_id) = rest.split_at(id_len);
-        let key_len = cbor_item_len(after_id).ok_or(Refusal("public_key_not_cbor"))?;
+        let (_, key_len) = cbor::canonical_item(after_id)?;
         let (public_key, after_key) = after_id.split_at(key_len);
         rest = after_key;
         Some(AttestedCredential {
@@ -120,7 +117,7 @@ pub fn parse(bytes: &[u8]) -> Result<AuthData, Refusal> {
         None
     };
     if flags.extensions() {
-        let len = cbor_item_len(rest).ok_or(Refusal("extensions_not_cbor"))?;
+        let (_, len) = cbor::strict_item(rest)?;
         rest = &rest[len..];
     }
     if !rest.is_empty() {
@@ -183,7 +180,24 @@ mod tests {
         no_key.extend_from_slice(&[0; 16]);
         no_key.extend_from_slice(&4_u16.to_be_bytes());
         no_key.extend_from_slice(&[1, 2, 3, 4]);
-        assert_eq!(parse(&no_key), refuse("public_key_not_cbor"));
+        assert_eq!(
+            parse(&no_key),
+            refuse("credential_id_length"),
+            "4 bytes is too short"
+        );
+        let mut not_cbor = header(0b0100_0101, 0);
+        not_cbor.extend_from_slice(&[0; 16]);
+        not_cbor.extend_from_slice(&16_u16.to_be_bytes());
+        not_cbor.extend_from_slice(&[1; 16]);
+        not_cbor.push(0xff);
+        assert_eq!(parse(&not_cbor), refuse("cbor_malformed"));
+        let mut unsorted_key = header(0b0100_0101, 0);
+        unsorted_key.extend_from_slice(&[0; 16]);
+        unsorted_key.extend_from_slice(&16_u16.to_be_bytes());
+        unsorted_key.extend_from_slice(&[1; 16]);
+        // {3: 0, 1: 0}: not CTAP2 canonical.
+        unsorted_key.extend_from_slice(&[0xa2, 0x03, 0x00, 0x01, 0x00]);
+        assert_eq!(parse(&unsorted_key), refuse("cbor_not_canonical"));
         let mut long_id = header(0b0100_0101, 0);
         long_id.extend_from_slice(&[0; 16]);
         long_id.extend_from_slice(&1024_u16.to_be_bytes());
@@ -191,6 +205,12 @@ mod tests {
         assert_eq!(parse(&long_id), refuse("credential_id_length"));
         let mut bad_ext = header(0b1000_0101, 0);
         bad_ext.push(0xff);
-        assert_eq!(parse(&bad_ext), refuse("extensions_not_cbor"));
+        assert_eq!(parse(&bad_ext), refuse("cbor_malformed"));
+        let mut indefinite_ext = header(0b1000_0101, 0);
+        indefinite_ext.extend_from_slice(&[0xbf, 0xff]);
+        assert_eq!(
+            parse(&indefinite_ext),
+            refuse("cbor_not_shortest_or_definite")
+        );
     }
 }

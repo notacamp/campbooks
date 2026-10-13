@@ -2910,6 +2910,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description `rate_limited`: ten registrations are already waiting for this account. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "identity.remove_passkey": {
@@ -5713,6 +5722,15 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account). */
             403: {
                 headers: {
@@ -5775,7 +5793,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestOptions"];
                 };
             };
-            /** @description `invalid_return_to`. */
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5793,14 +5811,14 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description This instance offers no passkeys (not https), or another identity provider serves it. */
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description `rate_limited`. */
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5838,6 +5856,15 @@ export interface operations {
                     "application/json": components["schemas"]["SignedInWith"];
                 };
             };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`. */
             403: {
                 headers: {
@@ -5863,7 +5890,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `rate_limited`. */
+            /** @description `rate_limited`: too many ceremonies from this address, or too many passkey-only accounts made on this instance in the last hour. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -5900,7 +5927,7 @@ export interface operations {
                     "application/json": components["schemas"]["CreationOptions"];
                 };
             };
-            /** @description `display_name_required` or `invalid_return_to`. */
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5918,14 +5945,14 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it. */
             404: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content?: never;
             };
-            /** @description `rate_limited`. */
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
             429: {
                 headers: {
                     [name: string]: unknown;

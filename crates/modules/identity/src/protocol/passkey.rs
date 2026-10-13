@@ -41,7 +41,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use super::{
-    Ctx,
+    Ctx, authorize,
     sign_in::{continue_after_sign_in, session_cookie},
 };
 use crate::{
@@ -66,6 +66,20 @@ pub const CEREMONY_COOKIE: &str = "__Host-campbooks_webauthn";
 
 /// Ceremonies one address may start or finish.
 const CEREMONY_LIMIT: Limit = Limit::new("identity.passkey", 30, Duration::from_mins(1));
+/// Challenges one address may hold at once: a challenge lives five minutes,
+/// so at most this many per five minutes.
+const CHALLENGE_LIMIT: Limit = Limit::new("identity.passkey_challenge", 10, Duration::from_mins(5));
+/// Accounts created with a passkey alone, instance-wide, per hour.
+const SIGN_UP_LIMIT: Limit = Limit::new("identity.passkey_sign_up", 30, Duration::from_hours(1));
+/// The one bucket of [`SIGN_UP_LIMIT`].
+const INSTANCE: &str = "instance";
+
+/// Longest request body a ceremony endpoint reads. A credential is a few
+/// kilobytes at most (an RSA-4096 key, a 1023-byte id).
+pub const MAX_BODY: usize = 16 * 1024;
+
+/// Longest authorization request id accepted (issued ones are 43 characters).
+const MAX_REQUEST_ID: usize = 64;
 
 /// The name a passkey made at sign-up is given.
 const FIRST_PASSKEY_NAME: &str = "Passkey";
@@ -102,6 +116,48 @@ fn not_accepted(refusal: Refusal) -> Error {
 
 fn expired() -> Error {
     Error::Conflict(MESSAGES.reason("passkey_expired"))
+}
+
+/// The waiting authorization request `request` names, checked before anything
+/// is stored: at most [`MAX_REQUEST_ID`] URL-safe characters, and known and
+/// unexpired. 404 otherwise.
+async fn waiting_request(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    request: Option<String>,
+) -> Result<Option<String>> {
+    let Some(request) = request else {
+        return Ok(None);
+    };
+    let well_formed = !request.is_empty()
+        && request.len() <= MAX_REQUEST_ID
+        && request
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
+    if !well_formed
+        || authorize::load(&ctx.state.db, &request, issuer.now())
+            .await?
+            .is_none()
+    {
+        return Err(Error::NotFound);
+    }
+    Ok(Some(request))
+}
+
+/// This browser's ceremony cookie, or a new one. Reused, so the autofill
+/// ceremony and the dialog's (or two tabs') keep their own challenges
+/// instead of the second one orphaning the first.
+fn ceremony_cookie(issuer: &Issuer, headers: &HeaderMap) -> String {
+    issuer
+        .cookies
+        .read(headers, CEREMONY_COOKIE)
+        .filter(|cookie| {
+            cookie.len() == 43
+                && cookie
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        })
+        .unwrap_or_else(random_token)
 }
 
 /// The CSRF check, the rate limit, and the issuer.
@@ -183,13 +239,15 @@ pub struct SignInStart {
         (status = 200, description = "Options for `navigator.credentials.get` (any of this \
             site's passkeys, user verification required), with a ceremony cookie.",
             body = RequestOptions, headers(("set-cookie" = String))),
-        (status = 400, description = "`invalid_return_to`.", body = campbooks_kernel::Problem,
+        (status = 400, description = "`invalid_return_to`, or `invalid_body` (not JSON, or over \
+            16 KiB).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
-        (status = 404, description = "This instance offers no passkeys (not https), or another \
-            identity provider serves it."),
-        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+        (status = 404, description = "No such waiting sign-in request (or it expired), this \
+            instance offers no passkeys (not https), or another identity provider serves it."),
+        (status = 429, description = "`rate_limited`: too many ceremonies, or ten challenges \
+            waiting, for this address.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
     ),
 )]
@@ -203,13 +261,18 @@ pub async fn sign_in_options(
     let rp = rp(issuer)?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let cookie = random_token();
+    let request = waiting_request(&ctx, issuer, body.request).await?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
+        .await?;
+    let cookie = ceremony_cookie(issuer, &headers);
     let challenge = passkeys::start(
         &ctx.state.db,
         Purpose::SignIn,
         Binding::Browser(&cookie),
         &Ceremony {
-            request_id: body.request,
+            request_id: request,
             return_to: Some(return_to),
             ..Ceremony::default()
         },
@@ -262,6 +325,8 @@ async fn take_ceremony(
     responses(
         (status = 200, description = "Signed in.", body = SignedInWith,
             headers(("set-cookie" = String))),
+        (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, or `passkey_not_accepted` (it did \
             not verify, or it is no longer a way into any account).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
@@ -421,14 +486,16 @@ pub struct SignUpStart {
         (status = 200, description = "Options for `navigator.credentials.create` (a \
             discoverable passkey, user verification required, attestation `none`), with a \
             ceremony cookie.", body = CreationOptions, headers(("set-cookie" = String))),
-        (status = 400, description = "`display_name_required` or `invalid_return_to`.",
+        (status = 400, description = "`display_name_required`, `invalid_return_to`, or \
+            `invalid_body` (not JSON, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
             instance takes invited people only, and a passkey proves no address).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 404, description = "This instance offers no passkeys, or another identity \
-            provider serves it."),
-        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+        (status = 404, description = "No such waiting sign-in request (or it expired), this \
+            instance offers no passkeys, or another identity provider serves it."),
+        (status = 429, description = "`rate_limited`: too many ceremonies, or ten challenges \
+            waiting, for this address.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
     ),
 )]
@@ -447,8 +514,13 @@ pub async fn sign_up_options(
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("display_name_required")))?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
+    let request = waiting_request(&ctx, issuer, body.request).await?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
+        .await?;
     let account = Uuid::now_v7();
-    let cookie = random_token();
+    let cookie = ceremony_cookie(issuer, &headers);
     let challenge = passkeys::start(
         &ctx.state.db,
         Purpose::SignUp,
@@ -456,7 +528,7 @@ pub async fn sign_up_options(
         &Ceremony {
             user_handle: Some(account),
             display_name: Some(display_name.clone()),
-            request_id: body.request,
+            request_id: request,
             return_to: Some(return_to),
             ..Ceremony::default()
         },
@@ -481,6 +553,8 @@ pub async fn sign_up_options(
     responses(
         (status = 201, description = "Created and signed in.", body = SignedInWith,
             headers(("set-cookie" = String))),
+        (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, or \
             `signup_invite_only`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
@@ -488,8 +562,9 @@ pub async fn sign_up_options(
             provider serves it."),
         (status = 409, description = "`passkey_expired`, or `passkey_already_registered`.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
-            content_type = "application/problem+json"),
+        (status = 429, description = "`rate_limited`: too many ceremonies from this address, or \
+            too many passkey-only accounts made on this instance in the last hour.",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
     ),
 )]
 pub async fn sign_up(
@@ -514,6 +589,12 @@ pub async fn sign_up(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
+    // Accounts with no provider are cheap to make: a ceiling for the whole
+    // instance, besides the per-address one.
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &SIGN_UP_LIMIT, &RateKey::text(INSTANCE))
+        .await?;
     let challenge = credential.challenge().map_err(not_accepted)?;
     let new = rp
         .verify_registration(&challenge, &credential)
