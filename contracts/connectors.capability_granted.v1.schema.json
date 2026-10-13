@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://campbooks.example.com/contracts/connectors.capability_granted.v1.schema.json",
   "title": "connectors.capability_granted v1 (event payload)",
-  "description": "Published by the connectors module, in the transaction that completes a consent, for each capability a connection newly gains. For `messages` it names the inbox the connectors module minted; the conversations module creates that inbox (granted_by as its manager) before applying batches for it. Ids and a blob reference only: the account's address and name are in the account document (connection-account.v1). Workspace-scoped.",
+  "description": "Published by the connectors module, in the transaction that completes a consent, for each capability a connection newly gains, and for `messages` for each mailbox the grant newly reaches (a Zoho login can hold several mail accounts). For `messages` it names the inbox the connectors module minted; the conversations module creates that inbox (granted_by as its manager) before applying batches for it. Ids and a blob reference only: the account's address and name are in the account document (connection-account.v1). Workspace-scoped.",
   "type": "object",
   "required": ["workspace", "connection", "capability", "granted_by", "account"],
   "additionalProperties": false,

@@ -538,6 +538,11 @@ fn log_composition(composition: &campbooks_server::Composition) {
     } else {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
     }
+    if composition.connectors.zoho.is_some() {
+        tracing::info!("Zoho Mail accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_ZOHO__CLIENT_ID unset: Zoho Mail accounts cannot be connected");
+    }
     if let Some(issuer) = &composition.identity.issuer {
         let providers: Vec<&str> = issuer
             .upstreams

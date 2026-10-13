@@ -58,11 +58,18 @@ pub const MAX_LOOKUPS: usize = 20;
 /// Downloads in flight at once within a run.
 pub const FETCH_CONCURRENCY: usize = 5;
 
-/// The most requests one run of a mailbox with `folders` tracked folders
-/// may make: a listing per folder (and the folder list), its downloads and
-/// look-ups.
+/// Downloads and look-ups a run is charged for up front, besides its
+/// listings: a quiet mailbox's run makes a few; a backfill's makes more,
+/// and Zoho's own 429 slows those down.
+pub const EXPECTED_FETCHES: usize = 10;
+
+/// What one run of a mailbox with `folders` tracked folders is charged
+/// before it starts: a listing per folder, the folder list, and
+/// [`EXPECTED_FETCHES`]. Charging the worst case ([`MAX_NEW`] downloads and
+/// [`MAX_LOOKUPS`] look-ups) would hold every member's change back for a
+/// minute after each run.
 pub fn requests_per_run(folders: usize) -> u32 {
-    u32::try_from(folders + 1 + MAX_NEW + MAX_LOOKUPS).unwrap_or(u32::MAX)
+    u32::try_from(folders + 1 + EXPECTED_FETCHES).unwrap_or(u32::MAX)
 }
 
 /// A tracked folder.

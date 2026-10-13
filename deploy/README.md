@@ -461,7 +461,8 @@ With the built-in issuer:
   `https://<host>` with no path, or Campbooks refuses to start. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
-  forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
+  forged callback cannot send the code anywhere else. The same app connects Zoho Mail:
+  see Connected accounts.
 - **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks
   and starting a link are rate-limited per client address. Behind a proxy every request
   comes from the proxy, so without this setting all clients share one budget (30
@@ -479,7 +480,7 @@ With the built-in issuer:
 
 ## Connected accounts
 
-Members connect outside accounts (Gmail today); Campbooks asks Google for consent through
+Members connect outside accounts (Gmail and Zoho Mail); Campbooks asks Google for consent through
 its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
 encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
@@ -500,6 +501,18 @@ hours when nothing changes. Nothing is connected until you register an OAuth cli
 A connection belongs to the workspace and records the member who granted it. When that
 member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
 Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
+
+**Zoho Mail** uses the Zoho app of Sign in with Zoho (above): the same client, secret and
+redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
+that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can
+connect more Zoho logins. The app must allow the scopes `openid`, `email`, `profile`,
+`ZohoMail.accounts.READ`, `ZohoMail.folders.ALL` and `ZohoMail.messages.ALL` (a
+server-based Zoho app takes its scopes with each request, so there is nothing more to
+register). Each mail account of a Zoho login becomes its own
+inbox. Campbooks reads and writes each account's mail at its own data centre
+(`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
+`CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
+synced yet.
 
 Connecting needs the built-in sign-in: an install still on Rauthy (`CAMPBOOKS_AUTH__ISSUER`
 set) cannot connect mail until it switches. `connectors.start_connection` answers with the

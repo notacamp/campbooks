@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT s.id AS \"stream: StreamId\", s.connection_id AS \"connection: ConnectionId\",\n                  c.provider, c.granted_by AS \"granted_by: UserId\", c.health,\n                  s.inbox_id AS \"inbox: InboxId\", s.phase, s.cursor, s.interval_seconds,\n                  s.paused, s.consecutive_failures, s.throttled_until\n             FROM connectors.streams s\n             JOIN connectors.connections c ON c.id = s.connection_id\n            WHERE s.id = $1",
+  "query": "SELECT s.id AS \"stream: StreamId\", s.connection_id AS \"connection: ConnectionId\",\n                  c.provider, c.provider_server, c.granted_by AS \"granted_by: UserId\", c.health,\n                  s.mailbox_key, s.inbox_id AS \"inbox: InboxId\", s.phase, s.cursor,\n                  s.interval_seconds,\n                  s.paused, s.consecutive_failures, s.throttled_until\n             FROM connectors.streams s\n             JOIN connectors.connections c ON c.id = s.connection_id\n            WHERE s.id = $1",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,17 @@
       },
       {
         "ordinal": 3,
+        "name": "provider_server",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider_server"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "granted_by: UserId",
         "type_info": "Uuid",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "health",
         "type_info": "Text",
         "origin": {
@@ -59,7 +70,18 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
+        "name": "mailbox_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "mailbox_key"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
         "name": "inbox: InboxId",
         "type_info": "Uuid",
         "origin": {
@@ -70,7 +92,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "phase",
         "type_info": "Text",
         "origin": {
@@ -81,7 +103,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "cursor",
         "type_info": "Jsonb",
         "origin": {
@@ -92,7 +114,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "interval_seconds",
         "type_info": "Int4",
         "origin": {
@@ -103,7 +125,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "paused",
         "type_info": "Bool",
         "origin": {
@@ -114,7 +136,7 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "consecutive_failures",
         "type_info": "Int4",
         "origin": {
@@ -125,7 +147,7 @@
         }
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "throttled_until",
         "type_info": "Timestamptz",
         "origin": {
@@ -145,6 +167,8 @@
       false,
       false,
       false,
+      true,
+      false,
       false,
       false,
       true,
@@ -156,5 +180,5 @@
       true
     ]
   },
-  "hash": "2d2a2fea329c6a2fe9e57008179897b3fb87ba02793b1a827da7a780893dfd27"
+  "hash": "32d90fe1caf99b5488f47dfbfaace42092b778783f7933563dd306e556317536"
 }

@@ -19,10 +19,12 @@
 //   `accounts-server`, as Zoho's does.
 //
 // Each fake Google account also has a demo Gmail mailbox (scripts/
-// fake-gmail.ts) that the connectors module syncs and writes members'
-// changes back to: `POST /fake/deliver` drops one more message into every
-// mailbox, to show mail arriving live, and `GET /fake/mailbox` lists what each
-// holds (subjects and labels), to show write-backs landing.
+// fake-gmail.ts), and each fake Zoho login a demo Zoho Mail mailbox (scripts/
+// fake-zoho-mail.ts), that the connectors module syncs, writes members'
+// changes back to and sends through: `POST /fake/deliver` drops one more
+// message into every mailbox, to show mail arriving live, and
+// `GET /fake/mailbox` lists what each holds (subjects and state), to show
+// write-backs landing.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
@@ -37,6 +39,13 @@ import {
   type Mailbox,
   writeGmail,
 } from "./fake-gmail.ts";
+import {
+  createZohoMailbox,
+  deliverZohoDemo,
+  describeZohoMailbox,
+  handleZohoMail,
+  type ZohoMailbox,
+} from "./fake-zoho-mail.ts";
 
 type Provider = "google" | "microsoft" | "zoho";
 
@@ -107,6 +116,16 @@ const codes = new Map<string, Grant>();
 /** Access and refresh tokens → the account they were issued for. */
 const tokens = new Map<string, string>();
 const mailboxes = new Map<string, Mailbox>();
+const zohoMailboxes = new Map<string, ZohoMailbox>();
+
+function zohoMailboxOf(sub: string): ZohoMailbox {
+  let mailbox = zohoMailboxes.get(sub);
+  if (mailbox === undefined) {
+    mailbox = createZohoMailbox(person.email);
+    zohoMailboxes.set(sub, mailbox);
+  }
+  return mailbox;
+}
 
 function mailboxOf(sub: string): Mailbox {
   let mailbox = mailboxes.get(sub);
@@ -117,9 +136,11 @@ function mailboxOf(sub: string): Mailbox {
   return mailbox;
 }
 
-/** The account a request's bearer token was issued for. */
+/** The account a request's bearer token was issued for (Zoho: `Zoho-oauthtoken`). */
 function bearer(request: IncomingMessage): string | undefined {
-  const token = /^Bearer (\S+)$/u.exec(request.headers.authorization ?? "")?.[1];
+  const token = /^(?:Bearer|Zoho-oauthtoken) (\S+)$/u.exec(
+    request.headers.authorization ?? "",
+  )?.[1];
   return token === undefined ? undefined : tokens.get(token);
 }
 
@@ -168,6 +189,9 @@ function consentPage(query: URLSearchParams): string {
     profile: "See your name",
     offline_access: "Keep access when you are away",
     "https://www.googleapis.com/auth/gmail.modify": "Read, compose and organise your mail",
+    "ZohoMail.accounts.READ": "See your mail accounts",
+    "ZohoMail.folders.ALL": "See and organise your folders",
+    "ZohoMail.messages.ALL": "Read, send and organise your mail",
   };
   const items = scopes.map((s) => `<li>${escape(wording[s] ?? s)}</li>`).join("");
   const allow = new URLSearchParams(query);
@@ -287,7 +311,8 @@ const server = createServer((request, response) => {
         ...(grant.offline ? { refresh_token: issued.refresh } : {}),
         expires_in: 3599,
         token_type: "Bearer",
-        scope: grant.scope,
+        // Zoho documents its scopes comma-separated.
+        scope: provider === "zoho" ? grant.scope.replaceAll(" ", ",") : grant.scope,
         id_token: idToken(grant.sub, grant.clientId, grant.nonce),
       });
       return;
@@ -351,6 +376,31 @@ const server = createServer((request, response) => {
       }
       if (url.pathname === "/fake/deliver" && request.method === "POST") {
         const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
+        json(response, 200, { delivered });
+        return;
+      }
+    }
+    if (provider === "zoho") {
+      if (url.pathname === "/oauth/v2/token/revoke" && request.method === "POST") {
+        json(response, 200, {});
+        return;
+      }
+      if (url.pathname.startsWith("/api/")) {
+        const sub = bearer(request);
+        if (sub === undefined) {
+          json(response, 401, { status: { code: 401 }, data: { errorCode: "INVALID_OAUTHTOKEN" } });
+          return;
+        }
+        if (await handleZohoMail(request, url, response, zohoMailboxOf(sub))) {
+          return;
+        }
+      }
+      if (url.pathname === "/fake/mailbox" && request.method === "GET") {
+        json(response, 200, { mailboxes: [...zohoMailboxes.values()].map(describeZohoMailbox) });
+        return;
+      }
+      if (url.pathname === "/fake/deliver" && request.method === "POST") {
+        const delivered = [...zohoMailboxes.values()].map(deliverZohoDemo);
         json(response, 200, { delivered });
         return;
       }

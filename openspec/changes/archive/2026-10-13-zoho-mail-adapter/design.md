@@ -190,8 +190,10 @@ announced in the job's transaction; if that fetch fails the send is still
 Each Zoho login has its own request budget,
 `CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` (default 60, a minute's
 worth of burst), in the shared `provider_budgets` table, so one mailbox's
-backfill never spends another's. A run takes its worst case (one listing
-per folder, its downloads and look-ups) before it starts. Zoho's 429 (and
+backfill never spends another's. A run is charged before it starts for
+one listing per folder and a share of downloads (ten): charging its worst
+case (50 downloads, 20 look-ups) would hold members' changes back for a
+minute after every run. A busier run is slowed by Zoho itself: its 429 (and
 errors coded as too many requests) throttle that stream until
 `Retry-After`, as for Gmail; 401 drops the access token and refreshes, and
 a refresh answered with `invalid_code`/`invalid_grant` (Zoho may answer 200)

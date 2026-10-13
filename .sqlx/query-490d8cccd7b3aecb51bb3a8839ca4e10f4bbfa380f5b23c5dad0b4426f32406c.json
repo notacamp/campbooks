@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT provider_message_id, label_ids FROM connectors.gmail_messages\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)",
+  "query": "SELECT provider_message_id, label_ids FROM connectors.messages\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "connectors.gmail_messages",
+            "table": "connectors.messages",
             "name": "provider_message_id"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "TextArray",
         "origin": {
           "Table": {
-            "table": "connectors.gmail_messages",
+            "table": "connectors.messages",
             "name": "label_ids"
           }
         }
@@ -37,5 +37,5 @@
       false
     ]
   },
-  "hash": "ce0b6b329b296555107a4717bda7e3e1bfc1c658fd23566649ae5adc9dfdafb4"
+  "hash": "490d8cccd7b3aecb51bb3a8839ca4e10f4bbfa380f5b23c5dad0b4426f32406c"
 }

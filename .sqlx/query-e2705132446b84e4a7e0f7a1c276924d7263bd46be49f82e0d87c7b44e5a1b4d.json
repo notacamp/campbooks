@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.oversized (workspace_id, stream_id, provider_message_id)\n                       VALUES ($1, $2, $3)\n                       ON CONFLICT DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e2705132446b84e4a7e0f7a1c276924d7263bd46be49f82e0d87c7b44e5a1b4d"
+}

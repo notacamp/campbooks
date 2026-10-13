@@ -114,8 +114,8 @@ the send SHALL still be `sent` and the stream due at once.
 ### Requirement: Zoho request budget
 Requests to Zoho SHALL draw from a budget per Zoho login,
 `CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` (default 60), shared by
-every process; a run SHALL take its worst case before it starts and wait
-for the budget otherwise. Zoho's 429, or an answer coded as too many
+every process; a run SHALL take its listings and a share of downloads
+before it starts and wait for the budget otherwise. Zoho's 429, or an answer coded as too many
 requests, SHALL throttle only that stream until `Retry-After`.
 
 #### Scenario: One login's backfill does not spend another's

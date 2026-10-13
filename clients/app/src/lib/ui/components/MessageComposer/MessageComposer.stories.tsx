@@ -137,7 +137,7 @@ export const NewMessage: Story = {
 };
 
 export const CannotSend: Story = {
-  args: { error: "Gmail refused this message. Check the addresses and try again." },
+  args: { error: "Your mail provider refused this message. Check the addresses and try again." },
 };
 
 export const Sending: Story = {

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id, provider_message_id FROM connectors.gmail_messages\n                WHERE stream_id = $1 AND internal_date >= $2 AND listed_generation < $3\n                  AND NOT (id = ANY($4))\n                ORDER BY internal_date",
+  "query": "SELECT id, provider_message_id FROM connectors.messages\n                WHERE stream_id = $1 AND internal_date >= $2 AND listed_generation < $3\n                  AND NOT (id = ANY($4))\n                ORDER BY internal_date",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "connectors.gmail_messages",
+            "table": "connectors.messages",
             "name": "id"
           }
         }
@@ -20,7 +20,7 @@
         "type_info": "Text",
         "origin": {
           "Table": {
-            "table": "connectors.gmail_messages",
+            "table": "connectors.messages",
             "name": "provider_message_id"
           }
         }
@@ -39,5 +39,5 @@
       false
     ]
   },
-  "hash": "c7a50f059ba9daf64c2248b4574795e895c0db937391600a7974cb94e2060f35"
+  "hash": "0de30599f33ed3242509993e161c73aefef3defbd6ec8c56ce8239708e82ec06"
 }

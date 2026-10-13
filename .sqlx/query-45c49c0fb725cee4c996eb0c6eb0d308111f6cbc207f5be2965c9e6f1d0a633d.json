@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT count(*) AS \"n!\" FROM connectors.gmail_messages",
+  "query": "SELECT count(*) AS \"n!\" FROM connectors.messages",
   "describe": {
     "columns": [
       {
@@ -17,5 +17,5 @@
       null
     ]
   },
-  "hash": "2622ce2ad8bcdb464ba4efdaa35530068015b41f9353145d0f2b6494ae374a64"
+  "hash": "45c49c0fb725cee4c996eb0c6eb0d308111f6cbc207f5be2965c9e6f1d0a633d"
 }

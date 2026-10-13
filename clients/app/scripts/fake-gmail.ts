@@ -65,8 +65,8 @@ interface DemoFile {
   content: string;
 }
 
-/** A message of the demo mailbox, before it is laid out as RFC 5322. */
-interface DemoMessage {
+/** A message of a demo mailbox, before it is laid out as RFC 5322. */
+export interface DemoMessage {
   from: string;
   to?: string;
   cc?: string;
@@ -85,7 +85,7 @@ interface DemoMessage {
 }
 
 /** A tiny but valid PDF, so attachments are real files. */
-function pdf(title: string): string {
+export function pdf(title: string): string {
   return [
     "%PDF-1.4",
     "1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj",
@@ -229,7 +229,12 @@ function wrap64(text: string): string {
 }
 
 /** Lay out `message` as RFC 5322 (multipart when it has HTML or files). */
-function rfc822(message: DemoMessage, date: Date, messageId: string, parent?: string): string {
+export function rfc822(
+  message: DemoMessage,
+  date: Date,
+  messageId: string,
+  parent?: string,
+): string {
   const headers: [string, string][] = [
     ["From", message.from],
     ["To", message.to ?? ""],
