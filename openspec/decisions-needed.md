@@ -114,29 +114,3 @@ contract) and the connector calling `labels.create` (5 units), after which
 conversations links the two by name as it already does; (c) ask the member
 the first time. **Recommended:** (b), with a per-inbox switch defaulting to
 on, since members expect a label they add to show on their phone.
-
-## Activity page: where it lives (campbooks-cloud#89)
-
-The assistant activity page (`openspec/changes/assistant-activity/`) needs a
-home. Options: (a) a sidebar item "Activity" (G then A) whose icon is a live
-Visor, with the Visor in the phone top bar instead of a fourth tab; (b) a
-section of Settings, read as an audit log; (c) a drawer opened from the
-Visor on any page. **Recommended:** (a).
-
-## Visor emotions: in which change, and which thinking motion (campbooks-cloud#89)
-
-The owner's prototype adds dizzy (our side failed), starry (a big win) and
-heart eyes (warmth), and reworks idle, reading and thinking (option A
-pondering or B working). Only dizzy has a use on the activity page.
-**Recommended:** ship all three and the motion rework together in one
-`lib/ui` change (`visor-emotions`), in parallel with the activity page,
-which shows `alert` for failures until dizzy lands; thinking option B, since
-A's drift is hard to read at 22px.
-
-## How long the activity journal is kept (campbooks-cloud#89)
-
-Sessions and steps hold no personal data (ids, labels, numbers); decisions
-stay in `conversations` for as long as their message. Options: 7, 30 or 90
-days by default, configurable 1 to 365. **Recommended:** 30 days. When
-reasoning text arrives with the `complete` role, keep it (capped, as a
-blob) under the same retention, with a switch to turn it off.

@@ -117,11 +117,12 @@ is recorded in a new ADR (0015) in this change.
   correction.
 - **Reasoning text and token streaming** for the `complete` and `vision`
   roles (drafts, extraction, chat turns). No module uses those roles yet;
-  the design fixes the contract, and the change that adds the first such
-  producer (#47 or the drafting slice) builds it.
+  the design fixes the contract (stored capped and without prompts, on by
+  default, with a workspace switch to turn it off), and the change that adds
+  the first such producer (#47 or the drafting slice) builds it.
 - **New Visor emotions** (dizzy, starry, heart eyes) and the reworked idle,
-  reading and thinking motion from the owner's prototype: a design-system
-  change of their own. This page uses `alert` for a failed session until
+  reading and thinking motion (option B) from the owner's prototype: the
+  separate design-system change `visor-emotions`. This page uses `alert` for a failed session until
   `dizzy` exists, then switches with a one-line mapping.
 - Recording work of modules that do not exist yet (tasks, documents, money,
   automation, assistant): each records its sessions in the change that

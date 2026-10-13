@@ -1,5 +1,20 @@
 # Design
 
+## Owner decisions (2026-10-13)
+
+The owner approved this design with three answers:
+
+1. **Where the page lives:** a sidebar item "Activity" (G then A) whose icon
+   is the live Visor; on phones the Visor sits in the top bar (Decision 5).
+2. **Visor emotions:** dizzy, starry and heart eyes ship in their own
+   design-system change, `visor-emotions`, built separately, with thinking
+   motion B (hopping eyes). This page shows `alert` for failures until that
+   lands, then uses `dizzy` (Decision 5).
+3. **Retention and reasoning:** the journal is kept 30 days by default.
+   Reasoning text from the `complete` role is stored when it arrives, capped
+   and never with prompts, and a workspace switch turns storing it off
+   (Decision 2; built in the reasoning slice).
+
 ## Context
 
 - **ADR 0009**: `decide` is a typed decision model (Laya by default). Its
@@ -281,8 +296,10 @@ privacy and on retention, not on familiarity.
   stored: they are rebuilt from records the member can already read.
   The raw token stream is delivered live by the producing module's own
   stream (the assistant's chat stream, #47) and is not kept beyond the
-  capped final text. That slice decides whether storing reasoning is on by
-  default (the recommendation is on, with the 30-day retention).
+  capped final text. Storing reasoning is **on by default** under the same
+  30-day retention, and a **workspace setting turns it off** (owner
+  decision); with it off, steps keep their facts, token counts and output
+  references only.
 
 Alternatives considered: copying each answer with its evidence into the step
 (one fetch per session, but a second copy of mail-derived text with its own
@@ -367,7 +384,7 @@ How it behaves:
 | Reachable while working | G then A from anywhere; one click | buried; reads as an audit log | yes, but a drawer cannot hold a list and a timeline at 375px |
 | "What is it doing now?" at a glance | the sidebar Visor animates while a session runs | no | only when open |
 
-**Chosen: the sidebar item**, with the Visor as its icon (`thinking` while a
+**Chosen (owner approved): the sidebar item**, with the Visor as its icon (`thinking` while a
 visible session runs, `alert` while one failed in the last hour, otherwise
 `idle`; `asleep` when no AI role is configured). On phones the tab bar keeps
 Home, Inbox, Settings, and the Visor sits in the top bar as a button to
@@ -407,13 +424,13 @@ Activity, so the live state is always on screen. The reader's "Why?" gains
 | failed or stalled | `alert` (then `dizzy`) |
 | no AI role configured | `asleep` |
 
-**The new emotions** belong to the design system, not to this change. Only
-`dizzy` has a use here (our side failed); `starry` (a big win) and heart
-eyes (warmth) have no producer in this change, and the prototype's reworked
-idle / reading / thinking motion is a separate choice (option A pondering or
-B working). They ship together in one `lib/ui` change with stories, both
-themes, reduced motion and the 22px legibility check; this page maps
-failures to `dizzy` once it exists.
+**The new emotions** belong to the design system, not to this change
+(owner approved). Only `dizzy` has a use here (our side failed); `starry` (a
+big win) and heart eyes (warmth) have no producer in this change. They ship
+with the reworked motion, thinking as option B (hopping eyes, legible at
+22px), in the separate `visor-emotions` change, with stories, both themes,
+reduced motion and the 22px legibility check. This page uses `alert` for
+failures until `dizzy` exists, then switches with a one-line mapping.
 
 ### Keyboard, languages, sizes
 
@@ -445,12 +462,13 @@ recording.
    needs a reply, asks you to do something, has a deadline, urgency and
    suspicious (the stream stays a move); the timeline shows the correction.
    Browser recording.
-3. **`visor-emotions`** (`lib/ui`, can run in parallel with 1): dizzy,
-   starry, heart eyes and the chosen motion rework, from the prototype.
-   Storybook recording; then the page maps failures to `dizzy`.
+3. **`visor-emotions`** (`lib/ui`, built in parallel by another agent):
+   dizzy, starry, heart eyes and the motion rework with thinking option B.
+   Storybook recording; then this page maps failures to `dizzy`.
 4. **`assistant-activity-reasoning`** (with #47 or the first `complete`
    producer): `complete`/`vision` steps with token counts, reasoning blobs,
-   the producer's live token stream, and the setting for keeping reasoning.
+   the producer's live token stream, and the workspace switch that turns
+   storing reasoning off (on by default).
 
 Other modules record their own sessions in the changes that build them.
 
