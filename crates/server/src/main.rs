@@ -70,6 +70,11 @@ enum Command {
         #[command(subcommand)]
         command: admin_cli::AdminCommand,
     },
+    /// Work with the search index.
+    Search {
+        #[command(subcommand)]
+        command: SearchCommand,
+    },
     /// Print the OpenAPI document as JSON.
     Openapi,
     /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
@@ -104,6 +109,17 @@ enum EventsCommand {
     Catalogue,
 }
 
+#[derive(Debug, Subcommand)]
+enum SearchCommand {
+    /// Rebuild a workspace's search index from its sources, in the
+    /// background (a worker runs it). Search keeps answering meanwhile.
+    Reindex {
+        /// The workspace's id.
+        #[arg(long)]
+        workspace: String,
+    },
+}
+
 /// Which parts of the server a process runs (ADR 0011).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Role {
@@ -131,6 +147,7 @@ impl Role {
 }
 
 fn main() -> ExitCode {
+    campbooks_server::telemetry::install_panic_hook();
     match Cli::parse().command.unwrap_or(Command::All) {
         Command::All | Command::Serve => serve(Role::All),
         Command::Api => serve(Role::Api),
@@ -145,6 +162,9 @@ fn main() -> ExitCode {
             Err(e) => fail(&e.to_string()),
         },
         Command::Admin { command } => admin_cli::run(command),
+        Command::Search {
+            command: SearchCommand::Reindex { workspace },
+        } => reindex(&workspace),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -201,6 +221,16 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
     })
 }
 
+/// The signer of opaque values (cursors) keyed by the instance secret, so
+/// every process of the install verifies them; without one, each process
+/// signs alone.
+fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
+    Ok(match campbooks_kernel::crypto::SecretKey::from_env()? {
+        Some(secret) => campbooks_kernel::crypto::Signer::new(&secret),
+        None => campbooks_kernel::crypto::Signer::default(),
+    })
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -239,6 +269,7 @@ async fn run(
     let state = campbooks_server::with_composed_ports(
         AppState::new(db.clone(), config)
             .with_rate_limits(rate_limits()?)
+            .with_signer(signer()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs),
@@ -468,6 +499,46 @@ fn replay(consumer: &str, since: Option<&str>) -> ExitCode {
             let _ = writeln!(
                 std::io::stdout(),
                 "enqueued {count} delivery(ies) to `{consumer}`; a worker runs them"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => fail(&e),
+    }
+}
+
+/// `search reindex --workspace <id>`.
+fn reindex(workspace: &str) -> ExitCode {
+    let Ok(workspace) = workspace.parse::<campbooks_kernel::tenancy::WorkspaceId>() else {
+        return fail("--workspace must be a workspace id (a UUID)");
+    };
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let registry = match campbooks_server::registry() {
+        Ok(registry) => registry,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(e) => return fail(&e),
+    };
+    let restarted = runtime.block_on(async {
+        let db = connect(&config).await?;
+        let state =
+            campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
+        let restarted = campbooks_search::reindex(&state, workspace)
+            .await
+            .map_err(|e| e.to_string());
+        db.close().await;
+        restarted
+    });
+    match restarted {
+        Ok(sources) => {
+            let _ = writeln!(
+                std::io::stdout(),
+                "reindexing {} source(s) of the workspace; a worker runs it",
+                sources.len()
             );
             ExitCode::SUCCESS
         }

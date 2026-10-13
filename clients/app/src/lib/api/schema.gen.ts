@@ -725,6 +725,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the records the caller may open. */
+        get: operations["search.query"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/security-events": {
         parameters: {
             query?: never;
@@ -1317,6 +1334,13 @@ export interface components {
         };
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
+        /** @description A filter the query applied, for chips. */
+        AppliedFilter: {
+            /** @description The operator (`from`, `has`, `in`, `is`, `label`, …). */
+            operator: string;
+            /** @description Its value. */
+            value: string;
+        };
         /** @description `AuthenticatorAssertionResponseJSON`: the authenticator's signature. */
         AssertionResponse: {
             /** @description The authenticator data, base64url. */
@@ -1788,6 +1812,49 @@ export interface components {
             /** @description Oldest first. */
             items: components["schemas"]["HeldGrant"][];
         };
+        /** @description One result: a record the caller may open, with what a list row shows. */
+        Hit: {
+            /** @description Its container (an inbox). */
+            container: components["schemas"]["RecordRef"];
+            /** @description The record's state, for the row. */
+            facets: components["schemas"]["HitFacets"];
+            from?: components["schemas"]["HitPerson"] | null;
+            matched?: components["schemas"]["RecordRef"] | null;
+            /**
+             * Format: date-time
+             * @description The record's time (a conversation's last message).
+             */
+            occurred_at: string;
+            /** @description The record (a conversation). */
+            record: components["schemas"]["RecordRef"];
+            /** @description A snippet of the best entry, hits marked. */
+            snippet: components["schemas"]["Segment"][];
+            /** @description The title, hits marked. */
+            title: components["schemas"]["Segment"][];
+        };
+        /** @description A hit's state. */
+        HitFacets: {
+            /** @description Some entry carries files. */
+            attachment?: boolean;
+            /**
+             * Format: int32
+             * @description How many entries (messages) it has.
+             */
+            count?: number;
+            /** @description Starred. */
+            starred?: boolean;
+            /** @description Its stream. */
+            stream?: string | null;
+            /** @description Something in it is unread. */
+            unread?: boolean;
+        };
+        /** @description A person on a hit. */
+        HitPerson: {
+            /** @description Their address. */
+            address: string;
+            /** @description Their display name. */
+            name?: string | null;
+        };
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)
@@ -2021,6 +2088,15 @@ export interface components {
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
         };
+        /** @description The query as understood. */
+        ParsedQuery: {
+            /** @description The filters applied. */
+            filters: components["schemas"]["AppliedFilter"][];
+            /** @description The free text, as searched. */
+            text: string;
+            /** @description What was not understood (and was searched as text, or ignored). */
+            warnings: components["schemas"]["QueryWarning"][];
+        };
         /** @description A passkey, as its owner sees it. */
         PasskeyView: {
             /**
@@ -2096,6 +2172,13 @@ export interface components {
          * @enum {string}
          */
         Provider: "google" | "zoho";
+        /** @description Something in the query that was not understood. */
+        QueryWarning: {
+            /** @description `unknown_operator`, `empty_value` or `invalid_value`. */
+            code: string;
+            /** @description The operator (or `tz`). */
+            operator: string;
+        };
         /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
@@ -2108,6 +2191,39 @@ export interface components {
              * @example signals.list_header
              */
             rule: string;
+        };
+        /**
+         * @description A pointer to any record of any module.
+         *
+         *     `type` is `<module>.<record>` (for example `conversations.thread`), the
+         *     same names operations list in `x-campbooks.records`; `id` is the record's
+         *     id as its module writes it (usually a UUID).
+         *
+         *     ```
+         *     use campbooks_kernel::records::RecordRef;
+         *
+         *     let thread = RecordRef::new(
+         *         "conversations.thread",
+         *         "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11",
+         *     );
+         *     assert_eq!(thread.module(), Some("conversations"));
+         *     assert_eq!(
+         *         serde_json::to_value(&thread).unwrap(),
+         *         serde_json::json!({"type": "conversations.thread", "id": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"})
+         *     );
+         *     ```
+         */
+        RecordRef: {
+            /**
+             * @description The record's id within its module.
+             * @example 0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11
+             */
+            id: string;
+            /**
+             * @description The record type, `<module>.<record>`.
+             * @example conversations.thread
+             */
+            type: string;
         };
         /** @description The new passkey. */
         RegisterPasskey: {
@@ -2187,6 +2303,20 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member";
+        /** @description A page of results. */
+        SearchResults: {
+            /** @description The results, in the order asked for. */
+            hits: components["schemas"]["Hit"][];
+            /**
+             * @description The index of some source is still being built: older records may be
+             *     missing for now.
+             */
+            indexing: boolean;
+            /** @description Pass it as `cursor` for the next page; `None` on the last one. */
+            next_cursor?: string | null;
+            /** @description The query as understood. */
+            query: components["schemas"]["ParsedQuery"];
+        };
         /**
          * Format: uuid
          * @description SecurityEventId (UUIDv7)
@@ -2215,6 +2345,16 @@ export interface components {
             /** @description Ids and roles involved; never secrets. */
             metadata: unknown;
             user_id?: components["schemas"]["UserId"] | null;
+        };
+        /**
+         * @description A run of plain text, part of a hit or not. Clients render it as text
+         *     (a `<mark>` around hits); it never carries markup.
+         */
+        Segment: {
+            /** @description Whether it matched the query. */
+            hit: boolean;
+            /** @description The text, verbatim. */
+            text: string;
         };
         /** @description Which version of the draft to send: the one the member last saw saved. */
         SendDraft: {
@@ -5383,6 +5523,92 @@ export interface operations {
             };
             /** @description `last_owner`: you are its only owner. */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "search.query": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The query: words, `"phrases"`, `-word`, `a OR b` and operators
+                 *     (`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`, `is:`,
+                 *     `label:`, `before:`, `after:`, `older_than:`, `newer_than:`). At most
+                 *     512 characters.
+                 */
+                q?: string;
+                /** @description `relevance` (default) or `newest`. */
+                sort?: "relevance" | "newest";
+                /** @description `true` while the member is typing: the last word matches as a prefix. */
+                prefix?: boolean;
+                /** @description Page size, 1 to 50 (default 20). */
+                limit?: number;
+                /** @description `next_cursor` of the previous page, with the same query and order. */
+                cursor?: string;
+                /** @description The caller's time zone for `before:` and `after:` (IANA, default UTC). */
+                tz?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of results. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description A query too long, a bad limit, or a cursor from another query. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many queries; try again shortly. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

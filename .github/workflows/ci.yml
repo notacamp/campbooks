@@ -54,6 +54,12 @@ jobs:
       - name: Architecture (module boundaries, migration names)
         if: always()
         run: cargo xtask arch
+      - name: New migrations sort after the base branch's
+        if: always() && github.event_name == 'pull_request'
+        env: { BASE: "${{ github.base_ref }}" }
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          cargo xtask migrations --base "origin/$BASE"
       - name: OpenAPI drift
         if: always()
         run: cargo xtask openapi --check

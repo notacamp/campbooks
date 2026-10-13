@@ -34,6 +34,8 @@ const TRACEPARENT: &str = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-
 const ALICE: &str = "alice@example.com";
 const BOB: &str = "bob@example.com";
 const COOKIE_SECRET: &str = "cookie-secret-3f9a";
+/// What a member searched for: never in a span or a log line.
+const SEARCHED: &str = "boilerrepairquote77";
 
 /// Log lines written by the fmt layer.
 #[derive(Clone, Default)]
@@ -143,7 +145,8 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
             .with_registry(registry().unwrap()),
     );
     let app = router(state.clone(), None);
-    let mut claims = idp.claims("workspaces:read workspaces:write workspaces:admin");
+    let mut claims = idp
+        .claims("workspaces:read workspaces:write workspaces:admin search:read conversations:read");
     claims["email"] = ALICE.into();
     claims["email_verified"] = true.into();
     claims["name"] = "Alice Example".into();
@@ -169,6 +172,16 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
     )
     .await;
     assert_eq!(invited.status, StatusCode::CREATED, "{:?}", invited.json);
+
+    let searched = send(
+        &app,
+        Method::GET,
+        &format!("/api/v1/w/{workspace}/search?q={SEARCHED}%20from%3A{ALICE}"),
+        &token,
+        None,
+    )
+    .await;
+    assert_eq!(searched.status, StatusCode::OK, "{:?}", searched.json);
 
     let deleted = send(
         &app,
@@ -196,7 +209,14 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
 
     // Nothing secret or personal, anywhere.
     let everything = format!("{spans:?}\n{}", serde_json::to_string(&lines).unwrap());
-    for secret in [token.as_str(), COOKIE_SECRET, ALICE, BOB, "Alice Example"] {
+    for secret in [
+        token.as_str(),
+        COOKIE_SECRET,
+        ALICE,
+        BOB,
+        "Alice Example",
+        SEARCHED,
+    ] {
         assert!(
             !everything.contains(secret),
             "telemetry contains {secret:?}:\n{everything}"
@@ -268,7 +288,7 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
         .iter()
         .filter(|line| line["message"] == "request finished")
         .collect();
-    assert_eq!(finished.len(), 3, "{lines:#?}");
+    assert_eq!(finished.len(), 4, "{lines:#?}");
     for line in finished {
         assert_eq!(line["span"]["trace_id"], TRACE_ID, "{line}");
         assert!(line["span"]["http.route"].is_string(), "{line}");
