@@ -25,7 +25,12 @@ use super::{
     registry::Registry,
     truncate_error,
 };
-use crate::{AppState, config::JobsConfig, events::EventId};
+use crate::{
+    AppState,
+    config::JobsConfig,
+    events::EventId,
+    telemetry::{self, JobOutcome},
+};
 
 /// How often a running worker logs its counters.
 const STATS_EVERY: Duration = Duration::from_mins(5);
@@ -37,6 +42,8 @@ const MIN_UPKEEP_EVERY: Duration = Duration::from_secs(1);
 const REAP_BATCH: i64 = 1_000;
 /// Pause before listening again after the notification connection failed.
 const LISTEN_RETRY: Duration = Duration::from_secs(5);
+/// How often a worker samples queue depth while metrics are exported.
+const SAMPLE_QUEUES_EVERY: Duration = Duration::from_secs(15);
 
 /// What a worker did, for logs and tests.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -87,6 +94,8 @@ fn bump(counter: &AtomicU64, by: u64) {
 struct Claimed {
     info: JobInfo,
     payload: Value,
+    /// The `traceparent` of whoever enqueued it.
+    trace_context: Option<String>,
 }
 
 /// Claims jobs from every queue in the registry and runs them.
@@ -169,6 +178,7 @@ impl Worker {
         let upkeep_every = poll.clamp(MIN_UPKEEP_EVERY, MAX_UPKEEP_EVERY);
         let mut next_upkeep = Instant::now();
         let mut next_stats = Instant::now() + STATS_EVERY;
+        let mut next_sample = Instant::now();
         let mut rotation = 0_usize;
         tokio::pin!(shutdown);
 
@@ -181,6 +191,10 @@ impl Worker {
             if now >= next_stats {
                 log_stats(&shared, "job worker counters");
                 next_stats = now + STATS_EVERY;
+            }
+            if now >= next_sample && shared.state.metrics.exported() {
+                shared.sample_queues().await;
+                next_sample = now + SAMPLE_QUEUES_EVERY;
             }
             shared.fill(&mut tasks, rotation).await;
             rotation = rotation.wrapping_add(1);
@@ -254,11 +268,11 @@ impl Worker {
     }
 }
 
-/// The jobs a worker is running, by task.
+/// The jobs a worker is running, by task, with when they were claimed.
 #[derive(Default)]
 struct Tasks {
     set: JoinSet<()>,
-    jobs: HashMap<task::Id, JobInfo>,
+    jobs: HashMap<task::Id, (JobInfo, Instant)>,
 }
 
 impl Shared {
@@ -281,7 +295,7 @@ impl Shared {
                     for job in claimed {
                         let info = job.info.clone();
                         let handle = tasks.set.spawn(execute(Arc::clone(self), job));
-                        tasks.jobs.insert(handle.id(), info);
+                        tasks.jobs.insert(handle.id(), (info, Instant::now()));
                     }
                 }
                 Err(e) => {
@@ -365,7 +379,9 @@ impl Shared {
               FROM picked
              WHERE j.id = picked.id
             RETURNING j.id AS "id: JobId", j.kind, j.queue, j.payload, j.workspace_id,
-                      j.event_id AS "event_id: EventId", j.attempts, j.max_attempts
+                      j.event_id AS "event_id: EventId", j.attempts, j.max_attempts,
+                      j.trace_context,
+                      extract(epoch FROM now() - j.run_at)::float8 AS "waited_seconds!"
             "#,
             queue,
             limit,
@@ -377,8 +393,10 @@ impl Shared {
         .await?;
 
         bump(&self.counters.claimed, rows.len() as u64);
+        let metrics = &self.state.metrics;
         Ok(rows
             .into_iter()
+            .inspect(|row| metrics.job_claimed(&row.kind, &row.queue, row.waited_seconds))
             .map(|row| Claimed {
                 info: JobInfo {
                     id: row.id,
@@ -390,6 +408,7 @@ impl Shared {
                     event_id: row.event_id,
                 },
                 payload: row.payload,
+                trace_context: row.trace_context,
             })
             .collect())
     }
@@ -401,13 +420,15 @@ impl Shared {
                 tasks.jobs.remove(&id);
             }
             Err(e) => {
-                let Some(info) = tasks.jobs.remove(&e.id()) else {
+                let Some((info, claimed_at)) = tasks.jobs.remove(&e.id()) else {
                     return;
                 };
                 if e.is_panic() {
                     tracing::error!(job_id = %info.id, kind = %info.kind, "job handler panicked");
-                    self.fail(&info, &JobError::retry("the handler panicked"))
+                    let outcome = self
+                        .fail(&info, &JobError::retry("the handler panicked"))
                         .await;
+                    self.record(&info, outcome, claimed_at.elapsed());
                 } else {
                     self.release(&[info]).await;
                 }
@@ -534,7 +555,7 @@ impl Shared {
         info: &JobInfo,
         tx: Option<sqlx::Transaction<'static, sqlx::Postgres>>,
         elapsed: Duration,
-    ) {
+    ) -> Option<JobOutcome> {
         let held = match tx {
             Some(mut tx) => match mark_succeeded(&mut *tx, &self.id, info.id, info.attempt).await {
                 Ok(true) => tx.commit().await.map(|()| true),
@@ -547,6 +568,7 @@ impl Shared {
             Ok(true) => {
                 bump(&self.counters.succeeded, 1);
                 tracing::info!(elapsed_ms = elapsed.as_millis(), "job succeeded");
+                Some(JobOutcome::Succeeded)
             }
             Ok(false) => {
                 bump(&self.counters.lost, 1);
@@ -554,16 +576,18 @@ impl Shared {
                     elapsed_ms = elapsed.as_millis(),
                     "job finished after its lease was taken over; its work was rolled back"
                 );
+                Some(JobOutcome::Lost)
             }
             Err(e) => {
                 self.fail(info, &JobError::retry(format!("could not commit: {e}")))
-                    .await;
+                    .await
             }
         }
     }
 
     /// Record a failed attempt: retry later, or mark the job failed (dead).
-    async fn fail(&self, info: &JobInfo, error: &JobError) {
+    /// `None` when the failure could not be recorded.
+    async fn fail(&self, info: &JobInfo, error: &JobError) -> Option<JobOutcome> {
         let (fatal, after) = match error {
             JobError::Fatal(_) => (true, None),
             JobError::Retry { after, .. } => (false, after.map(|d| d.as_secs_f64())),
@@ -611,20 +635,88 @@ impl Shared {
             Ok(Some(row)) if row.state == "failed" => {
                 bump(&self.counters.failed, 1);
                 tracing::error!(error = %message, "job failed for good");
+                Some(JobOutcome::Failed)
             }
             Ok(Some(row)) => {
                 bump(&self.counters.retried, 1);
                 tracing::warn!(error = %message, retry_at = %row.run_at, "job failed; will retry");
+                Some(JobOutcome::Retried)
             }
             Ok(None) => {
                 bump(&self.counters.lost, 1);
                 tracing::warn!(error = %message, "job failed after its lease was taken over");
+                Some(JobOutcome::Lost)
             }
-            Err(e) => tracing::error!(
-                error = %message,
-                db_error = %e,
-                "could not record a job failure; it runs again when its lease expires"
-            ),
+            Err(e) => {
+                tracing::error!(
+                    error = %message,
+                    db_error = %e,
+                    "could not record a job failure; it runs again when its lease expires"
+                );
+                None
+            }
+        }
+    }
+
+    /// Record how an attempt ended on its span and in the metrics.
+    fn record(&self, info: &JobInfo, outcome: Option<JobOutcome>, elapsed: Duration) {
+        let Some(outcome) = outcome else {
+            return;
+        };
+        let span = tracing::Span::current();
+        span.record("job.outcome", outcome.as_str());
+        if matches!(outcome, JobOutcome::Retried | JobOutcome::Failed) {
+            span.record("otel.status_code", "error");
+        }
+        self.state
+            .metrics
+            .job_finished(&info.kind, &info.queue, outcome, elapsed);
+    }
+
+    /// Record queue depth and the age of the oldest ready job, per queue,
+    /// for every queue this worker serves (0 when empty).
+    async fn sample_queues(&self) {
+        let rows = sqlx::query!(
+            r#"
+            SELECT queue AS "queue!",
+                   count(*) FILTER (WHERE state = 'pending' AND run_at <= now()) AS "ready!",
+                   count(*) FILTER (WHERE state = 'pending' AND run_at > now()) AS "scheduled!",
+                   count(*) FILTER (WHERE state = 'running') AS "running!",
+                   count(*) FILTER (WHERE state = 'failed') AS "failed!",
+                   extract(epoch FROM now() - min(run_at)
+                       FILTER (WHERE state = 'pending' AND run_at <= now()))::float8 AS oldest
+              FROM kernel.jobs
+             WHERE state IN ('pending', 'running', 'failed')
+             GROUP BY queue
+            "#
+        )
+        .fetch_all(&self.state.db)
+        .await;
+        let rows = match rows {
+            Ok(rows) => rows,
+            Err(e) => {
+                tracing::warn!(error = %e, "could not sample job queues");
+                return;
+            }
+        };
+        let metrics = &self.state.metrics;
+        for queue in &self.queues {
+            let (counts, oldest) =
+                rows.iter()
+                    .find(|row| row.queue == *queue)
+                    .map_or(([0; 4], None), |row| {
+                        (
+                            [row.ready, row.scheduled, row.running, row.failed],
+                            row.oldest,
+                        )
+                    });
+            for (state, count) in ["ready", "scheduled", "running", "failed"]
+                .into_iter()
+                .zip(counts)
+            {
+                metrics.queue_depth(queue, state, u64::try_from(count).unwrap_or(0));
+            }
+            metrics.oldest_ready(queue, oldest.unwrap_or(0.0));
         }
     }
 
@@ -692,27 +784,41 @@ impl Shared {
 }
 
 /// Run one claimed job in its tracing span, renewing its lease meanwhile.
+/// The span links to the span that enqueued the job.
 async fn execute(shared: Arc<Shared>, job: Claimed) {
     let info = job.info;
     let span = tracing::info_span!(
         "job",
-        job_id = %info.id,
-        kind = %info.kind,
-        queue = %info.queue,
-        attempt = info.attempt,
-        workspace = info.workspace.as_deref().unwrap_or(""),
+        otel.name = %format_args!("job {}", info.kind),
+        otel.kind = "consumer",
+        otel.status_code = tracing::field::Empty,
+        job.id = %info.id,
+        job.kind = %info.kind,
+        job.queue = %info.queue,
+        job.attempt = info.attempt,
+        job.outcome = tracing::field::Empty,
+        workspace.id = tracing::field::Empty,
+        trace_id = tracing::field::Empty,
     );
+    if let Some(workspace) = &info.workspace {
+        span.record(telemetry::field::WORKSPACE_ID, workspace.as_str());
+    }
+    if let Some(traceparent) = &job.trace_context {
+        telemetry::link_to(&span, traceparent);
+    }
+    telemetry::record_trace_id(&span);
     async move {
         let started = Instant::now();
         let Some(kind) = shared.registry.kind(&info.kind) else {
             let error = JobError::fatal(format!("no handler is registered for `{}`", info.kind));
-            shared.fail(&info, &error).await;
+            let outcome = shared.fail(&info, &error).await;
+            shared.record(&info, outcome, started.elapsed());
             return;
         };
         let mut ctx = JobContext::new(shared.state.clone(), info.clone());
         let result = with_heartbeat(&shared, &info, (kind.run)(&mut ctx, job.payload)).await;
         let tx = ctx.take_tx();
-        match result {
+        let outcome = match result {
             Ok(()) => shared.complete(&info, tx, started.elapsed()).await,
             Err(error) => {
                 if let Some(tx) = tx
@@ -720,9 +826,10 @@ async fn execute(shared: Arc<Shared>, job: Claimed) {
                 {
                     tracing::warn!(error = %e, "could not roll back the job's transaction");
                 }
-                shared.fail(&info, &error).await;
+                shared.fail(&info, &error).await
             }
-        }
+        };
+        shared.record(&info, outcome, started.elapsed());
     }
     .instrument(span)
     .await;

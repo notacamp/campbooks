@@ -202,6 +202,69 @@ docker run --rm -v campbooks_blobs-data:/data -v "$PWD":/backup busybox:1.37.0-m
   tar czf /backup/blobs-data.tgz -C /data .
 ```
 
+## Monitoring
+
+Out of the box Campbooks exports nothing and opens no extra port. It writes JSON logs to
+stdout (`docker compose logs server`); every line inside a request or a job carries its
+`trace_id`, and each request ends with one `request finished` line giving the route, the
+status and the latency. `/api/v1/system/health` and `/api/v1/system/version` work as
+before.
+
+**A Prometheus page.** Set an address for a separate metrics listener:
+
+```sh
+CAMPBOOKS_TELEMETRY__METRICS_ADDR=0.0.0.0:9464
+```
+
+and scrape `http://server:9464/metrics` from a Prometheus (or Grafana Alloy, VictoriaMetrics,
+Netdata, ...) on the same Docker network. The listener has no authentication: do not
+publish the port (the compose file does not), and never expose it to the internet.
+
+**OTLP to a collector.** Point the server at any OTLP/HTTP receiver (an OpenTelemetry
+Collector, Grafana Alloy, Jaeger, Tempo, a hosted service):
+
+```sh
+CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT=http://collector:4318   # /v1/traces and /v1/metrics are appended
+CAMPBOOKS_TELEMETRY__OTLP_HEADERS=authorization=Bearer abc # optional, secret
+CAMPBOOKS_TELEMETRY__SAMPLE_RATIO=1                        # share of new traces kept, 0 to 1
+```
+
+Metrics are pushed every 60 seconds, traces in batches. A collector that is down costs
+dropped telemetry, never slower requests. The standard `OTEL_SERVICE_NAME` and
+`OTEL_RESOURCE_ATTRIBUTES` variables are honoured (e.g.
+`OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production`). Both exports can be on at
+once.
+
+**What you get.**
+
+| Metric (Prometheus name) | What | Labels |
+| --- | --- | --- |
+| `http_server_request_duration_seconds` | Requests: rate, errors (by status) and latency | `http_request_method`, `http_route` (the route template), `http_response_status_code`, `error_type` (the error's `code`, e.g. `not_found`) |
+| `campbooks_job_duration_seconds` | Job attempts and how they ended | `job_kind`, `job_queue`, `job_outcome` (`succeeded`, `retried`, `failed`, `lost`) |
+| `campbooks_job_wait_seconds` | How long a ready job waited for a worker | `job_kind`, `job_queue` |
+| `campbooks_jobs` | Jobs per queue and state, sampled every 15 s | `job_queue`, `job_state` (`ready`, `scheduled`, `running`, `failed`) |
+| `campbooks_jobs_oldest_ready_age_seconds` | Age of the oldest job waiting for a worker | `job_queue` |
+| `gen_ai_client_operation_duration_seconds` | AI provider calls and their errors | `gen_ai_operation_name`, `campbooks_ai_role`, `server_address`, `gen_ai_request_model`, `error_type` |
+| `gen_ai_client_token_usage` | Tokens per AI call | the above plus `gen_ai_token_type` |
+| `db_client_connection_count`, `db_client_connection_max` | Database pool use | `db_client_connection_state` |
+| `db_client_connection_wait_time_seconds` | Time waiting for a pooled connection | |
+| `campbooks_build_info` | Always 1 | `service_version`, `campbooks_role` |
+
+Good first alerts: a rising share of 5xx in `http_server_request_duration_seconds_count`,
+`campbooks_jobs{job_state="failed"}` going up, `campbooks_jobs_oldest_ready_age_seconds`
+above a few minutes (workers cannot keep up: add one, see step 7 above), and
+`db_client_connection_count{db_client_connection_state="used"}` sitting at
+`db_client_connection_max`.
+
+Traces have a span per request (named after its route), per job attempt (linked to the
+request that enqueued it), per AI call and per identity-provider fetch, and honour a W3C
+`traceparent` sent by a client or proxy. If your proxy faces the internet, strip that
+header there unless you want callers to choose which of their requests are traced.
+
+**Privacy.** Telemetry never contains message content, prompts, tokens, cookies, codes
+or email addresses, and metrics never carry ids (workspace ids appear on spans only). A
+test in the server enforces this for every release.
+
 ## Identity provider
 
 Sign-in is handled by [Rauthy](https://github.com/sebadob/rauthy), an OpenID Connect /

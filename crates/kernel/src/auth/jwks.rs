@@ -26,9 +26,10 @@ use jsonwebtoken::{
 };
 use serde::Deserialize;
 use tokio::sync::{Mutex, OnceCell};
+use tracing::Instrument as _;
 
 use super::verifier::ALLOWED_ALGORITHMS;
-use crate::{Error, clock::Clock};
+use crate::{Error, clock::Clock, telemetry};
 
 /// Cache lifetime when the JWKS response sets no `max-age`.
 pub const DEFAULT_TTL: Duration = Duration::from_hours(1);
@@ -220,6 +221,18 @@ enum FetchError {
     NoUsableKeys,
 }
 
+impl FetchError {
+    /// The `error.type` telemetry records.
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::Http(e) => telemetry::http_error_type(e),
+            Self::TooLarge | Self::Json(_) | Self::IssuerMismatch(_) | Self::NoUsableKeys => {
+                "invalid_response"
+            }
+        }
+    }
+}
+
 async fn build_client() -> Result<reqwest::Client, FetchError> {
     Ok(reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
@@ -227,8 +240,27 @@ async fn build_client() -> Result<reqwest::Client, FetchError> {
         .build()?)
 }
 
+/// GET a document from the IdP, in a client span carrying the trace on.
 async fn get(http: &reqwest::Client, url: &str) -> Result<(HeaderMap, Vec<u8>), FetchError> {
-    let response = http.get(url).send().await?.error_for_status()?;
+    async {
+        let result = fetch_document(http, url, telemetry::trace_headers()).await;
+        if let Err(e) = &result {
+            telemetry::record_error(e.kind());
+        }
+        result
+    }
+    .instrument(telemetry::client_span("GET idp", url))
+    .await
+}
+
+async fn fetch_document(
+    http: &reqwest::Client,
+    url: &str,
+    trace: HeaderMap,
+) -> Result<(HeaderMap, Vec<u8>), FetchError> {
+    let response = http.get(url).headers(trace).send().await?;
+    tracing::Span::current().record("http.response.status_code", response.status().as_u16());
+    let response = response.error_for_status()?;
     let headers = response.headers().clone();
     let body = response.bytes().await?;
     if body.len() > MAX_DOCUMENT_BYTES {

@@ -26,7 +26,12 @@ icu_locale_core.workspace = true
 icu_plurals.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
+# sqlx's pool options take a `log` level (`db::connect_runtime`).
+log.workspace = true
 object_store.workspace = true
+opentelemetry.workspace = true
+# The W3C trace-context propagator (`telemetry`).
+opentelemetry_sdk.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true
@@ -36,6 +41,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tower.workspace = true
 tracing.workspace = true
+tracing-opentelemetry.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 uuid.workspace = true

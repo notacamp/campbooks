@@ -169,6 +169,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   whose user cannot create roles, see `deploy/README.md`.
 - API errors for malformed JSON bodies and query strings are now
   problem+json 400s, and unparsable ids in paths are 404s.
+- Monitoring, off unless you turn it on. `CAMPBOOKS_TELEMETRY__OTLP_ENDPOINT`
+  sends traces and metrics over OTLP/HTTP to a collector (with
+  `CAMPBOOKS_TELEMETRY__OTLP_HEADERS` for its credentials and
+  `CAMPBOOKS_TELEMETRY__SAMPLE_RATIO`, default 1, for the share of traces
+  kept). `CAMPBOOKS_TELEMETRY__METRICS_ADDR` serves Prometheus metrics at
+  `/metrics` on a separate port: keep it private. Metrics cover request
+  rates, errors (by their stable `code`) and latency per route, job durations and failures, queue
+  depth and wait, AI call latency and tokens per role, the database pool and
+  the build. Traces follow a request into the jobs it enqueues and the calls
+  it makes to AI providers and the identity provider, and honour an incoming
+  W3C `traceparent`. No message content, token, cookie or email address is
+  ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
 - **API clients:** every problem+json error now carries a stable `code`
@@ -194,8 +206,11 @@ All notable changes to Campbooks Next are documented here. The format follows
 - `/bff/api/*` now requires a signed-in session and calls the API with your
   access token; without a session it answers 401 `session_required`. It
   replaces the interim passthrough.
-- Request logs record the path of each request but no longer its query
-  string, which can carry secrets.
+- Log lines inside a request or a job now carry the W3C `trace_id`, and the
+  request's span records the route template (`http.route`) instead of the
+  full URI, which could carry personal data in its query string. A
+  client-sent `x-request-id` that is not a plain token is logged as
+  `invalid`. The request log line is now `request finished`.
 - The image's default command is now `all` instead of `serve` (same
   behaviour plus the job worker). Each job the worker runs may hold a
   database connection: keep `CAMPBOOKS_DATABASE_MAX_CONNECTIONS` (default 10)
