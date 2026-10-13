@@ -23,8 +23,9 @@ umask 077
 
 DIR=/run/db
 FILE="$DIR/runtime-password"
-# `nonroot` in the server image.
-SERVER_UID=65532
+# The server reads it through the supplementary group 10001 (compose
+# `group_add`), like the files `server-init` writes.
+SERVER_GID=10001
 
 mkdir -p "$DIR"
 if [ ! -s "$FILE" ]; then
@@ -32,8 +33,8 @@ if [ ! -s "$FILE" ]; then
   tr -dc 'A-Za-z0-9' </dev/urandom | head -c 48 >"$tmp"
   mv "$tmp" "$FILE"
 fi
-chown "$SERVER_UID:$SERVER_UID" "$FILE"
-chmod 0400 "$FILE"
+chown "0:$SERVER_GID" "$FILE"
+chmod 0440 "$FILE"
 
 # The password goes in as a psql variable, quoted by psql itself.
 psql -v ON_ERROR_STOP=1 -v "pw=$(cat "$FILE")" <<'SQL'

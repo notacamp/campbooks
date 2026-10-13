@@ -4,7 +4,7 @@
 
 mod idp;
 
-pub use idp::TestIdp;
+pub use idp::{TestIdp, TestUser, WEB_CLIENT_ID, WEB_CLIENT_SECRET};
 
 use std::time::Duration;
 

@@ -32,8 +32,8 @@ check.
 
 ### Password from a file
 `CAMPBOOKS_DATABASE_PASSWORD_FILE` follows the volume pattern of `idp-init`:
-the secret never enters `.env` or the process environment. The file is owned
-by the image's `nonroot` UID, mode 0400.
+the secret never enters `.env` or the process environment. The file is mode 0440, group 10001 (the
+server's supplementary group, as `server-init`'s files).
 
 ## Alternatives considered
 

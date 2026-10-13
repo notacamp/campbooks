@@ -23,7 +23,7 @@ campbooks-system = { path = "crates/modules/system" }
 campbooks-workspaces = { path = "crates/modules/workspaces" }
 
 # HTTP / async
-axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "tokio", "tower-log", "tracing", "matched-path"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.1", features = ["trace", "request-id", "timeout", "compression-gzip", "compression-br", "util", "fs", "set-header"] }

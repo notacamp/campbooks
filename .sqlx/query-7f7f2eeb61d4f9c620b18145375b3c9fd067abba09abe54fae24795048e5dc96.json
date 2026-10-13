@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM bff.sessions\n         WHERE ($2::text IS NOT NULL AND idp_session_id = $2\n                AND ($1::text IS NULL OR subject = $1))\n            OR ($2::text IS NULL AND $1::text IS NOT NULL AND subject = $1)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7f7f2eeb61d4f9c620b18145375b3c9fd067abba09abe54fae24795048e5dc96"
+}
