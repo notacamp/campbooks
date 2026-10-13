@@ -2,8 +2,8 @@
 //!
 //! A provider identity is keyed by provider, issuer and subject, and belongs
 //! to at most one account. It is linked only by the round trip that created
-//! the account (slice S1a) or one completed while signed in (S2); an email
-//! address is never used to find or link an account.
+//! the account or one completed while signed in ([`link`]); an email address
+//! is never used to find or link an account.
 
 use campbooks_kernel::Result;
 use chrono::{DateTime, Utc};
@@ -119,6 +119,107 @@ pub async fn create(
         account_id,
         disabled: false,
     }))
+}
+
+/// What linking a provider identity to an account did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LinkOutcome {
+    /// It is a new way into the account (its row).
+    Added(Uuid),
+    /// It already was one (its row).
+    Already(Uuid),
+    /// It is another account's way in: nothing changed.
+    Another,
+}
+
+/// Link `identity` to `account` (`via` = `link` or `connect`), after a round
+/// trip that account completed while signed in.
+pub async fn link(
+    conn: &mut PgConnection,
+    account: Uuid,
+    identity: &ProviderIdentity,
+    via: &str,
+    now: DateTime<Utc>,
+) -> Result<LinkOutcome> {
+    let id = Uuid::now_v7();
+    let inserted: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO identity.provider_identities
+             (id, account_id, provider, issuer, subject, email_at_link, email_verified_at_link,
+              linked_via, linked_at, last_used_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NULL)
+         ON CONFLICT (provider, issuer, subject) DO NOTHING
+         RETURNING id",
+    )
+    .bind(id)
+    .bind(account)
+    .bind(&identity.provider)
+    .bind(&identity.issuer)
+    .bind(&identity.subject)
+    .bind(&identity.email)
+    .bind(identity.email_verified)
+    .bind(via)
+    .bind(now)
+    .fetch_optional(&mut *conn)
+    .await?;
+    if let Some(id) = inserted {
+        return Ok(LinkOutcome::Added(id));
+    }
+    let owner: Option<(Uuid, Uuid)> = sqlx::query_as(
+        "SELECT id, account_id FROM identity.provider_identities
+          WHERE provider = $1 AND issuer = $2 AND subject = $3",
+    )
+    .bind(&identity.provider)
+    .bind(&identity.issuer)
+    .bind(&identity.subject)
+    .fetch_optional(conn)
+    .await?;
+    Ok(match owner {
+        Some((id, owner)) if owner == account => LinkOutcome::Already(id),
+        _ => LinkOutcome::Another,
+    })
+}
+
+/// A provider way in, as its owner sees it.
+#[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
+pub struct WayIn {
+    /// The provider identity.
+    pub id: Uuid,
+    /// `google`, `microsoft` or `zoho`.
+    pub provider: String,
+    /// The address the provider gave when it was linked.
+    pub email: Option<String>,
+    /// `sign_up`, `link` or `connect`.
+    pub linked_via: String,
+    /// When.
+    pub linked_at: DateTime<Utc>,
+    /// When it was last used to sign in.
+    pub last_used_at: Option<DateTime<Utc>>,
+}
+
+/// The provider ways into `account`, oldest first.
+pub async fn ways_in(db: &PgPool, account: Uuid) -> Result<Vec<WayIn>> {
+    Ok(sqlx::query_as(
+        "SELECT id, provider, email_at_link AS email, linked_via, linked_at, last_used_at
+           FROM identity.provider_identities
+          WHERE account_id = $1
+          ORDER BY linked_at, id",
+    )
+    .bind(account)
+    .fetch_all(db)
+    .await?)
+}
+
+/// Delete provider way in `id` of `account`; its provider, or `None` when it
+/// is not theirs.
+pub async fn remove(conn: &mut PgConnection, id: Uuid, account: Uuid) -> Result<Option<String>> {
+    Ok(sqlx::query_scalar(
+        "DELETE FROM identity.provider_identities WHERE id = $1 AND account_id = $2
+         RETURNING provider",
+    )
+    .bind(id)
+    .bind(account)
+    .fetch_optional(conn)
+    .await?)
 }
 
 /// What tokens say about account `id`, unless it is gone or disabled.

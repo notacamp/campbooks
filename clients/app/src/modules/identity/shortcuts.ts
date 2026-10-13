@@ -3,7 +3,8 @@ import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { CHOICE_SHORTCUTS } from "./model";
 
 /**
- * The sign-in screen's keys: the ways in by position, and passkeys. They live
+ * `identity` operations' keys (by operationId, ADR 0013): adding a way in on
+ * Settings → Ways to sign in. And the sign-in screen's keys: the ways in by position, and passkeys. They live
  * in the `focus` scope (one-question pages), so `1` and `2` don't fight the
  * list and item shortcuts, and the `?` sheet lists them only on that page.
  */
@@ -35,5 +36,12 @@ export const IDENTITY_SHORTCUTS = [
     scope: "focus",
     group: "general",
     label: "identity:shortcuts.passkey",
+  },
+  {
+    id: "identity.start_link",
+    keys: "a",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.addWayIn",
   },
 ] as const satisfies readonly ShortcutDefinition[];

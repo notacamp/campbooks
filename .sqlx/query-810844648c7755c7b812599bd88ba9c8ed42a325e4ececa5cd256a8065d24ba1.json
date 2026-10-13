@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes\n              SET state = 'failed', reason = 'expired', done_at = $3\n            WHERE stream_id = $1 AND state = 'pending' AND created_at < $2\n        RETURNING provider_message_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "provider_message_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "810844648c7755c7b812599bd88ba9c8ed42a325e4ececa5cd256a8065d24ba1"
+}

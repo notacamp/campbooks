@@ -161,9 +161,11 @@ pub struct Principal {
     /// authenticated in-process without a token. Long-lived responses (the
     /// change feed) end by then, so the caller is authorized again.
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
-    /// When the person last authenticated (`auth_time`), when the token says
-    /// so. Admin operations require a recent one
-    /// ([`Admin`](crate::admin::Admin)). Always `None` for clients.
+    /// When the user last authenticated (`auth_time`), when the token says.
+    /// Operations that change how someone signs in ask for a recent one
+    /// (step-up), and admin operations require one
+    /// ([`Admin`](crate::admin::Admin)). Always `None` for clients and
+    /// in-process principals.
     pub auth_time: Option<chrono::DateTime<chrono::Utc>>,
 }
 

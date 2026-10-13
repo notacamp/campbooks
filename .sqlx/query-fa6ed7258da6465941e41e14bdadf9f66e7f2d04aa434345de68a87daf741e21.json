@@ -1,0 +1,305 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT d.id AS \"id: DraftId\", d.inbox_id AS \"inbox_id: InboxId\",\n                   i.address AS inbox_address, i.display_name AS inbox_name, d.kind,\n                   d.conversation_id AS \"conversation_id: ConversationId\",\n                   d.source_message_id AS \"source_message_id: MessageId\",\n                   d.to_recipients, d.cc_recipients, d.bcc_recipients, d.subject, d.body,\n                   d.quoted, d.in_reply_to, d.reference_ids, d.thread_key, d.attachments,\n                   d.version, d.state, d.send_generation, d.send_at,\n                   d.failure_reason, d.created_at, d.updated_at\n              FROM conversations.drafts d\n              JOIN conversations.inboxes i ON i.id = d.inbox_id\n             WHERE d.id = $1 AND d.author IS NOT DISTINCT FROM $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: DraftId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "inbox_id: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "inbox_address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "inbox_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "conversation_id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "conversation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "source_message_id: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "source_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "to_recipients",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "to_recipients"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "cc_recipients",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "cc_recipients"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "bcc_recipients",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "bcc_recipients"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "body",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "body"
+          }
+        }
+      },
+      {
+        "ordinal": 12,
+        "name": "quoted",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "quoted"
+          }
+        }
+      },
+      {
+        "ordinal": 13,
+        "name": "in_reply_to",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "in_reply_to"
+          }
+        }
+      },
+      {
+        "ordinal": 14,
+        "name": "reference_ids",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "reference_ids"
+          }
+        }
+      },
+      {
+        "ordinal": 15,
+        "name": "thread_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "thread_key"
+          }
+        }
+      },
+      {
+        "ordinal": 16,
+        "name": "attachments",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "attachments"
+          }
+        }
+      },
+      {
+        "ordinal": 17,
+        "name": "version",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "version"
+          }
+        }
+      },
+      {
+        "ordinal": 18,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 19,
+        "name": "send_generation",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "send_generation"
+          }
+        }
+      },
+      {
+        "ordinal": 20,
+        "name": "send_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "send_at"
+          }
+        }
+      },
+      {
+        "ordinal": 21,
+        "name": "failure_reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "failure_reason"
+          }
+        }
+      },
+      {
+        "ordinal": 22,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 23,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "fa6ed7258da6465941e41e14bdadf9f66e7f2d04aa434345de68a87daf741e21"
+}

@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes SET applied_to = $2\n                WHERE stream_id = $1 AND state = 'applied' AND applied_to IS NULL\n                  AND applied_from IS NOT NULL AND applied_from < $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "dda366330dc618a7ab0e136995dbc740ef2f78e83ef2322da9cfbec7b3361dfd"
+}

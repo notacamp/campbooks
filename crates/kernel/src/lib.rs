@@ -23,6 +23,7 @@ pub mod ids;
 pub mod jobs;
 pub mod module;
 pub mod operations;
+pub mod rate_limit;
 pub mod records;
 pub mod signup;
 pub mod state;

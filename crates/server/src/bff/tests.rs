@@ -337,6 +337,22 @@ async fn login_redirects_to_the_idp_with_pkce_state_and_nonce(db: PgPool) {
     for name in ["state", "nonce", "code_challenge"] {
         assert_ne!(again[name], params[name], "{name}");
     }
+    assert!(!again.contains_key("max_age"));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_step_up_login_asks_for_a_recent_sign_in(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    let reply = browser
+        .get("/bff/login?max_age=600&return_to=%2Fsettings%2Fsign-in")
+        .await;
+    assert_eq!(reply.status, StatusCode::SEE_OTHER, "{}", reply.body);
+    let params = query(reply.header(header::LOCATION).unwrap());
+    assert_eq!(params["max_age"], "600");
+
+    let refused = browser.get("/bff/login?max_age=-1").await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{}", refused.body);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

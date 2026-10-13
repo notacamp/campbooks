@@ -50,6 +50,7 @@ pub fn config(database_url: &str) -> Config {
         blobs: BlobsConfig::default(),
         changes: ChangesConfig::default(),
         telemetry: TelemetryConfig::default(),
+        trusted_proxies: crate::rate_limit::TrustedProxies::default(),
     }
 }
 

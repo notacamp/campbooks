@@ -646,6 +646,67 @@ async fn id_token_yields_the_user() {
     assert_eq!(id.name.as_deref(), Some("Countess"));
 }
 
+/// What a multi-tenant provider adds to its ID tokens.
+#[derive(Debug, serde::Deserialize, PartialEq, Eq)]
+struct TenantClaims {
+    tid: Option<String>,
+    xms_edov: Option<bool>,
+}
+
+#[tokio::test]
+async fn id_token_for_a_given_issuer_with_its_own_claims() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let tenant_issuer = "https://login.example.com/tenant-a/v2.0";
+    let mut claims = idp.id_token_claims("user-1", nonce(), "s");
+    claims["iss"] = tenant_issuer.into();
+    claims["tid"] = "tenant-a".into();
+    claims["xms_edov"] = true.into();
+    claims["email"] = "ada@example.com".into();
+    let token = idp.id_token(&claims);
+
+    // Signed by this verifier's keys, for the issuer the caller names.
+    let (id, extra) = verifier
+        .verify_id_token_with::<TenantClaims>(&token, CLIENT, nonce(), Some(tenant_issuer))
+        .await
+        .unwrap();
+    assert_eq!(id.subject, "user-1");
+    assert_eq!(id.email.as_deref(), Some("ada@example.com"));
+    assert_eq!(
+        extra,
+        TenantClaims {
+            tid: Some("tenant-a".into()),
+            xms_edov: Some(true)
+        }
+    );
+
+    // Any other issuer, or the configured one, is refused.
+    invalid(
+        &verifier
+            .verify_id_token_with::<TenantClaims>(
+                &token,
+                CLIENT,
+                nonce(),
+                Some("https://login.example.com/tenant-b/v2.0"),
+            )
+            .await
+            .map(|(id, _)| id),
+    );
+    invalid(&verifier.verify_id_token(&token, CLIENT, nonce()).await);
+    // The nonce is still checked.
+    invalid(
+        &verifier
+            .verify_id_token_with::<TenantClaims>(
+                &token,
+                CLIENT,
+                other_nonce(),
+                Some(tenant_issuer),
+            )
+            .await
+            .map(|(id, _)| id),
+    );
+}
+
 #[tokio::test]
 async fn id_token_must_carry_the_sign_ins_nonce() {
     let idp = TestIdp::start().await;

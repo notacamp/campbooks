@@ -4,13 +4,18 @@
 //! the batch (`connectors.messages_changed`), advance the cursor and set the
 //! next run.
 //!
+//! A run first makes the stream's pending outbound changes at the provider
+//! (`gmail::write`), records how each ended, and only then reads: pushes
+//! and pulls of one stream never interleave, and share its budget, backoff
+//! and health.
+//!
 //! The stream row is the schedule: provider trouble (throttling, outages)
 //! is recorded on it and the run ends normally, with the next run set by
 //! the backoff, rather than failing the job.
 
 use campbooks_kernel::{
     JobContext, JobError,
-    blobs::{BlobOwner, BlobRef},
+    blobs::BlobOwner,
     db::BeginFor as _,
     jobs::{EnqueueOptions, JobHandler},
     tenancy::{UserId, WorkspaceId},
@@ -23,13 +28,13 @@ use crate::{
     deps::Deps,
     domain::{
         credentials::{self, TokenError},
-        health,
+        emit, health,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
-        removal::{BATCH_OWNER, GMAIL_MESSAGE_OWNER},
+        outbound,
+        removal::BATCH_OWNER,
         schedule::{self, LEASE, SYNC_STREAM, SyncStreamPayload},
     },
-    events::MessagesChanged,
-    gmail::{self, Cursor, IndexOp, Page, Reader},
+    gmail::{self, Cursor, Page, Reader, write},
     google::GoogleError,
 };
 
@@ -117,13 +122,40 @@ impl JobHandler for SyncStream {
                 Err(TokenError::Database(err)) => return Err(err.into()),
             };
 
+        // Stale changes are given up before anything is taken: never made
+        // late after a long pause.
+        let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
+        outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
+        let backlog = outbound::backlog(ctx.pool(), workspace, target.stream, now).await?;
+        let messages: std::collections::HashSet<&str> = backlog
+            .pending
+            .iter()
+            .map(|p| p.provider_message_id.as_str())
+            .collect();
+        let cost = gmail::UNITS_PER_RUN
+            + if messages.is_empty() {
+                0
+            } else {
+                write::units(messages.len())
+            };
         let rate = self.deps.config.google.units_per_second;
-        if let Err(wait) =
-            schedule::take_budget(ctx.pool(), target.provider, gmail::UNITS_PER_RUN, rate).await?
-        {
+        if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {
             let at = now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::seconds(1));
             schedule::set_due(ctx.tx().await?, workspace, target.stream, at).await?;
             return Ok(());
+        }
+
+        let pushed_up_to = backlog.last();
+        if pushed_up_to.is_some() {
+            let pushed = write::push(&google.gmail(&token), &backlog).await;
+            // Recorded on its own: the writes happened, whatever the read
+            // does next.
+            let mut tx = ctx.pool().begin_for(workspace).await?;
+            outbound::record_outcome(&mut tx, target.stream, &pushed.outcome, now).await?;
+            tx.commit().await?;
+            if let Some(err) = pushed.trouble {
+                return self.trouble(ctx, workspace, &target, &err, now).await;
+            }
         }
 
         let state = ctx.state().clone();
@@ -147,19 +179,27 @@ impl JobHandler for SyncStream {
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
-        self.apply(ctx, workspace, &target, inbox, page, now).await
+        self.apply(ctx, workspace, &target, inbox, page, pushed_up_to, now)
+            .await
     }
 }
 
 impl SyncStream {
-    /// Apply a page in the job's transaction.
+    /// Apply a page in the job's transaction. `pushed_up_to` is the newest
+    /// outbound change this run made: newer ones arrived during the run and
+    /// call for another at once.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one call site; the values are distinct"
+    )]
     async fn apply(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
         inbox: InboxId,
-        page: Page,
+        mut page: Page,
+        pushed_up_to: Option<uuid::Uuid>,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let state = ctx.state().clone();
@@ -183,36 +223,18 @@ impl SyncStream {
 
         let tx = ctx.tx().await?;
         if let Some(labels) = &page.labels {
-            sqlx::query!(
-                "DELETE FROM connectors.gmail_labels WHERE stream_id = $1",
-                target.stream as StreamId
-            )
-            .execute(&mut **tx)
-            .await?;
-            for label in labels {
-                sqlx::query!(
-                    r#"INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)
-                       VALUES ($1, $2, $3, $4, $5)"#,
-                    workspace as WorkspaceId,
-                    target.stream as StreamId,
-                    label.id,
-                    label.name,
-                    label.kind.as_deref().unwrap_or("system"),
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
+            replace_labels(tx, workspace, target.stream, labels).await?;
         }
-        apply_index(tx, &state, workspace, target.stream, page.index).await?;
+        emit::apply_index(tx, &state, workspace, target.stream, page.index).await?;
         if let Some(batch) = &batch {
-            store_batch(
+            emit::store_batch(
                 tx,
                 &state,
                 workspace,
-                target,
+                target.stream,
                 inbox,
                 batch,
-                &page.cursor,
+                &page.cursor.token(),
                 change_count,
                 now,
             )
@@ -236,6 +258,17 @@ impl SyncStream {
         .await?;
         if matches!(target.health, Health::Throttled | Health::Failing) {
             health::set(tx, target.connection, Health::Ok, None, now).await?;
+        }
+        if settle_outbound(
+            tx,
+            target.stream,
+            pushed_up_to,
+            now - retention,
+            &page.cursor,
+        )
+        .await?
+        {
+            page.more = true;
         }
         if page.more {
             // More is waiting: run again straight away, holding the
@@ -407,6 +440,55 @@ impl SyncStream {
     }
 }
 
+/// Replace the cached Gmail label names of `stream` with `labels`.
+async fn replace_labels(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    labels: &[crate::google::LabelInfo],
+) -> Result<(), JobError> {
+    sqlx::query!(
+        "DELETE FROM connectors.gmail_labels WHERE stream_id = $1",
+        stream as StreamId
+    )
+    .execute(&mut **tx)
+    .await?;
+    for label in labels {
+        sqlx::query!(
+            r#"INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)
+                       VALUES ($1, $2, $3, $4, $5)"#,
+            workspace as WorkspaceId,
+            stream as StreamId,
+            label.id,
+            label.name,
+            label.kind.as_deref().unwrap_or("system"),
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
+/// The end of a run's outbound work, in its transaction (after the stream
+/// row is locked by the run's update, so a change recorded concurrently is
+/// either seen here or enqueues its own run): prune old changes and close
+/// open write windows at the history id the run read up to. Returns whether changes arrived
+/// during this run (another run is needed now).
+async fn settle_outbound(
+    tx: &mut Transaction<'static, Postgres>,
+    stream: StreamId,
+    pushed_up_to: Option<uuid::Uuid>,
+    before: DateTime<Utc>,
+    cursor: &Cursor,
+) -> Result<bool, JobError> {
+    let read_up_to = cursor
+        .history_id
+        .as_deref()
+        .and_then(|h| h.parse::<i64>().ok());
+    outbound::prune(tx, stream, before, read_up_to).await?;
+    Ok(outbound::more_pending(tx, stream, pushed_up_to).await?)
+}
+
 /// The stream and its connection, read in a short transaction of its own.
 async fn load(
     ctx: &JobContext,
@@ -448,150 +530,6 @@ async fn load(
     }))
 }
 
-/// Apply the adapter's index updates, holding and releasing blobs.
-async fn apply_index(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &campbooks_kernel::AppState,
-    workspace: WorkspaceId,
-    stream: StreamId,
-    ops: Vec<IndexOp>,
-) -> Result<(), JobError> {
-    let key = workspace.to_string();
-    for op in ops {
-        match op {
-            IndexOp::Insert {
-                row,
-                provider_message_id,
-                thread_id,
-                label_ids,
-                internal_date,
-                document,
-                blobs,
-                generation,
-            } => {
-                let inserted = sqlx::query_scalar!(
-                    r#"INSERT INTO connectors.gmail_messages
-                           (id, workspace_id, stream_id, provider_message_id, thread_id, label_ids,
-                            internal_date, document_hash, document_size, listed_generation)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                       ON CONFLICT (stream_id, provider_message_id) DO UPDATE
-                          SET label_ids = EXCLUDED.label_ids,
-                              listed_generation = EXCLUDED.listed_generation
-                    RETURNING id"#,
-                    row,
-                    workspace as WorkspaceId,
-                    stream as StreamId,
-                    provider_message_id,
-                    thread_id,
-                    &label_ids,
-                    internal_date,
-                    document.hash.to_string(),
-                    i64::try_from(document.size).unwrap_or(i64::MAX),
-                    generation,
-                )
-                .fetch_one(&mut **tx)
-                .await?;
-                let owner = BlobOwner::new(GMAIL_MESSAGE_OWNER, inserted);
-                for blob in &blobs {
-                    state.blobs.attach(tx, &key, blob, &owner).await?;
-                }
-            }
-            IndexOp::Update {
-                row,
-                label_ids,
-                generation,
-            } => {
-                sqlx::query!(
-                    r#"UPDATE connectors.gmail_messages
-                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3)
-                        WHERE id = $1"#,
-                    row,
-                    &label_ids,
-                    generation,
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
-            IndexOp::Remove { row } => {
-                state
-                    .blobs
-                    .detach_owner(tx, &key, &BlobOwner::new(GMAIL_MESSAGE_OWNER, row))
-                    .await?;
-                sqlx::query!("DELETE FROM connectors.gmail_messages WHERE id = $1", row)
-                    .execute(&mut **tx)
-                    .await?;
-            }
-            IndexOp::Oversized {
-                provider_message_id,
-            } => {
-                sqlx::query!(
-                    r#"INSERT INTO connectors.gmail_oversized (workspace_id, stream_id, provider_message_id)
-                       VALUES ($1, $2, $3)
-                       ON CONFLICT DO NOTHING"#,
-                    workspace as WorkspaceId,
-                    stream as StreamId,
-                    provider_message_id,
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Record a batch, hold its blob and announce it.
-#[allow(
-    clippy::too_many_arguments,
-    reason = "one call site; the values are distinct"
-)]
-async fn store_batch(
-    tx: &mut Transaction<'static, Postgres>,
-    state: &campbooks_kernel::AppState,
-    workspace: WorkspaceId,
-    target: &Target,
-    inbox: InboxId,
-    batch: &BlobRef,
-    cursor: &Cursor,
-    changes: usize,
-    now: DateTime<Utc>,
-) -> Result<(), JobError> {
-    let id = uuid::Uuid::now_v7();
-    sqlx::query!(
-        r#"INSERT INTO connectors.batches
-               (id, workspace_id, stream_id, batch_hash, batch_size, cursor, changes, created_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
-        id,
-        workspace as WorkspaceId,
-        target.stream as StreamId,
-        batch.hash.to_string(),
-        i64::try_from(batch.size).unwrap_or(i64::MAX),
-        cursor.token(),
-        i32::try_from(changes).unwrap_or(i32::MAX),
-        now,
-    )
-    .execute(&mut **tx)
-    .await?;
-    let key = workspace.to_string();
-    state
-        .blobs
-        .attach(tx, &key, batch, &BlobOwner::new(BATCH_OWNER, id))
-        .await?;
-    state
-        .events
-        .publish(
-            tx,
-            &MessagesChanged {
-                workspace: key,
-                inbox_id: inbox,
-                batch: batch.clone(),
-                cursor: cursor.token(),
-            },
-        )
-        .await?;
-    Ok(())
-}
-
 /// Release the batches of `stream` older than `before`.
 async fn prune_batches(
     tx: &mut Transaction<'static, Postgres>,
@@ -615,6 +553,49 @@ async fn prune_batches(
             .await?;
     }
     Ok(())
+}
+
+/// Read one page of `stream` without pushing or applying it: the changes
+/// it would emit, as JSON (tests of the reader's overlay).
+#[cfg(test)]
+pub(crate) async fn read_page(
+    state: &campbooks_kernel::AppState,
+    deps: &Deps,
+    workspace: WorkspaceId,
+    stream: StreamId,
+) -> Vec<serde_json::Value> {
+    let mut tx = state.db.begin_for(workspace).await.unwrap();
+    let row = sqlx::query!(
+        r#"SELECT connection_id AS "connection: ConnectionId", phase, cursor
+             FROM connectors.streams WHERE id = $1"#,
+        stream as StreamId
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let token = credentials::access_token(&state.db, deps, workspace, row.connection)
+        .await
+        .unwrap_or_else(|_| panic!("a token"));
+    let google = deps.google.clone().unwrap();
+    let reader = Reader {
+        gmail: google.gmail(&token),
+        pool: &state.db,
+        blobs: &state.blobs,
+        workspace,
+        stream,
+        phase: Phase::parse(&row.phase).unwrap(),
+        cursor: serde_json::from_value(row.cursor).unwrap(),
+        now: deps.clock.now(),
+        backfill_days: deps.config.gmail.backfill_days,
+        max_message_bytes: deps.config.gmail.max_message_bytes,
+        run_budget_bytes: deps.config.gmail.run_budget_bytes,
+    };
+    let page = reader.read().await.unwrap();
+    page.changes
+        .iter()
+        .map(|c| serde_json::to_value(c).unwrap())
+        .collect()
 }
 
 #[cfg(test)]

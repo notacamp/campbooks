@@ -218,8 +218,8 @@ pub struct AuthorizationRequest<'a> {
     pub nonce: &'a str,
     /// The PKCE S256 challenge.
     pub code_challenge: &'a str,
-    /// `max_age`: how many seconds ago the person may have last signed in
-    /// at most; `Some(0)` makes them sign in again (OIDC Core §3.1.2.1).
+    /// `max_age`: sign in again unless the person did within this many
+    /// seconds (step-up); `Some(0)` always asks (OIDC Core §3.1.2.1).
     pub max_age: Option<u32>,
 }
 

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes\n                  SET state = $2, reason = $3, done_at = $4,\n                      applied_from = CASE WHEN $5 THEN $6::bigint END,\n                      applied_to = CASE WHEN $5 THEN $7::bigint END\n                WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Bool",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ce5669f881eb25200f5a333048de1e4d63b20fd77381aa758256911439699fc9"
+}

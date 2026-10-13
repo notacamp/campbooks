@@ -4,12 +4,14 @@ import { writeTabValue } from "~/lib/storage/tab";
 
 import {
   isInvitation,
+  linkResult,
   rememberedReturnTo,
   rememberReturnTo,
   safeReturnTo,
   signInError,
   startAgainUrl,
   startUrl,
+  stepUpUrl,
   waysIn,
 } from "./model";
 
@@ -59,5 +61,29 @@ describe("identity model", () => {
   it("explains known callback errors and calls the rest unknown", () => {
     expect(signInError("invalid_state")).toBe("invalid_state");
     expect(signInError("something_new")).toBe("unknown");
+  });
+});
+
+describe("linkResult", () => {
+  it("reads what the front door came back with", () => {
+    expect(linkResult({ linked: "zoho" })).toEqual({ kind: "linked", provider: "zoho" });
+    expect(linkResult({ linked: "yahoo" })).toBeUndefined();
+    expect(linkResult({ connected: "c1" })).toEqual({ kind: "connected" });
+    expect(linkResult({ link_error: "last_way_in_ever", linked: "zoho" })).toEqual({
+      kind: "error",
+      error: "unknown",
+    });
+    expect(linkResult({ link_error: "sign_in_again" })).toEqual({
+      kind: "error",
+      error: "sign_in_again",
+    });
+    expect(linkResult({})).toBeUndefined();
+  });
+
+  it("signs in again for at most ten minutes, coming back here", () => {
+    expect(stepUpUrl("/w/1/settings/sign-in")).toBe(
+      "/bff/login?return_to=%2Fw%2F1%2Fsettings%2Fsign-in&max_age=600",
+    );
+    expect(stepUpUrl("https://evil.example.com")).toBe("/bff/login?return_to=%2F&max_age=600");
   });
 });

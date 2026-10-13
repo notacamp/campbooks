@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.drafts\n            (id, workspace_id, inbox_id, author, kind, conversation_id, source_message_id,\n             to_recipients, cc_recipients, bcc_recipients, subject, body, quoted, in_reply_to,\n             reference_ids, thread_key, attachments)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "Text",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4aa108fe7048b395c72f4c0fa196ce362ce5cb45dacc9c90a14f6e7e159e89b5"
+}

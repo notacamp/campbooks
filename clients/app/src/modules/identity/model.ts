@@ -91,3 +91,52 @@ export function signInError(code: string): SignInError {
 export function leavePage(url: string): void {
   globalThis.location.assign(url);
 }
+
+/** How the front door came back to the Ways to sign in page (`?linked=`, `?connected=`, `?link_error=`). */
+export type LinkResult =
+  | { kind: "linked"; provider: Provider }
+  | { kind: "connected" }
+  | { kind: "error"; error: LinkError };
+
+/** The refusals the Ways to sign in page explains; anything else is `unknown`. */
+const LINK_ERRORS = [
+  "way_in_belongs_to_another_account",
+  "sign_in_again",
+  "link_expired",
+  "cancelled_at_provider",
+  "login_failed",
+  "provider_unavailable",
+  "consent_incomplete",
+  "account_mismatch",
+  "account_connected_by_another_member",
+] as const;
+type LinkError = (typeof LINK_ERRORS)[number] | "unknown";
+
+function linkError(code: string): LinkError {
+  return (LINK_ERRORS as readonly string[]).includes(code) ? (code as LinkError) : "unknown";
+}
+
+/** What the page's query says happened, if anything. */
+export function linkResult(search: {
+  linked?: string | undefined;
+  connected?: string | undefined;
+  link_error?: string | undefined;
+}): LinkResult | undefined {
+  if (search.link_error !== undefined) {
+    return { kind: "error", error: linkError(search.link_error) };
+  }
+  if (search.linked !== undefined && isProvider(search.linked)) {
+    return { kind: "linked", provider: search.linked };
+  }
+  return search.connected === undefined ? undefined : { kind: "connected" };
+}
+
+/** Signs in again (a fresh sign-in, at most ten minutes old) and comes back to `returnTo`. */
+export function stepUpUrl(returnTo: string): string {
+  return `${loginUrl(safeReturnTo(returnTo))}&max_age=600`;
+}
+
+/** Whether `provider` is one this client can show. */
+export function knownProvider(name: string): name is Provider {
+  return isProvider(name);
+}

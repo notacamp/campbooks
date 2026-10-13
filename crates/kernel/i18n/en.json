@@ -35,6 +35,7 @@
     "upload_mismatch": "The uploaded file does not match what was expected. Upload it again.",
     "upload_failed": "Reading the upload failed. Try again.",
     "too_many_streams": "You have too many live update connections open. Close some tabs or windows and try again.",
+    "rate_limited": "Too many attempts. Wait a moment and try again.",
     "mailbox_unsupported": "Connecting this kind of mailbox is not available on this instance."
   }
 }

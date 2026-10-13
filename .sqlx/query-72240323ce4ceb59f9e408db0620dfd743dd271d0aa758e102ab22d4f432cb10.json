@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.provider_budgets SET tokens = -1000000000, refilled_at = now()",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "72240323ce4ceb59f9e408db0620dfd743dd271d0aa758e102ab22d4f432cb10"
+}

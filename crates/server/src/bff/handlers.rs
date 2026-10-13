@@ -100,9 +100,9 @@ fn oidc_failure(err: &OidcError) -> Response {
 pub struct LoginQuery {
     /// Where to land after signing in: a path on this site (default `/`).
     return_to: Option<String>,
-    /// Passed to the identity provider: the most seconds since the person
-    /// last signed in that the new session may carry. `0` makes them sign in
-    /// again, as the admin API asks after `admin_reauth_required`.
+    /// Sign in again unless the person did within this many seconds: the
+    /// step-up an operation asks for with `step_up_required`, or `0` after
+    /// the admin API's `admin_reauth_required`.
     max_age: Option<u32>,
 }
 

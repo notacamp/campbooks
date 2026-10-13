@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT stream, count(*)::int AS \"conversations!\",\n               count(*) FILTER (WHERE unread_count > 0)::int AS \"unread!\"\n          FROM conversations.conversations\n         WHERE inbox_id = ANY($1) AND archived_at IS NULL AND NOT trashed\n         GROUP BY stream\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "conversations!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "unread!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "2655f228d12acaef58a45cc545036ae726605f247aca4e14f0ee7067f20a8020"
+}

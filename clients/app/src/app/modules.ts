@@ -5,7 +5,11 @@ import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { buildConnectorsRoutes } from "~/modules/connectors";
-import { buildConversationsRoutes } from "~/modules/conversations";
+import {
+  buildConversationsRoutes,
+  COMPOSE_SHORTCUTS,
+  CONVERSATIONS_SHORTCUTS,
+} from "~/modules/conversations";
 import { buildIdentityRoutes, IDENTITY_SHORTCUTS, MailboxStep } from "~/modules/identity";
 import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
 import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
@@ -31,14 +35,16 @@ export function buildModuleRoutes<
   const { root, workspace } = parents;
   // After a workspace is created, `identity` offers the mailbox held since sign-up.
   const workspaces = buildWorkspacesRoutes({ root, workspace, afterCreate: MailboxStep });
+  const identity = buildIdentityRoutes({ public: parents.public, workspace });
   return {
     // Signed in or not: signing in, creating an account.
-    public: [...buildIdentityRoutes(parents.public)],
+    public: [...identity.public],
     // Pages outside any workspace: status, first run, invitation links.
     root: [...buildSystemRoutes(root), ...workspaces.root],
     // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
     workspace: [
       ...workspaces.workspace,
+      ...identity.workspace,
       ...buildConversationsRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.
@@ -61,5 +67,7 @@ export const ADMIN_SECTIONS = [SYSTEM_ADMIN_SECTION] as const;
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
 export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...WORKSPACES_SHORTCUTS,
+  ...CONVERSATIONS_SHORTCUTS,
+  ...COMPOSE_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
 ];

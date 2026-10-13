@@ -6,6 +6,7 @@ use campbooks_kernel::auth::{ScopeInfo, ScopeName};
 pub const ALL: &[ScopeInfo] = &[
     ScopeInfo::of::<ConversationsRead>(),
     ScopeInfo::of::<ConversationsWrite>(),
+    ScopeInfo::of::<ConversationsSend>(),
 ];
 
 /// `conversations:read` — read your inboxes and their conversations.
@@ -25,4 +26,14 @@ impl ScopeName for ConversationsWrite {
     const NAME: &'static str = "conversations:write";
     const DESCRIPTION: &'static str =
         "Mark conversations read or unread, star, archive, label and move them between streams.";
+}
+
+/// `conversations:send` — write drafts and send messages.
+#[derive(Debug, Clone, Copy)]
+pub struct ConversationsSend;
+
+impl ScopeName for ConversationsSend {
+    const NAME: &'static str = "conversations:send";
+    const DESCRIPTION: &'static str =
+        "Write drafts and send messages, replies and forwards from your inboxes.";
 }

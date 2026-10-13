@@ -40,7 +40,8 @@
     },
     "language": "Idioma",
     "signOut": "Cerrar sesión",
-    "signingOut": "Cerrando sesión…"
+    "signingOut": "Cerrando sesión…",
+    "waysIn": "Formas de iniciar sesión"
   },
   "home": {
     "title": "Aún no hay nada que te necesite",

@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::domain::model::{Capability, ConnectionId, InboxId, Provider};
+use crate::domain::model::{Capability, ConnectionId, InboxId, Provider, SendId};
 
 /// The record type of a connection in the client change feed.
 pub const CONNECTION_RECORD: &str = "connectors.connection";
@@ -194,6 +194,70 @@ impl DomainEvent for MessagesChanged {
     }
 }
 
+/// How a send ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SendOutcome {
+    /// The provider accepted it.
+    Sent,
+    /// It was not sent, or may not have been (`unknown_outcome`).
+    Failed,
+}
+
+/// A send asked for by `conversations.send_requested` ended
+/// (`contracts/connectors.send_completed.v1.schema.json`). Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SendCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox it was sent from.
+    pub inbox_id: InboxId,
+    /// The send.
+    pub send_id: SendId,
+    /// Sent or failed.
+    pub outcome: SendOutcome,
+    /// The provider's id of the sent message (sent only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_message_id: Option<String>,
+    /// Why it failed (failed only): `not_connected`, `needs_reauth`,
+    /// `rejected`, `too_large`, `unavailable` (nothing was sent) or
+    /// `unknown_outcome` (it may have been).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl DomainEvent for SendCompleted {
+    const NAME: &'static str = "connectors.send_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `conversations.send_requested` v1, as this module reads it
+/// (`contracts/conversations.send_requested.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SendRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox to send from.
+    pub inbox_id: InboxId,
+    /// The send: recorded once.
+    pub send_id: SendId,
+    /// The outgoing-message v1 document, a blob of the workspace.
+    pub message: BlobRef,
+}
+
+impl DomainEvent for SendRequested {
+    const NAME: &'static str = "conversations.send_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 /// `workspaces.member_left` v1, as this module reads it.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct MemberLeft {
@@ -228,4 +292,84 @@ impl DomainEvent for WorkspaceDeleting {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+}
+
+/// `conversations.changes_requested` v1, as this module reads it
+/// (`contracts/conversations.changes_requested.v1.schema.json`): a member's
+/// changes the provider should mirror. Changes from the provider never
+/// produce it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox the messages belong to (minted here, owned by
+    /// conversations).
+    pub inbox_id: InboxId,
+    /// The conversation (an id of the conversations module).
+    pub conversation: uuid::Uuid,
+    /// Always `user`.
+    pub origin: String,
+    /// The changes, message by message.
+    pub items: Vec<RequestedItem>,
+}
+
+impl DomainEvent for ChangesRequested {
+    const NAME: &'static str = "conversations.changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// One message and the change asked for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequestedItem {
+    /// The provider's id for the message.
+    pub provider_message_id: String,
+    /// The change.
+    pub change: RequestedChange,
+}
+
+/// A change a member asked for. Kinds and streams a later contract version
+/// adds read as [`Unsupported`](Self::Unsupported) and are skipped.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RequestedChange {
+    /// Mark read.
+    MarkRead,
+    /// Mark unread.
+    MarkUnread,
+    /// Star.
+    Star,
+    /// Unstar.
+    Unstar,
+    /// Out of the inbox.
+    Archive,
+    /// Back in the inbox.
+    Unarchive,
+    /// Put a label on.
+    AddLabel {
+        /// The conversations label (not used here).
+        label: uuid::Uuid,
+        /// The provider's key, when the provider has the label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        provider_key: Option<String>,
+    },
+    /// Take a label off.
+    RemoveLabel {
+        /// The conversations label (not used here).
+        label: uuid::Uuid,
+        /// The provider's key, when the provider has the label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        provider_key: Option<String>,
+    },
+    /// The conversation moved to another stream.
+    MoveToStream {
+        /// The stream (`primary`, `updates`, `receipts`, `newsletters`).
+        stream: String,
+    },
+    /// A kind this version does not know.
+    #[serde(other)]
+    Unsupported,
 }

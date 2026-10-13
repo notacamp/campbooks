@@ -192,6 +192,15 @@ fn serve(role: Role) -> ExitCode {
     }
 }
 
+/// Rate-limit counters keyed by the instance secret, so every process of the
+/// install counts together; without one, each process counts alone.
+fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
+    Ok(match campbooks_kernel::crypto::SecretKey::from_env()? {
+        Some(secret) => campbooks_kernel::rate_limit::RateLimits::new(&secret),
+        None => campbooks_kernel::rate_limit::RateLimits::default(),
+    })
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -229,6 +238,7 @@ async fn run(
     let metrics_addr = config.telemetry.metrics_addr;
     let state = campbooks_server::with_composed_ports(
         AppState::new(db.clone(), config)
+            .with_rate_limits(rate_limits()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs),
@@ -251,10 +261,15 @@ async fn run(
         tracing::info!(addr = %bind_addr, version = env!("CARGO_PKG_VERSION"), "campbooks-server listening");
         let stopped = stopped(&stop);
         parts.spawn(async move {
-            axum::serve(listener, app)
-                .with_graceful_shutdown(stopped)
-                .await
-                .map_err(|e| format!("http server failed: {e}"))
+            // The peer address is what rate limits count by (or, behind
+            // `CAMPBOOKS_TRUSTED_PROXIES`, what vouches for X-Forwarded-For).
+            axum::serve(
+                listener,
+                app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+            )
+            .with_graceful_shutdown(stopped)
+            .await
+            .map_err(|e| format!("http server failed: {e}"))
         });
     }
     if let (Some(router), Some(addr)) = (telemetry.metrics_router(), metrics_addr) {
@@ -534,9 +549,14 @@ fn log_composition(composition: &campbooks_server::Composition) {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
     }
     if let Some(issuer) = &composition.identity.issuer {
+        let providers: Vec<&str> = issuer
+            .upstreams
+            .iter()
+            .map(|u| u.provider().as_str())
+            .collect();
         tracing::info!(
             issuer = %issuer.url,
-            google = issuer.google.is_some(),
+            providers = ?providers,
             "this instance is its own identity provider (OAuth 2.1 issuer)"
         );
     } else {

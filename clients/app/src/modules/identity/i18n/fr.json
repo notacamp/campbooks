@@ -8,7 +8,8 @@
     "choice1": "Se connecter avec la première option",
     "choice2": "Se connecter avec la deuxième option",
     "choice3": "Se connecter avec la troisième option",
-    "passkey": "Se connecter avec une clé d’accès"
+    "passkey": "Se connecter avec une clé d’accès",
+    "addWayIn": "Ajouter un moyen de connexion"
   },
   "signIn": {
     "title": "Se connecter à Campbooks",
@@ -157,5 +158,94 @@
     "confirm": "L’oublier",
     "cancel": "La garder",
     "forgetFailed": "Impossible de l’oublier. Réessayez."
+  },
+  "waysIn": {
+    "title": "Moyens de connexion",
+    "lead": "Vous pouvez vous connecter à Campbooks avec n’importe lequel de ces comptes. Chaque boîte mail que vous connectez en devient un aussi.",
+    "list": "Vos moyens de connexion",
+    "loading": "Chargement de vos moyens de connexion…",
+    "loadError": {
+      "title": "Impossible de charger vos moyens de connexion",
+      "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez.",
+      "retry": "Réessayer"
+    },
+    "signedUpWith": "Utilisé à l’inscription",
+    "added": "Ajouté le {{date}}",
+    "lastUsed": "Dernière utilisation le {{date}}",
+    "remove": "Retirer",
+    "removeLabel": "Retirer {{provider}} ({{address}})",
+    "confirm": "Retirer",
+    "cancel": "Garder",
+    "confirmRemove": "Ne plus vous connecter avec {{provider}} ({{address}}) ? Les boîtes mail connectées avec ce compte restent connectées.",
+    "confirmRemoveOnly": "Ne plus vous connecter avec {{provider}} ({{address}}) ? Les boîtes mail connectées avec ce compte restent connectées. Il vous faut d’abord un autre moyen de connexion.",
+    "lastWayIn": {
+      "title": "C’est votre seul moyen de connexion.",
+      "lead": "Ajoutez-en d’abord un autre, puis retirez celui-ci."
+    },
+    "removeFailed": {
+      "title": "Impossible de le retirer.",
+      "lead": "Rien n’a changé. Réessayez."
+    },
+    "needsReconnect": "La boîte mail de ce compte dans cet espace de travail ne se synchronise plus. Reconnectez-la pour continuer.",
+    "reconnect": "Reconnecter",
+    "reconnectLabel": "Reconnecter la boîte mail {{address}}",
+    "addTitle": "Ajouter un moyen de connexion",
+    "addLead": "Connectez-vous avec un autre de vos comptes. Vous le confirmez chez le fournisseur, et il est ajouté ici.",
+    "addNone": "Ce Campbooks ne propose aucun fournisseur de connexion. Demandez à la personne qui le gère d’en configurer un.",
+    "add": {
+      "google": "Ajouter un compte Google",
+      "microsoft": "Ajouter un compte Microsoft",
+      "zoho": "Ajouter un compte Zoho"
+    },
+    "startFailed": "Impossible de commencer. Réessayez.",
+    "stepUp": {
+      "title": "Reconnectez-vous d’abord",
+      "lead": "Par sécurité, changer votre façon de vous connecter demande une connexion de moins de 10 minutes.",
+      "action": "Se reconnecter"
+    },
+    "linked": "Vous pouvez maintenant vous connecter avec {{provider}}.",
+    "connected": "La boîte mail est de nouveau connectée.",
+    "errors": {
+      "way_in_belongs_to_another_account": {
+        "title": "Ce compte permet déjà d’accéder à un autre compte Campbooks.",
+        "lead": "Rien n’a été déplacé ni fusionné. Connectez-vous avec lui pour utiliser ce compte."
+      },
+      "sign_in_again": {
+        "title": "Reconnectez-vous pour faire cela.",
+        "lead": "Ce navigateur n’est plus connecté à votre compte. Connectez-vous, puis réessayez."
+      },
+      "link_expired": {
+        "title": "Cela a pris trop de temps.",
+        "lead": "Rien n’a changé. Recommencez."
+      },
+      "cancelled_at_provider": {
+        "title": "Vous avez annulé chez le fournisseur.",
+        "lead": "Rien n’a changé."
+      },
+      "login_failed": {
+        "title": "Le fournisseur n’a pas pu confirmer le compte.",
+        "lead": "Rien n’a changé. Réessayez."
+      },
+      "provider_unavailable": {
+        "title": "Le fournisseur n’a pas répondu.",
+        "lead": "Rien n’a changé. Patientez un instant, puis réessayez."
+      },
+      "consent_incomplete": {
+        "title": "L’accès aux mails n’a pas été autorisé.",
+        "lead": "Vous pouvez vous connecter avec ce compte, mais sa boîte mail n’est pas connectée. Réessayez en autorisant l’accès aux mails."
+      },
+      "account_mismatch": {
+        "title": "C’est un autre compte.",
+        "lead": "Reconnectez-vous avec le compte auquel appartient cette boîte mail."
+      },
+      "account_connected_by_another_member": {
+        "title": "Quelqu’un d’autre ici l’a déjà connectée.",
+        "lead": "Un autre membre de cet espace de travail a connecté cette boîte mail."
+      },
+      "unknown": {
+        "title": "Un problème est survenu.",
+        "lead": "Rien n’a changé. Réessayez."
+      }
+    }
   }
 }

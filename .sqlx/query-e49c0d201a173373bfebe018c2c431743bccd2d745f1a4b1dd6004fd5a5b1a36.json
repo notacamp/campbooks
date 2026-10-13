@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends\n                  SET state = 'sent', provider_message_id = $2, thread_key = $3, updated_at = now()\n                WHERE id = $1 AND state <> 'sent'\n            RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e49c0d201a173373bfebe018c2c431743bccd2d745f1a4b1dd6004fd5a5b1a36"
+}

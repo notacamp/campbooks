@@ -137,10 +137,9 @@ fn facts(
         Some(issuer) => (
             IdentityProvider::BuiltIn,
             issuer
-                .google
-                .is_some()
-                .then(|| "google".to_owned())
-                .into_iter()
+                .upstreams
+                .iter()
+                .map(|upstream| upstream.provider().as_str().to_owned())
                 .collect(),
         ),
         None if config.auth.issuer().is_some() => (IdentityProvider::External, Vec::new()),
@@ -195,9 +194,13 @@ pub fn with_ports(state: AppState) -> AppState {
 /// sign-in, and when the issuer runs in this process the API validates
 /// tokens with its keys, read in-process (ADR 0014).
 pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppState {
-    let state = with_ports(state).with_grant_intake(campbooks_connectors::grant_intake(
-        composition.connectors.clone(),
-    ));
+    let state = with_ports(state)
+        .with_grant_intake(campbooks_connectors::grant_intake(
+            composition.connectors.clone(),
+        ))
+        .with_consent_door(campbooks_identity::consent_door(
+            composition.identity.clone(),
+        ));
     match &composition.identity.issuer {
         Some(issuer) => {
             let keys = campbooks_identity::LocalKeys {

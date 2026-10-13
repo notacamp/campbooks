@@ -10,7 +10,11 @@
 //! adaptive intervals, a per-provider budget, and **health** (`ok`,
 //! `needs_reauth`, `throttled`, `failing`). **Adapters** read a page from a
 //! cursor; the Gmail adapter produces `MessageChangeBatch` v1 documents
-//! (`contracts/`) announced by `connectors.messages_changed`.
+//! (`contracts/`) announced by `connectors.messages_changed`. Members'
+//! changes (`conversations.changes_requested`) are recorded as **outbound
+//! changes** and made at Gmail by the stream's next run before it reads
+//! (`gmail/write.rs`): last writer wins in Gmail's history order, and a
+//! write never comes back as a change.
 //!
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, provider HTTP in `google/`
@@ -38,7 +42,7 @@ pub mod scopes;
 #[cfg(test)]
 mod testkit;
 
-pub use deps::{CREDENTIALS_PURPOSE, Deps, GOOGLE_CALLBACK_PATH};
+pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::intake::grant_intake;
 pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
@@ -61,7 +65,6 @@ pub fn module(deps: Deps) -> Module {
         router: OpenApiRouter::new()
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
-            .routes(routes!(features::complete_connection::handler))
             .routes(routes!(
                 features::get_connection::handler,
                 features::disconnect::handler
@@ -75,11 +78,15 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::ConnectionNeedsReauth>()
             .publishes::<events::ConnectionRemoved>()
             .publishes::<events::MessagesChanged>()
+            .publishes::<events::SendCompleted>()
             .handler(features::sync_stream::SyncStream::new(deps.clone()))
+            .handler(features::send_message::SendMessage::new(deps.clone()))
+            .consumer(features::queue_send::QueueSend)
             .schedule::<features::dispatch_due::DispatchDue>(features::dispatch_due::EVERY)
             .consumer(features::member_left::RevokeDepartedGrants::new(
                 deps.clone(),
             ))
+            .consumer(features::request_changes::RequestChanges::new(deps.clone()))
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
                 deps,
             )),

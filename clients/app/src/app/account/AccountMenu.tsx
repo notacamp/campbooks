@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type MouseEvent } from "react";
 import { useTranslation } from "react-i18next";
 
 import { signOutAndLeave, useSession } from "~/lib/api";
@@ -32,10 +32,12 @@ const LANGUAGE_NAMES: Record<Locale, string> = {
 export interface AccountMenuProps {
   /** Just the avatar, hanging from the phone header. */
   compact?: boolean | undefined;
+  /** Settings → Ways to sign in, as an in-app link. */
+  waysIn?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
 }
 
-/** Who is signed in, their theme, density and language, and Sign out. */
-export function AccountMenu({ compact = false }: AccountMenuProps) {
+/** Who is signed in, their theme, density and language, how they sign in, and Sign out. */
+export function AccountMenu({ compact = false, waysIn }: AccountMenuProps) {
   const { t, i18n } = useTranslation();
   const session = useSession();
   const theme = useTheme();
@@ -61,67 +63,89 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
         />
       )}
     >
-      <PopoverSection>
-        <Text weight="semibold" truncate>
-          {name}
-        </Text>
-        {email === undefined || email === name ? null : (
-          <Text tone="tertiary" size="sm" truncate>
-            {email}
-          </Text>
-        )}
-      </PopoverSection>
-      <PopoverSection title={t("account.theme")}>
-        <Segmented
-          label={t("account.theme")}
-          value={theme.theme}
-          onChange={theme.setTheme}
-          options={THEME_MODES.map((mode) => ({ value: mode, label: t(`account.themes.${mode}`) }))}
-        />
-      </PopoverSection>
-      <PopoverSection title={t("account.density")}>
-        <Segmented
-          label={t("account.density")}
-          value={theme.density}
-          onChange={theme.setDensity}
-          options={DENSITIES.map((density) => ({
-            value: density,
-            label: t(`account.densities.${density}`),
-          }))}
-        />
-      </PopoverSection>
-      <PopoverSection>
-        <Select
-          label={t("account.language")}
-          value={language}
-          options={SUPPORTED_LOCALES.map((locale) => ({
-            value: locale,
-            label: LANGUAGE_NAMES[locale],
-          }))}
-          onChange={(locale) => {
-            // Device-only for now. TODO(#69): also save it to the user's
-            // profile on the server so emails and other devices follow.
-            writePref("locale", locale);
-            void i18n.changeLanguage(locale);
-          }}
-        />
-      </PopoverSection>
-      <AdminEntry />
-      <PopoverSection>
-        <Button
-          variant="ghost"
-          icon="sign-out"
-          disabled={leaving}
-          onClick={() => {
-            setLeaving(true);
-            signOutAndLeave().catch(() => {
-              setLeaving(false);
-            });
-          }}
-        >
-          {leaving ? t("account.signingOut") : t("account.signOut")}
-        </Button>
-      </PopoverSection>
+      {(close) => (
+        <>
+          <PopoverSection>
+            <Text weight="semibold" truncate>
+              {name}
+            </Text>
+            {email === undefined || email === name ? null : (
+              <Text tone="tertiary" size="sm" truncate>
+                {email}
+              </Text>
+            )}
+          </PopoverSection>
+          <PopoverSection title={t("account.theme")}>
+            <Segmented
+              label={t("account.theme")}
+              value={theme.theme}
+              onChange={theme.setTheme}
+              options={THEME_MODES.map((mode) => ({
+                value: mode,
+                label: t(`account.themes.${mode}`),
+              }))}
+            />
+          </PopoverSection>
+          <PopoverSection title={t("account.density")}>
+            <Segmented
+              label={t("account.density")}
+              value={theme.density}
+              onChange={theme.setDensity}
+              options={DENSITIES.map((density) => ({
+                value: density,
+                label: t(`account.densities.${density}`),
+              }))}
+            />
+          </PopoverSection>
+          <PopoverSection>
+            <Select
+              label={t("account.language")}
+              value={language}
+              options={SUPPORTED_LOCALES.map((locale) => ({
+                value: locale,
+                label: LANGUAGE_NAMES[locale],
+              }))}
+              onChange={(locale) => {
+                // Device-only for now. TODO(#69): also save it to the user's
+                // profile on the server so emails and other devices follow.
+                writePref("locale", locale);
+                void i18n.changeLanguage(locale);
+              }}
+            />
+          </PopoverSection>
+          {waysIn === undefined ? null : (
+            <PopoverSection>
+              <ButtonLink
+                variant="ghost"
+                icon="key"
+                href={waysIn.href}
+                onClick={(event) => {
+                  waysIn.onClick(event);
+                  close();
+                }}
+              >
+                {t("account.waysIn")}
+              </ButtonLink>
+            </PopoverSection>
+          )}
+          <AdminEntry onNavigate={close} />
+          <PopoverSection>
+            <Button
+              variant="ghost"
+              icon="sign-out"
+              disabled={leaving}
+              onClick={() => {
+                setLeaving(true);
+                signOutAndLeave().catch(() => {
+                  setLeaving(false);
+                });
+              }}
+            >
+              {leaving ? t("account.signingOut") : t("account.signOut")}
+            </Button>
+          </PopoverSection>
+        </>
+      )}
     </Popover>
   );
 }
@@ -131,7 +155,7 @@ export function AccountMenu({ compact = false }: AccountMenuProps) {
  * system overview answers (it answers 404 to everyone else). Asked only
  * while the menu is open.
  */
-function AdminEntry() {
+function AdminEntry({ onNavigate }: { onNavigate: () => void }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { access } = useAdminAccess();
@@ -149,6 +173,7 @@ function AdminEntry() {
             return;
           }
           event.preventDefault();
+          onNavigate();
           void navigate({ to: "/admin" });
         }}
       >

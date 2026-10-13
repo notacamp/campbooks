@@ -41,6 +41,10 @@ impl Job for Prune {
                 now,
             ),
             (
+                "DELETE FROM identity.link_tickets WHERE expires_at <= $1",
+                now,
+            ),
+            (
                 "DELETE FROM identity.pending_sign_ups WHERE expires_at <= $1",
                 now,
             ),

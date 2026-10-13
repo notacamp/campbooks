@@ -217,6 +217,262 @@
         }
       }
     },
+    "/api/v1/identity/links": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start adding a way in, connecting or reconnecting a mailbox.",
+        "operationId": "identity.start_link",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartLink"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Send the browser to `url`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartedLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field the purpose needs is missing (`link_incomplete`), or `invalid_return_to`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or adding a way in or connecting needs a sign-in in the last ten minutes (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Unknown or unconfigured provider, a workspace the caller is not in, a connection the caller did not grant, or another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This instance cannot connect that provider's mailbox (`mailbox_unsupported`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.link_ticket"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/ways-in": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List how you sign in.",
+        "operationId": "identity.list_ways_in",
+        "responses": {
+          "200": {
+            "description": "The caller's provider ways in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WaysIn"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.provider_identity"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/ways-in/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Remove a way in.",
+        "operationId": "identity.remove_way_in",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The way in.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed; the sessions signed in with it ended. Mailbox connections are untouched."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's way in, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is the account's last way in (`last_way_in`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.provider_identity"
+          ],
+          "risk": "high"
+        }
+      }
+    },
     "/api/v1/system/health": {
       "get": {
         "tags": [
@@ -785,7 +1041,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "description": "Missing scope, a client token (`connection_needs_user`), or a sign-in more than ten minutes old for a new connection (`step_up_required`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -805,115 +1061,7 @@
             }
           },
           "409": {
-            "description": "The provider is not configured on this instance (`provider_not_configured`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": [
-              "connectors:write"
-            ]
-          }
-        ],
-        "x-campbooks": {
-          "assistant": false,
-          "automation": false,
-          "mutates": true,
-          "records": [
-            "connectors.connection"
-          ],
-          "risk": "low"
-        }
-      }
-    },
-    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
-      "post": {
-        "tags": [
-          "connectors"
-        ],
-        "summary": "Complete a connection.",
-        "operationId": "connectors.complete_connection",
-        "parameters": [
-          {
-            "name": "workspace_id",
-            "in": "path",
-            "description": "The workspace.",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/WorkspaceId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CompleteConnection"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "The connection, syncing.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConnectionView"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid access token.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`).",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No such started connection of yours in this workspace, or it expired.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured.",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "The provider could not be reached (`provider_unavailable`).",
+            "description": "The provider is not configured on this instance (`provider_not_configured`), or this instance has no front door for consents (`mailbox_unsupported`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1748,6 +1896,15 @@
             "schema": {
               "$ref": "#/components/schemas/MessageId"
             }
+          },
+          {
+            "name": "show_images",
+            "in": "query",
+            "description": "`true` to keep remote images (the member chose \"Show images\");\ntracking pixels are removed either way.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -2355,6 +2512,695 @@
           ],
           "risk": "low",
           "undo": "conversations.star"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/drafts": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List your drafts.",
+        "operationId": "conversations.list_drafts",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "query",
+            "description": "Only drafts answering this conversation.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your drafts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Start a draft.",
+        "operationId": "conversations.create_draft",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A missing inbox or message, or a field over its limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox or message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low",
+          "undo": "conversations.delete_draft"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Read one of your drafts.",
+        "operationId": "conversations.get_draft",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The draft.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Discard a draft (also a scheduled one, which then never leaves).",
+        "operationId": "conversations.delete_draft",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Discarded."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "On its way (`draft_not_editable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      },
+      "patch": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Save a draft.",
+        "operationId": "conversations.update_draft",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftChanges"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The draft, with its new version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A field over its limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Changed since that version (`draft_changed`), or on its way (`draft_not_editable`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/cancel_send": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take a send back within its undo window.",
+        "operationId": "conversations.cancel_send",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A draft again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours (a sent draft is gone).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It has already left (`too_late`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/send": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Send a draft.",
+        "operationId": "conversations.send_draft",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "draft_id",
+            "in": "path",
+            "description": "The draft.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DraftId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendDraft"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "description": "Scheduled: it leaves at `send_at` unless cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DraftView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you only read its inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such draft, or it is not yours.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:send"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.draft"
+          ],
+          "risk": "high",
+          "undo": "conversations.cancel_send"
         }
       }
     },
@@ -3182,6 +4028,93 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/streams": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the streams and their counts.",
+        "operationId": "conversations.list_streams",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox",
+            "in": "query",
+            "description": "Only this inbox; every inbox you can read when absent.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The streams.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamCounts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/workspaces": {
       "get": {
         "tags": [
@@ -3424,7 +4357,7 @@
           {
             "name": "provider",
             "in": "path",
-            "description": "`google`.",
+            "description": "`google`, `microsoft` or `zoho`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3465,11 +4398,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "accounts-server",
+            "in": "query",
+            "description": "Zoho's accounts server of the person's data centre.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`.",
+            "description": "Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. A signed-in round trip returns to its `return_to` with `linked=`, `connected=` or `link_error=`.",
             "headers": {
               "location": {
                 "schema": {
@@ -3485,6 +4427,16 @@
           },
           "404": {
             "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -3671,7 +4623,7 @@
           {
             "name": "provider",
             "in": "path",
-            "description": "`google`.",
+            "description": "`google`, `microsoft` or `zoho`.",
             "required": true,
             "schema": {
               "type": "string"
@@ -3694,11 +4646,20 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "link",
+            "in": "query",
+            "description": "A signed-in round trip's ticket (from `identity.start_link`).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "To the provider, with a round-trip cookie.",
+            "description": "To the provider, with a round-trip cookie; or, for a `link` ticket that is spent, expired or opened by a browser not signed in to its account, back with `link_error=`.",
             "headers": {
               "location": {
                 "schema": {
@@ -3724,6 +4685,16 @@
           },
           "404": {
             "description": "Unknown or unconfigured provider, or another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -4593,7 +5564,7 @@
           {
             "name": "max_age",
             "in": "query",
-            "description": "Passed to the identity provider: the most seconds since the person\nlast signed in that the new session may carry. `0` makes them sign in\nagain, as the admin API asks after `admin_reauth_required`.",
+            "description": "Sign in again unless the person did within this many seconds: the\nstep-up an operation asks for with `step_up_required`, or `0` after\nthe admin API's `admin_reauth_required`.",
             "required": false,
             "schema": {
               "type": [
@@ -5258,6 +6229,24 @@
           }
         }
       },
+      "AnswerView": {
+        "oneOf": [
+          {
+            "type": "boolean",
+            "description": "Yes or no."
+          },
+          {
+            "type": "number",
+            "format": "double",
+            "description": "A level on the question's scale."
+          },
+          {
+            "type": "string",
+            "description": "One of the question's options."
+          }
+        ],
+        "description": "An answer's value: a label (choice), a level (score) or yes/no."
+      },
       "AttachmentId": {
         "type": "string",
         "format": "uuid",
@@ -5297,11 +6286,6 @@
             "minimum": 0
           }
         }
-      },
-      "AuthorizationId": {
-        "type": "string",
-        "format": "uuid",
-        "description": "AuthorizationId (UUIDv7)"
       },
       "BackchannelLogout": {
         "type": "object",
@@ -5345,25 +6329,6 @@
         "enum": [
           "email"
         ]
-      },
-      "CompleteConnection": {
-        "type": "object",
-        "description": "What Google redirected the browser with.",
-        "required": [
-          "state",
-          "code"
-        ],
-        "properties": {
-          "code": {
-            "type": "string",
-            "description": "The `code` query parameter."
-          },
-          "state": {
-            "type": "string",
-            "description": "The `state` query parameter."
-          }
-        },
-        "additionalProperties": false
       },
       "ConnectionId": {
         "type": "string",
@@ -5471,12 +6436,20 @@
         "description": "A conversation and its newest messages, oldest first.",
         "required": [
           "conversation",
-          "messages"
+          "messages",
+          "decisions"
         ],
         "properties": {
           "conversation": {
             "$ref": "#/components/schemas/ConversationSummary",
             "description": "The conversation."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DecisionView"
+            },
+            "description": "The decide pass's answers about the newest inbound message, with\ntheir reasons: suggestions, except an answer marked `acted`."
           },
           "messages": {
             "type": "array",
@@ -5594,6 +6567,17 @@
             "type": "string",
             "description": "The first message's subject."
           },
+          "suggestion": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/StreamSuggestion",
+                "description": "Where the decide pass would put it instead, when it would: a\nsuggestion, never applied by itself."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "unread_count": {
             "type": "integer",
             "format": "int32",
@@ -5675,6 +6659,62 @@
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
       },
+      "DecisionSource": {
+        "type": "string",
+        "description": "What kind of strategy gave an answer.",
+        "enum": [
+          "rules",
+          "model",
+          "knn",
+          "cascade"
+        ]
+      },
+      "DecisionView": {
+        "type": "object",
+        "description": "One answer of the decide pass about the newest inbound message.",
+        "required": [
+          "question",
+          "value",
+          "source",
+          "acted",
+          "reasons"
+        ],
+        "properties": {
+          "acted": {
+            "type": "boolean",
+            "description": "Whether it changed anything. In this version only a confident rules\nstream answer may; every other answer is a suggestion."
+          },
+          "confidence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How sure, 0 to 100, when the source says.",
+            "minimum": 0
+          },
+          "question": {
+            "type": "string",
+            "description": "The question: `stream`, `needs_reply`, `asks_action`,\n`has_deadline`, `urgency` or `suspicious`.",
+            "example": "needs_reply"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonView"
+            },
+            "description": "Why."
+          },
+          "source": {
+            "$ref": "#/components/schemas/DecisionSource",
+            "description": "Who answered."
+          },
+          "value": {
+            "$ref": "#/components/schemas/AnswerView",
+            "description": "The answer."
+          }
+        }
+      },
       "Direction": {
         "type": "string",
         "description": "Whether a message came in or went out.",
@@ -5682,6 +6722,289 @@
           "inbound",
           "outbound"
         ]
+      },
+      "DraftAttachment": {
+        "type": "object",
+        "description": "A forwarded attachment, as the draft shows it.",
+        "required": [
+          "id",
+          "filename",
+          "content_type",
+          "size"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "Its media type, as sent (not trusted)."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Its file name."
+          },
+          "id": {
+            "$ref": "#/components/schemas/AttachmentId",
+            "description": "The original message's attachment."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its size in bytes.",
+            "minimum": 0
+          }
+        }
+      },
+      "DraftChanges": {
+        "type": "object",
+        "description": "The fields to change; the others stay.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "attachments": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/AttachmentId"
+            },
+            "description": "The forwarded attachments to keep (the others are dropped)."
+          },
+          "bcc": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Blind-copied recipients."
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The text."
+          },
+          "cc": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Copied recipients."
+          },
+          "quoted": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The quoted history."
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The subject."
+          },
+          "to": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Recipients."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The version this change was made on (from the draft last read).",
+            "minimum": 0
+          }
+        }
+      },
+      "DraftId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "DraftId (UUIDv7)"
+      },
+      "DraftKind": {
+        "type": "string",
+        "description": "What a draft answers.",
+        "enum": [
+          "new",
+          "reply",
+          "reply_all",
+          "forward"
+        ]
+      },
+      "DraftList": {
+        "type": "object",
+        "description": "The caller's drafts.",
+        "required": [
+          "drafts"
+        ],
+        "properties": {
+          "drafts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftView"
+            },
+            "description": "Newest first, at most 50."
+          }
+        }
+      },
+      "DraftState": {
+        "type": "string",
+        "description": "Where a draft is in its life.",
+        "enum": [
+          "draft",
+          "scheduled",
+          "sending",
+          "failed"
+        ]
+      },
+      "DraftView": {
+        "type": "object",
+        "description": "A draft.",
+        "required": [
+          "id",
+          "inbox_id",
+          "kind",
+          "from",
+          "to",
+          "cc",
+          "bcc",
+          "subject",
+          "body",
+          "quoted",
+          "attachments",
+          "version",
+          "state",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DraftAttachment"
+            },
+            "description": "The forwarded attachments."
+          },
+          "bcc": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Blind-copied recipients."
+          },
+          "body": {
+            "type": "string",
+            "description": "What the member writes: plain text with basic formatting."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Copied recipients."
+          },
+          "conversation_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConversationId",
+                "description": "The conversation it answers, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was started."
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last send failed (`not_connected`, `needs_reauth`,\n`rejected`, `too_large`, `unknown_outcome`)."
+          },
+          "from": {
+            "$ref": "#/components/schemas/Address",
+            "description": "The inbox's address and name."
+          },
+          "id": {
+            "$ref": "#/components/schemas/DraftId",
+            "description": "The draft."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox it is sent from."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DraftKind",
+            "description": "What it answers."
+          },
+          "message_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message it replies to or forwards, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quoted": {
+            "type": "string",
+            "description": "The quoted history under it."
+          },
+          "send_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a scheduled send leaves (until then it can be cancelled)."
+          },
+          "state": {
+            "$ref": "#/components/schemas/DraftState",
+            "description": "Where it is in its life."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The subject."
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Recipients."
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was last saved."
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Bumped by every save; name it when saving.",
+            "minimum": 0
+          }
+        }
       },
       "EndSession": {
         "type": "object",
@@ -5991,6 +7314,15 @@
           }
         }
       },
+      "LinkPurpose": {
+        "type": "string",
+        "description": "What the round trip is for.",
+        "enum": [
+          "link",
+          "connect",
+          "reconnect"
+        ]
+      },
       "LogoutResponse": {
         "type": "object",
         "description": "Where to send the browser to sign out of the identity provider too.",
@@ -6062,7 +7394,9 @@
         "type": "object",
         "description": "A message's bodies.",
         "required": [
-          "truncated"
+          "truncated",
+          "remote_images",
+          "images_shown"
         ],
         "properties": {
           "html": {
@@ -6070,7 +7404,17 @@
               "string",
               "null"
             ],
-            "description": "The HTML part: untrusted, to be shown only in a sandboxed frame."
+            "description": "The HTML part, sanitised; still to be shown only in a sandboxed frame."
+          },
+          "images_shown": {
+            "type": "boolean",
+            "description": "Whether the remote images were kept."
+          },
+          "remote_images": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Remote images in the HTML part: held back (their `src` removed)\nunless `show_images` was asked for.",
+            "minimum": 0
           },
           "text": {
             "type": [
@@ -6241,6 +7585,92 @@
           }
         }
       },
+      "NewDraft": {
+        "type": "object",
+        "description": "A message to start.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "bcc": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Blind-copied recipients."
+          },
+          "body": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The text."
+          },
+          "cc": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Copied recipients, instead of the filled ones."
+          },
+          "inbox_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxId",
+                "description": "The inbox to send from (a new message)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DraftKind",
+            "description": "What it answers."
+          },
+          "message_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The message replied to or forwarded (a reply or forward)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quoted": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The quoted history (written by the client: an attribution line and\nthe message quoted with `> `, or a forwarded-message header)."
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The subject, instead of the filled one."
+          },
+          "to": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Recipients, instead of the filled ones."
+          }
+        }
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -6298,6 +7728,25 @@
         "enum": [
           "google"
         ]
+      },
+      "ReasonView": {
+        "type": "object",
+        "description": "One reason behind an answer: a stable rule id the client translates,\nand what it matched.",
+        "required": [
+          "rule",
+          "evidence"
+        ],
+        "properties": {
+          "evidence": {
+            "type": "string",
+            "description": "What it matched (a header name, a word), possibly empty."
+          },
+          "rule": {
+            "type": "string",
+            "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
+            "example": "signals.list_header"
+          }
+        }
       },
       "RequestInfo": {
         "type": "object",
@@ -6424,6 +7873,21 @@
           }
         }
       },
+      "SendDraft": {
+        "type": "object",
+        "description": "Which version of the draft to send: the one the member last saw saved.",
+        "required": [
+          "version"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "description": "The draft's version as last saved by the caller; any other answers\n409 `draft_changed`, so what is sent is what the member saw.",
+            "minimum": 0
+          }
+        }
+      },
       "SessionInfo": {
         "type": "object",
         "description": "Who is signed in. Never contains a token.",
@@ -6502,7 +7966,7 @@
             "oneOf": [
               {
                 "$ref": "#/components/schemas/ConnectionId",
-                "description": "An existing connection of yours to extend (incremental consent);\nthe same account must consent."
+                "description": "An existing connection of yours to re-authorise; the same account\nmust consent."
               },
               {
                 "type": "null"
@@ -6516,27 +7980,87 @@
         },
         "additionalProperties": false
       },
+      "StartLink": {
+        "type": "object",
+        "description": "The round trip to start.",
+        "required": [
+          "purpose"
+        ],
+        "properties": {
+          "connection_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The connection, for `reconnect`."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`google`, `microsoft` or `zoho`; for `link` and `connect`. A\nreconnect uses the connection's."
+          },
+          "purpose": {
+            "$ref": "#/components/schemas/LinkPurpose",
+            "description": "What for."
+          },
+          "return_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Same-origin path to come back to (default `/`), with `linked=`,\n`connected=` or `link_error=` added."
+          },
+          "workspace_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId",
+                "description": "The workspace, for `connect` and `reconnect`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
+      },
       "StartedConnection": {
         "type": "object",
         "description": "A started consent.",
         "required": [
-          "authorization",
           "authorize_url",
           "expires_at"
         ],
         "properties": {
-          "authorization": {
-            "$ref": "#/components/schemas/AuthorizationId",
-            "description": "The started authorization."
-          },
           "authorize_url": {
             "type": "string",
-            "description": "Where to send the browser."
+            "description": "Where to send the browser: this instance's front door\n(`/auth/start/{provider}?link=…`), which comes back with\n`connected=<connection id>` or `link_error=<code>`."
           },
           "expires_at": {
             "type": "string",
             "format": "date-time",
-            "description": "When the consent must be completed by."
+            "description": "When the consent must be started by."
+          }
+        }
+      },
+      "StartedLink": {
+        "type": "object",
+        "description": "A started round trip.",
+        "required": [
+          "url",
+          "expires_at"
+        ],
+        "properties": {
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "It stops working then."
+          },
+          "url": {
+            "type": "string",
+            "description": "Send the browser here (same origin)."
           }
         }
       },
@@ -6550,6 +8074,49 @@
           "newsletters"
         ]
       },
+      "StreamCount": {
+        "type": "object",
+        "description": "A stream and what it holds.",
+        "required": [
+          "stream",
+          "conversations",
+          "unread"
+        ],
+        "properties": {
+          "conversations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations in it that are still in the inbox.",
+            "minimum": 0
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The stream."
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, the ones with an unread message.",
+            "minimum": 0
+          }
+        }
+      },
+      "StreamCounts": {
+        "type": "object",
+        "description": "Every built-in stream, in display order (Primary first).",
+        "required": [
+          "streams"
+        ],
+        "properties": {
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StreamCount"
+            },
+            "description": "The streams, each listed even when empty."
+          }
+        }
+      },
       "StreamSource": {
         "type": "string",
         "description": "Who put a conversation in its stream.",
@@ -6559,6 +8126,41 @@
           "model",
           "member"
         ]
+      },
+      "StreamSuggestion": {
+        "type": "object",
+        "description": "Where the decide pass would put a conversation, when that is not where it\nis: a suggestion the member can take or leave.",
+        "required": [
+          "stream",
+          "source",
+          "reasons"
+        ],
+        "properties": {
+          "confidence": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "How sure, 0 to 100, when the source says.",
+            "minimum": 0
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonView"
+            },
+            "description": "Why."
+          },
+          "source": {
+            "$ref": "#/components/schemas/DecisionSource",
+            "description": "Who suggested it."
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The suggested stream."
+          }
+        }
       },
       "StreamView": {
         "type": "object",
@@ -6783,6 +8385,80 @@
           }
         }
       },
+      "WayIn": {
+        "type": "object",
+        "description": "A provider account the caller signs in with.",
+        "required": [
+          "id",
+          "kind",
+          "provider",
+          "linked_via",
+          "linked_at"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address the provider gave when it was added (shown, never used\nto find an account)."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`provider` (passkeys are listed with the passkeys)."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was last used to sign in."
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "linked_via": {
+            "type": "string",
+            "description": "`sign_up`, `link` or `connect`."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`google`, `microsoft` or `zoho`."
+          }
+        }
+      },
+      "WaysIn": {
+        "type": "object",
+        "description": "The caller's ways in.",
+        "required": [
+          "items",
+          "providers"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WayIn"
+            },
+            "description": "Oldest first."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers this instance offers, in display order."
+          }
+        }
+      },
       "WorkspaceDeletion": {
         "type": "object",
         "description": "A deleted workspace.",
@@ -6875,7 +8551,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",

@@ -40,7 +40,8 @@
     },
     "language": "Language",
     "signOut": "Sign out",
-    "signingOut": "Signing out…"
+    "signingOut": "Signing out…",
+    "waysIn": "Ways to sign in"
   },
   "home": {
     "title": "Nothing needs you yet",

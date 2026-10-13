@@ -24,7 +24,9 @@
   },
   "compose": {
     "draft": "Escrever por mim",
-    "send": "Enviar"
+    "send": "Enviar",
+    "bold": "Negrito",
+    "italic": "Itálico"
   },
   "command": {
     "open": "Pesquisar ou perguntar"
