@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -130,6 +130,7 @@ function Ask({
   const sentence = useScopeSentence();
   const answer = useAnswerConsent(request);
   const allowButton = useRef<HTMLButtonElement>(null);
+  const canId = useId();
   const { client } = asked;
   const choices = asked.workspaces;
   const [workspace, setWorkspace] = useState<string | null>(
@@ -224,8 +225,12 @@ function Ask({
               {client.verified ? t("consent.verified") : t("consent.unverified")}
             </Tag>
           }
-          meta={t(`consent.kind.${kind}`, { host })}
-        />
+        >
+          {/* Wraps, unlike a row's meta: who vouches for the app matters here. */}
+          <Text tone="secondary" size="sm">
+            {t(`consent.kind.${kind}`, { host })}
+          </Text>
+        </ListRow>
       </List>
       {client.device ? (
         <Banner icon="warning" title={t("consent.device.title")}>
@@ -236,15 +241,19 @@ function Ask({
           {t("consent.unverifiedNote.lead")}
         </Banner>
       )}
-      <List label={t("consent.can")}>
-        {asked.scopes.map((scope) => (
-          <ListRow
-            key={scope.name}
-            leading={<Icon name="check" />}
-            title={sentence(scope.name, scope.description)}
-          />
-        ))}
-      </List>
+      <section className="flex flex-col gap-2" aria-labelledby={canId}>
+        <Text weight="semibold" id={canId}>
+          {t("consent.can")}
+        </Text>
+        <ul className="flex flex-col gap-2">
+          {asked.scopes.map((scope) => (
+            <li key={scope.name} className="flex items-start gap-2">
+              <Icon name="check" />
+              <Text as="span">{sentence(scope.name, scope.description)}</Text>
+            </li>
+          ))}
+        </ul>
+      </section>
       {asked.binds_workspace ? (
         noWorkspace ? (
           <Banner tone="danger" role="alert" title={t("consent.noWorkspace.title")}>
