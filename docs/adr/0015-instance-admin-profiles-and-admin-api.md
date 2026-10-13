@@ -1,6 +1,6 @@
 # 0015 — Instance administration: admin profiles and a separate admin API
 
-**Status:** Proposed · 2026-10-13
+**Status:** Accepted · 2026-10-13
 
 ## Context
 An instance needs people who run it: approve signups under the `approval`
