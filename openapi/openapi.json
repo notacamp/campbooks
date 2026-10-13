@@ -8572,7 +8572,8 @@
         "description": "The caller's ways in.",
         "required": [
           "items",
-          "providers"
+          "providers",
+          "mailbox_providers"
         ],
         "properties": {
           "items": {
@@ -8581,6 +8582,13 @@
               "$ref": "#/components/schemas/WayIn"
             },
             "description": "Oldest first."
+          },
+          "mailbox_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers a mailbox can be connected from (`identity.start_link`\nwith `connect`): offered, and with a mail adapter. Same order."
           },
           "providers": {
             "type": "array",
