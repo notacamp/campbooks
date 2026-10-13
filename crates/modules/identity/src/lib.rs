@@ -2,7 +2,8 @@
 //! get (ADR 0014).
 //!
 //! The module owns **accounts** and their **ways in** (provider identities
-//! today; passkeys later), linked only by proven ownership, never by email.
+//! and passkeys), linked only by proven ownership, never by email. It is
+//! the instance's WebAuthn relying party ([`webauthn`]).
 //! It is the instance's **OAuth 2.1 authorization server and OIDC
 //! provider**, in-process, on the app's own origin: discovery, JWKS, the
 //! authorization and token endpoints, revocation and logout, with Ed25519
