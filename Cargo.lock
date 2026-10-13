@@ -3772,6 +3772,7 @@ dependencies = [
  "tokio",
  "toml",
  "url",
+ "wiremock",
 ]
 
 [[package]]
