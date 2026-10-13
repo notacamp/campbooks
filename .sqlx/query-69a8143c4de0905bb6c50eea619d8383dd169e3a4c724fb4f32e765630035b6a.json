@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_message_id, add_labels, remove_labels\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND state = 'pending' AND provider_message_id = ANY($2)\n            ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "add_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "add_labels"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "remove_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "remove_labels"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "69a8143c4de0905bb6c50eea619d8383dd169e3a4c724fb4f32e765630035b6a"
+}

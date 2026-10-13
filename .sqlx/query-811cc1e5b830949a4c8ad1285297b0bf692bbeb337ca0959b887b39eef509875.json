@@ -1,0 +1,77 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT provider_message_id, add_labels, remove_labels,\n                  applied_from AS \"from!\", applied_to\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND state = 'applied' AND applied_from IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "provider_message_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "add_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "add_labels"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "remove_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "remove_labels"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "from!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_from"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "applied_to",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "applied_to"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "811cc1e5b830949a4c8ad1285297b0bf692bbeb337ca0959b887b39eef509875"
+}

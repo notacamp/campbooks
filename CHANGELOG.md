@@ -7,6 +7,18 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- What you do to mail in Campbooks now happens in Gmail too: marking read or
+  unread, starring, archiving and moving back to the inbox, adding or
+  removing a Gmail label, and moving a conversation to Primary, Updates or
+  Newsletters (Gmail's Primary, Updates and Promotions tabs). Changes reach
+  Gmail on the mailbox's next sync, normally within a second, and never come
+  back as new changes. If the same thing was changed in Gmail after you
+  changed it in Campbooks, the later change wins and Campbooks shows it.
+  Throttling and outages are retried with backoff within the shared Google
+  quota; a change Gmail refuses is recorded (without any message content)
+  and Campbooks shows the message as Gmail has it. Labels you create in
+  Campbooks and the Receipts stream stay in Campbooks for now. New table
+  `connectors.outbound_changes` (migration applied on start).
 - The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
   and French. Opening the app signed out goes straight to "Sign in to
   Campbooks" (and back to the page you opened afterwards), with one button

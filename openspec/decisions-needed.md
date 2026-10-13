@@ -100,3 +100,17 @@ The IdP spike found that client_credentials rejects HTTP Basic client
 authentication although discovery advertises it. (The missing Portuguese and
 Spanish translations are contributed upstream in sebadob/rauthy#1799.)
 **Recommended:** a maintainer files the Basic-auth bug upstream.
+
+## Labels made in Campbooks: create them in Gmail?
+
+Write-back (campbooks-cloud#66) mirrors Gmail labels a member adds or takes
+off, but a label created in Campbooks has no Gmail label yet, and the
+`changes_requested` intent carries only the label's id (its name is personal
+data). Today such a change is recorded as `skipped`
+(`label_not_at_provider`). Options: (a) keep Campbooks labels in Campbooks;
+(b) create the Gmail label on first use, with conversations adding an
+optional label-name blob to `add_label` (an additive change to the v1
+contract) and the connector calling `labels.create` (5 units), after which
+conversations links the two by name as it already does; (c) ask the member
+the first time. **Recommended:** (b), with a per-inbox switch defaulting to
+on, since members expect a label they add to show on their phone.

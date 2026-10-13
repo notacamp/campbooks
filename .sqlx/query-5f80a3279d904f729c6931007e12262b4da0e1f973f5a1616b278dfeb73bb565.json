@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM connectors.outbound_changes\n                           WHERE stream_id = $1 AND state = 'pending'\n                             AND ($2::uuid IS NULL OR id > $2)) AS \"more!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "more!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "5f80a3279d904f729c6931007e12262b4da0e1f973f5a1616b278dfeb73bb565"
+}
