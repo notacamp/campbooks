@@ -55,6 +55,7 @@ figment.workspace = true
 futures-util.workspace = true
 http-body-util.workspace = true
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
+wiremock.workspace = true
 
 [lints]
 workspace = true

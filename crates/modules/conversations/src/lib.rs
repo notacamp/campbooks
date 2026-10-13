@@ -134,12 +134,9 @@ impl ConversationsDeps {
 /// The `conversations` module, composed with `deps`, ready for the server
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
-    let model = deps
-        .ai
-        .filter(|gateway| gateway.config().provider(Role::Decide).is_ok())
-        .map(|gateway| {
-            Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
-        });
+    let model = deps.ai.filter(model_may_read_mail).map(|gateway| {
+        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
+    });
     Module {
         name: NAME,
         scopes: scopes::ALL,
@@ -171,6 +168,21 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
+    }
+}
+
+/// Whether the model pass runs: the `decide` role is configured and may
+/// receive mail (on the instance's network, or opted in with
+/// `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`). Without it, rules alone
+/// sort mail and nothing leaves the instance.
+fn model_may_read_mail(gateway: &Gateway) -> bool {
+    match gateway.config().provider_for_content(Role::Decide) {
+        Ok(_) => true,
+        Err(error @ campbooks_ai::Error::ExternalContentRefused { .. }) => {
+            tracing::warn!(%error, "the decide pass is off: rules alone sort mail");
+            false
+        }
+        Err(_) => false,
     }
 }
 

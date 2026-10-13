@@ -56,6 +56,7 @@ fn fast_retry() -> RetryPolicy {
 fn gateway(provider: ProviderConfig) -> Gateway {
     Gateway::new(AiConfig {
         roles: [(Role::Decide, provider)].into(),
+        ..AiConfig::default()
     })
     .unwrap()
     .with_retry(fast_retry())
@@ -269,7 +270,7 @@ async fn persistent_server_errors_give_up_after_the_last_attempt() {
         .await
         .unwrap_err();
     assert!(
-        matches!(&err, Error::Status { status: 500, body } if body.contains("inference failed")),
+        matches!(&err, Error::Status { status: 500 }) && !err.to_string().contains("inference"),
         "{err:?}"
     );
 }
@@ -338,6 +339,7 @@ async fn slow_provider_times_out_without_retry() {
     let gw = Gateway::with_timeouts(
         AiConfig {
             roles: [(Role::Decide, laya(&server))].into(),
+            ..AiConfig::default()
         },
         Duration::from_secs(1),
         Duration::from_millis(200),

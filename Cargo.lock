@@ -605,6 +605,7 @@ dependencies = [
  "utoipa",
  "utoipa-axum",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]
