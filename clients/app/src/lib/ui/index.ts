@@ -51,6 +51,7 @@ export {
   type Command,
   type CommandMenuProps,
 } from "./components/CommandMenu/CommandMenu";
+export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
 export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {

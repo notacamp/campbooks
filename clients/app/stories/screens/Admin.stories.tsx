@@ -8,6 +8,10 @@ import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
 import {
+  FAILED_JOBS,
+  FAILED_JOBS_FIRST_PAGE,
+  JOBS_SUMMARY,
+  JOBS_SUMMARY_EMPTY,
   NOT_FOUND_PROBLEM,
   OVERVIEW,
   OVERVIEW_WITHOUT_AI,
@@ -66,6 +70,69 @@ export const System: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByRole("heading", { level: 1, name: "System" })).toBeVisible();
     await expect(await canvas.findByText("Campbooks’ own")).toBeVisible();
+  },
+};
+
+const JOBS_ROUTE = "GET /bff/admin/v1/system/jobs";
+const FAILED_ROUTE = "GET /bff/admin/v1/system/jobs/failed";
+
+const jobsApi = (summary: MockRoute, failed: MockRoute): Record<string, MockRoute> => ({
+  ...signedIn({ body: OVERVIEW }),
+  [JOBS_ROUTE]: summary,
+  [FAILED_ROUTE]: failed,
+});
+
+/** Admin → Jobs: the queue by kind, and the failed jobs with their error to copy, retry or discard. */
+export const Jobs: Story = {
+  args: { path: "/admin/jobs", api: jobsApi({ body: JOBS_SUMMARY }, { body: FAILED_JOBS }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByRole("heading", { level: 1, name: "Jobs" })).toBeVisible();
+    await expect(await canvas.findByText("No error was recorded.")).toBeVisible();
+  },
+};
+
+/** Asking before a job is deleted for good. */
+export const JobsDiscardAsks: Story = {
+  args: {
+    path: "/admin/jobs",
+    api: jobsApi(
+      { body: JOBS_SUMMARY },
+      { body: { items: FAILED_JOBS.items.slice(0, 1), next: null } },
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const failed = await canvas.findByRole("list", { name: "Failed jobs" });
+    await userEvent.click(within(failed).getByRole("button", { name: "Discard" }));
+    await expect(await canvas.findByText(/It is deleted for good/u)).toBeVisible();
+  },
+};
+
+/** More failures than one page: Show more. */
+export const JobsFirstPage: Story = {
+  args: {
+    path: "/admin/jobs",
+    api: jobsApi({ body: JOBS_SUMMARY }, { body: FAILED_JOBS_FIRST_PAGE }),
+  },
+};
+
+/** An idle instance: nothing queued, nothing failed. */
+export const JobsIdle: Story = {
+  args: {
+    path: "/admin/jobs",
+    api: jobsApi({ body: JOBS_SUMMARY_EMPTY }, { body: { items: [], next: null } }),
+  },
+};
+
+/** The queue can't be read. */
+export const JobsUnavailable: Story = {
+  args: {
+    path: "/admin/jobs",
+    api: jobsApi(
+      { status: 503, body: { status: 503, code: "database_unavailable" } },
+      { status: 503 },
+    ),
   },
 };
 

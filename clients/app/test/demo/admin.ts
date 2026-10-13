@@ -98,3 +98,82 @@ export const NOT_FOUND_PROBLEM = {
   detail: "This resource does not exist, or you cannot see it.",
   code: "not_found",
 } as const;
+
+type QueueSummary = AdminSchema<"QueueSummary">;
+type FailedJob = AdminSchema<"FailedJob">;
+type FailedPage = AdminSchema<"FailedPage">;
+
+/** The job queue of a small instance: a busy sync, an AI read that keeps failing, a lost worker. */
+export const JOBS_SUMMARY: QueueSummary = {
+  at: "2026-10-13T09:30:00Z",
+  oldest_ready_seconds: 190,
+  kinds: [
+    {
+      queue: "ai",
+      kind: "conversations.read_message",
+      ready: 12,
+      scheduled: 3,
+      running: 2,
+      expired_leases: 0,
+      failed: 2,
+      oldest_ready_seconds: 190,
+    },
+    {
+      queue: "default",
+      kind: "system.prune_jobs",
+      ready: 0,
+      scheduled: 1,
+      running: 0,
+      expired_leases: 0,
+      failed: 0,
+      oldest_ready_seconds: null,
+    },
+    {
+      queue: "sync",
+      kind: "connectors.sync_mailbox",
+      ready: 1,
+      scheduled: 0,
+      running: 1,
+      expired_leases: 1,
+      failed: 0,
+      oldest_ready_seconds: 20,
+    },
+  ],
+};
+
+/** Nothing queued at all. */
+export const JOBS_SUMMARY_EMPTY: QueueSummary = {
+  at: "2026-10-13T09:30:00Z",
+  oldest_ready_seconds: null,
+  kinds: [],
+};
+
+const failedJob = (n: number, overrides: Partial<FailedJob> = {}): FailedJob => ({
+  id: `0199f0a0-0000-7000-8000-00000000000${String(n)}`,
+  queue: "ai",
+  kind: "conversations.read_message",
+  workspace_id: "wsp_demo",
+  attempts: 10,
+  max_attempts: 10,
+  last_error: "provider returned 503: upstream timed out while reading the message",
+  created_at: "2026-10-13T06:00:00Z",
+  finished_at: "2026-10-13T08:15:00Z",
+  ...overrides,
+});
+
+/** Two dead jobs: one with a long multi-line error, one with none recorded. */
+export const FAILED_JOBS: FailedPage = {
+  items: [
+    failedJob(1, {
+      last_error: `model returned an invalid decision: missing field \`reply\` at line 1 column 57\n${"  at conversations::read::decide ".repeat(8)}`,
+    }),
+    failedJob(2, { workspace_id: null, last_error: null, attempts: 1, max_attempts: 1 }),
+  ],
+  next: null,
+};
+
+/** The first page of many. */
+export const FAILED_JOBS_FIRST_PAGE: FailedPage = {
+  items: [failedJob(3)],
+  next: "1760344500000000.0199f0a0-0000-7000-8000-000000000003",
+};

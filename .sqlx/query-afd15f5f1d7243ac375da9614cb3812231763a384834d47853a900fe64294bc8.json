@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH locked AS (\n            SELECT j.id, j.unique_key\n              FROM kernel.jobs j\n             WHERE j.state = 'failed' AND j.kind = $1\n               AND ($2::text IS NULL OR j.queue = $2)\n               AND (j.unique_key IS NULL OR NOT EXISTS (\n                    SELECT 1 FROM kernel.jobs o\n                     WHERE o.kind = j.kind AND o.unique_key = j.unique_key\n                       AND o.state IN ('pending', 'running')))\n             ORDER BY j.finished_at, j.id\n             LIMIT $3\n               FOR UPDATE SKIP LOCKED\n        ),\n        picked AS (\n            -- Two dead jobs sharing a unique key must not both come back.\n            SELECT id FROM (\n                SELECT id, unique_key,\n                       row_number() OVER (PARTITION BY unique_key ORDER BY id) AS n\n                  FROM locked\n            ) l\n             WHERE l.unique_key IS NULL OR l.n = 1\n        )\n        UPDATE kernel.jobs j\n           SET state = 'pending', run_at = now(), attempts = 0,\n               finished_at = NULL, locked_by = NULL, locked_until = NULL,\n               updated_at = now()\n          FROM picked\n         WHERE j.id = picked.id\n        RETURNING j.queue\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "queue",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "queue"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "afd15f5f1d7243ac375da9614cb3812231763a384834d47853a900fe64294bc8"
+}

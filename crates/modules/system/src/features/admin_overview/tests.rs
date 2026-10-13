@@ -1,88 +1,25 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
-use axum::{
-    Router,
-    body::Body,
-    http::{Request, StatusCode, header},
-};
+use axum::http::{Method, StatusCode};
 use campbooks_ai::{AiConfig, Gateway, ProviderConfig, Role};
-use campbooks_kernel::{
-    Error,
-    admin::{
-        ACCESS_SCOPE, AdminAction, AdminAudit, AdminProfiles, AuditFuture, PermissionSet,
-        ProfilesFuture,
-    },
-    testing::{self, TestIdp, TestResponse},
-};
-use chrono::Utc;
+use campbooks_kernel::testing::TestResponse;
 use serde_json::json;
 use sqlx::PgPool;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
 
 use crate::{Deps, Facts, IdentityProvider};
 
-/// Accounts and their permission names, in memory.
-#[derive(Debug, Default)]
-struct Profiles(HashMap<&'static str, Vec<&'static str>>);
-
-impl AdminProfiles for Profiles {
-    fn permissions_of<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> ProfilesFuture<'a> {
-        let names = self.0.get(account).cloned().unwrap_or_default();
-        Box::pin(async move { Ok(PermissionSet::from_names(names)) })
-    }
-}
-
-#[derive(Debug, Default)]
-struct Trail(Mutex<Vec<AdminAction>>);
-
-impl AdminAudit for Trail {
-    fn record<'a>(&'a self, _db: &'a PgPool, action: &'a AdminAction) -> AuditFuture<'a> {
-        self.0.lock().unwrap().push(action.clone());
-        Box::pin(async { Ok::<(), Error>(()) })
-    }
-}
-
-struct World {
-    idp: TestIdp,
-    app: Router,
-    trail: Arc<Trail>,
-}
-
-async fn world(db: PgPool, deps: Deps) -> World {
-    let idp = TestIdp::start().await;
-    let trail = Arc::new(Trail::default());
-    let profiles = Profiles(HashMap::from([
-        ("ada", vec!["super"]),
-        ("ops", vec!["jobs.read"]),
-    ]));
-    let pool = testing::app_role_pool(&db).await;
-    let mut state = idp
-        .state(pool)
-        .with_admin(Arc::new(profiles), trail.clone());
-    let config = Arc::make_mut(&mut state.config);
-    config.database_url = "postgres://app:db-password@db.example.com/campbooks".into();
-    config.signup.codes = Some("signup-code-1".into());
-    let app = testing::admin_app(crate::module_with(deps), state);
-    World { idp, app, trail }
-}
+use crate::testkit::{World, world};
 
 impl World {
     async fn overview(&self, sub: &str, auth_age_seconds: i64, language: &str) -> TestResponse {
-        let mut claims = self.idp.claims(ACCESS_SCOPE);
-        claims["sub"] = json!(sub);
-        claims["auth_time"] = json!(Utc::now().timestamp() - auth_age_seconds);
-        let request = Request::get("/admin/v1/system/overview")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", self.idp.token(&claims)),
-            )
-            .header(header::ACCEPT_LANGUAGE, language)
-            .body(Body::empty())
-            .unwrap();
-        testing::send(&self.app, request).await
+        self.send(
+            Method::GET,
+            "/admin/v1/system/overview",
+            sub,
+            auth_age_seconds,
+            language,
+            None,
+        )
+        .await
     }
 }
 

@@ -14,6 +14,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Admin → Jobs: administrators with the `jobs.read` permission see the
+  background queue by kind (waiting, scheduled, running, running with a lost
+  worker, failed) and the jobs that gave up with their last error (monospace,
+  wrapped, copyable). With `jobs.retry` they can retry a failed job, retry all
+  failed jobs of a kind, or discard one after a confirmation. Only failed jobs
+  are ever touched, repeating an action changes nothing, and a job's contents
+  are never shown or returned. Grant the permissions with
+  `campbooks-server admin grant --permission jobs.read --permission jobs.retry`
+  (or `super`).
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your
