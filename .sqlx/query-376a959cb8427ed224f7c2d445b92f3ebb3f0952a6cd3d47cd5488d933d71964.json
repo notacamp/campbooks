@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT purge_after, (purge_after <= now()) AS \"due\"\n                 FROM workspaces.workspaces WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "purge_after",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workspaces.workspaces",
+            "name": "purge_after"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "due",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "376a959cb8427ed224f7c2d445b92f3ebb3f0952a6cd3d47cd5488d933d71964"
+}

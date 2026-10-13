@@ -4,7 +4,13 @@ use std::sync::Arc;
 
 use sqlx::PgPool;
 
-use crate::{auth::TokenVerifier, config::Config, events::EventBus, jobs::Registry};
+use crate::{
+    auth::TokenVerifier,
+    config::Config,
+    events::EventBus,
+    jobs::Registry,
+    tenancy::{MembershipPort, NoMembership},
+};
 
 /// What every handler can reach. Cheap to clone.
 #[derive(Debug, Clone)]
@@ -17,6 +23,11 @@ pub struct AppState {
     pub events: EventBus,
     /// Validates access tokens for [`Scoped`](crate::auth::Scoped) handlers.
     pub auth: TokenVerifier,
+    /// Answers whether a caller belongs to a workspace, for
+    /// [`Workspace`](crate::tenancy::Workspace) handlers. The server
+    /// registers the `workspaces` module's implementation; until then nobody
+    /// belongs anywhere.
+    pub membership: MembershipPort,
 }
 
 impl AppState {
@@ -29,7 +40,15 @@ impl AppState {
             auth: TokenVerifier::new(&config.auth),
             config: Arc::new(config),
             events: EventBus::default(),
+            membership: Arc::new(NoMembership),
         }
+    }
+
+    /// The same state, resolving workspace membership through `membership`.
+    #[must_use]
+    pub fn with_membership(mut self, membership: MembershipPort) -> Self {
+        self.membership = membership;
+        self
     }
 
     /// The same state, publishing to (and running the work of) `registry`.

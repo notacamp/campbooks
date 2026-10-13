@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.jobs SET run_at = now() WHERE kind = 'workspaces.purge_workspace'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "b656402998ce6366327b2662c8e209e949fa8cb0f521be7f162186ab4f1b952d"
+}

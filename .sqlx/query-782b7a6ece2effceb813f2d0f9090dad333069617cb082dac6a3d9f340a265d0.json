@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO workspaces.members (workspace_id, user_id, role)\n         SELECT $1, id, 'owner' FROM workspaces.users WHERE idp_subject = 'bea'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "782b7a6ece2effceb813f2d0f9090dad333069617cb082dac6a3d9f340a265d0"
+}

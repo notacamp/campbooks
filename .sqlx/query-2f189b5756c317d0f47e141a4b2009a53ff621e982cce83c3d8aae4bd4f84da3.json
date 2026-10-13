@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT EXISTS (\n                   SELECT 1 FROM workspaces.members m\n                     JOIN workspaces.workspaces w ON w.id = m.workspace_id\n                    WHERE m.user_id = $1 AND w.deleted_at IS NULL\n               ) AS \"is_member!\",\n               coalesce((SELECT u.id = $1 FROM workspaces.users u\n                          ORDER BY u.created_at, u.id LIMIT 1), false) AS \"is_first_user!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "is_member!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "is_first_user!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "2f189b5756c317d0f47e141a4b2009a53ff621e982cce83c3d8aae4bd4f84da3"
+}

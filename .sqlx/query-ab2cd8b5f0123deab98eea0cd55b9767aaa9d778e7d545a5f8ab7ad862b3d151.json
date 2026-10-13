@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.invitations SET accepted_at = now(), accepted_by = $2 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ab2cd8b5f0123deab98eea0cd55b9767aaa9d778e7d545a5f8ab7ad862b3d151"
+}

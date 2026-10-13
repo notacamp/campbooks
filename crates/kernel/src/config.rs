@@ -8,7 +8,7 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use figment::{Figment, providers::Env};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 
 /// Environment variable prefix shared by every Campbooks setting.
@@ -48,6 +48,21 @@ pub struct Config {
     #[serde(default = "defaults::database_max_connections")]
     pub database_max_connections: u32,
 
+    /// The role every pooled connection switches to (`SET ROLE`) before it
+    /// runs a query (`CAMPBOOKS_DATABASE_ROLE`, default `campbooks_app`). It
+    /// is subject to row-level security even when the login user is a
+    /// superuser; migrations still run as the login user. Set it empty to
+    /// query as the login user (which must then not bypass row-level
+    /// security). See [`crate::db`].
+    #[serde(default = "defaults::database_role")]
+    pub database_role: String,
+
+    /// Which kind of deployment this is (`CAMPBOOKS_ENV`, `production` by
+    /// default). `development` enables conveniences that must never run in
+    /// production, such as logging invitation links.
+    #[serde(default)]
+    pub env: Environment,
+
     /// Address the HTTP server binds to.
     #[serde(default = "defaults::bind_addr")]
     pub bind_addr: SocketAddr,
@@ -77,6 +92,111 @@ pub struct Config {
     /// The background job worker (`CAMPBOOKS_JOBS__*`).
     #[serde(default)]
     pub jobs: JobsConfig,
+
+    /// Who may create a first workspace on this instance
+    /// (`CAMPBOOKS_SIGNUP__*`).
+    #[serde(default)]
+    pub signup: SignupConfig,
+}
+
+impl Config {
+    /// The runtime database role; `None` when unset or blank (query as the
+    /// login user).
+    pub fn database_role(&self) -> Option<&str> {
+        non_blank(Some(self.database_role.as_str()))
+    }
+
+    /// Startup check of the settings the API and worker share: the runtime
+    /// role is a plain identifier and the signup settings are usable. The
+    /// message names the offending setting.
+    pub fn check(&self) -> Result<(), String> {
+        if let Some(role) = self.database_role()
+            && !is_identifier(role)
+        {
+            return Err(format!(
+                "CAMPBOOKS_DATABASE_ROLE={role} must be a lower-case identifier \
+                 (letters, digits, underscores)"
+            ));
+        }
+        self.signup.check()
+    }
+}
+
+/// The kind of deployment (`CAMPBOOKS_ENV`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Environment {
+    /// A real deployment: no development conveniences.
+    #[default]
+    Production,
+    /// A developer's machine.
+    Development,
+}
+
+/// Who may create a workspace when they are not a member of any yet.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SignupPolicy {
+    /// Anyone who can sign in.
+    #[default]
+    Open,
+    /// Nobody: people join by invitation.
+    InviteOnly,
+    /// Nobody until an instance administrator approves them; the request is
+    /// recorded.
+    Approval,
+    /// Whoever presents one of the configured signup codes.
+    Code,
+}
+
+/// Signup settings (`CAMPBOOKS_SIGNUP__*`). They apply only to a user with no
+/// workspace creating one; the instance's first user is always allowed.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct SignupConfig {
+    /// `CAMPBOOKS_SIGNUP__POLICY`: `open` (default), `invite_only`,
+    /// `approval` or `code`.
+    pub policy: SignupPolicy,
+    /// `CAMPBOOKS_SIGNUP__CODES`: comma-separated codes accepted under the
+    /// `code` policy. Each can be used any number of times. Secret.
+    pub codes: Option<SecretString>,
+}
+
+impl SignupConfig {
+    /// The configured codes, trimmed, without empty entries.
+    pub fn codes(&self) -> Vec<&str> {
+        self.codes
+            .as_ref()
+            .map(|codes| {
+                codes
+                    .expose_secret()
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|code| !code.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Startup check: the `code` policy needs at least one code.
+    pub fn check(&self) -> Result<(), String> {
+        if self.policy == SignupPolicy::Code && self.codes().is_empty() {
+            return Err(
+                "CAMPBOOKS_SIGNUP__POLICY=code needs at least one code in CAMPBOOKS_SIGNUP__CODES"
+                    .to_owned(),
+            );
+        }
+        Ok(())
+    }
+}
+
+fn is_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    chars
+        .next()
+        .is_some_and(|c| c.is_ascii_lowercase() || c == '_')
+        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+        && value.len() <= 63
 }
 
 /// Background job worker settings (`CAMPBOOKS_JOBS__*`, ADR 0012).
@@ -266,6 +386,10 @@ mod defaults {
         10
     }
 
+    pub fn database_role() -> String {
+        crate::db::DEFAULT_RUNTIME_ROLE.to_owned()
+    }
+
     pub fn bind_addr() -> SocketAddr {
         SocketAddr::from((Ipv4Addr::UNSPECIFIED, 8080))
     }
@@ -322,6 +446,10 @@ mod tests {
         assert_eq!(config.auth.leeway_seconds, 60);
         assert_eq!(config.jobs, JobsConfig::default());
         assert!(config.jobs.check().is_ok());
+        assert_eq!(config.database_role(), Some("campbooks_app"));
+        assert_eq!(config.env, Environment::Production);
+        assert_eq!(config.signup.policy, SignupPolicy::Open);
+        assert!(config.check().is_ok());
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
@@ -456,6 +584,58 @@ mod tests {
                 .unwrap_err()
                 .contains("CAMPBOOKS_AUTH__AUDIENCE")
         );
+    }
+
+    #[test]
+    fn parses_signup_env_and_role() {
+        let figment = figment(&[
+            ("database_url", "postgres://localhost/x"),
+            ("env", "development"),
+            ("database_role", ""),
+        ])
+        .merge(Serialized::default(
+            "signup",
+            serde_json::json!({ "policy": "code", "codes": " alpha, ,beta " }),
+        ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert_eq!(config.env, Environment::Development);
+        assert_eq!(config.database_role(), None);
+        assert_eq!(config.signup.policy, SignupPolicy::Code);
+        assert_eq!(config.signup.codes(), ["alpha", "beta"]);
+        assert!(config.check().is_ok());
+        assert!(!format!("{config:?}").contains("alpha"));
+    }
+
+    #[test]
+    fn check_names_the_bad_setting() {
+        let mut config = Config::from_figment(&figment(&[
+            ("database_url", "postgres://localhost/x"),
+            ("database_role", "app; DROP TABLE x"),
+        ]))
+        .unwrap();
+        assert!(
+            config
+                .check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_DATABASE_ROLE")
+        );
+        config.database_role = String::new();
+        config.signup.policy = SignupPolicy::Code;
+        assert!(
+            config
+                .check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_SIGNUP__CODES")
+        );
+        for policy in ["open", "invite_only", "approval"] {
+            let figment = figment(&[("database_url", "postgres://localhost/x")]).merge(
+                Serialized::default("signup", serde_json::json!({ "policy": policy })),
+            );
+            assert!(
+                Config::from_figment(&figment).unwrap().check().is_ok(),
+                "{policy}"
+            );
+        }
     }
 
     #[test]

@@ -8,12 +8,15 @@
 pub mod auth;
 pub mod clock;
 pub mod config;
+pub mod db;
 pub mod error;
 pub mod events;
+pub mod extract;
 pub mod ids;
 pub mod jobs;
 pub mod module;
 pub mod state;
+pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]
 pub mod testing;
 

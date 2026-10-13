@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.users\n                SET display_name = coalesce($2, display_name), email = coalesce($3, email)\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "16a4252286e063de721a0fee32bdf2fb31d436f0920acc539dcb51ff3fe42827"
+}

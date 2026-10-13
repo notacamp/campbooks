@@ -14,12 +14,13 @@ use std::sync::Arc;
 use campbooks_kernel::{
     AppState, Config,
     config::LogFormat,
+    db,
     events::{EventId, ReplayFrom},
     jobs::Worker,
 };
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
-use sqlx::{PgPool, postgres::PgPoolOptions};
+use sqlx::{Connection as _, PgConnection, PgPool, postgres::PgPoolOptions};
 use tokio::{sync::watch, task::JoinSet};
 use tracing_subscriber::{EnvFilter, fmt, prelude::*};
 
@@ -159,6 +160,7 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
 }
 
 async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error>> {
+    config.check()?;
     if role.api() {
         check_api_config(&config)?;
     }
@@ -166,17 +168,15 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
         config.jobs.check()?;
     }
     let registry = campbooks_server::registry()?;
-    let db = connect(&config).await?;
     if config.run_migrations {
-        sqlx::migrate!("../../migrations")
-            .run(&db)
-            .await
-            .map_err(|e| format!("migrations failed: {e}"))?;
-        tracing::info!("migrations applied");
+        migrate(&config).await?;
     }
+    let db = connect(&config).await?;
+    warn_if_row_security_is_bypassed(&db).await;
 
     let bind_addr = config.bind_addr;
-    let state = AppState::new(db.clone(), config).with_registry(registry);
+    let state =
+        campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.
     let stop = Arc::new(watch::channel(false).0);
@@ -233,13 +233,49 @@ fn stopped(stop: &watch::Sender<bool>) -> impl Future<Output = ()> + Send + 'sta
     }
 }
 
+/// Apply pending migrations on a connection of its own, as the login user
+/// (the pool runs as the runtime role, which may not change the schema).
+async fn migrate(config: &Config) -> Result<(), String> {
+    let mut conn = PgConnection::connect(config.database_url.expose_secret())
+        .await
+        .map_err(|e| format!("could not connect to the database: {e}"))?;
+    sqlx::migrate!("../../migrations")
+        .run(&mut conn)
+        .await
+        .map_err(|e| format!("migrations failed: {e}"))?;
+    let _ = conn.close().await;
+    tracing::info!("migrations applied");
+    Ok(())
+}
+
+/// The pool every request and job uses: each connection switches to the
+/// runtime role (`CAMPBOOKS_DATABASE_ROLE`), so row-level security applies.
 async fn connect(config: &Config) -> Result<PgPool, String> {
-    PgPoolOptions::new()
+    let options = PgPoolOptions::new()
         .max_connections(config.database_max_connections)
-        .acquire_timeout(DB_ACQUIRE_TIMEOUT)
+        .acquire_timeout(DB_ACQUIRE_TIMEOUT);
+    db::with_runtime_role(options, config.database_role())
         .connect(config.database_url.expose_secret())
         .await
-        .map_err(|e| format!("could not connect to the database: {e}"))
+        .map_err(|e| match config.database_role() {
+            Some(role) => format!(
+                "could not connect to the database as runtime role `{role}` (run the \
+                 migrations, or check CAMPBOOKS_DATABASE_ROLE): {e}"
+            ),
+            None => format!("could not connect to the database: {e}"),
+        })
+}
+
+async fn warn_if_row_security_is_bypassed(db: &PgPool) {
+    match db::bypasses_row_security(db).await {
+        Ok(false) => {}
+        Ok(true) => tracing::warn!(
+            "the database role the server queries as bypasses row-level security (a \
+             superuser or BYPASSRLS): workspace isolation then rests on queries alone; \
+             set CAMPBOOKS_DATABASE_ROLE (default campbooks_app)"
+        ),
+        Err(e) => tracing::warn!(error = %e, "could not check the database role"),
+    }
 }
 
 /// `events replay <consumer> [--since …]`.
