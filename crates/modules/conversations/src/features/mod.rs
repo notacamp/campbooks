@@ -22,6 +22,7 @@ pub mod needs;
 pub mod purge_workspace;
 pub mod record_send;
 pub mod release_send;
+pub mod search_source;
 pub mod send_draft;
 pub mod star;
 pub mod update_draft;

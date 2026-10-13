@@ -1,0 +1,38 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search.groups (id, workspace_id, record_type, record_id, container_type,\n                                      container_id, occurred_at, title, title_folded, keywords,\n                                      facets, index_version, refreshed_at)\n           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, lower(unaccent($8)),\n                   ARRAY(SELECT lower(unaccent(k)) FROM unnest($9::text[]) k), $10, $11, now())\n           ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE\n              SET container_type = EXCLUDED.container_type, container_id = EXCLUDED.container_id,\n                  occurred_at = EXCLUDED.occurred_at, title = EXCLUDED.title,\n                  title_folded = EXCLUDED.title_folded, keywords = EXCLUDED.keywords,\n                  facets = EXCLUDED.facets, index_version = EXCLUDED.index_version,\n                  refreshed_at = now()\n           RETURNING id AS \"id: GroupId\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: GroupId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "search.groups",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "TextArray",
+        "Jsonb",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "12792652e5628547908911866defed8bd3f5fe43f909ebab4d1c80183ceb8832"
+}

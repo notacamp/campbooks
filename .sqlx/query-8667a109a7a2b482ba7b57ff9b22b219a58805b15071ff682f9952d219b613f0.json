@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search.entries (id, workspace_id, group_id, record_type, record_id,\n                                       occurred_at, language, people, people_words, file_words,\n                                       from_folded, to_folded, cc_folded, body, attachments,\n                                       facets, stamp, tsv)\n           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, lower(unaccent($11)),\n                   lower(unaccent($12)), lower(unaccent($13)), $14, $15, $16, $17,\n                   search.entry_vector($18, $9, $10, $14, $7))\n           ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE\n              SET group_id = EXCLUDED.group_id, occurred_at = EXCLUDED.occurred_at,\n                  language = EXCLUDED.language, people = EXCLUDED.people,\n                  people_words = EXCLUDED.people_words, file_words = EXCLUDED.file_words,\n                  from_folded = EXCLUDED.from_folded, to_folded = EXCLUDED.to_folded,\n                  cc_folded = EXCLUDED.cc_folded, body = EXCLUDED.body,\n                  attachments = EXCLUDED.attachments, facets = EXCLUDED.facets,\n                  stamp = EXCLUDED.stamp, tsv = EXCLUDED.tsv",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "Jsonb",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8667a109a7a2b482ba7b57ff9b22b219a58805b15071ff682f9952d219b613f0"
+}

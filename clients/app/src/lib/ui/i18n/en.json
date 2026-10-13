@@ -41,7 +41,10 @@
     "unsure": "Campbooks is not sure",
     "happy": "Campbooks is happy",
     "alert": "Campbooks needs your attention",
-    "asleep": "Campbooks is paused"
+    "asleep": "Campbooks is paused",
+    "dizzy": "Campbooks hit a snag",
+    "starry": "Campbooks is delighted",
+    "hearts": "Campbooks loves this"
   },
   "signal": {
     "review": "Review",

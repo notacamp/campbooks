@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT record_type, record_id, stamp FROM search.entries\n          WHERE workspace_id = $1 AND record_id = ANY($2)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "record_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.entries",
+            "name": "record_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "record_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.entries",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "stamp",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.entries",
+            "name": "stamp"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "0084cb2460156e5d618be95880e9dc8f7fce0c51db0abfdf7bf73d65b55d3705"
+}

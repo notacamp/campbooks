@@ -103,7 +103,7 @@ isolation then rests on the queries alone.
 
 | Service | Role | Model | Notes |
 | --- | --- | --- | --- |
-| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | Built from `deploy/laya`; ~680 MB download on first start; about 2 GB of RAM |
+| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | `ghcr.io/notacamp/campbooks-laya`; ~680 MB download on first start; about 2 GB of RAM |
 | `ollama` | `complete` (and `vision`) | `qwen3:8b` | Pull models with `docker compose exec ollama ollama pull …` |
 | `embeddings` | `embed` | `BAAI/bge-m3` | linux/amd64 only; on arm64 use Ollama's `bge-m3` |
 
@@ -118,13 +118,17 @@ recent laptop).
   key, so the `laya` service refuses to start until `CAMPBOOKS_AI__DECIDE__API_KEY` is
   set in `.env`. The server sends the same value. The service has no published port:
   only containers on the compose network reach it.
-- **The image.** There is no official image, so compose builds one from
-  `deploy/laya/Dockerfile`: Python slim, CPU-only PyTorch, `laya[serve]` and its
-  libraries at pinned versions, running as a non-root user. On first start it
-  downloads the multilingual checkpoint (at the commit the `laya` package lists as
-  reviewed) into the `laya-models` volume; later starts load it from there. Build it
-  again after an upgrade with `docker compose --profile ai build laya`. The image is
-  optional and is not scanned by the release pipeline (only the Campbooks image is).
+- **The image.** Laya has no official image, so the release pipeline publishes one
+  next to the Campbooks image: `ghcr.io/notacamp/campbooks-laya`, built from
+  `deploy/laya/Dockerfile` for linux/amd64 and linux/arm64, scanned and attested
+  like the server image and published under the same tags (`next`, `next-<sha>`,
+  `next-vX.Y.Z`), so pin both to the same tag. It is Python slim, CPU-only
+  PyTorch, `laya[serve]` and its libraries at pinned versions, running as a
+  non-root user. The checkpoint is not in the image: on first start it downloads
+  the multilingual checkpoint (at the commit the `laya` package lists as reviewed)
+  into the `laya-models` volume; later starts load it from there. To build the
+  image yourself, swap `image:` for the commented `build: ./laya` line in
+  `compose.yaml` and run `docker compose --profile ai build laya`.
 - **CPU threads.** Inference uses every core by default; set `LAYA_THREADS` on the
   `laya` service to cap it.
 - **Another model.** `CAMPBOOKS_AI__DECIDE__MODEL` also accepts
@@ -398,7 +402,7 @@ Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF
 ## Built-in sign-in (Campbooks as its own identity provider)
 
 Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
-Google, Microsoft or Zoho (passkeys follow) and issues every token itself, so the `idp`
+Google, Microsoft, Zoho or a passkey and issues every token itself, so the `idp`
 services above will go away. The built-in issuer is already in the server. It runs when
 `CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
 `CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
@@ -477,6 +481,19 @@ With the built-in issuer:
   A provider account that is already another Campbooks account's way in is refused, never
   merged. The last way in can't be removed, and adding or removing one needs a sign-in in
   the last ten minutes. Disconnecting a mailbox keeps its sign-in.
+- **Passkeys.** Nothing to configure: people add passkeys under Settings → Ways to sign
+  in, sign in with them on the sign-in screen (the passkey button, `P`, or the browser's
+  autofill), and can create an account with a passkey alone. Passkeys belong to the host
+  of `CAMPBOOKS_PUBLIC_URL` (the WebAuthn relying party): **changing that host makes every
+  passkey stop working**, so people need another way in first. Browsers offer passkeys
+  only over `https://`, or `http://localhost` in development; on any other plain-http
+  host, or an IP address, the passkey options are hidden. Passkey-only accounts have no
+  email address, so on an `invite_only` instance passkeys can't create accounts (they
+  still sign in, and can be added once you are in). A passkey that reports an
+  authenticator counter going backwards (a possible clone) is allowed and recorded in
+  `identity.audit_events` as `passkey_sign_count_regressed`. Passkey ceremonies are
+  rate-limited per client address (set `CAMPBOOKS_TRUSTED_PROXIES` behind a proxy, as
+  above), and at most 30 passkey-only accounts are created per hour on the instance.
 
 ## Administrators
 

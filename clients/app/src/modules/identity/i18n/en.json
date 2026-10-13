@@ -9,7 +9,8 @@
     "choice2": "Sign in the second way listed",
     "choice3": "Sign in the third way listed",
     "passkey": "Sign in with a passkey",
-    "addWayIn": "Add a way to sign in"
+    "addWayIn": "Add a way to sign in",
+    "addPasskey": "Add a passkey"
   },
   "signIn": {
     "title": "Sign in to Campbooks",
@@ -48,6 +49,35 @@
     "failed": {
       "title": "Couldn’t load the ways to sign in",
       "lead": "Campbooks didn’t answer. Check your connection, then try again."
+    },
+    "passkeyWaiting": "Waiting for your passkey…",
+    "passkeySignUp": "New here? Create an account with a passkey",
+    "passkeyField": {
+      "label": "Saved passkeys",
+      "hint": "Your browser offers the passkeys you saved for Campbooks here.",
+      "placeholder": "Choose a passkey"
+    },
+    "passkeyProblem": {
+      "cancelled": {
+        "title": "No passkey was used.",
+        "lead": "Try again when you’re ready, or sign in another way."
+      },
+      "not_accepted": {
+        "title": "That passkey wasn’t accepted.",
+        "lead": "It may have been removed from your account. Try another passkey, or sign in another way."
+      },
+      "expired": {
+        "title": "That took too long.",
+        "lead": "Try again."
+      },
+      "rate_limited": {
+        "title": "Too many tries.",
+        "lead": "Wait a minute, then try again."
+      },
+      "failed": {
+        "title": "Couldn’t sign in with a passkey.",
+        "lead": "Something went wrong. Try again, or sign in another way."
+      }
     }
   },
   "errors": {
@@ -245,6 +275,104 @@
       "unknown": {
         "title": "Something went wrong.",
         "lead": "Nothing changed. Try again."
+      }
+    }
+  },
+  "passkeySignUp": {
+    "eyebrow": "New account",
+    "title": "Create an account with a passkey",
+    "lead": "Your device keeps the passkey and unlocks it with your face, fingerprint or screen lock. There’s no password.",
+    "footer": "No email address is needed. You can add Google, Microsoft or Zoho later.",
+    "name": {
+      "label": "What should we call you?",
+      "placeholder": "Your name",
+      "hint": "Shown in Campbooks and to the people you invite.",
+      "required": "Tell us what to call you.",
+      "tooLong": "Use 64 characters or fewer."
+    },
+    "create": "Create with a passkey",
+    "creating": "Waiting for your passkey…",
+    "another": "Sign in another way",
+    "nextTitle": "What happens next",
+    "next1": "Your device asks to save a passkey for Campbooks.",
+    "next2": "You create your first workspace.",
+    "next3": "You connect a mailbox whenever you’re ready.",
+    "problem": {
+      "cancelled": {
+        "title": "No passkey was made.",
+        "lead": "Nothing was created. Try again when you’re ready."
+      },
+      "exists": {
+        "title": "This device already has a passkey for that.",
+        "lead": "Sign in with it instead."
+      },
+      "expired": {
+        "title": "That took too long.",
+        "lead": "Nothing was created. Try again."
+      },
+      "not_accepted": {
+        "title": "That passkey wasn’t accepted.",
+        "lead": "Nothing was created. Try again, or use another device."
+      },
+      "failed": {
+        "title": "Couldn’t create the account.",
+        "lead": "Nothing was created. Try again."
+      }
+    },
+    "inviteOnly": {
+      "title": "This Campbooks takes invited people only",
+      "lead": "Sign in with the account your invitation was sent to. You can add a passkey once you’re in."
+    },
+    "unsupported": {
+      "title": "This browser can’t use passkeys",
+      "lead": "Use another browser or device, or sign in another way."
+    }
+  },
+  "passkeys": {
+    "title": "Passkeys",
+    "lead": "Sign in with your face, fingerprint or screen lock instead of a provider. Passkeys can’t be phished.",
+    "list": "Your passkeys",
+    "loading": "Loading your passkeys…",
+    "loadError": "Couldn’t load your passkeys.",
+    "retry": "Try again",
+    "none": "No passkeys yet.",
+    "add": "Add a passkey",
+    "adding": "Waiting for your passkey…",
+    "added": "{{name}} is added. You can sign in with it now.",
+    "nameOn": "Passkey on {{device}}",
+    "synced": "Synced across your devices",
+    "thisDevice": "On one device",
+    "rename": "Rename",
+    "renameLabel": "Rename {{name}}",
+    "removeLabel": "Remove {{name}}",
+    "nameLabel": "Name",
+    "save": "Save",
+    "confirmRemove": "Stop signing in with {{name}}? It stays on your device until you delete it there, and anyone signed in with it is signed out.",
+    "renameFailed": {
+      "title": "Couldn’t rename it.",
+      "lead": "Use 1 to 64 characters, then try again."
+    },
+    "unsupported": "This browser can’t make passkeys. Use another browser or device to add one.",
+    "problem": {
+      "cancelled": {
+        "title": "No passkey was added.",
+        "lead": "Try again when you’re ready."
+      },
+      "exists": {
+        "title": "This device already has a passkey for your account.",
+        "lead": "It’s in the list."
+      },
+      "expired": {
+        "title": "That took too long.",
+        "lead": "Nothing was added. Try again."
+      },
+      "notAccepted": {
+        "title": "That passkey wasn’t accepted.",
+        "lead": "Nothing was added. Try again, or use another device."
+      },
+      "failed": {
+        "title": "Couldn’t add a passkey.",
+        "lead": "Nothing was added. Try again."
       }
     }
   }

@@ -18,6 +18,8 @@ pub mod web;
 mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
+#[cfg(test)]
+mod search_tests;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
 
@@ -35,6 +37,7 @@ use campbooks_kernel::{
     i18n,
     jobs::{Registry, RegistryError},
     operations,
+    search::SearchSources,
 };
 use tower::ServiceBuilder;
 use tower_http::{
@@ -172,6 +175,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
         campbooks_attention::module(),
+        campbooks_search::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -179,7 +183,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// `state` with the ports modules implement for the kernel registered: the
 /// `workspaces` module answers who belongs to which workspace and which
 /// language each user chose; the `conversations` module, who may see the
-/// change feed's records inside an inbox; the `admin` module, who is an
+/// change feed's records inside an inbox and search's results, and how
+/// search reads its conversations (ADR 0016); the `admin` module, who is an
 /// administrator, and keeps the trail of what they do.
 pub fn with_ports(state: AppState) -> AppState {
     state
@@ -188,6 +193,9 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_search_sources(SearchSources::new(vec![
+            campbooks_conversations::search_source(),
+        ]))
 }
 
 /// [`with_ports`], plus the ports of the modules composed with
@@ -303,7 +311,12 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
-        (name = "attention", description = "The attention module."),
+        (name = "attention", description = "What needs you: one queue per member of what the \
+            records you may open ask of you (conversations today), with Later per member."),
+        (name = "search", description = "One search over the records you may open: \
+            conversations today. Words in English, Portuguese, Spanish and French with accents \
+            ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
+            from the containers (inboxes) you may see, checked at query time."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

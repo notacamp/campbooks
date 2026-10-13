@@ -41,7 +41,10 @@
     "unsure": "Campbooks n’est pas sûr",
     "happy": "Campbooks est content",
     "alert": "Campbooks a besoin de votre attention",
-    "asleep": "Campbooks est en pause"
+    "asleep": "Campbooks est en pause",
+    "dizzy": "Campbooks a eu un accroc",
+    "starry": "Campbooks est ravi",
+    "hearts": "Campbooks adore"
   },
   "signal": {
     "review": "Vérifier",

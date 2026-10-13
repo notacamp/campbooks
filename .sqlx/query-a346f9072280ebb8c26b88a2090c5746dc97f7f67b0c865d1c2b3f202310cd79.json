@@ -1,0 +1,35 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT l.id::text AS \"id!\", l.name\n             FROM conversations.conversation_labels cl\n             JOIN conversations.labels l ON l.id = cl.label_id\n            WHERE cl.conversation_id = $1 ORDER BY l.name",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.labels",
+            "name": "name"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false
+    ]
+  },
+  "hash": "a346f9072280ebb8c26b88a2090c5746dc97f7f67b0c865d1c2b3f202310cd79"
+}

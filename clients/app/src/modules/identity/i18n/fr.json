@@ -9,7 +9,8 @@
     "choice2": "Se connecter avec la deuxième option",
     "choice3": "Se connecter avec la troisième option",
     "passkey": "Se connecter avec une clé d’accès",
-    "addWayIn": "Ajouter un moyen de connexion"
+    "addWayIn": "Ajouter un moyen de connexion",
+    "addPasskey": "Ajouter une clé d’accès"
   },
   "signIn": {
     "title": "Se connecter à Campbooks",
@@ -48,6 +49,35 @@
     "failed": {
       "title": "Impossible de charger les façons de se connecter",
       "lead": "Campbooks n’a pas répondu. Vérifiez votre connexion, puis réessayez."
+    },
+    "passkeyWaiting": "En attente de votre clé d’accès…",
+    "passkeySignUp": "Pas encore de compte ? Créez-en un avec une clé d’accès",
+    "passkeyField": {
+      "label": "Clés d’accès enregistrées",
+      "hint": "Votre navigateur propose ici les clés d’accès que vous avez enregistrées pour Campbooks.",
+      "placeholder": "Choisissez une clé d’accès"
+    },
+    "passkeyProblem": {
+      "cancelled": {
+        "title": "Aucune clé d’accès n’a été utilisée.",
+        "lead": "Réessayez quand vous voulez, ou connectez-vous autrement."
+      },
+      "not_accepted": {
+        "title": "Cette clé d’accès n’a pas été acceptée.",
+        "lead": "Elle a peut-être été retirée de votre compte. Essayez une autre clé d’accès, ou connectez-vous autrement."
+      },
+      "expired": {
+        "title": "C’était trop long.",
+        "lead": "Réessayez."
+      },
+      "rate_limited": {
+        "title": "Trop de tentatives.",
+        "lead": "Attendez une minute, puis réessayez."
+      },
+      "failed": {
+        "title": "Impossible de se connecter avec une clé d’accès.",
+        "lead": "Un problème est survenu. Réessayez, ou connectez-vous autrement."
+      }
     }
   },
   "errors": {
@@ -245,6 +275,104 @@
       "unknown": {
         "title": "Un problème est survenu.",
         "lead": "Rien n’a changé. Réessayez."
+      }
+    }
+  },
+  "passkeySignUp": {
+    "eyebrow": "Nouveau compte",
+    "title": "Créer un compte avec une clé d’accès",
+    "lead": "Votre appareil garde la clé d’accès et la déverrouille avec votre visage, votre empreinte ou le verrouillage de l’écran. Il n’y a pas de mot de passe.",
+    "footer": "Aucune adresse e-mail n’est nécessaire. Vous pourrez ajouter Google, Microsoft ou Zoho plus tard.",
+    "name": {
+      "label": "Comment devons-nous vous appeler ?",
+      "placeholder": "Votre nom",
+      "hint": "Affiché dans Campbooks et aux personnes que vous invitez.",
+      "required": "Dites-nous comment vous appeler.",
+      "tooLong": "64 caractères au maximum."
+    },
+    "create": "Créer avec une clé d’accès",
+    "creating": "En attente de votre clé d’accès…",
+    "another": "Se connecter autrement",
+    "nextTitle": "Et ensuite",
+    "next1": "Votre appareil propose d’enregistrer une clé d’accès pour Campbooks.",
+    "next2": "Vous créez votre premier espace de travail.",
+    "next3": "Vous connectez une boîte mail quand vous le souhaitez.",
+    "problem": {
+      "cancelled": {
+        "title": "Aucune clé d’accès n’a été créée.",
+        "lead": "Rien n’a été créé. Réessayez quand vous voulez."
+      },
+      "exists": {
+        "title": "Cet appareil a déjà une clé d’accès pour cela.",
+        "lead": "Connectez-vous avec elle."
+      },
+      "expired": {
+        "title": "C’était trop long.",
+        "lead": "Rien n’a été créé. Réessayez."
+      },
+      "not_accepted": {
+        "title": "Cette clé d’accès n’a pas été acceptée.",
+        "lead": "Rien n’a été créé. Réessayez, ou utilisez un autre appareil."
+      },
+      "failed": {
+        "title": "Impossible de créer le compte.",
+        "lead": "Rien n’a été créé. Réessayez."
+      }
+    },
+    "inviteOnly": {
+      "title": "Ce Campbooks n’accepte que les personnes invitées",
+      "lead": "Connectez-vous avec le compte auquel l’invitation a été envoyée. Une fois dans Campbooks, vous pourrez ajouter une clé d’accès."
+    },
+    "unsupported": {
+      "title": "Ce navigateur ne peut pas utiliser de clés d’accès",
+      "lead": "Utilisez un autre navigateur ou appareil, ou connectez-vous autrement."
+    }
+  },
+  "passkeys": {
+    "title": "Clés d’accès",
+    "lead": "Connectez-vous avec votre visage, votre empreinte ou le verrouillage de l’écran plutôt qu’avec un fournisseur. Les clés d’accès résistent à l’hameçonnage.",
+    "list": "Vos clés d’accès",
+    "loading": "Chargement de vos clés d’accès…",
+    "loadError": "Impossible de charger vos clés d’accès.",
+    "retry": "Réessayer",
+    "none": "Aucune clé d’accès pour l’instant.",
+    "add": "Ajouter une clé d’accès",
+    "adding": "En attente de votre clé d’accès…",
+    "added": "{{name}} est ajoutée. Vous pouvez vous connecter avec elle dès maintenant.",
+    "nameOn": "Clé d’accès sur {{device}}",
+    "synced": "Synchronisée entre vos appareils",
+    "thisDevice": "Sur un seul appareil",
+    "rename": "Renommer",
+    "renameLabel": "Renommer {{name}}",
+    "removeLabel": "Retirer {{name}}",
+    "nameLabel": "Nom",
+    "save": "Enregistrer",
+    "confirmRemove": "Ne plus vous connecter avec {{name}} ? Elle reste sur votre appareil jusqu’à ce que vous l’y supprimiez, et toute session ouverte avec elle est fermée.",
+    "renameFailed": {
+      "title": "Impossible de la renommer.",
+      "lead": "Utilisez de 1 à 64 caractères, puis réessayez."
+    },
+    "unsupported": "Ce navigateur ne peut pas créer de clés d’accès. Utilisez un autre navigateur ou appareil pour en ajouter une.",
+    "problem": {
+      "cancelled": {
+        "title": "Aucune clé d’accès n’a été ajoutée.",
+        "lead": "Réessayez quand vous voulez."
+      },
+      "exists": {
+        "title": "Cet appareil a déjà une clé d’accès pour votre compte.",
+        "lead": "Elle figure dans la liste."
+      },
+      "expired": {
+        "title": "C’était trop long.",
+        "lead": "Rien n’a été ajouté. Réessayez."
+      },
+      "notAccepted": {
+        "title": "Cette clé d’accès n’a pas été acceptée.",
+        "lead": "Rien n’a été ajouté. Réessayez, ou utilisez un autre appareil."
+      },
+      "failed": {
+        "title": "Impossible d’ajouter une clé d’accès.",
+        "lead": "Rien n’a été ajouté. Réessayez."
       }
     }
   }

@@ -26,6 +26,7 @@ campbooks-connectors = { path = "crates/modules/connectors" }
 campbooks-identity = { path = "crates/modules/identity" }
 campbooks-admin = { path = "crates/modules/admin" }
 campbooks-attention = { path = "crates/modules/attention" }
+campbooks-search = { path = "crates/modules/search" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
@@ -103,10 +104,19 @@ regex = "1.13.1"
 # RUSTSEC-2021-0157/0158 in 4.2.0. Relax to a caret requirement after
 # 2026-10-27.
 ammonia = "=4.2.3"
+
+# Search: telling which of the four shipped languages an entry is written in
+# (whatlang: trigram profiles, no model files, MIT).
+whatlang = "0.18.0"
 # Email: MIME building of messages to send and parsing of raw messages
 # (connectors' email adapters).
 mail-builder = { version = "1.0.0", default-features = false }
 mail-parser = { version = "0.11.9", default-features = false }
+
+# Passkeys (identity, ADR 0014): COSE_Key parsing and the CBOR of WebAuthn
+# attestation objects. Signatures are verified with aws-lc-rs.
+coset = "0.4.2"
+ciborium = "0.2.2"
 
 # Tests
 wiremock = "0.6.5"

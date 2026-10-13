@@ -11,6 +11,7 @@ pub mod flags;
 pub mod format;
 pub mod needs;
 pub mod paths;
+pub mod plain_text;
 pub mod policy;
 pub mod redact;
 pub mod sanitize;
