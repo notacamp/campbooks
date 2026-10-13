@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM kernel.rate_limits\n             WHERE bucket IN (\n                 SELECT bucket FROM kernel.rate_limits WHERE resets_at <= now() LIMIT $1)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "40b354505d180033a20e53da739a83d74df2d9098a375d13ee0c895e19572f01"
+}
