@@ -107,7 +107,9 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       labels: ["INBOX", "Label_1", "CATEGORY_PERSONAL"],
       text: "Hi Sam,\n\nHere is the first draft of the Q4 plan. Could you review it by Friday?\n\nMaya",
       html: `<p>Hi Sam,</p><p>Here is the first draft of the <b>Q4 plan</b>. Could you review it by Friday?</p><p>Maya</p>`,
-      files: [{ name: "q4-plan-draft.pdf", type: "application/pdf", content: pdf("Q4 plan, draft") }],
+      files: [
+        { name: "q4-plan-draft.pdf", type: "application/pdf", content: pdf("Q4 plan, draft") },
+      ],
     },
     {
       from: `Sam Rivera <${me}>`,
@@ -199,7 +201,9 @@ function demoMessages(me: string, images: string): DemoMessage[] {
       labels: ["INBOX", "UNREAD", "Label_1", "CATEGORY_PERSONAL"],
       text: "The timeline can move by two weeks; the price stays the same. Attached is version 3.\n\nMaya",
       html: `<p>The timeline can move by two weeks; the price stays the same.</p><p>Attached is <b>version 3</b>.</p><p><img src="${images}/northwind-logo.svg" alt="Northwind Studio" width="140" height="40"></p>`,
-      files: [{ name: "q4-plan-v3.pdf", type: "application/pdf", content: pdf("Q4 plan, version 3") }],
+      files: [
+        { name: "q4-plan-v3.pdf", type: "application/pdf", content: pdf("Q4 plan, version 3") },
+      ],
     },
   ];
 }
@@ -415,7 +419,10 @@ export function handleGmail(
     if (message === undefined) {
       json(response, 404, { error: { code: 404, message: "Not Found" } });
     } else if (url.searchParams.get("format") === "raw") {
-      json(response, 200, { ...meta(message), raw: Buffer.from(message.raw).toString("base64url") });
+      json(response, 200, {
+        ...meta(message),
+        raw: Buffer.from(message.raw).toString("base64url"),
+      });
     } else {
       json(response, 200, meta(message));
     }

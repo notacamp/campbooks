@@ -3224,7 +3224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StreamList"
+                  "$ref": "#/components/schemas/StreamCounts"
                 }
               }
             }
@@ -6424,7 +6424,34 @@
           "newsletters"
         ]
       },
-      "StreamList": {
+      "StreamCount": {
+        "type": "object",
+        "description": "A stream and what it holds.",
+        "required": [
+          "stream",
+          "conversations",
+          "unread"
+        ],
+        "properties": {
+          "conversations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations in it that are still in the inbox.",
+            "minimum": 0
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The stream."
+          },
+          "unread": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, the ones with an unread message.",
+            "minimum": 0
+          }
+        }
+      },
+      "StreamCounts": {
         "type": "object",
         "description": "Every built-in stream, in display order (Primary first).",
         "required": [
@@ -6434,7 +6461,7 @@
           "streams": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/StreamView"
+              "$ref": "#/components/schemas/StreamCount"
             },
             "description": "The streams, each listed even when empty."
           }

@@ -55,5 +55,10 @@
   },
   "navigation": {
     "main": "Principale"
+  },
+  "conversation": {
+    "unread": "Non lue",
+    "starred": "Suivie",
+    "attachment": "Contient des pièces jointes"
   }
 }

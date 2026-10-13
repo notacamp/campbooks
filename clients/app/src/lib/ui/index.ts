@@ -81,8 +81,10 @@ export { Kbd, KbdHint, type KbdHintProps } from "./components/Kbd/Kbd";
 export { List, ListRow, type ListRowProps } from "./components/List/List";
 export {
   Attachment,
+  FoldedMessage,
   MessageCard,
   MetaLine,
+  type FoldedMessageProps,
   type MessageCardProps,
 } from "./components/Message/Message";
 export { NavItem, type NavItemProps } from "./components/NavItem/NavItem";
@@ -136,6 +138,7 @@ export {
   type AccountButtonProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
+export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
 export { TabBar, type TabBarItem, type TabBarProps } from "./components/TabBar/TabBar";

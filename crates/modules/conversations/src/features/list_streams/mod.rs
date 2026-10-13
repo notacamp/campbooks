@@ -27,7 +27,7 @@ pub struct StreamsQuery {
 
 /// A stream and what it holds.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct StreamView {
+pub struct StreamCount {
     /// The stream.
     pub stream: Stream,
     /// Conversations in it that are still in the inbox.
@@ -38,9 +38,9 @@ pub struct StreamView {
 
 /// Every built-in stream, in display order (Primary first).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct StreamList {
+pub struct StreamCounts {
     /// The streams, each listed even when empty.
-    pub streams: Vec<StreamView>,
+    pub streams: Vec<StreamCount>,
 }
 
 /// List the streams and their counts.
@@ -53,7 +53,7 @@ pub struct StreamList {
     extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), StreamsQuery),
     responses(
-        (status = OK, description = "The streams.", body = StreamList),
+        (status = OK, description = "The streams.", body = StreamCounts),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope.", body = Problem,
@@ -66,7 +66,7 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsRead>,
     extract::Query(query): extract::Query<StreamsQuery>,
-) -> Result<Json<StreamList>> {
+) -> Result<Json<StreamCounts>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
@@ -94,14 +94,14 @@ pub async fn handler(
         .into_iter()
         .map(|stream| {
             let row = rows.iter().find(|row| row.stream == stream.as_str());
-            StreamView {
+            StreamCount {
                 stream,
                 conversations: row.map_or(0, |r| count(r.conversations)),
                 unread: row.map_or(0, |r| count(r.unread)),
             }
         })
         .collect();
-    Ok(Json(StreamList { streams }))
+    Ok(Json(StreamCounts { streams }))
 }
 
 #[cfg(test)]

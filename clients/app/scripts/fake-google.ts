@@ -177,7 +177,11 @@ const server = createServer((request, response) => {
           return;
         }
         const issued = issueTokens(sub, refresh);
-        json(response, 200, { access_token: issued.access, expires_in: 3599, token_type: "Bearer" });
+        json(response, 200, {
+          access_token: issued.access,
+          expires_in: 3599,
+          token_type: "Bearer",
+        });
         return;
       }
       const grant = codes.get(form.get("code") ?? "");

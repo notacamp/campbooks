@@ -5,7 +5,7 @@ import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { buildConnectorsRoutes } from "~/modules/connectors";
-import { buildConversationsRoutes } from "~/modules/conversations";
+import { buildConversationsRoutes, CONVERSATIONS_SHORTCUTS } from "~/modules/conversations";
 import { buildSystemRoutes } from "~/modules/system";
 import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
 
@@ -35,4 +35,7 @@ export function buildModuleRoutes<TRoot extends AnyRoute, TWorkspace extends Any
 }
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
-export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [...WORKSPACES_SHORTCUTS];
+export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
+  ...WORKSPACES_SHORTCUTS,
+  ...CONVERSATIONS_SHORTCUTS,
+];

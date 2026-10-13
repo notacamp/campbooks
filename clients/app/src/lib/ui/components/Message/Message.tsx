@@ -12,9 +12,20 @@ export interface MessageCardProps {
   time: string;
   /** ISO timestamp for the <time> element. */
   dateTime?: string | undefined;
-  /** Plain text. Untrusted HTML bodies render through lib/ui/safe-html, never here. */
+  /** Who it went to: "To Sam Rivera, cc Leo Brandt". */
+  recipients?: string | undefined;
+  /**
+   * Plain text, shown as a paragraph. With `rich`, any block content (a
+   * {@link SafeHtml} frame for an HTML body): untrusted HTML renders only
+   * through lib/ui/safe-html, never here.
+   */
   children: ReactNode;
+  rich?: boolean | undefined;
   attachment?: string | undefined;
+  /** Several attached files. */
+  attachments?: readonly string[] | undefined;
+  /** Actions for this one message ("Show images"), under the body. */
+  actions?: ReactNode | undefined;
 }
 
 /** One message of a conversation. */
@@ -23,9 +34,14 @@ export function MessageCard({
   avatar,
   time,
   dateTime,
+  recipients,
   children,
+  rich = false,
   attachment,
+  attachments = [],
+  actions,
 }: MessageCardProps) {
+  const files = attachment === undefined ? attachments : [attachment, ...attachments];
   return (
     <article className={styles["message"]}>
       <Avatar name={from} {...avatar} />
@@ -36,10 +52,54 @@ export function MessageCard({
             {time}
           </time>
         </div>
-        <p className={styles["text"]}>{children}</p>
-        {attachment === undefined ? null : <Attachment name={attachment} />}
+        {recipients === undefined ? null : <p className={styles["recipients"]}>{recipients}</p>}
+        {rich ? (
+          <div className={styles["rich"]}>{children}</div>
+        ) : (
+          <p className={styles["text"]}>{children}</p>
+        )}
+        {actions === undefined ? null : <div className={styles["actions"]}>{actions}</div>}
+        {files.length === 0 ? null : (
+          <div className={styles["files"]}>
+            {files.map((name, index) => (
+              <Attachment key={`${name}-${String(index)}`} name={name} />
+            ))}
+          </div>
+        )}
       </div>
     </article>
+  );
+}
+
+export interface FoldedMessageProps {
+  from: string;
+  avatar?: Pick<AvatarProps, "kind" | "initials"> | undefined;
+  time: string;
+  dateTime?: string | undefined;
+  /** The start of its text. */
+  snippet: string;
+  /** Unfold it. */
+  onOpen: () => void;
+}
+
+/** An older message of a thread, folded to one line until opened. */
+export function FoldedMessage({
+  from,
+  avatar,
+  time,
+  dateTime,
+  snippet,
+  onOpen,
+}: FoldedMessageProps) {
+  return (
+    <button type="button" className={styles["folded"]} onClick={onOpen} aria-expanded={false}>
+      <Avatar name={from} size="sm" {...avatar} />
+      <b className={styles["from"]}>{from}</b>
+      <span className={styles["foldedSnippet"]}>{snippet}</span>
+      <time className={styles["time"]} dateTime={dateTime}>
+        {time}
+      </time>
+    </button>
   );
 }
 

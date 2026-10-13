@@ -239,6 +239,11 @@
   .readerBody {
     padding: var(--space-4);
   }
+
+  .listPane[data-narrow="hidden"],
+  .reader[data-narrow="hidden"] {
+    display: none;
+  }
 }
 
 /* Phones navigate with the tab bar instead of the sidebar. */
