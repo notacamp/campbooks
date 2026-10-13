@@ -155,5 +155,72 @@
       "title": "Não foi possível aceitar o convite",
       "lead": "O Campbooks não respondeu. Nada mudou."
     }
+  },
+  "admin": {
+    "open": "Abrir",
+    "openLabel": "Abrir {{name}}",
+    "retry": "Tentar novamente",
+    "more": "Mostrar mais",
+    "loadingMore": "A carregar mais…",
+    "loadErrorLead": "O servidor não respondeu. Verifique a ligação e tente novamente.",
+    "workspaceCount_one": "{{count}} espaço de trabalho",
+    "workspaceCount_other": "{{count}} espaços de trabalho",
+    "memberCount_one": "{{count}} membro",
+    "memberCount_other": "{{count}} membros",
+    "deletedOn": "Eliminado a {{date}}",
+    "people": {
+      "title": "Pessoas",
+      "lead": "Todas as pessoas que iniciaram sessão neste Campbooks, das mais recentes para as mais antigas. Vê quem são e onde estão, nunca o seu correio nem os seus documentos.",
+      "search": "Pesquisar pessoas",
+      "searchPlaceholder": "Início de um nome ou endereço de email",
+      "list": "Pessoas",
+      "loading": "A carregar pessoas…",
+      "empty": "Ainda ninguém iniciou sessão.",
+      "noMatch": "Nenhum nome ou endereço de email começa por “{{search}}”.",
+      "loadError": "Não foi possível carregar as pessoas",
+      "joined": "Entrou a {{date}}",
+      "back": "Todas as pessoas"
+    },
+    "person": {
+      "loading": "A carregar…",
+      "notFound": "Esta pessoa não está aqui",
+      "notFoundLead": "Ninguém com esta ligação iniciou sessão neste Campbooks.",
+      "loadError": "Não foi possível carregar esta pessoa",
+      "email": "Endereço de email",
+      "noEmail": "Nenhum indicado",
+      "firstSignIn": "Primeiro início de sessão",
+      "workspaces": "Espaços de trabalho",
+      "workspacesOf": "Espaços de trabalho de {{name}}",
+      "noWorkspaces": "Ainda não está em nenhum espaço de trabalho.",
+      "joined": "Entrou a {{date}}"
+    },
+    "workspaces": {
+      "title": "Espaços de trabalho",
+      "lead": "Todos os espaços de trabalho deste Campbooks, dos mais recentes para os mais antigos, e quem está em cada um. Nunca o que têm dentro.",
+      "search": "Pesquisar espaços de trabalho",
+      "searchPlaceholder": "Início do nome de um espaço de trabalho",
+      "list": "Espaços de trabalho",
+      "loading": "A carregar espaços de trabalho…",
+      "empty": "Ainda não há espaços de trabalho.",
+      "noMatch": "Nenhum espaço de trabalho tem um nome que comece por “{{search}}”.",
+      "loadError": "Não foi possível carregar os espaços de trabalho",
+      "created": "Criado a {{date}}",
+      "back": "Todos os espaços de trabalho"
+    },
+    "workspace": {
+      "loading": "A carregar…",
+      "notFound": "Este espaço de trabalho não está aqui",
+      "notFoundLead": "Nenhum espaço de trabalho deste Campbooks tem esta ligação.",
+      "loadError": "Não foi possível carregar este espaço de trabalho",
+      "state": "Estado",
+      "active": "Ativo",
+      "purgedLater": "Os dados são apagados definitivamente depois do período de espera.",
+      "kind": "Tipo",
+      "created": "Criado",
+      "members": "Membros",
+      "pendingInvitations": "Convites pendentes",
+      "invitationCount_one": "{{count}} convite",
+      "invitationCount_other": "{{count}} convites"
+    }
   }
 }

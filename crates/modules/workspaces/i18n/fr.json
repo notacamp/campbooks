@@ -11,6 +11,8 @@
     "signup_invite_only": "Sur cette instance, les nouveaux comptes se créent uniquement sur invitation.",
     "signup_requires_approval": "Votre demande d’inscription a été envoyée. Un administrateur doit l’approuver avant que vous puissiez créer un espace de travail.",
     "signup_code_invalid": "Ce code d’inscription n’est pas valide.",
-    "last_owner": "Un espace de travail doit avoir au moins un propriétaire. Désignez d’abord une autre personne comme propriétaire."
+    "last_owner": "Un espace de travail doit avoir au moins un propriétaire. Désignez d’abord une autre personne comme propriétaire.",
+    "invalid_cursor": "Ce lien de page n’est pas valide. Recommencez à la première page.",
+    "query_too_long": "La recherche peut contenir au maximum {{max}} caractères."
   }
 }

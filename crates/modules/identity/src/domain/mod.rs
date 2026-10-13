@@ -7,5 +7,6 @@ pub mod keys;
 pub mod links;
 pub mod sessions;
 pub mod step_up;
+pub mod suspension;
 pub mod tokens;
 pub mod ways_in;

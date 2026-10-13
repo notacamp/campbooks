@@ -1,6 +1,10 @@
 //! One folder per use case.
 
 pub mod accept_invitation;
+pub mod admin_get_user;
+pub mod admin_get_workspace;
+pub mod admin_list_users;
+pub mod admin_list_workspaces;
 pub mod change_role;
 pub mod create_workspace;
 pub mod delete_workspace;

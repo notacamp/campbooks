@@ -1,0 +1,86 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT u.id AS \"id: UserId\", u.idp_subject, u.display_name, u.email, u.created_at,\n               (SELECT count(*) FROM workspaces.members m\n                  JOIN workspaces.workspaces w ON w.id = m.workspace_id\n                 WHERE m.user_id = u.id AND w.deleted_at IS NULL) AS \"workspace_count!\"\n          FROM workspaces.users u\n         WHERE ($1::text IS NULL OR u.display_name ILIKE $1 OR u.email ILIKE $1)\n           AND ($2::timestamptz IS NULL OR (u.created_at, u.id) < ($2, $3))\n         ORDER BY u.created_at DESC, u.id DESC\n         LIMIT $4\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "idp_subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "idp_subject"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "display_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "created_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "created_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "workspace_count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Timestamptz",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true,
+      false,
+      null
+    ]
+  },
+  "hash": "d5d69a0014f70636694ad1a16530c766867e6e431e40a93b9df9d4ada5597dc9"
+}

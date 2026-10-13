@@ -12,6 +12,7 @@
     "step_up_required": "Vuelve a iniciar sesión primero: para cambiar cómo inicias sesión hace falta haber iniciado sesión en los últimos diez minutos.",
     "last_way_in": "Es la única forma de iniciar sesión, así que no se puede quitar. Añade otra primero.",
     "link_incomplete": "Indica el proveedor, el espacio de trabajo o el buzón al que se refiere.",
-    "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia."
+    "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia.",
+    "account_is_admin": "Esta cuenta es de un administrador. Revoca primero su perfil de administrador desde la línea de comandos del servidor (campbooks-server admin revoke) y después suspéndela."
   }
 }

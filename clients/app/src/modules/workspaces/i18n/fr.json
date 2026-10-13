@@ -155,5 +155,72 @@
       "title": "Impossible d’accepter l’invitation",
       "lead": "Campbooks n’a pas répondu. Rien n’a changé."
     }
+  },
+  "admin": {
+    "open": "Ouvrir",
+    "openLabel": "Ouvrir {{name}}",
+    "retry": "Réessayer",
+    "more": "Afficher plus",
+    "loadingMore": "Chargement…",
+    "loadErrorLead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez.",
+    "workspaceCount_one": "{{count}} espace de travail",
+    "workspaceCount_other": "{{count}} espaces de travail",
+    "memberCount_one": "{{count}} membre",
+    "memberCount_other": "{{count}} membres",
+    "deletedOn": "Supprimé le {{date}}",
+    "people": {
+      "title": "Personnes",
+      "lead": "Toutes les personnes qui se sont connectées à ce Campbooks, des plus récentes aux plus anciennes. Vous voyez qui elles sont et où elles se trouvent, jamais leurs e-mails ni leurs documents.",
+      "search": "Rechercher des personnes",
+      "searchPlaceholder": "Début d’un nom ou d’une adresse e-mail",
+      "list": "Personnes",
+      "loading": "Chargement des personnes…",
+      "empty": "Personne ne s’est encore connecté.",
+      "noMatch": "Aucun nom ni aucune adresse e-mail ne commence par « {{search}} ».",
+      "loadError": "Impossible de charger les personnes",
+      "joined": "Depuis le {{date}}",
+      "back": "Toutes les personnes"
+    },
+    "person": {
+      "loading": "Chargement…",
+      "notFound": "Cette personne n’est pas ici",
+      "notFoundLead": "Personne avec ce lien ne s’est connecté à ce Campbooks.",
+      "loadError": "Impossible de charger cette personne",
+      "email": "Adresse e-mail",
+      "noEmail": "Aucune",
+      "firstSignIn": "Première connexion",
+      "workspaces": "Espaces de travail",
+      "workspacesOf": "Espaces de travail de {{name}}",
+      "noWorkspaces": "Dans aucun espace de travail pour l’instant.",
+      "joined": "Membre depuis le {{date}}"
+    },
+    "workspaces": {
+      "title": "Espaces de travail",
+      "lead": "Tous les espaces de travail de ce Campbooks, des plus récents aux plus anciens, et qui s’y trouve. Jamais leur contenu.",
+      "search": "Rechercher des espaces de travail",
+      "searchPlaceholder": "Début du nom d’un espace de travail",
+      "list": "Espaces de travail",
+      "loading": "Chargement des espaces de travail…",
+      "empty": "Aucun espace de travail pour l’instant.",
+      "noMatch": "Aucun espace de travail n’a un nom qui commence par « {{search}} ».",
+      "loadError": "Impossible de charger les espaces de travail",
+      "created": "Créé le {{date}}",
+      "back": "Tous les espaces de travail"
+    },
+    "workspace": {
+      "loading": "Chargement…",
+      "notFound": "Cet espace de travail n’est pas ici",
+      "notFoundLead": "Aucun espace de travail de ce Campbooks n’a ce lien.",
+      "loadError": "Impossible de charger cet espace de travail",
+      "state": "État",
+      "active": "Actif",
+      "purgedLater": "Ses données sont supprimées définitivement après le délai d’attente.",
+      "kind": "Type",
+      "created": "Créé",
+      "members": "Membres",
+      "pendingInvitations": "Invitations en attente",
+      "invitationCount_one": "{{count}} invitation",
+      "invitationCount_other": "{{count}} invitations"
+    }
   }
 }

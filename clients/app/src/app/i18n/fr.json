@@ -62,7 +62,9 @@
     "opening": "Ouverture de l’administration…",
     "back": "Retour à Campbooks",
     "sections": {
-      "system": "Système"
+      "system": "Système",
+      "people": "Personnes",
+      "workspaces": "Espaces de travail"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Reconnectez-vous pour continuer",

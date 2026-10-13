@@ -197,7 +197,7 @@ pub struct WayIn {
 }
 
 /// The provider ways into `account`, oldest first.
-pub async fn ways_in(db: &PgPool, account: Uuid) -> Result<Vec<WayIn>> {
+pub async fn ways_in<'e>(db: impl sqlx::PgExecutor<'e>, account: Uuid) -> Result<Vec<WayIn>> {
     Ok(sqlx::query_as(
         "SELECT id, provider, email_at_link AS email, linked_via, linked_at, last_used_at
            FROM identity.provider_identities

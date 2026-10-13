@@ -11,6 +11,8 @@
     "signup_invite_only": "Nesta instância, só é possível criar contas por convite.",
     "signup_requires_approval": "O seu pedido de adesão foi enviado. Um administrador tem de o aprovar antes de poder criar um espaço de trabalho.",
     "signup_code_invalid": "Este código de registo não é válido.",
-    "last_owner": "Um espaço de trabalho precisa de pelo menos um proprietário. Torne primeiro outra pessoa proprietária."
+    "last_owner": "Um espaço de trabalho precisa de pelo menos um proprietário. Torne primeiro outra pessoa proprietária.",
+    "invalid_cursor": "Esta ligação de página não é válida. Recomece pela primeira página.",
+    "query_too_long": "A pesquisa pode ter no máximo {{max}} carateres."
   }
 }

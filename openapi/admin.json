@@ -10,6 +10,271 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/admin/v1/connectors/workspaces/{workspace_id}/connections": {
+      "get": {
+        "tags": [
+          "connectors"
+        ],
+        "summary": "See a workspace's connections and how they sync.",
+        "operationId": "connectors.admin_list_connections",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace's connections (none for an unknown workspace).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminConnectionList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `workspaces.read` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "workspaces.read"
+        }
+      }
+    },
+    "/admin/v1/identity/accounts/{account_id}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "See one account.",
+        "operationId": "identity.admin_get_account",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "description": "The account (a token `sub`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account (or another identity provider serves the instance), or not an administrator with `users.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "users.read"
+        }
+      }
+    },
+    "/admin/v1/identity/accounts/{account_id}/suspend": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Suspend an account.",
+        "operationId": "identity.admin_suspend_account",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "description": "The account (a token `sub`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account, suspended (now or before).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account, or not an administrator with `users.suspend`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`account_is_admin`: the account has an admin profile; revoke it with `campbooks-server admin revoke` first.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "users.suspend"
+        }
+      }
+    },
+    "/admin/v1/identity/accounts/{account_id}/unsuspend": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Unsuspend an account.",
+        "operationId": "identity.admin_unsuspend_account",
+        "parameters": [
+          {
+            "name": "account_id",
+            "in": "path",
+            "description": "The account (a token `sub`).",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The account, not suspended (now or before).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccount"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such account, or not an administrator with `users.suspend`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "users.suspend"
+        }
+      }
+    },
     "/admin/v1/system/overview": {
       "get": {
         "tags": [
@@ -61,10 +326,472 @@
           "permission": "system.read"
         }
       }
+    },
+    "/admin/v1/workspaces/users": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List people.",
+        "operationId": "workspaces.admin_list_users",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only rows whose name or address starts with this (case-insensitive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The `next` cursor of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many rows: 1 to 200, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of people.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `users.read` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "users.read"
+        }
+      }
+    },
+    "/admin/v1/workspaces/users/{user_id}": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "See one person.",
+        "operationId": "workspaces.admin_get_user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "description": "The user.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/UserId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person and their workspaces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such user, or not an administrator with `users.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "users.read"
+        }
+      }
+    },
+    "/admin/v1/workspaces/workspaces": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "List workspaces.",
+        "operationId": "workspaces.admin_list_workspaces",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Only rows whose name or address starts with this (case-insensitive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The `next` cursor of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many rows: 1 to 200, default 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of workspaces.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkspacePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `workspaces.read` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "workspaces.read"
+        }
+      }
+    },
+    "/admin/v1/workspaces/workspaces/{workspace_id}": {
+      "get": {
+        "tags": [
+          "workspaces"
+        ],
+        "summary": "See one workspace.",
+        "operationId": "workspaces.admin_get_workspace",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace and its members.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminWorkspaceDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or not an administrator with `workspaces.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "workspaces.read"
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AdminAccount": {
+        "type": "object",
+        "description": "An identity account, as an administrator sees it.",
+        "required": [
+          "id",
+          "primary_email_verified",
+          "created_at",
+          "ways_in",
+          "passkeys",
+          "sessions"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display name."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          },
+          "passkeys": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many passkeys it has."
+          },
+          "primary_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address it was created with."
+          },
+          "primary_email_verified": {
+            "type": "boolean",
+            "description": "Whether a provider verified that address."
+          },
+          "sessions": {
+            "$ref": "#/components/schemas/AdminSessions",
+            "description": "Its sign-ins."
+          },
+          "suspended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When an administrator suspended it; absent unless suspended."
+          },
+          "ways_in": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWayIn"
+            },
+            "description": "Its provider ways in, oldest first."
+          }
+        }
+      },
+      "AdminConnection": {
+        "type": "object",
+        "description": "A connection, as an administrator sees it.",
+        "required": [
+          "id",
+          "provider",
+          "address",
+          "granted_by",
+          "capabilities",
+          "health",
+          "health_changed_at",
+          "created_at",
+          "streams"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The connected account's address."
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Capability"
+            },
+            "description": "What it lets Campbooks do."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was connected."
+          },
+          "granted_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member who connected it."
+          },
+          "health": {
+            "$ref": "#/components/schemas/Health",
+            "description": "How it is doing."
+          },
+          "health_changed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Since when it has had this health."
+          },
+          "health_reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …)."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ConnectionId",
+            "description": "The connection."
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Provider",
+            "description": "The provider."
+          },
+          "streams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminStream"
+            },
+            "description": "Its change streams."
+          }
+        }
+      },
+      "AdminConnectionList": {
+        "type": "object",
+        "description": "A workspace's connections.",
+        "required": [
+          "connections"
+        ],
+        "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminConnection"
+            },
+            "description": "Oldest first."
+          }
+        }
+      },
       "AdminOverview": {
         "type": "object",
         "description": "The instance at a glance, for administrators.",
@@ -118,6 +845,335 @@
             "type": "string",
             "description": "Semantic version of the server.",
             "example": "0.1.0"
+          }
+        }
+      },
+      "AdminSessions": {
+        "type": "object",
+        "description": "The account's sign-ins.",
+        "required": [
+          "active"
+        ],
+        "properties": {
+          "active": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Browsers signed in to the issuer right now."
+          },
+          "last_sign_in_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the person last signed in."
+          }
+        }
+      },
+      "AdminStream": {
+        "type": "object",
+        "description": "A stream's sync state, as an administrator sees it.",
+        "required": [
+          "capability",
+          "phase",
+          "paused",
+          "consecutive_failures"
+        ],
+        "properties": {
+          "capability": {
+            "$ref": "#/components/schemas/Capability",
+            "description": "The capability it reads."
+          },
+          "consecutive_failures": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many runs in a row failed."
+          },
+          "last_synced_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a run last finished."
+          },
+          "paused": {
+            "type": "boolean",
+            "description": "Paused until the member connects again."
+          },
+          "phase": {
+            "$ref": "#/components/schemas/Phase",
+            "description": "Where it is in its reading."
+          }
+        }
+      },
+      "AdminUser": {
+        "type": "object",
+        "description": "A person, as an administrator sees them.",
+        "required": [
+          "id",
+          "account_id",
+          "created_at",
+          "workspace_count"
+        ],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "description": "Their identity account (the `sub` of their tokens), for the identity\nmodule's admin view of the account."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When they first signed in."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name, as their identity provider gives it."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their email address, as their identity provider gives it."
+          },
+          "id": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user."
+          },
+          "workspace_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many workspaces they belong to (not counting deleted ones)."
+          }
+        }
+      },
+      "AdminUserDetail": {
+        "type": "object",
+        "description": "A person and their workspaces.",
+        "required": [
+          "user",
+          "workspaces"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AdminUser",
+            "description": "Who they are."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserWorkspace"
+            },
+            "description": "Their workspaces, in the order they joined."
+          }
+        }
+      },
+      "AdminUserPage": {
+        "type": "object",
+        "description": "One page of people.",
+        "required": [
+          "users"
+        ],
+        "properties": {
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `after` of the next page; absent on the last one."
+          },
+          "users": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUser"
+            },
+            "description": "Newest first."
+          }
+        }
+      },
+      "AdminUserWorkspace": {
+        "type": "object",
+        "description": "One of a person's workspaces.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "role",
+          "joined_at"
+        ],
+        "properties": {
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was deleted (it is purged later); absent while it lives."
+          },
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When they joined."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind",
+            "description": "What it is for."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their role in it."
+          }
+        }
+      },
+      "AdminWayIn": {
+        "type": "object",
+        "description": "A way in, as an administrator sees it.",
+        "required": [
+          "provider",
+          "linked_via",
+          "linked_at"
+        ],
+        "properties": {
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The address the provider gave when it was added."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was last used to sign in."
+          },
+          "linked_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "linked_via": {
+            "type": "string",
+            "description": "`sign_up`, `link` or `connect`."
+          },
+          "provider": {
+            "type": "string",
+            "description": "`google`, `microsoft` or `zoho`."
+          }
+        }
+      },
+      "AdminWorkspace": {
+        "type": "object",
+        "description": "A workspace, as an administrator sees it.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "created_at",
+          "member_count",
+          "owner_ids"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was created."
+          },
+          "deleted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was deleted (it is purged later); absent while it lives."
+          },
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/Kind",
+            "description": "What it is for."
+          },
+          "member_count": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many members it has."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "owner_ids": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserId"
+            },
+            "description": "Its owners."
+          }
+        }
+      },
+      "AdminWorkspaceDetail": {
+        "type": "object",
+        "description": "A workspace and who is in it.",
+        "required": [
+          "workspace",
+          "members",
+          "pending_invitations"
+        ],
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemberView"
+            },
+            "description": "Its members, in the order they joined."
+          },
+          "pending_invitations": {
+            "type": "integer",
+            "format": "int64",
+            "description": "How many invitations are pending (not accepted, not expired)."
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/AdminWorkspace",
+            "description": "The workspace."
+          }
+        }
+      },
+      "AdminWorkspacePage": {
+        "type": "object",
+        "description": "One page of workspaces.",
+        "required": [
+          "workspaces"
+        ],
+        "properties": {
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The `after` of the next page; absent on the last one."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminWorkspace"
+            },
+            "description": "Newest first."
           }
         }
       },
@@ -198,6 +1254,16 @@
           "s3"
         ]
       },
+      "Capability": {
+        "type": "string",
+        "description": "What a connection lets Campbooks do with the account.",
+        "enum": [
+          "messages",
+          "calendar",
+          "files",
+          "bank"
+        ]
+      },
       "ConfigSummary": {
         "type": "object",
         "description": "The non-secret facts of a [`Config`] an administrator sees\n([`Config::summary`]).",
@@ -252,6 +1318,11 @@
             "description": "`CAMPBOOKS_SIGNUP__POLICY` (never the codes)."
           }
         }
+      },
+      "ConnectionId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ConnectionId (UUIDv7)"
       },
       "DatabaseLogins": {
         "type": "string",
@@ -343,6 +1414,16 @@
           }
         }
       },
+      "Health": {
+        "type": "string",
+        "description": "How a connection is doing.",
+        "enum": [
+          "ok",
+          "needs_reauth",
+          "throttled",
+          "failing"
+        ]
+      },
       "IdentityProvider": {
         "type": "string",
         "description": "Which identity provider issues this instance's tokens (ADR 0014).",
@@ -352,12 +1433,67 @@
           "none"
         ]
       },
+      "Kind": {
+        "type": "string",
+        "description": "What a workspace is for.",
+        "enum": [
+          "business",
+          "personal"
+        ]
+      },
+      "MemberView": {
+        "type": "object",
+        "description": "A member of a workspace.",
+        "required": [
+          "user_id",
+          "role",
+          "joined_at"
+        ],
+        "properties": {
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their name, as their identity provider gives it."
+          },
+          "email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their email address, as their identity provider gives it."
+          },
+          "joined_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When they joined."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "Their role."
+          },
+          "user_id": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user."
+          }
+        }
+      },
       "Migrations": {
         "type": "string",
         "description": "When schema migrations run.",
         "enum": [
           "on_start",
           "separately"
+        ]
+      },
+      "Phase": {
+        "type": "string",
+        "description": "Where a stream is in its reading.",
+        "enum": [
+          "backfill",
+          "incremental",
+          "resync"
         ]
       },
       "Problem": {
@@ -402,6 +1538,22 @@
           "type": "about:blank"
         }
       },
+      "Provider": {
+        "type": "string",
+        "description": "An outside provider.",
+        "enum": [
+          "google"
+        ]
+      },
+      "Role": {
+        "type": "string",
+        "description": "A member's role in a workspace.",
+        "enum": [
+          "owner",
+          "admin",
+          "member"
+        ]
+      },
       "SignupPolicy": {
         "type": "string",
         "description": "Who may create a workspace when they are not a member of any yet.",
@@ -411,6 +1563,16 @@
           "approval",
           "code"
         ]
+      },
+      "UserId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "UserId (UUIDv7)"
+      },
+      "WorkspaceId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "WorkspaceId (UUIDv7)"
       }
     },
     "securitySchemes": {

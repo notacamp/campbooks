@@ -480,10 +480,12 @@ With the built-in issuer:
 ## Administrators
 
 An administrator is a person whose account has an **admin profile** (ADR 0015). They see
-the **Admin** section of the app (account menu → Admin, or `/admin`): today the System
+the **Admin** section of the app (account menu → Admin, or `/admin`): the System
 panel, with the version, uptime, database and migrations, the effective configuration
-(never a secret) and whether each AI role's provider answers. Signups, people, workspaces
-and jobs follow.
+(never a secret) and whether each AI role's provider answers; **People**, everyone who has
+signed in, with their workspaces, how they sign in and a **Suspend** action; and
+**Workspaces**, with their members and each connected mailbox's health. Signups and jobs
+follow.
 
 Profiles exist only through the server's command line, never through the app or the API,
 so becoming an administrator needs shell access to the server. The command connects with
@@ -518,6 +520,9 @@ Permissions are `super` (everything), `system.read`, `signups.review`, `users.re
   the administrator to sign in again.
 - Admin views show metadata only (counts, states, providers, addresses people signed in
   with), never messages or documents, and nobody can act as another person.
+- Suspending someone (`users.suspend`) signs them out everywhere at once and stops every
+  sign-in until they are unsuspended; nothing of theirs is deleted. An administrator cannot
+  be suspended from the app: revoke their profile with `admin revoke` first.
 - With another identity provider (`CAMPBOOKS_AUTH__ISSUER`), give the `admin:access` scope
   only to the web app's client, and make sure access tokens carry `auth_time`; without it
   every admin request asks to sign in again. Campbooks' built-in sign-in does both.

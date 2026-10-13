@@ -11,6 +11,8 @@
     "signup_invite_only": "En esta instancia solo se pueden crear cuentas por invitación.",
     "signup_requires_approval": "Se ha enviado tu solicitud de acceso. Un administrador tiene que aprobarla antes de que puedas crear un espacio de trabajo.",
     "signup_code_invalid": "Este código de registro no es válido.",
-    "last_owner": "Un espacio de trabajo necesita al menos un propietario. Haz propietaria a otra persona primero."
+    "last_owner": "Un espacio de trabajo necesita al menos un propietario. Haz propietaria a otra persona primero.",
+    "invalid_cursor": "Este enlace de página no es válido. Vuelve a empezar desde la primera página.",
+    "query_too_long": "La búsqueda puede tener como máximo {{max}} caracteres."
   }
 }

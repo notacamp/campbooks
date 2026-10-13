@@ -1,0 +1,88 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT connection_id AS \"connection_id: ConnectionId\", capability, phase, paused,\n                  last_synced_at, consecutive_failures\n             FROM connectors.streams\n            WHERE connection_id = ANY($1)\n            ORDER BY capability",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "connection_id: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "connection_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "capability",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "capability"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "phase",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "phase"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "paused",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "last_synced_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "last_synced_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "consecutive_failures",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "consecutive_failures"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "d9bb43d09d41a9d4d5e82626150d2c2ddfcf27db0b81edc1621bd3b2e5e31984"
+}

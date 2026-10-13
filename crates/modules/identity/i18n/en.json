@@ -12,6 +12,7 @@
     "step_up_required": "Sign in again first: changing how you sign in needs a sign-in from the last ten minutes.",
     "last_way_in": "This is the only way you can sign in, so it can't be removed. Add another way first.",
     "link_incomplete": "Say which provider, workspace or mailbox this is for.",
-    "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet."
+    "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet.",
+    "account_is_admin": "This account is an administrator. Revoke its admin profile with the server's command line first (campbooks-server admin revoke), then suspend it."
   }
 }

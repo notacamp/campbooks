@@ -2,7 +2,7 @@
 //! as the runtime role (so row-level security applies, as in production),
 //! a test identity provider, and shortcuts for the common steps.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::{
     Router,
@@ -10,7 +10,11 @@ use axum::{
     http::{Method, Request, header},
 };
 use campbooks_kernel::{
-    AppState,
+    AppState, Error,
+    admin::{
+        ACCESS_SCOPE, AdminAction, AdminAudit, AdminProfiles, AuditFuture, PermissionSet,
+        ProfilesFuture,
+    },
     auth::{Principal, PrincipalKind},
     blobs::BlobStore,
     config::{BlobsConfig, SignupPolicy},
@@ -51,7 +55,50 @@ pub struct Kit {
     /// The state handlers run with: connections as the runtime role.
     pub state: AppState,
     app: Router,
+    admin_app: Router,
+    /// What the admin API recorded.
+    pub trail: Arc<Trail>,
     idp: TestIdp,
+}
+
+/// The administrators of the test world: `root` holds `super`, `people`
+/// only `users.read`, `ops` only `jobs.read`; everyone else none.
+#[derive(Debug, Default)]
+struct Profiles;
+
+impl AdminProfiles for Profiles {
+    fn permissions_of<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> ProfilesFuture<'a> {
+        let names: &[&str] = match account {
+            "root" => &["super"],
+            "people" => &["users.read"],
+            "ops" => &["jobs.read"],
+            _ => &[],
+        };
+        Box::pin(async move { Ok(PermissionSet::from_names(names)) })
+    }
+}
+
+/// The admin audit trail, in memory.
+#[derive(Debug, Default)]
+pub struct Trail(Mutex<Vec<AdminAction>>);
+
+impl Trail {
+    /// `(actor, operation, status)` of every recorded request.
+    pub fn entries(&self) -> Vec<(String, String, u16)> {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .map(|a| (a.actor.clone(), a.operation.clone(), a.status))
+            .collect()
+    }
+}
+
+impl AdminAudit for Trail {
+    fn record<'a>(&'a self, _db: &'a PgPool, action: &'a AdminAction) -> AuditFuture<'a> {
+        self.0.lock().unwrap().push(action.clone());
+        Box::pin(async { Ok::<(), Error>(()) })
+    }
 }
 
 impl Kit {
@@ -75,10 +122,17 @@ impl Kit {
         config.signup.policy = policy;
         config.signup.codes = codes.map(SecretString::from);
         let app = testing::app(crate::module(), state.clone());
+        let trail = Arc::new(Trail::default());
+        let admin_app = testing::admin_app(
+            crate::module(),
+            state.clone().with_admin(Arc::new(Profiles), trail.clone()),
+        );
         Self {
             db,
             state,
             app,
+            admin_app,
+            trail,
             idp,
         }
     }
@@ -130,6 +184,24 @@ impl Kit {
             email: None,
             kind: PrincipalKind::Client,
         }
+    }
+
+    /// A token of `sub` for the admin API: `admin:access`, signed in just
+    /// now. Whether it gets past the profile check depends on `sub`.
+    pub fn admin(&self, sub: &str) -> String {
+        let mut claims = self.idp.claims(&format!("{ALL_SCOPES} {ACCESS_SCOPE}"));
+        claims["sub"] = sub.into();
+        claims["auth_time"] = chrono::Utc::now().timestamp().into();
+        self.idp.token(&claims)
+    }
+
+    /// `GET uri` on the admin API with `token`.
+    pub async fn admin_get(&self, token: &str, uri: &str) -> TestResponse {
+        let request = Request::get(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::empty())
+            .unwrap();
+        testing::send(&self.admin_app, request).await
     }
 
     /// `GET uri` with `token` (none when empty).

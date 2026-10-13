@@ -74,7 +74,13 @@ pub fn module() -> Module {
                 features::invite_member::handler
             ))
             .routes(routes!(features::list_security_events::handler)),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new()
+                .routes(routes!(features::admin_list_users::handler))
+                .routes(routes!(features::admin_get_user::handler))
+                .routes(routes!(features::admin_list_workspaces::handler))
+                .routes(routes!(features::admin_get_workspace::handler)),
+        ),
         background: Background::new()
             .publishes::<events::WorkspaceCreated>()
             .publishes::<events::WorkspaceUpdated>()

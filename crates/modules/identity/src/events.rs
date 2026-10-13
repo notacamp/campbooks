@@ -111,3 +111,23 @@ impl DomainEvent for WayInRemoved {
         None
     }
 }
+
+/// An administrator suspended an account: its sessions ended and its
+/// refresh tokens were revoked, and it cannot sign in until it is
+/// unsuspended. Consumers drop whatever else keeps it signed in (the web
+/// BFF's sessions).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct AccountSuspended {
+    /// The account (the `sub` of its tokens).
+    pub account: Uuid,
+}
+
+impl DomainEvent for AccountSuspended {
+    const NAME: &'static str = "identity.account_suspended";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}

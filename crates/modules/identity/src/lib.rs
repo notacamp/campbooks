@@ -60,13 +60,19 @@ pub fn module(deps: Deps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router().layer(Extension(deps)),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new()
+                .routes(routes!(features::admin_get_account::handler))
+                .routes(routes!(features::admin_suspend_account::handler))
+                .routes(routes!(features::admin_unsuspend_account::handler)),
+        ),
         background: Background::new()
             .publishes::<events::AccountCreated>()
             .publishes::<events::SignedIn>()
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::AccountSuspended>()
             .schedule::<Prune>(PRUNE_EVERY),
     }
 }
@@ -82,6 +88,10 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::start_link::handler))
 }
 
+#[cfg(test)]
+mod admin_testkit;
+#[cfg(test)]
+mod suspension_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
