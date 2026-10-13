@@ -1,4 +1,5 @@
-//! Round trips to the providers people sign in with, and what is kept
+//! Round trips to the providers people sign in with (or link, or connect
+//! a mailbox with), and what is kept
 //! between the start of one and its callback, or between the callback and
 //! the person confirming a new account.
 //!
@@ -8,11 +9,11 @@
 //! keeps the provider's tokens sealed until the account is created, or
 //! until `identity.prune` deletes it.
 
-pub mod google;
+pub mod client;
 
 use campbooks_kernel::{
     Result,
-    crypto::{Cipher, hash},
+    crypto::{Cipher, hash, random_token},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use sqlx::{PgConnection, PgPool};
@@ -25,28 +26,71 @@ pub const FLOW_LIFETIME: TimeDelta = TimeDelta::minutes(10);
 /// How long a pending new account waits for the person to confirm it.
 pub const SIGN_UP_LIFETIME: TimeDelta = TimeDelta::minutes(15);
 
-/// The providers people sign in with. Slice S1a has Google; Microsoft and
-/// Zoho arrive with S2.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The providers people sign in with, in the order the sign-in screen shows
+/// them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Provider {
     /// Google (OIDC).
     Google,
+    /// Microsoft: personal, work and school accounts (OIDC, multi-tenant).
+    Microsoft,
+    /// Zoho, in every data centre (OIDC).
+    Zoho,
 }
 
 impl Provider {
+    /// Every provider, in display order.
+    pub const ALL: [Self; 3] = [Self::Google, Self::Microsoft, Self::Zoho];
+
     /// The wire and database name.
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Google => "google",
+            Self::Microsoft => "microsoft",
+            Self::Zoho => "zoho",
         }
     }
 
     /// The provider named `name`.
     pub fn parse(name: &str) -> Option<Self> {
-        match name {
-            "google" => Some(Self::Google),
-            _ => None,
+        Self::ALL.into_iter().find(|p| p.as_str() == name)
+    }
+}
+
+/// Why a round trip goes to the provider.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Purpose {
+    /// Sign in, or sign up.
+    SignIn,
+    /// Add a way in to the signed-in account.
+    Link,
+    /// Connect a mailbox (and add it as a way in).
+    Connect,
+    /// Re-authorise a connected mailbox.
+    Reconnect,
+}
+
+impl Purpose {
+    /// The database name.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SignIn => "sign_in",
+            Self::Link => "link",
+            Self::Connect => "connect",
+            Self::Reconnect => "reconnect",
         }
+    }
+
+    /// The purpose named `name`.
+    pub fn parse(name: &str) -> Option<Self> {
+        [Self::SignIn, Self::Link, Self::Connect, Self::Reconnect]
+            .into_iter()
+            .find(|p| p.as_str() == name)
+    }
+
+    /// Whether the round trip also brings a mailbox grant.
+    pub const fn wants_mailbox(self) -> bool {
+        matches!(self, Self::Connect | Self::Reconnect)
     }
 }
 
@@ -55,6 +99,14 @@ impl Provider {
 pub struct Flow {
     /// The provider.
     pub provider: Provider,
+    /// Why.
+    pub purpose: Purpose,
+    /// The signed-in account a link, connect or reconnect is for.
+    pub account_id: Option<Uuid>,
+    /// The workspace a connect or reconnect is for.
+    pub workspace_id: Option<Uuid>,
+    /// The connection a reconnect re-authorises.
+    pub connection_id: Option<String>,
     /// The `/oauth2/authorize` request to complete afterwards.
     pub request_id: Option<String>,
     /// Same-origin path to land on when there is no request to complete.
@@ -65,6 +117,24 @@ pub struct Flow {
     pub code_verifier: String,
     /// Whether this round trip already asked for consent again.
     pub consent_retry: bool,
+}
+
+impl Flow {
+    /// A sign-in round trip for `provider`.
+    pub fn sign_in(provider: Provider, request_id: Option<String>, return_to: String) -> Self {
+        Self {
+            provider,
+            purpose: Purpose::SignIn,
+            account_id: None,
+            workspace_id: None,
+            connection_id: None,
+            request_id,
+            return_to,
+            nonce: random_token(),
+            code_verifier: random_token(),
+            consent_retry: false,
+        }
+    }
 }
 
 fn verifier_context(state_hash: &[u8]) -> Vec<u8> {
@@ -86,13 +156,18 @@ pub async fn store_flow(
     let state_hash = hash(state);
     sqlx::query(
         "INSERT INTO identity.upstream_flows
-             (state_hash, browser_hash, provider, purpose, request_id, return_to, nonce,
-              code_verifier, consent_retry, created_at, expires_at)
-         VALUES ($1, $2, $3, 'sign_in', $4, $5, $6, $7, $8, $9, $10)",
+             (state_hash, browser_hash, provider, purpose, account_id, workspace_id,
+              connection_id, request_id, return_to, nonce, code_verifier, consent_retry,
+              created_at, expires_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)",
     )
     .bind(&state_hash)
     .bind(hash(browser_token))
     .bind(flow.provider.as_str())
+    .bind(flow.purpose.as_str())
+    .bind(flow.account_id)
+    .bind(flow.workspace_id)
+    .bind(&flow.connection_id)
     .bind(&flow.request_id)
     .bind(&flow.return_to)
     .bind(&flow.nonce)
@@ -119,6 +194,10 @@ pub async fn take_flow(
     struct Row {
         browser_hash: Vec<u8>,
         provider: String,
+        purpose: String,
+        account_id: Option<Uuid>,
+        workspace_id: Option<Uuid>,
+        connection_id: Option<String>,
         request_id: Option<String>,
         return_to: String,
         nonce: String,
@@ -130,8 +209,8 @@ pub async fn take_flow(
     // Deleted whether or not it matches: a state is tried once.
     let row: Option<Row> = sqlx::query_as(
         "DELETE FROM identity.upstream_flows WHERE state_hash = $1
-         RETURNING browser_hash, provider, request_id, return_to, nonce, code_verifier,
-                   consent_retry, expires_at",
+         RETURNING browser_hash, provider, purpose, account_id, workspace_id, connection_id,
+                   request_id, return_to, nonce, code_verifier, consent_retry, expires_at",
     )
     .bind(&state_hash)
     .fetch_optional(db)
@@ -148,8 +227,15 @@ pub async fn take_flow(
     let Ok(code_verifier) = cipher.open(&row.code_verifier, &verifier_context(&state_hash)) else {
         return Ok(None);
     };
+    let Some(purpose) = Purpose::parse(&row.purpose) else {
+        return Ok(None);
+    };
     Ok(Some(Flow {
         provider,
+        purpose,
+        account_id: row.account_id,
+        workspace_id: row.workspace_id,
+        connection_id: row.connection_id,
         request_id: row.request_id,
         return_to: row.return_to,
         nonce: row.nonce,

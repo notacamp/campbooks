@@ -28,6 +28,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod consent;
 pub mod deps;
 pub mod domain;
 pub mod events;
@@ -38,6 +39,7 @@ pub mod scopes;
 pub mod upstream;
 mod web;
 
+pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
 pub use prune::{PRUNE_EVERY, Prune};
@@ -71,9 +73,14 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_held_grants::handler))
         .routes(routes!(features::discard_held_grant::handler))
         .routes(routes!(features::adopt_held_grant::handler))
+        .routes(routes!(features::list_ways_in::handler))
+        .routes(routes!(features::remove_way_in::handler))
+        .routes(routes!(features::start_link::handler))
 }
 
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod ways_in_tests;
