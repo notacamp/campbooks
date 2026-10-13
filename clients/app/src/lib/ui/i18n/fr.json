@@ -89,5 +89,13 @@
     "discard": "Supprimer",
     "send": "Envoyer",
     "close": "Fermer"
+  },
+  "attachments": {
+    "label": "Pièces jointes",
+    "count_one": "{{count}} pièce jointe",
+    "count_other": "{{count}} pièces jointes",
+    "previewOf": "Aperçu de {{name}}",
+    "downloadOf": "Télécharger {{name}}",
+    "previewTitle": "Aperçu de {{name}}"
   }
 }

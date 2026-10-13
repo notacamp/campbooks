@@ -106,7 +106,8 @@
               "filename": { "type": "string" },
               "content_type": { "type": "string" },
               "blob": { "$ref": "#/$defs/blobRef" },
-              "inline": { "type": "boolean" }
+              "inline": { "type": "boolean" },
+              "content_id": { "type": "string", "maxLength": 255, "description": "The part's Content-ID without angle brackets: what the HTML part's cid: images name. At most 255 characters; a longer one is left out." }
             }
           }
         },

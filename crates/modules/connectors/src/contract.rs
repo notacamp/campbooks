@@ -144,6 +144,10 @@ pub struct Attachment {
     pub blob: BlobRef,
     /// Shown inside the body rather than attached.
     pub inline: bool,
+    /// Its `Content-ID`, without angle brackets: what the body's `cid:`
+    /// images name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub content_id: Option<String>,
 }
 
 /// Where a message is at the provider.

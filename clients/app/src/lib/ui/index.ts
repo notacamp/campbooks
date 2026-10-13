@@ -30,6 +30,15 @@ export {
 export { UI_NAMESPACES, type UiMessages } from "./messages";
 
 export { ActionBar, type ActionBarProps } from "./components/ActionBar/ActionBar";
+export {
+  AttachmentList,
+  focusNextAttachment,
+  ImagePreview,
+  type AttachmentKind,
+  type AttachmentListItem,
+  type AttachmentListProps,
+  type ImagePreviewProps,
+} from "./components/Attachments/Attachments";
 export { Avatar, avatarHue, initialsOf, type AvatarProps } from "./components/Avatar/Avatar";
 export { Banner, type BannerProps } from "./components/Banner/Banner";
 export {
