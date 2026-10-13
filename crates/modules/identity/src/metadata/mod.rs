@@ -8,17 +8,30 @@
 
 pub mod guard;
 
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    future::Future,
+    pin::Pin,
+    sync::{Arc, Mutex, PoisonError},
+    time::Duration,
+};
 
-use campbooks_kernel::{Result, auth::ScopeInfo};
+use campbooks_kernel::{
+    Result,
+    auth::ScopeInfo,
+    rate_limit::{Limit, RateKey, RateLimits},
+};
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
 use url::Url;
 
-use crate::domain::clients::{
-    self, Client, begin_as_server, is_registrable_redirect, third_party_may_hold,
-    third_party_scopes,
+use crate::domain::{
+    client_names,
+    clients::{
+        self, Client, begin_as_server, default_third_party_scopes, is_registrable_redirect,
+        third_party_may_hold, third_party_scopes,
+    },
 };
 
 pub use guard::{Fetched, Refused};
@@ -29,6 +42,40 @@ pub const MIN_CACHE: Duration = Duration::from_mins(5);
 pub const MAX_CACHE: Duration = Duration::from_hours(24);
 /// Most redirect URIs a document (or a registration) may list.
 pub const MAX_REDIRECT_URIS: usize = 10;
+
+/// How long a document that could not be fetched, or was refused, is not
+/// asked for again.
+pub const FAILURE_TTL: TimeDelta = TimeDelta::minutes(5);
+/// Most failures remembered at once (then the oldest are forgotten).
+const MAX_FAILURES: usize = 10_000;
+/// Documents the whole instance fetches per hour, whoever asks.
+const FETCHES: Limit = Limit::new("identity.metadata_fetch_all", 600, Duration::from_hours(1));
+
+/// Document URLs that recently failed, so a stranger can't make the server
+/// fetch the same bad URL again and again (per process).
+#[derive(Debug, Default)]
+pub struct Failures(Mutex<HashMap<String, DateTime<Utc>>>);
+
+impl Failures {
+    fn recent(&self, url: &Url, now: DateTime<Utc>) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(url.as_str())
+            .is_some_and(|until| *until > now)
+    }
+
+    fn record(&self, url: &Url, now: DateTime<Utc>) {
+        let mut failures = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        if failures.len() >= MAX_FAILURES {
+            failures.retain(|_, until| *until > now);
+            if failures.len() >= MAX_FAILURES {
+                failures.clear();
+            }
+        }
+        failures.insert(url.as_str().to_owned(), now + FAILURE_TTL);
+    }
+}
 
 /// A future returned by a [`Fetcher`].
 pub type FetchFuture<'a> = Pin<Box<dyn Future<Output = Result<Fetched, Refused>> + Send + 'a>>;
@@ -183,18 +230,20 @@ impl Registration {
         }
         let allowed = third_party_scopes(catalogue);
         let scopes = match self.scope {
-            None => allowed,
+            // Reading only, unless it asks for more.
+            None => default_third_party_scopes(catalogue),
             Some(scope) => scope
                 .split_whitespace()
                 .filter(|s| third_party_may_hold(s) && allowed.iter().any(|a| a == s))
                 .map(ToOwned::to_owned)
                 .collect(),
         };
+        // A stranger's name, cleaned; never Campbooks' own (then its host).
         let name = self
             .client_name
-            .map(|name| name.trim().chars().take(100).collect::<String>())
-            .filter(|name| !name.is_empty() && !name.chars().any(char::is_control))
-            .unwrap_or_else(|| fallback_name.chars().take(100).collect());
+            .map(|name| client_names::clean(&name))
+            .filter(|name| !name.is_empty() && !client_names::impersonates_campbooks(name))
+            .unwrap_or_else(|| client_names::clean(fallback_name));
         Ok(Described {
             name,
             redirect_uris: self.redirect_uris,
@@ -209,7 +258,9 @@ impl Registration {
 /// cannot be fetched or is not acceptable (then nothing is cached).
 pub async fn client(
     db: &PgPool,
+    limits: &RateLimits,
     fetcher: &dyn Fetcher,
+    failures: &Failures,
     url: &Url,
     catalogue: &[ScopeInfo],
     now: DateTime<Utc>,
@@ -225,10 +276,17 @@ pub async fn client(
             return Ok(row.into_client());
         }
     }
+    if failures.recent(url, now) {
+        return Ok(None);
+    }
+    limits
+        .check(db, &FETCHES, &RateKey::text("instance"))
+        .await?;
     let document = match fetcher.fetch(url).await {
         Ok(document) => document,
         Err(refused) => {
             tracing::info!(reason = %refused, "a client metadata document was not fetched");
+            failures.record(url, now);
             return Ok(None);
         }
     };
@@ -236,6 +294,7 @@ pub async fn client(
         Ok(described) => described,
         Err(invalid) => {
             tracing::info!(reason = %invalid, "a client metadata document was refused");
+            failures.record(url, now);
             return Ok(None);
         }
     };

@@ -113,8 +113,11 @@ export default async function appsAndConsent({ page }: ScenarioContext): Promise
   await page.mouse.wheel(0, 600);
   await caption(page, "What it may do, in plain words, and on its own device: asked every time");
   await page.getByRole("radio", { name: "Duarte & Pessoa" }).click();
-  await caption(page, "Its token will reach this workspace only. Allow (⌘↵)");
-  await page.keyboard.press("ControlOrMeta+Enter");
+  await caption(
+    page,
+    "Nothing is picked for you, and Allow waits a second. Its token reaches this workspace only",
+  );
+  await page.getByRole("button", { name: "Allow" }).click();
   await page.waitForURL(/code=/u);
   await caption(page, "Back to the agent with a one-time code");
 

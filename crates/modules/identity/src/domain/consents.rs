@@ -24,14 +24,22 @@ pub struct Consent {
     pub scopes: Vec<String>,
     /// Whether later authorizations may skip the screen.
     pub remembered: bool,
+    /// The redirect URI it was given for (a remembered consent covers this
+    /// one only).
+    pub redirect_uri: String,
+    /// Until when it is remembered.
+    pub remember_until: Option<DateTime<Utc>>,
     /// When.
     pub granted_at: DateTime<Utc>,
     /// When a token was last minted under it.
     pub last_used_at: Option<DateTime<Utc>>,
 }
 
-const COLUMNS: &str =
-    "id, client_id, bound_workspace_id, scopes, remembered, granted_at, last_used_at";
+const COLUMNS: &str = "id, client_id, bound_workspace_id, scopes, remembered, redirect_uri, \
+     remember_until, granted_at, last_used_at";
+
+/// How long a remembered consent lets authorizations skip the screen.
+pub const REMEMBER_FOR: chrono::TimeDelta = chrono::TimeDelta::days(90);
 
 /// What a person allowed.
 #[derive(Debug)]
@@ -46,8 +54,10 @@ pub struct NewConsent<'a> {
     pub member: Option<Uuid>,
     /// What.
     pub scopes: &'a [String],
-    /// Whether to skip the screen next time.
+    /// Whether to skip the screen next time (for [`REMEMBER_FOR`]).
     pub remembered: bool,
+    /// The redirect URI it is given for.
+    pub redirect_uri: &'a str,
 }
 
 /// The live consent of `account` for `client`.
@@ -63,6 +73,9 @@ pub async fn live(db: &PgPool, account: Uuid, client: &str) -> Result<Option<Con
 }
 
 /// Record `consent`, replacing the live one of the same person and client.
+/// The client's refresh tokens for that person that were bound to another
+/// workspace, or granted more scopes than this consent allows, stop working
+/// (those within it, such as the same app on another device, keep going).
 /// Its id.
 pub async fn grant(
     conn: &mut PgConnection,
@@ -78,12 +91,25 @@ pub async fn grant(
     .bind(now)
     .execute(&mut *conn)
     .await?;
+    sqlx::query(
+        "UPDATE identity.refresh_families SET revoked_at = $5, revoke_reason = 'consent_replaced'
+          WHERE account_id = $1 AND client_id = $2 AND revoked_at IS NULL
+            AND (bound_workspace_id IS DISTINCT FROM $3
+                 OR NOT (string_to_array(scope, ' ') <@ $4::text[]))",
+    )
+    .bind(consent.account_id)
+    .bind(consent.client_id)
+    .bind(consent.workspace)
+    .bind(consent.scopes)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?;
     let id = Uuid::now_v7();
     sqlx::query(
         "INSERT INTO identity.consents
              (id, account_id, client_id, bound_workspace_id, bound_member_id, scopes, remembered,
-              granted_at, last_used_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)",
+              redirect_uri, remember_until, granted_at, last_used_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)",
     )
     .bind(id)
     .bind(consent.account_id)
@@ -92,10 +118,30 @@ pub async fn grant(
     .bind(consent.member)
     .bind(consent.scopes)
     .bind(consent.remembered)
+    .bind(consent.redirect_uri)
+    .bind(consent.remembered.then_some(now + REMEMBER_FOR))
     .bind(now)
     .execute(conn)
     .await?;
     Ok(id)
+}
+
+/// Whether `account` still has a live consent for `client` bound to
+/// `workspace` and covering every scope of `scope`: what a code or a refresh
+/// token of a client that needs consent still stands on.
+pub async fn covers(
+    db: &PgPool,
+    account: Uuid,
+    client: &str,
+    workspace: Option<Uuid>,
+    scope: &str,
+) -> Result<bool> {
+    Ok(live(db, account, client).await?.is_some_and(|consent| {
+        consent.bound_workspace_id == workspace
+            && scope
+                .split_whitespace()
+                .all(|s| consent.scopes.iter().any(|c| c == s))
+    }))
 }
 
 /// Record that a token was minted under `consent`.

@@ -16,7 +16,7 @@ use crate::{
     MESSAGES,
     deps::Deps,
     domain::{
-        accounts,
+        accounts, client_names,
         clients::{is_registrable_redirect, third_party_may_hold},
         step_up,
         workspace_clients::{self, ClientType, NewClient, WorkspaceClient},
@@ -64,8 +64,8 @@ pub struct RegisteredClient {
     responses(
         (status = CREATED, description = "Registered; a confidential app's secret is shown this \
             once.", body = RegisteredClient),
-        (status = BAD_REQUEST, description = "A bad name, `client_scope_not_allowed` or \
-            `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
+        (status = BAD_REQUEST, description = "A bad name, `client_name_reserved` (it reads as \
+            Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "The token lacks `identity:clients`, the caller is not \
@@ -85,14 +85,18 @@ pub async fn handler(
     workspace_clients::require_admin(&workspace.access)?;
     let now = issuer.now();
     step_up::require_recent(&workspace.principal, now)?;
-    let name = body.name.trim();
-    if name.is_empty() || name.chars().count() > 100 || name.chars().any(char::is_control) {
+    let name = client_names::clean(&body.name);
+    if name.is_empty() || body.name.trim().chars().count() > client_names::MAX_NAME {
         return Err(Error::BadRequest(
             MESSAGES
                 .reason("invalid_client_metadata")
                 .arg("reason", "the name must be 1 to 100 characters"),
         ));
     }
+    if client_names::impersonates_campbooks(&name) {
+        return Err(Error::BadRequest(MESSAGES.reason("client_name_reserved")));
+    }
+    let name = name.as_str();
     let mut scopes: Vec<String> = Vec::new();
     for scope in body.scopes {
         let known = issuer.api_scopes.iter().any(|s| s.name == scope);

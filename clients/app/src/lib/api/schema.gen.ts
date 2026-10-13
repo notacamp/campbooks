@@ -1616,7 +1616,10 @@ export interface components {
             last_used_at?: string | null;
             /** @description What it may do. */
             scopes: string[];
-            /** @description Whether Campbooks or a workspace admin registered it. */
+            /**
+             * @description Whether it is Campbooks' own app (a workspace's app says so by its
+             *     kind; every other name is its registrant's word).
+             */
             verified: boolean;
             /**
              * Format: uuid
@@ -1695,10 +1698,16 @@ export interface components {
              */
             redirect_host?: string | null;
             /**
-             * @description Whether Campbooks or a workspace admin registered it; anyone can
-             *     register the others.
+             * @description Whether it is Campbooks' own app. Every other app's name is its
+             *     registrant's word.
              */
             verified: boolean;
+            /**
+             * @description For a workspace's own app, the workspace that registered it (its
+             *     name, when the person belongs to it): what the screen says instead of
+             *     "verified".
+             */
+            workspace_name?: string | null;
         };
         /** @description What the consent screen shows. */
         ConsentRequest: {
@@ -5534,7 +5543,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegisteredClient"];
                 };
             };
-            /** @description A bad name, `client_scope_not_allowed` or `client_needs_redirect`. */
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
             400: {
                 headers: {
                     [name: string]: unknown;

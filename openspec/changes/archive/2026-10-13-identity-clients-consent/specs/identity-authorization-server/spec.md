@@ -27,7 +27,8 @@ RFC 9207 `iss` response parameter, and
 `/oauth2/authorize` SHALL accept only `response_type=code` with an S256
 `code_challenge`, and only scopes the client may ask for: the OIDC scopes,
 and for Campbooks' own clients every scope of the catalogue, for any other
-client the ones it registered and never an `identity:*` scope. It SHALL
+client the ones it registered and never an `identity:*` scope,
+`workspaces:write`, `workspaces:admin` or `admin:access`. It SHALL
 match `redirect_uri` exactly against the client's registered values, except
 that a loopback redirect matches on any port (RFC 8252 §7.3). For an unknown
 client or an unregistered redirect it SHALL answer 400 and never redirect.
@@ -104,9 +105,15 @@ custom scheme (RFC 8252 §8.6). Its tokens SHALL carry no `workspace_id`.
 Before a client other than `campbooks-web` gets a code, the person SHALL
 allow it on the consent screen, unless a remembered consent covers the
 request. A consent SHALL be remembered only when the client's redirect is an
-exact `https` URI; it SHALL cover later requests for at most the scopes
-allowed and SHALL bind them to the same workspace; `prompt=consent` SHALL
-always show the screen. When the screen is due and the person's sign-in is
+exact `https` URI; it SHALL cover later requests to that same redirect URI,
+for at most the scopes allowed, for 90 days, and SHALL bind them to the same
+workspace; `prompt=consent` SHALL always show the screen. Every code and
+refresh token of such a client SHALL stand on a live consent of the person
+for the same workspace and covering its scopes, checked when it is redeemed
+(`invalid_grant` otherwise); a new consent that replaces one SHALL end the
+client's refresh tokens bound to another workspace or to more scopes. The
+screen SHALL say "verified" for Campbooks' own apps only, and name the
+workspace for a workspace's own app. When the screen is due and the person's sign-in is
 older than ten minutes, the issuer SHALL send them to sign in again first.
 `GET /auth/consent/{request}` SHALL answer only the browser signed in as the
 person the request was put to (404 otherwise) with the client (name, kind,
@@ -144,7 +151,10 @@ A token issued after a consent in a workspace SHALL carry that workspace as
 `workspace_id`. The in-process verifier SHALL keep that claim on a person's
 token (an outside identity provider's user claims stay ignored), and
 `Workspace<S>` SHALL answer 404 for any other workspace, whatever the
-scopes; membership SHALL still be checked.
+scopes; membership SHALL still be checked. Outside a workspace, such a token
+SHALL list that workspace only (`workspaces.list`), and SHALL get 404 from
+creating a workspace, accepting an invitation and every account-wide route
+(`identity.*`).
 
 #### Scenario: Another workspace
 - **WHEN** an agent allowed in Home calls a Work route with its token
@@ -173,7 +183,9 @@ rotating SHALL need a sign-in in the last ten minutes. A confidential client
 SHALL get a 256-bit random secret, returned only in that answer and stored as
 its SHA-256 only, and only the `client_credentials` grant; a public client
 SHALL get code + PKCE with 1 to 10 `https` or loopback redirect URIs. A
-client SHALL never be given an `identity:*` scope (`client_scope_not_allowed`).
+client SHALL never be given a scope a third party may not hold
+(`client_scope_not_allowed`), nor a name that reads as Campbooks or Not A
+Camp (`client_name_reserved`).
 Rotating SHALL stop the old secret at once; removing SHALL end the client's
 consents and refresh tokens. The table SHALL be under forced row-level
 security.
@@ -222,10 +234,13 @@ with `invalid_target`. The issuer SHALL serve RFC 9728 metadata for it at
 10 redirect URIs, each `https` or loopback `http` without fragment or
 userinfo (`invalid_redirect_uri`); `token_endpoint_auth_method` `none` or
 absent, grant types within `authorization_code` and `refresh_token`,
-response types within `code` (`invalid_client_metadata`). It SHALL drop any
-`identity:*` scope, issue no secret and no registration access token, limit
-registrations per client address (429 `rate_limited`), and delete a client
-unused for 30 days. Such clients SHALL be shown on the consent screen as
+response types within `code` (`invalid_client_metadata`). It SHALL drop
+any scope a third party may not hold, and with no `scope` grant read scopes
+only. It SHALL clean the name of control, format and direction characters,
+and SHALL show the redirect host instead of a name that reads as Campbooks or
+Not A Camp. It SHALL issue no secret and no registration access token,
+limit registrations per client address and for the whole instance per hour
+(429 `rate_limited`), and delete a client unused for 30 days. Such clients SHALL be shown on the consent screen as
 unverified.
 
 #### Scenario: A confidential registration
@@ -247,7 +262,10 @@ NAT64 forms) and the request sent to the checked address; no redirects, 5 s,
 URL, its redirect URIs SHALL follow the registration rules, and it SHALL not
 claim a secret or keys; anything else SHALL make the request `invalid_client`
 (shown, never redirected). A valid document SHALL be cached for its
-`Cache-Control: max-age`, between 5 minutes and 24 hours.
+`Cache-Control: max-age`, between 5 minutes and 24 hours; a failure SHALL
+not be fetched again for 5 minutes, and the instance SHALL fetch at most a
+fixed number of documents per hour. No proxy SHALL be used, and IPv4-
+translated addresses (`::ffff:0:0:0/96`) SHALL be refused too.
 
 #### Scenario: A document that lies
 - **WHEN** a client id URL serves a document whose `client_id` is another URL

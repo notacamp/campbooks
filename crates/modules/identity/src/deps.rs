@@ -23,7 +23,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::{clients::Clients, keys::Keys},
-    metadata::{FetcherPort, Guarded},
+    metadata::{Failures, FetcherPort, Guarded},
     upstream::{
         Provider,
         client::{Endpoints, Upstream, ZOHO_DEFAULT_ACCOUNTS_SERVER},
@@ -83,6 +83,8 @@ pub struct Issuer {
     pub api_scopes: Vec<ScopeInfo>,
     /// Fetches Client ID Metadata Documents (through the SSRF guard).
     pub fetcher: FetcherPort,
+    /// Metadata documents that recently failed, not asked for again yet.
+    pub document_failures: Failures,
     /// The time.
     pub clock: Arc<dyn Clock>,
 }
@@ -200,6 +202,7 @@ impl Deps {
             resource,
             api_scopes: api_scopes.to_vec(),
             fetcher: Arc::new(Guarded),
+            document_failures: Failures::default(),
             clock,
         };
         Ok(Self {

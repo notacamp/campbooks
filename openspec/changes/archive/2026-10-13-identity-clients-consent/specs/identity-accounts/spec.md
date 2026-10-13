@@ -8,8 +8,13 @@ otherwise), say whom the person is signed in as, list what the app will be
 able to do in plain sentences, ask which workspace it may use (only its own
 for a workspace's app; "all your workspaces" for Campbooks' own apps), say
 where the browser goes next, warn when the app is on this device, and say
-whether the answer will be remembered. Allow (⌘↵) and Deny (Esc) SHALL send
-the answer and follow the redirect. `step_up_required` SHALL offer "Sign in
+whether the answer will be remembered. A workspace's own app SHALL be named
+by its workspace, and only Campbooks' own apps as Campbooks. Focus SHALL start
+on Deny, no workspace SHALL be picked for the person, Allow SHALL have no
+keyboard shortcut and SHALL work only once the page has been visible and
+focused for a second (again after it was hidden or left), so no stray key
+press or click answers it. Allow and Deny (Esc) SHALL send the answer and
+follow the redirect. `step_up_required` SHALL offer "Sign in
 again"; a request no longer waiting SHALL be explained. It SHALL be in en,
 pt-PT, es-ES and fr, keyboard-operable with visible hints, and usable at
 375px.

@@ -35,8 +35,10 @@ export interface ConsentScreenProps {
  * `/consent`: an app other than Campbooks on the web asks to use the
  * person's account. Shows the app (and whether anyone vouches for it), what
  * it will be able to do, which workspace it may use, and where the browser
- * goes next; Allow (⌘↵) or Deny (Esc). A native app or an agent on this
- * device comes with a warning, and is asked every time.
+ * goes next; Allow or Deny (Esc). Focus starts on Deny, nothing is picked
+ * for the person, and Allow works only once the page has been in view for a
+ * second, so no stray key press or click answers it. A native app or an
+ * agent on this device comes with a warning, and is asked every time.
  */
 export function ConsentScreen({ request, leave = leavePage }: ConsentScreenProps) {
   const { t } = useTranslation("identity");
@@ -129,21 +131,24 @@ function Ask({
   const { t: tShell } = useTranslation("shell");
   const sentence = useScopeSentence();
   const answer = useAnswerConsent(request);
-  const allowButton = useRef<HTMLButtonElement>(null);
+  const denyButton = useRef<HTMLButtonElement>(null);
   const canId = useId();
+  const armed = useArmed();
   const { client } = asked;
   const choices = asked.workspaces;
-  const [workspace, setWorkspace] = useState<string | null>(
-    choices.length === 1 ? (choices[0]?.id ?? null) : null,
-  );
+  // Never picked for the person, even when there is one choice: picking is
+  // part of saying yes.
+  const [workspace, setWorkspace] = useState<string | null>(null);
   const busy = answer.isPending || answer.isSuccess;
   const noWorkspace = asked.binds_workspace && choices.length === 0;
-  const canAllow = !busy && !noWorkspace && (!asked.binds_workspace || workspace !== null);
+  const canAllow = armed && !busy && !noWorkspace && (!asked.binds_workspace || workspace !== null);
   const code = answer.isError ? problemCode(answer.error) : undefined;
   const gone = answer.isError && errorStatus(answer.error) === 404;
 
+  // Focus lands on Deny: a key pressed by habit (or because another page
+  // asked for it) never allows anything.
   useEffect(() => {
-    allowButton.current?.focus();
+    denyButton.current?.focus();
   }, []);
 
   const send = (decision: "allow" | "deny") => {
@@ -161,9 +166,6 @@ function Ask({
       },
     );
   };
-  useShortcut("identity.answer_consent", () => {
-    send("allow");
-  });
   useShortcut("overlay.close", () => {
     send("deny");
   });
@@ -186,23 +188,20 @@ function Ask({
           : t("consent.lead", { email: asked.account_email })
       }
       footer={asked.remembered ? t("consent.remembered") : t("consent.everyTime")}
-      formLabel={t("consent.form", { app: client.name })}
-      onSubmit={() => {
-        send("allow");
-      }}
       actions={
         <>
           <Button
-            ref={allowButton}
-            type="submit"
             variant="primary"
             size="lg"
-            shortcut="identity.answer_consent"
             disabled={!canAllow}
+            onClick={() => {
+              send("allow");
+            }}
           >
             {answer.isPending ? t("consent.allowing") : t("consent.allow")}
           </Button>
           <Button
+            ref={denyButton}
             variant="ghost"
             size="lg"
             shortcut="overlay.close"
@@ -220,15 +219,14 @@ function Ask({
         <ListRow
           leading={<Avatar name={client.name} size="lg" />}
           title={client.name}
-          badge={
-            <Tag icon={client.verified ? "check" : "warning"}>
-              {client.verified ? t("consent.verified") : t("consent.unverified")}
-            </Tag>
-          }
+          badge={<AppTag client={client} />}
         >
           {/* Wraps, unlike a row's meta: who vouches for the app matters here. */}
           <Text tone="secondary" size="sm">
-            {t(`consent.kind.${kind}`, { host })}
+            {t(`consent.kind.${kind}`, {
+              host,
+              workspace: client.workspace_name ?? t("consent.yourWorkspace"),
+            })}
           </Text>
         </ListRow>
       </List>
@@ -310,4 +308,65 @@ function Ask({
       ) : null}
     </FocusPage>
   );
+}
+
+/**
+ * Who vouches for an app: Campbooks for its own, the workspace for one a
+ * workspace registered, nobody for the rest.
+ */
+function AppTag({ client }: { client: ConsentRequest["client"] }) {
+  const { t } = useTranslation("identity");
+  if (client.verified) {
+    return <Tag icon="check">{t("consent.campbooks")}</Tag>;
+  }
+  if (client.kind === "workspace") {
+    return (
+      <Tag icon="people">
+        {t("consent.workspaceApp", {
+          workspace: client.workspace_name ?? t("consent.yourWorkspace"),
+        })}
+      </Tag>
+    );
+  }
+  return <Tag icon="warning">{t("consent.unverified")}</Tag>;
+}
+
+/** Time a page must be in view, and focused, before Allow works. */
+export const ARM_DELAY_MS = 1000;
+
+/**
+ * Whether the page has been visible and focused for [`ARM_DELAY_MS`]: a
+ * page that opens this screen and has the person press a key or click in
+ * the same moment gets nothing. Hiding the page or leaving the window
+ * starts the wait again.
+ */
+function useArmed(): boolean {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      clearTimeout(timer);
+      setArmed(false);
+      if (document.visibilityState === "visible") {
+        timer = setTimeout(() => {
+          setArmed(true);
+        }, ARM_DELAY_MS);
+      }
+    };
+    const disarm = () => {
+      clearTimeout(timer);
+      setArmed(false);
+    };
+    arm();
+    document.addEventListener("visibilitychange", arm);
+    globalThis.addEventListener("focus", arm);
+    globalThis.addEventListener("blur", disarm);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", arm);
+      globalThis.removeEventListener("focus", arm);
+      globalThis.removeEventListener("blur", disarm);
+    };
+  }, []);
+  return armed;
 }

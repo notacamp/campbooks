@@ -211,9 +211,13 @@ function ConnectedAppRow({
       leading={<Avatar name={name} />}
       title={name}
       badge={
-        <Tag icon={app.verified ? "check" : "warning"}>
-          {app.verified ? t("consent.verified") : t("consent.unverified")}
-        </Tag>
+        app.verified ? (
+          <Tag icon="check">{t("consent.campbooks")}</Tag>
+        ) : app.client_kind === "workspace" ? (
+          <Tag icon="people">{t("apps.connected.workspaceApp")}</Tag>
+        ) : (
+          <Tag icon="warning">{t("consent.unverified")}</Tag>
+        )
       }
       meta={meta}
       trailing={

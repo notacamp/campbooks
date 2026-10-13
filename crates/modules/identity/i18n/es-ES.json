@@ -27,6 +27,7 @@
     "invalid_client_metadata": "Los datos de la aplicación no son aceptables: {{reason}}",
     "client_needs_redirect": "Una aplicación de inicio de sesión necesita al menos una dirección de retorno https o de loopback.",
     "client_scope_not_allowed": "No se puede dar el permiso {{scope}} a aplicaciones.",
-    "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar."
+    "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar.",
+    "client_name_reserved": "Solo las aplicaciones del propio Campbooks pueden llamarse Campbooks o Not A Camp. Elige otro nombre."
   }
 }

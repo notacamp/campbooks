@@ -147,7 +147,6 @@ export const APP_ACCESS = {
   write: [
     "system:read",
     "workspaces:read",
-    "workspaces:write",
     "connectors:read",
     "connectors:write",
     "conversations:read",

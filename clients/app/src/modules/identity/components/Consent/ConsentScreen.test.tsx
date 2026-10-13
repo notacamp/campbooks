@@ -9,7 +9,19 @@ import {
 } from "../../../../../test/demo/identity";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 
-import { ConsentScreen } from "./ConsentScreen";
+import { ARM_DELAY_MS, ConsentScreen } from "./ConsentScreen";
+
+/** Allow, once the screen has been in view long enough to work. */
+async function armedAllow() {
+  const allow = screen.getByRole("button", { name: "Allow" });
+  await waitFor(
+    () => {
+      expect(allow).toBeEnabled();
+    },
+    { timeout: ARM_DELAY_MS * 3 },
+  );
+  return allow;
+}
 
 const SHOWN = `GET /auth/consent/${REQUEST}`;
 const ANSWER = `POST /auth/consent/${REQUEST}`;
@@ -38,12 +50,14 @@ describe("ConsentScreen", () => {
     expect(screen.getByText("Only if you just started this")).toBeVisible();
     expect(screen.getByText("Read your conversations and messages")).toBeVisible();
     expect(screen.getByText("Next, you’ll go back to an app on this device.")).toBeVisible();
-    const allow = screen.getByRole("button", { name: /Allow/u });
+    const allow = screen.getByRole("button", { name: "Allow" });
     expect(allow).toBeDisabled();
+    // Focus starts on Deny; nothing is picked for the person.
+    expect(screen.getByRole("button", { name: /Deny/u })).toHaveFocus();
+    expect(screen.getByRole("radio", { name: "Household" })).not.toBeChecked();
 
     fireEvent.click(screen.getByRole("radio", { name: "Household" }));
-    expect(allow).toBeEnabled();
-    fireEvent.click(allow);
+    fireEvent.click(await armedAllow());
     await waitFor(() => {
       expect(leave).toHaveBeenCalledWith("http://127.0.0.1:33418/callback?code=c1");
     });
@@ -64,8 +78,8 @@ describe("ConsentScreen", () => {
       await screen.findByText("It will work in all your workspaces, like Campbooks on the web."),
     ).toBeVisible();
     expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.getByText("Verified")).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /Allow/u }));
+    expect(screen.getAllByText("Campbooks").length).toBeGreaterThan(0);
+    fireEvent.click(await armedAllow());
     await waitFor(() => {
       expect(leave).toHaveBeenCalled();
     });
@@ -74,11 +88,13 @@ describe("ConsentScreen", () => {
     });
   });
 
-  it("picks the only workspace of a workspace's own app and says it will be remembered", async () => {
+  it("names a workspace's own app by its workspace and picks nothing for the person", async () => {
     mockApi({ [SHOWN]: { body: TEAM_APP_CONSENT } });
     renderScreen();
 
-    expect(await screen.findByRole("radio", { name: "Duarte & Pessoa" })).toBeChecked();
+    expect(await screen.findByRole("radio", { name: "Duarte & Pessoa" })).not.toBeChecked();
+    expect(screen.getByText("Duarte & Pessoa’s app")).toBeVisible();
+    expect(screen.getByText("Registered by an admin of Duarte & Pessoa.")).toBeVisible();
     expect(screen.getByText("Next, you’ll go to dashboard.example.com.")).toBeVisible();
     expect(screen.getByText(/You won’t be asked again for this app/u)).toBeVisible();
     expect(screen.queryByText("Only if you just started this")).toBeNull();
@@ -103,7 +119,8 @@ describe("ConsentScreen", () => {
     mockApi({ [SHOWN]: { body: NATIVE_CONSENT }, [ANSWER]: problem(403, "step_up_required") });
     const leave = renderScreen();
 
-    fireEvent.click(await screen.findByRole("button", { name: /Allow/u }));
+    await screen.findByRole("button", { name: /Deny/u });
+    fireEvent.click(await armedAllow());
     const alert = await screen.findByRole("alert");
     expect(within(alert).getByText("Sign in again first")).toBeVisible();
     fireEvent.click(within(alert).getByRole("button", { name: "Sign in again" }));
@@ -125,6 +142,35 @@ describe("ConsentScreen", () => {
     renderScreen();
 
     expect(await screen.findByText("Join a workspace first")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Allow/u })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Allow" })).toBeDisabled();
+  });
+
+  it("answers nothing to a key pressed at once, nor to Enter or ⌘↵ later", async () => {
+    const api = mockApi({ [SHOWN]: { body: NATIVE_CONSENT } });
+    renderScreen();
+    const allow = await screen.findByRole("button", { name: "Allow" });
+
+    fireEvent.click(allow);
+    fireEvent.keyDown(document, { key: "Enter" });
+    fireEvent.keyDown(document, { key: "Enter", metaKey: true });
+    fireEvent.keyDown(document, { key: "Enter", ctrlKey: true });
+    await armedAllow();
+    fireEvent.keyDown(document, { key: "Enter", metaKey: true });
+    fireEvent.keyDown(document, { key: "Enter", ctrlKey: true });
+    expect(api.calls.some((call) => call.route === ANSWER)).toBe(false);
+  });
+
+  it("waits again after the page was hidden or left", async () => {
+    const page = globalThis as unknown as Window;
+    mockApi({ [SHOWN]: { body: NATIVE_CONSENT } });
+    renderScreen();
+    await screen.findByRole("button", { name: "Allow" });
+    const allow = await armedAllow();
+
+    fireEvent.blur(page);
+    expect(allow).toBeDisabled();
+    fireEvent.focus(page);
+    expect(allow).toBeDisabled();
+    await armedAllow();
   });
 });

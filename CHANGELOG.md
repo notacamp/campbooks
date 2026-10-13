@@ -18,9 +18,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   each time. A consent screen names the app, says whether anyone vouches for
   it, lists what it will be able to do in plain words, and asks which
   workspace it may use; an app on your device (the desktop app, a local
-  agent) is asked for every time and comes with a warning. Settings → Apps
-  and integrations lists what you allowed, with Revoke. Allowing needs a
-  sign-in from the last ten minutes.
+  agent) is asked for every time and comes with a warning. Allow starts
+  unfocused, has no shortcut and waits a second after the page shows, so no
+  stray key press answers it; a remembered answer lasts 90 days for the same
+  return address. Settings → Apps and integrations lists what you allowed,
+  with Revoke, which ends the app's tokens at once. Allowing needs a sign-in
+  from the last ten minutes.
 - The desktop and mobile apps' sign-in is on (`campbooks-native`), always
   through the consent screen.
 - A workspace's own apps: owners and admins register server-to-server apps
@@ -33,7 +36,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   cached up to a day), protected-resource metadata
   (`/.well-known/oauth-protected-resource/api`), `resource_metadata` in the
   API's `WWW-Authenticate`, and resource indicators. Apps that aren't
-  Campbooks' own can never hold an `identity:*` scope.
+  Campbooks' own can never hold an `identity:*`, `workspaces:write` or
+  `workspaces:admin` scope, get read scopes only unless they ask for more,
+  see only the workspace they were allowed in, and can't be called
+  Campbooks or Not A Camp.
 - The Visor (the assistant's face) has three new emotions: dizzy (something failed on
   our side), starry (a big win) and heart eyes (a warm moment), with an optional
   gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at

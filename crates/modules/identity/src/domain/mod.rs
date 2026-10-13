@@ -1,6 +1,7 @@
 //! Types and storage shared by several of this module's endpoints.
 
 pub mod accounts;
+pub mod client_names;
 pub mod clients;
 pub mod consents;
 pub mod held_grants;

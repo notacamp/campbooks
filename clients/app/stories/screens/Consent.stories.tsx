@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, userEvent, within } from "storybook/test";
+import { expect, userEvent, waitFor, within } from "storybook/test";
 
 import { UndoProvider } from "~/lib/ui";
 
@@ -67,12 +67,16 @@ export const AgentOnThisDevice: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await expect(await canvas.findByText("Only if you just started this")).toBeVisible();
-    const allow = canvas.getByRole("button", { name: /Allow/u });
+    const allow = canvas.getByRole("button", { name: "Allow" });
     await expect(allow).toBeDisabled();
-    // ⌘↵ on a Mac, Ctrl+↵ elsewhere.
-    await expect(allow.getAttribute("aria-keyshortcuts")).toMatch(/^(Control|Meta)\+Enter$/u);
+    await expect(canvas.getByRole("button", { name: /Deny/u })).toHaveFocus();
     await userEvent.click(canvas.getByRole("radio", { name: "Duarte & Pessoa" }));
-    await expect(allow).toBeEnabled();
+    await waitFor(
+      async () => {
+        await expect(allow).toBeEnabled();
+      },
+      { timeout: 3000 },
+    );
   },
 };
 
@@ -93,7 +97,8 @@ export const WorkspaceApp: Story = {
   args: { path: PAGE, api: asking(TEAM_APP_CONSENT) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(await canvas.findByRole("radio", { name: "Duarte & Pessoa" })).toBeChecked();
+    await expect(await canvas.findByRole("radio", { name: "Duarte & Pessoa" })).not.toBeChecked();
+    await expect(canvas.getByText("Duarte & Pessoa’s app")).toBeVisible();
     await expect(canvas.getByText("Next, you’ll go to dashboard.example.com.")).toBeVisible();
   },
 };
@@ -138,7 +143,14 @@ export const SignInAgainFirst: Story = {
   args: { path: PAGE, api: asking(NATIVE_CONSENT, problem(403, "step_up_required")) },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: /Allow/u }));
+    const allow = await canvas.findByRole("button", { name: "Allow" });
+    await waitFor(
+      async () => {
+        await expect(allow).toBeEnabled();
+      },
+      { timeout: 3000 },
+    );
+    await userEvent.click(allow);
     await expect(await canvas.findByText("Sign in again first")).toBeVisible();
   },
 };

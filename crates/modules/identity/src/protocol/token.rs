@@ -32,7 +32,7 @@ use crate::{
     domain::{
         accounts,
         clients::{self, Client, Kind},
-        sessions,
+        consents, sessions,
         tokens::{self, Grant, Mint, OFFLINE_ACCESS, Refusal, TOKEN_LIFETIME},
     },
     events::RefreshReuseDetected,
@@ -278,6 +278,21 @@ async fn respond(
         refresh_token,
         nonce,
     } = exchanged;
+    // A code or refresh token of an app that needs consent stands on that
+    // consent: revoked, replaced by one for another workspace, or narrower,
+    // and nothing more is minted (the transaction rolls back).
+    if client.needs_consent()
+        && !consents::covers(
+            &ctx.state.db,
+            grant.account_id,
+            &client.id,
+            grant.workspace,
+            &grant.scope,
+        )
+        .await?
+    {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
     let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     };

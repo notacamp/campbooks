@@ -10,7 +10,7 @@
 //! - the request goes to the address that was checked, so a second DNS
 //!   answer cannot swap it; the certificate is still checked against the
 //!   name;
-//! - no redirects, [`TIMEOUT`] overall, at most [`MAX_BODY`] bytes read,
+//! - no redirects and no proxy, [`TIMEOUT`] overall, at most [`MAX_BODY`] bytes read,
 //!   `application/json` only.
 
 use std::{
@@ -75,6 +75,10 @@ pub fn is_public(ip: IpAddr) -> bool {
                 return is_public_v4(v4);
             }
             let segments = v6.segments();
+            // ::ffff:0:0:0/96, IPv4-translated (RFC 2765): never a public host.
+            if segments[..4] == [0; 4] && segments[4] == 0xffff && segments[5] == 0 {
+                return false;
+            }
             // NAT64 (64:ff9b::/96 and the local-use 64:ff9b:1::/48) embeds
             // an IPv4 address: judge that one.
             if segments[0] == 0x64 && segments[1] == 0xff9b {
@@ -151,6 +155,9 @@ pub async fn fetch(url: &Url) -> Result<Fetched, Refused> {
     let address = resolve(host).await?;
     let http = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
+        // Straight to the checked address: a proxy from the environment
+        // would resolve the name again, and reach what it can reach.
+        .no_proxy()
         .timeout(TIMEOUT)
         .connect_timeout(TIMEOUT)
         .resolve(host, address)
@@ -254,6 +261,8 @@ mod tests {
             "2001:db8::1",
             "::ffff:127.0.0.1",
             "::ffff:169.254.169.254",
+            "::ffff:0:7f00:1",
+            "::ffff:0:5db8:d822",
             "::127.0.0.1",
             "64:ff9b::7f00:1",
             "64:ff9b::a9fe:a9fe",

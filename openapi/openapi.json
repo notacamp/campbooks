@@ -4049,7 +4049,7 @@
             }
           },
           "400": {
-            "description": "A bad name, `client_scope_not_allowed` or `client_needs_redirect`.",
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8257,7 +8257,7 @@
           },
           "verified": {
             "type": "boolean",
-            "description": "Whether Campbooks or a workspace admin registered it."
+            "description": "Whether it is Campbooks' own app (a workspace's app says so by its\nkind; every other name is its registrant's word)."
           },
           "workspace_id": {
             "type": [
@@ -8436,7 +8436,14 @@
           },
           "verified": {
             "type": "boolean",
-            "description": "Whether Campbooks or a workspace admin registered it; anyone can\nregister the others."
+            "description": "Whether it is Campbooks' own app. Every other app's name is its\nregistrant's word."
+          },
+          "workspace_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a workspace's own app, the workspace that registered it (its\nname, when the person belongs to it): what the screen says instead of\n\"verified\"."
           }
         }
       },

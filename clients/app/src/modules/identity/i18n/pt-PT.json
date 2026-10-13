@@ -11,7 +11,6 @@
     "passkey": "Iniciar sessão com uma chave de acesso",
     "addWayIn": "Adicionar uma forma de iniciar sessão",
     "addPasskey": "Adicionar uma chave de acesso",
-    "allow": "Autorizar a aplicação",
     "newApp": "Nova aplicação"
   },
   "signIn": {
@@ -384,13 +383,11 @@
     "title": "A aplicação {{app}} quer usar a sua conta Campbooks",
     "lead": "Tem sessão iniciada como {{email}}.",
     "leadNoEmail": "Tem sessão iniciada no Campbooks.",
-    "form": "Autorizar ou recusar {{app}}",
     "app": "A aplicação",
-    "verified": "Verificada",
     "unverified": "Não verificada",
     "kind": {
       "first_party": "Aplicação do próprio Campbooks.",
-      "workspace": "Registada por um administrador do seu espaço de trabalho.",
+      "workspace": "Registada por um administrador de {{workspace}}.",
       "dynamic": "Registou-se sozinha. Ninguém verificou quem a fez.",
       "metadata_document": "Descrita por {{host}}. Ninguém verificou quem a fez."
     },
@@ -440,7 +437,10 @@
     "answerFailed": {
       "title": "Não foi possível concluir",
       "lead": "Nada foi autorizado. Tente novamente."
-    }
+    },
+    "campbooks": "Campbooks",
+    "workspaceApp": "Aplicação de {{workspace}}",
+    "yourWorkspace": "o seu espaço de trabalho"
   },
   "scopes": {
     "openid": "Saber quem é no Campbooks",
@@ -484,7 +484,8 @@
       "revokeLabel": "Revogar {{app}}",
       "confirmRevoke": "{{app}} deixa de funcionar de imediato, até a autorizar novamente.",
       "cancel": "Cancelar",
-      "revokeFailed": "Não foi possível revogá-la. Tente novamente."
+      "revokeFailed": "Não foi possível revogá-la. Tente novamente.",
+      "workspaceApp": "Aplicação do espaço de trabalho"
     },
     "workspace": {
       "title": "Aplicações deste espaço de trabalho",

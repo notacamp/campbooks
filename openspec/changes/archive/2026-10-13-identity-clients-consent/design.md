@@ -379,7 +379,7 @@ Visor):
 - "You'll be sent to `host`" with the redirect host in full. For a
   loopback or custom-scheme client: "an app on this device", and a warning
   Banner that it can act as you if you didn't just start this yourself;
-- **Allow** (`⌘Enter`) and **Deny** (`Esc`);
+- **Allow** (no shortcut) and **Deny** (`Esc`);
 - errors in place: `step_up_required` offers "Sign in again", an expired
   request says start again from the app.
 
@@ -534,3 +534,40 @@ From `kernel::rate_limit` (per address unless noted):
   - a review of the SSRF guard against DNS rebinding with IPv6 and NAT64
     prefixes beyond `64:ff9b::/96`;
   - per-client limits on the token endpoint.
+
+## After the security review
+
+- **Bound tokens outside a workspace.** `workspaces.list` shows a bound
+  token its workspace only. `workspaces.create` and
+  `workspaces.accept_invitation` answer 404 to it. Every `identity.*` API
+  route takes the kernel's new `Unbound<S>` (404 for a bound token).
+  `workspaces:write` and `workspaces:admin` join `identity:*` and
+  `admin:access` as Campbooks' own. Self-registered clients get read scopes
+  only when they name none. A server end-to-end test walks each route.
+- **Consent screen.**
+  - Focus starts on Deny, and no workspace is preselected.
+  - Allow has no shortcut and works only after the page has been visible
+    and focused for one second. Hiding the page or leaving the window
+    starts the wait again.
+  - Clickjacking by keystroke is closed.
+- **SSRF guard.** No proxy, and `::ffff:0:0:0/96` is refused.
+- **Abuse.**
+  - IPv6 is counted per /64 (as before).
+  - Instance-wide hourly caps on registrations (300) and document fetches
+    (600).
+  - Failed documents aren't fetched again for 5 minutes (per process).
+- **Spoofing.**
+  - Names lose control, format and bidi characters.
+  - "Campbooks" and "Not A Camp" are reserved: case-, spacing- and
+    look-alike-insensitive. A self-registered app shows its host instead; a
+    workspace client is refused with `client_name_reserved`.
+  - "Verified" now means Campbooks' own. A workspace's app is named by its
+    workspace.
+- **Revocation.**
+  - A code or refresh token is redeemed only while a consent for the same
+    workspace covers its scopes.
+  - Replacing a consent ends the old tokens that were bound to another
+    workspace or to more scopes.
+  - Remembered consents cover their own redirect URI only, for 90 days.
+  - Access-token `jti` tracking on removal is left for #57 (they live ten
+    minutes).

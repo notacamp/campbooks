@@ -193,12 +193,6 @@ impl Client {
         !self.is_first_party()
     }
 
-    /// Whether the person can trust its name: Campbooks' own, or a client
-    /// a workspace admin registered. Anyone can register the others.
-    pub fn is_verified(&self) -> bool {
-        matches!(self.kind, Kind::FirstParty | Kind::Workspace)
-    }
-
     /// Whether it may ask for `scope`: the OIDC scopes; for Campbooks' own,
     /// every scope of `catalogue`; for anyone else, the ones it registered,
     /// never an `identity:*` scope.
@@ -216,10 +210,19 @@ impl Client {
     }
 }
 
-/// Whether a client other than Campbooks' own may ever hold `scope`: never
-/// an `identity:*` scope, nor `admin:access` (ADR 0015).
+/// Scopes only Campbooks' own apps may hold, besides every `identity:*`
+/// scope: making or joining workspaces and managing their members act on a
+/// person's account beyond the one workspace a third party is bound to, and
+/// `admin:access` is the instance's (ADR 0015).
+const FIRST_PARTY_ONLY: [&str; 3] = [
+    "workspaces:write",
+    "workspaces:admin",
+    campbooks_kernel::admin::ACCESS_SCOPE,
+];
+
+/// Whether a client other than Campbooks' own may ever hold `scope`.
 pub fn third_party_may_hold(scope: &str) -> bool {
-    !scope.starts_with(FIRST_PARTY_ONLY_PREFIX) && scope != campbooks_kernel::admin::ACCESS_SCOPE
+    !scope.starts_with(FIRST_PARTY_ONLY_PREFIX) && !FIRST_PARTY_ONLY.contains(&scope)
 }
 
 /// The scopes of `catalogue` a client other than Campbooks' own may hold.
@@ -228,6 +231,15 @@ pub fn third_party_scopes(catalogue: &[ScopeInfo]) -> Vec<String> {
         .iter()
         .filter(|s| third_party_may_hold(s.name))
         .map(|s| s.name.to_owned())
+        .collect()
+}
+
+/// What a client that registered itself (or a metadata document) may ask
+/// for when it names no `scope`: reading only, never writing.
+pub fn default_third_party_scopes(catalogue: &[ScopeInfo]) -> Vec<String> {
+    third_party_scopes(catalogue)
+        .into_iter()
+        .filter(|s| s.ends_with(":read"))
         .collect()
 }
 
@@ -605,6 +617,43 @@ mod tests {
         let native = clients.first_party_client(NATIVE_CLIENT_ID).unwrap();
         assert!(native.may_ask_for("identity:read", &catalogue));
         assert_eq!(third_party_scopes(&catalogue), ["system:read"]);
+    }
+
+    #[test]
+    fn workspace_changes_are_campbooks_own_and_defaults_only_read() {
+        for scope in ["workspaces:write", "workspaces:admin", "identity:clients"] {
+            assert!(!third_party_may_hold(scope), "{scope}");
+        }
+        let catalogue = [
+            ScopeInfo {
+                name: "conversations:read",
+                description: "",
+            },
+            ScopeInfo {
+                name: "conversations:write",
+                description: "",
+            },
+            ScopeInfo {
+                name: "workspaces:read",
+                description: "",
+            },
+            ScopeInfo {
+                name: "workspaces:write",
+                description: "",
+            },
+        ];
+        assert_eq!(
+            default_third_party_scopes(&catalogue),
+            ["conversations:read", "workspaces:read"]
+        );
+        assert_eq!(
+            third_party_scopes(&catalogue),
+            [
+                "conversations:read",
+                "conversations:write",
+                "workspaces:read"
+            ]
+        );
     }
 
     #[test]

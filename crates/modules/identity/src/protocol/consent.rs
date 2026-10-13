@@ -53,9 +53,13 @@ pub struct ConsentClient {
     pub name: String,
     /// `first_party`, `workspace`, `dynamic` or `metadata_document`.
     pub kind: String,
-    /// Whether Campbooks or a workspace admin registered it; anyone can
-    /// register the others.
+    /// Whether it is Campbooks' own app. Every other app's name is its
+    /// registrant's word.
     pub verified: bool,
+    /// For a workspace's own app, the workspace that registered it (its
+    /// name, when the person belongs to it): what the screen says instead of
+    /// "verified".
+    pub workspace_name: Option<String>,
     /// Its logo (a workspace's own app only).
     pub logo_uri: Option<String>,
     /// Where the browser goes next: the redirect URI's host (`None` for a
@@ -183,12 +187,18 @@ pub async fn get(
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
     let (session, request, client) = waiting(&ctx, issuer, &headers, &id).await?;
+    let mine = ctx
+        .state
+        .membership
+        .workspaces_of(&ctx.state.db, &session.account_id.to_string())
+        .await?;
+    let workspace_name = client.workspace.and_then(|own| {
+        mine.iter()
+            .find(|w| *w.id.as_uuid() == own)
+            .map(|w| w.name.clone())
+    });
     let workspaces = if client.binds_workspace() {
-        ctx.state
-            .membership
-            .workspaces_of(&ctx.state.db, &session.account_id.to_string())
-            .await?
-            .into_iter()
+        mine.into_iter()
             .filter(|w| client.workspace.is_none_or(|own| *w.id.as_uuid() == own))
             .map(|w| ConsentWorkspace {
                 id: w.id,
@@ -224,7 +234,8 @@ pub async fn get(
         client: ConsentClient {
             name: client.name.clone(),
             kind: client.kind.as_str().to_owned(),
-            verified: client.is_verified(),
+            verified: client.is_first_party(),
+            workspace_name,
             logo_uri: client.logo_uri.clone(),
             redirect_host: redirect_host(&request.redirect_uri),
             document_host: (client.kind == Kind::MetadataDocument)
@@ -366,6 +377,7 @@ pub async fn answer(
             member,
             scopes: &scopes,
             remembered: is_https_redirect(&request.redirect_uri),
+            redirect_uri: &request.redirect_uri,
         },
         now,
     )

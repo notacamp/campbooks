@@ -46,9 +46,10 @@ CREATE POLICY authorization_server ON identity.clients
     WITH CHECK (current_setting('campbooks.identity_role', true) = 'authorization_server');
 
 -- A person's yes to a client. At most one live consent per (account,
--- client); a new one replaces it. `remembered` consents let later
--- authorizations skip the screen (only for clients whose redirect is an
--- exact https URI). The bound workspace and member are what the person
+-- client); a new one replaces it, and ends the old one's tokens that were
+-- for another workspace or more scopes. A `remembered` consent lets later
+-- authorizations to the same exact https redirect skip the screen, for 90
+-- days. The bound workspace and member are what the person
 -- chose: the row is theirs, not the workspace's (no row-level security).
 CREATE TABLE identity.consents (
     id uuid PRIMARY KEY,
@@ -60,6 +61,9 @@ CREATE TABLE identity.consents (
     bound_member_id uuid,
     scopes text[] NOT NULL,
     remembered boolean NOT NULL,
+    -- A remembered consent covers this redirect URI only, until this time.
+    redirect_uri text NOT NULL,
+    remember_until timestamptz,
     granted_at timestamptz NOT NULL,
     last_used_at timestamptz,
     revoked_at timestamptz

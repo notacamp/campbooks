@@ -499,7 +499,9 @@ With the built-in issuer:
     which names this issuer. They register themselves at `/oauth2/register` (public
     clients only; unused ones are deleted after 30 days) or use an `https` URL of their
     metadata document as their client id. The consent screen marks them unverified. Their
-    tokens are bound to one workspace and can never manage accounts or apps.
+    tokens are bound to one workspace (they see no other, and can't create or join one)
+    and can never manage accounts, apps or members. Registrations and document fetches
+    are also capped per hour for the whole instance.
   - Access tokens now name `${CAMPBOOKS_PUBLIC_URL}/api` as their audience;
     `CAMPBOOKS_AUTH__AUDIENCE` only applies to an outside identity provider.
 - **Passkeys.** Nothing to configure: people add passkeys under Settings → Ways to sign

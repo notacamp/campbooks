@@ -3,7 +3,7 @@
 //! used. Settings → Apps and integrations lists them with Revoke.
 
 use axum::{Extension, Json, extract::State};
-use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Scoped};
+use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Unbound};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -26,7 +26,8 @@ pub struct ConnectedApp {
     pub client_name: Option<String>,
     /// `first_party`, `workspace`, `dynamic` or `metadata_document`.
     pub client_kind: Option<String>,
-    /// Whether Campbooks or a workspace admin registered it.
+    /// Whether it is Campbooks' own app (a workspace's app says so by its
+    /// kind; every other name is its registrant's word).
     pub verified: bool,
     /// The workspace it may use; `null` for Campbooks' own apps (all).
     pub workspace_id: Option<Uuid>,
@@ -66,7 +67,7 @@ pub struct ConnectedApps {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityRead>,
+    Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<ConnectedApps>> {
     let (issuer, account) = super::account(&deps, &principal)?;
     let mut items = Vec::new();
@@ -76,9 +77,7 @@ pub async fn handler(
             id: consent.id,
             client_name: client.as_ref().map(|c| c.name.clone()),
             client_kind: client.as_ref().map(|c| c.kind.as_str().to_owned()),
-            verified: client
-                .as_ref()
-                .is_some_and(|c| matches!(c.kind, Kind::FirstParty | Kind::Workspace)),
+            verified: client.as_ref().is_some_and(|c| c.kind == Kind::FirstParty),
             client_id: consent.client_id,
             workspace_id: consent.bound_workspace_id,
             scopes: consent.scopes,

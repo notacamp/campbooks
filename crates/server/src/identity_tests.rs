@@ -501,7 +501,7 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
                     "client_name": "Desk Agent",
                     "redirect_uris": [callback],
                     "grant_types": ["authorization_code", "refresh_token"],
-                    "scope": "conversations:read offline_access identity:write",
+                    "scope": "conversations:read workspaces:read offline_access identity:write workspaces:write",
                 })
                 .to_string(),
             ),
@@ -514,9 +514,12 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
         registered.body
     );
     let client = registered.json()["client_id"].as_str().unwrap().to_owned();
-    assert_eq!(registered.json()["scope"], "conversations:read");
+    assert_eq!(
+        registered.json()["scope"],
+        "conversations:read workspaces:read"
+    );
     step(&format!(
-        "POST /oauth2/register -> {client} (public, PKCE; identity:* dropped)"
+        "POST /oauth2/register -> {client} (public, PKCE; identity:* and workspaces:write dropped)"
     ));
 
     // The person's browser: signed in already, so straight to the consent
@@ -528,7 +531,7 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
         .append_pair("response_type", "code")
         .append_pair("client_id", &client)
         .append_pair("redirect_uri", callback)
-        .append_pair("scope", "conversations:read offline_access")
+        .append_pair("scope", "conversations:read workspaces:read offline_access")
         .append_pair("state", "agent-state")
         .append_pair(
             "code_challenge",
@@ -608,6 +611,91 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
         .await;
     assert_eq!(in_work.status, StatusCode::NOT_FOUND);
     step("GET Home's inboxes -> 200; Work's -> 404 (bound to Home)");
+
+    // Every route outside a workspace: the bound token sees Home only, and
+    // reaches nothing account-wide.
+    let call = |method: Method, path: String, body: Option<&'static str>| {
+        let browser = &browser;
+        let bearer = bearer.clone();
+        async move {
+            let mut headers = vec![("authorization", bearer.as_str())];
+            if body.is_some() {
+                headers.push(("content-type", "application/json"));
+            }
+            browser
+                .raw(method, &path, &headers, body.map(ToOwned::to_owned))
+                .await
+        }
+    };
+    let listed = call(Method::GET, "/api/v1/workspaces".to_owned(), None).await;
+    assert_eq!(listed.status, StatusCode::OK, "{}", listed.body);
+    let names: Vec<String> = listed.json()["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(names, ["Home"]);
+    for (method, path, body, expected) in [
+        (
+            Method::POST,
+            "/api/v1/workspaces".to_owned(),
+            Some(r#"{"name":"Sneaky","kind":"business"}"#),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::POST,
+            "/api/v1/workspaces/invitations/accept".to_owned(),
+            Some(r#"{"token":"x"}"#),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/consents".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/ways-in".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/held-grants".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/passkeys".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{home}/identity/clients"),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{work}/changes"),
+            None,
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            Method::GET,
+            "/admin/v1/system/overview".to_owned(),
+            None,
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let reply = call(method.clone(), path.clone(), body).await;
+        assert_eq!(reply.status, expected, "{method} {path}: {}", reply.body);
+    }
+    step("outside a workspace: lists Home only; creating, joining, accounts, apps, admin refused");
 
     // A workspace's own server-to-server client.
     let created = browser

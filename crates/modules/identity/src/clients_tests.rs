@@ -785,7 +785,9 @@ async fn a_workspaces_own_sign_in_app_is_allowed_in_that_workspace_only(db: PgPo
     let (url, verifier) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
     let id = to_consent(&kit, &url).await;
     let shown = kit.get(&format!("/auth/consent/{id}")).await;
-    assert_eq!(shown.json["client"]["verified"], true);
+    // Named by its workspace, not "verified": an admin chose its name.
+    assert_eq!(shown.json["client"]["verified"], false);
+    assert_eq!(shown.json["client"]["workspace_name"], "Home");
     let listed: Vec<&str> = shown.json["workspaces"]
         .as_array()
         .into_iter()
@@ -943,4 +945,196 @@ async fn discovery_names_registration_and_the_protected_resource(db: PgPool) {
         assert!(scopes.contains("conversations:read"), "{scopes}");
         assert!(!scopes.contains("identity:"), "{scopes}");
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_consent_stands_behind_every_token_of_its_app(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let web = kit.signed_up().await;
+    let client = agent(&kit, "conversations:read").await;
+    let refresh_in = |workspace| {
+        let kit = &kit;
+        let client = client.clone();
+        async move {
+            let (url, verifier) = Kit::authorize_url(
+                &client,
+                "http://localhost:7000/callback",
+                "conversations:read offline_access",
+            );
+            let id = to_consent(kit, &url).await;
+            let code = allow(kit, &id, Some(workspace)).await;
+            let tokens = redeem_public(
+                kit,
+                &client,
+                &code,
+                "http://localhost:7000/callback",
+                &verifier,
+            )
+            .await;
+            tokens.json["refresh_token"]
+                .as_str()
+                .unwrap_or_else(|| panic!("{tokens:?}"))
+                .to_owned()
+        }
+    };
+    let refresh = |token: String| {
+        let kit = &kit;
+        let client = client.clone();
+        async move {
+            kit.post_form(
+                "/oauth2/token",
+                &[
+                    ("grant_type", "refresh_token"),
+                    ("refresh_token", &token),
+                    ("client_id", &client),
+                ],
+            )
+            .await
+        }
+    };
+    let home = refresh_in(HOME).await;
+    // Allowing it again in Work ends the Home tokens.
+    let work = refresh_in(WORK).await;
+    assert_eq!(refresh(home).await.json["error"], "invalid_grant");
+    let rotated = refresh(work).await;
+    assert_eq!(rotated.status, StatusCode::OK, "{rotated:?}");
+
+    // A code allowed, then the consent revoked before redemption: nothing.
+    let (url, verifier) = Kit::authorize_url(
+        &client,
+        "http://localhost:7000/callback",
+        "conversations:read",
+    );
+    let id = to_consent(&kit, &url).await;
+    let code = allow(&kit, &id, Some(HOME)).await;
+    let apps = kit
+        .api(Method::GET, "/api/v1/identity/consents", &web)
+        .await;
+    let consent = apps.json["items"][0]["id"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    kit.api(
+        Method::DELETE,
+        &format!("/api/v1/identity/consents/{consent}"),
+        &web,
+    )
+    .await;
+    let late = redeem_public(
+        &kit,
+        &client,
+        &code,
+        "http://localhost:7000/callback",
+        &verifier,
+    )
+    .await;
+    assert_eq!(late.json["error"], "invalid_grant");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_remembered_consent_covers_its_own_redirect_only(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.sign_up().await;
+    let registered = register(
+        &kit,
+        &serde_json::json!({
+            "client_name": "Two Doors",
+            "redirect_uris": [AGENT_CALLBACK, "https://other.example.com/callback"],
+            "scope": "conversations:read",
+        }),
+    )
+    .await;
+    let client = registered.json["client_id"]
+        .as_str()
+        .unwrap_or_default()
+        .to_owned();
+    let (url, _) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
+    let id = to_consent(&kit, &url).await;
+    allow(&kit, &id, Some(HOME)).await;
+    let (same, _) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
+    assert!(kit.get(&same).await.location().starts_with(AGENT_CALLBACK));
+    let (other, _) = Kit::authorize_url(
+        &client,
+        "https://other.example.com/callback",
+        "conversations:read",
+    );
+    to_consent(&kit, &other).await;
+
+    // After 90 days the screen comes back.
+    let (again, _) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
+    let id = to_consent(&kit, &format!("{again}&prompt=consent")).await;
+    allow(&kit, &id, Some(HOME)).await;
+    sqlx::query("UPDATE identity.consents SET remember_until = now() - interval '1 second'")
+        .execute(&kit.state.db)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"));
+    let (expired, _) = Kit::authorize_url(&client, AGENT_CALLBACK, "conversations:read");
+    to_consent(&kit, &expired).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn nobody_else_may_be_called_campbooks(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let web = kit.signed_up().await;
+    let fake = register(
+        &kit,
+        &serde_json::json!({
+            "client_name": "C\u{0430}mpbooks Desktop\u{202E}",
+            "redirect_uris": [AGENT_CALLBACK],
+        }),
+    )
+    .await;
+    assert_eq!(fake.status, StatusCode::CREATED);
+    assert_eq!(
+        fake.json["client_name"], "agent.example.com",
+        "its host instead"
+    );
+    assert_eq!(
+        fake.json["scope"], "system:read conversations:read",
+        "reading only by default"
+    );
+    let hidden = register(
+        &kit,
+        &serde_json::json!({
+            "client_name": "Desk\u{202E}Agent\u{200B}",
+            "redirect_uris": [AGENT_CALLBACK],
+        }),
+    )
+    .await;
+    assert_eq!(hidden.json["client_name"], "DeskAgent");
+    let reserved = kit
+        .api_json(
+            Method::POST,
+            &format!("/api/v1/w/{HOME}/identity/clients"),
+            &web,
+            &serde_json::json!({ "name": "Not A Camp sync", "type": "confidential", "scopes": [] }),
+        )
+        .await;
+    assert_eq!(reserved.status, StatusCode::BAD_REQUEST);
+    assert_eq!(reserved.json["code"], "client_name_reserved");
+    let write = kit
+        .api_json(
+            Method::POST,
+            &format!("/api/v1/w/{HOME}/identity/clients"),
+            &web,
+            &serde_json::json!({ "name": "Sync", "type": "confidential",
+                "scopes": ["workspaces:write"] }),
+        )
+        .await;
+    assert_eq!(
+        write.json["code"], "client_scope_not_allowed",
+        "Campbooks' own only"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_document_that_failed_is_not_fetched_again_at_once(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.sign_up().await;
+    let missing = "https://agent.example.com/oauth/gone.json";
+    for _ in 0..3 {
+        let (url, _) = Kit::authorize_url(missing, AGENT_CALLBACK, "openid");
+        assert_eq!(kit.get(&url).await.status, StatusCode::BAD_REQUEST);
+    }
+    assert_eq!(kit.documents.fetched(), [missing]);
 }

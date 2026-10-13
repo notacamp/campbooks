@@ -11,7 +11,6 @@
     "passkey": "Sign in with a passkey",
     "addWayIn": "Add a way to sign in",
     "addPasskey": "Add a passkey",
-    "allow": "Allow the app",
     "newApp": "New app"
   },
   "signIn": {
@@ -384,13 +383,11 @@
     "title": "{{app}} wants to use your Campbooks account",
     "lead": "You’re signed in as {{email}}.",
     "leadNoEmail": "You’re signed in to Campbooks.",
-    "form": "Allow or deny {{app}}",
     "app": "The app",
-    "verified": "Verified",
     "unverified": "Unverified",
     "kind": {
       "first_party": "Campbooks’ own app.",
-      "workspace": "Registered by an admin of your workspace.",
+      "workspace": "Registered by an admin of {{workspace}}.",
       "dynamic": "Registered itself. Nobody has checked who made it.",
       "metadata_document": "Described by {{host}}. Nobody has checked who made it."
     },
@@ -440,7 +437,10 @@
     "answerFailed": {
       "title": "That didn’t go through",
       "lead": "Nothing was allowed. Try again."
-    }
+    },
+    "campbooks": "Campbooks",
+    "workspaceApp": "{{workspace}}’s app",
+    "yourWorkspace": "your workspace"
   },
   "scopes": {
     "openid": "Know who you are on Campbooks",
@@ -484,7 +484,8 @@
       "revokeLabel": "Revoke {{app}}",
       "confirmRevoke": "{{app}} stops working at once, until you allow it again.",
       "cancel": "Cancel",
-      "revokeFailed": "Couldn’t revoke it. Try again."
+      "revokeFailed": "Couldn’t revoke it. Try again.",
+      "workspaceApp": "Workspace app"
     },
     "workspace": {
       "title": "This workspace’s apps",

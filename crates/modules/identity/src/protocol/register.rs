@@ -37,6 +37,8 @@ use crate::{
 
 /// Registrations one address may make.
 const REGISTER_LIMIT: Limit = Limit::new("identity.register", 20, Duration::from_hours(1));
+/// Registrations the whole instance takes per hour, from every address.
+const REGISTER_ALL: Limit = Limit::new("identity.register_all", 300, Duration::from_hours(1));
 
 /// What a client sends (RFC 7591 §2; the fields read).
 #[derive(Debug, Deserialize, ToSchema)]
@@ -115,6 +117,10 @@ pub async fn register(
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &REGISTER_LIMIT, &RateKey::ip(ip))
+        .await?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &REGISTER_ALL, &RateKey::text("instance"))
         .await?;
     let Ok(Json(request)) = body else {
         return Ok(refuse(

@@ -7,7 +7,7 @@ use axum::{
     extract::{Path, State},
     http::StatusCode,
 };
-use campbooks_kernel::{AppState, Error, Operation, Problem, Result, Risk, auth::Scoped};
+use campbooks_kernel::{AppState, Error, Operation, Problem, Result, Risk, auth::Unbound};
 use uuid::Uuid;
 
 use crate::{
@@ -47,7 +47,7 @@ pub struct ConsentPath {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityWrite>,
+    Unbound { principal, .. }: Unbound<IdentityWrite>,
     Path(path): Path<ConsentPath>,
 ) -> Result<StatusCode> {
     let (issuer, account) = super::account(&deps, &principal)?;

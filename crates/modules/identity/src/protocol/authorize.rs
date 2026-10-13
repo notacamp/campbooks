@@ -9,7 +9,8 @@
 //!
 //! - the web app gets a code at once;
 //! - another client whose redirect is an exact `https` URI gets one at once
-//!   when a remembered consent already covers the request;
+//!   when a remembered consent (for that same redirect, less than 90 days
+//!   old) already covers the request;
 //! - otherwise the person answers the consent screen (`/consent`), after a
 //!   sign-in in the last ten minutes. A loopback or private-use-scheme
 //!   redirect (native apps, many agents) is asked every time: any app on the
@@ -154,7 +155,9 @@ pub async fn find_client(
             .await?;
         return metadata::client(
             &ctx.state.db,
+            &ctx.state.rate_limits,
             issuer.fetcher.as_ref(),
+            &issuer.document_failures,
             &url,
             &issuer.api_scopes,
             issuer.now(),
@@ -426,6 +429,8 @@ async fn decision(
             .await?
             .filter(|consent| {
                 consent.remembered
+                    && consent.remember_until.is_some_and(|until| until > now)
+                    && consent.redirect_uri == request.redirect_uri
                     && (consent.bound_workspace_id.is_some() || !client.binds_workspace())
                     && request
                         .scope
