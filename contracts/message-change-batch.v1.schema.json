@@ -1,0 +1,146 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/message-change-batch.v1.schema.json",
+  "title": "MessageChangeBatch v1",
+  "description": "What changed in one inbox, in order: upserts and removals of messages in provider-neutral form. Produced by the connectors module, stored as a blob (content type `application/vnd.campbooks.message-changes+json; version=1`) in the workspace, and applied by the job `conversations.apply_changes`. Applying is idempotent per (inbox, provider_message_id). Bodies and attachments are blobs the producer stores before the batch.",
+  "type": "object",
+  "required": ["version", "inbox", "changes"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "inbox": { "$ref": "#/$defs/uuid", "description": "The conversations inbox the batch is for." },
+    "changes": {
+      "type": "array",
+      "description": "Applied in this order.",
+      "items": { "$ref": "#/$defs/change" }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "blobRef": {
+      "description": "A blob stored in the workspace (campbooks_kernel::blobs::BlobRef).",
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "SHA-256 of the bytes." },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string", "minLength": 1 }
+      }
+    },
+    "address": {
+      "type": "object",
+      "required": ["address"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"], "description": "The display name, when given." },
+        "address": { "type": "string", "minLength": 1 }
+      }
+    },
+    "addresses": { "type": "array", "items": { "$ref": "#/$defs/address" } },
+    "change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "description": "The message exists at the provider in this state: insert it, or update its flags, mailbox state and labels.",
+          "required": ["op", "message"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "upsert" },
+            "message": { "$ref": "#/$defs/message" }
+          }
+        },
+        {
+          "type": "object",
+          "description": "The message is gone from the provider.",
+          "required": ["op", "provider_message_id"],
+          "additionalProperties": false,
+          "properties": {
+            "op": { "const": "remove" },
+            "provider_message_id": { "type": "string", "minLength": 1 }
+          }
+        }
+      ]
+    },
+    "message": {
+      "type": "object",
+      "required": ["provider_message_id", "from", "sent_at", "direction", "mailbox"],
+      "additionalProperties": false,
+      "properties": {
+        "provider_message_id": { "type": "string", "minLength": 1, "description": "Unique and stable within the inbox." },
+        "thread_key": { "type": ["string", "null"], "description": "The provider's thread id (Gmail threadId, Graph conversationId); messages sharing it form one conversation." },
+        "rfc_message_id": { "type": ["string", "null"], "description": "RFC 5322 Message-ID, without angle brackets." },
+        "in_reply_to": { "type": ["string", "null"], "description": "RFC 5322 In-Reply-To, without angle brackets." },
+        "references": { "type": "array", "items": { "type": "string" }, "description": "RFC 5322 References, oldest first, without angle brackets." },
+        "from": { "$ref": "#/$defs/address" },
+        "to": { "$ref": "#/$defs/addresses" },
+        "cc": { "$ref": "#/$defs/addresses" },
+        "reply_to": { "$ref": "#/$defs/addresses" },
+        "subject": { "type": "string" },
+        "sent_at": { "type": "string", "format": "date-time" },
+        "direction": { "enum": ["inbound", "outbound"], "description": "Received by the inbox, or sent from it." },
+        "headers": {
+          "type": "object",
+          "description": "The headers subset sorting reads, values as sent, unfolded.",
+          "additionalProperties": false,
+          "properties": {
+            "list_id": { "type": ["string", "null"] },
+            "list_unsubscribe": { "type": ["string", "null"] },
+            "precedence": { "type": ["string", "null"] },
+            "auto_submitted": { "type": ["string", "null"] }
+          }
+        },
+        "raw": { "oneOf": [{ "$ref": "#/$defs/blobRef" }, { "type": "null" }], "description": "The raw message (RFC 5322), when kept." },
+        "text": { "oneOf": [{ "$ref": "#/$defs/blobRef" }, { "type": "null" }], "description": "The plain-text part, UTF-8." },
+        "html": { "oneOf": [{ "$ref": "#/$defs/blobRef" }, { "type": "null" }], "description": "The HTML part, UTF-8. Untrusted." },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["filename", "content_type", "blob"],
+            "additionalProperties": false,
+            "properties": {
+              "filename": { "type": "string" },
+              "content_type": { "type": "string" },
+              "blob": { "$ref": "#/$defs/blobRef" },
+              "inline": { "type": "boolean" }
+            }
+          }
+        },
+        "mailbox": {
+          "type": "object",
+          "required": ["in_inbox"],
+          "additionalProperties": false,
+          "properties": {
+            "in_inbox": { "type": "boolean", "description": "In the inbox (not archived)." },
+            "in_spam": { "type": "boolean" },
+            "in_trash": { "type": "boolean" }
+          }
+        },
+        "labels": {
+          "type": "array",
+          "description": "The provider's user labels (Gmail labels, Graph categories, IMAP keywords).",
+          "items": {
+            "type": "object",
+            "required": ["key", "name"],
+            "additionalProperties": false,
+            "properties": {
+              "key": { "type": "string", "minLength": 1, "description": "The provider's stable key." },
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "categories": {
+          "type": "array",
+          "description": "The provider's own sorting (Gmail's category tabs), normalised.",
+          "items": { "enum": ["updates", "promotions", "social", "forums"] }
+        },
+        "read": { "type": "boolean" },
+        "starred": { "type": "boolean" }
+      }
+    }
+  }
+}
