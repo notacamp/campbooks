@@ -316,6 +316,27 @@ export function ConversationReader({
           }}
         />
         {replyButtons}
+        {renderReplySlot === undefined ? null : (
+          // Phones: Reply is in the floating bar; these two stay in the header.
+          <span className="flex gap-1 md:hidden">
+            <IconButton
+              label={t("actions.replyAll")}
+              icon="reply-all"
+              shortcut="item.reply_all"
+              onClick={() => {
+                askReply("reply_all");
+              }}
+            />
+            <IconButton
+              label={t("actions.forward")}
+              icon="forward"
+              shortcut="item.forward"
+              onClick={() => {
+                askReply("forward");
+              }}
+            />
+          </span>
+        )}
         <Spacer />
         <span className="flex gap-1 max-md:hidden">
           <IconButton
@@ -391,31 +412,34 @@ export function ConversationReader({
         ))}
         {renderReplySlot?.(replyContext)}
       </ReaderBody>
-      <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
-        {renderReplySlot === undefined ? null : (
+      {/* While the composer is open it owns the bottom of the screen. */}
+      {reply === null ? (
+        <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
+          {renderReplySlot === undefined ? null : (
+            <Button
+              variant="primary"
+              size="lg"
+              icon="reply"
+              grow
+              onClick={() => {
+                askReply("reply");
+              }}
+            >
+              {tShortcuts("item.reply")}
+            </Button>
+          )}
           <Button
-            variant="primary"
             size="lg"
-            icon="reply"
+            icon="archive"
             grow
             onClick={() => {
-              askReply("reply");
+              onDone(conversation);
             }}
           >
-            {tShortcuts("item.reply")}
+            {tShortcuts("item.done")}
           </Button>
-        )}
-        <Button
-          size="lg"
-          icon="archive"
-          grow
-          onClick={() => {
-            onDone(conversation);
-          }}
-        >
-          {tShortcuts("item.done")}
-        </Button>
-      </ActionBar>
+        </ActionBar>
+      ) : null}
     </>
   );
 }
