@@ -304,6 +304,7 @@ struct Row {
     verdict: Option<String>,
     verdict_message_id: Option<MessageId>,
     verdict_by: Option<UserId>,
+    latest_inbound_id: Option<MessageId>,
 }
 
 impl Row {
@@ -335,7 +336,8 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
         SELECT message_id AS "message_id: MessageId", reason, trust, basis, question,
                decision_id AS "decision_id: DecisionId", due_on, urgent, state, cleared_because,
                verdict, verdict_message_id AS "verdict_message_id: MessageId",
-               verdict_by AS "verdict_by: UserId"
+               verdict_by AS "verdict_by: UserId",
+               latest_inbound_id AS "latest_inbound_id: MessageId"
           FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE
         "#,
         conversation as ConversationId,
@@ -383,7 +385,7 @@ async fn candidate(
     id: ConversationId,
     row: Option<&Row>,
     settings: &NeedSettings,
-) -> Result<Option<Need>> {
+) -> Result<(Option<Need>, Option<MessageId>)> {
     let newest = sqlx::query!(
         r#"SELECT id AS "id: MessageId", sent_at FROM conversations.messages
             WHERE conversation_id = $1 AND direction = 'inbound'
@@ -410,11 +412,12 @@ async fn candidate(
             );
         }
     }
-    Ok(match (raised, row) {
+    let need = match (raised, row) {
         (Some(need), _) => Some(need),
         (None, Some(row)) if row.state == "open" => Some(row.need()?),
         (None, _) => None,
-    })
+    };
+    Ok((need, newest.map(|n| n.id)))
 }
 
 /// What happened in conversation `id` since `need`'s message, given whether
@@ -484,7 +487,7 @@ pub async fn refresh(
     };
     let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
-    let need = candidate(tx, id, row.as_ref(), settings).await?;
+    let (need, latest) = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
         return Ok(());
     };
@@ -496,14 +499,7 @@ pub async fn refresh(
         Settled::Open(need) => (need, None),
         Settled::Cleared(need, cause) => (need, Some(*cause)),
     };
-    // A need that was never open is not announced as cleared.
-    let was_open = row.as_ref().is_some_and(|r| r.state == "open");
-    if cause.is_some() && !was_open && row.as_ref().is_none_or(|r| r.message_id != need.message) {
-        return Ok(());
-    }
-    if let Some(row) = &row
-        && unchanged(row, need, cause)?
-    {
+    if !worth_announcing(row.as_ref(), need, cause, latest)? {
         return Ok(());
     }
     let cleared_by = match cause {
@@ -514,16 +510,17 @@ pub async fn refresh(
         r#"
         INSERT INTO conversations.needs
             (conversation_id, workspace_id, message_id, reason, trust, basis, question,
-             decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at)
+             decision_id, due_on, urgent, state, cleared_because, cleared_by, cleared_at,
+             latest_inbound_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                CASE WHEN $12::text IS NULL THEN NULL ELSE now() END)
+                CASE WHEN $12::text IS NULL THEN NULL ELSE now() END, $14)
         ON CONFLICT (conversation_id) DO UPDATE
            SET message_id = EXCLUDED.message_id, reason = EXCLUDED.reason,
                trust = EXCLUDED.trust, basis = EXCLUDED.basis, question = EXCLUDED.question,
                decision_id = EXCLUDED.decision_id, due_on = EXCLUDED.due_on,
                urgent = EXCLUDED.urgent, state = EXCLUDED.state,
                cleared_because = EXCLUDED.cleared_because, cleared_by = EXCLUDED.cleared_by,
-               cleared_at = EXCLUDED.cleared_at,
+               cleared_at = EXCLUDED.cleared_at, latest_inbound_id = EXCLUDED.latest_inbound_id,
                revision = conversations.needs.revision + 1, updated_at = now()
         RETURNING revision
         "#,
@@ -540,6 +537,7 @@ pub async fn refresh(
         if cause.is_some() { "cleared" } else { "open" },
         cause.map(ClearCause::as_str),
         cleared_by.map(|u| *u.as_uuid()),
+        latest as Option<MessageId>,
     )
     .fetch_one(&mut **tx)
     .await?;
@@ -564,10 +562,32 @@ pub async fn refresh(
                 },
                 cleared_because: cause,
                 cleared_by,
+                latest_message: latest,
             },
         )
         .await?;
     Ok(())
+}
+
+/// Whether settling `need` (cleared by `cause`, if any) changes what was
+/// announced in `row`, given the conversation's newest inbound message.
+fn worth_announcing(
+    row: Option<&Row>,
+    need: &Need,
+    cause: Option<ClearCause>,
+    latest: Option<MessageId>,
+) -> Result<bool> {
+    let Some(row) = row else {
+        // A need that was never open is not announced as cleared.
+        return Ok(cause.is_none());
+    };
+    if cause.is_some() && row.state != "open" && row.message_id != need.message {
+        return Ok(false);
+    }
+    // The sender writing again is news even when it raises nothing (it ends
+    // a member's Later), as long as the need is still open.
+    let newer_message = row.state == "open" && cause.is_none() && row.latest_inbound_id != latest;
+    Ok(newer_message || !unchanged(row, need, cause)?)
 }
 
 fn unchanged(row: &Row, need: &Need, cause: Option<ClearCause>) -> Result<bool> {
@@ -615,6 +635,7 @@ pub async fn conversation_gone(
                     need: None,
                     cleared_because: Some(ClearCause::Superseded),
                     cleared_by: None,
+                    latest_message: None,
                 },
             )
             .await?;

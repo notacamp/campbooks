@@ -1730,6 +1730,11 @@ export interface components {
          * @enum {string}
          */
         ClientType: "confidential" | "public";
+        /** @description Yes to a question. */
+        Confirm: {
+            /** @description The message the question the member saw comes from. */
+            message_id: components["schemas"]["MessageId"];
+        };
         /** @description An app the caller let in. */
         ConnectedApp: {
             /** @description The app's client id. */
@@ -2920,6 +2925,12 @@ export interface components {
         };
         /** @description A member's verdict on a need. */
         Resolve: {
+            /**
+             * @description The message the need the member saw comes from (`NeedView.message_id`):
+             *     when the open need comes from another one, nothing is recorded (409
+             *     `need_changed`).
+             */
+            message_id: components["schemas"]["MessageId"];
             /** @description Done or Not needed. */
             outcome: components["schemas"]["Outcome"];
         };
@@ -4373,6 +4384,11 @@ export interface operations {
             query?: {
                 /** @description `open` (default) or `cleared`. */
                 state?: "open" | "cleared";
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0,
+                 *     UTC): where their day starts, for Done today and for what is overdue.
+                 */
+                utc_offset?: number;
             };
             header?: never;
             path: {
@@ -4392,7 +4408,7 @@ export interface operations {
                     "application/json": components["schemas"]["AttentionList"];
                 };
             };
-            /** @description Not a state. */
+            /** @description Not a state, or an offset beyond 14 hours (`invalid_offset`). */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -5333,7 +5349,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Confirm"];
+            };
+        };
         responses: {
             /** @description The conversation afterwards. */
             200: {
@@ -5342,6 +5362,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No message id. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
                 };
             };
             /** @description No valid access token. */
@@ -5371,7 +5400,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description No question to answer (`no_open_need`). */
+            /** @description No question to answer (`no_open_need`), or not the one you saw (`need_changed`). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5506,7 +5535,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It needs nothing (`no_open_need`). */
+            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
             409: {
                 headers: {
                     [name: string]: unknown;

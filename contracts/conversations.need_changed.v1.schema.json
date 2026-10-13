@@ -33,7 +33,11 @@
     "cleared_because": {
       "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded"]
     },
-    "cleared_by": { "$ref": "#/$defs/uuid" }
+    "cleared_by": { "$ref": "#/$defs/uuid" },
+    "latest_message": {
+      "description": "The conversation's newest inbound message. When it changes the sender wrote again: a member's Later ends, even if the need did not change.",
+      "$ref": "#/$defs/uuid"
+    }
   },
   "$defs": {
     "uuid": {

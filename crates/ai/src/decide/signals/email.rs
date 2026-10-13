@@ -20,6 +20,7 @@ use std::{
     time::Instant,
 };
 
+use campbooks_kernel::text::displayable;
 use regex::Regex;
 use serde::Deserialize;
 
@@ -1584,7 +1585,10 @@ fn quoted_sentence(fresh: &str, reason: &Reason) -> Option<String> {
 }
 
 fn sentence_at(candidate: &str, needle: &str) -> Option<String> {
-    let flat = candidate.split_whitespace().collect::<Vec<_>>().join(" ");
+    // Whitespace collapsed first (so lines do not run together), then what
+    // could reorder or hide text dropped: bidi controls, zero-width and
+    // control characters (`campbooks_kernel::text`).
+    let flat = displayable(&candidate.split_whitespace().collect::<Vec<_>>().join(" "));
     let normalised = flat.to_lowercase().replace('\u{2019}', "'");
     if flat.is_empty() || !normalised.contains(needle) {
         return None;
@@ -1682,6 +1686,20 @@ mod tests {
             d.reasons[0].sentence.as_deref(),
             Some("Your invoice CH-20418 for €148.00 is due on 16 October.")
         );
+    }
+
+    #[test]
+    fn quotes_drop_what_reorders_or_hides_text() {
+        // An RLO inside an IBAN would show its digits reversed.
+        let env = mail(
+            "billing@supplier.example",
+            "Invoice",
+            "Payment due: please pay to IBAN PT50\u{202E}0002 0123\u{200B}4567 by Friday. Thanks.",
+        );
+        let d = ask(&env, triage::ASKS_ACTION).unwrap();
+        let sentence = d.reasons[0].sentence.clone().unwrap();
+        assert!(!sentence.contains('\u{202E}') && !sentence.contains('\u{200B}'));
+        assert!(sentence.contains("PT500002 01234567"), "{sentence}");
     }
 
     #[test]

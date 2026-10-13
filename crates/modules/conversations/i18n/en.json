@@ -17,6 +17,7 @@
     "too_late": "It is too late to undo: the message has already left.",
     "invalid_ids": "Ask for between 1 and {{max}} conversation ids, separated by commas.",
     "no_open_need": "Nothing here needs you any more.",
-    "nothing_to_reopen": "There is nothing to bring back here."
+    "nothing_to_reopen": "There is nothing to bring back here.",
+    "need_changed": "This changed while you were looking at it. Have another look."
   }
 }

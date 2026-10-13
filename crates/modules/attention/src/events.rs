@@ -64,6 +64,9 @@ pub struct ConversationNeedChanged {
     /// The member who cleared it.
     #[serde(default)]
     pub cleared_by: Option<UserId>,
+    /// The conversation's newest inbound message (the sender writing again).
+    #[serde(default)]
+    pub latest_message: Option<String>,
 }
 
 /// The need as `conversations.need_changed` carries it.

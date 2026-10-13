@@ -207,7 +207,7 @@ async fn read(
         ItemRow,
         r#"
         SELECT i.id AS "id: ItemId", i.record_type, i.record_id, i.container_type,
-               i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent,
+               i.container_id, i.cause_type, i.cause_id, i.reason AS "reason!", i.trust AS "trust!", i.due_on, i.urgent,
                i.since, i.state, i.cleared_because, i.cleared_by AS "cleared_by: _",
                i.cleared_at, s.until AS "snoozed_until?"
           FROM attention.items i

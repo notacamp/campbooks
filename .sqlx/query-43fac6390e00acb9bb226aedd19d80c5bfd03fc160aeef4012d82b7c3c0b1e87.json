@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT message_id AS \"message_id: MessageId\", reason, trust, basis, question,\n               decision_id AS \"decision_id: DecisionId\", due_on, urgent, state, cleared_because,\n               verdict, verdict_message_id AS \"verdict_message_id: MessageId\",\n               verdict_by AS \"verdict_by: UserId\"\n          FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE\n        ",
+  "query": "\n        SELECT message_id AS \"message_id: MessageId\", reason, trust, basis, question,\n               decision_id AS \"decision_id: DecisionId\", due_on, urgent, state, cleared_because,\n               verdict, verdict_message_id AS \"verdict_message_id: MessageId\",\n               verdict_by AS \"verdict_by: UserId\",\n               latest_inbound_id AS \"latest_inbound_id: MessageId\"\n          FROM conversations.needs WHERE conversation_id = $1 FOR UPDATE\n        ",
   "describe": {
     "columns": [
       {
@@ -145,6 +145,17 @@
             "name": "verdict_by"
           }
         }
+      },
+      {
+        "ordinal": 13,
+        "name": "latest_inbound_id: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "latest_inbound_id"
+          }
+        }
       }
     ],
     "parameters": {
@@ -165,8 +176,9 @@
       true,
       true,
       true,
+      true,
       true
     ]
   },
-  "hash": "27ab1ba132fa7c24a80a090d1fb834d87e7de962918bfded5dd3d40c3bcb6ed8"
+  "hash": "43fac6390e00acb9bb226aedd19d80c5bfd03fc160aeef4012d82b7c3c0b1e87"
 }

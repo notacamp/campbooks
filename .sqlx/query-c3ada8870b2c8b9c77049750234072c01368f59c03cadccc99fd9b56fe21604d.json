@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n               i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on, i.urgent,\n               i.since, i.state, i.cleared_because, i.cleared_by AS \"cleared_by: _\",\n               i.cleared_at, s.until AS \"snoozed_until?\"\n          FROM attention.items i\n          LEFT JOIN attention.snoozes s ON s.item_id = i.id AND s.user_id = $2\n         WHERE i.id = $1\n        ",
+  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       s.until AS \"snoozed_until?\"\n                  FROM attention.items i\n                  LEFT JOIN attention.snoozes s\n                         ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4\n                 WHERE i.workspace_id = $1\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND i.reason IS NOT NULL\n                   AND ((i.state = 'cleared' AND i.cleared_at >= $5\n                         AND i.cleared_because IS DISTINCT FROM 'superseded')\n                        OR (i.state = 'open' AND s.created_at >= $5))\n                 ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id\n                ",
   "describe": {
     "columns": [
       {
@@ -82,7 +82,7 @@
       },
       {
         "ordinal": 7,
-        "name": "reason",
+        "name": "reason!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +93,7 @@
       },
       {
         "ordinal": 8,
-        "name": "trust",
+        "name": "trust!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -194,7 +194,10 @@
     "parameters": {
       "Left": [
         "Uuid",
-        "Uuid"
+        "TextArray",
+        "Uuid",
+        "Timestamptz",
+        "Timestamptz"
       ]
     },
     "nullable": [
@@ -205,17 +208,17 @@
       false,
       false,
       false,
-      false,
-      false,
-      true,
-      false,
-      false,
-      false,
       true,
       true,
       true,
-      true
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false
     ]
   },
-  "hash": "2c60aa6cc737b6c95dae0910605451715fc5688ae9774eaa182f1308febe7eba"
+  "hash": "c3ada8870b2c8b9c77049750234072c01368f59c03cadccc99fd9b56fe21604d"
 }

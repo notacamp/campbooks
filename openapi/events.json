@@ -483,6 +483,17 @@
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox: who may see the need."
           },
+          "latest_message": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The conversation's newest inbound message: when it changes, the\nsender wrote again (a member's Later ends) even if the need did not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "message": {
             "$ref": "#/components/schemas/MessageId",
             "description": "The inbound message the need comes from."

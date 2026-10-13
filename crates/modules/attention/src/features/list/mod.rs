@@ -4,7 +4,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Operation, Problem, Result,
+    AppState, Error, Operation, Problem, Result,
     db::BeginFor as _,
     extract,
     tenancy::{Workspace, WorkspaceId},
@@ -37,7 +37,14 @@ pub struct ListQuery {
     #[serde(default)]
     #[param(inline)]
     pub state: ListState,
+    /// The caller's offset from UTC, in minutes (-840 to 840; default 0,
+    /// UTC): where their day starts, for Done today and for what is overdue.
+    #[serde(default)]
+    pub utc_offset: i32,
 }
+
+/// The widest offset from UTC a time zone has (UTC+14:00), in minutes.
+const MAX_OFFSET_MINUTES: i32 = 14 * 60;
 
 /// How many open items there are for one reason.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -70,7 +77,7 @@ pub struct AttentionList {
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "The caller's items.", body = AttentionList),
-        (status = BAD_REQUEST, description = "Not a state.", body = Problem,
+        (status = BAD_REQUEST, description = "Not a state, or an offset beyond 14 hours (`invalid_offset`).", body = Problem,
             content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
@@ -85,9 +92,14 @@ pub async fn handler(
     workspace: Workspace<AttentionRead>,
     extract::Query(query): extract::Query<ListQuery>,
 ) -> Result<Json<AttentionList>> {
+    if query.utc_offset.abs() > MAX_OFFSET_MINUTES {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_offset")));
+    }
     let access = &workspace.access;
     let now = Utc::now();
-    let today = now.date_naive();
+    let offset = TimeDelta::minutes(i64::from(query.utc_offset));
+    // The caller's own today.
+    let today = (now + offset).date_naive();
     let mut tx = state.db.begin_for(access.workspace).await?;
     let visible = visible_containers(&state, &mut tx, access).await?;
     let user = access.user.map(|u| *u.as_uuid());
@@ -97,7 +109,7 @@ pub async fn handler(
                 ItemRow,
                 r#"
                 SELECT i.id AS "id: ItemId", i.record_type, i.record_id, i.container_type,
-                       i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on,
+                       i.container_id, i.cause_type, i.cause_id, i.reason AS "reason!", i.trust AS "trust!", i.due_on,
                        i.urgent, i.since, i.state, i.cleared_because,
                        i.cleared_by AS "cleared_by: _", i.cleared_at,
                        NULL::timestamptz AS "snoozed_until?"
@@ -123,12 +135,13 @@ pub async fn handler(
             .await?
         }
         ListState::Cleared => {
-            let start = today.and_hms_opt(0, 0, 0).unwrap_or_default().and_utc();
+            // Midnight where the caller is, as an instant.
+            let start = today.and_hms_opt(0, 0, 0).unwrap_or_default().and_utc() - offset;
             sqlx::query_as!(
                 ItemRow,
                 r#"
                 SELECT i.id AS "id: ItemId", i.record_type, i.record_id, i.container_type,
-                       i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on,
+                       i.container_id, i.cause_type, i.cause_id, i.reason AS "reason!", i.trust AS "trust!", i.due_on,
                        i.urgent, i.since, i.state, i.cleared_because,
                        i.cleared_by AS "cleared_by: _", i.cleared_at,
                        s.until AS "snoozed_until?"
@@ -137,6 +150,7 @@ pub async fn handler(
                          ON s.item_id = i.id AND s.user_id = $3 AND s.until > $4
                  WHERE i.workspace_id = $1
                    AND i.container_type || ':' || i.container_id = ANY($2)
+                   AND i.reason IS NOT NULL
                    AND ((i.state = 'cleared' AND i.cleared_at >= $5
                          AND i.cleared_because IS DISTINCT FROM 'superseded')
                         OR (i.state = 'open' AND s.created_at >= $5))

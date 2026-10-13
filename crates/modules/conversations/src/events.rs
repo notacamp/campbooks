@@ -247,6 +247,10 @@ pub struct NeedChanged {
     /// The member who cleared it, when one did.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cleared_by: Option<UserId>,
+    /// The conversation's newest inbound message: when it changes, the
+    /// sender wrote again (a member's Later ends) even if the need did not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_message: Option<MessageId>,
 }
 
 impl DomainEvent for NeedChanged {

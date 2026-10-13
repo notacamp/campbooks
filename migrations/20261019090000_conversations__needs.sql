@@ -28,6 +28,9 @@ CREATE TABLE conversations.needs (
     verdict_message_id uuid,
     verdict_by uuid,
     verdict_correction_id uuid,
+    -- The newest inbound message when the need was last announced: a newer
+    -- one (the sender writing again) is announced even when it raises nothing.
+    latest_inbound_id uuid,
     -- Grows with every change; consumers apply only newer revisions.
     revision bigint NOT NULL DEFAULT 1,
     updated_at timestamptz NOT NULL DEFAULT now(),

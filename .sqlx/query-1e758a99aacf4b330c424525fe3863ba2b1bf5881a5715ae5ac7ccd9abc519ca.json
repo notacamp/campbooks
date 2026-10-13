@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n                SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n                       i.container_id, i.cause_type, i.cause_id, i.reason, i.trust, i.due_on,\n                       i.urgent, i.since, i.state, i.cleared_because,\n                       i.cleared_by AS \"cleared_by: _\", i.cleared_at,\n                       NULL::timestamptz AS \"snoozed_until?\"\n                  FROM attention.items i\n                 WHERE i.workspace_id = $1 AND i.state = 'open'\n                   AND i.container_type || ':' || i.container_id = ANY($2)\n                   AND (i.due_on IS NULL OR i.due_on >= $3)\n                   AND NOT EXISTS (SELECT 1 FROM attention.snoozes s\n                                    WHERE s.item_id = i.id AND s.user_id = $4 AND s.until > $5)\n                 ORDER BY CASE i.reason WHEN 'review' THEN 0 WHEN 'reply' THEN 1\n                                        WHEN 'decide' THEN 2 WHEN 'do' THEN 3 ELSE 4 END,\n                          (i.due_on IS NOT NULL AND i.due_on < $6) DESC,\n                          i.due_on ASC NULLS LAST, i.urgent DESC, i.since ASC, i.id\n                ",
+  "query": "\n        SELECT i.id AS \"id: ItemId\", i.record_type, i.record_id, i.container_type,\n               i.container_id, i.cause_type, i.cause_id, i.reason AS \"reason!\", i.trust AS \"trust!\", i.due_on, i.urgent,\n               i.since, i.state, i.cleared_because, i.cleared_by AS \"cleared_by: _\",\n               i.cleared_at, s.until AS \"snoozed_until?\"\n          FROM attention.items i\n          LEFT JOIN attention.snoozes s ON s.item_id = i.id AND s.user_id = $2\n         WHERE i.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -82,7 +82,7 @@
       },
       {
         "ordinal": 7,
-        "name": "reason",
+        "name": "reason!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -93,7 +93,7 @@
       },
       {
         "ordinal": 8,
-        "name": "trust",
+        "name": "trust!",
         "type_info": "Text",
         "origin": {
           "Table": {
@@ -183,17 +183,18 @@
         "ordinal": 16,
         "name": "snoozed_until?",
         "type_info": "Timestamptz",
-        "origin": "Expression"
+        "origin": {
+          "Table": {
+            "table": "attention.snoozes",
+            "name": "until"
+          }
+        }
       }
     ],
     "parameters": {
       "Left": [
         "Uuid",
-        "TextArray",
-        "Date",
-        "Uuid",
-        "Timestamptz",
-        "Date"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -204,17 +205,17 @@
       false,
       false,
       false,
-      false,
-      false,
-      true,
-      false,
-      false,
-      false,
       true,
       true,
       true,
-      null
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
     ]
   },
-  "hash": "2fb57f959b48e28461251a40e85d67b0feeba197e3bdef28f080f7beb22beed9"
+  "hash": "1e758a99aacf4b330c424525fe3863ba2b1bf5881a5715ae5ac7ccd9abc519ca"
 }

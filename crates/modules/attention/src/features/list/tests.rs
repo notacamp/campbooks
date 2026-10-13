@@ -21,6 +21,7 @@ fn need(n: u32, reason: Reason, due_in: Option<i64>) -> Need {
         reason,
         due_on: due_in.map(|days| Utc::now().date_naive() + TimeDelta::days(days)),
         sent_at: Utc::now() - TimeDelta::hours(i64::from(n)),
+        latest: None,
     }
 }
 
@@ -145,4 +146,29 @@ async fn done_today_lists_what_left_and_what_was_put_off(db: PgPool) {
     assert!(items[0]["snoozed_until"].is_string());
     assert_eq!(items[1]["cleared_because"], "done");
     assert_eq!(items[1]["cleared_by"], sam_id.to_string());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn today_is_the_callers_today(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    // Due yesterday for someone 14 hours ahead of UTC is still due "the day
+    // after" in UTC: what is overdue follows the caller's clock.
+    let ahead = (Utc::now() + TimeDelta::hours(14)).date_naive();
+    let mut due = need(1, Reason::Pay, None);
+    due.due_on = Some(ahead - TimeDelta::days(1));
+    kit.need(workspace, &due).await;
+    let uri = format!("/api/v1/w/{workspace}/attention?utc_offset=840");
+    let list = kit.get(&sam, &uri).await;
+    assert_eq!(list.json["items"][0]["overdue"], true);
+    let bad = kit
+        .get(
+            &sam,
+            &format!("/api/v1/w/{workspace}/attention?utc_offset=900"),
+        )
+        .await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+    assert_eq!(bad.json["code"], "invalid_offset");
 }

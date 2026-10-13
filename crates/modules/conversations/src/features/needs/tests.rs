@@ -81,7 +81,7 @@ async fn need_events_follow_the_contract_and_hold_no_personal_data(db: PgPool) {
     kit.post(
         &sam,
         &format!("{base}/resolve"),
-        Some(json!({"outcome": "done"})),
+        Some(json!({"outcome": "done", "message_id": kit.message_of("needs-3").await})),
     )
     .await;
     kit.ingest(workspace, inbox, "needs-replied").await;
@@ -116,7 +116,7 @@ async fn done_and_undo(db: PgPool) {
         .post(
             &sam,
             &format!("{base}/resolve"),
-            Some(json!({"outcome": "done"})),
+            Some(json!({"outcome": "done", "message_id": kit.message_of("needs-2").await})),
         )
         .await;
     assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
@@ -131,7 +131,7 @@ async fn done_and_undo(db: PgPool) {
         .post(
             &sam,
             &format!("{base}/resolve"),
-            Some(json!({"outcome": "done"})),
+            Some(json!({"outcome": "done", "message_id": kit.message_of("needs-2").await})),
         )
         .await;
     assert_eq!(again.status, StatusCode::CONFLICT);
@@ -163,7 +163,7 @@ async fn not_needed_teaches_and_undo_withdraws_it(db: PgPool) {
     kit.post(
         &sam,
         &format!("{base}/resolve"),
-        Some(json!({"outcome": "not_needed"})),
+        Some(json!({"outcome": "not_needed", "message_id": kit.message_of("needs-5").await})),
     )
     .await;
     let (question, from, to, source, withdrawn): (String, String, String, String, bool) =
@@ -205,7 +205,7 @@ async fn it_is_safe_corrects_the_warning(db: PgPool) {
         .post(
             &sam,
             &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
-            Some(json!({"outcome": "not_needed"})),
+            Some(json!({"outcome": "not_needed", "message_id": kit.message_of("needs-4").await})),
         )
         .await;
     assert_eq!(safe.json["need"], Value::Null);
@@ -256,7 +256,7 @@ async fn done_in_a_shared_inbox_clears_it_for_everyone(db: PgPool) {
     kit.post(
         &sam,
         &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
-        Some(json!({"outcome": "done"})),
+        Some(json!({"outcome": "done", "message_id": kit.message_of("needs-1").await})),
     )
     .await;
     let seen_by_leo = summary(&kit, &leo, workspace, "needs-1").await;
@@ -272,7 +272,7 @@ async fn readers_and_strangers_cannot_resolve(db: PgPool) {
     let (eve, _) = kit.member("eve", workspace);
     let id = kit.conversation_of("needs-1").await;
     let uri = format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve");
-    let body = Some(json!({"outcome": "done"}));
+    let body = Some(json!({"outcome": "done", "message_id": kit.message_of("needs-1").await}));
     let denied = kit.post(&ana, &uri, body.clone()).await;
     assert_eq!(denied.status, StatusCode::FORBIDDEN);
     assert_eq!(denied.json["code"], "inbox_read_only");
@@ -281,7 +281,11 @@ async fn readers_and_strangers_cannot_resolve(db: PgPool) {
         StatusCode::NOT_FOUND
     );
     let bad = kit
-        .post(&ana, &uri, Some(json!({"outcome": "later"})))
+        .post(
+            &ana,
+            &uri,
+            Some(json!({"outcome": "later", "message_id": kit.message_of("needs-1").await})),
+        )
         .await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 }
@@ -329,4 +333,46 @@ async fn listing_by_ids_leaves_out_what_you_cannot_see(db: PgPool) {
         .await;
     assert_eq!(bad.status, StatusCode::BAD_REQUEST);
     assert_eq!(bad.json["code"], "invalid_ids");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn acting_on_a_need_that_changed_records_nothing(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let id = kit.conversation_of("needs-1").await;
+    // The member saw the need of another (older) message.
+    let stale = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
+            Some(json!({"outcome": "not_needed", "message_id": kit.message_of("needs-2").await})),
+        )
+        .await;
+    assert_eq!(stale.status, StatusCode::CONFLICT);
+    assert_eq!(stale.json["code"], "need_changed");
+    let corrections: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.corrections")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(corrections, 0);
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_sender_writing_again_is_announced_even_without_a_new_need(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, _) = sams_needs(&kit).await;
+    let before = kit.events("conversations.need_changed").await.len();
+    kit.ingest(workspace, inbox, "needs-followup").await;
+    let events = kit.events("conversations.need_changed").await;
+    assert_eq!(events.len(), before + 1, "{events:?}");
+    let last = events.last().unwrap();
+    // Same need (Pedro's lease), a newer message in the conversation.
+    assert_eq!(last["need"]["reason"], "do");
+    assert_eq!(last["message"], kit.message_of("needs-2").await.as_str());
+    assert_eq!(
+        last["latest_message"],
+        kit.message_of("needs-7").await.as_str()
+    );
 }

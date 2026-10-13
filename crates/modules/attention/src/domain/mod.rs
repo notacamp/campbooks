@@ -222,3 +222,18 @@ pub async fn visible_containers(
 pub fn key(reference: &RecordRef) -> String {
     format!("{}:{}", reference.record_type, reference.id)
 }
+
+/// Forget every item inside `container` (and their snoozes) in `conn`'s
+/// workspace: the hook for when the owning module deletes a container, such
+/// as an inbox (campbooks-cloud#117). Returns how many items went.
+pub async fn purge_container(conn: &mut PgConnection, container: &RecordRef) -> Result<u64> {
+    let gone = sqlx::query!(
+        "DELETE FROM attention.items WHERE container_type = $1 AND container_id = $2",
+        container.record_type,
+        container.id,
+    )
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(gone)
+}

@@ -18,8 +18,13 @@ CREATE TABLE attention.items (
     -- The record that raised it (`conversations.message`): a new cause ends a snooze.
     cause_type text NOT NULL,
     cause_id text NOT NULL,
-    reason text NOT NULL CHECK (reason IN ('review', 'reply', 'decide', 'do', 'pay')),
-    trust text NOT NULL CHECK (trust IN ('sure', 'check')),
+    -- The record's newest cause the producer announced (the sender's newest
+    -- message): when it changes, every member's Later ends.
+    latest_id text,
+    -- NULL only on a tombstone: a clear that arrived before its open (deliveries
+    -- are not ordered), kept so the late open cannot reopen it.
+    reason text CHECK (reason IN ('review', 'reply', 'decide', 'do', 'pay')),
+    trust text CHECK (trust IN ('sure', 'check')),
     due_on date,
     urgent boolean NOT NULL DEFAULT false,
     -- When its cause arrived.
@@ -32,11 +37,13 @@ CREATE TABLE attention.items (
     -- The producer's revision of this record's need: only newer ones apply.
     producer_revision bigint NOT NULL,
     updated_at timestamptz NOT NULL DEFAULT now(),
-    UNIQUE (workspace_id, record_type, record_id)
+    UNIQUE (workspace_id, record_type, record_id),
+    CHECK (state = 'cleared' OR (reason IS NOT NULL AND trust IS NOT NULL))
 );
 CREATE INDEX items_open_idx ON attention.items (workspace_id, reason, due_on) WHERE state = 'open';
 CREATE INDEX items_cleared_idx ON attention.items (workspace_id, cleared_at DESC)
     WHERE state = 'cleared';
+CREATE INDEX items_container_idx ON attention.items (workspace_id, container_type, container_id);
 
 -- "Later": a member's own snooze of an item, until a time or a new cause.
 CREATE TABLE attention.snoozes (

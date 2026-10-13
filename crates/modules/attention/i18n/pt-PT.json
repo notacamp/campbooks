@@ -1,6 +1,7 @@
 {
   "errors": {
     "invalid_until": "Escolha uma hora posterior a agora e a menos de um ano.",
-    "snooze_needs_member": "Só um membro pode deixar algo para mais tarde."
+    "snooze_needs_member": "Só um membro pode deixar algo para mais tarde.",
+    "invalid_offset": "A diferença em relação ao UTC tem de estar dentro de 14 horas."
   }
 }

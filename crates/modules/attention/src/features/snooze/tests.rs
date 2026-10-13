@@ -22,6 +22,7 @@ fn need(revision: i64, message: &str) -> Need {
         reason: Reason::Reply,
         due_on: None,
         sent_at: Utc::now() - TimeDelta::hours(1),
+        latest: None,
     }
 }
 
@@ -119,4 +120,30 @@ async fn later_needs_a_future_time_a_member_and_an_item_you_can_see(db: PgPool) 
         kit.post(&reader, &uri, tomorrow).await.status,
         StatusCode::FORBIDDEN
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_sender_writing_again_ends_later_even_without_a_new_need(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    kit.need(workspace, &need(1, FIRST)).await;
+    let item = kit.get(&sam, &list_uri(workspace)).await.json["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let monday = Utc::now() + TimeDelta::days(4);
+    kit.post(
+        &sam,
+        &format!("{}/{item}/snooze", list_uri(workspace)),
+        Some(json!({"until": monday})),
+    )
+    .await;
+    assert_eq!(count(&kit, &sam, workspace).await, 0);
+    // Same need (same cause), a newer message from the sender.
+    let mut again = need(2, FIRST);
+    again.latest = Some(FOLLOW_UP.into());
+    kit.need(workspace, &again).await;
+    assert_eq!(count(&kit, &sam, workspace).await, 1);
 }

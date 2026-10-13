@@ -48,6 +48,18 @@ pub enum Outcome {
 pub struct Resolve {
     /// Done or Not needed.
     pub outcome: Outcome,
+    /// The message the need the member saw comes from (`NeedView.message_id`):
+    /// when the open need comes from another one, nothing is recorded (409
+    /// `need_changed`).
+    pub message_id: MessageId,
+}
+
+/// Yes to a question.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Confirm {
+    /// The message the question the member saw comes from.
+    pub message_id: MessageId,
 }
 
 /// Mark what a conversation needs as done, or as not needed.
@@ -76,8 +88,8 @@ pub struct Resolve {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such conversation, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "It needs nothing (`no_open_need`).", body = Problem,
-            content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`).",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn resolve(
@@ -97,6 +109,7 @@ pub async fn resolve(
         &workspace.access,
         path.conversation_id,
         verdict,
+        body.message_id,
     )
     .await
     .map(Json)
@@ -117,16 +130,19 @@ pub async fn resolve(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
     ),
+    request_body = Confirm,
     responses(
         (status = OK, description = "The conversation afterwards.", body = ConversationSummary),
+        (status = BAD_REQUEST, description = "No message id.", body = Problem,
+            content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox (`inbox_read_only`).",
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such conversation, or you cannot see it.",
             body = Problem, content_type = "application/problem+json"),
-        (status = CONFLICT, description = "No question to answer (`no_open_need`).", body = Problem,
-            content_type = "application/problem+json"),
+        (status = CONFLICT, description = "No question to answer (`no_open_need`), or not the one you saw (`need_changed`).",
+            body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn confirm(
@@ -134,6 +150,7 @@ pub async fn confirm(
     Extension(settings): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
+    extract::Json(body): extract::Json<Confirm>,
 ) -> Result<Json<ConversationSummary>> {
     judge(
         &state,
@@ -141,6 +158,7 @@ pub async fn confirm(
         &workspace.access,
         path.conversation_id,
         NeedVerdict::Confirmed,
+        body.message_id,
     )
     .await
     .map(Json)
@@ -226,6 +244,7 @@ async fn judge(
     access: &Access,
     id: ConversationId,
     verdict: NeedVerdict,
+    seen: MessageId,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
     lock_conversation(&mut tx, access, id).await?;
@@ -242,6 +261,11 @@ async fn judge(
     .await?
     .filter(|need| verdict != NeedVerdict::Confirmed || need.trust == "check")
     .ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("no_open_need")))?;
+    // Not the need the member saw (a newer message replaced it meanwhile):
+    // record nothing rather than a wrong correction.
+    if need.message != seen {
+        return Err(Error::Conflict(crate::MESSAGES.reason("need_changed")));
+    }
     let correction = match verdict {
         NeedVerdict::Done => None,
         NeedVerdict::NotNeeded => Some(

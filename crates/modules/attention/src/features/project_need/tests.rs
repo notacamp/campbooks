@@ -18,6 +18,7 @@ fn need(revision: i64, reason: Reason) -> Need {
         reason,
         due_on: None,
         sent_at: Utc::now() - TimeDelta::hours(2),
+        latest: None,
     }
 }
 
@@ -60,14 +61,6 @@ async fn clearing_keeps_the_row_and_says_why(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_cleared_need_never_seen_creates_nothing(db: PgPool) {
-    let kit = Kit::new(db.clone()).await;
-    kit.cleared(WorkspaceId::new(), &need(1, Reason::Reply), "replied", None)
-        .await;
-    assert!(items(&db).await.is_empty());
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
 async fn replaying_rebuilds_the_items(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let workspace = WorkspaceId::new();
@@ -91,4 +84,103 @@ async fn replaying_rebuilds_the_items(db: PgPool) {
     }
     kit.run_jobs().await;
     assert_eq!(items(&db).await, before);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_clear_delivered_before_its_open_wins(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    // The reply clears it (revision 2) before the open (revision 1) arrives.
+    kit.cleared(workspace, &need(2, Reason::Reply), "replied", None)
+        .await;
+    kit.need(workspace, &need(1, Reason::Reply)).await;
+    let (state, reason, revision): (String, Option<String>, i64) =
+        sqlx::query_as("SELECT state, reason, producer_revision FROM attention.items")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), reason, revision), ("cleared", None, 2));
+    // Nothing reached Home, nor Done today.
+    assert!(kit.events("attention.item_changed").await.is_empty());
+}
+
+/// A tiny deterministic generator, so the shuffles below repeat.
+struct Lcg(u64);
+
+impl Lcg {
+    fn next(&mut self, bound: usize) -> usize {
+        self.0 = self
+            .0
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1);
+        usize::try_from(self.0 >> 33).unwrap_or(0) % bound
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn any_delivery_order_ends_where_the_newest_revision_says(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let reasons = [Reason::Reply, Reason::Do, Reason::Pay, Reason::Review];
+    for seed in 1_u64..=24 {
+        let mut rng = Lcg(seed);
+        let conversation = format!("0192f0c4-7d4e-7b39-a7f1-{seed:012}");
+        // Revisions 1..=n, each an open (with some reason) or a clear.
+        let n = 2 + rng.next(5);
+        let mut history: Vec<(i64, Option<Reason>)> = (1..=n)
+            .map(|revision| {
+                let open = rng.next(3) != 0;
+                let reason = reasons[rng.next(reasons.len())];
+                (i64::try_from(revision).unwrap(), open.then_some(reason))
+            })
+            .collect();
+        let expected = history.last().copied().unwrap();
+        // Shuffle (Fisher–Yates), then deliver one by one.
+        for i in (1..history.len()).rev() {
+            history.swap(i, rng.next(i + 1));
+        }
+        for (revision, reason) in &history {
+            let mut event = need(*revision, reason.unwrap_or(Reason::Reply));
+            event.conversation = conversation.clone();
+            match reason {
+                Some(_) => kit.need(workspace, &event).await,
+                None => kit.cleared(workspace, &event, "done", None).await,
+            };
+        }
+        let (state, reason, revision): (String, Option<String>, i64) = sqlx::query_as(
+            "SELECT state, reason, producer_revision FROM attention.items WHERE record_id = $1",
+        )
+        .bind(&conversation)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(revision, expected.0, "seed {seed}: {history:?}");
+        match expected.1 {
+            Some(want) => {
+                assert_eq!(state, "open", "seed {seed}: {history:?}");
+                assert_eq!(reason.as_deref(), Some(want.as_str()), "seed {seed}");
+            }
+            None => assert_eq!(state, "cleared", "seed {seed}: {history:?}"),
+        }
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_deleted_inbox_takes_its_items_along(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    kit.need(workspace, &need(1, Reason::Reply)).await;
+    let mut tx = campbooks_kernel::db::BeginFor::begin_for(&kit.state.db, workspace)
+        .await
+        .unwrap();
+    let inbox = campbooks_kernel::RecordRef::new(
+        "conversations.inbox",
+        "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c22",
+    );
+    let gone = crate::domain::purge_container(&mut tx, &inbox)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!(gone, 1);
+    assert!(items(&db).await.is_empty());
 }

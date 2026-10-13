@@ -19,5 +19,6 @@ that against the schema.
 | `fr.json` | A shipping update, a receipt (reçu), a neighbour's message |
 | `followup.json` | Later changes to `en.json`: read, starred, archived, relabelled, one message removed |
 | `needs.json` | What needs Sam: a question with a date, a lease to sign, a bill, a phishing message, a lunch question |
+| `needs-followup.json` | Pedro writes again about the lease, asking nothing new |
 | `needs-replied.json` | Sam's reply to the lunch question, sent from another client |
 | `late-parent.json` | Two replies stored before the message they answer (no thread keys) |

@@ -112,6 +112,8 @@ pub struct Need {
     pub reason: Reason,
     pub due_on: Option<NaiveDate>,
     pub sent_at: DateTime<Utc>,
+    /// The conversation's newest inbound message, when not `message`.
+    pub latest: Option<String>,
 }
 
 impl Kit {
@@ -189,6 +191,7 @@ impl Kit {
                 }),
                 cleared_because: None,
                 cleared_by: None,
+                latest_message: need.latest.clone(),
             },
         )
         .await
@@ -214,6 +217,7 @@ impl Kit {
                 need: None,
                 cleared_because: Some(cause.to_owned()),
                 cleared_by: by,
+                latest_message: need.latest.clone(),
             },
         )
         .await
