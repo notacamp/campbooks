@@ -20,6 +20,9 @@
 - [x] 3.3 Settings → Members: list, change role with undo, remove with inline confirm, invite, pending invitations
 - [x] 3.4 Accept-invitation page
 - [x] 3.5 `workspaces` i18n namespace in en, pt-PT, es-ES and fr
+- [x] 3.6 `workspaces.invite_member` returns `accept_url` once (never listed, logged or published); the members page shows it with Copy (C); server test
+- [x] 3.7 Workspaces queries keyed by `operationKey`; the workspace frame follows the change feed
+- [x] 3.8 Module manifest mounts modules under the workspace layout, and `cargo xtask new-module` generates that
 
 ## 4. Verification
 
