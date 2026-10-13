@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "invalid_client": "Esta aplicación no está registrada en Campbooks.",
+    "invalid_redirect_uri": "Esta aplicación pidió volver a una dirección que no registró.",
+    "csrf_check_failed": "Esta solicitud no procede del propio Campbooks.",
+    "way_in_belongs_to_another_account": "Esta cuenta ya da acceso a otra cuenta de Campbooks. Inicia sesión con ella para usar esa cuenta.",
+    "sign_up_expired": "El registro ha tardado demasiado. Vuelve a iniciar sesión para empezar de nuevo.",
+    "invalid_return_to": "Después de iniciar sesión, Campbooks solo puede volver a una de sus propias páginas.",
+    "held_grant_not_found": "No hay ningún buzón esperando a que lo conectes."
+  }
+}

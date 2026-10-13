@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "invalid_client": "This app is not registered with Campbooks.",
+    "invalid_redirect_uri": "This app asked to return to an address it did not register.",
+    "csrf_check_failed": "This request did not come from Campbooks itself.",
+    "way_in_belongs_to_another_account": "This account is already a way into another Campbooks account. Sign in with it to use that account.",
+    "sign_up_expired": "This sign-up took too long. Sign in again to start over.",
+    "invalid_return_to": "After signing in, Campbooks can only return to one of its own pages.",
+    "held_grant_not_found": "There is no mailbox waiting to be connected."
+  }
+}

@@ -81,8 +81,8 @@ CREATE TABLE identity.upstream_flows (
     browser_hash bytea NOT NULL,
     provider text NOT NULL,
     purpose text NOT NULL CHECK (purpose IN ('sign_in', 'link', 'connect', 'reconnect')),
-    -- The authorize request to complete afterwards (its id hash), if any.
-    request_hash bytea,
+    -- The authorize request to complete afterwards, if any.
+    request_id text,
     return_to text NOT NULL,
     nonce text NOT NULL,
     code_verifier bytea NOT NULL,
@@ -106,7 +106,7 @@ CREATE TABLE identity.pending_sign_ups (
     display_name text,
     -- The provider's grant (sealed JSON: access and refresh tokens, scopes).
     grant_tokens bytea,
-    request_hash bytea,
+    request_id text,
     return_to text NOT NULL,
     created_at timestamptz NOT NULL,
     expires_at timestamptz NOT NULL
@@ -114,6 +114,9 @@ CREATE TABLE identity.pending_sign_ups (
 CREATE INDEX pending_sign_ups_expires_idx ON identity.pending_sign_ups (expires_at);
 
 -- A mailbox grant obtained at sign-up, waiting for a workspace to land in.
+-- Never adopted, it is deleted (not revoked at the provider: revoking one
+-- Google token revokes every token of that account's grant to the same app,
+-- including a mailbox connection made through it).
 CREATE TABLE identity.held_grants (
     id uuid PRIMARY KEY,
     account_id uuid NOT NULL REFERENCES identity.accounts (id) ON DELETE CASCADE,

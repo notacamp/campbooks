@@ -1,0 +1,11 @@
+{
+  "errors": {
+    "invalid_client": "Esta aplicação não está registada no Campbooks.",
+    "invalid_redirect_uri": "Esta aplicação pediu para regressar a um endereço que não registou.",
+    "csrf_check_failed": "Este pedido não veio do próprio Campbooks.",
+    "way_in_belongs_to_another_account": "Esta conta já dá acesso a outra conta Campbooks. Inicie sessão com ela para usar essa conta.",
+    "sign_up_expired": "O registo demorou demasiado tempo. Inicie sessão novamente para recomeçar.",
+    "invalid_return_to": "Depois de iniciar sessão, o Campbooks só pode regressar a uma das suas próprias páginas.",
+    "held_grant_not_found": "Não há nenhuma caixa de correio à espera de ser ligada."
+  }
+}
