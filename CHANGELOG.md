@@ -7,6 +7,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- The inbox: the four streams (Primary, Updates, Receipts, Newsletters) under
+  Inbox with their unread counts, each stream's conversations newest first,
+  and a reader with the thread (older messages folded, attachments listed).
+  Campbooks' sorting shows only as a suggestion ("Suggests Newsletters"),
+  with "Why?" listing the stored reasons and "Move to …" one key away; Done,
+  star, read/unread and move all have shortcuts and Undo. On phones the list
+  and the reader are separate screens. New read operation
+  `conversations.list_streams`; conversation summaries carry `suggestion`
+  and details carry `decisions`.
+- Email bodies are sanitised on the server before they reach the app
+  (scripts, style sheets, forms, frames and tracking pixels removed, links
+  open in a new tab), shown only in a sandboxed frame, and remote images stay
+  blocked until you choose "Show images" for a message.
 - The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
   and French. Opening the app signed out goes straight to "Sign in to
   Campbooks" (and back to the page you opened afterwards), with one button
@@ -24,19 +37,6 @@ All notable changes to Campbooks Next are documented here. The format follows
   path Campbooks sends to Google when your OAuth app registered another one, with a
   reverse proxy rewriting it to `/auth/callback/google`. The same
   `CAMPBOOKS_<PROVIDER>__REDIRECT_PATH` pattern applies to future sign-in providers.
-- The inbox: the four streams (Primary, Updates, Receipts, Newsletters) under
-  Inbox with their unread counts, each stream's conversations newest first,
-  and a reader with the thread (older messages folded, attachments listed).
-  Campbooks' sorting shows only as a suggestion ("Suggests Newsletters"),
-  with "Why?" listing the stored reasons and "Move to …" one key away; Done,
-  star, read/unread and move all have shortcuts and Undo. On phones the list
-  and the reader are separate screens. New read operation
-  `conversations.list_streams`; conversation summaries carry `suggestion`
-  and details carry `decisions`.
-- Email bodies are sanitised on the server before they reach the app
-  (scripts, style sheets, forms, frames and tracking pixels removed, links
-  open in a new tab), shown only in a sandboxed frame, and remote images stay
-  blocked until you choose "Show images" for a message.
 - Campbooks can be its own identity provider (ADR 0014), replacing Rauthy in
   a later release. With `CAMPBOOKS_AUTH__ISSUER` unset and
   `CAMPBOOKS_SECRET_KEY` set, the server is an OAuth 2.1 / OpenID Connect

@@ -15,10 +15,10 @@ import { pause, type ScenarioContext } from "../context.ts";
 //   CAMPBOOKS_GOOGLE__BASE_URL=http://127.0.0.1:9071 CAMPBOOKS_BLOBS__PATH=/tmp/blobs \
 //   CAMPBOOKS_DATABASE_URL=postgres://…/scratch cargo run -p campbooks-server -- all
 //   CAMPBOOKS_API_URL=http://127.0.0.1:8191 pnpm --dir clients/app exec vite --port 5181
-//   pnpm --dir clients record inbox --base-url http://localhost:5181
+//   INBOX_BASE_URL=http://localhost:5181 pnpm --dir clients record inbox --base-url http://localhost:5181
 //
-// Sign-up, the first workspace and adopting the mailbox are other slices'
-// screens; the scenario does them quickly, then records the inbox itself.
+// Sign-up, the first workspace and connecting the mailbox are other slices'
+// screens; the scenario goes through them quickly, then records the inbox.
 // Fictional person and mail only; no token is ever shown.
 
 /** A caption pinned to the bottom of the page, so the video explains itself. */
@@ -50,36 +50,29 @@ async function api(page: Page, method: string, path: string): Promise<unknown> {
   }).then((response) => response.status === 204 ? null : response.json())`);
 }
 
-/** Sign up with the fake Google, make a workspace and adopt the mailbox. */
+/**
+ * Sign up through the sign-in screens with the fake Google, create a
+ * workspace and connect the mailbox from sign-up, then wait for the first
+ * sync to bring the demo mail in.
+ */
 async function setUp(page: Page): Promise<string> {
   await page.goto("/");
-  await page.getByRole("link", { name: "Sign in" }).click();
-  await page.waitForURL(/\/sign-in\?request=/u);
-  const request = new URL(page.url()).searchParams.get("request") ?? "";
-  await page.goto(`/auth/start/google?request=${encodeURIComponent(request)}`);
+  await page.getByRole("link", { name: /Continue with Google/u }).click();
   await page.getByRole("link", { name: "Allow" }).click();
-  await page.waitForURL(/\/sign-in\/new/u);
-  const created = (await api(page, "POST", "/auth/new-account")) as { redirect: string };
-  await page.goto(created.redirect);
+  await page.getByRole("button", { name: /Create account/u }).click();
   const name = page.getByRole("textbox", { name: "Workspace name" });
   await name.waitFor();
   await name.fill("Rivera Studio");
   await page.keyboard.press("Enter");
   await page.getByRole("radio", { name: "Business" }).click();
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await page.getByRole("heading", { name: "Rivera Studio is ready" }).waitFor();
+  await page.getByRole("heading", { name: /will be connected to this workspace/u }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.getByRole("heading", { name: "Your mail" }).waitFor();
   const { workspaces } = (await api(page, "GET", "/bff/api/v1/workspaces")) as {
     workspaces: { id: string }[];
   };
   const workspace = workspaces[0]?.id ?? "";
-  const held = (await api(page, "GET", "/bff/api/v1/identity/held-grants")) as {
-    items: { id: string }[];
-  };
-  await api(
-    page,
-    "POST",
-    `/bff/api/v1/w/${workspace}/identity/held-grants/${held.items[0]?.id ?? ""}/adopt`,
-  );
   // The first sync: the backfill reads the demo mailbox.
   for (let attempt = 0; attempt < 90; attempt += 1) {
     const list = (await api(page, "GET", `/bff/api/v1/w/${workspace}/conversations`)) as {
@@ -98,8 +91,29 @@ function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
 }
 
+/**
+ * Run `setUp` in a context of its own (not recorded) and hand its session
+ * cookie to the recorded page, so the video starts in the inbox.
+ */
+async function signedIn(page: Page): Promise<string> {
+  const browser = page.context().browser();
+  if (browser === null) {
+    return setUp(page);
+  }
+  // The recorder's --base-url, repeated (a context does not expose its own).
+  const baseURL = process.env["INBOX_BASE_URL"] ?? "http://localhost:5173";
+  const setup = await browser.newContext({ baseURL });
+  try {
+    const workspace = await setUp(await setup.newPage());
+    await page.context().addCookies((await setup.storageState()).cookies);
+    return workspace;
+  } finally {
+    await setup.close();
+  }
+}
+
 export default async function inbox({ page }: ScenarioContext): Promise<void> {
-  const workspace = await setUp(page);
+  const workspace = await signedIn(page);
   const phone = isPhone(page);
   const shots = process.env["INBOX_SHOTS"];
   const shot = async (name: string) => {
@@ -225,6 +239,15 @@ export default async function inbox({ page }: ScenarioContext): Promise<void> {
     1200,
   );
   await page.request.post("http://127.0.0.1:9071/fake/deliver");
+  // Sync now instead of waiting for the next scheduled run.
+  const { connections } = (await api(page, "GET", `/bff/api/v1/w/${workspace}/connections`)) as {
+    connections: { id: string }[];
+  };
+  await api(
+    page,
+    "POST",
+    `/bff/api/v1/w/${workspace}/connections/${connections[0]?.id ?? ""}/sync`,
+  );
   await page.getByText("VAT Q3: two receipts missing").first().waitFor({ timeout: 120_000 });
   await caption(page, "VAT Q3 from Rui arrived in Primary", 1800);
   await shot("10-live");
