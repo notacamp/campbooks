@@ -8,6 +8,7 @@ pub mod decisions;
 pub mod drafts;
 pub mod flags;
 pub mod format;
+pub mod needs;
 pub mod paths;
 pub mod policy;
 pub mod redact;

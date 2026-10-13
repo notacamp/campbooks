@@ -15,7 +15,10 @@ use crate::{
     model::{Address, ConversationId, InboxId, LabelId, Stream, StreamSource},
 };
 
-use super::suggestions::{self, StreamSuggestion};
+use super::{
+    needs::{self, NeedView},
+    suggestions::{self, StreamSuggestion},
+};
 
 /// A label as shown on a conversation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -58,6 +61,8 @@ pub struct ConversationSummary {
     /// Where the decide pass would put it instead, when it would: a
     /// suggestion, never applied by itself.
     pub suggestion: Option<StreamSuggestion>,
+    /// What it needs from its inbox's members, while it needs something.
+    pub need: Option<NeedView>,
 }
 
 /// A row of the summary queries.
@@ -101,6 +106,7 @@ impl TryFrom<SummaryRow> for ConversationSummary {
             labels: serde_json::from_value(row.labels)
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             suggestion: None,
+            need: None,
         })
     }
 }
@@ -137,6 +143,7 @@ pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<Conv
     .ok_or(Error::NotFound)?;
     let mut summary = [ConversationSummary::try_from(row)?];
     suggestions::attach(conn, &mut summary).await?;
+    needs::attach(conn, &mut summary).await?;
     let [summary] = summary;
     Ok(summary)
 }
@@ -229,6 +236,18 @@ impl Changed {
         events: &EventBus,
         tx: &mut Transaction<'_, Postgres>,
     ) -> Result<()> {
+        let empty = sqlx::query_scalar!(
+            r#"SELECT NOT EXISTS (SELECT 1 FROM conversations.messages
+                                   WHERE conversation_id = $1) AS "empty!""#,
+            self.conversation as ConversationId,
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+        if empty {
+            // Announce its need as gone before the row goes with it.
+            needs::conversation_gone(tx, events, &self.workspace, self.inbox, self.conversation)
+                .await?;
+        }
         let state = recount(tx, self.conversation).await?;
         if state.is_none() && !self.changes.contains(&Change::Removed) {
             self.changes.push(Change::Removed);

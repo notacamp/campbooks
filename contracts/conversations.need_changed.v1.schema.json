@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/conversations.need_changed.v1.schema.json",
+  "title": "conversations.need_changed v1 (event payload)",
+  "description": "Published by the conversations module when what a conversation needs from its inbox's members opens, changes or is cleared; the attention module projects it into each member's queue. Ids, enums and a date only, never names, addresses, subjects or text. `revision` grows with every change of one conversation's need: apply only newer ones. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": ["workspace", "inbox", "conversation", "message", "revision", "sent_at", "need"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "inbox": { "$ref": "#/$defs/uuid" },
+    "conversation": { "$ref": "#/$defs/uuid" },
+    "message": { "$ref": "#/$defs/uuid" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "sent_at": { "type": "string", "format": "date-time" },
+    "need": {
+      "description": "The need, or null once cleared.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["reason", "trust", "urgent"],
+          "additionalProperties": false,
+          "properties": {
+            "reason": { "enum": ["reply", "do", "pay", "review"] },
+            "trust": { "enum": ["sure", "check"] },
+            "due_on": { "type": "string", "format": "date" },
+            "urgent": { "type": "boolean" }
+          }
+        }
+      ]
+    },
+    "cleared_because": {
+      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded"]
+    },
+    "cleared_by": { "$ref": "#/$defs/uuid" }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

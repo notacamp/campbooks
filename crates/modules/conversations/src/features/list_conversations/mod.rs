@@ -18,7 +18,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         conversation::{ConversationSummary, SummaryRow},
-        suggestions,
+        needs, suggestions,
     },
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
@@ -44,6 +44,10 @@ pub struct ListQuery {
     pub cursor: Option<String>,
     /// Page size, 1 to 100 (default 50).
     pub limit: Option<u32>,
+    /// These conversations only (1 to 100 ids, comma-separated), whatever
+    /// their stream or whether archived; those you cannot see are left
+    /// out. Other filters and the cursor are ignored.
+    pub ids: Option<String>,
 }
 
 /// A page of conversations.
@@ -89,10 +93,25 @@ pub async fn handler(
                 .arg("max", MAX_LIMIT),
         ));
     }
+    let ids = query.ids.as_deref().map(parse_ids).transpose()?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
+    if let Some(ids) = ids {
+        let rows = fetch_ids(&mut tx, &inboxes, &ids).await?;
+        let mut conversations = rows
+            .into_iter()
+            .map(ConversationSummary::try_from)
+            .collect::<Result<Vec<_>>>()?;
+        suggestions::attach(&mut tx, &mut conversations).await?;
+        needs::attach(&mut tx, &mut conversations).await?;
+        tx.commit().await?;
+        return Ok(Json(ConversationList {
+            conversations,
+            next_cursor: None,
+        }));
+    }
     if let Some(inbox) = query.inbox {
         if !inboxes.contains(&inbox) {
             return Err(Error::NotFound);
@@ -105,6 +124,7 @@ pub async fn handler(
         .map(ConversationSummary::try_from)
         .collect::<Result<Vec<_>>>()?;
     suggestions::attach(&mut tx, &mut conversations).await?;
+    needs::attach(&mut tx, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);
@@ -197,6 +217,58 @@ async fn fetch_page(
         .await?
     };
     Ok(rows)
+}
+
+/// `ids=a,b,c`: 1 to [`MAX_LIMIT`] conversation ids.
+fn parse_ids(ids: &str) -> Result<Vec<ConversationId>> {
+    let bad = || {
+        Error::BadRequest(
+            crate::MESSAGES
+                .reason("invalid_ids")
+                .arg("max", MAX_LIMIT),
+        )
+    };
+    let ids = ids
+        .split(',')
+        .map(|id| id.trim().parse::<ConversationId>().map_err(|_| bad()))
+        .collect::<Result<Vec<_>>>()?;
+    if ids.is_empty() || ids.len() > MAX_LIMIT as usize {
+        return Err(bad());
+    }
+    Ok(ids)
+}
+
+/// The conversations `ids` that are in `inboxes`, newest first.
+async fn fetch_ids(
+    conn: &mut PgConnection,
+    inboxes: &[InboxId],
+    ids: &[ConversationId],
+) -> Result<Vec<SummaryRow>> {
+    Ok(sqlx::query_as!(
+        SummaryRow,
+        r#"
+        SELECT c.id AS "id: ConversationId", c.inbox_id AS "inbox_id: InboxId", c.subject,
+               c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,
+               c.starred, c.archived_at IS NOT NULL AS "archived!",
+               m.sender AS "sender?", m.snippet AS "snippet?",
+               coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)
+                                          ORDER BY l.name)
+                           FROM conversations.conversation_labels cl
+                           JOIN conversations.labels l ON l.id = cl.label_id
+                          WHERE cl.conversation_id = c.id), '[]') AS "labels!"
+          FROM conversations.conversations c
+          LEFT JOIN LATERAL (
+              SELECT sender, snippet FROM conversations.messages
+               WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1
+          ) m ON true
+         WHERE c.inbox_id = ANY($1) AND c.id = ANY($2)
+         ORDER BY c.last_message_at DESC, c.id DESC
+        "#,
+        inboxes as &[InboxId],
+        ids as &[ConversationId],
+    )
+    .fetch_all(conn)
+    .await?)
 }
 
 /// `(last_message_at, id)` of the last row of a page, opaque.

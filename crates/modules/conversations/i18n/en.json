@@ -14,6 +14,9 @@
     "no_recipients": "Add at least one recipient.",
     "invalid_address": "This address is not valid: {{address}}",
     "attachments_too_large": "Attachments can add up to {{max}} MB at most.",
-    "too_late": "It is too late to undo: the message has already left."
+    "too_late": "It is too late to undo: the message has already left.",
+    "invalid_ids": "Ask for between 1 and {{max}} conversation ids, separated by commas.",
+    "no_open_need": "Nothing here needs you any more.",
+    "nothing_to_reopen": "There is nothing to bring back here."
   }
 }

@@ -317,13 +317,17 @@ impl Kit {
 }
 
 /// The shipped email signals, with stream placement enabled at 0.9 (the
-/// shipped baseline lets no stream answer act yet).
+/// shipped baseline lets no stream answer act yet). Needs are raised
+/// whatever the fixtures' dates (`needs_window_days`), so tests do not drift
+/// with the calendar.
 pub fn sorting_deps() -> ConversationsDeps {
-    ConversationsDeps::offline().with_policy(Policy::baseline().with(
+    let mut deps = ConversationsDeps::offline().with_policy(Policy::baseline().with(
         triage::STREAM,
         Source::Rules,
         Switch::ActAbove(0.9),
-    ))
+    ));
+    deps.config.needs_window_days = 36_500;
+    deps
 }
 
 /// `fixtures/<name>.json`.

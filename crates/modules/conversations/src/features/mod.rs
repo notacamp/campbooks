@@ -17,6 +17,7 @@ pub mod list_inboxes;
 pub mod list_streams;
 pub mod mark_read;
 pub mod move_to_stream;
+pub mod needs;
 pub mod purge_workspace;
 pub mod record_send;
 pub mod release_send;

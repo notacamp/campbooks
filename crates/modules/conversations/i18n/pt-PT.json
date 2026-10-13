@@ -14,6 +14,9 @@
     "no_recipients": "Adicione pelo menos um destinatário.",
     "invalid_address": "Este endereço não é válido: {{address}}",
     "attachments_too_large": "Os anexos podem somar no máximo {{max}} MB.",
-    "too_late": "Já não é possível anular: a mensagem já foi enviada."
+    "too_late": "Já não é possível anular: a mensagem já foi enviada.",
+    "invalid_ids": "Peça entre 1 e {{max}} identificadores de conversa, separados por vírgulas.",
+    "no_open_need": "Já nada aqui precisa de si.",
+    "nothing_to_reopen": "Não há nada para recuperar aqui."
   }
 }
