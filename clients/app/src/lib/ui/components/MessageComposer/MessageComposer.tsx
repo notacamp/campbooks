@@ -118,7 +118,6 @@ export function MessageComposer({
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
 
-
   function format(kind: Format) {
     const box = bodyRef.current;
     if (box === null) {

@@ -78,7 +78,9 @@ describe("ReplyComposer", () => {
 
   it("reopens the draft already started for that message, and shows why a send failed", async () => {
     mockApi({
-      [`GET ${D}`]: { body: { drafts: [{ ...REPLY, state: "failed", failure_reason: "rejected" }] } },
+      [`GET ${D}`]: {
+        body: { drafts: [{ ...REPLY, state: "failed", failure_reason: "rejected" }] },
+      },
     });
     renderWithProviders(slot(null));
     expect(
@@ -141,7 +143,10 @@ describe("ReplyComposer", () => {
   });
 
   it("says so when a draft cannot be started", async () => {
-    mockApi({ [`GET ${D}`]: { body: { drafts: [] } }, [`POST ${D}`]: problem(403, "inbox_read_only") });
+    mockApi({
+      [`GET ${D}`]: { body: { drafts: [] } },
+      [`POST ${D}`]: problem(403, "inbox_read_only"),
+    });
     renderWithProviders(slot({ mode: "reply_all", messageId: FIRST, nonce: 1 }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Something went wrong");
   });

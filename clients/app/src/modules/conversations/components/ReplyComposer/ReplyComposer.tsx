@@ -35,7 +35,7 @@ export function ReplyComposer({
   const { t, i18n } = useTranslation("conversations");
   const queryClient = useQueryClient();
   const drafts = useConversationDrafts(workspaceId, conversation.id);
-  const [draftId, setDraftId] = useState<string | undefined>(undefined);
+  const [draftId, setDraftId] = useState<string | undefined>();
   const [closed, setClosed] = useState(false);
   const [failed, setFailed] = useState(false);
   const started = useRef<number | null>(null);

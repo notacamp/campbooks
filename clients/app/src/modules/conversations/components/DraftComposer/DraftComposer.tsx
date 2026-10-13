@@ -5,7 +5,7 @@ import { MessageComposer, useUndoToast } from "~/lib/ui";
 import type { Draft } from "../../api/drafts";
 import type { Translate } from "../../model";
 import { addressLine, displayName } from "../../compose/quote";
-import { useDraftEditor } from "../../compose/useDraftEditor";
+import { useDraftEditor } from "../../compose/use-draft-editor";
 
 export interface DraftComposerProps {
   workspaceId: string;

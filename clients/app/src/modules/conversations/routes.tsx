@@ -7,7 +7,10 @@ import {
   type AnyRoute,
 } from "@tanstack/react-router";
 
+import { useTranslation } from "react-i18next";
+
 import { useShortcut } from "~/lib/shortcuts";
+import { Button } from "~/lib/ui";
 
 import { isStream } from "./api/queries";
 import { InboxScreen } from "./components/InboxScreen/InboxScreen";
@@ -21,10 +24,12 @@ function InboxPage() {
   });
   const workspaceId = params.workspaceId ?? "";
   const stream = params.stream ?? "";
+  const { t } = useTranslation("conversations");
   const navigate = useNavigate();
-  useShortcut("compose.new", () => {
+  const compose = () => {
     void navigate({ to: "/w/$workspaceId/compose", params: { workspaceId } });
-  });
+  };
+  useShortcut("compose.new", compose);
   if (!isStream(stream)) {
     return (
       <Navigate
@@ -41,6 +46,11 @@ function InboxPage() {
       stream={stream}
       conversationId={params.conversationId}
       renderReplySlot={renderReplyComposer}
+      composeAction={
+        <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
+          {t("compose.newMessage")}
+        </Button>
+      }
     />
   );
 }
@@ -60,7 +70,11 @@ function ComposePage() {
         void navigate({ to: "/w/$workspaceId/inbox", params: { workspaceId } });
       }}
       onReopen={(draft) => {
-        void navigate({ to: "/w/$workspaceId/compose", params: { workspaceId }, search: { draft } });
+        void navigate({
+          to: "/w/$workspaceId/compose",
+          params: { workspaceId },
+          search: { draft },
+        });
       }}
     />
   );

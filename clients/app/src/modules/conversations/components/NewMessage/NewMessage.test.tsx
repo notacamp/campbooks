@@ -59,7 +59,13 @@ describe("NewMessage", () => {
   });
 
   it("chooses the inbox to send from when there are several", async () => {
-    const office = { ...INBOX, id: "0192f1a0-0000-7000-8000-0000000000b9", address: "office@example.com", display_name: null, role: "sender" as const };
+    const office = {
+      ...INBOX,
+      id: "0192f1a0-0000-7000-8000-0000000000b9",
+      address: "office@example.com",
+      display_name: null,
+      role: "sender" as const,
+    };
     const api = mockApi({
       [`GET ${W}/inboxes`]: {
         body: { inboxes: [INBOX, office, { ...INBOX, id: "x", role: "reader" }] },
@@ -68,14 +74,16 @@ describe("NewMessage", () => {
       [`GET ${D}/${NEW.id}`]: { body: NEW },
       [`DELETE ${D}/${NEW.id}`]: { status: 204 },
     });
-    renderWithProviders(<NewMessage workspaceId={DUARTE.id} onLeave={vi.fn()} onReopen={vi.fn()} />);
+    renderWithProviders(
+      <NewMessage workspaceId={DUARTE.id} onLeave={vi.fn()} onReopen={vi.fn()} />,
+    );
     const from = await screen.findByRole("combobox", { name: "From" });
     expect(from.querySelectorAll("option")).toHaveLength(2);
     fireEvent.change(from, { target: { value: office.id } });
     await waitFor(() => {
       expect(api.calls.filter((call) => call.route === `POST ${D}`)).toHaveLength(2);
     });
-    expect(api.calls.filter((call) => call.route === `POST ${D}`).at(-1)?.body).toEqual({
+    expect(api.calls.findLast((call) => call.route === `POST ${D}`)?.body).toEqual({
       kind: "new",
       inbox_id: office.id,
     });
@@ -83,7 +91,9 @@ describe("NewMessage", () => {
 
   it("asks for a mailbox when there is none to send from", async () => {
     mockApi({ [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: "reader" }] } } });
-    renderWithProviders(<NewMessage workspaceId={DUARTE.id} onLeave={vi.fn()} onReopen={vi.fn()} />);
+    renderWithProviders(
+      <NewMessage workspaceId={DUARTE.id} onLeave={vi.fn()} onReopen={vi.fn()} />,
+    );
     expect(await screen.findByText("Connect a mailbox to send from it.")).toBeVisible();
   });
 

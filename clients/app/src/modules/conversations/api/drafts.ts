@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
 
 export type Draft = Schema<"DraftView">;
-export type DraftKind = Schema<"DraftKind">;
 export type NewDraft = Schema<"NewDraft">;
 export type DraftChanges = Schema<"DraftChanges">;
 export type Inbox = Schema<"InboxView">;

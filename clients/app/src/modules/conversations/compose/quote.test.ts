@@ -45,7 +45,11 @@ describe("quotes", () => {
       "To: Sam Rivera <sam.rivera@example.com>",
     ]);
     expect(quote).toContain("Could you review it by Friday?");
-    expect(forwardQuote({ ...first, text: null }, "en", words).endsWith("To: Sam Rivera <sam.rivera@example.com>")).toBe(true);
+    expect(
+      forwardQuote({ ...first, text: null }, "en", words).endsWith(
+        "To: Sam Rivera <sam.rivera@example.com>",
+      ),
+    ).toBe(true);
   });
 
   it("names people by name, else address", () => {

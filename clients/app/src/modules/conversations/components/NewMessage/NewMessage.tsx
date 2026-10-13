@@ -3,7 +3,13 @@ import { useTranslation } from "react-i18next";
 
 import { EmptyState, Select, SkeletonList } from "~/lib/ui";
 
-import { createDraft, deleteDraft, useDraft, useSendingInboxes, type Inbox } from "../../api/drafts";
+import {
+  createDraft,
+  deleteDraft,
+  useDraft,
+  useSendingInboxes,
+  type Inbox,
+} from "../../api/drafts";
 import { addressLine } from "../../compose/quote";
 import { DraftComposer } from "../DraftComposer/DraftComposer";
 
@@ -25,7 +31,7 @@ function fromLine(inbox: Inbox): string {
 export function NewMessage({ workspaceId, draftId, onLeave, onReopen }: NewMessageProps) {
   const { t } = useTranslation("conversations");
   const inboxes = useSendingInboxes(workspaceId);
-  const [inboxId, setInboxId] = useState<string | undefined>(undefined);
+  const [inboxId, setInboxId] = useState<string | undefined>();
   const [created, setCreated] = useState<string | undefined>(draftId);
   const [failed, setFailed] = useState(false);
   const creating = useRef<string | null>(null);

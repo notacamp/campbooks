@@ -28,7 +28,7 @@ export interface DraftFields {
 export type SaveState = "saved" | "saving" | "unsaved" | "failed";
 
 /** Saves are this far apart while the member types. */
-export const AUTOSAVE_MS = 800;
+const AUTOSAVE_MS = 800;
 
 function fieldsOf(draft: Draft): DraftFields {
   return {
