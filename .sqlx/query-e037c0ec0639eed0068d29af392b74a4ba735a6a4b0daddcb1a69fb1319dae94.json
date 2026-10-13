@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM search.groups WHERE workspace_id = $1 AND record_type = $2 AND record_id = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e037c0ec0639eed0068d29af392b74a4ba735a6a4b0daddcb1a69fb1319dae94"
+}

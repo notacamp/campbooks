@@ -1,20 +1,21 @@
 //! The change feed's `Visibility` port for this module's containers: a
 //! conversation or message change lives within its inbox, and a member sees
 //! it only if they are a member of that inbox (a client token bound to the
-//! workspace sees every inbox, as it does over the API). Registered by the
-//! server with `AppState::with_visibility`.
+//! workspace sees every inbox, as it does over the API). The same rule lists
+//! the inboxes a caller may search. Registered by the server with
+//! `AppState::with_visibility`.
 
 use std::sync::Arc;
 
 use campbooks_kernel::{
     RecordRef,
-    changes::{Visibility, VisibilityFuture, VisibilityPort},
+    changes::{ContainersFuture, Visibility, VisibilityFuture, VisibilityPort},
     db::BeginFor as _,
     tenancy::Access,
 };
 use sqlx::PgPool;
 
-use crate::{events::INBOX_RECORD, model::InboxId};
+use crate::{domain::access::visible_inboxes, events::INBOX_RECORD, model::InboxId};
 
 /// The port, for the server to register.
 pub fn visibility() -> VisibilityPort {
@@ -66,6 +67,26 @@ impl Visibility for InboxVisibility {
             Ok(visible)
         })
     }
+
+    fn visible_containers<'a>(
+        &'a self,
+        db: &'a PgPool,
+        access: &'a Access,
+        container_type: &'a str,
+    ) -> ContainersFuture<'a> {
+        Box::pin(async move {
+            if container_type != INBOX_RECORD {
+                return Ok(Vec::new());
+            }
+            let mut tx = db.begin_for(access.workspace).await?;
+            let inboxes = visible_inboxes(&mut tx, access).await?;
+            tx.commit().await?;
+            Ok(inboxes
+                .iter()
+                .map(|inbox| RecordRef::new(INBOX_RECORD, inbox))
+                .collect())
+        })
+    }
 }
 
 #[cfg(test)]
@@ -115,6 +136,58 @@ mod tests {
                 RecordRef::new("schedule.calendar", &inbox)
             )
             .await
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_member_lists_the_inboxes_they_belong_to(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let workspace = WorkspaceId::new();
+        let sam = UserId::new();
+        let first = kit
+            .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Reader)])
+            .await;
+        let second = kit
+            .inbox(workspace, "team@example.com", &[(sam, InboxRole::Manager)])
+            .await;
+        let other = kit.inbox(workspace, "ops@example.com", &[]).await;
+        let list = |user| {
+            let pool = kit.state.db.clone();
+            async move {
+                let access = Access {
+                    workspace,
+                    user,
+                    role: None,
+                };
+                let mut listed: Vec<String> = InboxVisibility
+                    .visible_containers(&pool, &access, INBOX_RECORD)
+                    .await
+                    .unwrap()
+                    .into_iter()
+                    .map(|container| container.id)
+                    .collect();
+                listed.sort();
+                listed
+            }
+        };
+        let mut sams = vec![first.to_string(), second.to_string()];
+        sams.sort();
+        assert_eq!(list(Some(sam)).await, sams);
+        let mut all = vec![first.to_string(), second.to_string(), other.to_string()];
+        all.sort();
+        assert_eq!(list(None).await, all);
+        let pool = kit.state.db.clone();
+        let access = Access {
+            workspace,
+            user: Some(sam),
+            role: None,
+        };
+        assert!(
+            InboxVisibility
+                .visible_containers(&pool, &access, "schedule.calendar")
+                .await
+                .unwrap()
+                .is_empty()
         );
     }
 

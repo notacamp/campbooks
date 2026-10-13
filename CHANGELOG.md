@@ -25,6 +25,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   Settings lists its sections (Members, Mailboxes, Ways to sign in) in the
   sidebar and, on phones, under the header. `identity.list_ways_in` also
   returns `mailbox_providers`.
+- Search over your mail (`GET /api/v1/w/{workspace_id}/search`, operation
+  `search.query`, new scope `search:read`; screens follow). Words match in
+  English, Portuguese, Spanish and French whatever language you type in, with
+  accents ignored ("fatura joao" finds "As faturas de João"); Gmail-style
+  operators (`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`,
+  `is:unread`, `is:starred`, `label:`, `before:`, `after:`, `older_than:`,
+  `newer_than:`, `"phrases"`, `-word`, `OR`) narrow it, and highlights come
+  back as plain text. You only ever find conversations in inboxes you can
+  read, checked at the moment you search. The index lives in Postgres and
+  stays current within seconds; mail that arrived before this version is
+  indexed in the background the first time someone searches a workspace (or
+  run `campbooks-server search reindex --workspace <id>`). Queries are never
+  stored or logged. **Self-hosters on managed Postgres:** the server now
+  creates the `unaccent` and `pg_trgm` extensions (both ship with Postgres and
+  are in the default image); allow them if your provider asks.
 - The Visor (the assistant's face) has three new emotions: dizzy (something failed on
   our side), starry (a big win) and heart eyes (a warm moment), with an optional
   gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at

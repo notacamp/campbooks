@@ -41,6 +41,7 @@
 
 mod catalogue;
 mod invoke;
+mod read_rules;
 
 #[cfg(test)]
 mod tests;
@@ -55,6 +56,7 @@ use crate::{AppState, idempotency};
 
 pub use catalogue::{Catalogue, OperationInfo};
 pub use invoke::{Caller, Invocation, InvokeError, Operations, Output, invoke};
+pub use read_rules::ReadRules;
 
 /// Name of the OpenAPI vendor extension that carries an [`Operation`].
 pub const EXTENSION: &str = "x-campbooks";

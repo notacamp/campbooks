@@ -5,6 +5,8 @@
 //!   and `openapi/admin.json`.
 //! - `cargo xtask events [--check]` regenerates (or verifies) `openapi/events.json`.
 //! - `cargo xtask eval decide` measures `decide` strategies on a labelled eval set.
+//! - `cargo xtask migrations --base <ref>` checks that new migrations sort after
+//!   every migration on the base branch.
 //! - `cargo xtask i18n` checks that every server message catalogue is at parity.
 //! - `cargo xtask new-module <name>` and `cargo xtask new-feature <module> <feature>`
 //!   scaffold a module or a feature slice; `cargo xtask scaffold-check` proves
@@ -16,6 +18,7 @@ mod arch;
 mod eval;
 mod events;
 mod i18n;
+mod migrations;
 mod openapi;
 mod scaffold;
 
@@ -64,6 +67,14 @@ enum Command {
         /// Fail if the committed catalogue is stale instead of writing it.
         #[arg(long)]
         check: bool,
+    },
+    /// Check that the migrations added since git `<base>` sort after every
+    /// migration on it, and that no version is used twice (CI runs it on
+    /// pull requests against their base branch).
+    Migrations {
+        /// The base to compare with, e.g. `origin/next`.
+        #[arg(long)]
+        base: String,
     },
     /// Check that every server message catalogue (`crates/**/i18n/`) has
     /// `en`, `pt-PT`, `es-ES` and `fr` with the same messages, plural forms
@@ -115,6 +126,7 @@ fn main() -> ExitCode {
         Command::Eval {
             what: EvalCommand::Decide(args),
         } => eval::run_decide(&root, &args),
+        Command::Migrations { base } => migrations::run(&root, &base),
         Command::I18n => i18n::run(&root),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),

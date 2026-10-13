@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search.entries\n                SET tsv = search.entry_vector($1, people_words, file_words, body, language)\n              WHERE group_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b744bc94447ed96e34e29d385c1c37524a9352f6ccf994e7d95c8958ddaf85f0"
+}

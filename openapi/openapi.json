@@ -4451,6 +4451,165 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search the records the caller may open.",
+        "operationId": "search.query",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "The query: words, `\"phrases\"`, `-word`, `a OR b` and operators\n(`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`, `is:`,\n`label:`, `before:`, `after:`, `older_than:`, `newer_than:`). At most\n512 characters.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "`relevance` (default) or `newest`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "How results are ordered.",
+              "enum": [
+                "relevance",
+                "newest"
+              ]
+            }
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "`true` while the member is typing: the last word matches as a prefix.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1 to 50 (default 20).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page, with the same query and order.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "description": "The caller's time zone for `before:` and `after:` (IANA, default UTC).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A query too long, a bad limit, or a cursor from another query.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many queries; try again shortly.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "search:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "search.result"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/security-events": {
       "get": {
         "tags": [
@@ -7169,6 +7328,24 @@
         ],
         "description": "An answer's value: a label (choice), a level (score) or yes/no."
       },
+      "AppliedFilter": {
+        "type": "object",
+        "description": "A filter the query applied, for chips.",
+        "required": [
+          "operator",
+          "value"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "description": "The operator (`from`, `has`, `in`, `is`, `label`, …)."
+          },
+          "value": {
+            "type": "string",
+            "description": "Its value."
+          }
+        }
+      },
       "AssertionResponse": {
         "type": "object",
         "description": "`AuthenticatorAssertionResponseJSON`: the authenticator's signature.",
@@ -8261,6 +8438,124 @@
           }
         }
       },
+      "Hit": {
+        "type": "object",
+        "description": "One result: a record the caller may open, with what a list row shows.",
+        "required": [
+          "record",
+          "container",
+          "title",
+          "snippet",
+          "occurred_at",
+          "facets"
+        ],
+        "properties": {
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Its container (an inbox)."
+          },
+          "facets": {
+            "$ref": "#/components/schemas/HitFacets",
+            "description": "The record's state, for the row."
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HitPerson",
+                "description": "Who wrote the best entry."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The entry that matched best (a message), when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The record's time (a conversation's last message)."
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record (a conversation)."
+          },
+          "snippet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "description": "A snippet of the best entry, hits marked."
+          },
+          "title": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "description": "The title, hits marked."
+          }
+        }
+      },
+      "HitFacets": {
+        "type": "object",
+        "description": "A hit's state.",
+        "properties": {
+          "attachment": {
+            "type": "boolean",
+            "description": "Some entry carries files."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many entries (messages) it has.",
+            "minimum": 0
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Starred."
+          },
+          "stream": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its stream."
+          },
+          "unread": {
+            "type": "boolean",
+            "description": "Something in it is unread."
+          }
+        }
+      },
+      "HitPerson": {
+        "type": "object",
+        "description": "A person on a hit.",
+        "required": [
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their display name."
+          }
+        }
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -8809,6 +9104,35 @@
           }
         }
       },
+      "ParsedQuery": {
+        "type": "object",
+        "description": "The query as understood.",
+        "required": [
+          "text",
+          "filters",
+          "warnings"
+        ],
+        "properties": {
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedFilter"
+            },
+            "description": "The filters applied."
+          },
+          "text": {
+            "type": "string",
+            "description": "The free text, as searched."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryWarning"
+            },
+            "description": "What was not understood (and was searched as text, or ignored)."
+          }
+        }
+      },
       "PasskeyView": {
         "type": "object",
         "description": "A passkey, as its owner sees it.",
@@ -8922,6 +9246,24 @@
           "zoho"
         ]
       },
+      "QueryWarning": {
+        "type": "object",
+        "description": "Something in the query that was not understood.",
+        "required": [
+          "code",
+          "operator"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`unknown_operator`, `empty_value` or `invalid_value`."
+          },
+          "operator": {
+            "type": "string",
+            "description": "The operator (or `tz`)."
+          }
+        }
+      },
       "ReasonView": {
         "type": "object",
         "description": "One reason behind an answer: a stable rule id the client translates,\nand what it matched.",
@@ -8938,6 +9280,26 @@
             "type": "string",
             "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
             "example": "signals.list_header"
+          }
+        }
+      },
+      "RecordRef": {
+        "type": "object",
+        "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id within its module.",
+            "example": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"
+          },
+          "type": {
+            "type": "string",
+            "description": "The record type, `<module>.<record>`.",
+            "example": "conversations.thread"
           }
         }
       },
@@ -9127,6 +9489,39 @@
           "member"
         ]
       },
+      "SearchResults": {
+        "type": "object",
+        "description": "A page of results.",
+        "required": [
+          "hits",
+          "indexing",
+          "query"
+        ],
+        "properties": {
+          "hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hit"
+            },
+            "description": "The results, in the order asked for."
+          },
+          "indexing": {
+            "type": "boolean",
+            "description": "The index of some source is still being built: older records may be\nmissing for now."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass it as `cursor` for the next page; `None` on the last one."
+          },
+          "query": {
+            "$ref": "#/components/schemas/ParsedQuery",
+            "description": "The query as understood."
+          }
+        }
+      },
       "SecurityEventId": {
         "type": "string",
         "format": "uuid",
@@ -9185,6 +9580,24 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "Segment": {
+        "type": "object",
+        "description": "A run of plain text, part of a hit or not. Clients render it as text\n(a `<mark>` around hits); it never carries markup.",
+        "required": [
+          "text",
+          "hit"
+        ],
+        "properties": {
+          "hit": {
+            "type": "boolean",
+            "description": "Whether it matched the query."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text, verbatim."
           }
         }
       },
@@ -9964,7 +10377,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -9994,6 +10407,10 @@
     {
       "name": "identity",
       "description": "Accounts and their ways in, and this instance's OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, sign-in with a provider, and the mailboxes a sign-up granted, waiting for a workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve browsers and OAuth clients; they answer 404 while another identity provider serves the instance."
+    },
+    {
+      "name": "search",
+      "description": "One search over the records you may open: conversations today. Words in English, Portuguese, Spanish and French with accents ignored, Gmail-style operators, highlights as plain-text segments. Results come only from the containers (inboxes) you may see, checked at query time."
     },
     {
       "name": "changes",
