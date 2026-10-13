@@ -187,6 +187,22 @@ tuned with `CAMPBOOKS_JOBS__*` (concurrency, per-workspace limit, poll
 interval, lease, retention, shutdown grace, retry backoff). A third role,
 `sync`, arrives with the connectors (ADR 0011).
 
+### AI calls
+
+A module asks `campbooks-ai` for a **role**, never a vendor (ADR 0005).
+`embed`, `complete` and `vision` use the OpenAI-compatible protocol. `decide`
+is typed (ADR 0009): `Gateway::decide(ctx, state, questions)` takes a compact
+state built by the module and `choice` / `score` / `noul` questions, and
+returns one answer per question with a probability per option and a
+confidence. It is served by Laya over `laya-serve` (`protocol = laya`, the
+default) or by an instruct model through a JSON-schema adapter
+(`protocol = openai`, probabilities from logprobs when available). Questions
+are checked before any call (at most 20 options: split larger sets into a
+coarse choice and a fine one). Probabilities pass through a per (question
+type, option count) temperature, from config today and refitted from user
+corrections later. A module acts on an answer only through
+`answer.accept_if(threshold)` and asks the user below it.
+
 ## Clients
 
 One React/TypeScript UI, three delivery targets (ADR 0003):
