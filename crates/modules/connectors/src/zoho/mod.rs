@@ -52,8 +52,8 @@ pub const ACCOUNTS_SERVERS: [&str; 8] = [
 /// Where one data centre's services live.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DataCentre {
-    /// The accounts server (the issuer), without a trailing slash.
-    pub accounts: String,
+    /// The accounts server (the grant's issuer), without a trailing slash.
+    pub issuer: String,
     /// Its token endpoint.
     pub token: Url,
     /// Its revocation endpoint.
@@ -76,11 +76,11 @@ impl Centres {
     /// The data centre of `issuer`, when it is one of these.
     pub fn of(&self, issuer: &str) -> Option<DataCentre> {
         let issuer = issuer.trim().trim_end_matches('/');
-        let (accounts, mail) = match self {
+        let (origin, mail) = match self {
             Self::Zoho => {
-                let accounts = ACCOUNTS_SERVERS.iter().find(|s| **s == issuer)?;
-                let host = accounts.strip_prefix("https://accounts.")?;
-                ((*accounts).to_owned(), format!("https://mail.{host}/api/"))
+                let origin = ACCOUNTS_SERVERS.iter().find(|s| **s == issuer)?;
+                let host = origin.strip_prefix("https://accounts.")?;
+                ((*origin).to_owned(), format!("https://mail.{host}/api/"))
             }
             Self::Fake(base) => {
                 let base = base.as_str().trim_end_matches('/');
@@ -92,10 +92,10 @@ impl Centres {
         };
         let parse = |url: &str| Url::parse(url).ok();
         Some(DataCentre {
-            token: parse(&format!("{accounts}/oauth/v2/token"))?,
-            revoke: parse(&format!("{accounts}/oauth/v2/token/revoke"))?,
+            token: parse(&format!("{origin}/oauth/v2/token"))?,
+            revoke: parse(&format!("{origin}/oauth/v2/token/revoke"))?,
             mail: parse(&mail)?,
-            accounts,
+            issuer: origin,
         })
     }
 }
@@ -216,7 +216,7 @@ mod tests {
     #[test]
     fn a_zoho_issuer_maps_to_its_data_centre() {
         let eu = Centres::Zoho.of("https://accounts.zoho.eu/").unwrap();
-        assert_eq!(eu.accounts, "https://accounts.zoho.eu");
+        assert_eq!(eu.issuer, "https://accounts.zoho.eu");
         assert_eq!(eu.mail.as_str(), "https://mail.zoho.eu/api/");
         assert_eq!(eu.token.as_str(), "https://accounts.zoho.eu/oauth/v2/token");
         assert_eq!(

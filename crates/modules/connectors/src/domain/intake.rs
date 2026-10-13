@@ -202,7 +202,7 @@ impl Intake {
         if mailboxes.is_empty() {
             return Err(Error::Conflict(MESSAGES.reason("no_mailbox")));
         }
-        Ok((centre.accounts, mailboxes))
+        Ok((centre.issuer, mailboxes))
     }
 }
 
