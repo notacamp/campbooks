@@ -13,8 +13,13 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
-      # Built from POSTGRES_PASSWORD so the two never drift apart.
-      CAMPBOOKS_DATABASE_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
+      # Two logins (ADR 0011). The server queries as `campbooks_runtime`, a
+      # plain login that cannot bypass row-level security; db-init creates it
+      # and generates its password into the db-secrets volume. The owner login
+      # (built from POSTGRES_PASSWORD) only applies migrations.
+      CAMPBOOKS_DATABASE_URL: postgres://campbooks_runtime@postgres:5432/campbooks
+      CAMPBOOKS_DATABASE_PASSWORD_FILE: /run/db/runtime-password
+      CAMPBOOKS_DATABASE_MIGRATION_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
       # Trust the bundled IdP's access tokens (ADR 0004). To use another IdP,
       # change these lines (and drop the idp services).
       CAMPBOOKS_AUTH__ISSUER: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}/auth/v1/
@@ -32,6 +37,8 @@ services:
       # The instance secret key and the web client's OIDC secret, read through
       # the supplementary group 10001 (the files are 0440, see server/init.sh).
       - server-secrets:/run/campbooks:ro
+      # The runtime database login's password (see db-init).
+      - db-secrets:/run/db:ro
     group_add: ["10001"]
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
@@ -40,6 +47,8 @@ services:
       postgres:
         condition: service_healthy
       server-init:
+        condition: service_completed_successfully
+      db-init:
         condition: service_completed_successfully
     # The image's HEALTHCHECK runs `campbooks-server healthcheck`.
 
@@ -67,6 +76,23 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+
+  # One-shot: creates the server's database login (see postgres/init.sh).
+  db-init:
+    image: pgvector/pgvector:pg17
+    restart: "no"
+    entrypoint: ["sh", "/postgres/init.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: campbooks
+      PGPASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      PGDATABASE: campbooks
+    volumes:
+      - ./postgres:/postgres:ro
+      - db-secrets:/run/db
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # --- Identity provider (OIDC / OAuth 2.1) -------------------------------------
   # Rauthy (ADR 0004). Three services, no manual steps:
@@ -180,6 +206,7 @@ services:
 
 volumes:
   postgres-data:
+  db-secrets:
   blobs-data:
   idp-data:
   # The instance secret key and the web client's OIDC secret (read-only for the server).

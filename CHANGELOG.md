@@ -166,6 +166,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   problem+json 400s, and unparsable ids in paths are 404s.
 
 ### Changed
+- **Separate database logins.** The server now queries as a dedicated
+  non-superuser login (`campbooks_runtime`) that cannot bypass row-level
+  security or switch back to a more powerful role, and the owner login is used
+  only to run migrations. New settings: `CAMPBOOKS_DATABASE_MIGRATION_URL`,
+  `CAMPBOOKS_DATABASE_PASSWORD_FILE` and `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS`.
+  **Upgrading with the bundled compose file needs no manual step**: the new
+  `db-init` service creates the login and its password on the first
+  `docker compose up -d` (existing data is untouched). With your own
+  Postgres nothing breaks either: a single privileged `CAMPBOOKS_DATABASE_URL`
+  keeps working, with a startup warning recommending the split (see "Database
+  logins" in `deploy/README.md`). The server now refuses to start when the
+  login it queries as is a superuser or has `BYPASSRLS` (for example with
+  `CAMPBOOKS_DATABASE_ROLE=` set empty on a superuser URL); set
+  `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS=true` to opt out.
 - `/bff/api/*` now requires a signed-in session and calls the API with your
   access token; without a session it answers 401 `session_required`. It
   replaces the interim passthrough.
