@@ -21,7 +21,8 @@ use tower::ServiceExt;
 use crate::{
     AppState, Config, Module,
     blobs::BlobStore,
-    config::{AuthConfig, BlobsConfig, JobsConfig, LogFormat},
+    config::{AuthConfig, BlobsConfig, Environment, JobsConfig, LogFormat, SignupConfig},
+    db,
 };
 
 /// A config pointing at `database_url`, everything else default (no
@@ -30,6 +31,8 @@ pub fn config(database_url: &str) -> Config {
     Config {
         database_url: SecretString::from(database_url),
         database_max_connections: 5,
+        database_role: db::DEFAULT_RUNTIME_ROLE.to_owned(),
+        env: Environment::Production,
         bind_addr: ([127, 0, 0, 1], 0).into(),
         public_url: "http://localhost:8080".to_owned(),
         run_migrations: false,
@@ -37,8 +40,27 @@ pub fn config(database_url: &str) -> Config {
         web_dir: None,
         auth: AuthConfig::default(),
         jobs: JobsConfig::default(),
+        signup: SignupConfig::default(),
         blobs: BlobsConfig::default(),
     }
+}
+
+/// A pool on the same database as `db` (e.g. the one `#[sqlx::test]` hands
+/// you, which connects as a superuser) whose connections run as the runtime
+/// role, like the server's: row-level security applies.
+///
+/// # Panics
+/// If the database refuses the connection or the role switch (the kernel
+/// migration, which creates the role, has not run).
+pub async fn app_role_pool(db: &PgPool) -> PgPool {
+    let options = db::with_runtime_role(
+        PgPoolOptions::new().max_connections(5),
+        Some(db::DEFAULT_RUNTIME_ROLE),
+    );
+    options
+        .connect_with((*db.connect_options()).clone())
+        .await
+        .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
 }
 
 /// App state over `db` (e.g. the pool `#[sqlx::test]` hands you), storing

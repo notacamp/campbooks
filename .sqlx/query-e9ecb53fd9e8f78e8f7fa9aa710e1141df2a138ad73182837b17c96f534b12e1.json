@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.workspaces\n              SET deleted_at = now(), purge_after = now() + make_interval(days => $2)\n            WHERE id = $1\n        RETURNING purge_after AS \"purge_after!: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "purge_after!: DateTime<Utc>",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workspaces.workspaces",
+            "name": "purge_after"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "e9ecb53fd9e8f78e8f7fa9aa710e1141df2a138ad73182837b17c96f534b12e1"
+}

@@ -1,0 +1,32 @@
+[package]
+name = "campbooks-workspaces"
+description = "Campbooks workspaces module: users, workspaces, members and roles, invitations, signup policy and the security log (tenancy)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+# Invitation tokens: randomness, SHA-256 and constant-time comparison. Already
+# in the graph as the rustls / jsonwebtoken crypto backend.
+aws-lc-rs.workspace = true
+axum.workspace = true
+base64.workspace = true
+campbooks-kernel.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
+utoipa.workspace = true
+utoipa-axum.workspace = true
+
+[dev-dependencies]
+campbooks-kernel = { workspace = true, features = ["test-util"] }
+secrecy.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

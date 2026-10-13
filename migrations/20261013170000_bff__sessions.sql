@@ -61,3 +61,9 @@ CREATE TABLE bff.login_transactions (
 );
 
 CREATE INDEX login_transactions_expires_at_idx ON bff.login_transactions (expires_at);
+
+-- The runtime role (see `kernel__runtime_role`). Sessions belong to people at
+-- the identity provider, not to a workspace, so these tables carry no
+-- row-level security policies; only the BFF reads and writes them.
+GRANT USAGE ON SCHEMA bff TO campbooks_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON bff.sessions, bff.login_transactions TO campbooks_app;

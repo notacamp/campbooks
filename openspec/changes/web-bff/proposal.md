@@ -86,7 +86,9 @@ that change, not a specified requirement.
 - Code: `campbooks-server` (new `bff` module, router, startup), `campbooks-kernel`
   (OIDC token validation, `Registry::build_with`, test IdP), `xtask` (arch
   rules), `clients/app/src/lib/api`.
-- Data: new schema `bff` (two tables), migration `20261013000000_bff__sessions.sql`.
+- Data: new schema `bff` (two tables, granted to the `campbooks_app` runtime role
+  without row-level security: sessions belong to people, not workspaces),
+  migration `20261013170000_bff__sessions.sql`.
   No module schema changes; no events published or consumed.
 - Configuration: `CAMPBOOKS_SECRET_KEY` / `CAMPBOOKS_SECRET_KEY_FILE` (required
   once web sign-in is configured) and `CAMPBOOKS_BFF__*`. Without an issuer or

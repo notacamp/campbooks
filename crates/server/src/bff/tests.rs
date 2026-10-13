@@ -91,7 +91,9 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
     else {
         panic!("test BFF settings are valid");
     };
-    let state = AppState::new(db.clone(), config);
+    // The app runs as the runtime role, like the server (row-level security
+    // applies); the test's own queries keep the superuser pool.
+    let state = AppState::new(testing::app_role_pool(&db).await, config);
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
@@ -855,7 +857,10 @@ async fn a_changed_secret_key_ends_sessions_instead_of_failing(db: PgPool) {
     let Ok(Loaded::Enabled(settings)) = config::settings(&config, bff, Some([9; 32]), &[]) else {
         panic!("valid settings");
     };
-    browser.app = app(AppState::new(db, config), Some(*settings));
+    browser.app = app(
+        AppState::new(testing::app_role_pool(&db).await, config),
+        Some(*settings),
+    );
     browser
         .get("/bff/api/v1/test/whoami")
         .await

@@ -20,6 +20,7 @@ campbooks-kernel = { path = "crates/kernel" }
 campbooks-ai = { path = "crates/ai" }
 campbooks-server = { path = "crates/server" }
 campbooks-system = { path = "crates/modules/system" }
+campbooks-workspaces = { path = "crates/modules/workspaces" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }

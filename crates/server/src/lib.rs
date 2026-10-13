@@ -62,8 +62,15 @@ pub const SECURITY_SCHEME: &str = "bearer";
 pub fn modules() -> Vec<Module> {
     vec![
         campbooks_system::module(),
+        campbooks_workspaces::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
+}
+
+/// `state` with the ports modules implement for the kernel registered: the
+/// `workspaces` module answers who belongs to which workspace.
+pub fn with_ports(state: AppState) -> AppState {
+    state.with_membership(campbooks_workspaces::membership())
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
@@ -121,6 +128,9 @@ fn security_scheme() -> SecurityScheme {
     components(schemas(Problem)),
     tags(
         (name = "system", description = "Instance health and version."),
+        (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
+            security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
+            caller who is not a member (or a client token bound to another workspace) gets 404."),
         // `cargo xtask new-module` inserts above this line.
     ),
 )]
@@ -354,6 +364,87 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("/")
+    }
+
+    /// Row-level security can only protect tables that have it: every table
+    /// with a `workspace_id` column (and the workspaces themselves) must
+    /// enable and force it and carry a policy, so a new module cannot forget.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn every_workspace_owned_table_has_row_level_security(db: sqlx::PgPool) {
+        let unprotected = sqlx::query_scalar!(
+            r#"
+            SELECT n.nspname || '.' || c.relname AS "table!"
+              FROM pg_class c
+              JOIN pg_namespace n ON n.oid = c.relnamespace
+             WHERE c.relkind IN ('r', 'p')
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public', 'kernel')
+               AND (EXISTS (SELECT 1 FROM pg_attribute a
+                             WHERE a.attrelid = c.oid AND a.attname = 'workspace_id'
+                               AND NOT a.attisdropped)
+                    OR (n.nspname, c.relname) = ('workspaces', 'workspaces'))
+               AND NOT (c.relrowsecurity AND c.relforcerowsecurity
+                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))
+             ORDER BY 1
+            "#
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(
+            unprotected.is_empty(),
+            "no forced row-level security: {unprotected:?}"
+        );
+    }
+
+    /// Every table of every module (and the kernel) is usable by the runtime
+    /// role the server queries as: each migration grants its own.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_runtime_role_may_use_every_table(db: sqlx::PgPool) {
+        let role = campbooks_kernel::db::DEFAULT_RUNTIME_ROLE;
+        let missing = sqlx::query_scalar!(
+            r#"
+            SELECT t.schemaname || '.' || t.tablename AS "table!"
+              FROM pg_tables t
+             WHERE t.schemaname NOT IN ('pg_catalog', 'information_schema', 'public')
+               AND NOT (has_schema_privilege($1, t.schemaname, 'USAGE')
+                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'SELECT')
+                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'INSERT')
+                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'UPDATE')
+                        AND has_table_privilege($1, format('%I.%I', t.schemaname, t.tablename), 'DELETE'))
+             ORDER BY 1
+            "#,
+            role
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(
+            missing.is_empty(),
+            "`{role}` lacks privileges on {missing:?}"
+        );
+    }
+
+    /// The worker runs as the runtime role in production: it can claim, run
+    /// and complete kernel jobs.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn the_worker_runs_as_the_runtime_role(db: sqlx::PgPool) {
+        use campbooks_kernel::jobs::{self, EnqueueOptions, PruneJobs, Worker};
+
+        let pool = testing::app_role_pool(&db).await;
+        let state = with_ports(
+            AppState::new(
+                pool.clone(),
+                testing::config("postgres://test@localhost/test"),
+            )
+            .with_registry(registry().unwrap()),
+        );
+        let mut tx = pool.begin().await.unwrap();
+        jobs::enqueue(&mut tx, &PruneJobs, EnqueueOptions::default())
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        let stats = Worker::new(state).run_until_idle().await;
+        assert_eq!(stats.succeeded, 1, "{stats:?}");
     }
 
     #[test]

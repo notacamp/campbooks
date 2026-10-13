@@ -1,0 +1,67 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id AS \"id: InvitationId\", i.email, i.role,\n                  i.accepted_at IS NOT NULL AS \"used!\", i.expires_at <= now() AS \"expired!\"\n             FROM workspaces.invitations i\n             JOIN workspaces.workspaces w ON w.id = i.workspace_id\n            WHERE i.token_hash = $1 AND i.workspace_id = $2 AND w.deleted_at IS NULL\n              FOR UPDATE OF i",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: InvitationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.invitations",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.invitations",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.invitations",
+            "name": "role"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "used!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 4,
+        "name": "expired!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "2a04ec49ee10d811d485f0795185da4bef74069063b288f5b9ee24dab28873eb"
+}

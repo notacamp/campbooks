@@ -25,7 +25,10 @@ spike (ADR 0004, Evaluation) recorded what this design relies on:
 Schema **`bff`**, owned by `campbooks-server`'s BFF, not by a module (like
 `kernel`): migrations `<ts>_bff__<desc>.sql`, touching only `bff`, checked by
 `cargo xtask arch`; no module may touch it or take its name. No cross-schema
-reference. No domain events are published or consumed. Background work:
+reference. The runtime role `campbooks_app` (row-level security, #442) is
+granted the two tables; they carry no workspace policies, because a session
+belongs to a person at the IdP, not to a workspace. No domain events are
+published or consumed. Background work:
 `bff.prune_sessions` (queue `maintenance`, every 15 min), registered through
 `Registry::build_with` because the BFF is not a module.
 

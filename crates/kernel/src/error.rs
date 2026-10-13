@@ -41,6 +41,11 @@ pub enum Error {
     /// Credentials are valid but lack permission for this *action*.
     #[error("forbidden")]
     Forbidden,
+    /// This *action* is refused for a stated reason the client can act on
+    /// (e.g. `signup_invite_only`); the machine-readable code is the problem
+    /// `detail`. Like [`Error::Forbidden`], never for reads.
+    #[error("denied: {0}")]
+    Denied(&'static str),
     /// The request conflicts with the current state; the message is shown.
     #[error("{0}")]
     Conflict(String),
@@ -67,7 +72,7 @@ impl Error {
             Self::NotFound => StatusCode::NOT_FOUND,
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
-            Self::InsufficientScope(_) | Self::Forbidden => StatusCode::FORBIDDEN,
+            Self::InsufficientScope(_) | Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -82,6 +87,7 @@ impl Error {
             }
             Self::Unauthorized(failure) => Some(failure.code().to_owned()),
             Self::InsufficientScope(_) => Some("insufficient_scope".to_owned()),
+            Self::Denied(code) => Some((*code).to_owned()),
             Self::NotFound | Self::Forbidden | Self::Internal(_) => None,
         };
         Problem::new(self.status(), detail)
@@ -245,8 +251,15 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn denied_is_403_with_its_code() {
+        let (status, _, body) = render(Error::Denied("signup_invite_only")).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(body["detail"], "signup_invite_only");
+    }
+
+    #[tokio::test]
     async fn other_errors_have_no_challenge() {
-        for err in [Error::NotFound, Error::Forbidden] {
+        for err in [Error::NotFound, Error::Forbidden, Error::Denied("x")] {
             assert!(
                 err.into_response()
                     .headers()

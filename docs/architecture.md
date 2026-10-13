@@ -42,6 +42,9 @@ crates/
   modules/
     system/                campbooks-system — health, version. The reference slice:
                            copy its shape for every new module.
+    workspaces/            campbooks-workspaces — tenancy: users, workspaces, members
+                           and roles, invitations, signup policy, security log;
+                           implements the kernel's `Membership` port.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
@@ -97,6 +100,22 @@ schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
 
+**Tenancy in depth (ADR 0011).** Every workspace-owned table has a
+`workspace_id` column, and queries filter on it. Behind that, Postgres
+row-level security (enabled and forced) admits only the rows of the
+workspace set for the transaction in `campbooks.workspace_id`:
+`state.db.begin_for(workspace)` (`kernel::db::BeginFor`) for requests, and
+`ctx.tx()` for jobs and event handlers. Superusers skip policies, so the
+server never queries as the user it logs in with: migrations run first on a
+connection of their own, then every pooled connection switches to the
+runtime role `campbooks_app` (`CAMPBOOKS_DATABASE_ROLE`), which the kernel
+migration creates. Each migration grants that role what its own tables need
+and declares the policies of its workspace-owned tables (with
+`nullif(current_setting('campbooks.workspace_id', true), '')::uuid`); a
+server test fails if a table with a `workspace_id` column has no forced
+policy, or if the runtime role cannot use a table. Module tests run under
+the same role with `kernel::testing::app_role_pool`.
+
 ### Files (blobs)
 
 Message bodies (raw MIME), attachments and files are not stored in
@@ -109,7 +128,8 @@ hash, size and content type to keep on its record), then `attach`es the blob
 to its record in the transaction that writes the record, and `detach`es it in
 the transaction that removes it. The kernel's hourly `kernel.sweep_blobs`
 deletes blobs nothing holds once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` have
-passed, and `purge_workspace` removes a deleted workspace's blobs. The store
+passed, and `purge_workspace` removes a deleted workspace's blobs (the
+`workspaces.purge_workspace` job calls it when the grace period ends). The store
 never serves blobs by URL: a module's download endpoint checks access, then
 streams `get`.
 
@@ -122,9 +142,21 @@ lists them in `Module.scopes`. Every handler either requires one with the
 `security(("bearer" = ["<scope>"]))`, or is explicitly public with
 `security(())`. The extractor validates the bearer JWT against the IdP
 configured by `CAMPBOOKS_AUTH__*` and yields the `Principal` (subject, kind,
-client id, scopes, workspace). Bad tokens get 401, and missing scopes get 403.
-Whether the principal may see a given record is the module's decision, and a
-read it may not see answers 404. `campbooks-server scopes` prints the
+client id, scopes, workspace, and a user's email and name). Bad tokens get
+401, and missing scopes get 403. Whether the principal may see a given
+record is the module's decision, and a read it may not see answers 404.
+
+Workspace-owned resources live under `/api/v1/w/{workspace_id}/<module>/…`
+(the workspace itself is `/api/v1/w/{workspace_id}`). Their handlers take
+`kernel::tenancy::Workspace<S>` instead of `Scoped<S>`: after the token and
+scope checks it reads the workspace from the path, requires a client
+token's `workspace_id` claim to name it, and asks the `Membership` port —
+a kernel trait the `workspaces` module implements and the server registers
+in `AppState` — whether a user is a member, and with which role. Anything
+else is 404. Handlers then open `state.db.begin_for(workspace.id)`. The path,
+not a header, carries the workspace so URLs name it, generated clients must
+pass it, and two tabs can work in two workspaces. Every operation's OpenAPI
+`operation_id` is its catalogue name, `<module>.<verb>[_<noun>]` (ADR 0013). `campbooks-server scopes` prints the
 catalogue the IdP mirrors. Module tests sign their own tokens with
 `kernel::testing::TestIdp`.
 
