@@ -34,6 +34,10 @@ use crate::{
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::RecordRef;
+use crate::domain::resources;
+use crate::events::MESSAGE_RECORD;
 
 /// Longest body returned, in bytes, per part.
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
@@ -101,6 +105,14 @@ pub async fn handler(
     let (conversation, message) = (path.conversation_id, path.message_id);
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(MESSAGE_RECORD, &message),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let bodies = sqlx::query_scalar!(
         r#"SELECT bodies FROM conversations.messages

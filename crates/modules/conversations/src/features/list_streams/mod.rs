@@ -16,6 +16,9 @@ use crate::{
     model::{InboxId, Stream},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 
 /// Which inbox.
 #[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]
@@ -68,6 +71,7 @@ pub async fn handler(
     extract::Query(query): extract::Query<StreamsQuery>,
 ) -> Result<Json<StreamCounts>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, CONVERSATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
     if let Some(inbox) = query.inbox {

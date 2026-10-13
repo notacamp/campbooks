@@ -23,6 +23,9 @@ use crate::{
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 
 /// Page size when none is asked for.
 pub const DEFAULT_LIMIT: u32 = 50;
@@ -91,6 +94,7 @@ pub async fn handler(
     }
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, CONVERSATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
     if let Some(inbox) = query.inbox {

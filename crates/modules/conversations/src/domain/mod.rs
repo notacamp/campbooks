@@ -13,5 +13,6 @@ pub mod paths;
 pub mod plain_text;
 pub mod policy;
 pub mod redact;
+pub mod resources;
 pub mod sanitize;
 pub mod suggestions;

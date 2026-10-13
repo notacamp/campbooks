@@ -27,6 +27,7 @@ use crate::{
     model::{DraftId, DraftState},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
 
 /// Which version of the draft to send: the one the member last saw saved.
 #[derive(Debug, Clone, Copy, Deserialize, ToSchema)]
@@ -84,7 +85,7 @@ pub async fn send(
     let access = &workspace.access;
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let row = drafts::load(&mut tx, access, id, true).await?;
+    let row = drafts::load(&state, &mut tx, access, id, true, Action::Send).await?;
     if !row.state()?.editable() {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
@@ -142,7 +143,7 @@ pub async fn send(
             .run_at(send_at),
     )
     .await?;
-    let draft = drafts::load(&mut tx, access, id, false).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
     tx.commit().await?;
     Ok((StatusCode::ACCEPTED, Json(draft)))
 }
@@ -181,7 +182,7 @@ pub async fn cancel(
     let access = &workspace.access;
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let row = drafts::load(&mut tx, access, id, true).await?;
+    let row = drafts::load(&state, &mut tx, access, id, true, Action::Write).await?;
     match row.state()? {
         DraftState::Scheduled => {
             sqlx::query!(
@@ -198,7 +199,7 @@ pub async fn cancel(
         // Not sending: nothing to take back.
         DraftState::Draft | DraftState::Failed => {}
     }
-    let draft = drafts::load(&mut tx, access, id, false).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
     tx.commit().await?;
     Ok(Json(draft))
 }

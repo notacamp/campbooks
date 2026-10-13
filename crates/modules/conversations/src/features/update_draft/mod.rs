@@ -28,6 +28,7 @@ use crate::{
     model::{Address, AttachmentId, DraftId, DraftState},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
 
 /// The fields to change; the others stay.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -95,7 +96,7 @@ pub async fn update(
     let access = &workspace.access;
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let row = drafts::load(&mut tx, access, id, true).await?;
+    let row = drafts::load(&state, &mut tx, access, id, true, Action::Write).await?;
     if !row.state()?.editable() {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),
@@ -152,7 +153,7 @@ pub async fn update(
     )
     .execute(&mut *tx)
     .await?;
-    let draft = drafts::load(&mut tx, access, id, false).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
     tx.commit().await?;
     Ok(Json(draft))
 }
@@ -191,7 +192,7 @@ pub async fn delete(
     let access = &workspace.access;
     let id = path.draft_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let row = drafts::load(&mut tx, access, id, true).await?;
+    let row = drafts::load(&state, &mut tx, access, id, true, Action::Delete).await?;
     if row.state()? == DraftState::Sending {
         return Err(Error::Conflict(
             crate::MESSAGES.reason("draft_not_editable"),

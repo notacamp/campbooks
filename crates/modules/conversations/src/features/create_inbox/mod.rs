@@ -64,8 +64,9 @@ impl EventHandler for CreateInbox {
         sqlx::query!(
             r#"
             INSERT INTO conversations.inboxes
-                (id, workspace_id, channel, address, display_name, connection_id)
-            VALUES ($1, $2, $3, $4, $5, $6)
+                (id, workspace_id, channel, address, display_name, connection_id, owner)
+            SELECT $1, $2, $3, $4, $5, $6, $7
+             WHERE NOT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)
             ON CONFLICT DO NOTHING
             "#,
             inbox as InboxId,
@@ -74,6 +75,7 @@ impl EventHandler for CreateInbox {
             account.address.to_lowercase(),
             account.display_name,
             granted.connection as ConnectionId,
+            granted.granted_by.as_uuid(),
         )
         .execute(&mut **tx)
         .await?;
@@ -85,7 +87,8 @@ impl EventHandler for CreateInbox {
         let added = sqlx::query!(
             r#"
             INSERT INTO conversations.inbox_members (workspace_id, inbox_id, user_id, role)
-            SELECT $1, i.id, $3, $4 FROM conversations.inboxes i WHERE i.id = $2
+            SELECT $1, i.id, $3, $4 FROM conversations.inboxes i
+             WHERE i.id = $2 AND i.detached_at IS NULL
             ON CONFLICT DO NOTHING
             "#,
             workspace.as_uuid(),

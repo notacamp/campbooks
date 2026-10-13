@@ -21,13 +21,15 @@ use crate::{
         access::visible_inboxes,
         drafts::{
             self, DraftView, MAX_REFERENCES, StoredAttachment, check_limits, decode,
-            require_sender, tidy,
+            tidy,
         },
     },
     events::DRAFT_RECORD,
     model::{Address, AttachmentId, ConversationId, DraftId, DraftKind, InboxId, MessageId},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
+use crate::domain::resources;
 
 /// A message to start.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -111,7 +113,7 @@ pub async fn handler(
             fill(&mut tx, access, kind, message).await?
         }
     };
-    require_sender(&mut tx, access, filled.inbox).await?;
+    resources::authorize(&state, &mut tx, access, Action::Send, &resources::inbox(filled.inbox)).await?;
 
     let [to, cc, bcc] = tidy([
         body.to.unwrap_or(filled.to),
@@ -160,7 +162,7 @@ pub async fn handler(
             .attach(&mut tx, &ws, &attachment.blob, &owner)
             .await?;
     }
-    let draft = drafts::load(&mut tx, access, id, false).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read).await?.view()?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(draft)))
 }

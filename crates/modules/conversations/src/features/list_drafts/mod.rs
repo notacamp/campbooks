@@ -21,6 +21,9 @@ use crate::{
     model::{ConversationId, DraftId, InboxId},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
+use crate::domain::resources;
+use crate::events::DRAFT_RECORD;
 
 /// Most drafts listed.
 pub const MAX_DRAFTS: i64 = 50;
@@ -70,6 +73,7 @@ pub async fn list(
     extract::Query(filter): extract::Query<DraftFilter>,
 ) -> Result<Json<DraftList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, DRAFT_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let ids = sqlx::query_scalar!(
@@ -125,7 +129,7 @@ pub async fn get(
 ) -> Result<Json<DraftView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let draft = drafts::load(&mut tx, access, path.draft_id, false)
+    let draft = drafts::load(&state, &mut tx, access, path.draft_id, false, Action::Read)
         .await?
         .view()?;
     tx.commit().await?;

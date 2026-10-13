@@ -4,7 +4,7 @@
 //! connector's change batch, like any message. A late outcome for a draft
 //! that stopped waiting (`failed`, same send) still counts.
 
-use campbooks_kernel::{Event, EventConsumer, JobContext, JobError};
+use campbooks_kernel::{Event, EventConsumer, JobContext, JobError, tenancy::UserId};
 
 use crate::{
     events::{DraftSent, SendCompleted, SendFailed, SendOutcome},
@@ -31,7 +31,8 @@ impl EventConsumer for RecordSend {
         let tx = ctx.tx().await?;
         let Some(draft) = sqlx::query!(
             r#"SELECT id AS "id: DraftId", inbox_id AS "inbox: InboxId",
-                      conversation_id AS "conversation: ConversationId"
+                      conversation_id AS "conversation: ConversationId",
+                      author AS "author: UserId"
                  FROM conversations.drafts
                 WHERE send_id = $1 AND state IN ('sending', 'failed')
                   FOR UPDATE"#,
@@ -54,6 +55,7 @@ impl EventConsumer for RecordSend {
                             inbox: draft.inbox,
                             draft: draft.id,
                             conversation: draft.conversation,
+                            author: draft.author,
                         },
                     )
                     .await?;
@@ -82,6 +84,7 @@ impl EventConsumer for RecordSend {
                             inbox: draft.inbox,
                             draft: draft.id,
                             reason,
+                            author: draft.author,
                         },
                     )
                     .await?;

@@ -114,6 +114,7 @@ impl JobHandler for ReleaseSend {
                     draft: payload.draft,
                     send_id,
                     message: blob,
+                    author: author.map(Into::into),
                 },
             )
             .await?;

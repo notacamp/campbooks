@@ -38,6 +38,10 @@ use crate::{
     model::{AttachmentId, ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::RecordRef;
+use crate::domain::resources;
+use crate::features::apply_changes::ATTACHMENT_RECORD;
 
 /// The policy of every attachment response: if a browser ever shows one as
 /// a document, it has an opaque origin, runs nothing, loads nothing, cannot
@@ -100,6 +104,14 @@ pub async fn handler(
 ) -> Result<Response> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(ATTACHMENT_RECORD, &path.attachment),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let row = sqlx::query!(
         r#"SELECT a.filename, a.content_type, a.blob

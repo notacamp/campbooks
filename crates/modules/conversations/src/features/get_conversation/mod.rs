@@ -29,6 +29,10 @@ use crate::{
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::RecordRef;
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 
 /// Newest messages returned with a conversation.
 pub const MAX_MESSAGES: i64 = 100;
@@ -158,6 +162,14 @@ pub async fn handler(
     let id = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &id),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let visible = sqlx::query_scalar!(
         "SELECT 1 AS one FROM conversations.conversations WHERE id = $1 AND inbox_id = ANY($2)",

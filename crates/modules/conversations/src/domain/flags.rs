@@ -60,7 +60,7 @@ pub async fn apply(
     flag: Flag,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = lock_conversation(&mut tx, access, id).await?;
+    let inbox = lock_conversation(state, &mut tx, access, id).await?;
     let changed = match flag {
         Flag::Read => {
             sqlx::query_scalar!(

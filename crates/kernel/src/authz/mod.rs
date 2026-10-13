@@ -150,6 +150,8 @@ pub enum Grantee {
     /// Client tokens bound to the workspace: a narrower grant than a
     /// member's, listed explicitly.
     Clients,
+    /// Client tokens, on a record a client wrote ([`OwnerFact::Clients`]).
+    OwningClients,
     /// Instance administrators (the admin API; never the main API).
     InstanceAdmins,
     /// Anyone, signed in or not ([`Tenancy::Public`] resources only).
@@ -481,6 +483,7 @@ fn allowed(catalogue: &Catalogue, declared: &ResourceType, access: &Access, fact
             Grantee::ContainerRole(min) => access.user.is_some() && at_least(min),
             Grantee::OwnerWithContainerRole(min) => is_owner && at_least(min),
             Grantee::Clients => access.user.is_none(),
+            Grantee::OwningClients => access.user.is_none() && facts.owner == OwnerFact::Clients,
             // The main API never admits an administrator as one.
             Grantee::InstanceAdmins => false,
             Grantee::Anyone => true,
@@ -581,7 +584,10 @@ pub fn authorize_type(
     let possible = |grant: &Grant| grant.actions.contains(&action);
     let allowed = match access.user {
         None => declared.grants.iter().any(|grant| {
-            matches!(grant.to, Grantee::Clients | Grantee::Anyone) && possible(grant)
+            matches!(
+                grant.to,
+                Grantee::Clients | Grantee::OwningClients | Grantee::Anyone
+            ) && possible(grant)
         }),
         Some(_) => {
             let by_owner = match declared.owner {
@@ -600,7 +606,9 @@ pub fn authorize_type(
                                 .is_some_and(|role| workspace_rank(role) >= workspace_rank(min)),
                             Grantee::ContainerRole(_) | Grantee::OwnerWithContainerRole(_) => true,
                             Grantee::Anyone => true,
-                            Grantee::Clients | Grantee::InstanceAdmins => false,
+                            Grantee::Clients
+                            | Grantee::OwningClients
+                            | Grantee::InstanceAdmins => false,
                         }
                 })
         }

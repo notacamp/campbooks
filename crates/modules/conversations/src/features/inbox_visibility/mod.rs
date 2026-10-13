@@ -1,7 +1,8 @@
 //! The change feed's `Visibility` port for this module's containers: a
 //! conversation or message change lives within its inbox, and a member sees
-//! it only if they are a member of that inbox (a client token bound to the
-//! workspace sees every inbox, as it does over the API). The same rule lists
+//! it only if they are a member (or the owner) of that inbox (a client
+//! token bound to the workspace sees every inbox, as it does over the API):
+//! the access catalogue's `read` on the inbox (`domain::resources`). The same rule lists
 //! the inboxes a caller may search. Registered by the server with
 //! `AppState::with_visibility`.
 
@@ -27,6 +28,12 @@ pub fn visibility() -> VisibilityPort {
 pub struct InboxVisibility;
 
 impl Visibility for InboxVisibility {
+    /// A membership ending, an owner leaving, an inbox kept read-only or
+    /// deleted are announced as changes of the inbox record.
+    fn access_records(&self) -> &'static [&'static str] {
+        &[INBOX_RECORD]
+    }
+
     fn container_visible<'a>(
         &'a self,
         db: &'a PgPool,
@@ -46,7 +53,9 @@ impl Visibility for InboxVisibility {
                 Some(user) => {
                     sqlx::query_scalar!(
                         r#"SELECT EXISTS (SELECT 1 FROM conversations.inbox_members
-                                           WHERE inbox_id = $1 AND user_id = $2) AS "visible!""#,
+                                           WHERE inbox_id = $1 AND user_id = $2)
+                               OR EXISTS (SELECT 1 FROM conversations.inboxes
+                                           WHERE id = $1 AND owner = $2) AS "visible!""#,
                         inbox as InboxId,
                         user.as_uuid(),
                     )

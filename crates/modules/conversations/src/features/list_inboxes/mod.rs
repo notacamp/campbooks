@@ -14,6 +14,9 @@ use crate::{
     model::{Channel, InboxId, InboxRole},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
+use crate::domain::resources;
+use crate::events::INBOX_RECORD;
 
 /// An inbox.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -31,6 +34,9 @@ pub struct InboxView {
     pub role: Option<InboxRole>,
     /// Unread inbound messages in conversations still in the inbox.
     pub unread_count: u32,
+    /// Kept as read-only history after its connection was removed: no
+    /// longer synced, nothing can be written or sent from it.
+    pub read_only: bool,
 }
 
 /// The inboxes, by address.
@@ -64,11 +70,13 @@ pub async fn handler(
     workspace: Workspace<ConversationsRead>,
 ) -> Result<Json<InboxList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, INBOX_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let visible = visible_inboxes(&mut tx, access).await?;
     let rows = sqlx::query!(
         r#"
         SELECT i.id AS "id: InboxId", i.channel, i.address, i.display_name,
+               i.detached_at IS NOT NULL AS "read_only!",
                (SELECT m.role FROM conversations.inbox_members m
                  WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,
                (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c
@@ -94,6 +102,7 @@ pub async fn handler(
                 display_name: row.display_name,
                 role: row.role.as_deref().map(str::parse).transpose()?,
                 unread_count: u32::try_from(row.unread_count).unwrap_or_default(),
+                read_only: row.read_only,
             })
         })
         .collect::<Result<_>>()?;

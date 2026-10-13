@@ -155,6 +155,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::SendRequested>()
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
+            .publishes::<events::InboxChanged>()
+            .publishes::<events::InboxRemoved>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
@@ -169,8 +171,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
             ))
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()
+            .on_event::<features::forget_connection::ForgetConnection>()
+            .on_event::<features::forget_member::ForgetMember>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
+        resources: domain::resources::resources(),
     }
 }
 

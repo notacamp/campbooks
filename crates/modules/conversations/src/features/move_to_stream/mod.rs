@@ -74,7 +74,7 @@ pub async fn handler(
     let id = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = lock_conversation(&mut tx, access, id).await?;
+    let inbox = lock_conversation(&state, &mut tx, access, id).await?;
     let current = sqlx::query!(
         "SELECT stream, stream_source FROM conversations.conversations WHERE id = $1",
         id as ConversationId
