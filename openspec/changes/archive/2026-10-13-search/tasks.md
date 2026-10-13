@@ -45,5 +45,5 @@
 - [x] 6.1 OpenAPI and events catalogue regenerated; client types regenerated
 - [x] 6.2 CHANGELOG updated (search, Postgres extensions for self-hosters on managed Postgres)
 - [x] 6.3 Gates green (fmt, clippy, tests, arch, openapi, events, deny, machete, `.sqlx`, OpenSpec validate)
-- [ ] 6.4 Terminal recording (`vhs`): ingest, accent/stem queries, operators, segments, another inbox's member, purge
-- [ ] 6.5 Archive the change into `openspec/specs/`
+- [x] 6.4 Terminal recording (`vhs`): ingest, accent/stem queries, operators, segments, another inbox's member, purge
+- [x] 6.5 Archive the change into `openspec/specs/`
