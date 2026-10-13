@@ -53,6 +53,34 @@ use crate::{
     },
 };
 
+/// The API's scope catalogue in these tests.
+const CATALOGUE: [ScopeInfo; 6] = [
+    ScopeInfo {
+        name: "system:read",
+        description: "See the instance's health.",
+    },
+    ScopeInfo {
+        name: "identity:read",
+        description: "See your account.",
+    },
+    ScopeInfo {
+        name: "identity:write",
+        description: "Change your account.",
+    },
+    ScopeInfo {
+        name: "identity:clients",
+        description: "Manage a workspace's apps.",
+    },
+    ScopeInfo {
+        name: "connectors:write",
+        description: "Connect mailboxes.",
+    },
+    ScopeInfo {
+        name: "conversations:read",
+        description: "Read your conversations.",
+    },
+];
+
 /// The instance under test.
 pub const ORIGIN: &str = "http://localhost:8080";
 /// The scope the fake intake asks for.
@@ -232,10 +260,13 @@ impl Membership for Everyone {
     }
 }
 
+/// A served document and its `max-age`.
+type Served = (Vec<u8>, Option<std::time::Duration>);
+
 /// Client metadata documents served at their URLs (no network).
 #[derive(Debug, Default)]
 pub struct FakeDocuments {
-    documents: Mutex<HashMap<String, (Vec<u8>, Option<std::time::Duration>)>>,
+    documents: Mutex<HashMap<String, Served>>,
     fetched: Mutex<Vec<String>>,
 }
 
@@ -438,32 +469,7 @@ impl Kit {
             &Figment::from(Serialized::defaults(serde_json::json!({}))),
             &config,
             Some(SecretKey::from_bytes([9; 32])),
-            &[
-                ScopeInfo {
-                    name: "system:read",
-                    description: "See the instance's health.",
-                },
-                ScopeInfo {
-                    name: "identity:read",
-                    description: "See your account.",
-                },
-                ScopeInfo {
-                    name: "identity:write",
-                    description: "Change your account.",
-                },
-                ScopeInfo {
-                    name: "identity:clients",
-                    description: "Manage a workspace's apps.",
-                },
-                ScopeInfo {
-                    name: "connectors:write",
-                    description: "Connect mailboxes.",
-                },
-                ScopeInfo {
-                    name: "conversations:read",
-                    description: "Read your conversations.",
-                },
-            ],
+            &CATALOGUE,
             Arc::new(SystemClock),
         )
         .unwrap_or_else(|e| panic!("deps: {e}"));
@@ -568,7 +574,7 @@ impl Kit {
 
     /// Send the next requests from `peer` (as the server sees a socket
     /// address), or from inside the process (`None`).
-    pub fn from_address(&self, peer: Option<&str>) {
+    pub fn send_from(&self, peer: Option<&str>) {
         *self.peer.lock().unwrap_or_else(PoisonError::into_inner) =
             peer.map(|p| p.parse().unwrap_or_else(|e| panic!("{p}: {e}")));
     }

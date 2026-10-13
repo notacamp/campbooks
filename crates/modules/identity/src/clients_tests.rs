@@ -525,7 +525,7 @@ async fn dynamic_registration_takes_public_code_clients_only(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn registration_and_tokens_are_rate_limited_per_address(db: PgPool) {
     let kit = Kit::new(db).await;
-    kit.from_address(Some("203.0.113.7:4000"));
+    kit.send_from(Some("203.0.113.7:4000"));
     let body = serde_json::json!({ "redirect_uris": [AGENT_CALLBACK] });
     for _ in 0..20 {
         assert_eq!(register(&kit, &body).await.status, StatusCode::CREATED);
@@ -535,9 +535,9 @@ async fn registration_and_tokens_are_rate_limited_per_address(db: PgPool) {
     assert_eq!(limited.json["code"], "rate_limited");
     assert!(limited.headers.contains_key("retry-after"));
     // Another address is not affected; the server's own calls never are.
-    kit.from_address(Some("198.51.100.9:4000"));
+    kit.send_from(Some("198.51.100.9:4000"));
     assert_eq!(register(&kit, &body).await.status, StatusCode::CREATED);
-    kit.from_address(Some("198.51.100.9:4000"));
+    kit.send_from(Some("198.51.100.9:4000"));
     for _ in 0..120 {
         kit.post_form("/oauth2/token", &[("grant_type", "client_credentials")])
             .await;
@@ -868,10 +868,28 @@ async fn a_client_known_by_its_metadata_document(db: PgPool) {
         assert_eq!(refused.json["code"], "invalid_client");
         assert!(refused.headers.get("location").is_none());
     }
+    // Looking documents up is limited per address: the server can't be
+    // made to fetch without end.
+    kit.send_from(Some("203.0.113.8:4000"));
+    let mut limited = None;
+    for n in 0..31 {
+        let (url, _) = Kit::authorize_url(
+            &format!("https://agent.example.com/oauth/{n}.json"),
+            AGENT_CALLBACK,
+            "openid",
+        );
+        let response = kit.get(&url).await;
+        if response.status == StatusCode::TOO_MANY_REQUESTS {
+            limited = Some(n);
+            break;
+        }
+    }
+    assert_eq!(limited, Some(30));
+    kit.send_from(None);
     // An http client id is not a document to fetch.
     let (url, _) = Kit::authorize_url("http://agent.example.com/c.json", AGENT_CALLBACK, "openid");
     assert_eq!(kit.get(&url).await.status, StatusCode::BAD_REQUEST);
-    assert_eq!(kit.documents.fetched().len(), 3);
+    assert_eq!(kit.documents.fetched().len(), 33);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

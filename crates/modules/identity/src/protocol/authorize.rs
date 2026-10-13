@@ -15,6 +15,8 @@
 //!   redirect (native apps, many agents) is asked every time: any app on the
 //!   device can claim one (RFC 8252 §8.6).
 
+use std::time::Duration;
+
 use axum::{
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
@@ -24,6 +26,7 @@ use campbooks_kernel::{
     Operation, Result,
     crypto::{hash, random_token},
     error::LocalizableProblem,
+    rate_limit::{ClientIp, Limit, RateKey},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::Deserialize;
@@ -130,10 +133,25 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     web::no_store(LocalizableProblem::new(status, MESSAGES.reason(code)).into_response())
 }
 
+/// Metadata documents one address may make the server look up (each may
+/// be a fetch from the internet).
+const DOCUMENT_LIMIT: Limit = Limit::new("identity.metadata_document", 30, Duration::from_mins(1));
+
 /// The client `id` names: Campbooks' own, a stored one, or the client a
-/// metadata document at that URL describes (fetched now if not cached).
-pub async fn find_client(ctx: &Ctx, issuer: &Issuer, id: &str) -> Result<Option<Client>> {
+/// metadata document at that URL describes (fetched now if not cached; the
+/// asker's address is limited, so the server can't be made to fetch
+/// without end).
+pub async fn find_client(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    id: &str,
+    ip: ClientIp,
+) -> Result<Option<Client>> {
     if let Some(url) = metadata::document_url(id) {
+        ctx.state
+            .rate_limits
+            .check(&ctx.state.db, &DOCUMENT_LIMIT, &RateKey::ip(ip))
+            .await?;
         return metadata::client(
             &ctx.state.db,
             issuer.fetcher.as_ref(),
@@ -162,16 +180,20 @@ pub async fn find_client(ctx: &Ctx, issuer: &Issuer, id: &str) -> Result<Option<
         (status = 400, description = "`invalid_client` or `invalid_redirect_uri`: nothing is \
             redirected.", body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "Another identity provider serves this instance."),
+        (status = 429, description = "`rate_limited`: too many metadata-document clients \
+            looked up from this address.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn authorize(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     headers: HeaderMap,
     Query(query): Query<AuthorizeQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
     let client = match query.client_id.as_deref() {
-        Some(id) => find_client(&ctx, issuer, id).await?,
+        Some(id) => find_client(&ctx, issuer, id, ip).await?,
         None => None,
     };
     let Some(client) = client else {

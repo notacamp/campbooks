@@ -6238,6 +6238,16 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`: too many metadata-document clients looked up from this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [

@@ -6447,6 +6447,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "identity.end_session": {

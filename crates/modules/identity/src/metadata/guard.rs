@@ -302,7 +302,7 @@ mod tests {
     fn cache_control_max_age() {
         assert_eq!(
             max_age("public, max-age=600"),
-            Some(Duration::from_secs(600))
+            Some(Duration::from_mins(10))
         );
         assert_eq!(max_age("no-store"), Some(Duration::ZERO));
         assert_eq!(max_age("private"), None);

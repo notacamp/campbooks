@@ -507,6 +507,8 @@ From `kernel::rate_limit` (per address unless noted):
 - `identity.token`: 120 per minute. In-process requests (the BFF) are not
   counted.
 - `identity.consent`: 30 per minute.
+- `identity.metadata_document`: 30 metadata-document lookups per minute (each may be
+  a fetch from the internet), so the server can't be made to fetch without end.
 
 ## Security notes
 
