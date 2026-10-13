@@ -62,13 +62,6 @@
   height: calc(var(--s) * 0.2);
 }
 
-.visor[data-state="happy"] .eye {
-  width: calc(var(--s) * 0.21);
-  height: calc(var(--s) * 0.17);
-  border-radius: var(--radius-full) var(--radius-full) 0 0 / 190% 190% 0 0;
-  animation: none;
-}
-
 .visor[data-state="asleep"] .eye {
   width: calc(var(--s) * 0.2);
   height: calc(var(--s) * 0.05);
@@ -119,6 +112,7 @@
 }
 
 /* Glyph eyes: dizzy, starry and hearts draw an inline SVG instead of a pill. */
+.visor[data-state="happy"],
 .visor[data-state="dizzy"],
 .visor[data-state="starry"],
 .visor[data-state="hearts"] {
@@ -136,6 +130,11 @@
 
 .visor[data-state="dizzy"] {
   animation: visor-wobble var(--duration-wobble) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="happy"] .glyph {
+  width: calc(var(--s) * 0.3);
+  height: calc(var(--s) * 0.3);
 }
 
 .visor[data-state="dizzy"] .glyph {

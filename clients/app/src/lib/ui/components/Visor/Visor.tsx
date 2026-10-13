@@ -43,15 +43,30 @@ const SPIRAL_PATH = Array.from({ length: 121 }, (_, i) => {
   return `${i === 0 ? "M" : "L"}${(12 + r * Math.cos(t)).toFixed(2)} ${(12 + r * Math.sin(t)).toFixed(2)}`;
 }).join(" ");
 
+/** A smiling eye: an upward arc, "^". */
+const HAPPY_PATH = "M4.5 17C8 8.5 16 8.5 19.5 17";
+
 const STAR_PATH =
   "M12 0.5C12.9 7.6 16.4 11.1 23.5 12 16.4 12.9 12.9 16.4 12 23.5 11.1 16.4 7.6 12.9 0.5 12 7.6 11.1 11.1 7.6 12 0.5Z";
 const HEART_PATH =
   "M12 21.4l-1.5-1.3C5.4 15.4 2 12.3 2 8.5 2 5.4 4.4 3 7.5 3c1.7 0 3.4.8 4.5 2.1C13.1 3.8 14.8 3 16.5 3 19.6 3 22 5.4 22 8.5c0 3.8-3.4 6.9-8.5 11.5L12 21.4z";
 
-function Glyph({ state }: { state: "dizzy" | "starry" | "hearts" }) {
+type GlyphState = "happy" | "dizzy" | "starry" | "hearts";
+
+const GLYPH_STATES: ReadonlySet<VisorState> = new Set(["happy", "dizzy", "starry", "hearts"]);
+
+function Glyph({ state }: { state: GlyphState }) {
   return (
     <svg className={styles["glyph"]} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-      {state === "dizzy" ? (
+      {state === "happy" ? (
+        <path
+          d={HAPPY_PATH}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="4.4"
+          strokeLinecap="round"
+        />
+      ) : state === "dizzy" ? (
         <path
           d={SPIRAL_PATH}
           fill="none"
@@ -75,7 +90,7 @@ export function Visor({
   className,
 }: VisorProps) {
   const { t } = useTranslation("ui");
-  const glyph = state === "dizzy" || state === "starry" || state === "hearts" ? state : null;
+  const glyph = GLYPH_STATES.has(state) ? (state as GlyphState) : null;
   return (
     <span
       className={cx(styles["visor"], className)}

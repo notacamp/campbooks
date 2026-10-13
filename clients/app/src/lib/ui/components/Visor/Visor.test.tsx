@@ -5,7 +5,7 @@ import { renderUi } from "../../../../../test/render";
 
 import { Visor, VISOR_STATES } from "./Visor";
 
-const GLYPH_STATES = ["dizzy", "starry", "hearts"] as const;
+const GLYPH_STATES = ["happy", "dizzy", "starry", "hearts"] as const;
 
 describe("Visor", () => {
   it("is decorative by default", () => {
