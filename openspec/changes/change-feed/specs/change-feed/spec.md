@@ -25,6 +25,14 @@ remain valid across server restarts and between server replicas.
 - **WHEN** two transactions in one workspace record changes and the later-started one commits first
 - **THEN** a subscriber that has received cursor N never later receives a change with a cursor below N
 
+#### Scenario: Producers are not delayed
+- **WHEN** one transaction that recorded changes stays open while others in the same workspace record changes and commit
+- **THEN** the others commit without waiting for it or for the numbering, and once it commits every change has a cursor with no gap
+
+#### Scenario: Bursts coalesce
+- **WHEN** a thousand events with changes are published in one workspace in a burst
+- **THEN** a handful of numbering runs at most handle them, and their cursors are 1 to 1000 in publish order
+
 #### Scenario: Another replica
 - **WHEN** a client resumes with a cursor obtained from one server process against another process of the same instance
 - **THEN** it receives exactly the changes after that cursor

@@ -7,6 +7,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Live updates: the app learns what changed in a workspace (renamed, a
+  member joined, left or changed role) as it happens and refreshes only what
+  it shows, catching up after a lost connection or a sleeping laptop. API
+  clients can follow the same stream at `GET /api/v1/w/{workspace_id}/changes`
+  (Server-Sent Events, ids only). Self-hosters behind a reverse proxy must
+  let `text/event-stream` responses through unbuffered; tuning lives in the
+  new `CAMPBOOKS_CHANGES__*` settings (see `deploy/.env.example`).
 - The server now answers in your language: error messages from the API are
   in English, European Portuguese, Spanish or French, following the language
   you chose (once accounts can save one) or your browser's language, and say

@@ -57,6 +57,37 @@ export interface paths {
         patch: operations["workspaces.update"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Follow a workspace's changes.
+         * @description A Server-Sent Events stream of what changed in the workspace, for clients
+         *     that keep a cache: each `change` frame names a record and an operation
+         *     (`{"cursor","record":{"type","id"},"op":"upsert"|"delete","version"}`),
+         *     never its contents; refetch what you show. Frames: `ready` (where the
+         *     stream starts), `change`, `heartbeat` (an SSE comment, or the cursor when
+         *     it moved past changes you may not see), `reset` (your cursor is unknown,
+         *     expired or too far behind: refetch everything, continue from the
+         *     cursor given), `revoked` (you no longer belong to the workspace) and
+         *     `closing` (the stream ends; reconnect with your cursor). Every frame
+         *     that carries a cursor sets the SSE `id`, so `EventSource` resumes on its
+         *     own. You only receive changes of records a read operation you hold a
+         *     scope for returns.
+         */
+        get: operations["changes.stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/invitations": {
         parameters: {
             query?: never;
@@ -855,6 +886,75 @@ export interface operations {
             };
             /** @description No such workspace, or you are not a member. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "changes.stream": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The last cursor received, for clients that cannot send
+                 *     `Last-Event-ID` (the header wins when both are present). Omit it to
+                 *     start from now.
+                 */
+                after?: string;
+            };
+            header?: {
+                /** @description The last cursor received; resumes after it. */
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The change stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `too_many_streams`: you hold the maximum number of open streams. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

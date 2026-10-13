@@ -19,6 +19,9 @@ const config: KnipConfig = {
         // used or not yet (AGENTS.md → UI).
         "src/lib/ui/index.ts",
         "src/lib/shortcuts/index.ts",
+        // The API client and change feed (`subscribeToChanges` is wired in
+        // by the first module that follows a workspace).
+        "src/lib/api/index.ts",
       ],
       project: [
         "src/**/*.{ts,tsx,css}",
