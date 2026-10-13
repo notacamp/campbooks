@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT stream, stream_source FROM conversations.conversations WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "stream_source",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "stream_source"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f38e2de094a7bcdb1ef9ba8266e42f6b10459c886924edc5c85dcc3b18c6b4d1"
+}

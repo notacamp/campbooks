@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.inbox_members (workspace_id, inbox_id, user_id, role)\n             VALUES ($1, $2, $3, $4)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d6cf1c365dc0922467e7cd804caf8a881ae07cfd4caa3cdfacd4b904c0ea74f7"
+}

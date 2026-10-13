@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                SELECT c.id AS \"id: ConversationId\"\n                  FROM conversations.conversations c\n                 WHERE c.inbox_id = $1 AND c.thread_key IS NULL\n                   AND EXISTS (SELECT 1 FROM conversations.messages m\n                                WHERE m.conversation_id = c.id\n                                  AND (m.in_reply_to = $2 OR m.reference_ids @> ARRAY[$2]))\n                 ORDER BY c.created_at, c.id\n                ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "825274a2b1268bddeed8fe206314d73097cd0e61a4ef9062e0010d3adfda75ad"
+}

@@ -26,8 +26,8 @@ pub mod testing;
 
 pub use config::Config;
 pub use error::{Error, Problem, Result};
-pub use events::{DomainEvent, Event, EventBus, EventHandler};
-pub use jobs::{Background, Job, JobContext, JobError};
+pub use events::{DomainEvent, Event, EventBus, EventConsumer, EventHandler};
+pub use jobs::{Background, Job, JobContext, JobError, JobHandler};
 pub use module::Module;
 pub use operations::{Operation, Risk};
 pub use records::RecordRef;

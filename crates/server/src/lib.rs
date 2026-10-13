@@ -1,7 +1,9 @@
 //! `campbooks-server` — composes the modules into one HTTP API.
 //!
 //! This is the only crate that knows the full list of modules. Adding a module
-//! means adding one line to [`modules`]. Their background work (jobs, event
+//! means adding one line to [`modules`], which composes each module with the
+//! dependencies it takes ([`Deps`]: built from the environment to run, or
+//! [`Deps::offline`] to describe the modules without running them). Their background work (jobs, event
 //! handlers, schedules, published events) is collected by [`registry`]; their
 //! operations form the catalogue of [`openapi`] (ADR 0013).
 
@@ -61,11 +63,46 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 /// `security(("bearer" = ["<scope>"]))`.
 pub const SECURITY_SCHEME: &str = "bearer";
 
-/// Every module, in mount order.
-pub fn modules() -> Vec<Module> {
+/// What modules are composed with. Modules never look dependencies up: the
+/// server builds them once and hands each module its own.
+#[derive(Debug, Clone)]
+pub struct Deps {
+    /// The `conversations` module's: the AI gateway and its settings.
+    pub conversations: campbooks_conversations::ConversationsDeps,
+}
+
+impl Deps {
+    /// Dependencies from the environment (`CAMPBOOKS_AI__*`,
+    /// `CAMPBOOKS_CONVERSATIONS__*`). The AI gateway exists only when some
+    /// AI role is configured.
+    pub fn from_env() -> Result<Self, String> {
+        let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
+        let gateway = if ai.roles.is_empty() {
+            None
+        } else {
+            Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
+        };
+        let config = campbooks_conversations::ConversationsConfig::from_env()?;
+        Ok(Self {
+            conversations: campbooks_conversations::ConversationsDeps::new(gateway, config),
+        })
+    }
+
+    /// No AI and default settings: for describing the modules (OpenAPI,
+    /// scopes, the events catalogue, `cargo xtask`) without running them.
+    pub fn offline() -> Self {
+        Self {
+            conversations: campbooks_conversations::ConversationsDeps::offline(),
+        }
+    }
+}
+
+/// Every module, composed with `deps`, in mount order.
+pub fn modules(deps: &Deps) -> Vec<Module> {
     vec![
         campbooks_system::module(),
         campbooks_workspaces::module(),
+        campbooks_conversations::module(deps.conversations.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -76,23 +113,23 @@ pub fn with_ports(state: AppState) -> AppState {
     state.with_membership(campbooks_workspaces::membership())
 }
 
-/// Every job kind, event handler and schedule of every module, plus the
-/// kernel's maintenance. Fails when a registration breaks a naming rule or
-/// is duplicated (also checked by `cargo xtask arch`).
-pub fn registry() -> Result<Registry, RegistryError> {
-    Registry::build(&modules())
+/// Every job kind, event handler and schedule of every module (composed
+/// with `deps`), plus the kernel's maintenance. Fails when a registration
+/// breaks a naming rule or is duplicated (also checked by `cargo xtask arch`).
+pub fn registry(deps: &Deps) -> Result<Registry, RegistryError> {
+    Registry::build(&modules(deps))
 }
 
 /// Every event the modules publish, with its payload schema: what
 /// `campbooks-server events catalogue` prints and `openapi/events.json` holds.
 pub fn events_catalogue() -> Result<EventCatalogue, RegistryError> {
-    registry().map(|registry| EventCatalogue::new(&registry))
+    registry(&Deps::offline()).map(|registry| EventCatalogue::new(&registry))
 }
 
 /// Every OAuth scope the API knows, sorted by name: what
 /// `campbooks-server scopes` prints and the identity provider mirrors.
 pub fn scope_catalogue() -> Vec<ScopeInfo> {
-    let mut scopes: Vec<ScopeInfo> = modules()
+    let mut scopes: Vec<ScopeInfo> = modules(&Deps::offline())
         .iter()
         .flat_map(|module| module.scopes.iter().copied())
         .collect();
@@ -138,18 +175,21 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
+        (name = "conversations", description = "Inboxes, conversations and messages on any \
+            channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes \
+            they are a member of; a client token bound to the workspace sees them all."),
         // `cargo xtask new-module` inserts above this line.
     ),
 )]
 struct ApiDoc;
 
-fn api() -> OpenApiRouter<AppState> {
+fn api(deps: &Deps) -> OpenApiRouter<AppState> {
     let mut doc = ApiDoc::openapi();
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(SECURITY_SCHEME, security_scheme());
-    modules()
+    modules(deps)
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
@@ -158,7 +198,7 @@ fn api() -> OpenApiRouter<AppState> {
 
 /// The OpenAPI document for every module's routes.
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    api().into_openapi()
+    api(&Deps::offline()).into_openapi()
 }
 
 /// The full HTTP application: module routes (behind the idempotency layer),
@@ -170,12 +210,12 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// The same module routes are installed in the state's
 /// [`Operations`](operations::Operations), so automation and the assistant invoke operations by id
 /// through exactly what HTTP requests reach.
-pub fn router(state: AppState) -> Router {
+pub fn router(state: AppState, deps: &Deps) -> Router {
     let operations::Composed {
         routes,
         spec,
         state,
-    } = operations::compose(api(), state);
+    } = operations::compose(api(deps), state);
     let spec = Arc::new(spec);
     let request_id = HeaderName::from_static(REQUEST_ID_HEADER);
     let web_client = web::configured_dir(&state.config).map(web::WebClient::new);
@@ -248,7 +288,10 @@ mod tests {
     use super::*;
 
     fn app() -> Router {
-        router(testing::state(testing::unreachable_pool()))
+        router(
+            testing::state(testing::unreachable_pool()),
+            &Deps::offline(),
+        )
     }
 
     #[test]
@@ -311,7 +354,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique, "sorted and unique");
-        for module in modules() {
+        for module in modules(&Deps::offline()) {
             for scope in module.scopes {
                 assert!(
                     scope.name.starts_with(&format!("{}:", module.name)),
@@ -438,7 +481,7 @@ mod tests {
                 pool.clone(),
                 testing::config("postgres://test@localhost/test"),
             )
-            .with_registry(registry().unwrap()),
+            .with_registry(registry(&Deps::offline()).unwrap()),
         );
         let mut tx = pool.begin().await.unwrap();
         jobs::enqueue(&mut tx, &PruneJobs, EnqueueOptions::default())
@@ -451,7 +494,7 @@ mod tests {
 
     #[test]
     fn registry_builds() {
-        let registry = registry().unwrap();
+        let registry = registry(&Deps::offline()).unwrap();
         assert!(registry.kind_names().contains(&"kernel.prune_jobs"));
         assert!(registry.kind_names().contains(&"kernel.prune_idempotency"));
     }
@@ -478,7 +521,10 @@ mod tests {
 
     #[tokio::test]
     async fn operations_are_invocable_by_id_and_gated_by_their_metadata() {
-        let composed = operations::compose(api(), testing::state(testing::unreachable_pool()));
+        let composed = operations::compose(
+            api(&Deps::offline()),
+            testing::state(testing::unreachable_pool()),
+        );
         let catalogue = composed.state.operations.catalogue().unwrap();
         assert!(
             catalogue
@@ -514,7 +560,7 @@ mod tests {
 
     #[test]
     fn module_names_are_unique() {
-        let mut names: Vec<_> = modules().iter().map(|m| m.name).collect();
+        let mut names: Vec<_> = modules(&Deps::offline()).iter().map(|m| m.name).collect();
         names.sort_unstable();
         let before = names.len();
         names.dedup();
@@ -584,7 +630,10 @@ mod tests {
     fn web_app(dir: &WebDir) -> Router {
         let mut config = testing::config("postgres://test@localhost/test");
         config.web_dir = Some(dir.0.clone());
-        router(AppState::new(testing::unreachable_pool(), config))
+        router(
+            AppState::new(testing::unreachable_pool(), config),
+            &Deps::offline(),
+        )
     }
 
     struct Raw {

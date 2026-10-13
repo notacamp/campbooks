@@ -1,0 +1,43 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "fr-1",
+      "thread_key": "thr-fr-colis",
+      "from": {"name": "Colis Rapide", "address": "suivi@colis-rapide.example"},
+      "to": [{"address": "camille.martin@example.com"}],
+      "subject": "Votre colis a été expédié",
+      "sent_at": "2026-10-02T14:10:00Z",
+      "direction": "inbound",
+      "headers": {"auto_submitted": "auto-generated"},
+      "text": "Bonne nouvelle : votre colis n° CR-55120 a été expédié et arrivera jeudi.",
+      "mailbox": {"in_inbox": true},
+      "categories": ["updates"],
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "fr-2",
+      "thread_key": "thr-fr-recu",
+      "from": {"name": "Boulangerie des Halles", "address": "caisse@boulangerie-halles.example"},
+      "to": [{"address": "camille.martin@example.com"}],
+      "subject": "Votre reçu – commande n° 3381",
+      "sent_at": "2026-10-03T07:55:00Z",
+      "direction": "inbound",
+      "text": "Merci pour votre commande. Montant payé : 18,40 €. Vous trouverez votre reçu en pièce jointe.",
+      "attachments": [{"filename": "recu-3381.pdf", "content_type": "application/pdf", "content": "%PDF-1.7 recu fictif"}],
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "fr-3",
+      "thread_key": "thr-fr-voisin",
+      "from": {"name": "Hugo Bernard", "address": "hugo.bernard@courriel.example"},
+      "to": [{"name": "Camille", "address": "camille.martin@example.com"}],
+      "subject": "Fuite d'eau dans la cave",
+      "sent_at": "2026-10-04T19:20:00Z",
+      "direction": "inbound",
+      "text": "Bonsoir Camille, il y a une fuite d'eau dans la cave près de votre box. Pouvez-vous passer demain matin avant 9 h pour qu'on regarde ensemble ? Hugo",
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }}
+  ]
+}

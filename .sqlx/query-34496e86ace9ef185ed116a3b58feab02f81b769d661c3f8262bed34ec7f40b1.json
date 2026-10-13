@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        DELETE FROM conversations.conversation_labels cl\n         USING conversations.labels l\n         WHERE cl.label_id = l.id AND cl.conversation_id = $1 AND l.provider_key = ANY($2)\n           AND NOT EXISTS (SELECT 1 FROM conversations.messages m\n                            WHERE m.conversation_id = $1 AND l.provider_key = ANY(m.provider_labels))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "34496e86ace9ef185ed116a3b58feab02f81b769d661c3f8262bed34ec7f40b1"
+}

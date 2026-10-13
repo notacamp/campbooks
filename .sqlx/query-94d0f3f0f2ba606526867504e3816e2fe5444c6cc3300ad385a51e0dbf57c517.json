@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT id AS \"id: MessageId\", conversation_id AS \"conversation: ConversationId\",\n                   read, starred, in_inbox, in_spam, in_trash, provider_labels\n              FROM conversations.messages\n             WHERE inbox_id = $1 AND provider_message_id = $2\n               FOR UPDATE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: MessageId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "conversation: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "conversation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "read",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "read"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "starred",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "starred"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "in_inbox",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "in_inbox"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "in_spam",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "in_spam"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "in_trash",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "in_trash"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "provider_labels",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_labels"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "94d0f3f0f2ba606526867504e3816e2fe5444c6cc3300ad385a51e0dbf57c517"
+}

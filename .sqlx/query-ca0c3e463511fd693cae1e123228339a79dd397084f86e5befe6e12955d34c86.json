@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH moved_messages AS (\n            UPDATE conversations.messages SET conversation_id = $2, updated_at = now()\n             WHERE conversation_id = $1\n        ), moved_decisions AS (\n            UPDATE conversations.decisions SET conversation_id = $2 WHERE conversation_id = $1\n        ), moved_corrections AS (\n            UPDATE conversations.corrections SET conversation_id = $2 WHERE conversation_id = $1\n        )\n        INSERT INTO conversations.conversation_labels (workspace_id, conversation_id, label_id)\n        SELECT workspace_id, $2, label_id FROM conversations.conversation_labels\n         WHERE conversation_id = $1\n        ON CONFLICT DO NOTHING\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ca0c3e463511fd693cae1e123228339a79dd397084f86e5befe6e12955d34c86"
+}

@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT bodies FROM conversations.messages\n            WHERE id = $1 AND conversation_id = $2 AND inbox_id = ANY($3)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "bodies",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "bodies"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d922387fc51a370c7030bccc1e332fd4e7b1f9d944ab0b331bdb183e6873efd7"
+}

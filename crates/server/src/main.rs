@@ -178,7 +178,8 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     if role.worker() {
         config.jobs.check()?;
     }
-    let registry = campbooks_server::registry()?;
+    let deps = campbooks_server::Deps::from_env()?;
+    let registry = campbooks_server::registry(&deps)?;
     if config.run_migrations {
         migrate(&config).await?;
     }
@@ -199,7 +200,7 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
-        let app = campbooks_server::router(state.clone());
+        let app = campbooks_server::router(state.clone(), &deps);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
@@ -325,7 +326,9 @@ fn replay(consumer: &str, since: Option<&str>) -> ExitCode {
         Ok(config) => config,
         Err(e) => return fail(&e.to_string()),
     };
-    let registry = match campbooks_server::registry() {
+    // Replay only enqueues deliveries; it runs nothing, so it needs no
+    // configured dependencies.
+    let registry = match campbooks_server::registry(&campbooks_server::Deps::offline()) {
         Ok(registry) => registry,
         Err(e) => return fail(&e.to_string()),
     };
