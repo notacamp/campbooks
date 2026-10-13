@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.sync_due (stream_id, workspace_id, due_at) VALUES ($1, $2, $3)\n           ON CONFLICT (stream_id) DO UPDATE SET due_at = $3",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bb3a407d6ccdbfb1af2b03990efac5064f84f7eaba6d0c6bb994b8946f470093"
+}

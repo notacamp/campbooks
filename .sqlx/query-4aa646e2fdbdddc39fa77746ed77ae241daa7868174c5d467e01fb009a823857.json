@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT workspace_id AS \"w!\" FROM kernel.events\n            WHERE name = 'connectors.messages_changed' ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "w!",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.events",
+            "name": "workspace_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "4aa646e2fdbdddc39fa77746ed77ae241daa7868174c5d467e01fb009a823857"
+}

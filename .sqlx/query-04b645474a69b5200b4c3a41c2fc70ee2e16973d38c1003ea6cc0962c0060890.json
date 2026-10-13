@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT account_subject FROM connectors.connections",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "account_subject"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "04b645474a69b5200b4c3a41c2fc70ee2e16973d38c1003ea6cc0962c0060890"
+}

@@ -78,6 +78,32 @@ pub trait Job: Serialize + DeserializeOwned + Send + Sync + 'static {
     fn run(self, ctx: &mut JobContext) -> impl Future<Output = Result<(), JobError>> + Send;
 }
 
+/// A job kind run by a value that owns its dependencies: the module builds
+/// it from what it was composed with (an AI gateway, settings) and registers
+/// it with [`Background::handler`]. Enqueue its payload with
+/// [`enqueue_to::<H>`](enqueue_to).
+///
+/// Use [`Job`] when the job needs nothing but its payload and the
+/// [`JobContext`]. The payload rules are the same: ids, never secrets or
+/// message bodies.
+pub trait JobHandler: Send + Sync + 'static {
+    /// The job's payload, stored as JSON.
+    type Payload: Serialize + DeserializeOwned + Send + Sync + 'static;
+    /// Stable wire name, `<module>.<job>`.
+    const NAME: &'static str;
+    /// The queue it runs on.
+    const QUEUE: &'static str;
+    /// Attempts before the job is marked failed (dead).
+    const MAX_ATTEMPTS: u32 = DEFAULT_MAX_ATTEMPTS;
+
+    /// Do the work.
+    fn run(
+        &self,
+        ctx: &mut JobContext,
+        payload: Self::Payload,
+    ) -> impl Future<Output = Result<(), JobError>> + Send;
+}
+
 /// Why a job did not succeed. The message is stored in `last_error`
 /// (truncated) and logged: never put secrets or user content in it.
 #[derive(Debug, thiserror::Error)]
@@ -220,6 +246,26 @@ pub async fn enqueue<J: Job>(
             kind: J::NAME,
             queue: J::QUEUE,
             max_attempts: J::MAX_ATTEMPTS,
+            payload,
+        },
+        options,
+    )
+    .await
+}
+
+/// Enqueue a job of `H`'s kind inside `tx`, like [`enqueue`].
+pub async fn enqueue_to<H: JobHandler>(
+    tx: &mut Transaction<'_, Postgres>,
+    payload: &H::Payload,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    let payload = serde_json::to_value(payload).map_err(|e| sqlx::Error::Encode(e.into()))?;
+    insert(
+        tx,
+        NewJob {
+            kind: H::NAME,
+            queue: H::QUEUE,
+            max_attempts: H::MAX_ATTEMPTS,
             payload,
         },
         options,

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM kernel.jobs WHERE kind = 'connectors.sync_stream'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "0d1305100b6395eb0c14158ecd1893906ad41bcbaec0dc0bb1e2522a05515604"
+}

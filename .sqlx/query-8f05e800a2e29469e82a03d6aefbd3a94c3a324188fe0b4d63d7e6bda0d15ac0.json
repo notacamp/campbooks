@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(DISTINCT hash) AS \"n!\" FROM kernel.blob_refs\n            WHERE owner_type = 'connectors.gmail_message'",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "8f05e800a2e29469e82a03d6aefbd3a94c3a324188fe0b4d63d7e6bda0d15ac0"
+}

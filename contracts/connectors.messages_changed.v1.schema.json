@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.messages_changed.v1.schema.json",
+  "title": "connectors.messages_changed v1 (event payload)",
+  "description": "Published by the connectors module, in the transaction that records how far it read, when a change stream yields a MessageChangeBatch for an inbox. Ids only: the batch itself is a blob. The conversations module consumes it and enqueues `conversations.apply_changes` (ordered per inbox). Workspace-scoped.",
+  "type": "object",
+  "required": ["workspace", "inbox_id", "batch", "cursor"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string", "description": "The workspace id (the event bus keys deliveries by it)." },
+    "inbox_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "The conversations inbox; equals the batch's `inbox`."
+    },
+    "batch": {
+      "description": "The MessageChangeBatch v1 document, a blob of the workspace (campbooks_kernel::blobs::BlobRef).",
+      "type": "object",
+      "required": ["hash", "size", "content_type"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0 },
+        "content_type": { "type": "string" }
+      }
+    },
+    "cursor": { "type": "string", "description": "The change stream's cursor after this batch (opaque, provider-specific, never personal data)." }
+  }
+}

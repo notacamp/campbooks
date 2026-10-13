@@ -8,7 +8,11 @@ use chrono::TimeDelta;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 
-use super::crypto::{Cipher, SECRET_KEY_LEN, decode_secret_key};
+use campbooks_kernel::crypto::{Cipher, SecretKey};
+
+/// The HKDF label of the BFF's token-encryption key. Never change it: the
+/// tokens of every live session were sealed under it.
+pub const KEY_PURPOSE: &[u8] = b"campbooks bff token encryption v1";
 
 /// Scopes every web sign-in asks for, before the API's own.
 pub const OIDC_SCOPES: [&str; 4] = ["openid", "profile", "email", "offline_access"];
@@ -73,8 +77,6 @@ impl Default for BffConfig {
 struct Env {
     #[serde(default)]
     bff: BffConfig,
-    secret_key: Option<SecretString>,
-    secret_key_file: Option<PathBuf>,
 }
 
 /// Where the client secret comes from.
@@ -141,21 +143,7 @@ pub fn load(config: &Config, api_scopes: &[&str]) -> Result<Loaded, String> {
     let env: Env = campbooks_kernel::config::env_source()
         .extract()
         .map_err(|e| format!("invalid configuration: {e}"))?;
-    let secret = match (&env.secret_key_file, &env.secret_key) {
-        (Some(path), _) => Some(
-            std::fs::read_to_string(path)
-                .map_err(|e| format!("CAMPBOOKS_SECRET_KEY_FILE={}: {e}", path.display()))
-                .and_then(|key| {
-                    decode_secret_key(&key)
-                        .map_err(|e| format!("CAMPBOOKS_SECRET_KEY_FILE={}: {e}", path.display()))
-                })?,
-        ),
-        (None, Some(key)) => Some(
-            decode_secret_key(key.expose_secret())
-                .map_err(|e| format!("CAMPBOOKS_SECRET_KEY {e}"))?,
-        ),
-        (None, None) => None,
-    };
+    let secret = SecretKey::from_env()?;
     settings(config, env.bff, secret, api_scopes)
 }
 
@@ -163,7 +151,7 @@ pub fn load(config: &Config, api_scopes: &[&str]) -> Result<Loaded, String> {
 pub fn settings(
     config: &Config,
     bff: BffConfig,
-    secret: Option<[u8; SECRET_KEY_LEN]>,
+    secret: Option<SecretKey>,
     api_scopes: &[&str],
 ) -> Result<Loaded, String> {
     let Some(issuer) = config.auth.issuer() else {
@@ -233,7 +221,7 @@ pub fn settings(
         client_secret,
         scopes,
         timeouts,
-        cipher: Arc::new(Cipher::new(&secret)),
+        cipher: Arc::new(Cipher::new(&secret, KEY_PURPOSE)),
         http,
     })))
 }
@@ -326,7 +314,7 @@ mod tests {
         let public = enabled(settings(
             &config(Some(ISSUER), "https://app.example.com/"),
             with_secret(),
-            Some([1; 32]),
+            Some(SecretKey::from_bytes([1; 32])),
             &["system:read"],
         ));
         assert_eq!(public.public_origin, "https://app.example.com");
@@ -348,7 +336,7 @@ mod tests {
                 scopes: Some("openid system:read".into()),
                 ..with_secret()
             },
-            Some([1; 32]),
+            Some(SecretKey::from_bytes([1; 32])),
             &[],
         ));
         assert_eq!(local.public_origin, "http://localhost:8080");
@@ -369,7 +357,7 @@ mod tests {
         let no_secret = settings(
             &config(Some(ISSUER), "http://localhost:8080"),
             BffConfig::default(),
-            Some([1; 32]),
+            Some(SecretKey::from_bytes([1; 32])),
             &[],
         );
         assert!(
@@ -380,14 +368,14 @@ mod tests {
     #[test]
     fn bad_settings_are_named() {
         let base = config(Some(ISSUER), "https://app.example.com");
-        let err = |bff: BffConfig, secret: Option<[u8; 32]>, config: &Config| {
+        let err = |bff: BffConfig, secret: Option<SecretKey>, config: &Config| {
             settings(config, bff, secret, &[]).unwrap_err()
         };
         assert!(err(with_secret(), None, &base).contains("CAMPBOOKS_SECRET_KEY"));
         assert!(
             err(
                 with_secret(),
-                Some([1; 32]),
+                Some(SecretKey::from_bytes([1; 32])),
                 &config(Some(ISSUER), "https://app.example.com/app")
             )
             .contains("CAMPBOOKS_PUBLIC_URL")
@@ -398,7 +386,7 @@ mod tests {
                     idp_internal_url: Some("idp:8080".into()),
                     ..with_secret()
                 },
-                Some([1; 32]),
+                Some(SecretKey::from_bytes([1; 32])),
                 &base
             )
             .contains("CAMPBOOKS_BFF__IDP_INTERNAL_URL")
@@ -409,7 +397,7 @@ mod tests {
                     scopes: Some("profile".into()),
                     ..with_secret()
                 },
-                Some([1; 32]),
+                Some(SecretKey::from_bytes([1; 32])),
                 &base
             )
             .contains("openid")
@@ -420,7 +408,7 @@ mod tests {
                     rotate_minutes: 1,
                     ..with_secret()
                 },
-                Some([1; 32]),
+                Some(SecretKey::from_bytes([1; 32])),
                 &base
             )
             .contains("CAMPBOOKS_BFF__ROTATE_MINUTES")
@@ -435,7 +423,7 @@ mod tests {
                 client_secret_file: Some(PathBuf::from("/run/secrets/web")),
                 ..with_secret()
             },
-            Some([1; 32]),
+            Some(SecretKey::from_bytes([1; 32])),
             &[],
         ));
         assert!(

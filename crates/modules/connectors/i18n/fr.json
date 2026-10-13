@@ -1,0 +1,15 @@
+{
+  "errors": {
+    "connection_needs_user": "Seul un membre connecté peut associer ou dissocier un compte.",
+    "provider_not_configured": "Ce fournisseur n’est pas configuré sur cette instance. Demandez à votre administrateur de le configurer.",
+    "capabilities_required": "Choisissez au moins un élément à associer.",
+    "capability_not_offered": "L’association de {{capability}} n’est pas encore disponible.",
+    "authorization_code_invalid": "La connexion au fournisseur a expiré ou a déjà été utilisée. Recommencez l’association.",
+    "provider_unavailable": "Impossible de joindre le fournisseur. Réessayez dans un instant.",
+    "consent_incomplete": "Campbooks n’a pas reçu l’accès à ce que vous avez choisi. Associez de nouveau le compte et autorisez l’accès.",
+    "no_offline_access": "Le fournisseur n’a pas permis à Campbooks de rester connecté. Associez de nouveau le compte et autorisez l’accès.",
+    "account_mismatch": "Vous vous êtes connecté avec un autre compte que celui que vous étendez. Utilisez le même compte.",
+    "account_connected_by_another_member": "Un autre membre de cet espace de travail a déjà associé ce compte.",
+    "needs_reauth": "Cette connexion nécessite que vous associiez de nouveau le compte avant de pouvoir synchroniser."
+  }
+}
