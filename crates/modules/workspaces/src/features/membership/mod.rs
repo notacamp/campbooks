@@ -7,9 +7,14 @@ use std::sync::Arc;
 use campbooks_kernel::{
     auth::{Principal, PrincipalKind},
     db::BeginFor as _,
-    tenancy::{Access, Membership, MembershipFuture, MembershipPort, Role, UserId, WorkspaceId},
+    tenancy::{
+        Access, Membership, MembershipFuture, MembershipPort, Role, UserId, WorkspaceId,
+        WorkspaceSummary, WorkspacesFuture,
+    },
 };
 use sqlx::PgPool;
+
+use crate::domain::db::begin_as_user;
 
 /// The port implementation the server registers in `AppState`.
 pub fn membership() -> MembershipPort {
@@ -71,10 +76,82 @@ impl Membership for WorkspaceMembership {
         })
     }
 
+    fn workspaces_of<'a>(&'a self, db: &'a PgPool, subject: &'a str) -> WorkspacesFuture<'a> {
+        Box::pin(async move {
+            let Some(user) = sqlx::query_scalar!(
+                r#"SELECT id AS "id: UserId" FROM workspaces.users WHERE idp_subject = $1"#,
+                subject
+            )
+            .fetch_optional(db)
+            .await?
+            else {
+                return Ok(Vec::new());
+            };
+            // Across workspaces, as that user: row-level security applies.
+            let mut tx = begin_as_user(db, user).await?;
+            let rows = sqlx::query!(
+                r#"
+                SELECT w.id AS "id: WorkspaceId", w.name, m.role
+                  FROM workspaces.members m
+                  JOIN workspaces.workspaces w ON w.id = m.workspace_id
+                 WHERE m.user_id = $1 AND w.deleted_at IS NULL
+                 ORDER BY w.created_at, w.id
+                "#,
+                user as UserId,
+            )
+            .fetch_all(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            rows.into_iter()
+                .map(|row| {
+                    Ok(WorkspaceSummary {
+                        id: row.id,
+                        name: row.name,
+                        role: row.role.parse::<Role>()?,
+                    })
+                })
+                .collect()
+        })
+    }
+
     fn access_records(&self) -> &'static [&'static str] {
         &[
             crate::events::MEMBER_RECORD,
             crate::events::WORKSPACE_RECORD,
         ]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::tenancy::{Membership as _, Role};
+    use sqlx::PgPool;
+
+    use super::WorkspaceMembership;
+    use crate::testkit::Kit;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn workspaces_of_lists_a_persons_live_workspaces_only(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let bea = kit.user("bea");
+        let mine = kit.create_workspace(&ana, "Mine").await;
+        let gone = kit.create_workspace(&ana, "Gone").await;
+        kit.create_workspace(&bea, "Hers").await;
+        kit.delete(&ana, &format!("/api/v1/w/{gone}")).await;
+
+        let listed = WorkspaceMembership
+            .workspaces_of(&kit.state.db, "ana")
+            .await
+            .unwrap();
+        assert_eq!(listed.len(), 1, "{listed:?}");
+        assert_eq!(listed[0].id, mine);
+        assert_eq!(listed[0].name, "Mine");
+        assert_eq!(listed[0].role, Role::Owner);
+        let nobody = WorkspaceMembership
+            .workspaces_of(&kit.state.db, "nobody")
+            .await
+            .unwrap();
+        assert!(nobody.is_empty());
     }
 }
