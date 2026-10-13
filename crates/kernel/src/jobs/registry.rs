@@ -16,6 +16,7 @@ use crate::{
     changes::{PruneChanges, SequenceChanges},
     events::{DomainEvent, Event, EventConsumer, EventHandler, EventId, PublishedEvent},
     idempotency::PruneIdempotency,
+    rate_limit::PruneRateLimits,
 };
 
 pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
@@ -366,6 +367,7 @@ impl Registry {
             .schedule::<PruneJobs>(PRUNE_EVERY)
             .schedule::<SweepBlobs>(SWEEP_EVERY)
             .schedule::<PruneIdempotency>(PRUNE_EVERY)
+            .schedule::<PruneRateLimits>(PRUNE_EVERY)
             .job::<SequenceChanges>()
             .schedule::<PruneChanges>(PRUNE_EVERY);
         let owners = std::iter::once((KERNEL_OWNER, &kernel))

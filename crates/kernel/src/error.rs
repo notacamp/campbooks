@@ -60,6 +60,13 @@ pub enum Error {
     /// change streams); the reason says which.
     #[error("too many requests: {0}")]
     TooManyRequests(Reason),
+    /// The caller hit a [rate limit](crate::rate_limit) and may try again
+    /// in `retry_after` seconds (sent as `Retry-After`).
+    #[error("rate limited")]
+    RateLimited {
+        /// Seconds until the window ends.
+        retry_after: u64,
+    },
     /// The request conflicts with the current state.
     #[error("conflict: {0}")]
     Conflict(Reason),
@@ -88,7 +95,7 @@ impl Error {
             Self::Unauthorized(_) => StatusCode::UNAUTHORIZED,
             Self::InsufficientScope(_) | Self::Forbidden | Self::Denied(_) => StatusCode::FORBIDDEN,
             Self::Conflict(_) => StatusCode::CONFLICT,
-            Self::TooManyRequests(_) => StatusCode::TOO_MANY_REQUESTS,
+            Self::TooManyRequests(_) | Self::RateLimited { .. } => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
@@ -110,6 +117,7 @@ impl Error {
                 kernel.reason("insufficient_scope").arg("scope", *scope)
             }
             Self::Forbidden => kernel.reason("forbidden"),
+            Self::RateLimited { .. } => kernel.reason("rate_limited"),
             Self::Internal(_) => kernel.reason("internal_error"),
         }
     }
@@ -158,6 +166,11 @@ impl IntoResponse for Error {
             response
                 .headers_mut()
                 .insert(header::WWW_AUTHENTICATE, challenge);
+        }
+        if let Self::RateLimited { retry_after } = self {
+            response
+                .headers_mut()
+                .insert(header::RETRY_AFTER, HeaderValue::from(retry_after));
         }
         response
     }
@@ -363,6 +376,15 @@ mod tests {
         let (_, _, body) = render(Error::InsufficientScope("mail:read")).await;
         assert_eq!(body["code"], "insufficient_scope");
         assert!(body["detail"].as_str().unwrap().contains("mail:read"));
+    }
+
+    #[tokio::test]
+    async fn rate_limited_is_429_with_retry_after() {
+        let response = Error::RateLimited { retry_after: 42 }.into_response();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers()[header::RETRY_AFTER], "42");
+        let (_, _, body) = render(Error::RateLimited { retry_after: 42 }).await;
+        assert_eq!(body["code"], "rate_limited");
     }
 
     #[tokio::test]
