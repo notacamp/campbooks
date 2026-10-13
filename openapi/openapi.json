@@ -1862,6 +1862,120 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/attachments/{attachment_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Download one attachment of a message.",
+        "operationId": "conversations.get_attachment",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          },
+          {
+            "name": "attachment_id",
+            "in": "path",
+            "description": "The attachment.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/AttachmentId"
+            }
+          },
+          {
+            "name": "inline",
+            "in": "query",
+            "description": "`true` to show it in the browser (`Content-Disposition: inline`):\nhonoured for raster images and PDFs only; anything else is still a\ndownload.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bytes, as a download. `Content-Type` is the stored type when it is on the safe list (raster images, PDF, plain text, CSV, calendar, archives, office documents, common audio and video), else `application/octet-stream`; `Content-Disposition` carries the sanitised file name.",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttachmentBytes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such attachment, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
       "get": {
         "tags": [
@@ -5915,6 +6029,11 @@
         ],
         "description": "An answer's value: a label (choice), a level (score) or yes/no."
       },
+      "AttachmentBytes": {
+        "type": "string",
+        "format": "binary",
+        "description": "An attachment's bytes, as the OpenAPI document describes them (a binary\nstring); the handler streams them."
+      },
       "AttachmentId": {
         "type": "string",
         "format": "uuid",
@@ -5928,7 +6047,8 @@
           "filename",
           "content_type",
           "size",
-          "inline"
+          "inline",
+          "in_body"
         ],
         "properties": {
           "content_type": {
@@ -5942,6 +6062,10 @@
           "id": {
             "$ref": "#/components/schemas/AttachmentId",
             "description": "The attachment."
+          },
+          "in_body": {
+            "type": "boolean",
+            "description": "Shown by the HTML body (an inline raster image its `cid:` source\nnames), so a reader need not list it with the files."
           },
           "inline": {
             "type": "boolean",

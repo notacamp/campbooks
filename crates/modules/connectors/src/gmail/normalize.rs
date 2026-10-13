@@ -94,6 +94,8 @@ pub struct ParsedAttachment {
     pub content_type: String,
     pub bytes: Vec<u8>,
     pub inline: bool,
+    /// Its `Content-ID`, without angle brackets: what `cid:` images name.
+    pub content_id: Option<String>,
 }
 
 /// What a message without a usable `From` is attributed to (RFC 2606's
@@ -144,6 +146,10 @@ pub fn parse(raw: &[u8]) -> Parsed {
                 inline: part
                     .content_disposition()
                     .is_some_and(|d| d.ctype().eq_ignore_ascii_case("inline")),
+                content_id: part
+                    .content_id()
+                    .map(strip_angles)
+                    .filter(|id| !id.is_empty()),
             }
         })
         .collect();
@@ -356,6 +362,36 @@ mod tests {
         assert_eq!(pdf.content_type, "application/pdf");
         assert_eq!(pdf.bytes, b"%PDF-1.4\n");
         assert!(!pdf.inline);
+        assert_eq!(pdf.content_id, None);
+    }
+
+    #[test]
+    fn inline_parts_keep_their_content_id() {
+        let raw = concat!(
+            "From: Ana <ana@example.com>\r\n",
+            "Subject: Logo\r\n",
+            "MIME-Version: 1.0\r\n",
+            "Content-Type: multipart/related; boundary=\"r1\"\r\n",
+            "\r\n",
+            "--r1\r\n",
+            "Content-Type: text/html; charset=utf-8\r\n",
+            "\r\n",
+            "<p><img src=\"cid:logo@example.com\"></p>\r\n",
+            "--r1\r\n",
+            "Content-Type: image/png; name=\"logo.png\"\r\n",
+            "Content-Disposition: inline; filename=\"logo.png\"\r\n",
+            "Content-ID: <logo@example.com>\r\n",
+            "Content-Transfer-Encoding: base64\r\n",
+            "\r\n",
+            "iVBORw0KGgo=\r\n",
+            "--r1--\r\n",
+        );
+        let parsed = parse(raw.as_bytes());
+        assert_eq!(parsed.attachments.len(), 1);
+        let logo = &parsed.attachments[0];
+        assert!(logo.inline);
+        assert_eq!(logo.content_id.as_deref(), Some("logo@example.com"));
+        assert_eq!(logo.content_type, "image/png");
     }
 
     #[test]

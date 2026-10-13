@@ -608,8 +608,8 @@ impl Apply<'_> {
                 r#"
                 INSERT INTO conversations.attachments
                     (id, workspace_id, message_id, position, filename, content_type, size,
-                     inline, blob)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                     inline, blob, content_id)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 "#,
                 attachment_id as AttachmentId,
                 self.workspace.as_uuid(),
@@ -620,6 +620,7 @@ impl Apply<'_> {
                 size,
                 attachment.inline,
                 json!(attachment.blob),
+                attachment.content_id,
             )
             .execute(&mut **tx)
             .await?;

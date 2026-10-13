@@ -106,7 +106,8 @@
               "filename": { "type": "string" },
               "content_type": { "type": "string" },
               "blob": { "$ref": "#/$defs/blobRef" },
-              "inline": { "type": "boolean" }
+              "inline": { "type": "boolean" },
+              "content_id": { "type": "string", "description": "The part's Content-ID without angle brackets: what the HTML part's cid: images name." }
             }
           }
         },

@@ -6,8 +6,12 @@
 //! open in a new tab; remote images held back unless asked for; tracking
 //! pixels removed), then reaches the client as a string that the client
 //! renders only in its sandboxed frame (`lib/ui/safe-html`, AGENTS.md).
+//! Inline (`cid:`) images are not remote: they show the message's own parts
+//! as `data:` URLs, raster types only and within [`MAX_INLINE_IMAGE_BYTES`]
+//! and [`MAX_INLINE_TOTAL_BYTES`]; anything else shows the placeholder.
 
 use axum::{Json, extract::State};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     blobs::BlobRef,
@@ -20,7 +24,12 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::paths::MessagePath,
-    domain::{access::visible_inboxes, blobs::read_text, sanitize::sanitize},
+    domain::{
+        access::visible_inboxes,
+        attachments::{is_raster, served_type},
+        blobs::{read_bytes, read_text},
+        sanitize::{InlineImages, sanitize},
+    },
     features::get_conversation::Bodies,
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
@@ -28,6 +37,10 @@ use crate::{
 
 /// Longest body returned, in bytes, per part.
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+/// Largest inline image shown, in bytes; a larger one shows the placeholder.
+pub const MAX_INLINE_IMAGE_BYTES: u64 = 2 * 1024 * 1024;
+/// Most inline-image bytes shown in one body; the rest show the placeholder.
+pub const MAX_INLINE_TOTAL_BYTES: u64 = 6 * 1024 * 1024;
 
 /// How to render the HTML part.
 #[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]
@@ -99,6 +112,17 @@ pub async fn handler(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(Error::NotFound)?;
+    // Parts `cid:` images may name (read only if the HTML names any).
+    let parts: Vec<InlinePart> = sqlx::query_as!(
+        InlinePart,
+        r#"SELECT content_id AS "content_id!", content_type, blob
+             FROM conversations.attachments
+            WHERE message_id = $1 AND content_id IS NOT NULL
+            ORDER BY position"#,
+        message as MessageId,
+    )
+    .fetch_all(&mut *tx)
+    .await?;
     tx.commit().await?;
     let bodies: Bodies = serde_json::from_value(bodies)
         .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
@@ -106,9 +130,15 @@ pub async fn handler(
     let (text, text_cut) = read(&state, &ws, bodies.text.as_ref()).await?;
     let (html, html_cut) = read(&state, &ws, bodies.html.as_ref()).await?;
     let truncated = text_cut || html_cut;
+    let inline = match html.as_deref() {
+        Some(html) if html.to_ascii_lowercase().contains("cid:") => {
+            inline_images(&state, &ws, parts).await?
+        }
+        _ => InlineImages::new(),
+    };
     let sanitized = html
         .as_deref()
-        .map(|html| sanitize(html, query.show_images));
+        .map(|html| sanitize(html, query.show_images, &inline));
     Ok(Json(MessageBody {
         text,
         remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
@@ -116,6 +146,49 @@ pub async fn handler(
         html: sanitized.map(|s| s.html),
         truncated,
     }))
+}
+
+/// A part of the message with a content id.
+struct InlinePart {
+    content_id: String,
+    content_type: String,
+    blob: serde_json::Value,
+}
+
+/// `parts` of a raster type, as `data:` URLs by content id, within the size
+/// limits.
+async fn inline_images(state: &AppState, ws: &str, parts: Vec<InlinePart>) -> Result<InlineImages> {
+    let mut images = InlineImages::new();
+    let mut total = 0_u64;
+    for part in parts {
+        if !is_raster(&part.content_type) {
+            continue;
+        }
+        let blob: BlobRef = serde_json::from_value(part.blob)
+            .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?;
+        if blob.size > MAX_INLINE_IMAGE_BYTES || total + blob.size > MAX_INLINE_TOTAL_BYTES {
+            continue;
+        }
+        let limit = usize::try_from(MAX_INLINE_IMAGE_BYTES).unwrap_or(usize::MAX);
+        let (bytes, cut) = read_bytes(&state.blobs, ws, &blob, limit).await?;
+        if cut {
+            continue;
+        }
+        total += blob.size;
+        let id = part
+            .content_id
+            .trim()
+            .trim_start_matches('<')
+            .trim_end_matches('>')
+            .to_lowercase();
+        let url = format!(
+            "data:{};base64,{}",
+            served_type(&part.content_type),
+            STANDARD.encode(bytes)
+        );
+        images.entry(id).or_insert(url);
+    }
+    Ok(images)
 }
 
 async fn read(
@@ -135,9 +208,72 @@ async fn read(
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    use serde_json::json;
     use sqlx::PgPool;
 
-    use crate::testkit::Kit;
+    use crate::{dev, domain::sanitize::PLACEHOLDER, testkit::Kit};
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn inline_images_show_their_parts_and_the_rest_a_placeholder(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let recorded = json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": "cid-1",
+            "from": {"name": "Ana Lopes", "address": "ana@brightloop.example"},
+            "to": [{"address": "sam@example.com"}],
+            "subject": "Our new logo",
+            "sent_at": "2026-10-06T08:30:00Z",
+            "direction": "inbound",
+            "text": "Our new logo.",
+            "html": "<p><img src=\"cid:logo@brightloop.example\" alt=\"Logo\"></p><p><img src=\"cid:vector@brightloop.example\" alt=\"Vector\"></p><img src=\"https://cdn.brightloop.example/banner.png\" alt=\"Banner\" width=\"560\" height=\"120\">",
+            "attachments": [
+                {"filename": "logo.png", "content_type": "image/png", "content": "PNG-bytes",
+                 "inline": true, "content_id": "logo@brightloop.example"},
+                {"filename": "vector.svg", "content_type": "image/svg+xml",
+                 "content": "<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>",
+                 "inline": true, "content_id": "vector@brightloop.example"}
+            ],
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        }}]});
+        let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+            .await
+            .unwrap();
+        dev::submit(&kit.state, workspace, &batch).await.unwrap();
+        kit.run_jobs().await;
+        let (conversation, message): (String, String) = sqlx::query_as(
+            "SELECT conversation_id::text, id::text FROM conversations.messages
+              WHERE provider_message_id = 'cid-1'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        let stored: Option<String> = sqlx::query_scalar(
+            "SELECT content_id FROM conversations.attachments WHERE filename = 'logo.png'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(stored.as_deref(), Some("logo@brightloop.example"));
+
+        let uri =
+            format!("/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body");
+        let body = kit.get(&sam, &uri).await;
+        assert_eq!(body.status, StatusCode::OK);
+        let html = body.json["html"].as_str().unwrap();
+        // The PNG part, without asking; never counted as remote.
+        assert!(
+            html.contains("src=\"data:image/png;base64,UE5HLWJ5dGVz\""),
+            "{html}"
+        );
+        assert_eq!(body.json["remote_images"], 1);
+        // The SVG part is not a raster image, and the banner is held back:
+        // both show the placeholder; nothing of either leaves.
+        assert_eq!(html.matches(PLACEHOLDER).count(), 2, "{html}");
+        assert!(!html.contains("script"), "{html}");
+        assert!(!html.contains("cdn.brightloop.example"), "{html}");
+        assert!(!html.contains("cid:"), "{html}");
+    }
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn html_is_returned_as_json_data_never_as_a_page(db: PgPool) {
@@ -168,12 +304,19 @@ mod tests {
                 .contains("calmer mornings")
         );
         assert_eq!(response.json["truncated"], false);
-        // Sanitised: the remote image is held back and counted.
+        // Sanitised: the remote image is held back (the placeholder shows
+        // in its place) and counted.
         assert!(
             !response.json["html"]
                 .as_str()
                 .unwrap()
                 .contains("paperkite.example")
+        );
+        assert!(
+            response.json["html"]
+                .as_str()
+                .unwrap()
+                .contains(PLACEHOLDER)
         );
         assert_eq!(response.json["remote_images"], 1);
         assert_eq!(response.json["images_shown"], false);

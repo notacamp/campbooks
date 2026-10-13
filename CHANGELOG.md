@@ -14,6 +14,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Attachments open from the reader. Each message lists its files with their
+  size, Download and, for pictures and PDFs, Preview: a picture opens in a
+  dialog, a PDF in your browser's own viewer in a new tab. V moves through
+  the attachments, Enter opens one. HTML, SVG and every other type only
+  download. The new operation `conversations.get_attachment` (scope
+  `conversations:read`) serves the bytes as a download under a cleaned file
+  name, with the stored type only when it is on a safe list and a `sandbox`
+  policy. Pictures inside a message's body (`cid:`) now show without asking,
+  since nothing remote loads; remote images that stay hidden show a quiet
+  placeholder instead of a broken-image icon. Mail synced before this
+  release keeps the placeholder for its inline pictures. The web client's
+  Content-Security-Policy now allows `blob:` images (the picture preview).
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your
