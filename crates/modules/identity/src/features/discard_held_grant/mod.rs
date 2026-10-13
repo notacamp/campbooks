@@ -7,7 +7,6 @@ use axum::{
     http::StatusCode,
 };
 use campbooks_kernel::{AppState, Error, Operation, Problem, Result, Risk, auth::Scoped};
-use uuid::Uuid;
 
 use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite};
 
@@ -19,7 +18,7 @@ use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite};
     tag = "identity",
     security(("bearer" = ["identity:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"])))),
-    params(("id" = Uuid, Path, description = "The held grant.")),
+    params(("id" = uuid::Uuid, Path, description = "The held grant.")),
     responses(
         (status = NO_CONTENT, description = "Discarded."),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -34,11 +33,11 @@ pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
     Scoped { principal, .. }: Scoped<IdentityWrite>,
-    Path(id): Path<Uuid>,
+    Path(path): Path<super::HeldGrantPath>,
 ) -> Result<StatusCode> {
     let (_, account) = super::account(&deps, &principal)?;
     let mut conn = state.db.acquire().await?;
-    if held_grants::delete(&mut conn, id, account).await? {
+    if held_grants::delete(&mut conn, path.id, account).await? {
         Ok(StatusCode::NO_CONTENT)
     } else {
         Err(Error::NotFound)

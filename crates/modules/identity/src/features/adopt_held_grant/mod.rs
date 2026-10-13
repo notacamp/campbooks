@@ -15,7 +15,6 @@ use campbooks_kernel::{
 use secrecy::SecretString;
 use serde::Serialize;
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite};
 
@@ -36,7 +35,7 @@ pub struct Adopted {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"])))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
-        ("id" = Uuid, Path, description = "The held grant."),
+        ("id" = uuid::Uuid, Path, description = "The held grant."),
     ),
     responses(
         (status = OK, description = "Connected.", body = Adopted),
@@ -55,9 +54,9 @@ pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
     workspace: Workspace<IdentityWrite>,
-    Path(path): Path<(WorkspaceId, Uuid)>,
+    Path(path): Path<super::HeldGrantPath>,
 ) -> Result<Json<Adopted>> {
-    let id = path.1;
+    let id = path.id;
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
     let now = issuer.now();
     let mut tx = state.db.begin().await?;

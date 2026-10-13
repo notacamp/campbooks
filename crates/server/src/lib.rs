@@ -12,6 +12,9 @@ pub mod changes;
 pub mod telemetry;
 pub mod web;
 
+#[cfg(test)]
+mod identity_tests;
+
 use std::{fmt::Write as _, sync::Arc, time::Duration};
 
 use axum::{

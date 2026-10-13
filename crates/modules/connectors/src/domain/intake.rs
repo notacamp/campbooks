@@ -97,3 +97,89 @@ impl GrantIntake for Intake {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::{
+        Error,
+        connections::ProviderGrant,
+        tenancy::{Role, WorkspaceId},
+    };
+    use secrecy::SecretString;
+    use sqlx::PgPool;
+
+    use super::grant_intake;
+    use crate::testkit::{ACCOUNT_SUB, Kit};
+
+    fn grant(workspace: WorkspaceId, subject: &str, provider: &str) -> ProviderGrant {
+        ProviderGrant {
+            workspace,
+            subject: subject.to_owned(),
+            provider: provider.to_owned(),
+            account_subject: ACCOUNT_SUB.to_owned(),
+            address: "Sam@Example.com".to_owned(),
+            address_verified: true,
+            display_name: Some("Sam Rivera".to_owned()),
+            scopes: vec![
+                "openid".to_owned(),
+                "email".to_owned(),
+                crate::google::GMAIL_SCOPE.to_owned(),
+            ],
+            access_token: SecretString::from("fake-access"),
+            refresh_token: Some(SecretString::from("fake-refresh")),
+            expires_in: Some(3600),
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_sign_in_grant_becomes_the_members_connection(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ws = WorkspaceId::new();
+        let ana = kit.user("ana");
+        let ana_id = kit.join(&ana, ws, Role::Owner);
+        let intake = grant_intake(kit.deps.clone());
+        assert_eq!(intake.mailbox_scopes("google"), [crate::google::GMAIL_SCOPE]);
+        assert!(intake.mailbox_scopes("zoho").is_empty());
+
+        let id = intake.adopt(&kit.state, grant(ws, "ana", "google")).await.unwrap();
+        let list = kit
+            .get(&ana.token, &format!("/api/v1/w/{ws}/connections"))
+            .await;
+        let connection = &list.json["connections"][0];
+        assert_eq!(connection["id"], id);
+        assert_eq!(connection["address"], "sam@example.com");
+        assert_eq!(connection["granted_by"], ana_id.to_string());
+        assert_eq!(connection["capabilities"], serde_json::json!(["messages"]));
+        assert_eq!(
+            kit.events_of(ws).await,
+            ["connectors.connection_added", "connectors.capability_granted"]
+        );
+
+        // The same account again refreshes it.
+        let again = intake.adopt(&kit.state, grant(ws, "ana", "google")).await.unwrap();
+        assert_eq!(again, id);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_stranger_or_an_unknown_provider_is_refused(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ws = WorkspaceId::new();
+        let intake = grant_intake(kit.deps.clone());
+        assert!(matches!(
+            intake.adopt(&kit.state, grant(ws, "bea", "google")).await,
+            Err(Error::NotFound)
+        ));
+        let ana = kit.user("ana");
+        kit.join(&ana, ws, Role::Owner);
+        assert!(matches!(
+            intake.adopt(&kit.state, grant(ws, "ana", "zoho")).await,
+            Err(Error::Conflict(_))
+        ));
+        let mut no_mail = grant(ws, "ana", "google");
+        no_mail.scopes.pop();
+        assert!(matches!(
+            intake.adopt(&kit.state, no_mail).await,
+            Err(Error::Denied(_))
+        ));
+    }
+}

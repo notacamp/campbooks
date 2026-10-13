@@ -285,3 +285,108 @@ impl campbooks_kernel::auth::KeySource for LocalKeys {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::{
+        clock::FixedClock,
+        crypto::SecretKey,
+        testing,
+    };
+    use chrono::{TimeZone as _, Utc};
+    use sqlx::PgPool;
+
+    use super::*;
+
+    fn keys(clock: &Arc<FixedClock>, secret: u8) -> Keys {
+        Keys::new(
+            Cipher::new(&SecretKey::from_bytes([secret; 32]), b"campbooks identity test v1"),
+            clock.clone(),
+        )
+    }
+
+    fn kids(jwks: &serde_json::Value) -> Vec<String> {
+        jwks["keys"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|k| k["kid"].as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn keys_rotate_on_schedule_with_overlap(db: PgPool) {
+        let db = testing::app_role_pool(&db).await;
+        let clock = Arc::new(FixedClock::new(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()));
+        let keys = keys(&clock, 1);
+
+        let first = keys.signer(&db).await.unwrap().kid.clone();
+        assert_eq!(kids(&keys.jwks(&db).await.unwrap()), [first.clone()]);
+
+        // Within a week of retirement the successor is published, not used.
+        clock.advance(TimeDelta::days(24));
+        assert_eq!(keys.signer(&db).await.unwrap().kid, first);
+        let published = kids(&keys.jwks(&db).await.unwrap());
+        assert_eq!(published.len(), 2);
+        assert_eq!(published[0], first);
+        let second = published[1].clone();
+
+        // At 30 days the successor signs; the first stays published.
+        clock.advance(TimeDelta::days(6) + TimeDelta::minutes(1));
+        assert_eq!(keys.signer(&db).await.unwrap().kid, second);
+        assert!(kids(&keys.jwks(&db).await.unwrap()).contains(&first));
+
+        // Two days after retiring, the first is gone.
+        clock.advance(TimeDelta::days(2));
+        assert_eq!(kids(&keys.jwks(&db).await.unwrap()), [second]);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn concurrent_first_starts_make_one_key(db: PgPool) {
+        let db = testing::app_role_pool(&db).await;
+        let clock = Arc::new(FixedClock::new(Utc::now()));
+        let processes: Vec<Keys> = (0..3).map(|_| keys(&clock, 1)).collect();
+        let signers = futures_join(&processes, &db).await;
+        assert!(signers.windows(2).all(|w| w[0] == w[1]), "{signers:?}");
+        let count: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.signing_keys")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+    }
+
+    async fn futures_join(processes: &[Keys], db: &PgPool) -> Vec<String> {
+        let (a, b, c) = tokio::join!(
+            processes[0].signer(db),
+            processes[1].signer(db),
+            processes[2].signer(db)
+        );
+        [a, b, c]
+            .into_iter()
+            .map(|s| s.unwrap().kid.clone())
+            .collect()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_key_sealed_under_another_secret_is_replaced(db: PgPool) {
+        let db = testing::app_role_pool(&db).await;
+        let clock = Arc::new(FixedClock::new(Utc::now()));
+        let before = keys(&clock, 1).signer(&db).await.unwrap().kid.clone();
+        let after = keys(&clock, 2).signer(&db).await.unwrap().kid.clone();
+        assert_ne!(before, after);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn private_keys_are_sealed_at_rest(db: PgPool) {
+        let db = testing::app_role_pool(&db).await;
+        let clock = Arc::new(FixedClock::new(Utc::now()));
+        keys(&clock, 1).signer(&db).await.unwrap();
+        let (jwk, sealed): (serde_json::Value, Vec<u8>) =
+            sqlx::query_as("SELECT public_jwk, private_key FROM identity.signing_keys")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert!(jwk.get("d").is_none());
+        assert_eq!(sealed[0], 1, "the kernel's sealed format, version 1");
+    }
+}

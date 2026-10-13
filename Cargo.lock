@@ -503,6 +503,7 @@ dependencies = [
  "campbooks-workspaces",
  "chrono",
  "clap",
+ "figment",
  "futures-util",
  "http-body-util",
  "log",

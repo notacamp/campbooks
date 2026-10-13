@@ -12,6 +12,14 @@ use uuid::Uuid;
 
 use crate::deps::{Deps, Issuer};
 
+/// The held grant a path names (by field, so routes nested under the web
+/// BFF's `/bff/api/{*path}` still resolve).
+#[derive(Debug, serde::Deserialize)]
+pub struct HeldGrantPath {
+    /// The held grant.
+    pub id: Uuid,
+}
+
 /// The in-process issuer and the caller's account. 404 when another
 /// identity provider serves the instance (its subjects are not accounts).
 fn account(deps: &Deps, principal: &Principal) -> Result<(Arc<Issuer>, Uuid)> {

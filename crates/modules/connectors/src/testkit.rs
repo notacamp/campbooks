@@ -137,6 +137,8 @@ pub struct Kit {
     pub clock: Arc<FixedClock>,
     /// The fake Google.
     pub google: FakeGoogle,
+    /// What the module was composed with.
+    pub deps: Deps,
     app: Router,
     idp: TestIdp,
     membership: Arc<FakeMembership>,
@@ -201,6 +203,7 @@ impl Kit {
             state,
             clock,
             google,
+            deps,
             app,
             idp,
             membership,
