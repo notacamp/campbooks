@@ -14,6 +14,17 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Settings → Mailboxes: every mailbox connected to the workspace (yours;
+  all of them for owners and admins), who connected it and whether it is
+  syncing, waiting for someone to sign in again, paused by the provider or
+  failing. Connect Gmail or Zoho Mail from there (only the providers your
+  instance has set up for mail), reconnect a mailbox of yours that stopped,
+  or disconnect one: the mail already in Campbooks stays, and signing in
+  with that account keeps working. Keys: ⇧C connect, J/K choose, R
+  reconnect, ⌫ disconnect. Home's "Connect your mail" now opens it, and
+  Settings lists its sections (Members, Mailboxes, Ways to sign in) in the
+  sidebar and, on phones, under the header. `identity.list_ways_in` also
+  returns `mailbox_providers`.
 - Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
   asks a second time, for the mail, only when the account is new; signing
   in again never asks), and members can connect more Zoho logins; every

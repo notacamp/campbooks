@@ -126,7 +126,10 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
       </PaneHeader>
       <ReaderBody>
         <Text tone="secondary">{t("mailboxes.lead", { workspace: workspace.name })}</Text>
-        <Outcome result={result} connections={connections.data} />
+        {/* Said once: a disconnect afterwards replaces it. */}
+        {disconnected === undefined ? (
+          <Outcome result={result} connections={connections.data} />
+        ) : null}
         {disconnected === undefined ? null : (
           <Banner
             role="status"

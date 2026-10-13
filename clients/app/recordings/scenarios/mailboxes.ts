@@ -38,7 +38,8 @@ function isPhone(page: Page): boolean {
 async function allowAll(page: Page, provider: string): Promise<void> {
   await page.getByText(`Fake ${provider} · development only`).waitFor();
   await caption(page, `${provider}'s consent (a dev-only fake): Allow`, 1400);
-  while (page.url().includes("127.0.0.1:917")) {
+  // The fakes listen on 127.0.0.1; the app on localhost.
+  while (new URL(page.url()).hostname === "127.0.0.1") {
     await page.getByRole("link", { name: "Allow" }).click();
     await page.waitForLoadState();
     await pause(500);
@@ -57,7 +58,7 @@ async function openMailboxes(page: Page, phone: boolean): Promise<void> {
 }
 
 /** Press `key` on desktop, or click `button` on a phone. */
-async function act(page: Page, phone: boolean, key: string, button: string): Promise<void> {
+async function act(page: Page, phone: boolean, key: string, button: RegExp): Promise<void> {
   await (phone ? page.getByRole("button", { name: button }).click() : page.keyboard.press(key));
 }
 
@@ -115,16 +116,21 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
     `fetch("/bff/api/v1/w/${workspace}/connections", { headers: { "x-campbooks-csrf": "1" } }).then((r) => r.json())`,
   );
   const zoho = connections.find((connection) => connection.provider === "zoho")?.id ?? "";
-  await page.evaluate(
-    `fetch("/bff/api/v1/w/${workspace}/connections/${zoho}/sync", { method: "POST", headers: { "x-campbooks-csrf": "1" } })`,
-  );
-  await page.getByText("Needs you to sign in again").waitFor({ timeout: 60_000 });
+  // Ask for a sync now (again, until it has run): it finds the grant gone.
+  const needsYou = page.getByText("Needs you to sign in again");
+  for (let attempt = 0; attempt < 60 && !(await needsYou.isVisible()); attempt += 1) {
+    await page.evaluate(
+      `fetch("/bff/api/v1/w/${workspace}/connections/${zoho}/sync", { method: "POST", headers: { "x-campbooks-csrf": "1" } })`,
+    );
+    await pause(3000);
+  }
+  await needsYou.waitFor();
   await caption(
     page,
     phone ? "…so it needs you: Reconnect" : "…so it needs you: R reconnects the chosen mailbox",
     2400,
   );
-  await act(page, phone, "r", "Reconnect sam.rivera@example.com");
+  await act(page, phone, "r", /^Reconnect /u);
   await allowAll(page, "Zoho");
   await page.getByText(/^Zoho Mail .+ is connected$/u).waitFor();
   await page.getByText("Needs you to sign in again").waitFor({ state: "detached" });

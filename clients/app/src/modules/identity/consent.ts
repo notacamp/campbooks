@@ -7,7 +7,7 @@ import { useStartLink, useWaysIn } from "./api/queries";
 import { leavePage, stepUpUrl } from "./model";
 
 /** Why `identity.start_link` refused, in the words the Mailboxes page has. */
-export function consentRefusal(error: unknown): ConsentRefusal {
+function consentRefusal(error: unknown): ConsentRefusal {
   if (problemCode(error) === "step_up_required") {
     return "step_up";
   }

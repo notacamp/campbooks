@@ -42,7 +42,7 @@ const LINK_ERRORS = [
   "unknown_data_centre",
   "no_mailbox",
 ] as const;
-export type MailboxError = (typeof LINK_ERRORS)[number] | "unknown";
+type MailboxError = (typeof LINK_ERRORS)[number] | "unknown";
 
 /** How the front door came back to the Mailboxes page. */
 export type MailboxResult =
