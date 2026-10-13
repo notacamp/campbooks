@@ -164,10 +164,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
 fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, get_conversation, get_message_body, labels, list_conversations, list_inboxes,
-        mark_read, move_to_stream, star,
+        list_streams, mark_read, move_to_stream, star,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
+        .routes(routes!(list_streams::handler))
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
         .routes(routes!(get_message_body::handler))

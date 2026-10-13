@@ -23,6 +23,7 @@ allow = [
     "ISC",                 # aws-lc-sys/aws-lc-rs (AWS-LC crypto, via rustls), untrusted
     "Unicode-3.0",         # ICU data/normalisation crates (via url -> idna)
     "Zlib",                # foldhash (via hashbrown <- sqlx-core)
+    "MPL-2.0",             # cssparser, dtoa-short (via ammonia, the email HTML sanitiser): file-level copyleft, used unmodified
     "CDLA-Permissive-2.0", # Mozilla CA root data: webpki-roots (sqlx), webpki-root-certs (reqwest)
 ]
 exceptions = []
