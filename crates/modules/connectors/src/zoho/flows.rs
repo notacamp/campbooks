@@ -21,7 +21,7 @@ use crate::{
     domain::model::{InboxId, SendId, StreamId},
     events::{ChangesRequested, SendRequested},
     testkit::{FIXTURES, Kit, assert_contract, synthetic},
-    testkit_zoho::{CLIENTS, DRAFTS, INBOX, SENT, TRASH},
+    testkit_zoho::{CLIENTS, DRAFTS, INBOX, SENT, SNOOZED, SPAM, TRASH},
 };
 
 /// A workspace with Sam's Zoho login connected and its first sync done.
@@ -258,11 +258,15 @@ async fn archive_move_and_delete_in_zoho_are_seen_without_a_download(db: PgPool)
     let archived = kit.zoho.deliver(&synthetic(1), INBOX, true, at(3));
     let moved = kit.zoho.deliver(&synthetic(2), INBOX, true, at(2));
     let trashed = kit.zoho.deliver(&synthetic(3), INBOX, true, at(1));
+    let snoozed = kit.zoho.deliver(&synthetic(4), INBOX, true, at(1));
     let mailbox = connected(&kit).await;
     let start = changes(&kit, mailbox.ws).await.len();
 
     kit.zoho.change(&archived, |m| m.archived = true);
     kit.zoho.change(&moved, |m| m.folder = CLIENTS.to_owned());
+    // Into a folder the adapter does not read: its Inbox no longer has it,
+    // so it is looked for elsewhere, and found, not removed.
+    kit.zoho.change(&snoozed, |m| m.folder = SNOOZED.to_owned());
     kit.zoho.change(&trashed, |m| {
         m.folder = TRASH.to_owned();
         m.flag = "important".to_owned();
@@ -272,6 +276,13 @@ async fn archive_move_and_delete_in_zoho_are_seen_without_a_download(db: PgPool)
     let latest = |id: &str| upsert_of(&now[start..], id).last().unwrap()["message"].clone();
     assert_eq!(latest(&archived)["mailbox"]["in_inbox"], false);
     assert_eq!(latest(&moved)["mailbox"]["in_inbox"], false);
+    assert_eq!(latest(&snoozed)["mailbox"]["in_inbox"], false);
+    assert!(
+        !now[start..]
+            .iter()
+            .any(|c| c["op"] == "remove" && c["provider_message_id"] == snoozed.as_str()),
+        "a moved message is not removed"
+    );
     let in_trash = latest(&trashed);
     assert_eq!(in_trash["mailbox"]["in_trash"], true);
     assert_eq!(in_trash["starred"], true);
@@ -616,4 +627,215 @@ async fn disconnecting_revokes_at_the_data_centre(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(budgets, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn unarchiving_a_conversation_never_moves_sent_mail_into_the_inbox(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let theirs = kit.zoho.deliver(&synthetic(1), INBOX, true, at(3));
+    let mine = kit.zoho.deliver(&synthetic(2), SENT, true, at(2));
+    let junk = kit.zoho.deliver(&synthetic(3), SPAM, true, at(1));
+    let mailbox = connected(&kit).await;
+    mailbox
+        .request(&kit, &[(theirs.as_str(), json!({"kind": "archive"}))])
+        .await;
+    assert!(kit.zoho.message(&theirs).archived);
+    kit.zoho.clear();
+    // Unarchive covers every message of the conversation, the member's own
+    // reply too.
+    mailbox
+        .request(
+            &kit,
+            &[
+                (theirs.as_str(), json!({"kind": "unarchive"})),
+                (mine.as_str(), json!({"kind": "unarchive"})),
+                (junk.as_str(), json!({"kind": "unarchive"})),
+            ],
+        )
+        .await;
+    assert!(!kit.zoho.message(&theirs).archived);
+    assert_eq!(
+        kit.zoho.message(&mine).folder,
+        SENT,
+        "sent mail stays in Sent"
+    );
+    assert_eq!(kit.zoho.message(&junk).folder, SPAM);
+    let writes: Vec<String> = kit
+        .zoho
+        .calls()
+        .into_iter()
+        .filter(|c| c.starts_with("PUT"))
+        .collect();
+    assert_eq!(writes.len(), 1, "{writes:?}");
+    assert!(writes[0].ends_with("unArchiveMails"), "{writes:?}");
+    let ends: Vec<(String, Option<String>)> = sqlx::query_as(
+        "SELECT state, reason FROM connectors.outbound_changes ORDER BY id OFFSET 1",
+    )
+    .fetch_all(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(
+        ends,
+        [
+            ("applied".to_owned(), None),
+            ("skipped".to_owned(), Some("not_movable".to_owned())),
+            ("skipped".to_owned(), Some("in_trash".to_owned())),
+        ]
+    );
+}
+
+/// A reply whose send is under way: run its first attempt only.
+async fn first_attempt(kit: &Kit, mailbox: &Connected) -> SendId {
+    let send = reply(kit, mailbox, "m1@example.com").await;
+    kit.run_jobs().await;
+    send
+}
+
+/// The outcome the last `send_completed` of `mailbox` reported.
+async fn outcome(kit: &Kit, mailbox: &Connected) -> Option<Value> {
+    kit.payloads(mailbox.ws, "connectors.send_completed")
+        .await
+        .last()
+        .cloned()
+}
+
+/// Let the sends' retries come due and run them (`rounds` times).
+async fn retry_sends(kit: &Kit, rounds: usize) {
+    for _ in 0..rounds {
+        kit.clock.advance(TimeDelta::minutes(2));
+        sqlx::query!(
+            r#"UPDATE kernel.jobs SET run_at = now()
+                WHERE state = 'pending' AND kind = 'connectors.send_message'
+                  AND payload->>'give_up' = 'false'"#
+        )
+        .execute(&kit.db)
+        .await
+        .unwrap();
+        kit.run_jobs().await;
+    }
+}
+
+async fn with_parent(kit: &Kit) -> Connected {
+    kit.zoho.deliver(
+        &synthetic(1),
+        INBOX,
+        false,
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    connected(kit).await
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_same_subject_message_minutes_later_is_not_taken_for_the_send(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = with_parent(&kit).await;
+    kit.zoho.lose_next_send();
+    first_attempt(&kit, &mailbox).await;
+    assert!(
+        kit.zoho.sends().is_empty(),
+        "the attempt never reached Zoho"
+    );
+    // Two minutes later the member sends a follow-up from another client:
+    // same subject and recipient, other words.
+    let later = kit.clock.now() + TimeDelta::minutes(2);
+    kit.zoho.deliver(
+        b"From: sam@example.net\r\nTo: sender1@example.com\r\nSubject: Re: Message 1\r\n\r\nOne more thing: the address.\r\n",
+        SENT,
+        true,
+        later,
+    );
+    retry_sends(&kit, 3).await;
+    // Not mistaken for the send: it was sent, once, as itself.
+    assert_eq!(kit.zoho.sends().len(), 1);
+    let done = outcome(&kit, &mailbox).await.unwrap();
+    assert_eq!(done["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_missing_sent_folder_proves_nothing_and_the_send_waits(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = with_parent(&kit).await;
+    kit.zoho.lose_next_send_answer();
+    kit.zoho.hide_sent_folder(true);
+    first_attempt(&kit, &mailbox).await;
+    retry_sends(&kit, 2).await;
+    assert_eq!(kit.zoho.sends().len(), 1, "not sent again");
+    assert!(outcome(&kit, &mailbox).await.is_none(), "still unclear");
+    kit.zoho.hide_sent_folder(false);
+    retry_sends(&kit, 2).await;
+    assert_eq!(kit.zoho.sends().len(), 1);
+    assert_eq!(outcome(&kit, &mailbox).await.unwrap()["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_queued_in_the_outbox_counts_as_sent(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = with_parent(&kit).await;
+    kit.zoho.queue_next_send();
+    first_attempt(&kit, &mailbox).await;
+    retry_sends(&kit, 2).await;
+    assert_eq!(kit.zoho.sends().len(), 1);
+    assert_eq!(kit.zoho.sent().len(), 0, "still in the Outbox");
+    assert_eq!(outcome(&kit, &mailbox).await.unwrap()["outcome"], "sent");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn two_matching_sent_messages_leave_the_send_unclear(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = with_parent(&kit).await;
+    kit.zoho.lose_next_send_answer();
+    first_attempt(&kit, &mailbox).await;
+    // A second, identical copy at the same moment: which one is ours cannot
+    // be told.
+    let copy = kit.zoho.sent()[0].clone();
+    kit.zoho.deliver(&copy.raw, SENT, true, copy.received);
+    retry_sends(&kit, 12).await;
+    assert_eq!(kit.zoho.sends().len(), 1, "never sent twice");
+    let done = outcome(&kit, &mailbox).await.unwrap();
+    assert_eq!(done["outcome"], "failed");
+    assert_eq!(done["reason"], "unknown_outcome");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_answer_without_an_id_claims_the_sent_copy(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let mailbox = with_parent(&kit).await;
+    kit.zoho.answer_next_send_without_id();
+    first_attempt(&kit, &mailbox).await;
+    let done = outcome(&kit, &mailbox).await.unwrap();
+    assert_eq!(done["outcome"], "sent");
+    assert_eq!(done["provider_message_id"], kit.zoho.sent()[0].id.as_str());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_zoho_fails_on_is_skipped_and_tried_again_later(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let at = |hours: i64| kit.clock.now() - TimeDelta::hours(hours);
+    let good = kit.zoho.deliver(&synthetic(1), INBOX, false, at(2));
+    let bad = kit.zoho.deliver(&synthetic(2), INBOX, false, at(1));
+    kit.zoho.fail_downloads_of(&bad, true);
+    let mailbox = connected(&kit).await;
+    let all = changes(&kit, mailbox.ws).await;
+    assert_eq!(
+        upsert_of(&all, &good).len(),
+        1,
+        "the rest of the mailbox syncs"
+    );
+    assert!(upsert_of(&all, &bad).is_empty());
+    assert_eq!(kit.stream().await["phase"], "incremental");
+    let skipped: i64 = sqlx::query_scalar("SELECT count(*) FROM connectors.skipped_messages")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(skipped, 1);
+    // Not tried again before its time.
+    let fetches = kit.zoho.raw_fetches(&bad);
+    mailbox.run(&kit).await;
+    assert_eq!(kit.zoho.raw_fetches(&bad), fetches);
+    // Later, Zoho serves it.
+    kit.zoho.fail_downloads_of(&bad, false);
+    kit.clock.advance(TimeDelta::minutes(5));
+    mailbox.run(&kit).await;
+    assert_eq!(upsert_of(&changes(&kit, mailbox.ws).await, &bad).len(), 1);
 }

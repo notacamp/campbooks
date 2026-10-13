@@ -36,6 +36,8 @@ const FOLDERS = [
   { folderId: "9000000002022", folderName: "Sent", folderType: "Sent", path: "/Sent" },
   { folderId: "9000000002024", folderName: "Spam", folderType: "Spam", path: "/Spam" },
   { folderId: "9000000002026", folderName: "Trash", folderType: "Trash", path: "/Trash" },
+  { folderId: "9000000002028", folderName: "Outbox", folderType: "Outbox", path: "/Outbox" },
+  { folderId: "9000000002020", folderName: "Snoozed", folderType: "Snoozed", path: "/Snoozed" },
   { folderId: "9000000075001", folderName: "Suppliers", folderType: "Inbox", path: "/Suppliers" },
 ];
 const INBOX = "9000000002014";
@@ -191,7 +193,23 @@ function header(raw: string, name: string): string {
   return line === undefined ? "" : line.slice(name.length + 1).trim();
 }
 
+/** The start of a message's text, tags left out, as Zoho's `summary`. */
+function summary(raw: string): string {
+  const body = raw.split("\r\n\r\n").slice(1).join(" ");
+  // Base64 parts of the demo mail would read as noise: keep only what reads.
+  const decoded = body.replaceAll(/^[A-Za-z0-9+/=]{20,}$/gmu, (line) =>
+    Buffer.from(line, "base64").toString("utf8"),
+  );
+  return decoded
+    .replaceAll(/<[^>]*>/gu, " ")
+    .replaceAll(/--[\w-]+(--)?|Content-[\w-]+:[^\r\n]*/gu, " ")
+    .replaceAll(/\s+/gu, " ")
+    .trim()
+    .slice(0, 100);
+}
+
 function listed(message: ZohoMessage) {
+  const cc = header(message.raw, "Cc");
   return {
     messageId: message.id,
     folderId: message.folderId,
@@ -201,6 +219,10 @@ function listed(message: ZohoMessage) {
     size: String(message.raw.length),
     subject: escapeHtml(header(message.raw, "Subject")),
     toAddress: escapeHtml(header(message.raw, "To")),
+    ccAddress: cc === "" ? "Not Provided" : escapeHtml(cc),
+    hasAttachment: /Content-Disposition: attachment/iu.test(message.raw) ? "1" : "0",
+    summary: escapeHtml(summary(message.raw)),
+    sentDateInGMT: String(message.received),
     sender: escapeHtml(header(message.raw, "From")),
   };
 }
@@ -293,9 +315,10 @@ export async function handleZohoMail(
     reply(response, 200, page);
     return true;
   }
-  const details = /^folders\/\d+\/messages\/(\d+)\/details$/u.exec(rest)?.[1];
-  if (details !== undefined) {
-    const message = find(details);
+  const details = /^folders\/(\d+)\/messages\/(\d+)\/details$/u.exec(rest);
+  if (details !== null) {
+    // Like Zoho, a message is found only in the folder it is in.
+    const message = mailbox.messages.find((m) => m.id === details[2] && m.folderId === details[1]);
     reply(response, message ? 200 : 404, message ? listed(message) : { errorCode: "NOT_FOUND" });
     return true;
   }
@@ -385,6 +408,7 @@ export async function handleZohoMail(
         {
           from: `Sam Rivera <${field("fromAddress")}>`,
           to: field("toAddress"),
+          ...(field("ccAddress") === "" ? {} : { cc: field("ccAddress") }),
           subject: field("subject"),
           hoursAgo: 0,
           labels: [],

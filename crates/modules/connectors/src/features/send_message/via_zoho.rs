@@ -1,10 +1,13 @@
 //! Sending through Zoho Mail. Zoho takes the message as JSON (or as a reply
 //! to one of its messages) and sets its own `Message-ID`, so an attempt that
-//! may have gone out is looked up in the mailbox's Sent folder instead: a
-//! message sent since that attempt, with the same subject and recipients,
-//! that is not already another send's.
+//! may have gone out is looked up in the mailbox's Sent folder and Outbox
+//! instead: a message sent within the attempt's window (from just before it
+//! to the HTTP timeout after it), with the same subject, To, Cc, attachment
+//! flag and start of text, that is not already another send's. Exactly one
+//! such message proves the send; none proves it was not sent; several leave
+//! it unclear. A mailbox whose Sent folder cannot be found proves nothing.
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 use campbooks_kernel::{JobContext, JobError, db::BeginFor as _};
 use chrono::{DateTime, TimeDelta, Utc};
@@ -20,17 +23,21 @@ use crate::{
         schedule::{self, Rate},
     },
     mail::Fetched,
-    provider::ProviderError,
+    provider::{HTTP_TIMEOUT, ProviderError},
     zoho::{
-        OriginalFetch, ZohoMail,
+        Listed, OriginalFetch, ZohoMail,
         read::Cursor,
         state::{self, FolderKind},
     },
 };
 
-/// How far before an unclear attempt a sent message still counts as it
-/// (clocks differ).
-const CLOCK_SLACK: TimeDelta = TimeDelta::minutes(2);
+/// How far around an attempt's window a sent message still counts as it
+/// (Zoho's clock and ours differ a little).
+const CLOCK_SLACK: TimeDelta = TimeDelta::seconds(30);
+
+/// Characters of text compared between a sent message and the document
+/// (letters and digits only: Zoho's summary is made from the HTML).
+const TEXT_PREFIX: usize = 40;
 
 /// Sent messages looked at when looking an attempt up.
 const LOOKUP_PAGE: u32 = 50;
@@ -65,29 +72,26 @@ impl SendMessage {
         self.take_budget(ctx, connection, document).await?;
         let mailbox = target.mailbox_key.clone().unwrap_or_default();
         let mail = zoho.mail(&centre, token, &mailbox);
-        let sent_folder = sent_folder(&target, &mail).await;
 
         // An earlier attempt may have reached Zoho: look before sending.
         if target.unclear {
-            let since = target.attempted_at.unwrap_or(now) - CLOCK_SLACK;
-            match look_up(ctx, &mail, &sent_folder, &attempt, since).await? {
-                Ok(Some(id)) => {
+            let at = target.attempted_at.unwrap_or(now);
+            match self.look_up(ctx, &mail, &attempt, at).await? {
+                Lookup::Found(id, sent_folder) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let sent = self
-                        .fetch_sent(&mail, sent_folder.ok().flatten(), id, now)
-                        .await;
+                    let sent = self.fetch_sent(&mail, Some(sent_folder), id, now).await;
                     return self
                         .finish_sent(ctx, workspace, send, &target, stream, sent, now)
                         .await;
                 }
-                Ok(None) => {
+                Lookup::NotSent => {
                     // Proven not sent.
                     set_unclear(ctx, workspace, send, false).await?;
                     target.unclear = false;
                 }
-                Err(err) => {
+                Lookup::Unclear(why) => {
                     return Err(JobError::retry_after(
-                        format!("looking up an earlier attempt: {err}"),
+                        format!("looking up an earlier attempt: {why}"),
                         UNCLEAR_WAIT,
                     ));
                 }
@@ -115,11 +119,18 @@ impl SendMessage {
         target.unclear = true;
         match mail.send(&body, parent.as_deref()).await {
             Ok(answer) => {
-                let sent = match answer.message_id {
-                    Some(id) => {
-                        self.fetch_sent(&mail, sent_folder.ok().flatten(), id, now)
-                            .await
-                    }
+                let sent_folder = folders(&target, &mail).await.ok().map(|f| f.sent);
+                let id = match answer.message_id {
+                    Some(id) => Some(id),
+                    // No id in the answer: claim the Sent copy, so no later
+                    // look-up takes it for another send.
+                    None => match self.look_up(ctx, &mail, &attempt, now).await? {
+                        Lookup::Found(id, _) => Some(id),
+                        Lookup::NotSent | Lookup::Unclear(_) => None,
+                    },
+                };
+                let sent = match id {
+                    Some(id) => self.fetch_sent(&mail, sent_folder, id, now).await,
                     None => Sent {
                         id: None,
                         thread_key: None,
@@ -242,45 +253,134 @@ async fn upload(
     Ok(Ok(uploaded))
 }
 
-/// The message of an earlier attempt in the Sent folder, if it went out.
-async fn look_up(
-    ctx: &JobContext,
-    mail: &ZohoMail<'_>,
-    sent_folder: &Result<Option<String>, ProviderError>,
-    attempt: &Attempt<'_>,
-    since: DateTime<Utc>,
-) -> Result<Result<Option<String>, ProviderError>, JobError> {
-    Ok(match sent_folder {
-        Ok(Some(folder)) => {
-            let others = other_sends(ctx, attempt.workspace, attempt.stream, attempt.send).await?;
-            find_sent(mail, folder, attempt.document, since, &others).await
-        }
-        Ok(None) => Ok(None),
-        Err(err) => Err(err.clone()),
-    })
+/// What looking an attempt up found.
+#[derive(Debug, PartialEq, Eq)]
+enum Lookup {
+    /// Exactly one message is the attempt's: its id, and the Sent folder.
+    Found(String, String),
+    /// None is: it was not sent.
+    NotSent,
+    /// Nothing can be concluded (several match, or Zoho could not say).
+    Unclear(String),
 }
 
-/// The mailbox's Sent folder: from the stream's cursor, else asked.
-async fn sent_folder(
-    target: &Target,
-    mail: &ZohoMail<'_>,
-) -> Result<Option<String>, ProviderError> {
+impl SendMessage {
+    /// Look for the attempt made at `at` in the Sent folder and Outbox.
+    async fn look_up(
+        &self,
+        ctx: &JobContext,
+        mail: &ZohoMail<'_>,
+        attempt: &Attempt<'_>,
+        at: DateTime<Utc>,
+    ) -> Result<Lookup, JobError> {
+        let folders = match folders_of(mail).await {
+            Ok(folders) => folders,
+            Err(why) => return Ok(Lookup::Unclear(why)),
+        };
+        let others = other_sends(ctx, attempt.workspace, attempt.stream, attempt.send).await?;
+        let mut found = Vec::new();
+        for folder in std::iter::once(&folders.sent).chain(folders.outbox.as_ref()) {
+            let listed = match mail.list(folder, 1, LOOKUP_PAGE).await {
+                Ok(listed) => listed,
+                Err(err) => return Ok(Lookup::Unclear(err.to_string())),
+            };
+            found.extend(
+                listed
+                    .into_iter()
+                    .filter(|m| {
+                        !others.contains(&m.message_id) && is_attempt(m, attempt.document, at)
+                    })
+                    .map(|m| m.message_id),
+            );
+        }
+        Ok(match found.as_slice() {
+            [] => Lookup::NotSent,
+            [one] => Lookup::Found(one.clone(), folders.sent),
+            _ => Lookup::Unclear("several sent messages match".to_owned()),
+        })
+    }
+}
+
+/// The folders a sent message can be in.
+struct SentFolders {
+    sent: String,
+    outbox: Option<String>,
+}
+
+/// The mailbox's Sent folder (from the stream's cursor, else asked).
+async fn folders(target: &Target, mail: &ZohoMail<'_>) -> Result<SentFolders, String> {
     let cursor: Option<Cursor> = target
         .cursor
         .clone()
         .and_then(|c| serde_json::from_value(c).ok());
-    if let Some(folder) = cursor
+    if let Some(sent) = cursor
         .as_ref()
         .and_then(|c| c.folder_of_kind(FolderKind::Sent))
     {
-        return Ok(Some(folder.to_owned()));
+        return Ok(SentFolders {
+            sent: sent.to_owned(),
+            outbox: None,
+        });
     }
-    Ok(mail
-        .folders()
-        .await?
-        .into_iter()
-        .find(|f| FolderKind::of(&f.kind, &f.path) == Some(FolderKind::Sent))
-        .map(|f| f.id))
+    folders_of(mail).await
+}
+
+/// The mailbox's Sent folder and Outbox, asked. No Sent folder is an error:
+/// it proves nothing about a send.
+async fn folders_of(mail: &ZohoMail<'_>) -> Result<SentFolders, String> {
+    let folders = mail.folders().await.map_err(|e| e.to_string())?;
+    let of = |kind: &str| {
+        folders
+            .iter()
+            .find(|f| f.kind.eq_ignore_ascii_case(kind))
+            .map(|f| f.id.clone())
+    };
+    let sent = of("Sent").ok_or_else(|| "the mailbox has no Sent folder".to_owned())?;
+    Ok(SentFolders {
+        sent,
+        outbox: of("Outbox"),
+    })
+}
+
+/// Whether sent message `m` is `document`'s attempt made at `at`.
+fn is_attempt(m: &Listed, document: &OutgoingMessage, at: DateTime<Utc>) -> bool {
+    let timeout = TimeDelta::from_std(HTTP_TIMEOUT).unwrap_or(TimeDelta::MAX);
+    let window =
+        (at - CLOCK_SLACK).timestamp_millis()..=(at + timeout + CLOCK_SLACK).timestamp_millis();
+    // A copy without a time cannot be placed in the window.
+    let Some(time) = m.time() else {
+        return false;
+    };
+    let set = |list: &[Address]| -> BTreeSet<String> {
+        list.iter()
+            .map(|a| a.address.trim().to_lowercase())
+            .collect()
+    };
+    window.contains(&time)
+        && m.subject() == clean(&document.subject)
+        && m.recipients().into_iter().collect::<BTreeSet<_>>() == set(&document.to)
+        && m.copied().into_iter().collect::<BTreeSet<_>>() == set(&document.cc)
+        && m.attached() != document.attachments.is_empty()
+        && same_start(&m.summary(), &document.text)
+}
+
+/// Whether `summary` (Zoho's, made from the HTML) and `text` start alike:
+/// their first [`TEXT_PREFIX`] letters and digits, lower-cased. A summary
+/// Zoho left empty compares with nothing.
+fn same_start(summary: &str, text: &str) -> bool {
+    let start = |s: &str| -> String {
+        s.chars()
+            .filter(|c| c.is_alphanumeric())
+            .flat_map(char::to_lowercase)
+            .take(TEXT_PREFIX)
+            .collect()
+    };
+    let (a, b) = (start(summary), start(text));
+    if a.is_empty() {
+        return true;
+    }
+    let n = a.chars().count().min(b.chars().count());
+    n > 0 && a.chars().take(n).eq(b.chars().take(n))
 }
 
 /// The provider ids other sends of `stream` already claimed.
@@ -301,35 +401,6 @@ async fn other_sends(
     .await?;
     tx.commit().await?;
     Ok(ids.into_iter().collect())
-}
-
-/// A message of the Sent folder `folder` that is `document`: sent since
-/// `since`, same subject, every recipient of it, not another send's.
-async fn find_sent(
-    mail: &ZohoMail<'_>,
-    folder: &str,
-    document: &OutgoingMessage,
-    since: DateTime<Utc>,
-    others: &HashSet<String>,
-) -> Result<Option<String>, ProviderError> {
-    let since = since.timestamp_millis();
-    let subject = clean(&document.subject);
-    let wanted: Vec<String> = document
-        .to
-        .iter()
-        .map(|a| a.address.trim().to_lowercase())
-        .collect();
-    let listed = mail.list(folder, 1, LOOKUP_PAGE).await?;
-    Ok(listed
-        .into_iter()
-        .find(|m| {
-            let recipients = m.recipients();
-            !others.contains(&m.message_id)
-                && m.received_time.is_some_and(|t| t >= since)
-                && m.subject() == subject
-                && wanted.iter().all(|a| recipients.contains(a))
-        })
-        .map(|m| m.message_id))
 }
 
 /// The Zoho message `document` answers, when the stream has it: a reply is

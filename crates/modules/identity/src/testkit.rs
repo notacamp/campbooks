@@ -91,7 +91,7 @@ pub struct FakeIntake {
 /// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
 pub const ZOHO_MAIL_SCOPES: [&str; 3] = [
     "ZohoMail.accounts.READ",
-    "ZohoMail.folders.ALL",
+    "ZohoMail.folders.READ",
     "ZohoMail.messages.ALL",
 ];
 

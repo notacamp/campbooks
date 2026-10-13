@@ -512,7 +512,9 @@ impl Reader<'_> {
             .iter()
             .filter_map(|op| match op {
                 IndexOp::Insert { row, .. } | IndexOp::Update { row, .. } => Some(*row),
-                IndexOp::Remove { .. } | IndexOp::Oversized { .. } => None,
+                IndexOp::Remove { .. } | IndexOp::Oversized { .. } | IndexOp::Skipped { .. } => {
+                    None
+                }
             })
             .collect();
         let mut tx = self.pool.begin_for(self.workspace).await?;

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.jobs SET run_at = now()\n                WHERE state = 'pending' AND kind = 'connectors.send_message'\n                  AND payload->>'give_up' = 'false'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "e643aecd0e3ada5e94b2c6ae3f1a5575a43b6be93ef9144d049a7a749573003e"
+}

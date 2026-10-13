@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, de::DeserializeOwned};
 use url::Url;
 
 use super::html;
-use crate::provider::{ProviderError, retry_after, transport};
+use crate::provider::{ProviderError, retry_after, transport, unreadable};
 
 /// The Mail API for one access token and mail account.
 #[derive(Debug, Clone, Copy)]
@@ -117,6 +117,18 @@ pub struct Listed {
     /// Its recipients, HTML-escaped.
     #[serde(default)]
     pub to_address: String,
+    /// Its copied recipients, HTML-escaped (`Not Provided` for none).
+    #[serde(default)]
+    pub cc_address: String,
+    /// Whether it has attachments (`0`/`1`, or a boolean).
+    #[serde(default, deserialize_with = "text")]
+    pub has_attachment: String,
+    /// The start of its text, HTML-escaped.
+    #[serde(default)]
+    pub summary: String,
+    /// When it was sent, epoch milliseconds.
+    #[serde(default, deserialize_with = "number", rename = "sentDateInGMT")]
+    pub sent_time: Option<i64>,
 }
 
 impl Listed {
@@ -138,6 +150,26 @@ impl Listed {
     /// Its recipients' addresses, decoded and lower-cased.
     pub fn recipients(&self) -> Vec<String> {
         html::addresses(&html::unescape(&self.to_address))
+    }
+
+    /// Its copied recipients' addresses, decoded and lower-cased.
+    pub fn copied(&self) -> Vec<String> {
+        html::addresses(&html::unescape(&self.cc_address))
+    }
+
+    /// Whether it has attachments.
+    pub fn attached(&self) -> bool {
+        matches!(self.has_attachment.as_str(), "1" | "true")
+    }
+
+    /// The start of its text, decoded.
+    pub fn summary(&self) -> String {
+        html::unescape(&self.summary)
+    }
+
+    /// When it was received (else sent), epoch milliseconds.
+    pub fn time(&self) -> Option<i64> {
+        self.received_time.or(self.sent_time)
     }
 }
 
@@ -230,10 +262,9 @@ impl<'a> ZohoMail<'a> {
         if !status.is_success() {
             return Err(failure(response).await);
         }
-        let envelope: Envelope<T> = response
-            .json()
-            .await
-            .map_err(|e| ProviderError::Unexpected(format!("Zoho answer: {}", e.without_url())))?;
+        let body = response.bytes().await.map_err(transport)?;
+        let envelope: Envelope<T> = serde_json::from_slice(&body)
+            .map_err(|e| ProviderError::Unexpected(unreadable("a Zoho answer", &e)))?;
         Ok(envelope.data)
     }
 
@@ -307,7 +338,7 @@ impl<'a> ZohoMail<'a> {
         }
         let fetched_bytes = u64::try_from(body.len()).unwrap_or(u64::MAX);
         let envelope: Envelope<Original> = serde_json::from_slice(&body)
-            .map_err(|e| ProviderError::Unexpected(format!("raw message answer: {e}")))?;
+            .map_err(|e| ProviderError::Unexpected(unreadable("a raw message answer", &e)))?;
         let raw = envelope.data.content.into_bytes();
         if u64::try_from(raw.len()).unwrap_or(u64::MAX) > max_bytes {
             return Ok(OriginalFetch::TooLarge);
@@ -399,9 +430,9 @@ impl<'a> ZohoMail<'a> {
         if !response.status().is_success() {
             return Err(failure(response).await);
         }
-        let envelope: Envelope<SendAnswer> = response.json().await.map_err(|e| {
-            ProviderError::Unavailable(format!("unreadable answer to a send: {}", e.without_url()))
-        })?;
+        let body = response.bytes().await.map_err(transport)?;
+        let envelope: Envelope<SendAnswer> = serde_json::from_slice(&body)
+            .map_err(|e| ProviderError::Unavailable(unreadable("the answer to a send", &e)))?;
         Ok(envelope.data)
     }
 }
@@ -431,14 +462,13 @@ pub(super) fn classify(
     headers: Option<&reqwest::header::HeaderMap>,
     code: Option<&str>,
 ) -> ProviderError {
-    let code = code.unwrap_or_default().to_ascii_uppercase();
-    let throttled = code.contains("TOO_MANY") || code.contains("THROTTL") || code.contains("LIMIT");
-    if status == reqwest::StatusCode::TOO_MANY_REQUESTS || throttled {
+    let code = code.unwrap_or_default();
+    if status == reqwest::StatusCode::TOO_MANY_REQUESTS || RATE_LIMITED.contains(&code) {
         return ProviderError::RateLimited {
             retry_after: headers.and_then(retry_after),
         };
     }
-    if code.contains("OAUTHTOKEN") || code.contains("INVALID_TICKET") {
+    if REFUSED_TOKEN.contains(&code) {
         return ProviderError::Unauthorized;
     }
     match status {
@@ -457,6 +487,16 @@ pub(super) fn classify(
     }
 }
 
+/// The `errorCode`s Zoho's APIs answer when a caller is over its limits.
+const RATE_LIMITED: [&str; 3] = [
+    "TOO_MANY_REQUESTS",
+    "URL_ROLLING_THROTTLES_LIMIT_EXCEEDED",
+    "THROTTLE_LIMIT_EXCEEDED",
+];
+
+/// The `errorCode`s Zoho answers for an access token it does not accept.
+const REFUSED_TOKEN: [&str; 2] = ["INVALID_OAUTHTOKEN", "INVALID_TICKET"];
+
 /// A JSON string or number, as a string.
 fn id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<String, D::Error> {
     optional_id(deserializer)?.ok_or_else(|| serde::de::Error::custom("an id is missing"))
@@ -466,6 +506,7 @@ fn optional_id<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Option<Stri
     Ok(match serde_json::Value::deserialize(deserializer)? {
         serde_json::Value::String(s) if !s.is_empty() => Some(s),
         serde_json::Value::Number(n) => Some(n.to_string()),
+        serde_json::Value::Bool(b) => Some(b.to_string()),
         _ => None,
     })
 }

@@ -72,6 +72,17 @@ pub fn requests_per_run(folders: usize) -> u32 {
     u32::try_from(folders + 1 + EXPECTED_FETCHES).unwrap_or(u32::MAX)
 }
 
+/// Trouble that stops the whole run (the stream's backoff, throttling and
+/// health handle it), rather than one message.
+fn is_run_trouble(err: &ProviderError) -> bool {
+    matches!(
+        err,
+        ProviderError::RateLimited { .. }
+            | ProviderError::Unauthorized
+            | ProviderError::InvalidGrant
+    )
+}
+
 /// A tracked folder.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TrackedFolder {
@@ -136,7 +147,7 @@ impl Cursor {
         self.folders
             .iter()
             .find(|f| f.id == folder)
-            .map_or(FolderKind::Other, |f| f.kind)
+            .map_or(FolderKind::Untracked, |f| f.kind)
     }
 }
 
@@ -427,6 +438,7 @@ impl Reader<'_> {
         let indexed = self.indexed(&ids).await?;
         let oversized = self.oversized(&ids).await?;
         let reemit = self.reemits().await?;
+        let skipped = self.skipped(&ids).await?;
         let overlay = outbound::overlay(self.pool, self.workspace, self.stream, &ids).await?;
         let mut new: Vec<(&Listed, Vec<String>)> = Vec::new();
         for (message, kind) in listed {
@@ -460,7 +472,7 @@ impl Reader<'_> {
                         });
                     }
                 }
-                None if oversized.contains(id) => {}
+                None if oversized.contains(id) || skipped.contains(id) => {}
                 None if message.size.is_some_and(|s| {
                     u64::try_from(s).unwrap_or(0) > self.config.max_message_bytes
                 }) =>
@@ -548,7 +560,11 @@ impl Reader<'_> {
                 }
                 // Deleted between listing and fetching.
                 Err(ProviderError::NotFound) => continue,
-                Err(other) => return Err(other.into()),
+                Err(err) if is_run_trouble(&err) => return Err(err.into()),
+                Err(err) => {
+                    self.skip(&message.message_id, &err, out);
+                    continue;
+                }
             };
             let internal_date = message
                 .received_time
@@ -577,7 +593,10 @@ impl Reader<'_> {
     }
 
     /// Look up where `vanished` messages went (folder, id, row): archived in
-    /// place, moved, or gone.
+    /// place, moved, or gone. A message its folder no longer has is looked
+    /// for in the account's other folders before it counts as gone. Zoho
+    /// failing on one message skips that message (and backs off), not the
+    /// run.
     async fn look_up(
         &self,
         cursor: &Cursor,
@@ -585,30 +604,57 @@ impl Reader<'_> {
         generation: i32,
         out: &mut Out,
     ) -> Result<(), ReadError> {
+        let ids: Vec<String> = vanished.iter().map(|(_, id, _)| id.clone()).collect();
+        let skipped = self.skipped(&ids).await?;
+        let mut elsewhere: Option<Vec<String>> = None;
         for (folder, id, known) in vanished {
-            let now = match self.mail.details(&folder, &id).await {
-                Ok(found) if found.folder_id == folder => state::archived(&state::tokens(
+            if skipped.contains(&id) {
+                continue;
+            }
+            let found = match self.mail.details(&folder, &id).await {
+                Ok(found) => Some(found),
+                Err(ProviderError::NotFound) => {
+                    if elsewhere.is_none() {
+                        elsewhere = Some(self.other_folders().await?);
+                    }
+                    let folders = elsewhere.as_deref().unwrap_or_default();
+                    match self.relocate(folders, &folder, &id).await {
+                        Ok(found) => found,
+                        Err(err) if is_run_trouble(&err) => return Err(err.into()),
+                        Err(err) => {
+                            self.skip(&id, &err, out);
+                            continue;
+                        }
+                    }
+                }
+                Err(err) if is_run_trouble(&err) => return Err(err.into()),
+                Err(err) => {
+                    self.skip(&id, &err, out);
+                    continue;
+                }
+            };
+            let now = match found {
+                Some(found) if found.folder_id == folder => state::archived(&state::tokens(
                     &folder,
                     cursor.kind_of(&folder),
                     found.read(),
                     found.flagged(),
                     true,
                 )),
-                Ok(found) => state::tokens(
+                Some(found) => state::tokens(
                     &found.folder_id,
                     cursor.kind_of(&found.folder_id),
                     found.read(),
                     found.flagged(),
                     false,
                 ),
-                Err(ProviderError::NotFound) => {
+                None => {
                     out.changes.push(MessageChange::Remove {
                         provider_message_id: id,
                     });
                     out.index.push(IndexOp::Remove { row: known.row });
                     continue;
                 }
-                Err(other) => return Err(other.into()),
             };
             let mut before = known.labels.clone();
             before.sort();
@@ -622,6 +668,65 @@ impl Reader<'_> {
             });
         }
         Ok(())
+    }
+
+    /// Every folder of the account a message can have moved to (all but
+    /// drafts and templates), the untracked ones too.
+    async fn other_folders(&self) -> Result<Vec<String>, ReadError> {
+        Ok(self
+            .mail
+            .folders()
+            .await?
+            .into_iter()
+            .filter(|f| !matches!(f.kind.to_ascii_lowercase().as_str(), "drafts" | "templates"))
+            .map(|f| f.id)
+            .collect())
+    }
+
+    /// Message `id`, which folder `gone_from` no longer has, in another of
+    /// `folders`; `None` when none has it (it is gone).
+    async fn relocate(
+        &self,
+        folders: &[String],
+        gone_from: &str,
+        id: &str,
+    ) -> Result<Option<Listed>, ProviderError> {
+        for folder in folders.iter().filter(|f| *f != gone_from) {
+            match self.mail.details(folder, id).await {
+                Ok(found) => return Ok(Some(found)),
+                Err(ProviderError::NotFound) => {}
+                Err(err) => return Err(err),
+            }
+        }
+        Ok(None)
+    }
+
+    /// Zoho failed on message `id` alone: skip it this run and back off.
+    fn skip(&self, id: &str, err: &ProviderError, out: &mut Out) {
+        tracing::info!(stream = %self.stream, error = %err, "a message Zoho failed on is skipped for now");
+        out.index.push(IndexOp::Skipped {
+            provider_message_id: id.to_owned(),
+            at: self.now,
+        });
+    }
+
+    /// Which of `ids` are skipped for now (Zoho failed on them).
+    async fn skipped(&self, ids: &[String]) -> Result<HashSet<String>, ReadError> {
+        if ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows = sqlx::query_scalar!(
+            r#"SELECT provider_message_id FROM connectors.skipped_messages
+                WHERE stream_id = $1 AND provider_message_id = ANY($2) AND retry_at > $3"#,
+            self.stream as StreamId,
+            ids,
+            self.now,
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(rows.into_iter().collect())
     }
 
     /// The end of a sweep: indexed messages of the window no listing of
@@ -639,7 +744,9 @@ impl Reader<'_> {
             .iter()
             .filter_map(|op| match op {
                 IndexOp::Insert { row, .. } | IndexOp::Update { row, .. } => Some(*row),
-                IndexOp::Remove { .. } | IndexOp::Oversized { .. } => None,
+                IndexOp::Remove { .. } | IndexOp::Oversized { .. } | IndexOp::Skipped { .. } => {
+                    None
+                }
             })
             .collect();
         let mut tx = self.pool.begin_for(self.workspace).await?;

@@ -14,14 +14,16 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
-- Zoho Mail. Signing in with Zoho also connects your Zoho mailbox (one
-  consent, as with Google), and members can connect more Zoho logins; every
+- Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
+  asks a second time, for the mail, only when the account is new; signing
+  in again never asks), and members can connect more Zoho logins; every
   mail account of a login becomes its own inbox, beside Gmail in the same
   streams. Mail is read from the account's own data centre and polled (Zoho
   has no push); read, star (flag), archive and unarchive go back to Zoho;
-  replies and new messages are sent through Zoho, never twice. Uses the Zoho
+  unarchiving never moves your own sent mail into the Inbox; replies and new
+  messages are sent through Zoho, never twice. Uses the Zoho
   app of Sign in with Zoho, which must allow `ZohoMail.accounts.READ`,
-  `ZohoMail.folders.ALL` and `ZohoMail.messages.ALL`. New settings
+  `ZohoMail.folders.READ` and `ZohoMail.messages.ALL`. New settings
   `CAMPBOOKS_CONNECTORS__ZOHO__*` (window, size limits,
   `REQUESTS_PER_MINUTE` per Zoho login, default 60, and `SWEEP_MINUTES`).
   Zoho labels are not synced yet. A migration renames the connectors' message

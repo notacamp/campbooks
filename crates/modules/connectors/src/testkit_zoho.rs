@@ -47,6 +47,12 @@ enum SendFault {
     Refuse(u16),
     /// Send it, but answer 503, as when the answer is lost.
     LoseAnswer,
+    /// Queue it in the Outbox, and answer 503.
+    QueueAndLoseAnswer,
+    /// Answer 503 and send nothing (it never reached Zoho).
+    Lost,
+    /// Send it, and answer without its id.
+    NoId,
 }
 
 #[derive(Debug)]
@@ -65,6 +71,10 @@ struct State {
     /// Bodies of the sends Zoho received (JSON), in order.
     sends: Vec<(Option<String>, serde_json::Value)>,
     refusing: Vec<String>,
+    /// The folder list leaves the Sent folder out.
+    sent_hidden: bool,
+    /// Messages whose download answers 500.
+    failing: Vec<String>,
 }
 
 /// Folder ids of every fake account: Inbox, Drafts, Sent, Spam, Trash,
@@ -75,6 +85,8 @@ pub const SENT: &str = "9000000002022";
 pub const SPAM: &str = "9000000002024";
 pub const TRASH: &str = "9000000002026";
 pub const CLIENTS: &str = "9000000075001";
+pub const OUTBOX: &str = "9000000002028";
+pub const SNOOZED: &str = "9000000002020";
 
 /// Zoho's OAuth and Mail endpoints, faked over mutable mailboxes.
 #[derive(Clone)]
@@ -105,6 +117,8 @@ impl FakeZoho {
             send_fault: None,
             sends: Vec::new(),
             refusing: Vec::new(),
+            sent_hidden: false,
+            failing: Vec::new(),
         }));
         Mock::given(any())
             .respond_with(Responder(state.clone()))
@@ -246,6 +260,35 @@ impl FakeZoho {
         self.lock().send_fault = Some(SendFault::LoseAnswer);
     }
 
+    /// The next send is queued in the Outbox, and its answer is lost.
+    pub fn queue_next_send(&self) {
+        self.lock().send_fault = Some(SendFault::QueueAndLoseAnswer);
+    }
+
+    /// The next send never reaches Zoho (503, nothing sent).
+    pub fn lose_next_send(&self) {
+        self.lock().send_fault = Some(SendFault::Lost);
+    }
+
+    /// The next send goes out, but Zoho's answer names no id.
+    pub fn answer_next_send_without_id(&self) {
+        self.lock().send_fault = Some(SendFault::NoId);
+    }
+
+    /// The folder list leaves the Sent folder out (or shows it again).
+    pub fn hide_sent_folder(&self, hidden: bool) {
+        self.lock().sent_hidden = hidden;
+    }
+
+    /// Downloading message `id` answers 500 (or works again).
+    pub fn fail_downloads_of(&self, id: &str, failing: bool) {
+        let mut state = self.lock();
+        state.failing.retain(|f| f != id);
+        if failing {
+            state.failing.push(id.to_owned());
+        }
+    }
+
     /// Zoho refuses every change to message `id` (400).
     pub fn refuse_changes(&self, id: &str) {
         self.lock().refusing.push(id.to_owned());
@@ -266,6 +309,11 @@ impl FakeZoho {
     /// Calls seen, as `METHOD path` plus a write's mode (no tokens).
     pub fn calls(&self) -> Vec<String> {
         self.lock().calls.clone()
+    }
+
+    /// Forget the calls seen so far.
+    pub fn clear(&self) {
+        self.lock().calls.clear();
     }
 
     /// How many raw downloads of `id` were made.
@@ -318,29 +366,64 @@ fn header(raw: &[u8], name: &str) -> String {
         .unwrap_or_default()
 }
 
+/// The start of a raw message's text, tags left out, as Zoho's `summary`.
+fn summary(raw: &[u8]) -> String {
+    let text = String::from_utf8_lossy(raw);
+    let body = text.split_once("\r\n\r\n").map_or("", |(_, body)| body);
+    let mut out = String::new();
+    let mut in_tag = false;
+    for c in body.chars() {
+        match c {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            c if !in_tag => out.push(c),
+            _ => {}
+        }
+    }
+    out.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(100)
+        .collect()
+}
+
 fn listed(message: &ZohoMessage) -> serde_json::Value {
+    let cc = header(&message.raw, "Cc");
     serde_json::json!({
         "messageId": message.id,
         "folderId": message.folder,
         "receivedTime": message.received.timestamp_millis().to_string(),
+        "sentDateInGMT": message.received.timestamp_millis().to_string(),
         "status": if message.read { "1" } else { "0" },
         "flagid": message.flag,
         "size": message.raw.len().to_string(),
         "subject": escape(&header(&message.raw, "Subject")),
         "toAddress": escape(&header(&message.raw, "To")),
+        "ccAddress": if cc.is_empty() { "Not Provided".to_owned() } else { escape(&cc) },
+        "hasAttachment": "0",
+        "summary": escape(&summary(&message.raw)),
         "sender": "Someone",
     })
 }
 
-fn folders() -> serde_json::Value {
-    serde_json::json!([
-        {"folderId": INBOX, "folderName": "Inbox", "folderType": "Inbox", "path": "/Inbox"},
-        {"folderId": DRAFTS, "folderName": "Drafts", "folderType": "Drafts", "path": "/Drafts"},
-        {"folderId": SENT, "folderName": "Sent", "folderType": "Sent", "path": "/Sent"},
-        {"folderId": SPAM, "folderName": "Spam", "folderType": "Spam", "path": "/Spam"},
-        {"folderId": TRASH, "folderName": "Trash", "folderType": "Trash", "path": "/Trash"},
-        {"folderId": CLIENTS, "folderName": "Clients", "folderType": "Inbox", "path": "/Clients"}
-    ])
+fn folders(sent_hidden: bool) -> serde_json::Value {
+    let mut folders = vec![
+        serde_json::json!({"folderId": INBOX, "folderName": "Inbox", "folderType": "Inbox", "path": "/Inbox"}),
+        serde_json::json!({"folderId": DRAFTS, "folderName": "Drafts", "folderType": "Drafts", "path": "/Drafts"}),
+        serde_json::json!({"folderId": SNOOZED, "folderName": "Snoozed", "folderType": "Snoozed", "path": "/Snoozed"}),
+        serde_json::json!({"folderId": SPAM, "folderName": "Spam", "folderType": "Spam", "path": "/Spam"}),
+        serde_json::json!({"folderId": TRASH, "folderName": "Trash", "folderType": "Trash", "path": "/Trash"}),
+        serde_json::json!({"folderId": OUTBOX, "folderName": "Outbox", "folderType": "Outbox", "path": "/Outbox"}),
+        serde_json::json!({"folderId": CLIENTS, "folderName": "Clients", "folderType": "Inbox", "path": "/Clients"}),
+    ];
+    if !sent_hidden {
+        folders.insert(
+            2,
+            serde_json::json!({"folderId": SENT, "folderName": "Sent", "folderType": "Sent", "path": "/Sent"}),
+        );
+    }
+    serde_json::Value::Array(folders)
 }
 
 impl Respond for Responder {
@@ -357,7 +440,14 @@ impl Respond for Responder {
         match (request.method.as_str(), path.as_str()) {
             ("POST", "/oauth/v2/token") => return token(&mut state, &request.body),
             ("POST", "/oauth/v2/token/revoke") => {
-                let token = query.get("token").cloned().unwrap_or_default();
+                let form: HashMap<String, String> = url::form_urlencoded::parse(&request.body)
+                    .into_owned()
+                    .collect();
+                let token = form
+                    .get("token")
+                    .or_else(|| query.get("token"))
+                    .cloned()
+                    .unwrap_or_default();
                 state.revoked.push(token);
                 return ResponseTemplate::new(200);
             }
@@ -448,7 +538,7 @@ fn mail(
 ) -> ResponseTemplate {
     let parts: Vec<&str> = path.split('/').collect();
     match (method, parts.as_slice()) {
-        ("GET", ["folders"]) => ok(&folders()),
+        ("GET", ["folders"]) => ok(&folders(state.sent_hidden)),
         ("GET", ["messages", "view"]) => {
             let folder = query.get("folderId").cloned().unwrap_or_default();
             let start: usize = query.get("start").and_then(|s| s.parse().ok()).unwrap_or(1);
@@ -470,11 +560,15 @@ fn mail(
                 .collect();
             ok(&page.into())
         }
-        ("GET", ["folders", _, "messages", id, "details"]) => {
+        // Like Zoho, a message is found only in the folder it is in.
+        ("GET", ["folders", folder, "messages", id, "details"]) => {
             match state.accounts[index].messages.get(*id) {
-                Some(message) => ok(&listed(message)),
-                None => error(404, "MESSAGE_NOT_FOUND"),
+                Some(message) if message.folder == *folder => ok(&listed(message)),
+                _ => error(404, "MESSAGE_NOT_FOUND"),
             }
+        }
+        ("GET", ["messages", id, "originalmessage"]) if state.failing.iter().any(|f| f == id) => {
+            error(500, "INTERNAL_ERROR")
         }
         ("GET", ["messages", id, "originalmessage"]) => {
             match state.accounts[index].messages.get(*id) {
@@ -555,6 +649,9 @@ fn send(
     if let Some(SendFault::Refuse(status)) = fault {
         return error(status, "EXTRA_KEY_FOUND_IN_JSON");
     }
+    if fault == Some(SendFault::Lost) {
+        return error(503, "INTERNAL_ERROR");
+    }
     let field = |key: &str| body[key].as_str().unwrap_or_default().to_owned();
     let parent_id = match &parent {
         Some(parent) => match state.accounts[index].messages.get(parent) {
@@ -572,6 +669,9 @@ fn send(
         field("toAddress"),
         field("subject"),
     );
+    if !field("ccAddress").is_empty() {
+        write!(raw, "Cc: {}\r\n", field("ccAddress")).unwrap();
+    }
     if let Some(parent_id) = parent_id {
         write!(
             raw,
@@ -594,7 +694,11 @@ fn send(
         id.clone(),
         ZohoMessage {
             id: id.clone(),
-            folder: SENT.to_owned(),
+            folder: if fault == Some(SendFault::QueueAndLoseAnswer) {
+                OUTBOX.to_owned()
+            } else {
+                SENT.to_owned()
+            },
             read: true,
             flag: "flag_not_set".to_owned(),
             archived: false,
@@ -603,8 +707,14 @@ fn send(
         },
     );
     state.sends.push((parent, body.clone()));
-    if fault == Some(SendFault::LoseAnswer) {
+    if matches!(
+        fault,
+        Some(SendFault::LoseAnswer | SendFault::QueueAndLoseAnswer)
+    ) {
         return error(503, "INTERNAL_ERROR");
+    }
+    if fault == Some(SendFault::NoId) {
+        return ok(&serde_json::json!({"subject": field("subject")}));
     }
     ok(&serde_json::json!({"messageId": id, "subject": field("subject")}))
 }

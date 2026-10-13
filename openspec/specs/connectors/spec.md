@@ -370,12 +370,13 @@ it as new.
 ### Requirement: Zoho Mail connections in their data centre
 The module SHALL connect Zoho Mail accounts when `CAMPBOOKS_ZOHO__CLIENT_ID`
 and a client secret are set, asking in the grant for
-`ZohoMail.accounts.READ`, `ZohoMail.folders.ALL` and `ZohoMail.messages.ALL`.
+`ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and `ZohoMail.messages.ALL`.
 A Zoho grant SHALL be taken only when its issuer is one of Zoho's accounts
 servers (`.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), or, in
 development only, the server `CAMPBOOKS_ZOHO__BASE_URL` names; any other
 SHALL be refused with `unknown_data_centre`. Its tokens SHALL be refreshed
-and revoked at that accounts server, and its mail read and written at that
+and revoked at that accounts server (the token in the body first, the
+query only if Zoho refuses that; a refusal is never taken as revoked), and its mail read and written at that
 data centre's mail host (`accounts.zoho.<x>` → `mail.zoho.<x>`), never at a
 host taken from a request or a provider's answer. A refresh Zoho refuses
 (`invalid_code` or `invalid_grant`, even in a 200 answer) SHALL set
@@ -416,7 +417,12 @@ be fetched as raw MIME and stored like Gmail's; a known message whose
 folder, read state, flag or archive state changed SHALL be emitted again
 without downloading it. A known message that leaves its folder's listing
 and appears in no other SHALL be looked up: archived, moved, or removed.
-Metadata SHALL be HTML-decoded before use. The upsert SHALL say in inbox
+A message its folder no longer has SHALL be looked for in the account's
+other folders before it counts as removed. Zoho failing on one message (a
+download or a look-up) SHALL skip that message, retried later with a
+backoff from a minute doubling to a day, never stop the run. Metadata SHALL
+be HTML-decoded before use, and an answer that does not parse SHALL be
+reported by its error category and position only. The upsert SHALL say in inbox
 for the Inbox folder when not archived, spam and trash by folder, read
 from Zoho's status, starred for any flag, outbound for the Sent folder,
 with no categories, labels or thread key; its headers SHALL come from the
@@ -444,8 +450,12 @@ the merge, supersede, trash, retry and give-up rules of the Gmail
 write-back and without a history stamp (arrival order): read and unread
 (`markAsRead`, `markAsUnread`), star and unstar (`setFlag` `important`,
 `flag_not_set`), archive (`archiveMails`) and unarchive (`unArchiveMails`
-for an archived message, a move to the Inbox folder for one in another
-folder). Label changes and moves between streams SHALL be recorded `skipped`
+only for a message actually archived, a move to the Inbox folder only for
+one in the member's own folders). A message in the Sent folder, spam, the
+trash, or a folder the adapter does not read (drafts, outbox, snoozed)
+SHALL never be moved to the Inbox: that part of the change is recorded
+`skipped` (`not_movable`, or `in_trash`) and the message's state emitted
+again. Label changes and moves between streams SHALL be recorded `skipped`
 (`label_not_at_provider`, `no_provider_equivalent`). After a write, the
 index SHALL hold the state written, so the next run emits nothing for it.
 
@@ -454,8 +464,12 @@ index SHALL hold the state written, so the next run emits nothing for it.
 - **THEN** Zoho receives `archiveMails` for it, the change is `applied`, and the next run emits no batch for that message
 
 #### Scenario: Unarchive a moved message
-- **WHEN** a member unarchives a message that sits in another Zoho folder
+- **WHEN** a member unarchives a message that sits in one of their own Zoho folders
 - **THEN** Zoho receives `moveMessage` to the Inbox folder and the change is `applied`
+
+#### Scenario: Unarchive a conversation with the member's own reply
+- **WHEN** a member unarchives a conversation holding an archived message and their own reply in Sent
+- **THEN** Zoho receives `unArchiveMails` for the archived message only, the reply stays in Sent, and its change is `skipped` (`not_movable`)
 
 ### Requirement: Sending through Zoho
 A send from an inbox fed by a Zoho stream SHALL go through Zoho's send API
@@ -464,9 +478,14 @@ from the stream's mailbox, with To, Cc, Bcc, subject, the HTML alternative
 `In-Reply-To` names a message of the stream SHALL be sent as Zoho's reply to
 that message. The idempotency rules of Gmail sending SHALL hold, with one
 difference: while a send is unclear, the next attempt SHALL look in the
-mailbox's Sent folder for a message sent since that attempt with the same
-subject and recipients, not already another send's, and record it as sent
-if found. Once Zoho accepts, the sent message SHALL be fetched, indexed and
+mailbox's Sent folder and Outbox for a message sent between 30 seconds
+before that attempt and the HTTP timeout plus 30 seconds after it, with
+the same subject, To, Cc, attachment flag and start of text, not already
+another send's. Exactly one such message SHALL record the send as sent;
+none SHALL prove it was not sent; several, a copy without a time, or a
+mailbox whose Sent folder cannot be found SHALL leave it unclear. When
+Zoho's answer to a send names no message, the job SHALL claim the Sent
+copy it finds this way, so no later look-up takes it for another send. Once Zoho accepts, the sent message SHALL be fetched, indexed and
 announced in the job's transaction like Gmail's; when it cannot be fetched
 the send SHALL still be `sent` and the stream due at once.
 
@@ -478,12 +497,21 @@ the send SHALL still be `sent` and the stream due at once.
 - **WHEN** Zoho accepts a message but the answer is lost, and the job runs again
 - **THEN** the job finds it in the Sent folder and Zoho receives no second send
 
+#### Scenario: A follow-up with the same subject
+- **WHEN** an attempt never reached Zoho and, two minutes later, the member sends another message with the same subject and recipient from another client
+- **THEN** that message is not taken for the send, which is sent
+
+#### Scenario: Two matching copies
+- **WHEN** two sent messages match an unclear attempt
+- **THEN** the send stays unclear, is never sent again, and ends `unknown_outcome`
+
 ### Requirement: Zoho request budget
 Requests to Zoho SHALL draw from a budget per Zoho login,
 `CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` (default 60), shared by
 every process; a run SHALL take its listings and a share of downloads
-before it starts and wait for the budget otherwise. Zoho's 429, or an answer coded as too many
-requests, SHALL throttle only that stream until `Retry-After`.
+before it starts and wait for the budget otherwise. Zoho's 429, or an
+answer coded `TOO_MANY_REQUESTS` or as a throttle limit, SHALL throttle only
+that stream until `Retry-After`.
 
 #### Scenario: One login's backfill does not spend another's
 - **WHEN** one Zoho login's budget is spent and another login's stream is due

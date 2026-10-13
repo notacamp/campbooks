@@ -190,7 +190,7 @@ function consentPage(query: URLSearchParams): string {
     offline_access: "Keep access when you are away",
     "https://www.googleapis.com/auth/gmail.modify": "Read, compose and organise your mail",
     "ZohoMail.accounts.READ": "See your mail accounts",
-    "ZohoMail.folders.ALL": "See and organise your folders",
+    "ZohoMail.folders.READ": "See your folders",
     "ZohoMail.messages.ALL": "Read, send and organise your mail",
   };
   const items = scopes.map((s) => `<li>${escape(wording[s] ?? s)}</li>`).join("");

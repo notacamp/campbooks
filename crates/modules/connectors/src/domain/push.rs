@@ -65,6 +65,10 @@ pub struct Results {
     pub refused: HashSet<String>,
     /// Messages the provider no longer has.
     pub gone: HashSet<String>,
+    /// Messages a change would put back in the inbox although they are not
+    /// the member's to move there (their own sent mail, at Zoho): that part
+    /// is not made.
+    pub unmovable: HashSet<String>,
 }
 
 impl Plan {
@@ -183,8 +187,13 @@ impl Plan {
             let pairs = self.won.get(&id).map(Vec::as_slice).unwrap_or_default();
             let fate_is = |fate| move |p: &(String, String)| self.fates[p] == fate;
             let ended = |state, reason| End { id, state, reason };
+            let only_inbox = !pairs.is_empty() && pairs.iter().all(|(_, label)| label == "INBOX");
             let end = if pairs.is_empty() {
                 ended(State::Superseded, Some("replaced"))
+            } else if done.unmovable.contains(message) && only_inbox {
+                // The provider's state stands: Campbooks is told so.
+                outcome.reemit.push(message.clone());
+                ended(State::Skipped, Some("not_movable"))
             } else if done.written.contains(message) && pairs.iter().any(fate_is(Fate::Write)) {
                 ended(State::Applied, None)
             } else if done.refused.contains(message) {

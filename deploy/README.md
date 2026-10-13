@@ -551,7 +551,7 @@ Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
 redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
 that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can
 connect more Zoho logins. The app must allow the scopes `openid`, `email`, `profile`,
-`ZohoMail.accounts.READ`, `ZohoMail.folders.ALL` and `ZohoMail.messages.ALL` (a
+`ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and `ZohoMail.messages.ALL` (a
 server-based Zoho app takes its scopes with each request, so there is nothing more to
 register). Each mail account of a Zoho login becomes its own
 inbox. Campbooks reads and writes each account's mail at its own data centre

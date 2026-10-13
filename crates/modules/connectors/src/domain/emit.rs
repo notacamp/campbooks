@@ -65,6 +65,14 @@ pub async fn apply_index(
                 )
                 .fetch_one(&mut **tx)
                 .await?;
+                sqlx::query!(
+                    r#"DELETE FROM connectors.skipped_messages
+                        WHERE stream_id = $1 AND provider_message_id = $2"#,
+                    stream as StreamId,
+                    provider_message_id,
+                )
+                .execute(&mut **tx)
+                .await?;
                 let owner = BlobOwner::new(MESSAGE_OWNER, inserted);
                 for blob in &blobs {
                     state.blobs.attach(tx, &key, blob, &owner).await?;
@@ -96,22 +104,62 @@ pub async fn apply_index(
                     .execute(&mut **tx)
                     .await?;
             }
+            IndexOp::Skipped {
+                provider_message_id,
+                at,
+            } => skipped(tx, workspace, stream, &provider_message_id, at).await?,
             IndexOp::Oversized {
                 provider_message_id,
-            } => {
-                sqlx::query!(
-                    r#"INSERT INTO connectors.oversized (workspace_id, stream_id, provider_message_id)
-                       VALUES ($1, $2, $3)
-                       ON CONFLICT DO NOTHING"#,
-                    workspace as WorkspaceId,
-                    stream as StreamId,
-                    provider_message_id,
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
+            } => oversized(tx, workspace, stream, &provider_message_id).await?,
         }
     }
+    Ok(())
+}
+
+/// The provider failed on message `id`: skip it until a minute from `at`,
+/// doubling per failure, at most a day.
+async fn skipped(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    id: &str,
+    at: DateTime<Utc>,
+) -> Result<(), JobError> {
+    sqlx::query!(
+        r#"INSERT INTO connectors.skipped_messages
+               (workspace_id, stream_id, provider_message_id, failures, retry_at)
+           VALUES ($1, $2, $3, 1, $4::timestamptz + interval '1 minute')
+           ON CONFLICT (stream_id, provider_message_id) DO UPDATE
+              SET failures = connectors.skipped_messages.failures + 1,
+                  retry_at = $4::timestamptz + least(interval '1 day',
+                      interval '1 minute' * power(2, least(connectors.skipped_messages.failures, 12)))"#,
+        workspace as WorkspaceId,
+        stream as StreamId,
+        id,
+        at,
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(())
+}
+
+/// Message `id` is over the size limit: never fetched again.
+async fn oversized(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    id: &str,
+) -> Result<(), JobError> {
+    sqlx::query!(
+        r#"INSERT INTO connectors.oversized (workspace_id, stream_id, provider_message_id)
+           VALUES ($1, $2, $3)
+           ON CONFLICT DO NOTHING"#,
+        workspace as WorkspaceId,
+        stream as StreamId,
+        id,
+    )
+    .execute(&mut **tx)
+    .await?;
     Ok(())
 }
 

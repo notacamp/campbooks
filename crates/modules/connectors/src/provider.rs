@@ -125,6 +125,18 @@ pub fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
         .map(Duration::from_secs)
 }
 
+/// What a provider's answer that did not parse says in an error: its
+/// category and position only, never a value from it (an answer can carry
+/// addresses, subjects or raw mail).
+pub fn unreadable(what: &str, err: &serde_json::Error) -> String {
+    format!(
+        "{what} did not parse ({:?} error at line {} column {})",
+        err.classify(),
+        err.line(),
+        err.column()
+    )
+}
+
 /// An HTTP client for providers: our user agent, the timeouts.
 pub fn http_client(name: &str) -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
@@ -142,11 +154,11 @@ mod tests {
     #[test]
     fn scopes_split_on_spaces_and_commas() {
         assert_eq!(
-            split_scopes("openid, ZohoMail.messages.ALL,ZohoMail.folders.ALL  email"),
+            split_scopes("openid, ZohoMail.messages.ALL,ZohoMail.folders.READ  email"),
             [
                 "openid",
                 "ZohoMail.messages.ALL",
-                "ZohoMail.folders.ALL",
+                "ZohoMail.folders.READ",
                 "email"
             ]
         );

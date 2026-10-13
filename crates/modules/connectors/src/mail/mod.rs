@@ -91,6 +91,14 @@ pub enum IndexOp {
         /// The provider's id.
         provider_message_id: String,
     },
+    /// The provider failed on this one message: skip it, and try again
+    /// later, backing off with each failure.
+    Skipped {
+        /// The provider's id.
+        provider_message_id: String,
+        /// The time of the run.
+        at: DateTime<Utc>,
+    },
 }
 
 /// A fetched message, as [`store_message`] stores it.

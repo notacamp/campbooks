@@ -102,8 +102,12 @@ export default async function zohoMail({ page }: ScenarioContext): Promise<void>
   await page.goto("/");
   await caption(page, "Sign in with Zoho");
   await page.getByRole("link", { name: /Continue with Zoho/u }).click();
+  await page.getByText("Know who you are on Zoho").waitFor();
+  await caption(page, "Zoho first asks only who you are", 1800);
+  await page.getByRole("link", { name: "Allow" }).click();
+  // A new account: Zoho is asked once more, for the mail.
   await page.getByText("Read, send and organise your mail").waitFor();
-  await caption(page, "One Zoho consent: who you are, and your mail", 2200);
+  await caption(page, "New here: Zoho asks once more, for your mail", 2200);
   await page.getByRole("link", { name: "Allow" }).click();
   await page.getByRole("button", { name: /Create account/u }).click();
   const name = page.getByRole("textbox", { name: "Workspace name" });

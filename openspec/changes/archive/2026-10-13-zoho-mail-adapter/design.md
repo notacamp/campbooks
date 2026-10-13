@@ -102,12 +102,12 @@ development (`unknown_data_centre` otherwise).
 
 ## Consent and scopes
 
-`mailbox_scopes("zoho")` is `ZohoMail.accounts.READ ZohoMail.folders.ALL
+`mailbox_scopes("zoho")` is `ZohoMail.accounts.READ ZohoMail.folders.READ
 ZohoMail.messages.ALL`, so the sign-in, connect and reconnect round trips
 ask for them with `access_type=offline` (and `prompt=consent` on the
 existing retry when no refresh token came back). The Zoho OAuth app must
 allow exactly: `openid`, `email`, `profile`, `ZohoMail.accounts.READ`,
-`ZohoMail.folders.ALL`, `ZohoMail.messages.ALL`. Zoho documents scopes as
+`ZohoMail.folders.READ`, `ZohoMail.messages.ALL`. Zoho documents scopes as
 comma-separated and its token answer may omit `scope`; granted scopes are
 read split on spaces and commas, and a Zoho answer without `scope` counts
 as granting what was asked (Zoho's consent screen is all or nothing).
@@ -206,6 +206,28 @@ one OAuth app), `…__BASE_URL` (development only),
 `CAMPBOOKS_CONNECTORS__ZOHO__{BACKFILL_DAYS,MAX_MESSAGE_BYTES,
 RUN_BUDGET_BYTES,REQUESTS_PER_MINUTE,SWEEP_MINUTES}`.
 
+## After review
+
+- **Unarchive never moves the member's own mail.** Conversations unarchives
+  every message of a conversation, the member's replies too. The adapter
+  calls `unArchiveMails` only for an archived message and `moveMessage` only
+  from the member's own folders (tracked as `OWN`); a message in Sent, spam,
+  the trash or a folder it does not read is left where it is (`not_movable`).
+- **The Sent look-up is strict.** Sent folder and Outbox; a window from 30 s
+  before the attempt to the HTTP timeout plus 30 s after it; subject, To,
+  Cc, attachment flag and the first 40 letters and digits of the text; one
+  match proves the send, several leave it unclear (it then ends
+  `unknown_outcome`, never sent twice); a missing Sent folder proves nothing.
+  An answer without an id claims its Sent copy.
+- **Refresh tokens only when kept.** A Zoho sign-in asks for the mailbox only
+  for a new account (a second round trip), and every Zoho refresh token
+  Campbooks does not keep is revoked (Zoho caps them per person and app).
+- **One bad message never stops a mailbox.** A download or look-up Zoho
+  fails on is skipped and retried with a backoff
+  (`connectors.skipped_messages`); a message its folder no longer has is
+  looked for in the other folders before it counts as removed.
+- `ZohoMail.folders.READ` (reading folders is all the adapter does).
+
 ## Risks
 
 - Zoho's API is verified against its documentation and the fake, not a
@@ -214,6 +236,9 @@ RUN_BUDGET_BYTES,REQUESTS_PER_MINUTE,SWEEP_MINUTES}`.
 - A message moved within Zoho to a folder past that folder's newest page is
   first seen as moved by its `details` look-up, or else removed and
   re-added by the next sweep.
-- The Sent-folder look-up could take an identical message the member sent
-  from another client within the same seconds for ours: the send is then
-  recorded `sent` without a second copy going out, the safe side.
+- Mail beyond the newest 50 of a folder waits for the sweep (up to six
+  hours) when more than 50 arrive between runs.
+- At the end of a sweep, unlisted messages beyond the first 20 look-ups are
+  taken as archived (or gone, in the trash and spam) until the next sweep.
+- A new Zoho account that declines the mailbox on the second consent
+  screen ends at the sign-in screen (Zoho's consent is all or nothing).

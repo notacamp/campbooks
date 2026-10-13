@@ -4,7 +4,10 @@
 //! echo-free writes) is the same as Gmail's:
 //!
 //! `folder:<id>`, `INBOX` (in the Inbox folder and not archived), `SENT`,
-//! `SPAM`, `TRASH`, `UNREAD`, `STARRED` (any flag), `ARCHIVED`.
+//! `SPAM`, `TRASH`, `OWN` (one of the member's own folders), `UNREAD`,
+//! `STARRED` (any flag), `ARCHIVED`. A message in a folder the adapter does
+//! not read (Snoozed, Outbox, a folder made since the last sweep) carries
+//! its folder token only.
 
 use serde::{Deserialize, Serialize};
 
@@ -27,6 +30,9 @@ pub enum FolderKind {
     Trash,
     /// One of the member's own folders.
     Other,
+    /// A folder the adapter does not read (drafts, outbox, snoozed), or one
+    /// it has not seen yet. Never a place to move mail out of.
+    Untracked,
 }
 
 impl FolderKind {
@@ -73,6 +79,7 @@ pub fn tokens(
     push("SENT", kind == FolderKind::Sent);
     push("SPAM", kind == FolderKind::Spam);
     push("TRASH", kind == FolderKind::Trash);
+    push("OWN", kind == FolderKind::Other);
     push("UNREAD", !read);
     push("STARRED", flagged);
     push("ARCHIVED", archived);
@@ -136,6 +143,12 @@ mod tests {
 
     #[test]
     fn tokens_say_where_and_how_a_message_is() {
+        let own = tokens("14", FolderKind::Other, true, false, false);
+        assert_eq!(own, ["OWN", "folder:14"]);
+        assert_eq!(
+            tokens("15", FolderKind::Untracked, true, false, false),
+            ["folder:15"]
+        );
         let inbox = tokens("11", FolderKind::Inbox, false, true, false);
         assert_eq!(inbox, ["INBOX", "STARRED", "UNREAD", "folder:11"]);
         let state = flags(&inbox);

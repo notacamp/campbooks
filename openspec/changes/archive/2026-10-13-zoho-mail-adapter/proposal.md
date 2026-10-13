@@ -21,7 +21,7 @@ cross-module dependency, no new crate.
   data centre (`mail.zoho.eu`, `.com`, …), derived from the accounts server
   identity validated, never from input.
 - **One consent, as with Google**: a Zoho sign-in also asks for
-  `ZohoMail.accounts.READ`, `ZohoMail.folders.ALL` and
+  `ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and
   `ZohoMail.messages.ALL` with offline access; connect and reconnect go
   through identity's front door as for Google.
 - **Several mailboxes per connection**: one Zoho login can hold several mail

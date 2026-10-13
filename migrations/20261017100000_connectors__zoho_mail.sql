@@ -32,3 +32,22 @@ ALTER INDEX connectors.gmail_messages_reemit_idx RENAME TO messages_reemit_idx;
 ALTER TABLE connectors.messages ADD COLUMN rfc_message_id text;
 CREATE INDEX messages_rfc_idx ON connectors.messages (stream_id, rfc_message_id)
     WHERE rfc_message_id IS NOT NULL;
+
+-- Messages the provider failed on, one at a time (a download or a look-up
+-- answered with an error other than "gone"): skipped until `retry_at`, which
+-- backs off with each failure, so one bad message never stops a mailbox.
+CREATE TABLE connectors.skipped_messages (
+    workspace_id uuid NOT NULL,
+    stream_id uuid NOT NULL REFERENCES connectors.streams (id) ON DELETE CASCADE,
+    provider_message_id text NOT NULL,
+    failures integer NOT NULL DEFAULT 1,
+    retry_at timestamptz NOT NULL,
+    PRIMARY KEY (stream_id, provider_message_id)
+);
+
+ALTER TABLE connectors.skipped_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE connectors.skipped_messages FORCE ROW LEVEL SECURITY;
+CREATE POLICY workspace_isolation ON connectors.skipped_messages USING
+    (workspace_id = nullif(current_setting('campbooks.workspace_id', true), '')::uuid);
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON connectors.skipped_messages TO campbooks_app;

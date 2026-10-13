@@ -25,6 +25,7 @@ pub use api::{Listed, OriginalFetch, ZohoMail};
 
 use crate::provider::{
     ClientSecret, FORM, OAuthError, ProviderError, TokenGrant, form_body, http_client, transport,
+    unreadable,
 };
 
 /// The scopes the `messages` capability needs: list the login's mail
@@ -32,7 +33,7 @@ use crate::provider::{
 /// app must allow these besides `openid email profile`.
 pub const MAIL_SCOPES: [&str; 3] = [
     "ZohoMail.accounts.READ",
-    "ZohoMail.folders.ALL",
+    "ZohoMail.folders.READ",
     "ZohoMail.messages.ALL",
 ];
 
@@ -180,32 +181,53 @@ impl Zoho {
         }
         if status.is_success() {
             return serde_json::from_slice(&body)
-                .map_err(|e| ProviderError::Unexpected(format!("token answer: {e}")));
+                .map_err(|e| ProviderError::Unexpected(unreadable("a token answer", &e)));
         }
         Err(api::classify(status, None, None))
     }
 
-    /// Revoke `refresh_token` at `centre` (the whole grant). A token Zoho no
-    /// longer knows counts as revoked.
+    /// Revoke `refresh_token` at `centre`: in the request body first
+    /// (RFC 7009), and only if Zoho refuses that, as the query parameter its
+    /// documentation shows. Any refusal is an error, never taken as
+    /// "already revoked".
     pub async fn revoke(
         &self,
         centre: &DataCentre,
         refresh_token: &str,
     ) -> Result<(), ProviderError> {
-        let mut url = centre.revoke.clone();
-        url.query_pairs_mut().append_pair("token", refresh_token);
-        let response = self
+        let form = form_body(&[("token", refresh_token)]);
+        match self.revoke_at(centre.revoke.clone(), Some(form)).await {
+            Err(ProviderError::Unexpected(_)) => {
+                let mut url = centre.revoke.clone();
+                url.query_pairs_mut().append_pair("token", refresh_token);
+                self.revoke_at(url, None).await
+            }
+            other => other,
+        }
+    }
+
+    async fn revoke_at(&self, url: Url, form: Option<String>) -> Result<(), ProviderError> {
+        let mut request = self
             .http
             .post(url)
-            .header(reqwest::header::CONTENT_TYPE, FORM)
-            .send()
-            .await
-            .map_err(transport)?;
-        let status = response.status();
-        if status.is_success() || status == reqwest::StatusCode::BAD_REQUEST {
-            return Ok(());
+            .header(reqwest::header::CONTENT_TYPE, FORM);
+        if let Some(form) = form {
+            request = request.body(form);
         }
-        Err(api::classify(status, None, None))
+        let response = request.send().await.map_err(transport)?;
+        let status = response.status();
+        let body = response.bytes().await.map_err(transport)?;
+        if !status.is_success() {
+            return Err(api::classify(status, None, None));
+        }
+        // Zoho can refuse with a 200 and an `error`.
+        match serde_json::from_slice::<OAuthError>(&body) {
+            Ok(refused) => Err(ProviderError::Unexpected(format!(
+                "revocation refused: {}",
+                refused.error
+            ))),
+            Err(_) => Ok(()),
+        }
     }
 }
 
