@@ -1,0 +1,184 @@
+# Design
+
+## Context
+
+Since the ways-in slice (campbooks-cloud#79), `identity` is the one front
+door for provider consent (ADR 0014): `identity.start_link` issues a
+single-use ticket for `link`, `connect` or `reconnect`, the browser goes to
+`/auth/start/{provider}?link=…`, and the round trip ends back on the
+caller's `return_to` with `connected=<connection id>` or
+`link_error=<code>`. Connecting needs a sign-in in the last ten minutes
+(`step_up_required`); reconnecting a grant that stopped working does not.
+`connectors.list_connections` returns each connection with its health
+(`ok`, `needs_reauth`, `throttled`, `failing`); `connectors.disconnect`
+revokes the grant at the provider and deletes the connection.
+
+What was missing is the screen. This document decides where it lives, how a
+client module reaches the front door without a dependency cycle, the one
+server read the screen needs, what Disconnect says, and the keys.
+
+## Where the screen lives
+
+### Alternatives considered
+
+1. **Its own page, Settings → Mailboxes, in the `connectors` client module
+   (chosen).** Mailboxes are the workspace's: owners and admins see every
+   member's, members see their own, and any of them may be disconnected by
+   an owner. Ways in are the person's, across every workspace. A page per
+   concept keeps each rule in one place: removing a way in never
+   disconnects a mailbox, and disconnecting a mailbox never removes a way
+   in. The client module mirrors the server module that owns the data
+   (`connectors`).
+2. **A section of Ways to sign in.** Fewer pages, and a connected mailbox
+   *is* a way in (ADR 0014). But the section would show colleagues'
+   mailboxes on a page about your own account, Remove and Disconnect would
+   sit next to each other with opposite consequences, and the page would
+   change with the open workspace while the rest of it does not. Rejected.
+3. **The page in the `identity` client module**, next to Ways to sign in,
+   using `identity`'s hooks directly. Least plumbing, but the page's data,
+   rules and mutations are `connectors`', and the client modules are meant
+   to mirror the server's crates. Rejected.
+
+The old Rails app on `main` has an "email accounts" settings page too; this
+design does not copy it. It is chosen for the reasons above (data owner,
+the scope difference between workspace mailboxes and personal ways in),
+and the flow underneath (one front door, `return_to`, refusal codes) is
+Next's own.
+
+## Reaching the front door from `connectors`
+
+`identity`'s client already imports `connectors` (Ways to sign in shows a
+Reconnect for your own mailboxes), and dependency-cruiser forbids cycles, so
+`connectors` cannot import `identity`.
+
+### Alternatives considered
+
+1. **A port, filled by the app shell (chosen).** `connectors` declares
+   `UseMailboxConsent`, a hook type: the providers a mailbox can be
+   connected from, `start({ connect | reconnect })`, whether it is starting,
+   why it was refused, and "sign in again". `identity` implements it
+   (`useMailboxConsent`, over `identity.start_link` and its step-up URL);
+   the app's module manifest hands it to `buildConnectorsRoutes`. This is
+   the client mirror of the server, where `identity` implements the
+   kernel's `ConsentDoor` and the server registers it for `connectors`.
+   The same pattern already hands `identity`'s `MailboxStep` to the
+   `workspaces` routes. No new machinery, no cycle.
+2. **Call `connectors.start_connection` from `connectors`.** No port
+   needed: the server already delegates it to the front door. But the
+   kernel's `ConsentRequest` has no `return_to`, so the browser would come
+   back to `/`, not to the page; fixing that touches the kernel port, both
+   modules and the API contract, and the operation speaks of capabilities
+   the page never offers. Rejected for now; it stays for API clients.
+3. **Move the shared pieces to `lib/`.** `lib/` is business-agnostic and
+   may not import modules; the front door's purposes and step-up rules are
+   `identity`'s. Rejected.
+
+## The providers on offer
+
+The page must offer "only the providers the server lists". The server lists
+sign-in providers (`identity.list_ways_in` → `providers`), but connecting a
+mailbox also needs a mail adapter for that provider (`GrantIntake::
+mailbox_scopes` non-empty): Microsoft signs in but has no mail adapter.
+
+### Alternatives considered
+
+1. **A `mailbox_providers` field on `identity.list_ways_in` (chosen).**
+   `identity` decides what `start_link(connect)` accepts (configured
+   upstream *and* mailbox scopes), so the same module says what is on
+   offer, from the same two checks, in display order. One field on an
+   existing read: no new operation, scope or migration. The response is
+   already per caller and needs `identity:read`, which every web session
+   has.
+2. **A new operation `identity.list_mailbox_providers`.** Cleaner name,
+   but one more endpoint, OpenAPI entry and request on the page for a list
+   of at most three words. Rejected.
+3. **A list from `connectors`.** `connectors` knows its adapters but not
+   whether `identity` has the provider configured for sign-in; it would
+   have to ask through a new kernel port. Rejected.
+
+## Data ownership, events, scopes
+
+No schema change. Nothing is published or consumed that was not before.
+
+| Operation | Scope | Used for |
+|---|---|---|
+| `connectors.list_connections` | `connectors:read` | the list and health |
+| `connectors.disconnect` | `connectors:write` | Disconnect |
+| `identity.list_ways_in` | `identity:read` | `mailbox_providers` |
+| `identity.start_link` | `identity:write` | Connect (`connect`), Reconnect (`reconnect`) |
+| `workspaces.list_members` | `workspaces:read` | "Connected by" |
+
+A connection the caller may not see is 404 everywhere, as before; the page
+only lists what `list_connections` returns.
+
+## The page
+
+- **Rows**: provider mark and name, the address, "Connected by you" or by a
+  member's name, and the health line:
+  - `ok`: "Syncing";
+  - `needs_reauth`: "Needs you to sign in again" (yours), or "Needs Ana
+    Duarte to sign in again" (a colleague's, which only its grantor can
+    reconnect: `reconnect_target` is 404 for anyone else);
+  - `throttled`: "Paused by Gmail for a few minutes" (or Zoho Mail);
+  - `failing`: "Not syncing — we'll keep trying".
+- **Reconnect** shows only on your own mailbox that needs it.
+- **Disconnect** opens an inline confirmation: "Campbooks stops syncing
+  this mailbox and gives up its access at Gmail. The mail already in
+  Campbooks stays, and you can still sign in with this account." After it,
+  a status banner says it is disconnected. No Undo: the grant is revoked at
+  the provider, so only a new consent brings it back; the page says
+  Connect is how.
+- **Connect a mailbox**: one button per `mailbox_providers` entry ("Connect
+  Gmail", "Connect Zoho Mail"); with none, a sentence saying this instance
+  has no mail provider set up.
+- **Coming back**: `?connected=<id>` → "Zoho Mail is connected", naming the
+  address once the list has it; `?link_error=<code>` → a title and a lead
+  for every code the front door and the grant intake send back:
+  `sign_in_again`, `link_expired`, `cancelled_at_provider`, `login_failed`,
+  `provider_unavailable`, `consent_incomplete`, `account_mismatch`,
+  `account_connected_by_another_member`,
+  `way_in_belongs_to_another_account`, `mailbox_unsupported`,
+  `provider_not_configured`, `no_offline_access`, `unknown_data_centre`,
+  `no_mailbox`, and anything else as a generic one. The query is read once
+  and cleared, as on Ways to sign in.
+- **Starting refused** (the API call itself): `step_up_required` → the
+  "Sign in again first" banner reused from Ways to sign in (its button goes
+  to `/bff/login?max_age=600` and back here); `mailbox_unsupported`,
+  `rate_limited` and anything else → a sentence each.
+
+## Keys
+
+`c` is global (new message) and `r`, `⇧R` belong to the reader, and the
+registry refuses keys that two live scopes share. The page's keys get a new
+`settings` scope that overlaps only `global` (and itself): a settings page
+never shows the inbox's list, item or composer.
+
+| Key | Does |
+|---|---|
+| ⇧C | Focus the first Connect button (Enter starts it) |
+| J / K | Choose the next / previous mailbox (existing `list.next` / `list.previous`) |
+| R | Reconnect the chosen mailbox, when it needs you |
+| ⌫ | Disconnect the chosen mailbox: opens the inline confirmation (focus on Cancel, Esc cancels) |
+
+The chosen row is highlighted, and its buttons carry the hints. The first
+choice is the first mailbox that needs you, else the first.
+
+## Settings sections
+
+Settings had one page in the sidebar (Members) and Ways to sign in behind
+the account menu. Inside Settings, the sidebar now nests Members,
+Mailboxes and Ways to sign in under Settings (as the streams nest under
+Inbox), and phones get the same three as chips under the header. Home's
+"Connect your mail" opens Mailboxes; Home's mail section links to it once
+mailboxes are connected, and the held-mailbox offer offers "Connect a
+different mailbox".
+
+## Risks
+
+- **Mail after Disconnect.** Nothing deletes a disconnected mailbox's
+  conversations today, so the confirmation says the mail stays. If the
+  conversations module later removes them on `connectors.connection_removed`,
+  this copy changes with it. Recorded in `openspec/decisions-needed.md`.
+- **Revoking at Google revokes the person's whole grant to the app**, which
+  may include a sign-in's consent; signing in again simply asks again, so
+  the way in still works, as the confirmation promises.
