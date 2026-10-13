@@ -39,7 +39,10 @@ use axum::{
     routing::{get, post},
 };
 use campbooks_kernel::{
-    AppState, Error, Job, JobContext, JobError, auth::TokenVerifier, jobs::Background,
+    AppState, Error, Event, EventConsumer, Job, JobContext, JobError,
+    auth::TokenVerifier,
+    jobs::Background,
+    rate_limit::{Limit, RateLimits, TrustedProxies},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -117,7 +120,15 @@ struct Inner {
     /// Serialize refreshes within this process; a row lock serializes them
     /// across processes.
     refresh_locks: Box<[tokio::sync::Mutex<()>]>,
+    /// Counts sign-ins started per address ([`LOGIN_LIMIT`]).
+    rate_limits: RateLimits,
+    /// The proxies whose `X-Forwarded-For` names the client.
+    trusted_proxies: TrustedProxies,
 }
+
+/// Sign-ins one address may start (each stores a sign-in transaction and
+/// may make the server fetch the provider's metadata).
+const LOGIN_LIMIT: Limit = Limit::new("bff.login", 30, Duration::from_mins(1));
 
 impl Bff {
     /// The BFF for `settings` (`None`: web sign-in is off and every endpoint
@@ -144,6 +155,8 @@ impl Bff {
                 refresh_locks: (0..REFRESH_LOCKS)
                     .map(|_| tokio::sync::Mutex::new(()))
                     .collect(),
+                rate_limits: state.rate_limits.clone(),
+                trusted_proxies: state.config.trusted_proxies.clone(),
             })
         });
         Self { inner }
@@ -187,9 +200,39 @@ impl Bff {
     }
 }
 
-/// The BFF's background work: pruning ended sessions.
+/// The BFF's background work: pruning ended sessions, and ending the web
+/// sessions of a person who signed out everywhere.
 pub fn background() -> Background {
-    Background::new().schedule::<PruneSessions>(PRUNE_EVERY)
+    Background::new()
+        .schedule::<PruneSessions>(PRUNE_EVERY)
+        .consumer(EndSignedOutSessions)
+}
+
+/// `bff.end_signed_out_sessions` ← `identity.signed_out_everywhere`: every
+/// web session of the account ends (their refresh tokens were already
+/// revoked at the issuer; this ends them now rather than at the next
+/// refresh).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EndSignedOutSessions;
+
+impl EventConsumer for EndSignedOutSessions {
+    type Event = campbooks_identity::events::SignedOutEverywhere;
+    const NAME: &'static str = "bff.end_signed_out_sessions";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(
+        &self,
+        ctx: &mut JobContext,
+        event: Event<Self::Event>,
+    ) -> Result<(), JobError> {
+        let ended =
+            store::delete_for_subject(ctx.pool(), &event.payload.account.to_string()).await?;
+        tracing::info!(
+            sessions = ended,
+            "ended the web sessions of a sign-out everywhere"
+        );
+        Ok(())
+    }
 }
 
 /// Delete ended sessions and expired sign-ins. Scheduled every

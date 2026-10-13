@@ -676,6 +676,9 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     let reply = stale.get("/bff/session").await;
     assert_eq!(reply.json()["authenticated"], true);
     assert!(reply.set_cookie(SESSION).is_none());
+    // Past the grace, the old id is a copied cookie (and either copy may be
+    // a thief's): the session ends for both, and its refresh token is
+    // revoked at the identity provider.
     exec(
         &h.db,
         "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
@@ -687,7 +690,92 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     );
     assert_eq!(
         browser.get("/bff/session").await.json()["authenticated"],
-        true
+        false,
+        "the session ended everywhere"
+    );
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1);
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn sign_ins_are_rate_limited_per_address(db: PgPool) {
+    let h = harness(db).await;
+    let from =
+        |address: [u8; 4]| {
+            let mut request = Request::get("/bff/login").body(Body::empty()).unwrap();
+            request.extensions_mut().insert(axum::extract::ConnectInfo(
+                std::net::SocketAddr::from((address, 50_000)),
+            ));
+            request
+        };
+    for _ in 0..30 {
+        let started = send(&h.app, from([203, 0, 113, 7])).await;
+        assert_eq!(started.status, StatusCode::SEE_OTHER, "{}", started.body);
+    }
+    let limited = send(&h.app, from([203, 0, 113, 7])).await;
+    assert_eq!(
+        limited.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{}",
+        limited.body
+    );
+    assert_eq!(limited.json()["code"], "rate_limited");
+    let elsewhere = send(&h.app, from([198, 51, 100, 2])).await;
+    assert_eq!(elsewhere.status, StatusCode::SEE_OTHER);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
+    use campbooks_identity::events::SignedOutEverywhere;
+
+    let h = harness(db).await;
+    let account = uuid::Uuid::now_v7();
+    h.idp.set_user(TestUser {
+        subject: account.to_string(),
+        name: "Ana Lima".to_owned(),
+        email: "ana@example.com".to_owned(),
+    });
+    let mut laptop = Browser::new(&h.app);
+    laptop.sign_in(&h.idp, "/").await;
+    let mut phone = Browser::new(&h.app);
+    phone.sign_in(&h.idp, "/").await;
+    h.idp.set_user(TestUser {
+        subject: "someone-else".to_owned(),
+        name: "Sam".to_owned(),
+        email: "sam@example.com".to_owned(),
+    });
+    let mut other = Browser::new(&h.app);
+    other.sign_in(&h.idp, "/").await;
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 3);
+
+    let state = AppState::new(
+        h.db.clone(),
+        testing::config("postgres://test@localhost/test"),
+    )
+    .with_registry(crate::registry().unwrap());
+    let mut tx = state.db.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &SignedOutEverywhere { account })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    campbooks_kernel::jobs::Worker::new(state)
+        .run_until_idle()
+        .await;
+
+    for browser in [&mut laptop, &mut phone] {
+        assert_eq!(
+            browser.get("/bff/session").await.json()["authenticated"],
+            false
+        );
+    }
+    assert_eq!(
+        other.get("/bff/session").await.json()["authenticated"],
+        true,
+        "nobody else's"
     );
 }
 

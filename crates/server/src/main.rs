@@ -231,6 +231,32 @@ fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
     })
 }
 
+/// Startup checks of the settings `role` uses; the web BFF's settings when
+/// it serves the API with web sign-in.
+fn check(config: &Config, role: Role) -> Result<Option<bff::Settings>, String> {
+    config.check()?;
+    let bff = if role.api() {
+        check_api_config(config)?
+    } else {
+        None
+    };
+    if role.worker() {
+        config.jobs.check()?;
+    }
+    Ok(bff)
+}
+
+/// The instance's mailer (`CAMPBOOKS_MAIL__*`), saying which it is.
+fn mailer(config: &Config) -> Result<campbooks_kernel::mail::MailerPort, String> {
+    let mailer = config.mail.mailer()?;
+    if mailer.is_configured() {
+        tracing::info!("security notices are sent by mail");
+    } else {
+        tracing::info!("no mail transport configured; security notices are shown in the app only");
+    }
+    Ok(mailer)
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -243,15 +269,7 @@ async fn run(
     role: Role,
     telemetry: &Telemetry,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    config.check()?;
-    let bff = if role.api() {
-        check_api_config(&config)?
-    } else {
-        None
-    };
-    if role.worker() {
-        config.jobs.check()?;
-    }
+    let bff = check(&config, role)?;
     let composition = campbooks_server::Composition::from_env(&config)?;
     log_composition(&composition);
     let registry = campbooks_server::registry_with(&composition)?;
@@ -263,12 +281,7 @@ async fn run(
     telemetry.observe_pool(&db, config.database_max_connections);
 
     let blobs = blob_store(&config, &db).await?;
-    let mailer = config.mail.mailer()?;
-    if mailer.is_configured() {
-        tracing::info!("security notices are sent by mail");
-    } else {
-        tracing::info!("no mail transport configured; security notices are shown in the app only");
-    }
+    let mailer = mailer(&config)?;
 
     let bind_addr = config.bind_addr;
     let metrics_addr = config.telemetry.metrics_addr;

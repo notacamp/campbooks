@@ -13,6 +13,7 @@ use campbooks_kernel::{
     error::LocalizableProblem,
     i18n,
     operations::{Operation, Risk},
+    rate_limit::{ClientIp, RateKey},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -124,14 +125,33 @@ pub struct LoginQuery {
             headers(("location" = String), ("set-cookie" = String))),
         (status = 400, description = "`invalid_return_to`", body = Problem,
             content_type = "application/problem+json"),
+        (status = 429, description = "`rate_limited`: too many sign-ins started from this \
+            address.", body = Problem, content_type = "application/problem+json"),
         (status = 503, description = "`bff_not_configured`, or the identity provider is unreachable.",
             body = Problem, content_type = "application/problem+json"),
     ),
 )]
-pub async fn login(State(bff): State<Bff>, Query(query): Query<LoginQuery>) -> Response {
+pub async fn login(
+    State(bff): State<Bff>,
+    peer: Option<axum::Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>,
+    headers: HeaderMap,
+    Query(query): Query<LoginQuery>,
+) -> Response {
     let Some(inner) = &bff.inner else {
         return not_configured();
     };
+    let ip = ClientIp::resolve(
+        peer.map(|axum::Extension(axum::extract::ConnectInfo(addr))| addr.ip()),
+        &headers,
+        &inner.trusted_proxies,
+    );
+    if let Err(limited) = inner
+        .rate_limits
+        .check(&inner.db, &super::LOGIN_LIMIT, &RateKey::ip(ip))
+        .await
+    {
+        return limited.into_response();
+    }
     let Some(return_to) = return_to(query.return_to.as_deref()) else {
         return problem(StatusCode::BAD_REQUEST, code::INVALID_RETURN_TO);
     };
