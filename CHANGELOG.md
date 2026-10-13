@@ -14,6 +14,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- The Visor (the assistant's face) has three new emotions: dizzy (something failed on
+  our side), starry (a big win) and heart eyes (a warm moment), with an optional
+  gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at
+  small sizes.
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your

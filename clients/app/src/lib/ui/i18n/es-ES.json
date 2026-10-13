@@ -43,7 +43,10 @@
     "unsure": "Campbooks no está seguro",
     "happy": "Campbooks está contento",
     "alert": "Campbooks necesita tu atención",
-    "asleep": "Campbooks está en pausa"
+    "asleep": "Campbooks está en pausa",
+    "dizzy": "Campbooks ha tenido un tropiezo",
+    "starry": "Campbooks está encantado",
+    "hearts": "A Campbooks le encanta"
   },
   "signal": {
     "review": "Revisar",

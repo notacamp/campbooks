@@ -47,10 +47,15 @@
   animation: visor-scan var(--duration-scan) var(--ease-in-out) infinite;
 }
 
+/* Working: round eyes hop in turn, like a typing indicator. Reads at 22px. */
 .visor[data-state="thinking"] .eye {
-  width: calc(var(--s) * 0.19);
-  height: calc(var(--s) * 0.11);
-  animation: visor-think var(--duration-pulse) var(--ease-in-out) infinite;
+  width: calc(var(--s) * 0.17);
+  height: calc(var(--s) * 0.17);
+  animation: visor-hop var(--duration-hop) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="thinking"] .eye:last-child {
+  animation-delay: calc(var(--duration-hop) * 0.16);
 }
 
 .visor[data-state="unsure"] .eye:first-child {
@@ -101,19 +106,125 @@
   }
 }
 
-@keyframes visor-think {
+@keyframes visor-hop {
+  0%,
+  60%,
+  100% {
+    translate: 0 0;
+  }
+
+  30% {
+    translate: 0 calc(var(--s) * -0.09);
+  }
+}
+
+/* Glyph eyes: dizzy, starry and hearts draw an inline SVG instead of a pill. */
+.visor[data-state="dizzy"],
+.visor[data-state="starry"],
+.visor[data-state="hearts"] {
+  gap: calc(var(--s) * 0.1);
+}
+
+.glyph {
+  display: block;
+  overflow: visible;
+  width: calc(var(--s) * 0.27);
+  height: calc(var(--s) * 0.27);
+  color: var(--visor-eye);
+  filter: drop-shadow(0 0 calc(var(--s) * 0.05) var(--visor-eye-glow));
+}
+
+.visor[data-state="dizzy"] {
+  animation: visor-wobble var(--duration-wobble) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="dizzy"] .glyph {
+  animation: visor-spin var(--duration-spin) linear infinite;
+}
+
+.visor[data-state="starry"] .glyph {
+  width: calc(var(--s) * 0.3);
+  height: calc(var(--s) * 0.3);
+  animation: visor-twinkle var(--duration-twinkle) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="starry"] .glyph:last-child {
+  animation-delay: calc(var(--duration-twinkle) * 0.17);
+}
+
+.visor[data-state="hearts"] .glyph {
+  animation: visor-beat var(--duration-beat) var(--ease-out) infinite;
+}
+
+.visor[data-tinted="true"][data-state="starry"] .glyph {
+  color: var(--visor-tint-star);
+  filter: drop-shadow(0 0 calc(var(--s) * 0.06) var(--visor-tint-star));
+}
+
+.visor[data-tinted="true"][data-state="hearts"] .glyph {
+  color: var(--visor-tint-heart);
+  filter: drop-shadow(0 0 calc(var(--s) * 0.06) var(--visor-tint-heart));
+}
+
+@keyframes visor-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+@keyframes visor-wobble {
   0%,
   100% {
-    opacity: var(--opacity-dim);
+    rotate: -3deg;
   }
 
   50% {
-    opacity: 1;
+    rotate: 3deg;
+  }
+}
+
+@keyframes visor-twinkle {
+  0%,
+  100% {
+    scale: 1;
+    rotate: 0deg;
+  }
+
+  40% {
+    scale: 1.18;
+    rotate: 12deg;
+  }
+
+  60% {
+    scale: 0.94;
+    rotate: 4deg;
+  }
+}
+
+@keyframes visor-beat {
+  0%,
+  45%,
+  100% {
+    scale: 1;
+  }
+
+  12% {
+    scale: 1.2;
+  }
+
+  24% {
+    scale: 1.02;
+  }
+
+  34% {
+    scale: 1.14;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .eye {
+  .visor,
+  .eye,
+  .glyph {
     animation: none;
   }
 }
