@@ -4711,6 +4711,338 @@
         }
       }
     },
+    "/bff/admin/{path}": {
+      "get": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "Read from the admin API as the signed-in administrator.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.admin_get",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The admin API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "PUT to the admin API as the signed-in administrator.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.admin_put",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The admin API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "high"
+        }
+      },
+      "post": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "POST to the admin API as the signed-in administrator.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.admin_post",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The admin API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "high"
+        }
+      },
+      "delete": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "DELETE in the admin API as the signed-in administrator.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.admin_delete",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The admin API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "high"
+        }
+      },
+      "patch": {
+        "tags": [
+          "bff"
+        ],
+        "summary": "PATCH the admin API as the signed-in administrator.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "operationId": "bff.admin_patch",
+        "parameters": [
+          {
+            "name": "path",
+            "in": "path",
+            "description": "The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The admin API's response, whatever its status."
+          },
+          "401": {
+            "description": "`session_required`: no live session.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "`bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "high"
+        }
+      }
+    },
     "/bff/api/{path}": {
       "get": {
         "tags": [
@@ -5232,7 +5564,7 @@
           {
             "name": "max_age",
             "in": "query",
-            "description": "Sign in again unless the person did within this many seconds: the\nstep-up an operation asks for with `step_up_required`.",
+            "description": "Sign in again unless the person did within this many seconds: the\nstep-up an operation asks for with `step_up_required`, or `0` after\nthe admin API's `admin_reauth_required`.",
             "required": false,
             "schema": {
               "type": [
@@ -8227,7 +8559,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",

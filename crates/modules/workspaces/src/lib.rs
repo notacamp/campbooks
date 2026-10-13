@@ -74,6 +74,7 @@ pub fn module() -> Module {
                 features::invite_member::handler
             ))
             .routes(routes!(features::list_security_events::handler)),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::WorkspaceCreated>()
             .publishes::<events::WorkspaceUpdated>()

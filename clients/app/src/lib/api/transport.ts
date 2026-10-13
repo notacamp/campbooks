@@ -8,7 +8,8 @@ import { TransportError } from "./errors";
  * How API requests leave the app. openapi-fetch builds a typed `Request`; the
  * transport decides how it reaches the server. Modules never see this.
  *
- * - web:   same-origin `fetch` to the server's BFF (`/bff/api/v1/...`). The
+ * - web:   same-origin `fetch` to the server's BFF (`/bff/api/v1/...`, and
+ *          `/bff/admin/v1/...` for the admin API). The
  *          browser attaches the httpOnly session cookie; JS never sees a token.
  *          Every request carries the BFF's CSRF header, and a `session_required`
  *          answer sends the browser to sign in, coming back to the same page.
@@ -17,7 +18,7 @@ import { TransportError } from "./errors";
  */
 export interface Transport {
   readonly kind: "web" | "tauri";
-  /** Base URL openapi-fetch prefixes to every `/api/v1/...` path. */
+  /** Base URL openapi-fetch prefixes to every `/api/v1/...` (and `/admin/v1/...`) path. */
   readonly baseUrl: string;
   readonly fetch: (request: Request) => Promise<Response>;
 }
@@ -33,9 +34,21 @@ export const CSRF_HEADER = "X-Campbooks-CSRF";
 /** The BFF's problem `code` when a request has no live session. */
 const SESSION_REQUIRED = "session_required";
 
-/** Where to start signing in, coming back to `returnTo` (a path on this site). */
-export function loginUrl(returnTo: string): string {
-  return `${BFF_PREFIX}/login?return_to=${encodeURIComponent(returnTo)}`;
+/**
+ * The admin API's problem `code` when the last sign-in is too old for it
+ * (more than 12 hours): sign in again with {@link loginUrl}'s `fresh`. Not a
+ * signed-out session, so the transport leaves it to the caller.
+ */
+export const ADMIN_REAUTH_REQUIRED = "admin_reauth_required";
+
+/**
+ * Where to start signing in, coming back to `returnTo` (a path on this
+ * site). `fresh` makes the person sign in again even with a live session at
+ * the identity provider (`max_age=0`), as the admin API asks.
+ */
+export function loginUrl(returnTo: string, { fresh = false }: { fresh?: boolean } = {}): string {
+  const url = `${BFF_PREFIX}/login?return_to=${encodeURIComponent(returnTo)}`;
+  return fresh ? `${url}&max_age=0` : url;
 }
 
 function uiLanguage(): string {

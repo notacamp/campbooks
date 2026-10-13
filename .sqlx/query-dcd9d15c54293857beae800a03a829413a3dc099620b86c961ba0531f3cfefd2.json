@@ -1,0 +1,79 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO admin.profiles AS p (account_id, permissions, note, granted_at, updated_at)\n           VALUES ($1, $2, $3, $4, $4)\n           ON CONFLICT (account_id) DO UPDATE\n              SET permissions = ARRAY(SELECT DISTINCT unnest(p.permissions || excluded.permissions)\n                                       ORDER BY 1),\n                  note = coalesce(excluded.note, p.note),\n                  updated_at = excluded.updated_at\n           RETURNING account_id, permissions AS \"permissions!\", note, granted_at, updated_at",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "account_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "admin.profiles",
+            "name": "account_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "permissions!",
+        "type_info": "TextArray",
+        "origin": {
+          "Table": {
+            "table": "admin.profiles",
+            "name": "permissions"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "note",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "admin.profiles",
+            "name": "note"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "granted_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "admin.profiles",
+            "name": "granted_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "updated_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "admin.profiles",
+            "name": "updated_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "TextArray",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "dcd9d15c54293857beae800a03a829413a3dc099620b86c961ba0531f3cfefd2"
+}

@@ -80,6 +80,7 @@ pub fn module(deps: Deps) -> Module {
             ))
             .routes(routes!(features::sync_now::handler))
             .layer(Extension(deps.clone())),
+        admin_router: None,
         background: Background::new()
             .publishes::<events::ConnectionAdded>()
             .publishes::<events::CapabilityGranted>()

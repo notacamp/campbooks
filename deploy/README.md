@@ -478,6 +478,51 @@ With the built-in issuer:
   merged. The last way in can't be removed, and adding or removing one needs a sign-in in
   the last ten minutes. Disconnecting a mailbox keeps its sign-in.
 
+## Administrators
+
+An administrator is a person whose account has an **admin profile** (ADR 0015). They see
+the **Admin** section of the app (account menu → Admin, or `/admin`): today the System
+panel, with the version, uptime, database and migrations, the effective configuration
+(never a secret) and whether each AI role's provider answers. Signups, people, workspaces
+and jobs follow.
+
+Profiles exist only through the server's command line, never through the app or the API,
+so becoming an administrator needs shell access to the server. The command connects with
+the migration login (`CAMPBOOKS_DATABASE_MIGRATION_URL`); the login every request uses
+cannot write a profile.
+
+**The first super admin.** Sign in to the app once, then on the server:
+
+```sh
+docker compose exec server campbooks-server admin grant --email you@example.com --permission super
+```
+
+It names the account it found and asks before changing anything (`--yes` skips the
+question). `--email` must be a verified address of exactly one account; when two accounts
+share it, or with another identity provider (the shipped `compose.yaml` still uses
+Rauthy), pass `--account <id>` instead: the id is the `sub` that
+`https://<your instance>/bff/session` shows to the signed-in person.
+
+```sh
+docker compose exec server campbooks-server admin list            # who, with what, since when
+docker compose exec server campbooks-server admin revoke --email you@example.com   # all of it
+docker compose exec server campbooks-server admin revoke --account <id> --permission jobs.retry
+docker compose exec server campbooks-server admin log             # the audit trail
+```
+
+Permissions are `super` (everything), `system.read`, `signups.review`, `users.read`,
+`users.suspend`, `workspaces.read`, `jobs.read` and `jobs.retry`; the dashboard shows only to
+`super` for now. Changes apply on the person's next request.
+
+- Every admin request and every command above is recorded (`admin log`).
+- The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks
+  the administrator to sign in again.
+- Admin views show metadata only (counts, states, providers, addresses people signed in
+  with), never messages or documents, and nobody can act as another person.
+- With another identity provider (`CAMPBOOKS_AUTH__ISSUER`), give the `admin:access` scope
+  only to the web app's client, and make sure access tokens carry `auth_time`; without it
+  every admin request asks to sign in again. Campbooks' built-in sign-in does both.
+
 ## Connected accounts
 
 Members connect outside accounts (Gmail and Zoho Mail); Campbooks asks Google for consent through

@@ -56,6 +56,7 @@ export default tseslint.config(
       "recordings/out/",
       // Generated from openapi/openapi.json (`pnpm api:generate`); never hand-edited.
       "src/lib/api/schema.gen.ts",
+      "src/lib/api/admin.gen.ts",
       // Intentionally boundary-violating sources for the dependency-cruiser test.
       "test/fixtures/",
     ],

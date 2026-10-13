@@ -4,6 +4,8 @@ pnpm-lock.yaml
 **/node_modules/
 app/src-tauri/target/
 app/src-tauri/gen/
-# Generated from openapi/openapi.json; checked by `pnpm api:check` instead.
+# Generated from openapi/openapi.json and openapi/admin.json; checked by
+# `pnpm api:check` instead.
 app/src/lib/api/schema.gen.ts
+app/src/lib/api/admin.gen.ts
 app/src/lib/api/records.gen.ts

@@ -393,6 +393,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "campbooks-admin"
+version = "0.1.0"
+dependencies = [
+ "campbooks-kernel",
+ "chrono",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "utoipa-axum",
+ "uuid",
+]
+
+[[package]]
 name = "campbooks-ai"
 version = "0.1.0"
 dependencies = [
@@ -534,6 +547,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.22.1",
+ "campbooks-admin",
  "campbooks-ai",
  "campbooks-connectors",
  "campbooks-conversations",
@@ -575,7 +589,9 @@ name = "campbooks-system"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "campbooks-ai",
  "campbooks-kernel",
+ "chrono",
  "serde",
  "serde_json",
  "sqlx",
@@ -583,6 +599,7 @@ dependencies = [
  "tracing",
  "utoipa",
  "utoipa-axum",
+ "wiremock",
 ]
 
 [[package]]
