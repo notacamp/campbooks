@@ -127,9 +127,9 @@
 
 .glyph {
   display: block;
-  overflow: visible;
-  width: calc(var(--s) * 0.27);
-  height: calc(var(--s) * 0.27);
+  overflow: hidden;
+  width: calc(var(--s) * 0.28);
+  height: calc(var(--s) * 0.28);
   color: var(--visor-eye);
   filter: drop-shadow(0 0 calc(var(--s) * 0.05) var(--visor-eye-glow));
 }
@@ -139,6 +139,8 @@
 }
 
 .visor[data-state="dizzy"] .glyph {
+  width: calc(var(--s) * 0.32);
+  height: calc(var(--s) * 0.32);
   animation: visor-spin var(--duration-spin) linear infinite;
 }
 
@@ -191,7 +193,7 @@
   }
 
   40% {
-    scale: 1.18;
+    scale: 1.1;
     rotate: 12deg;
   }
 

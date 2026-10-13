@@ -33,10 +33,13 @@ export interface VisorProps {
   className?: string | undefined;
 }
 
-/** An Archimedean spiral in a 24 x 24 box, drawn once. */
+/**
+ * An Archimedean spiral in a 24 x 24 box, drawn once: 2.5 turns, radius 0.6 to 9, so with the
+ * stroke it stays inside the box (and the glass) with margin.
+ */
 const SPIRAL_PATH = Array.from({ length: 121 }, (_, i) => {
-  const t = (i / 120) * Math.PI * 5.2;
-  const r = 0.6 + t * 1.55;
+  const t = (i / 120) * Math.PI * 5;
+  const r = 0.6 + t * (8.4 / (Math.PI * 5));
   return `${i === 0 ? "M" : "L"}${(12 + r * Math.cos(t)).toFixed(2)} ${(12 + r * Math.sin(t)).toFixed(2)}`;
 }).join(" ");
 
@@ -53,7 +56,7 @@ function Glyph({ state }: { state: "dizzy" | "starry" | "hearts" }) {
           d={SPIRAL_PATH}
           fill="none"
           stroke="currentColor"
-          strokeWidth="2.6"
+          strokeWidth="2.2"
           strokeLinecap="round"
         />
       ) : (

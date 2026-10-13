@@ -92,3 +92,30 @@ export const Accents: Story = {
     </div>
   ),
 };
+
+/** No eye may poke out of the glass, at any size or state (animation paused to measure the rest pose). */
+export const Containment: Story = {
+  render: () => (
+    <>
+      <style>{"[data-state] , [data-state] * { animation: none !important; }"}</style>
+      <StateTable />
+    </>
+  ),
+  play: async ({ canvasElement }) => {
+    const visors = canvasElement.querySelectorAll<HTMLElement>("[data-state][data-size]");
+    await expect(visors.length).toBe(VISOR_STATES.length * SIZES.length);
+    for (const visor of visors) {
+      const glass = visor.getBoundingClientRect();
+      const eyes = visor.querySelectorAll<HTMLElement | SVGElement>(":scope > *");
+      for (const eye of eyes) {
+        const box = eye.getBoundingClientRect();
+        const where = `${visor.dataset["state"]} ${visor.dataset["size"]}`;
+        const margin = glass.height * 0.08;
+        await expect(box.top, `${where} top`).toBeGreaterThanOrEqual(glass.top + margin);
+        await expect(box.bottom, `${where} bottom`).toBeLessThanOrEqual(glass.bottom - margin);
+        await expect(box.left, `${where} left`).toBeGreaterThanOrEqual(glass.left + margin);
+        await expect(box.right, `${where} right`).toBeLessThanOrEqual(glass.right - margin);
+      }
+    }
+  },
+};
