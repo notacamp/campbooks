@@ -427,6 +427,17 @@ With the built-in issuer:
   without asking again. Until Google verifies your app for the Gmail scope, people see
   Google's "unverified app" screen when they sign up. Publish the app (rather than leaving it
   in "Testing"): testing apps issue refresh tokens that expire after 7 days.
+- **An OAuth app that registered another callback path.** Google only accepts a
+  `redirect_uri` registered in the app, and the token request must repeat it. If the app
+  already has a different path (for example an earlier deployment's
+  `https://campbooks.example.com/oauth/gmail/callback`), set
+  `CAMPBOOKS_GOOGLE__REDIRECT_PATH=/oauth/gmail/callback` and make your reverse proxy
+  rewrite that path to `/auth/callback/google` (same query string). Campbooks then sends
+  the registered URI in both requests and keeps serving `/auth/callback/google`. Leave it
+  unset for a new OAuth app. Other providers follow the same pattern
+  (`CAMPBOOKS_<PROVIDER>__REDIRECT_PATH`, default `/auth/callback/<provider>`). The value
+  must be an absolute path with no host, query or fragment, or the server refuses to
+  start.
 - Accounts are linked to a Google account by its id, never by email address. Signing in
   with a Google account Campbooks doesn't know offers to create a new account.
 

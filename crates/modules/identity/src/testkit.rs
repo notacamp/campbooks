@@ -49,8 +49,9 @@ use crate::{
         Provider,
         client::{
             Endpoints, IssuerRule, MICROSOFT_ISSUER_PREFIX, MICROSOFT_ISSUER_SUFFIX, Server,
-            Upstream, default_callback_path,
+            Upstream,
         },
+        redirect_uri,
     },
 };
 
@@ -241,14 +242,19 @@ fn server_of(idp: &TestIdp) -> Server {
     }
 }
 
-/// The client of `provider`, talking to the fake `idp`.
-fn fake(provider: Provider, idp: &TestIdp, issuers: IssuerRule) -> Upstream {
+/// The client of `provider`, talking to the fake `idp`, registered with
+/// callback path `redirect_path` (the default when `None`).
+fn fake(
+    provider: Provider,
+    idp: &TestIdp,
+    issuers: IssuerRule,
+    redirect_path: Option<&str>,
+) -> Upstream {
     Upstream::new(
         provider,
         FAKE_GOOGLE_CLIENT.to_owned(),
         ClientSecret::Inline(SecretString::from(FAKE_GOOGLE_SECRET)),
-        ORIGIN,
-        &default_callback_path(provider),
+        redirect_uri(provider, ORIGIN, redirect_path).unwrap_or_else(|e| panic!("{e}")),
         Endpoints {
             authorize: Url::parse(&format!("{}oidc/authorize", idp.issuer()))
                 .unwrap_or_else(|e| panic!("{e}")),
@@ -290,6 +296,21 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
+        Self::build(db, policy, invited, None).await
+    }
+
+    /// A fresh world whose Google client was registered with the callback
+    /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
+    pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
+        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path)).await
+    }
+
+    async fn build(
+        db: PgPool,
+        policy: SignupPolicy,
+        invited: &[&str],
+        redirect_path: Option<&str>,
+    ) -> Self {
         let google = TestIdp::start().await;
         let microsoft = TestIdp::start().await;
         let zoho = TestIdp::start().await;
@@ -328,6 +349,7 @@ impl Kit {
                 Provider::Google,
                 &google,
                 IssuerRule::Fixed(server_of(&google)),
+                redirect_path,
             ),
             fake(
                 Provider::Microsoft,
@@ -339,11 +361,13 @@ impl Kit {
                     only: None,
                     except: None,
                 },
+                None,
             ),
             fake(
                 Provider::Zoho,
                 &zoho,
                 IssuerRule::Servers(vec![server_of(&zoho), server_of(&zoho_eu)]),
+                None,
             ),
         ];
         let intake = Arc::new(FakeIntake::default());

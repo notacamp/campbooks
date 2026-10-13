@@ -24,7 +24,8 @@ use crate::{
     domain::{clients::Clients, keys::Keys},
     upstream::{
         Provider,
-        client::{Endpoints, Upstream, default_callback_path},
+        client::{Endpoints, Upstream},
+        redirect_uri,
     },
     web::Cookies,
 };
@@ -233,28 +234,8 @@ fn upstream_client(
         Some(base) => Endpoints::under(provider, &base, &tenant)
             .map_err(|e| format!("{prefix}BASE_URL={base}: {e}"))?,
     };
-    let callback_path = match present(settings.redirect_path) {
-        None => default_callback_path(provider),
-        Some(path) if is_plain_path(&path) => path,
-        Some(path) => {
-            return Err(format!(
-                "{prefix}REDIRECT_PATH={path} must be an absolute path such as \
-                 /auth/callback/{}",
-                provider.as_str()
-            ));
-        }
-    };
-    Upstream::new(provider, client_id, secret, issuer, &callback_path, endpoints).map(Some)
-}
-
-/// `/`-rooted, not protocol-relative, no query, fragment, backslash or
-/// anything a URL would escape.
-fn is_plain_path(path: &str) -> bool {
-    path.starts_with('/')
-        && !path.starts_with("//")
-        && path
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b"/-_.~".contains(&b))
+    let redirect_uri = redirect_uri(provider, issuer, settings.redirect_path.as_deref())?;
+    Upstream::new(provider, client_id, secret, redirect_uri, endpoints).map(Some)
 }
 
 /// `scheme://host[:port]` of the public URL and whether it is `https`. The
@@ -419,24 +400,73 @@ mod tests {
     }
 
     #[test]
-    fn a_redirect_path_must_be_a_plain_path() {
+    fn microsoft_and_zoho_take_a_redirect_path_too() {
         let config = config("http://localhost:8080", None);
         let rails = deps_with(
             &config,
             KEY,
-            &serde_json::json!({ "zoho": { "client_id": "z", "client_secret": "s", "redirect_path": "/oauth/zoho/callback" } }),
+            &serde_json::json!({
+                "microsoft": { "client_id": "m", "client_secret": "s", "redirect_path": "/oauth/microsoft/callback" },
+                "zoho": { "client_id": "z", "client_secret": "s", "redirect_path": "/oauth/zoho/callback" },
+            }),
         )
         .unwrap();
-        let zoho = &rails.issuer.unwrap().upstreams[0];
-        assert!(format!("{zoho:?}").contains("http://localhost:8080/oauth/zoho/callback"));
-        for bad in ["https://evil.example.com/cb", "//evil.example.com", "/cb?x=1", "cb"] {
-            let err = deps_with(
+        let issuer = rails.issuer.unwrap();
+        let uris: Vec<&str> = issuer.upstreams.iter().map(Upstream::redirect_uri).collect();
+        assert_eq!(
+            uris,
+            [
+                "http://localhost:8080/oauth/microsoft/callback",
+                "http://localhost:8080/oauth/zoho/callback"
+            ]
+        );
+        let err = deps_with(
+            &config,
+            KEY,
+            &serde_json::json!({ "zoho": { "client_id": "z", "client_secret": "s", "redirect_path": "//evil.example.com" } }),
+        )
+        .unwrap_err();
+        assert!(err.contains("CAMPBOOKS_ZOHO__REDIRECT_PATH"), "{err}");
+    }
+
+    #[test]
+    fn the_google_redirect_path_defaults_and_is_validated_at_load() {
+        let config = config("https://app.example.com", None);
+        let redirect = |path: serde_json::Value| {
+            deps(
                 &config,
                 KEY,
-                &serde_json::json!({ "microsoft": { "client_id": "m", "client_secret": "s", "redirect_path": bad } }),
+                &serde_json::json!({ "client_id": "g", "client_secret": "s", "redirect_path": path }),
             )
-            .unwrap_err();
-            assert!(err.contains("CAMPBOOKS_MICROSOFT__REDIRECT_PATH"), "{bad}: {err}");
+            .map(|deps| deps.issuer.unwrap().upstreams[0].redirect_uri().to_owned())
+        };
+        assert_eq!(
+            redirect(serde_json::Value::Null).unwrap(),
+            "https://app.example.com/auth/callback/google"
+        );
+        assert_eq!(
+            redirect(serde_json::json!("")).unwrap(),
+            "https://app.example.com/auth/callback/google"
+        );
+        assert_eq!(
+            redirect(serde_json::json!("/oauth/gmail/callback")).unwrap(),
+            "https://app.example.com/oauth/gmail/callback"
+        );
+        for bad in [
+            "oauth/gmail/callback",
+            "https://evil.example.com/cb",
+            "//evil.example.com/cb",
+            "/cb?x=1",
+            "/cb#frag",
+            "/a/../cb",
+            "/a b",
+            "/a\\b",
+        ] {
+            let err = redirect(serde_json::json!(bad)).unwrap_err();
+            assert!(
+                err.contains("CAMPBOOKS_GOOGLE__REDIRECT_PATH"),
+                "{bad}: {err}"
+            );
         }
     }
 

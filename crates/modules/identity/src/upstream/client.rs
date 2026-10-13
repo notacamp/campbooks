@@ -54,12 +54,6 @@ pub const ZOHO_ACCOUNTS_SERVERS: [&str; 8] = [
     "https://accounts.zoho.uk",
 ];
 
-/// The path a provider redirects back to, under the issuer, unless the
-/// install registered another (`CAMPBOOKS_<P>__REDIRECT_PATH`).
-pub fn default_callback_path(provider: Provider) -> String {
-    format!("/auth/callback/{}", provider.as_str())
-}
-
 fn parse(url: &str) -> Url {
     Url::parse(url).unwrap_or_else(|e| unreachable!("{url}: {e}"))
 }
@@ -352,15 +346,14 @@ pub struct SignedIn {
 }
 
 impl Upstream {
-    /// `provider`'s client `client_id` with `secret`, redirecting to
-    /// `callback_path` under `issuer` (this instance's origin), talking to
-    /// `endpoints`.
+    /// `provider`'s client `client_id` with `secret`, sending `redirect_uri`
+    /// (see [`super::redirect_uri`]) in both the authorization request and
+    /// the code exchange, talking to `endpoints`.
     pub fn new(
         provider: Provider,
         client_id: String,
         secret: ClientSecret,
-        issuer: &str,
-        callback_path: &str,
+        redirect_uri: String,
         endpoints: Endpoints,
     ) -> Result<Self, String> {
         let http = reqwest::Client::builder()
@@ -400,7 +393,7 @@ impl Upstream {
         Ok(Self {
             provider,
             http,
-            redirect_uri: format!("{issuer}{callback_path}"),
+            redirect_uri,
             client_id,
             secret,
             authorize: endpoints.authorize,
@@ -411,6 +404,11 @@ impl Upstream {
     /// The provider.
     pub fn provider(&self) -> Provider {
         self.provider
+    }
+
+    /// The `redirect_uri` sent to the provider.
+    pub fn redirect_uri(&self) -> &str {
+        &self.redirect_uri
     }
 
     /// The URL the browser is sent to.
@@ -687,8 +685,7 @@ mod tests {
             provider,
             "client".to_owned(),
             ClientSecret::Inline(SecretString::from("secret")),
-            "https://app.example.com",
-            &default_callback_path(provider),
+            super::super::redirect_uri(provider, "https://app.example.com", None).unwrap(),
             endpoints,
         )
         .unwrap()
