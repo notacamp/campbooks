@@ -85,6 +85,11 @@ export {
   MetaLine,
   type MessageCardProps,
 } from "./components/Message/Message";
+export {
+  MessageComposer,
+  type ComposerAttachment,
+  type MessageComposerProps,
+} from "./components/MessageComposer/MessageComposer";
 export { NavItem, type NavItemProps } from "./components/NavItem/NavItem";
 export {
   Note,
@@ -113,6 +118,13 @@ export {
   type PageHeroProps,
   type QueueGroupProps,
 } from "./components/Queue/Queue";
+export {
+  isEmailAddress,
+  parseRecipients,
+  RecipientField,
+  type Recipient,
+  type RecipientFieldProps,
+} from "./components/RecipientField/RecipientField";
 export {
   Segmented,
   type SegmentedOption,

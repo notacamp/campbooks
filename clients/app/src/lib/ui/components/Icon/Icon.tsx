@@ -82,6 +82,20 @@ const ICONS = {
     path("M15.5 8.5V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7.5a2 2 0 0 0 2 2h2.5"),
   ],
   "chevron-up-down": [path("m8 9.5 4-4 4 4M8 14.5l4 4 4-4")],
+  send: [path("M4.5 12 20 4.5 15.5 20l-3.5-6.5Z"), path("M12 13.5 20 4.5")],
+  bold: [path("M7.5 5h5.25a3.5 3.5 0 0 1 0 7H7.5Zm0 7h6.25a3.5 3.5 0 0 1 0 7H7.5Z")],
+  italic: [path("M10.5 5H18M6 19h7.5M14.5 5l-5 14")],
+  bullets: [
+    path("M10 7h10M10 12h10M10 17h10"),
+    <circle key="a" cx="5.5" cy="7" r="1" />,
+    <circle key="b" cx="5.5" cy="12" r="1" />,
+    <circle key="c" cx="5.5" cy="17" r="1" />,
+  ],
+  numbers: [
+    path(
+      "M10.5 7H20M10.5 12H20M10.5 17H20M4.5 5.5 6 4.5v5M4.5 14.5a1.5 1.5 0 1 1 2.5 1.1L4.5 19.5H7",
+    ),
+  ],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

@@ -55,5 +55,34 @@
   },
   "navigation": {
     "main": "Principal"
+  },
+  "recipients": {
+    "list": "Destinatarios en {{label}}",
+    "remove": "Quitar a {{name}}",
+    "invalid": "Esto no es una dirección de correo: {{address}}"
+  },
+  "composer": {
+    "from": "De",
+    "to": "Para",
+    "cc": "Cc",
+    "bcc": "Cco",
+    "copies": "Cc Cco",
+    "subject": "Asunto",
+    "body": "Mensaje",
+    "formatting": "Formato",
+    "format": {
+      "bold": "Negrita",
+      "italic": "Cursiva",
+      "bullets": "Lista con viñetas",
+      "numbers": "Lista numerada"
+    },
+    "showQuoted": "Mostrar texto citado",
+    "hideQuoted": "Ocultar texto citado",
+    "quoted": "Texto citado",
+    "attachments": "Archivos adjuntos",
+    "removeAttachment": "Quitar {{name}}",
+    "discard": "Descartar",
+    "send": "Enviar",
+    "close": "Cerrar"
   }
 }
