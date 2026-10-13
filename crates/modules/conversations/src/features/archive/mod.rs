@@ -11,7 +11,7 @@ use crate::{
     domain::paths::ConversationPath,
     domain::{
         conversation::ConversationSummary,
-        flags::{Flag, apply},
+        flags::{self, Flag},
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -49,7 +49,7 @@ pub async fn archive(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Archive)
+    flags::apply(&state, &workspace.access, id, Flag::Archive)
         .await
         .map(Json)
 }
@@ -86,7 +86,7 @@ pub async fn unarchive(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Unarchive)
+    flags::apply(&state, &workspace.access, id, Flag::Unarchive)
         .await
         .map(Json)
 }

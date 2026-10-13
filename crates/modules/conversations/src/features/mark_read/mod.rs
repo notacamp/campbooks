@@ -11,7 +11,7 @@ use crate::{
     domain::paths::ConversationPath,
     domain::{
         conversation::ConversationSummary,
-        flags::{Flag, apply},
+        flags::{self, Flag},
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -49,7 +49,7 @@ pub async fn read(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Read)
+    flags::apply(&state, &workspace.access, id, Flag::Read)
         .await
         .map(Json)
 }
@@ -86,7 +86,7 @@ pub async fn unread(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Unread)
+    flags::apply(&state, &workspace.access, id, Flag::Unread)
         .await
         .map(Json)
 }

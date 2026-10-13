@@ -1261,3 +1261,111 @@ fn errors_are_truncated() {
     assert_eq!(truncate_error(&long).chars().count(), MAX_ERROR_LEN + 1);
     assert_eq!(truncate_error("short"), "short");
 }
+
+// --- workspace isolation of the kernel's tables (campbooks-cloud#117) ---------
+
+/// An event of workspace `workspace`, with one change for the feed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Touched {
+    workspace: String,
+}
+
+impl DomainEvent for Touched {
+    const NAME: &'static str = "test.touched";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<crate::changes::Change> {
+        vec![crate::changes::Change::upsert(crate::RecordRef::new(
+            "test.thing",
+            "t-1",
+        ))]
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_transaction_sees_and_writes_only_its_kernel_rows(db: PgPool) {
+    use crate::{db::BeginFor as _, tenancy::WorkspaceId};
+
+    let pool = crate::testing::app_role_pool(&db).await;
+    let state = crate::testing::state(pool.clone());
+    let (ana, bea) = (WorkspaceId::new(), WorkspaceId::new());
+    for workspace in [ana, bea] {
+        let mut tx = pool.begin_for(workspace).await.unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Touched {
+                    workspace: workspace.to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        crate::jobs::enqueue(
+            &mut tx,
+            &Probe::default(),
+            EnqueueOptions::for_workspace(workspace.to_string()),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    // In Ana's transaction, the event log, the queue and the feed show
+    // Ana's rows only.
+    let mut tx = pool.begin_for(ana).await.unwrap();
+    for (table, sql) in [
+        ("events", "SELECT DISTINCT workspace_id FROM kernel.events"),
+        ("jobs", "SELECT DISTINCT workspace_id FROM kernel.jobs"),
+        ("changes", "SELECT DISTINCT workspace_id FROM kernel.changes"),
+    ] {
+        let workspaces: Vec<Option<String>> = sqlx::query_scalar(sql)
+            .fetch_all(&mut *tx)
+            .await
+            .unwrap();
+        assert!(
+            workspaces
+                .iter()
+                .all(|w| w.as_deref().is_none_or(|w| w == ana.to_string())),
+            "{table}: {workspaces:?}"
+        );
+        assert!(!workspaces.is_empty(), "{table}");
+    }
+    // Publishing Bea's event from Ana's transaction is refused.
+    let refused = state
+        .events
+        .publish(
+            &mut tx,
+            &Touched {
+                workspace: bea.to_string(),
+            },
+        )
+        .await;
+    assert!(
+        matches!(refused, Err(sqlx::Error::InvalidArgument(_))),
+        "{refused:?}"
+    );
+    tx.rollback().await.unwrap();
+    // And row-level security refuses a forged row even without the check.
+    let mut tx = pool.begin_for(ana).await.unwrap();
+    let forged = sqlx::query(
+        "INSERT INTO kernel.changes (workspace_id, event_id, record_type, record_id, op)
+         VALUES ($1, kernel.uuid_v7(), 'test.thing', 't-2', 'upsert')",
+    )
+    .bind(bea.to_string())
+    .execute(&mut *tx)
+    .await;
+    assert!(forged.is_err(), "{forged:?}");
+    tx.rollback().await.unwrap();
+
+    // The kernel's own machinery (no workspace set) sees both.
+    let both: i64 = sqlx::query_scalar("SELECT count(DISTINCT workspace_id) FROM kernel.changes")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(both, 2);
+}

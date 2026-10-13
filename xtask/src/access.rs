@@ -137,7 +137,12 @@ pub fn check_authorize_calls(
         let tenancy = catalogue
             .get(resource)
             .map_or("", |declared| declared.tenancy.as_str());
-        if !matches!(tenancy, "workspace" | "account") {
+        // Public operations (`security(())`) authenticate what they act on
+        // themselves (a code, a verifier, an ID token hint).
+        let public = operation["security"]
+            .as_array()
+            .is_some_and(|reqs| reqs.iter().any(|r| r.as_object().is_some_and(serde_json::Map::is_empty)));
+        if !matches!(tenancy, "workspace" | "account") || public {
             continue;
         }
         if let Some(entry) = pending.get(id) {
@@ -150,9 +155,9 @@ pub fn check_authorize_calls(
             continue;
         }
         let declaration = format!("operation_id = \"{id}\"");
-        let declaring = sources
-            .iter()
-            .find(|(_, text)| text.contains(&declaration) || declares_by_macro(text, id));
+        let declaring = sources.iter().find(|(path, text)| {
+            !is_test_file(path) && (text.contains(&declaration) || declares_by_macro(text, id))
+        });
         let Some((path, text)) = declaring else {
             violations.push(format!(
                 "operation `{name}` (`{id}`): no source file declares it"
@@ -160,8 +165,7 @@ pub fn check_authorize_calls(
             continue;
         };
         let code = without_tests(text);
-        let asks = code.contains("authz::")
-            || AUTHORIZE_CALL.is_match(code)
+        let asks = AUTHORIZE_CALL.is_match(code)
             || file.helpers.iter().any(|helper| code.contains(helper.as_str()));
         if !asks {
             violations.push(format!(
@@ -185,7 +189,9 @@ pub fn check_authorize_calls(
 
 /// A call to an authorize function: `authorize(`, `authorize_type(`, …
 static AUTHORIZE_CALL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"\bauthorize(_type|_account)?\s*\(")
+    Regex::new(
+        r"\b(authz::(require|require_type|require_account|decide)|authorize(_type|_account)?)\s*\(",
+    )
         .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
 
@@ -196,7 +202,7 @@ fn declares_by_macro(text: &str, id: &str) -> bool {
 
 /// The code before the file's test module (by convention its last item).
 fn without_tests(text: &str) -> &str {
-    text.find("#[cfg(test)]\nmod tests")
+    text.find("#[cfg(test)]\nmod tests {")
         .map_or(text, |at| &text[..at])
 }
 
@@ -226,10 +232,14 @@ pub fn workspace_tables(migrations: &[(String, String)]) -> BTreeSet<String> {
         Regex::new(r"(?is)alter\s+table\s+([a-z_]+\.[a-z_]+)\s+add\s+column\s+workspace_id\b")
             .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
+    static COLUMN: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?m)^\s*workspace_id\s")
+            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+    });
     let mut tables = BTreeSet::new();
     for (_, sql) in migrations {
         for caps in CREATE.captures_iter(sql) {
-            if caps[2].contains("workspace_id") {
+            if COLUMN.is_match(&caps[2]) {
                 tables.insert(caps[1].to_lowercase());
             }
         }
@@ -264,7 +274,12 @@ pub fn check_workspace_queries(
             .iter()
             .any(|entry| path == entry.path || (entry.path.ends_with('/') && path.starts_with(&entry.path)))
     };
-    let mut violations = Vec::new();
+    let mut violations: Vec<String> = file
+        .pool_access
+        .iter()
+        .filter(|entry| entry.reason.trim().is_empty())
+        .map(|entry| format!("architecture.toml: pool access `{}` needs a reason", entry.path))
+        .collect();
     for (path, text) in sources {
         if !path.starts_with("crates/modules/") || is_test_file(path) || allowed(path) {
             continue;
@@ -406,6 +421,9 @@ mod tests {
         let file = AccessFile::default();
         let src = |text: &str| vec![("crates/modules/mail/src/list.rs".to_owned(), text.to_owned())];
         assert_eq!(check_authorize_calls(&s, &c, &src(declared), &file).len(), 1);
+        // Naming the action in `x-campbooks` is not asking.
+        let named = format!("{declared}// .access(\"mail.thread\", authz::Action::Read)\n");
+        assert_eq!(check_authorize_calls(&s, &c, &src(&named), &file).len(), 1);
         let asking = format!("{declared}fn h() {{ authz::require_type(); }}\n");
         assert!(check_authorize_calls(&s, &c, &src(&asking), &file).is_empty());
         // A call inside the test module does not count.
@@ -438,7 +456,7 @@ mod tests {
     #[test]
     fn workspace_tables_come_from_the_migrations() {
         let sql = "CREATE TABLE mail.threads (\n    id uuid,\n    workspace_id uuid NOT NULL\n);\n\
-                   CREATE TABLE mail.budgets (\n    provider text\n);\n";
+                   CREATE TABLE mail.budgets (\n    provider text,\n    target_workspace_id uuid\n);\n";
         let tables = workspace_tables(&[("1_mail__init.sql".to_owned(), sql.to_owned())]);
         assert_eq!(tables, BTreeSet::from(["mail.threads".to_owned()]));
     }
