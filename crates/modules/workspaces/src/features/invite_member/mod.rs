@@ -14,6 +14,7 @@ use campbooks_kernel::{
     extract,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -22,7 +23,8 @@ use crate::MESSAGES;
 
 use crate::{
     domain::{
-        access::{acting_manager, lock_workspace},
+        access::{acting_user, authorize_type, lock_workspace},
+        resources::INVITATION_RECORD,
         invitation::{self, InvitationView, VALIDITY},
         model::InvitationId,
         security::{self, SecurityKind},
@@ -86,7 +88,7 @@ fn accept_url(public_url: &str, token: &str) -> String {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Emails another person and grants access once accepted.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"]).access("workspaces.invitation", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = InviteMember,
     responses(
@@ -123,7 +125,8 @@ pub async fn handler(
 
 /// Invite `input.email` to the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> Result<Issued> {
-    let (actor, _) = acting_manager(access)?;
+    let (actor, _) = acting_user(access)?;
+    authorize_type(state, access, Action::Write, INVITATION_RECORD)?;
     if input.role == Role::Owner {
         return Err(Error::BadRequest(MESSAGES.reason("invalid_role")));
     }

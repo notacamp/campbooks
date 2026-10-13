@@ -71,7 +71,7 @@ pub struct NewDraft {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.delete_draft")
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.inbox", campbooks_kernel::authz::Action::Send)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = NewDraft,
     responses(

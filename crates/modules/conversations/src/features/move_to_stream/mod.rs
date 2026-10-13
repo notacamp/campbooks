@@ -47,7 +47,7 @@ pub struct MoveToStream {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .automation()
         .assistant()
-        .records(["conversations.conversation", "conversations.correction"])))),
+        .records(["conversations.conversation", "conversations.correction"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),

@@ -43,7 +43,7 @@ pub struct AcceptInvitation {
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
     // Accepting an invitation is the invitee's own act; not for rules or the assistant.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.invitation", "workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.invitation", "workspaces.member"]).access("workspaces.account", campbooks_kernel::authz::Action::Write)))),
     request_body = AcceptInvitation,
     responses(
         (status = OK, description = "You are a member; the workspace with your role.",
@@ -66,6 +66,13 @@ pub async fn handler(
     Scoped { principal, .. }: Scoped<WorkspacesWrite>,
     extract::Json(input): extract::Json<AcceptInvitation>,
 ) -> Result<Json<WorkspaceView>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        crate::domain::resources::ACCOUNT_RECORD,
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     execute(&state, &principal, input).await.map(Json)
 }
 

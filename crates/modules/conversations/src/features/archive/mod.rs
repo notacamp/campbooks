@@ -28,7 +28,7 @@ use crate::{
         .undo("conversations.unarchive")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -65,7 +65,7 @@ pub async fn archive(
         .undo("conversations.archive")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),

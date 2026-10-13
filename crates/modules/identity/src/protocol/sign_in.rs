@@ -98,7 +98,7 @@ pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
     path = "/auth/requests/{id}",
     tag = "identity",
     operation_id = "identity.get_sign_in_request",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     params(("id" = String, Path, description = "The `request` the sign-in screen was given.")),
     security(()),
     responses(
@@ -173,7 +173,7 @@ async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bo
     path = "/auth/start/{provider}",
     tag = "identity",
     operation_id = "identity.start_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         StartQuery,
@@ -323,7 +323,7 @@ pub struct CallbackQuery {
     path = "/auth/callback/{provider}",
     tag = "identity",
     operation_id = "identity.finish_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         CallbackQuery,
@@ -743,7 +743,7 @@ pub struct NewAccount {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.get_new_account",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The pending account.", body = NewAccount),
@@ -783,7 +783,7 @@ pub struct Created {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.create_account",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     security(()),
     responses(

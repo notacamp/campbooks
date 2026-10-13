@@ -55,7 +55,7 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
     path = "/.well-known/openid-configuration",
     tag = "identity",
     operation_id = "identity.openid_configuration",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The issuer's metadata.", body = Object),
@@ -72,7 +72,7 @@ pub async fn openid_configuration(State(ctx): State<Ctx>) -> Result<Json<serde_j
     path = "/.well-known/oauth-authorization-server",
     tag = "identity",
     operation_id = "identity.authorization_server_metadata",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The issuer's metadata.", body = Object),
@@ -92,7 +92,7 @@ pub async fn authorization_server_metadata(
     path = "/oauth2/jwks",
     tag = "identity",
     operation_id = "identity.jwks",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.signing_key"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.signing_key"]).access("identity.signing_key", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The JWKS.", body = Object),

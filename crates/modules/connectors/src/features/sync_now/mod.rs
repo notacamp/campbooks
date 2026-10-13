@@ -8,7 +8,8 @@ use axum::{
     http::StatusCode,
 };
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Operation, Problem, RecordRef, Result, Risk,
+    authz::{self, Action},
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
@@ -23,6 +24,7 @@ use crate::{
         model::{ConnectionId, ConnectionPath, Health, StreamId},
         schedule,
     },
+    events::CONNECTION_RECORD,
     scopes::ConnectorsWrite,
 };
 
@@ -40,7 +42,7 @@ pub struct SyncScheduled {
     operation_id = "connectors.sync_now",
     tag = "connectors",
     security(("bearer" = ["connectors:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["connectors.connection"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).automation().assistant().records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("connection_id" = ConnectionId, Path, description = "The connection."),
@@ -77,10 +79,16 @@ pub async fn execute(
 ) -> Result<SyncScheduled> {
     let now = deps.clock.now();
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let connection = connections::load(&mut tx, id)
-        .await?
-        .filter(|c| connections::visible(access, c.granted_by))
-        .ok_or(Error::NotFound)?;
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Write,
+        &RecordRef::new(CONNECTION_RECORD, &id),
+        || Error::Forbidden,
+    )
+    .await?;
+    let connection = connections::load(&mut tx, id).await?.ok_or(Error::NotFound)?;
     if connection.health == Health::NeedsReauth {
         return Err(Error::Conflict(MESSAGES.reason("needs_reauth")));
     }

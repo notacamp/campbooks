@@ -49,7 +49,7 @@ pub struct DraftList {
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         DraftFilter,
@@ -103,7 +103,7 @@ pub async fn list(
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),

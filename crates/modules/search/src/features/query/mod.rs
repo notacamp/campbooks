@@ -194,7 +194,7 @@ pub struct SearchResults {
     operation_id = "search.query",
     tag = "search",
     security(("bearer" = ["search:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["search.result"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["search.result"]).access("search.result", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), SearchParams),
     responses(
         (status = OK, description = "A page of results.", body = SearchResults),

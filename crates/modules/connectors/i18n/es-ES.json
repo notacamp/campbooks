@@ -12,6 +12,7 @@
     "account_connected_by_another_member": "Otro miembro de este espacio de trabajo ya ha conectado esta cuenta.",
     "needs_reauth": "Esta conexión necesita que vuelvas a conectar la cuenta antes de poder sincronizar.",
     "unknown_data_centre": "Campbooks no reconoce el centro de datos de Zoho de esta cuenta. Consulta a tu administrador.",
-    "no_mailbox": "Esta cuenta no tiene ningún buzón que Campbooks pueda leer."
+    "no_mailbox": "Esta cuenta no tiene ningún buzón que Campbooks pueda leer.",
+    "disconnect_owner_only": "Solo el miembro que conectó esta cuenta puede desconectarla."
   }
 }

@@ -39,6 +39,7 @@ pub mod events;
 mod features;
 pub mod protocol;
 mod prune;
+mod resources;
 pub mod scopes;
 pub mod upstream;
 mod web;
@@ -70,6 +71,7 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
             .schedule::<Prune>(PRUNE_EVERY),
+        resources: resources::resources(),
     }
 }
 

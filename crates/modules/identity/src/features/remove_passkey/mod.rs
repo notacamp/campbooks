@@ -26,7 +26,7 @@ use crate::{
     operation_id = "identity.remove_passkey",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.passkey"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.passkey"]).access("identity.passkey", campbooks_kernel::authz::Action::Delete)))),
     params(("id" = uuid::Uuid, Path, description = "The passkey.")),
     responses(
         (status = NO_CONTENT, description = "Removed; the sessions signed in with it ended. \
@@ -48,6 +48,13 @@ pub async fn handler(
     Scoped { principal, .. }: Scoped<IdentityWrite>,
     Path(path): Path<PasskeyPath>,
 ) -> Result<StatusCode> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Delete,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let now = issuer.now();
     step_up::require_recent(&principal, now)?;

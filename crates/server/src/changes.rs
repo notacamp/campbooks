@@ -69,7 +69,7 @@ pub struct StreamQuery {
     operation_id = "changes.stream",
     tag = "changes",
     security(("bearer" = ["workspaces:read"])),
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("changes.feed", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("Last-Event-ID" = Option<String>, Header,

@@ -7,11 +7,15 @@ use campbooks_kernel::{
     db::BeginFor as _,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{access::acting_manager, invitation::InvitationView, model::InvitationId},
+    domain::{
+        access::authorize_type, invitation::InvitationView, model::InvitationId,
+        resources::INVITATION_RECORD,
+    },
     scopes::WorkspacesAdmin,
 };
 
@@ -29,7 +33,7 @@ pub struct InvitationList {
     operation_id = "workspaces.list_invitations",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.invitation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.invitation"]).access("workspaces.invitation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "Pending invitations.", body = InvitationList),
@@ -50,7 +54,7 @@ pub async fn handler(
 
 /// The pending invitations of the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access) -> Result<InvitationList> {
-    acting_manager(access)?;
+    authorize_type(state, access, Action::Read, INVITATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let rows = sqlx::query!(
         r#"SELECT id AS "id: InvitationId", email, role, invited_by AS "invited_by: UserId",

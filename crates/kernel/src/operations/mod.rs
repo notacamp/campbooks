@@ -21,7 +21,7 @@
 //!         .undo("conversations.unarchive")
 //!         .automation()
 //!         .assistant()
-//!         .records(["conversations.thread"])))),
+//!         .records(["conversations.thread"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
 //!     responses(…),
 //! )]
 //! pub async fn handler(…) -> Result<…> { … }

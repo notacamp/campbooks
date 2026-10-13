@@ -54,7 +54,7 @@ pub struct CreateWorkspace {
     operation_id = "workspaces.create",
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace", "workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace", "workspaces.member"]).access("workspaces.account", campbooks_kernel::authz::Action::Write)))),
     request_body = CreateWorkspace,
     responses(
         (status = CREATED, description = "Created; you are its owner.", body = WorkspaceView),
@@ -72,6 +72,13 @@ pub async fn handler(
     Scoped { principal, .. }: Scoped<WorkspacesWrite>,
     extract::Json(input): extract::Json<CreateWorkspace>,
 ) -> Result<(StatusCode, Json<WorkspaceView>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        crate::domain::resources::ACCOUNT_RECORD,
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let view = execute(&state, &principal, input).await?;
     Ok((StatusCode::CREATED, Json(view)))
 }

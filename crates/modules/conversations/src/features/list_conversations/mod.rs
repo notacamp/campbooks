@@ -62,7 +62,7 @@ pub struct ConversationList {
     operation_id = "conversations.list",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "A page of conversations.", body = ConversationList),

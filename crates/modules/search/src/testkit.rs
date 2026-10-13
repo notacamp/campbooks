@@ -62,7 +62,7 @@ impl ScopeName for ConversationsRead {
     path = "/api/v1/test/conversations",
     operation_id = "conversations.list",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     responses((status = OK, description = "Nothing."))
 )]
 async fn list_conversations(_: Scoped<ConversationsRead>) -> Json<()> {

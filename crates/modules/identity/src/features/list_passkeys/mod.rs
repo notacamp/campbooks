@@ -56,7 +56,7 @@ pub struct Passkeys {
     operation_id = "identity.list_passkeys",
     tag = "identity",
     security(("bearer" = ["identity:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.passkey"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.passkey"]).access("identity.passkey", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The caller's passkeys.", body = Passkeys),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -72,6 +72,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Scoped { principal, .. }: Scoped<IdentityRead>,
 ) -> Result<Json<Passkeys>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Read,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (_, account) = super::account(&deps, &principal)?;
     let items = passkeys::list(&state.db, account)
         .await?

@@ -11,15 +11,17 @@ use super::{
     access::{keep_an_owner, lock_workspace, role_of},
     security::{self, SecurityKind},
 };
-use crate::events::MemberLeft;
+use crate::events::{MailChoice, MemberLeft};
 
 /// Who is acting on a departure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Departure {
-    /// The member leaves.
+    /// The member leaves: the mail of the mailboxes they connected is
+    /// deleted.
     Leave,
-    /// A manager (with their role) removes the member.
-    RemovedBy(UserId, Role),
+    /// A manager (with their role) removes the member, deleting or keeping
+    /// their mail.
+    RemovedBy(UserId, Role, MailChoice),
 }
 
 /// Take `member` out of `workspace`. Refuses to remove the last owner (409
@@ -35,7 +37,7 @@ pub async fn depart(
     let role = role_of(&mut tx, workspace, member)
         .await?
         .ok_or(Error::NotFound)?;
-    if let Departure::RemovedBy(_, actor_role) = how
+    if let Departure::RemovedBy(_, actor_role, _) = how
         && role == Role::Owner
         && actor_role != Role::Owner
     {
@@ -49,16 +51,18 @@ pub async fn depart(
     )
     .execute(&mut *tx)
     .await?;
-    let (actor, kind, removed_by) = match how {
-        Departure::Leave => (member, SecurityKind::MemberLeft, None),
-        Departure::RemovedBy(actor, _) => (actor, SecurityKind::MemberRemoved, Some(actor)),
+    let (actor, kind, removed_by, mail) = match how {
+        Departure::Leave => (member, SecurityKind::MemberLeft, None, MailChoice::Delete),
+        Departure::RemovedBy(actor, _, mail) => {
+            (actor, SecurityKind::MemberRemoved, Some(actor), mail)
+        }
     };
     security::record(
         &mut tx,
         Some(workspace),
         Some(actor),
         kind,
-        serde_json::json!({ "member": member, "role": role }),
+        serde_json::json!({ "member": member, "role": role, "mail": mail }),
     )
     .await?;
     state
@@ -69,6 +73,7 @@ pub async fn depart(
                 workspace: workspace.to_string(),
                 user: member,
                 removed_by,
+                mail,
             },
         )
         .await?;

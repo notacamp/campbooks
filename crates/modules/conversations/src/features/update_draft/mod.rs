@@ -66,7 +66,7 @@ pub struct DraftChanges {
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),
@@ -166,7 +166,7 @@ pub async fn update(
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Delete)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),

@@ -50,7 +50,7 @@ pub struct StreamCounts {
     operation_id = "conversations.list_streams",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), StreamsQuery),
     responses(
         (status = OK, description = "The streams.", body = StreamCounts),

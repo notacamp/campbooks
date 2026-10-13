@@ -217,6 +217,7 @@ impl AppState {
     /// The same state, publishing to (and running the work of) `registry`.
     #[must_use]
     pub fn with_registry(mut self, registry: Registry) -> Self {
+        self.resources = registry.resources().clone();
         self.events = EventBus::new(Arc::new(registry));
         self
     }

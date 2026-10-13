@@ -7,10 +7,12 @@ use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk,
     tenancy::{Access, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::db::BeginFor as _;
 
 use crate::{
     domain::{
-        access::acting_user,
+        access::{acting_user, authorize, member_resource},
         departure::{Departure, depart},
     },
     scopes::WorkspacesWrite,
@@ -23,7 +25,7 @@ use crate::{
     operation_id = "workspaces.leave",
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"]).access("workspaces.member", campbooks_kernel::authz::Action::Delete)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = NO_CONTENT, description = "You are no longer a member."),
@@ -48,6 +50,9 @@ pub async fn handler(
 /// The user of `access` leaves its workspace.
 pub async fn execute(state: &AppState, access: &Access) -> Result<()> {
     let (user, _) = acting_user(access)?;
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    authorize(state, &mut tx, access, Action::Delete, &member_resource(user)).await?;
+    tx.commit().await?;
     depart(state, access.workspace, user, Departure::Leave).await
 }
 
@@ -74,6 +79,7 @@ mod tests {
         );
         let payload = kit.last_event_payload(&ws.to_string()).await;
         assert_eq!(payload["removed_by"], serde_json::Value::Null);
+        assert_eq!(payload["mail"], "delete");
         assert_eq!(
             kit.security_kinds(&ws.to_string()).await.last().unwrap(),
             "member_left"

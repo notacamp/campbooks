@@ -53,7 +53,7 @@ pub struct SendSettings {
     extensions(("x-campbooks" = json!(Operation::command(Risk::High)
         .undo("conversations.cancel_send")
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Send)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),
@@ -156,7 +156,7 @@ pub async fn send(
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),

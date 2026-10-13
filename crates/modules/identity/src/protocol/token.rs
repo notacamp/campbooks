@@ -122,7 +122,7 @@ fn authenticate<'a>(
     path = "/oauth2/token",
     tag = "identity",
     operation_id = "identity.token",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Write)))),
     request_body(content = TokenForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(
@@ -263,7 +263,7 @@ async fn refused(
     path = "/oauth2/revoke",
     tag = "identity",
     operation_id = "identity.revoke",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Delete)))),
     request_body(content = RevokeForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(

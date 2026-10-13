@@ -1,6 +1,7 @@
 //! `connectors.revoke_departed_grants` ← `workspaces.member_left`: a grant
 //! is personal, so the connections a departing member granted in that
-//! workspace are disconnected and revoked.
+//! workspace are disconnected and revoked. Their mail is deleted, unless the
+//! owner or admin who removed them chose to keep it read-only (`mail`).
 
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError,
@@ -52,7 +53,7 @@ impl EventConsumer for RevokeDepartedGrants {
         }
         let tx = ctx.tx().await?;
         for id in granted {
-            removal::delete(tx, &state, workspace, id).await?;
+            removal::delete(tx, &state, workspace, id, event.payload.mail).await?;
         }
         Ok(())
     }

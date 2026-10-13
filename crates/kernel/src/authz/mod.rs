@@ -152,6 +152,8 @@ pub enum Grantee {
     Clients,
     /// Instance administrators (the admin API; never the main API).
     InstanceAdmins,
+    /// Anyone, signed in or not ([`Tenancy::Public`] resources only).
+    Anyone,
 }
 
 /// Actions given to someone besides the owner.
@@ -481,6 +483,7 @@ fn allowed(catalogue: &Catalogue, declared: &ResourceType, access: &Access, fact
             Grantee::Clients => access.user.is_none(),
             // The main API never admits an administrator as one.
             Grantee::InstanceAdmins => false,
+            Grantee::Anyone => true,
         };
         if applies {
             actions.extend(grant.actions);
@@ -577,10 +580,9 @@ pub fn authorize_type(
     };
     let possible = |grant: &Grant| grant.actions.contains(&action);
     let allowed = match access.user {
-        None => declared
-            .grants
-            .iter()
-            .any(|grant| grant.to == Grantee::Clients && possible(grant)),
+        None => declared.grants.iter().any(|grant| {
+            matches!(grant.to, Grantee::Clients | Grantee::Anyone) && possible(grant)
+        }),
         Some(_) => {
             let by_owner = match declared.owner {
                 Owner::Member | Owner::Account => declared.owner_actions.contains(&action),
@@ -597,6 +599,7 @@ pub fn authorize_type(
                                 .role
                                 .is_some_and(|role| workspace_rank(role) >= workspace_rank(min)),
                             Grantee::ContainerRole(_) | Grantee::OwnerWithContainerRole(_) => true,
+                            Grantee::Anyone => true,
                             Grantee::Clients | Grantee::InstanceAdmins => false,
                         }
                 })
@@ -621,6 +624,57 @@ pub fn require_type(
     forbidden: impl FnOnce() -> Error,
 ) -> Result<(), Error> {
     match authorize_type(&state.resources, access, action, resource_type) {
+        Decision::Allow => Ok(()),
+        Decision::NotFound => Err(Error::NotFound),
+        Decision::Forbidden => Err(forbidden()),
+    }
+}
+
+/// Whether `principal` may take `action` on its own resources of
+/// `resource_type`, an [`Tenancy::Account`] type (their ways in, the
+/// workspaces they belong to): a user takes the owner's actions on what is
+/// theirs (the owning module answers only the caller's own records); a
+/// client token only what a [`Grantee::Clients`] grant lists.
+pub fn authorize_account(
+    catalogue: &Catalogue,
+    principal: &crate::auth::Principal,
+    action: Action,
+    resource_type: &str,
+) -> Decision {
+    let Some(declared) = catalogue
+        .get(resource_type)
+        .filter(|declared| declared.tenancy == Tenancy::Account)
+    else {
+        return Decision::NotFound;
+    };
+    let allowed = match principal.kind {
+        crate::auth::PrincipalKind::User => {
+            declared.owner == Owner::Account && declared.owner_actions.contains(&action)
+        }
+        crate::auth::PrincipalKind::Client => declared.grants.iter().any(|grant| {
+            matches!(grant.to, Grantee::Clients | Grantee::Anyone)
+                && grant.actions.contains(&action)
+        }),
+    };
+    if allowed {
+        Decision::Allow
+    } else {
+        Decision::Forbidden
+    }
+}
+
+/// [`authorize_account`] as a `Result`.
+///
+/// # Errors
+/// [`Error::NotFound`] for an unknown type, `forbidden()` when not allowed.
+pub fn require_account(
+    state: &AppState,
+    principal: &crate::auth::Principal,
+    action: Action,
+    resource_type: &str,
+    forbidden: impl FnOnce() -> Error,
+) -> Result<(), Error> {
+    match authorize_account(&state.resources, principal, action, resource_type) {
         Decision::Allow => Ok(()),
         Decision::NotFound => Err(Error::NotFound),
         Decision::Forbidden => Err(forbidden()),

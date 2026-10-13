@@ -6,8 +6,15 @@ use campbooks_kernel::{
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
 
-use crate::{domain::model::WorkspaceView, scopes::WorkspacesRead};
+use crate::{
+    domain::{
+        access::{authorize, workspace_resource},
+        model::WorkspaceView,
+    },
+    scopes::WorkspacesRead,
+};
 
 /// Read a workspace.
 #[utoipa::path(
@@ -16,7 +23,7 @@ use crate::{domain::model::WorkspaceView, scopes::WorkspacesRead};
     operation_id = "workspaces.get",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.workspace"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.workspace"]).access("workspaces.workspace", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The workspace.", body = WorkspaceView),
@@ -38,6 +45,7 @@ pub async fn handler(
 /// The workspace `access` is for.
 pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceView> {
     let mut tx = state.db.begin_for(access.workspace).await?;
+    authorize(state, &mut tx, access, Action::Read, &workspace_resource(access)).await?;
     let view = load(&mut tx, access).await?;
     tx.commit().await?;
     Ok(view)

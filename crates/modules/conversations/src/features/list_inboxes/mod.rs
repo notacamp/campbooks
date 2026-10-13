@@ -47,7 +47,7 @@ pub struct InboxList {
     operation_id = "conversations.list_inboxes",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"]).access("conversations.inbox", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The inboxes.", body = InboxList),

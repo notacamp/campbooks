@@ -48,7 +48,7 @@ pub struct AddLabel {
         .undo("conversations.remove_label")
         .automation()
         .assistant()
-        .records(["conversations.conversation", "conversations.label"])))),
+        .records(["conversations.conversation", "conversations.label"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -139,7 +139,7 @@ pub async fn add(
         .undo("conversations.add_label")
         .automation()
         .assistant()
-        .records(["conversations.conversation", "conversations.label"])))),
+        .records(["conversations.conversation", "conversations.label"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),

@@ -10,18 +10,19 @@ use std::time::Duration;
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Job, JobContext, JobError, Operation, Problem, Result, Risk,
+    AppState, Job, JobContext, JobError, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     jobs::{self, EnqueueOptions},
-    tenancy::{Access, Role, Workspace, WorkspaceId},
+    tenancy::{Access, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        access::{acting_user, lock_workspace},
+        access::{acting_user, authorize, lock_workspace, workspace_resource},
         security::{self, SecurityKind},
     },
     events::WorkspaceDeleting,
@@ -48,7 +49,7 @@ pub struct WorkspaceDeletion {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Deletes everything in the workspace after the grace period.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.workspace"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.workspace"]).access("workspaces.workspace", campbooks_kernel::authz::Action::Delete)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = ACCEPTED, description = "Deleted; its records are purged after the grace \
@@ -71,12 +72,10 @@ pub async fn handler(
 
 /// Delete the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDeletion> {
-    let (user, role) = acting_user(access)?;
-    if role != Role::Owner {
-        return Err(Error::Forbidden);
-    }
+    let (user, _) = acting_user(access)?;
     let id = access.workspace;
     let mut tx = state.db.begin_for(id).await?;
+    authorize(state, &mut tx, access, Action::Delete, &workspace_resource(access)).await?;
     lock_workspace(&mut tx, id).await?;
     let purge_after = sqlx::query_scalar!(
         r#"UPDATE workspaces.workspaces

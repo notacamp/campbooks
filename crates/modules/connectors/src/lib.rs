@@ -52,7 +52,8 @@ mod zoho;
 pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::intake::grant_intake;
 pub use domain::model::{
-    AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
+    AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, MailChoice, Phase,
+    Provider,
     StreamId, StreamView,
 };
 pub use google::{Endpoints, Google};
@@ -99,6 +100,7 @@ pub fn module(deps: Deps) -> Module {
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
                 deps,
             )),
+        resources: domain::resources::resources(),
     }
 }
 

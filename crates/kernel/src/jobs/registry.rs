@@ -319,6 +319,11 @@ pub struct Registry {
     consumers: Vec<ConsumerInfo>,
     schedules: Vec<ScheduleInfo>,
     published: Vec<PublishedEvent>,
+    /// Every declared resource type and its facts (ADR 0017), installed in
+    /// the state with the registry.
+    resources: crate::authz::Catalogue,
+    /// The declarations behind [`resources`](Self::resources), by owner.
+    declared: Vec<(&'static str, crate::authz::Resources)>,
 }
 
 impl std::fmt::Debug for Registry {
@@ -387,11 +392,66 @@ impl Registry {
                 errors.extend(registry.add_published(owner, event));
             }
         }
+        for module in modules {
+            errors.extend(registry.add_resources(module.name, &module.resources));
+        }
+        match crate::authz::Catalogue::new(registry.declared.iter().map(|(_, r)| r)) {
+            Ok(resources) => registry.resources = resources,
+            Err(e) => errors.push(e),
+        }
         if errors.is_empty() {
             Ok(registry)
         } else {
             Err(RegistryError(errors))
         }
+    }
+
+    /// The same registry, with the resource types of parts of the server
+    /// that are not modules, each `(owner, resources)` (the change feed,
+    /// the web BFF).
+    ///
+    /// # Errors
+    /// A misnamed or duplicated resource type.
+    pub fn with_resources(
+        mut self,
+        others: &[(&'static str, crate::authz::Resources)],
+    ) -> Result<Self, RegistryError> {
+        let mut errors = Vec::new();
+        for (owner, resources) in others {
+            errors.extend(self.add_resources(owner, resources));
+        }
+        match crate::authz::Catalogue::new(self.declared.iter().map(|(_, r)| r)) {
+            Ok(resources) => self.resources = resources,
+            Err(e) => errors.push(e),
+        }
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(RegistryError(errors))
+        }
+    }
+
+    fn add_resources(
+        &mut self,
+        owner: &'static str,
+        resources: &crate::authz::Resources,
+    ) -> Vec<String> {
+        let errors = resources
+            .types
+            .iter()
+            .filter_map(|declared| {
+                check_owned_name(owner, declared.name)
+                    .err()
+                    .map(|e| format!("resource type `{}`: {e}", declared.name))
+            })
+            .collect();
+        self.declared.push((owner, resources.clone()));
+        errors
+    }
+
+    /// The access catalogue: every declared resource type (ADR 0017).
+    pub fn resources(&self) -> &crate::authz::Catalogue {
+        &self.resources
     }
 
     fn add_kind(&mut self, owner: &str, kind: &KindSpec) -> Vec<String> {

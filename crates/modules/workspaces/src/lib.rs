@@ -83,5 +83,6 @@ pub fn module() -> Module {
             .publishes::<events::MemberRoleChanged>()
             .publishes::<events::WorkspaceDeleting>()
             .job::<PurgeWorkspace>(),
+        resources: domain::resources::resources(),
     }
 }

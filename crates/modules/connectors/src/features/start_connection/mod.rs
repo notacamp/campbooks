@@ -10,6 +10,7 @@ use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     auth::Principal,
+    authz::{self, Action},
     connections::ConsentRequest,
     db::BeginFor as _,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
@@ -25,6 +26,7 @@ use crate::{
         connections,
         model::{Capability, ConnectionId, Provider},
     },
+    events::CONNECTION_RECORD,
     google,
     scopes::ConnectorsWrite,
 };
@@ -61,7 +63,7 @@ pub struct StartedConnection {
     operation_id = "connectors.start_connection",
     tag = "connectors",
     security(("bearer" = ["connectors:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["connectors.connection"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = StartConnection,
     responses(
@@ -108,6 +110,10 @@ pub async fn execute(
     input: StartConnection,
 ) -> Result<StartedConnection> {
     let user = acting_member(access)?;
+    // A connection is owned by the member who makes it (ADR 0017).
+    authz::require_type(state, access, Action::Write, CONNECTION_RECORD, || {
+        Error::Denied(MESSAGES.reason("connection_needs_user"))
+    })?;
     let configured = match input.provider {
         Provider::Google => deps.google.is_some(),
         Provider::Zoho => deps.zoho.is_some(),

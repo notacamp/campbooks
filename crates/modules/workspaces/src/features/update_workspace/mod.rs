@@ -8,12 +8,13 @@ use campbooks_kernel::{
     extract,
     tenancy::{Access, Workspace, WorkspaceId},
 };
+use campbooks_kernel::authz::Action;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        access::{acting_manager, lock_workspace},
+        access::{acting_user, authorize, lock_workspace, workspace_resource},
         model::{Accent, WorkspaceView, workspace_name},
     },
     events::WorkspaceUpdated,
@@ -40,7 +41,7 @@ pub struct UpdateWorkspace {
     operation_id = "workspaces.update",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace"]).access("workspaces.workspace", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = UpdateWorkspace,
     responses(
@@ -69,9 +70,10 @@ pub async fn execute(
     access: &Access,
     input: UpdateWorkspace,
 ) -> Result<WorkspaceView> {
-    let (actor, _) = acting_manager(access)?;
+    let (actor, _) = acting_user(access)?;
     let name = input.name.as_deref().map(workspace_name).transpose()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    authorize(state, &mut tx, access, Action::Write, &workspace_resource(access)).await?;
     lock_workspace(&mut tx, access.workspace).await?;
     let changed = sqlx::query!(
         r#"WITH old AS (SELECT name, accent FROM workspaces.workspaces WHERE id = $1)
