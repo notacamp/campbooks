@@ -22,7 +22,7 @@ async function homeFilled(page: Page, workspace: string): Promise<void> {
     await page.goto(`/w/${workspace}`);
     const heading = page.getByRole("heading", { level: 1 });
     await heading.waitFor();
-    if (/need you/u.test((await heading.textContent()) ?? "")) {
+    if (((await heading.textContent()) ?? "").includes("need you")) {
       return;
     }
     await pause(1000);
@@ -84,11 +84,9 @@ export default async function whatNeedsYou({ page }: ScenarioContext): Promise<v
   }
   await pause(1200);
   await caption(page, phone ? "Undo brings it back" : "Z brings it back");
-  if (phone) {
-    await page.getByRole("button", { name: /^Undo/u }).first().click();
-  } else {
-    await page.keyboard.press("z");
-  }
+  await (phone
+    ? page.getByRole("button", { name: /^Undo/u }).first().click()
+    : page.keyboard.press("z"));
   await pause(1500);
 
   // L later.
@@ -109,14 +107,12 @@ export default async function whatNeedsYou({ page }: ScenarioContext): Promise<v
   await page.getByText("This may be phishing. Don’t use its links.").click();
   await pause(2000);
   await caption(page, "It's safe (X) takes it off and teaches Campbooks", 2000);
-  if (phone) {
-    await page
-      .getByRole("button", { name: /It’s safe/u })
-      .first()
-      .click();
-  } else {
-    await page.keyboard.press("x");
-  }
+  await (phone
+    ? page
+        .getByRole("button", { name: /It’s safe/u })
+        .first()
+        .click()
+    : page.keyboard.press("x"));
   await pause(1500);
 
   // Inbox chips and the reader's note.
