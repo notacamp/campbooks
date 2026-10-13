@@ -36,11 +36,16 @@ pub mod events;
 mod features;
 mod gmail;
 mod google;
+mod mail;
+mod provider;
 #[cfg(test)]
 mod rls_tests;
 pub mod scopes;
 #[cfg(test)]
 mod testkit;
+#[cfg(test)]
+mod testkit_zoho;
+mod zoho;
 
 pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::intake::grant_intake;
@@ -48,7 +53,9 @@ pub use domain::model::{
     AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
     StreamId, StreamView,
 };
-pub use google::{ClientSecret, Endpoints, Google};
+pub use google::{Endpoints, Google};
+pub use provider::ClientSecret;
+pub use zoho::{Centres, Zoho};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "connectors";

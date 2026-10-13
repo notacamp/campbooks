@@ -13,10 +13,10 @@ use sqlx::{Postgres, Transaction};
 use crate::{
     domain::{
         model::{InboxId, StreamId},
-        removal::{BATCH_OWNER, GMAIL_MESSAGE_OWNER},
+        removal::{BATCH_OWNER, MESSAGE_OWNER},
     },
     events::MessagesChanged,
-    gmail::IndexOp,
+    mail::IndexOp,
 };
 
 /// Apply the adapter's index updates, holding and releasing blobs.
@@ -34,6 +34,7 @@ pub async fn apply_index(
                 row,
                 provider_message_id,
                 thread_id,
+                rfc_message_id,
                 label_ids,
                 internal_date,
                 document,
@@ -41,10 +42,11 @@ pub async fn apply_index(
                 generation,
             } => {
                 let inserted = sqlx::query_scalar!(
-                    r#"INSERT INTO connectors.gmail_messages
+                    r#"INSERT INTO connectors.messages
                            (id, workspace_id, stream_id, provider_message_id, thread_id, label_ids,
-                            internal_date, document_hash, document_size, listed_generation)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+                            internal_date, document_hash, document_size, listed_generation,
+                            rfc_message_id)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
                        ON CONFLICT (stream_id, provider_message_id) DO UPDATE
                           SET label_ids = EXCLUDED.label_ids,
                               listed_generation = EXCLUDED.listed_generation
@@ -59,10 +61,11 @@ pub async fn apply_index(
                     document.hash.to_string(),
                     i64::try_from(document.size).unwrap_or(i64::MAX),
                     generation,
+                    rfc_message_id,
                 )
                 .fetch_one(&mut **tx)
                 .await?;
-                let owner = BlobOwner::new(GMAIL_MESSAGE_OWNER, inserted);
+                let owner = BlobOwner::new(MESSAGE_OWNER, inserted);
                 for blob in &blobs {
                     state.blobs.attach(tx, &key, blob, &owner).await?;
                 }
@@ -73,7 +76,7 @@ pub async fn apply_index(
                 generation,
             } => {
                 sqlx::query!(
-                    r#"UPDATE connectors.gmail_messages
+                    r#"UPDATE connectors.messages
                           SET label_ids = $2, listed_generation = greatest(listed_generation, $3),
                               reemit = false
                         WHERE id = $1"#,
@@ -87,9 +90,9 @@ pub async fn apply_index(
             IndexOp::Remove { row } => {
                 state
                     .blobs
-                    .detach_owner(tx, &key, &BlobOwner::new(GMAIL_MESSAGE_OWNER, row))
+                    .detach_owner(tx, &key, &BlobOwner::new(MESSAGE_OWNER, row))
                     .await?;
-                sqlx::query!("DELETE FROM connectors.gmail_messages WHERE id = $1", row)
+                sqlx::query!("DELETE FROM connectors.messages WHERE id = $1", row)
                     .execute(&mut **tx)
                     .await?;
             }
@@ -97,7 +100,7 @@ pub async fn apply_index(
                 provider_message_id,
             } => {
                 sqlx::query!(
-                    r#"INSERT INTO connectors.gmail_oversized (workspace_id, stream_id, provider_message_id)
+                    r#"INSERT INTO connectors.oversized (workspace_id, stream_id, provider_message_id)
                        VALUES ($1, $2, $3)
                        ON CONFLICT DO NOTHING"#,
                     workspace as WorkspaceId,

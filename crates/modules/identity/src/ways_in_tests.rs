@@ -9,8 +9,8 @@ use sqlx::PgPool;
 
 use crate::{
     testkit::{
-        HEALTHY, Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT, ZOHO_MAIL_SCOPES,
-        query,
+        HEALTHY, Kit, MAIL_SCOPE, ORIGIN, RECONNECTABLE, RECONNECTABLE_ADDRESS, TENANT,
+        ZOHO_MAIL_SCOPES, query,
     },
     upstream::{
         Provider,
@@ -582,7 +582,9 @@ async fn a_zoho_sign_up_brings_its_mailbox_and_its_data_centre(db: PgPool) {
     kit.zoho_eu.set_user(user("eu-sam"));
     let (url, verifier) = Kit::web_authorize();
     let request = kit.get(&url).await.location_query()["request"].clone();
-    let start = kit.get(&format!("/auth/start/zoho?request={request}")).await;
+    let start = kit
+        .get(&format!("/auth/start/zoho?request={request}"))
+        .await;
     let asked = query(&start.location());
     assert_eq!(asked["access_type"], "offline");
     assert_eq!(

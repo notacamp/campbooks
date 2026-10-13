@@ -40,13 +40,18 @@ use crate::{
     },
     events::{SendCompleted, SendOutcome},
     gmail::{self, compose},
-    google::{GoogleError, HTTP_TIMEOUT, MessageMeta, MessageRaw},
+    google::{MessageMeta, MessageRaw},
+    mail::{self, Fetched},
+    provider::{HTTP_TIMEOUT, ProviderError},
+    zoho,
 };
+
+mod via_zoho;
 
 /// The blob owner type of a send (its outgoing document).
 pub const SEND_OWNER: &str = "connectors.send";
 
-/// The largest message Gmail sends, in bytes once encoded.
+/// The largest message sent, in bytes once encoded (Gmail's limit).
 pub const MAX_MESSAGE_BYTES: usize = 35 * 1024 * 1024;
 
 /// How long an unclear attempt waits before the next one looks it up.
@@ -94,6 +99,8 @@ struct Target {
     stream: Option<StreamId>,
     connection: Option<ConnectionId>,
     provider: Option<String>,
+    provider_server: Option<String>,
+    mailbox_key: Option<String>,
     granted_by: Option<UserId>,
     health: Option<String>,
     paused: Option<bool>,
@@ -142,15 +149,25 @@ impl SendMessage {
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         send: SendId,
-        mut target: Target,
+        target: Target,
         give_up: bool,
     ) -> Result<(), JobError> {
         if give_up && !target.unclear {
             // No attempt may have gone out: nothing was sent.
             return finish_failed(ctx, workspace, send, &target, "unavailable").await;
         }
-        let (Some(stream), Some(connection), Some(google)) =
-            (target.stream, target.connection, self.deps.google.clone())
+        let provider = target
+            .provider
+            .as_deref()
+            .map(Provider::parse)
+            .transpose()?;
+        let configured = match provider {
+            Some(Provider::Google) => self.deps.google.is_some(),
+            Some(Provider::Zoho) => self.deps.zoho.is_some(),
+            None => false,
+        };
+        let (Some(stream), Some(connection), Some(provider), true) =
+            (target.stream, target.connection, provider, configured)
         else {
             return finish_failed(ctx, workspace, send, &target, "not_connected").await;
         };
@@ -160,8 +177,8 @@ impl SendMessage {
             return finish_failed(ctx, workspace, send, &target, "needs_reauth").await;
         }
         let now = self.deps.clock.now();
-        // A runner that lost its lease may still be in its call to Gmail:
-        // never call again before that call has surely ended.
+        // A runner that lost its lease may still be in its call to the
+        // provider: never call again before that call has surely ended.
         if let Some(at) = target.attempted_at {
             let quiet = TimeDelta::from_std(HTTP_TIMEOUT + UNCLEAR_WAIT).unwrap_or(TimeDelta::MAX);
             let wait = at + quiet - now;
@@ -180,14 +197,48 @@ impl SendMessage {
             return Ok(());
         };
         let document = read_document(ctx, workspace, &target.document).await?;
-        let Some(raw) = message_bytes(ctx, workspace, &document).await? else {
+        let attempt = Attempt {
+            workspace,
+            send,
+            stream,
+            token: &token,
+            document: &document,
+            give_up,
+            now,
+        };
+        match provider {
+            Provider::Google => self.attempt_gmail(ctx, target, attempt).await,
+            Provider::Zoho => self.attempt_zoho(ctx, target, attempt).await,
+        }
+    }
+
+    /// An attempt through Gmail.
+    async fn attempt_gmail(
+        &self,
+        ctx: &mut JobContext,
+        mut target: Target,
+        attempt: Attempt<'_>,
+    ) -> Result<(), JobError> {
+        let Attempt {
+            workspace,
+            send,
+            stream,
+            token,
+            document,
+            give_up,
+            now,
+        } = attempt;
+        let Some(google) = self.deps.google.clone() else {
+            return finish_failed(ctx, workspace, send, &target, "not_connected").await;
+        };
+        let Some(raw) = message_bytes(ctx, workspace, document).await? else {
             return finish_failed(ctx, workspace, send, &target, "too_large").await;
         };
-        let gmail = google.gmail(&token);
+        let gmail = google.gmail(token);
 
-        let provider = Provider::parse(target.provider.as_deref().unwrap_or("google"))?;
         let rate = self.deps.config.google.units_per_second;
-        if let Err(wait) = schedule::take_budget(ctx.pool(), provider, UNITS_PER_SEND, rate).await?
+        if let Err(wait) =
+            schedule::take_budget(ctx.pool(), Provider::Google, UNITS_PER_SEND, rate).await?
         {
             return Err(JobError::retry_after(
                 "waiting for the provider budget",
@@ -200,9 +251,9 @@ impl SendMessage {
             match gmail.find_by_message_id(&document.rfc_message_id).await {
                 Ok(Some(meta)) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let accepted = Accepted::from_meta(meta);
+                    let sent = gmail_sent(&meta, raw, now);
                     return self
-                        .finish_sent(ctx, workspace, send, &target, stream, accepted, raw, now)
+                        .finish_sent(ctx, workspace, send, &target, stream, sent, now)
                         .await;
                 }
                 Ok(None) => {
@@ -227,16 +278,17 @@ impl SendMessage {
         target.unclear = true;
         match gmail.send(&raw, document.thread_key.as_deref()).await {
             Ok(answer) => {
-                let accepted = Accepted {
+                let meta = MessageMeta {
                     id: answer.id,
                     thread_id: answer.thread_id,
                     label_ids: answer.label_ids,
                     internal_date: None,
                 };
-                self.finish_sent(ctx, workspace, send, &target, stream, accepted, raw, now)
+                let sent = gmail_sent(&meta, raw, now);
+                self.finish_sent(ctx, workspace, send, &target, stream, sent, now)
                     .await
             }
-            Err(GoogleError::Unavailable(reason)) => {
+            Err(ProviderError::Unavailable(reason)) => {
                 // Gmail may have it: look it up before trying again.
                 tracing::warn!(%workspace, %send, %reason, "send ended unclearly");
                 Err(JobError::retry_after(
@@ -254,22 +306,50 @@ impl SendMessage {
     }
 }
 
-/// A message Gmail has, as the send needs it.
-struct Accepted {
-    id: String,
-    thread_id: String,
-    label_ids: Vec<String>,
-    internal_date: Option<String>,
+/// What one attempt works with.
+#[derive(Debug, Clone, Copy)]
+struct Attempt<'a> {
+    workspace: WorkspaceId,
+    send: SendId,
+    stream: StreamId,
+    token: &'a str,
+    document: &'a OutgoingMessage,
+    give_up: bool,
+    now: DateTime<Utc>,
 }
 
-impl Accepted {
-    fn from_meta(meta: MessageMeta) -> Self {
-        Self {
-            id: meta.id,
-            thread_id: meta.thread_id,
-            label_ids: meta.label_ids,
-            internal_date: meta.internal_date,
-        }
+/// A message the provider accepted, as the send records it: its id, and
+/// the message to index and announce when it could be had.
+#[derive(Debug)]
+struct Sent {
+    id: Option<String>,
+    thread_key: Option<String>,
+    fetched: Option<Fetched>,
+}
+
+/// A message Gmail has (`meta`), sent as `raw`.
+fn gmail_sent(meta: &MessageMeta, raw: Vec<u8>, now: DateTime<Utc>) -> Sent {
+    let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+    let meta = MessageMeta {
+        internal_date: meta
+            .internal_date
+            .clone()
+            .or_else(|| Some(now.timestamp_millis().to_string())),
+        ..meta.clone()
+    };
+    Sent {
+        id: Some(meta.id.clone()),
+        thread_key: Some(meta.thread_id.clone()),
+        fetched: Some(gmail::fetched(
+            &meta.id.clone(),
+            MessageRaw {
+                meta,
+                raw,
+                fetched_bytes,
+            },
+            &HashMap::new(),
+            now,
+        )),
     }
 }
 
@@ -319,14 +399,14 @@ impl SendMessage {
         workspace: WorkspaceId,
         send: SendId,
         target: &Target,
-        err: &GoogleError,
+        err: &ProviderError,
     ) -> Result<(), JobError> {
         match err {
-            GoogleError::RateLimited { retry_after } => Err(JobError::retry_after(
+            ProviderError::RateLimited { retry_after } => Err(JobError::retry_after(
                 "rate limited by the provider",
                 retry_after.unwrap_or(Duration::from_secs(30)),
             )),
-            GoogleError::Unauthorized => {
+            ProviderError::Unauthorized => {
                 if let Some(connection) = target.connection {
                     let mut tx = ctx.pool().begin_for(workspace).await?;
                     credentials::forget_access_token(&mut tx, connection).await?;
@@ -334,20 +414,23 @@ impl SendMessage {
                 }
                 Err(JobError::retry("the access token was refused"))
             }
-            GoogleError::InvalidGrant => {
+            ProviderError::InvalidGrant => {
                 finish_failed(ctx, workspace, send, target, "needs_reauth").await
             }
-            GoogleError::Unavailable(_) | GoogleError::NotFound | GoogleError::Unexpected(_) => {
+            ProviderError::Unavailable(_)
+            | ProviderError::NotFound
+            | ProviderError::Unexpected(_) => {
                 tracing::warn!(%workspace, %send, error = %err, "the provider refused the message");
                 finish_failed(ctx, workspace, send, target, "rejected").await
             }
         }
     }
 
-    /// Gmail has the message: index it, announce it, mark the send sent.
+    /// The provider has the message: index and announce it (when it could
+    /// be had), mark the send sent.
     #[allow(
         clippy::too_many_arguments,
-        reason = "two call sites; the values are distinct"
+        reason = "three call sites; the values are distinct"
     )]
     async fn finish_sent(
         &self,
@@ -356,53 +439,30 @@ impl SendMessage {
         send: SendId,
         target: &Target,
         stream: StreamId,
-        accepted: Accepted,
-        raw: Vec<u8>,
+        accepted: Sent,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let state = ctx.state().clone();
         let ws = workspace.to_string();
-        let cursor: gmail::Cursor = target
-            .cursor
-            .clone()
-            .map(serde_json::from_value)
-            .transpose()
-            .map_err(|e| JobError::fatal(format!("stream {stream} has an unreadable cursor: {e}")))?
-            .unwrap_or_default();
-        let meta = MessageMeta {
-            id: accepted.id.clone(),
-            thread_id: accepted.thread_id.clone(),
-            label_ids: accepted.label_ids,
-            internal_date: accepted
-                .internal_date
-                .or_else(|| Some(now.timestamp_millis().to_string())),
-        };
-        let fetched_bytes = u64::try_from(raw.len()).unwrap_or(u64::MAX);
+        let (token, generation) = cursor_of(target)?;
         // Blobs are stored before the transaction that references them.
-        let (message, op) = gmail::store_message(
-            &state.blobs,
-            &ws,
-            now,
-            &accepted.id,
-            MessageRaw {
-                meta,
-                raw,
-                fetched_bytes,
-            },
-            &HashMap::new(),
-            cursor.generation,
-        )
-        .await
-        .map_err(|e| JobError::retry(e.to_string()))?;
-        let batch = MessageChangeBatch::new(
-            target.inbox,
-            vec![MessageChange::Upsert {
-                message: Box::new(message),
-            }],
-        );
-        let bytes = serde_json::to_vec(&batch)
-            .map_err(|e| JobError::fatal(format!("encoding a batch: {e}")))?;
-        let batch = state.blobs.put(&ws, bytes, BATCH_CONTENT_TYPE).await?;
+        let stored = match accepted.fetched {
+            Some(fetched) => {
+                let (message, op) = mail::store_message(&state.blobs, &ws, fetched, generation)
+                    .await
+                    .map_err(|e| JobError::retry(e.to_string()))?;
+                let batch = MessageChangeBatch::new(
+                    target.inbox,
+                    vec![MessageChange::Upsert {
+                        message: Box::new(message),
+                    }],
+                );
+                let bytes = serde_json::to_vec(&batch)
+                    .map_err(|e| JobError::fatal(format!("encoding a batch: {e}")))?;
+                Some((op, state.blobs.put(&ws, bytes, BATCH_CONTENT_TYPE).await?))
+            }
+            None => None,
+        };
 
         let tx = ctx.tx().await?;
         // Settled already (another runner, or the check): announce it once.
@@ -413,26 +473,28 @@ impl SendMessage {
             RETURNING id"#,
             send as SendId,
             accepted.id,
-            accepted.thread_id,
+            accepted.thread_key,
         )
         .fetch_optional(&mut **tx)
         .await?;
         if first.is_none() {
             return Ok(());
         }
-        emit::apply_index(tx, &state, workspace, stream, vec![op]).await?;
-        emit::store_batch(
-            tx,
-            &state,
-            workspace,
-            stream,
-            target.inbox,
-            &batch,
-            &cursor.token(),
-            1,
-            now,
-        )
-        .await?;
+        if let Some((op, batch)) = stored {
+            emit::apply_index(tx, &state, workspace, stream, vec![op]).await?;
+            emit::store_batch(
+                tx,
+                &state,
+                workspace,
+                stream,
+                target.inbox,
+                &batch,
+                &token,
+                1,
+                now,
+            )
+            .await?;
+        }
         state
             .blobs
             .detach_owner(tx, &ws, &BlobOwner::new(SEND_OWNER, send))
@@ -446,16 +508,31 @@ impl SendMessage {
                     inbox_id: target.inbox,
                     send_id: send,
                     outcome: SendOutcome::Sent,
-                    provider_message_id: Some(accepted.id),
+                    provider_message_id: accepted.id,
                     reason: None,
                 },
             )
             .await?;
-        // Pick up Gmail's own view of it (labels, thread) soon.
+        // Pick up the provider's own view of it soon.
         schedule::set_due(tx, workspace, stream, now).await?;
         tracing::info!(%workspace, %send, "message sent");
         Ok(())
     }
+}
+
+/// The stream's cursor as an event carries it, and its pass generation.
+fn cursor_of(target: &Target) -> Result<(String, i32), JobError> {
+    let unreadable =
+        |e: serde_json::Error| JobError::fatal(format!("a stream has an unreadable cursor: {e}"));
+    let Some(cursor) = target.cursor.clone() else {
+        return Ok((String::new(), 0));
+    };
+    if target.provider.as_deref() == Some(Provider::Zoho.as_str()) {
+        let cursor: zoho::read::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
+        return Ok((cursor.token(), cursor.generation));
+    }
+    let cursor: gmail::Cursor = serde_json::from_value(cursor).map_err(unreadable)?;
+    Ok((cursor.token(), cursor.generation))
 }
 
 /// The send and its stream, read in a short transaction of its own.
@@ -468,7 +545,9 @@ async fn load(
     let row = sqlx::query!(
         r#"SELECT s.inbox_id AS "inbox: InboxId", s.document, s.state, s.unclear, s.attempted_at,
                   st.id AS "stream?: StreamId", st.paused AS "paused?", st.cursor AS "cursor?",
+                  st.mailbox_key AS "mailbox_key?",
                   c.id AS "connection?: ConnectionId", c.provider AS "provider?",
+                  c.provider_server,
                   c.granted_by AS "granted_by?: UserId", c.health AS "health?"
              FROM connectors.sends s
              LEFT JOIN connectors.streams st ON st.id = s.stream_id
@@ -493,6 +572,8 @@ async fn load(
         stream: row.stream,
         connection: row.connection,
         provider: row.provider,
+        provider_server: row.provider_server,
+        mailbox_key: row.mailbox_key,
         granted_by: row.granted_by,
         health: row.health,
         paused: row.paused,
