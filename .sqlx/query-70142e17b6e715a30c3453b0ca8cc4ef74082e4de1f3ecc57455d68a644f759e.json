@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            DELETE FROM kernel.blobs b\n             USING unnest($1::text[], $2::text[]) AS c(workspace_id, hash)\n             WHERE b.workspace_id = c.workspace_id AND b.hash = c.hash\n               AND b.touched_at < now() - make_interval(secs => $3)\n               AND NOT EXISTS (SELECT 1 FROM kernel.blob_refs r\n                                WHERE r.workspace_id = b.workspace_id AND r.hash = b.hash)\n            RETURNING b.workspace_id, b.hash\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "workspace_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.blobs",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "hash",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.blobs",
+            "name": "hash"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "TextArray",
+        "TextArray",
+        "Float8"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "70142e17b6e715a30c3453b0ca8cc4ef74082e4de1f3ecc57455d68a644f759e"
+}

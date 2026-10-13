@@ -8,7 +8,7 @@
 use std::{net::SocketAddr, path::PathBuf};
 
 use figment::{Figment, providers::Env};
-use secrecy::SecretString;
+use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 
 /// Environment variable prefix shared by every Campbooks setting.
@@ -77,6 +77,135 @@ pub struct Config {
     /// The background job worker (`CAMPBOOKS_JOBS__*`).
     #[serde(default)]
     pub jobs: JobsConfig,
+
+    /// Where message bodies and files are stored (`CAMPBOOKS_BLOBS__*`).
+    #[serde(default)]
+    pub blobs: BlobsConfig,
+}
+
+/// Which object store holds the blobs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum BlobBackend {
+    /// A directory on local disk (`CAMPBOOKS_BLOBS__PATH`); the self-host
+    /// default.
+    #[default]
+    Fs,
+    /// Any S3-compatible bucket (`CAMPBOOKS_BLOBS__S3__*`).
+    S3,
+}
+
+/// Blob storage settings (`CAMPBOOKS_BLOBS__*`, ADR 0011): message bodies,
+/// attachments and files live outside Postgres.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct BlobsConfig {
+    /// `fs` (default) or `s3` (`CAMPBOOKS_BLOBS__BACKEND`).
+    pub backend: BlobBackend,
+    /// The directory of the `fs` backend (`CAMPBOOKS_BLOBS__PATH`), created
+    /// on startup if missing. The image mounts the `blobs-data` volume here.
+    pub path: PathBuf,
+    /// The bucket of the `s3` backend (`CAMPBOOKS_BLOBS__S3__*`).
+    pub s3: S3Config,
+    /// Largest blob accepted, in bytes (`CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES`).
+    pub max_object_bytes: u64,
+    /// How long a blob nothing references is kept before the sweeper deletes
+    /// it, counted from its last upload or detach
+    /// (`CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS`).
+    pub sweep_grace_hours: u64,
+}
+
+impl Default for BlobsConfig {
+    fn default() -> Self {
+        Self {
+            backend: BlobBackend::Fs,
+            path: PathBuf::from("/data/blobs"),
+            s3: S3Config::default(),
+            max_object_bytes: 50 * 1024 * 1024,
+            sweep_grace_hours: 24,
+        }
+    }
+}
+
+/// An S3-compatible bucket (`CAMPBOOKS_BLOBS__S3__*`): AWS S3, Garage,
+/// `MinIO`, Ceph, Cloudflare R2 and the like.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(default)]
+pub struct S3Config {
+    /// Bucket name (`CAMPBOOKS_BLOBS__S3__BUCKET`); required.
+    pub bucket: Option<String>,
+    /// The store's URL (`CAMPBOOKS_BLOBS__S3__ENDPOINT`, e.g.
+    /// `https://s3.example.com`); unset means AWS. Plain `http://` is
+    /// accepted, for a store on a private network.
+    pub endpoint: Option<String>,
+    /// Region (`CAMPBOOKS_BLOBS__S3__REGION`); default `us-east-1`, which
+    /// most other stores accept as well.
+    pub region: Option<String>,
+    /// Access key id (`CAMPBOOKS_BLOBS__S3__ACCESS_KEY_ID`). With the secret
+    /// unset too, credentials come from the environment's instance role.
+    pub access_key_id: Option<String>,
+    /// Secret access key (`CAMPBOOKS_BLOBS__S3__SECRET_ACCESS_KEY`).
+    pub secret_access_key: Option<SecretString>,
+    /// Address the bucket as `<endpoint>/<bucket>` instead of
+    /// `<bucket>.<endpoint>` (`CAMPBOOKS_BLOBS__S3__PATH_STYLE`). Most
+    /// self-hosted stores need `true`.
+    pub path_style: bool,
+}
+
+impl S3Config {
+    /// The configured endpoint; `None` when unset or blank.
+    pub fn endpoint(&self) -> Option<&str> {
+        non_blank(self.endpoint.as_deref())
+    }
+
+    /// The configured region, or `us-east-1`.
+    pub fn region(&self) -> &str {
+        non_blank(self.region.as_deref()).unwrap_or("us-east-1")
+    }
+}
+
+impl BlobsConfig {
+    /// Startup check: limits are positive and the chosen backend has what it
+    /// needs. The message names the offending setting.
+    pub fn check(&self) -> Result<(), String> {
+        if self.max_object_bytes == 0 {
+            return Err("CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES must be at least 1".to_owned());
+        }
+        if self.sweep_grace_hours == 0 {
+            return Err("CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS must be at least 1".to_owned());
+        }
+        match self.backend {
+            BlobBackend::Fs if self.path.as_os_str().is_empty() => {
+                Err("CAMPBOOKS_BLOBS__PATH must not be empty".to_owned())
+            }
+            BlobBackend::Fs => Ok(()),
+            BlobBackend::S3 => self.s3.check(),
+        }
+    }
+}
+
+impl S3Config {
+    fn check(&self) -> Result<(), String> {
+        if non_blank(self.bucket.as_deref()).is_none() {
+            return Err("CAMPBOOKS_BLOBS__S3__BUCKET must be set when \
+                        CAMPBOOKS_BLOBS__BACKEND=s3"
+                .to_owned());
+        }
+        if let Some(endpoint) = self.endpoint() {
+            check_url("CAMPBOOKS_BLOBS__S3__ENDPOINT", endpoint)?;
+        }
+        let key = non_blank(self.access_key_id.as_deref()).is_some();
+        let secret = self
+            .secret_access_key
+            .as_ref()
+            .is_some_and(|s| !s.expose_secret().trim().is_empty());
+        if key != secret {
+            return Err("CAMPBOOKS_BLOBS__S3__ACCESS_KEY_ID and \
+                        CAMPBOOKS_BLOBS__S3__SECRET_ACCESS_KEY must be set together"
+                .to_owned());
+        }
+        Ok(())
+    }
 }
 
 /// Background job worker settings (`CAMPBOOKS_JOBS__*`, ADR 0012).
@@ -322,6 +451,11 @@ mod tests {
         assert_eq!(config.auth.leeway_seconds, 60);
         assert_eq!(config.jobs, JobsConfig::default());
         assert!(config.jobs.check().is_ok());
+        assert_eq!(config.blobs.backend, BlobBackend::Fs);
+        assert_eq!(config.blobs.path, PathBuf::from("/data/blobs"));
+        assert_eq!(config.blobs.max_object_bytes, 52_428_800);
+        assert_eq!(config.blobs.sweep_grace_hours, 24);
+        assert!(config.blobs.check().is_ok());
         assert_eq!(
             config.database_url.expose_secret(),
             "postgres://u:p@db.example.com/campbooks"
@@ -383,6 +517,89 @@ mod tests {
         assert_eq!(jobs.concurrency, 16);
         assert_eq!(jobs.poll_interval_ms, 250);
         assert_eq!(jobs.lease_seconds, JobsConfig::default().lease_seconds);
+    }
+
+    #[test]
+    fn parses_blobs_section() {
+        // `CAMPBOOKS_BLOBS__S3__BUCKET` etc. land under `blobs.s3`.
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "blobs",
+                serde_json::json!({
+                    "backend": "s3",
+                    "max_object_bytes": 1024,
+                    "s3": {
+                        "bucket": "campbooks",
+                        "endpoint": "https://s3.example.com",
+                        "access_key_id": "key",
+                        "secret_access_key": "hunter2",
+                        "path_style": true,
+                    },
+                }),
+            ));
+        let blobs = Config::from_figment(&figment).unwrap().blobs;
+        assert_eq!(blobs.backend, BlobBackend::S3);
+        assert_eq!(blobs.max_object_bytes, 1024);
+        assert_eq!(blobs.sweep_grace_hours, 24);
+        assert_eq!(blobs.s3.bucket.as_deref(), Some("campbooks"));
+        assert_eq!(blobs.s3.endpoint(), Some("https://s3.example.com"));
+        assert_eq!(blobs.s3.region(), "us-east-1");
+        assert!(blobs.s3.path_style);
+        assert!(blobs.check().is_ok());
+        assert!(!format!("{blobs:?}").contains("hunter2"));
+    }
+
+    #[test]
+    fn blobs_check_names_the_bad_setting() {
+        let s3 = |s3: S3Config| BlobsConfig {
+            backend: BlobBackend::S3,
+            s3,
+            ..BlobsConfig::default()
+        };
+        let cases = [
+            (s3(S3Config::default()), "CAMPBOOKS_BLOBS__S3__BUCKET"),
+            (
+                s3(S3Config {
+                    bucket: Some("b".into()),
+                    endpoint: Some("s3.example.com".into()),
+                    ..S3Config::default()
+                }),
+                "CAMPBOOKS_BLOBS__S3__ENDPOINT",
+            ),
+            (
+                s3(S3Config {
+                    bucket: Some("b".into()),
+                    access_key_id: Some("key".into()),
+                    ..S3Config::default()
+                }),
+                "CAMPBOOKS_BLOBS__S3__SECRET_ACCESS_KEY",
+            ),
+            (
+                BlobsConfig {
+                    max_object_bytes: 0,
+                    ..BlobsConfig::default()
+                },
+                "CAMPBOOKS_BLOBS__MAX_OBJECT_BYTES",
+            ),
+            (
+                BlobsConfig {
+                    sweep_grace_hours: 0,
+                    ..BlobsConfig::default()
+                },
+                "CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS",
+            ),
+            (
+                BlobsConfig {
+                    path: PathBuf::new(),
+                    ..BlobsConfig::default()
+                },
+                "CAMPBOOKS_BLOBS__PATH",
+            ),
+        ];
+        for (config, setting) in cases {
+            let err = config.check().unwrap_err();
+            assert!(err.contains(setting), "{setting}: {err}");
+        }
     }
 
     #[test]

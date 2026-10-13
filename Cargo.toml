@@ -23,7 +23,7 @@ campbooks-system = { path = "crates/modules/system" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "tokio", "tower-log", "tracing", "matched-path"] }
-tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time"] }
+tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.1", features = ["trace", "request-id", "timeout", "compression-gzip", "compression-br", "util", "fs", "set-header"] }
 http-body-util = "0.1.5"
@@ -36,6 +36,14 @@ utoipa-axum = "0.3.0"
 
 # Database
 sqlx = { version = "0.9.0", default-features = false, features = ["runtime-tokio", "tls-rustls-aws-lc-rs", "postgres", "macros", "migrate", "uuid", "chrono", "json"] }
+
+# Object storage for blobs (ADR 0011): local disk, S3-compatible stores and an
+# in-memory store for tests behind one interface, with streaming multipart
+# upload. Its `aws` feature signs with aws-lc-rs and talks through reqwest 0.13,
+# both already in the graph.
+object_store = { version = "0.14.2", default-features = false, features = ["fs", "aws"] }
+bytes = "1.12.1"
+futures-util = { version = "0.3.34", default-features = false, features = ["std"] }
 
 # Serialization / config
 serde = { version = "1.0.229", features = ["derive"] }

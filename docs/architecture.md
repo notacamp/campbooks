@@ -29,7 +29,7 @@ architecture.toml          module dependency allowlist, read by `cargo xtask arc
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
                            auth extractors, ids, clock, durable event bus and job
-                           queue (schema `kernel`), Module trait.
+                           queue (schema `kernel`), blob storage, Module trait.
                            Depends on NO internal crate.
   ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
                            model, ADR 0009), embed/complete/vision (OpenAI-compatible
@@ -91,6 +91,22 @@ API. `cargo xtask arch` checks that each migration touches only its owner's
 schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
+
+### Files (blobs)
+
+Message bodies (raw MIME), attachments and files are not stored in
+Postgres but in object storage (ADR 0011), through `state.blobs`
+(`kernel::blobs::BlobStore`): local disk by default, any S3-compatible
+bucket otherwise (`CAMPBOOKS_BLOBS__*`). Blobs are content-addressed per
+workspace (`<workspace>/<aa>/<sha256>`), so the same bytes are stored once.
+A module `put`s the bytes (streamed and hashed; it gets a `BlobRef` of
+hash, size and content type to keep on its record), then `attach`es the blob
+to its record in the transaction that writes the record, and `detach`es it in
+the transaction that removes it. The kernel's hourly `kernel.sweep_blobs`
+deletes blobs nothing holds once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` have
+passed, and `purge_workspace` removes a deleted workspace's blobs. The store
+never serves blobs by URL: a module's download endpoint checks access, then
+streams `get`.
 
 ### Endpoints and auth
 
