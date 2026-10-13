@@ -15,6 +15,53 @@ The owner approved this design with three answers:
    and never with prompts, and a workspace switch turns storing it off
    (Decision 2; built in the reasoning slice).
 
+## Owner feedback (2026-10-13): paused until Scout has real jobs
+
+The owner reviewed the prototype and paused this change. The feedback:
+
+1. The dizzy face is not acceptable: its eyes are bigger than the face.
+   That is fixed in the `visor-emotions` change, not here.
+2. Every example was sorting, and a log of sorting alone is of little use.
+3. An opened session was hard to understand: it read as a log of stages,
+   not as what happened.
+
+**Decision.** Scout gets real jobs first: Home showing what needs the member
+(replies owed, deadlines, asks, suspicious mail), then drafts and summaries.
+The Activity page is redesigned around those jobs afterwards, and it is
+**built only once those jobs exist**. The data model, the kernel port, the
+live transport and the access rules above still stand; the page design
+(Decision 5) and the slicing (Decision 6) are to be redone.
+
+**What the redesign must do.**
+
+- **Each entry reads as a plain sentence first**, about the person and the
+  thing, not the pipeline. For example:
+  - "Marta asks you to confirm Thursday's walkthrough. Scout kept it in
+    Primary and marked it Needs a reply, due Thursday."
+  - "Acme Hosting's invoice INV-2041 is due on 30 October. Scout added the
+    deadline to Home."
+  - "Scout drafted a reply to Jonas about lunch on Friday. It is waiting in
+    your drafts for you to read and send."
+  - "IT Support asks you to verify your mailbox, from a look-alike of your
+    own domain. Scout flagged it as suspicious and kept it out of Home."
+  - "Scout summarised the 14-message thread about the studio repaint:
+    Pedro's quote, the two dates offered, and that he is waiting for your
+    answer."
+  - "Scout sorted 6 new messages in Work: 1 newsletter moved, 4 left where
+    they were."
+- **Sorting is one job among several**, never the whole page. Entries span
+  Scout's jobs: noticed a deadline, found an ask, drafted a reply, flagged
+  phishing, summarised a thread, sorted mail.
+- **How it decided is folded away.** Stages, strategies, confidence,
+  probabilities and thresholds sit behind "How Scout decided" on each entry,
+  closed by default. What the member reads first is what Scout did, about
+  whom, and what is left for them to do (with the action to do it).
+- **Live updates stay**, now expressed per job: "Scout is drafting a reply
+  to Marta" while a step works, then the sentence once it lands.
+
+The name in UI copy follows the product's copy rules when the page is
+built; these examples use the owner's wording.
+
 ## Context
 
 - **ADR 0009**: `decide` is a typed decision model (Laya by default). Its

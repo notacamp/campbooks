@@ -5,8 +5,14 @@ reasoning steps are their own changes.
 
 ## 0. Before building
 
-- [ ] 0.1 Owner sign-off on the design (gated)
-- [ ] 0.2 Visual prototype of the list, the running session and the phone screens (artifact), approved before any UI task
+**Paused (owner decision, 2026-10-13).** Scout gets real jobs first (Home
+showing replies owed, deadlines, asks and suspicious mail; then drafts and
+summaries). The page is redesigned around those jobs and built only once
+they exist; see design.md, "Owner feedback". The tasks below are kept for
+when the change resumes and will be revised then.
+
+- [x] 0.1 Owner sign-off on the design (gated)
+- [ ] ~~0.2 Visual prototype of the list, the running session and the phone screens~~ Superseded: the first prototype (sorting only, stage-by-stage log) was rejected; a new prototype follows the redesign around Scout's jobs, with plain-sentence entries and "How Scout decided" folded away
 
 ## 1. Kernel port
 
