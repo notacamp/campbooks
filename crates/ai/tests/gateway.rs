@@ -19,10 +19,10 @@ struct Verdict {
 }
 
 fn provider(server: &MockServer, model: &str, api_key: Option<&str>) -> ProviderConfig {
-    ProviderConfig {
-        base_url: format!("{}/v1", server.uri()).parse().unwrap(),
-        api_key: api_key.map(Into::into),
-        model: model.into(),
+    let provider = ProviderConfig::new(format!("{}/v1", server.uri()).parse().unwrap(), model);
+    match api_key {
+        Some(key) => provider.with_api_key(key),
+        None => provider,
     }
 }
 

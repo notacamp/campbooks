@@ -73,6 +73,25 @@ jobs:
             exit 1
           fi
 
+      - name: A VERSION bump rolls the changelog
+        if: always() && github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --quiet "$BASE_SHA"...HEAD -- VERSION; then
+            echo "VERSION unchanged."; exit 0
+          fi
+          version=$(tr -d '[:space:]' < VERSION)
+          if git ls-remote --exit-code --tags origin "refs/tags/next-v${version}" >/dev/null 2>&1; then
+            echo "::error::next-v${version} is already released; bump VERSION to a new version."
+            exit 1
+          fi
+          if ! .github/scripts/release-notes.sh "$version" >/dev/null; then
+            echo "::error::VERSION is now ${version}: roll CHANGELOG.md [Unreleased] into a '## [next-v${version}] - YYYY-MM-DD' section (CONTRIBUTING.md → Releases)."
+            exit 1
+          fi
+          echo "Release next-v${version} is ready to be cut on merge."
+
       - name: OpenSpec specs and changes are valid
         if: always()
         run: npx -y @fission-ai/openspec@1.13.2 validate --all --strict --no-interactive

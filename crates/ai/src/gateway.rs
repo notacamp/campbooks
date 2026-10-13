@@ -1,13 +1,18 @@
-//! The gateway: one client for every role, over the OpenAI-compatible API.
+//! The gateway: one client for every role. `embed`, `complete` and `vision`
+//! speak the OpenAI-compatible API; `decide` speaks Laya's typed protocol or
+//! goes through the instruct-model adapter (ADR 0009).
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
-use reqwest::{Client, RequestBuilder};
+use reqwest::{Client, RequestBuilder, StatusCode, header::RETRY_AFTER};
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use url::Url;
 
-use crate::{AiConfig, Error, ProviderConfig, Role};
+use crate::{
+    AiConfig, Error, Protocol, ProviderConfig, Role,
+    decide::{self, Answers, DecisionContext, DecisionState, Question},
+};
 
 /// Default TCP connect timeout.
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -15,6 +20,43 @@ pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_mins(2);
 /// Longest error body kept in [`Error::Status`].
 const MAX_ERROR_BODY: usize = 2048;
+
+/// How `decide` retries a provider that is down, restarting or busy.
+///
+/// A request is retried after a connection failure or a 5xx answer (Laya
+/// answers 503 with `Retry-After` when it is saturated), waiting `base_delay`
+/// and doubling each time up to `max_delay`; a `Retry-After` header wins when
+/// it asks for longer. Timeouts are not retried: on a slow CPU host a retry
+/// only doubles the queue.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RetryPolicy {
+    /// Attempts in total, the first included (1 disables retries).
+    pub attempts: u32,
+    /// Wait before the first retry.
+    pub base_delay: Duration,
+    /// Longest wait between attempts.
+    pub max_delay: Duration,
+}
+
+impl Default for RetryPolicy {
+    fn default() -> Self {
+        Self {
+            attempts: 3,
+            base_delay: Duration::from_millis(250),
+            max_delay: Duration::from_secs(4),
+        }
+    }
+}
+
+impl RetryPolicy {
+    fn delay(&self, retry: u32, retry_after: Option<Duration>) -> Duration {
+        let backoff = self
+            .base_delay
+            .saturating_mul(2u32.saturating_pow(retry))
+            .min(self.max_delay);
+        retry_after.map_or(backoff, |after| after.min(self.max_delay).max(backoff))
+    }
+}
 
 /// Who said a chat message.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,6 +242,17 @@ struct WireChatRequest<'a> {
     stream: bool,
 }
 
+/// A chat request that also asks for token log-probabilities (`decide`).
+#[derive(Serialize)]
+struct WireDecideChatRequest<'a> {
+    #[serde(flatten)]
+    chat: WireChatRequest<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    logprobs: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    top_logprobs: Option<u8>,
+}
+
 #[derive(Deserialize)]
 struct WireChatResponse {
     #[serde(default)]
@@ -241,6 +294,7 @@ struct WireEmbedding {
 pub struct Gateway {
     config: AiConfig,
     http: Client,
+    retry: RetryPolicy,
 }
 
 impl Gateway {
@@ -260,7 +314,18 @@ impl Gateway {
             .timeout(request_timeout)
             .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
             .build()?;
-        Ok(Self { config, http })
+        Ok(Self {
+            config,
+            http,
+            retry: RetryPolicy::default(),
+        })
+    }
+
+    /// The same gateway with another retry policy for `decide`.
+    #[must_use]
+    pub fn with_retry(mut self, retry: RetryPolicy) -> Self {
+        self.retry = retry;
+        self
     }
 
     /// The configuration in use.
@@ -319,6 +384,127 @@ impl Gateway {
         Ok(wire.data.into_iter().map(|e| e.embedding).collect())
     }
 
+    /// Answer typed `questions` about `state` with the `decide` role, all in
+    /// one call. Answers come back in question order, calibrated with the
+    /// role's temperatures. The state is never logged.
+    ///
+    /// Questions are checked first ([`decide::MAX_OPTIONS`] options at most,
+    /// unique ids and labels, …); a bad set fails with
+    /// [`Error::InvalidQuestion`] before anything is sent.
+    pub async fn decide(
+        &self,
+        ctx: &DecisionContext<'_>,
+        state: &DecisionState,
+        questions: &[Question],
+    ) -> Result<Answers, Error> {
+        let provider = self.config.provider(Role::Decide)?;
+        decide::validate(state, questions)?;
+        if questions.is_empty() {
+            return Ok(Answers::default());
+        }
+        tracing::debug!(
+            purpose = ctx.purpose,
+            protocol = provider.protocol.as_str(),
+            model = %provider.model,
+            questions = questions.len(),
+            "ai decide request"
+        );
+        let started = Instant::now();
+        let (raw, model, version) = match provider.protocol {
+            Protocol::Laya => {
+                let body = decide::laya::Request {
+                    model: &provider.model,
+                    state,
+                    questions,
+                };
+                let request = self.post(provider, "systemone")?.json(&body);
+                let wire: decide::laya::Response = self.send_with_retry(request).await?;
+                let model = wire.model(&provider.model);
+                (wire.into_raw(questions)?, model, None)
+            }
+            Protocol::OpenAi => {
+                let messages = decide::openai::messages(state, questions);
+                let format =
+                    ResponseFormat::json_schema("decision", decide::openai::schema(questions));
+                let body = WireDecideChatRequest {
+                    chat: WireChatRequest {
+                        model: &provider.model,
+                        messages: &messages,
+                        temperature: Some(0.0),
+                        max_tokens: None,
+                        response_format: Some(&format),
+                        stream: false,
+                    },
+                    logprobs: provider.logprobs.then_some(true),
+                    top_logprobs: provider.logprobs.then_some(decide::openai::TOP_LOGPROBS),
+                };
+                let request = self.post(provider, "chat/completions")?.json(&body);
+                let wire: decide::openai::Response = self.send_with_retry(request).await?;
+                let model = if wire.model.is_empty() {
+                    provider.model.clone()
+                } else {
+                    wire.model.clone()
+                };
+                let version = wire.system_fingerprint.clone();
+                (wire.into_raw(questions)?, model, version)
+            }
+        };
+        let latency = started.elapsed();
+        tracing::debug!(
+            purpose = ctx.purpose,
+            model = %model,
+            latency_ms = latency.as_millis(),
+            "ai decide answered"
+        );
+        Ok(Answers::new(
+            questions
+                .iter()
+                .zip(raw)
+                .map(|(question, raw)| {
+                    decide::finish(
+                        question,
+                        raw,
+                        &provider.calibration,
+                        &model,
+                        version.as_deref(),
+                        latency,
+                    )
+                })
+                .collect(),
+        ))
+    }
+
+    async fn send_with_retry<T: DeserializeOwned>(
+        &self,
+        request: RequestBuilder,
+    ) -> Result<T, Error> {
+        let mut retry = 0;
+        loop {
+            let attempt = request
+                .try_clone()
+                .ok_or_else(|| Error::Config("request body cannot be retried".into()))?;
+            let retry_after = match attempt.send().await {
+                Ok(response) if response.status().is_server_error() => {
+                    if retry + 1 >= self.retry.attempts {
+                        return read(response).await;
+                    }
+                    retry_after(&response)
+                }
+                Ok(response) => return read(response).await,
+                Err(err) if err.is_connect() && retry + 1 < self.retry.attempts => None,
+                Err(err) => return Err(err.into()),
+            };
+            let delay = self.retry.delay(retry, retry_after);
+            retry += 1;
+            tracing::debug!(
+                retry,
+                delay_ms = delay.as_millis(),
+                "ai provider unavailable, retrying"
+            );
+            tokio::time::sleep(delay).await;
+        }
+    }
+
     fn post(&self, provider: &ProviderConfig, path: &str) -> Result<RequestBuilder, Error> {
         let url = endpoint(&provider.base_url, path)?;
         let mut request = self.http.post(url);
@@ -341,8 +527,20 @@ fn endpoint(base_url: &Url, path: &str) -> Result<Url, Error> {
         .map_err(|e| Error::Config(format!("invalid base_url {base_url}: {e}")))
 }
 
+/// `Retry-After` in seconds, when a 503 carries one.
+fn retry_after(response: &reqwest::Response) -> Option<Duration> {
+    if response.status() != StatusCode::SERVICE_UNAVAILABLE {
+        return None;
+    }
+    let seconds = response.headers().get(RETRY_AFTER)?.to_str().ok()?;
+    seconds.trim().parse::<u64>().ok().map(Duration::from_secs)
+}
+
 async fn send<T: DeserializeOwned>(request: RequestBuilder) -> Result<T, Error> {
-    let response = request.send().await?;
+    read(request.send().await?).await
+}
+
+async fn read<T: DeserializeOwned>(response: reqwest::Response) -> Result<T, Error> {
     let status = response.status();
     if !status.is_success() {
         let mut body = response.text().await.unwrap_or_default();
@@ -365,6 +563,27 @@ async fn send<T: DeserializeOwned>(request: RequestBuilder) -> Result<T, Error> 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn retry_delay_doubles_up_to_the_cap_and_honours_retry_after() {
+        let policy = RetryPolicy {
+            attempts: 5,
+            base_delay: Duration::from_millis(100),
+            max_delay: Duration::from_secs(1),
+        };
+        assert_eq!(policy.delay(0, None), Duration::from_millis(100));
+        assert_eq!(policy.delay(1, None), Duration::from_millis(200));
+        assert_eq!(policy.delay(5, None), Duration::from_secs(1));
+        assert_eq!(
+            policy.delay(0, Some(Duration::from_millis(500))),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            policy.delay(0, Some(Duration::from_mins(1))),
+            Duration::from_secs(1),
+            "a huge Retry-After is capped"
+        );
+    }
 
     #[test]
     fn endpoint_joins_with_or_without_trailing_slash() {

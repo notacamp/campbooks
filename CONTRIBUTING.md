@@ -93,7 +93,35 @@ no visual effect) can be exempted by a maintainer with the `no-recording` label.
 ## Releases
 
 Versions follow semver from the `VERSION` file. Until Next replaces the Rails
-app, its releases use a separate tag namespace (see the release-pipeline task).
+app, its releases live in their own namespace so they never collide with the
+Rails `v0.x.y` tags and releases that `main` owns: tags `next-vX.Y.Z`, images
+`ghcr.io/notacamp/campbooks:next-vX.Y.Z` and `:next-vX.Y`.
+
+Every green push to `next` already publishes `:next` and `:next-<sha12>` and
+deploys staging (`publish-next.yml`). A *release* is the same image under a
+version, plus a tag and a GitHub **prerelease**.
+
+**To cut a release**, open one PR into `next` (title `chore: release next-vX.Y.Z`)
+that:
+
+1. sets `VERSION` to `X.Y.Z` and `[workspace.package] version` in `Cargo.toml`
+   to match (`cargo xtask arch` checks this; refresh `Cargo.lock`);
+2. renames `## [Unreleased]` in `CHANGELOG.md` to `## [next-vX.Y.Z] - YYYY-MM-DD`
+   and adds a fresh empty `## [Unreleased]` above it.
+
+The Policy check fails the PR if the changelog section is missing or the tag
+already exists. Merge it; when CI is green on the merge commit,
+`release-next.yml` builds the image, tags it `next-vX.Y.Z` and `next-vX.Y`,
+fails on fixable HIGH/CRITICAL Trivy findings, attests build provenance and an
+SPDX SBOM, and only then creates the tag and the prerelease (the changelog
+section is the release notes). Nothing is committed back to `next`: its branch
+ruleset requires checks on every commit, so the changelog is rolled in the PR.
+If the workflow fails after the merge, fix the cause and re-run it from the
+Actions tab (`Release next`, branch `next`); it is idempotent until the tag exists.
+Verify an image with `gh attestation verify oci://ghcr.io/notacamp/campbooks:next-vX.Y.Z --repo notacamp/campbooks`.
+
+Releases do not deploy anything yet (staging follows `:next`); the workflow
+documents where a production deploy dispatch will hook in.
 
 ## Working with AI agents
 

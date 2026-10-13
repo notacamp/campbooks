@@ -1,0 +1,161 @@
+name: Image
+
+# Reusable: build the server image for one commit (amd64 + arm64, natively),
+# publish it under the requested tags, scan it, and attest it. Called by
+# `publish-next.yml` (every green push to next) and `release-next.yml`
+# (versioned releases) so there is exactly one build recipe.
+#
+# Order matters: the manifest is created, then Trivy gates it, then provenance
+# and the SBOM are attested. Callers only continue (staging dispatch, GitHub
+# release) once this whole workflow is green.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to build (the one CI approved)
+        type: string
+        required: true
+      tags:
+        description: Image tags to publish, one per line, e.g. "next-v0.2.0"
+        type: string
+        required: true
+    outputs:
+      digest:
+        description: Digest of the published multi-arch manifest
+        value: ${{ jobs.publish.outputs.digest }}
+
+permissions:
+  contents: read
+
+env:
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { platform: linux/amd64, runner: ubuntu-latest, pair: linux-amd64 }
+          - { platform: linux/arm64, runner: ubuntu-24.04-arm, pair: linux-arm64 }
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ inputs.ref }}
+      - id: sha
+        run: echo "short=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          build-args: GIT_SHA=${{ steps.sha.outputs.short }}
+          # Provenance and the SBOM are attested on the final multi-arch
+          # manifest below; per-platform attestation manifests would leak
+          # `unknown/unknown` entries into it.
+          provenance: false
+          sbom: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.sha.outputs.short }}
+            org.opencontainers.image.licenses=LicenseRef-Sustainable-Use
+          cache-from: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-next-${{ matrix.pair }}
+          cache-to: type=registry,ref=${{ env.REGISTRY_IMAGE }}:buildcache-next-${{ matrix.pair }},mode=max
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+      - name: Export digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: digests-${{ matrix.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
+      id-token: write # keyless signing of the attestations
+      attestations: write
+    outputs:
+      digest: ${{ steps.manifest.outputs.digest }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create the multi-arch manifest
+        id: manifest
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          TAGS: ${{ inputs.tags }}
+        run: |
+          args=()
+          first=""
+          while IFS= read -r tag; do
+            [ -n "$tag" ] || continue
+            [ -n "$first" ] || first="$tag"
+            args+=(-t "$REGISTRY_IMAGE:$tag")
+          done <<< "$TAGS"
+          [ -n "$first" ] || { echo "::error::no tags given"; exit 1; }
+          # shellcheck disable=SC2046
+          docker buildx imagetools create "${args[@]}" \
+            $(printf "$REGISTRY_IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$REGISTRY_IMAGE:$first"
+          digest=$(docker buildx imagetools inspect "$REGISTRY_IMAGE:$first" --format '{{json .Manifest}}' | jq -r .digest)
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          echo "first=$first" >> "$GITHUB_OUTPUT"
+      - name: Trivy (HIGH/CRITICAL, fixable)
+        # Pinned by SHA: this action's tags have been tampered with before.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY_IMAGE }}@${{ steps.manifest.outputs.digest }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: SBOM (SPDX)
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: ${{ env.REGISTRY_IMAGE }}@${{ steps.manifest.outputs.digest }}
+          format: spdx-json
+          output: ${{ runner.temp }}/sbom.spdx.json
+          scan-type: image
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY_IMAGE }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          push-to-registry: true
+      - name: Attest SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY_IMAGE }}
+          subject-digest: ${{ steps.manifest.outputs.digest }}
+          sbom-path: ${{ runner.temp }}/sbom.spdx.json
+          push-to-registry: true

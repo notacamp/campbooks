@@ -1,0 +1,126 @@
+name: Release next
+
+# Versioned releases of `next`, in the `next-v<semver>` namespace so they never
+# collide with the Rails `v0.x.y` tags owned by `main` (until cutover).
+#
+# A release is cut by merging a PR that bumps `VERSION` (and the workspace
+# version in Cargo.toml) and rolls CHANGELOG.md `[Unreleased]` into a dated
+# `## [next-vX.Y.Z]` section (CONTRIBUTING.md → Releases). When CI is green on
+# that commit, this workflow:
+#
+#   1. sees `next-vX.Y.Z` does not exist yet and the changelog section does
+#   2. builds + scans + attests the image as :next-vX.Y.Z and :next-vX.Y
+#      (image.yml, the same recipe as every push to next)
+#   3. creates the tag and a GitHub PRERELEASE with the changelog as notes
+#
+# It never commits to `next`: the branch ruleset needs checks on every commit,
+# so a bot cannot push the changelog roll. The roll is part of the bump PR and
+# the Policy check verifies it. Tags are created only after the image passed
+# Trivy, so a failed scan leaves nothing to clean up; re-run the workflow.
+#
+# Future prod deploy hook: after the `release` job, add a job that sends a
+# `repository_dispatch` (event_type `campbooks-next-release`, payload
+# `{"tag":"next-vX.Y.Z"}`) to the cloud repo exactly like
+# `deploy-staging` in publish-next.yml. Deliberately absent today: staging
+# follows :next, and there is no production for next yet.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [next]
+  workflow_dispatch: # re-run a release whose image/scan step failed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-next
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: >-
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'next') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.plan.outputs.release }}
+      ref: ${{ steps.plan.outputs.ref }}
+      version: ${{ steps.plan.outputs.version }}
+      minor: ${{ steps.plan.outputs.minor }}
+      tag: ${{ steps.plan.outputs.tag }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - id: plan
+        run: |
+          version=$(tr -d '[:space:]' < VERSION)
+          tag="next-v${version}"
+          echo "ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "minor=${version%.*}" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "::notice::$tag already exists; nothing to release."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          rc=0
+          .github/scripts/release-notes.sh "$version" >/dev/null || rc=$?
+          if [ "$rc" = 2 ]; then
+            echo "::notice::VERSION is $version but CHANGELOG.md has no '## [$tag]' section; not a release commit."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          elif [ "$rc" != 0 ]; then
+            exit "$rc"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  image:
+    needs: plan
+    if: needs.plan.outputs.release == 'true'
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ needs.plan.outputs.ref }}
+      tags: |
+        ${{ needs.plan.outputs.tag }}
+        next-v${{ needs.plan.outputs.minor }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+  release:
+    needs: [plan, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # create the tag and the release
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ needs.plan.outputs.ref }}
+      - name: Create the tag and the prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.plan.outputs.tag }}
+          VERSION: ${{ needs.plan.outputs.version }}
+          REF: ${{ needs.plan.outputs.ref }}
+          DIGEST: ${{ needs.image.outputs.digest }}
+          IMAGE: ghcr.io/${{ github.repository }}
+        run: |
+          {
+            .github/scripts/release-notes.sh "$VERSION"
+            printf '\n---\n\nImage: `%s:%s` (`%s@%s`), linux/amd64 + linux/arm64.\n' \
+              "$IMAGE" "$TAG" "$IMAGE" "$DIGEST"
+            printf 'Verify: `gh attestation verify oci://%s:%s --repo %s`\n' \
+              "$IMAGE" "$TAG" "$GITHUB_REPOSITORY"
+          } > "$RUNNER_TEMP/notes.md"
+          # --target pins the tag to the commit CI approved, not the branch tip.
+          gh release create "$TAG" --target "$REF" --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" --prerelease --latest=false

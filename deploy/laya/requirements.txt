@@ -1,0 +1,13 @@
+# laya-serve and the libraries it runs on, pinned (each release is at least two
+# weeks old when pinned). torch is installed first from the PyTorch CPU index
+# (see Dockerfile), so the CUDA wheels never download.
+laya[serve]==0.3.21
+transformers==5.17.0
+tokenizers==0.23.2
+huggingface_hub==1.33.0
+safetensors==0.8.0
+numpy==2.5.3
+fastapi==0.141.1
+starlette==1.7.0
+uvicorn==0.54.0
+python-multipart==0.0.32
