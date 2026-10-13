@@ -1,6 +1,6 @@
 # 0004 — OAuth 2.1 with a dedicated IdP; BFF for web, keychain for native
 
-**Status:** Accepted · 2026-10-12 — IdP: **Rauthy** (spike done 2026-10-12, see Evaluation)
+**Status:** Superseded by [0014](0014-campbooks-owned-identity.md) · was Accepted 2026-10-12 — IdP: **Rauthy** (spike done 2026-10-12, see Evaluation)
 
 ## Context
 First-party clients (web, desktop, mobile) and third-party clients
