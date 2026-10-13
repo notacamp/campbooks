@@ -9,16 +9,17 @@
 //! client gates against the regenerated API types, and checks that OpenSpec
 //! rejects the unfinished change.
 //!
-//! By default the copy builds into `target/scaffold-check`, its own target
-//! directory, so the copy's `xtask` and server binaries never replace this
-//! checkout's; dependencies compile once there and are reused by later runs.
-//! `--target-dir target` reuses the checkout's own build instead, which is
-//! cheaper but overwrites those binaries: CI does it as the last step of a
-//! throwaway job.
+//! The copy builds into this checkout's target directory, so dependencies
+//! are not compiled twice. Cargo re-links a checkout's own binaries
+//! (`target/debug/xtask`, the server) whenever it runs them, so the copy's
+//! builds never stand in for this checkout's. The copy lives at a path
+//! derived from this checkout's, so repeated runs reuse its artifacts
+//! instead of piling up new ones.
 
 use std::{
     ffi::OsStr,
     fs,
+    hash::{DefaultHasher, Hash as _, Hasher as _},
     io::Write as _,
     path::{Path, PathBuf},
     process::Command,
@@ -50,21 +51,18 @@ const CLIENT_GATES: [&str; 8] = [
 ];
 
 /// Run the check. Keeps the copy for inspection when a step fails.
-pub fn run(root: &Path, full: bool, target_dir: Option<PathBuf>) -> Result<String> {
-    let copy =
-        std::env::temp_dir().join(format!("campbooks-scaffold-check-{}", std::process::id()));
+pub fn run(root: &Path, full: bool) -> Result<String> {
+    let copy = std::env::temp_dir().join(format!("campbooks-scaffold-check-{:016x}", {
+        let mut hasher = DefaultHasher::new();
+        root.hash(&mut hasher);
+        hasher.finish()
+    }));
     if copy.exists() {
         fs::remove_dir_all(&copy).with_context(|| format!("clearing {}", copy.display()))?;
     }
     copy_repository(root, &copy)?;
-    let target = target_dir.map_or_else(
-        || {
-            std::env::var_os("CARGO_TARGET_DIR")
-                .map_or_else(|| root.join("target"), PathBuf::from)
-                .join("scaffold-check")
-        },
-        |dir| root.join(dir),
-    );
+    let target =
+        std::env::var_os("CARGO_TARGET_DIR").map_or_else(|| root.join("target"), PathBuf::from);
 
     let result = generate_and_check(&copy, &target, full);
     match result {

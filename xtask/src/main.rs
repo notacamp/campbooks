@@ -69,11 +69,6 @@ enum Command {
         /// unfinished change (needs `pnpm install` in clients/ and npx).
         #[arg(long)]
         full: bool,
-        /// Cargo target directory for the copy (default:
-        /// `target/scaffold-check`). Sharing the checkout's `target` is cheaper
-        /// but overwrites its `xtask` and server binaries.
-        #[arg(long)]
-        target_dir: Option<PathBuf>,
     },
 }
 
@@ -85,9 +80,7 @@ fn main() -> ExitCode {
         Command::Openapi { check } => openapi::run(&root, check),
         Command::NewModule { name, issue } => run_new_module(&root, &name, issue),
         Command::NewFeature { module, feature } => run_new_feature(&root, &module, &feature),
-        Command::ScaffoldCheck { full, target_dir } => {
-            scaffold::check::run(&root, full, target_dir)
-        }
+        Command::ScaffoldCheck { full } => scaffold::check::run(&root, full),
     };
     match result {
         Ok(message) => {

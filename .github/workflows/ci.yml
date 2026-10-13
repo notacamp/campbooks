@@ -74,9 +74,7 @@ jobs:
         if: always()
         # `cargo xtask new-module` + `new-feature` in a temporary copy, then
         # fmt, OpenAPI, arch, clippy, the generated tests and machete on it.
-        # Kept last: sharing this job's target dir overwrites the xtask and
-        # server binaries, which nothing uses afterwards.
-        run: cargo xtask scaffold-check --target-dir target
+        run: cargo xtask scaffold-check
 
   deny:
     runs-on: ubuntu-latest
