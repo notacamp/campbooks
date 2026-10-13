@@ -153,5 +153,53 @@
     "replyAll": "Responder a todos",
     "forward": "Reencaminhar",
     "showImages": "Mostrar imagens"
+  },
+  "compose": {
+    "title": {
+      "reply": "Responder a {{name}}",
+      "reply_all": "Responder a todos",
+      "forward": "Reencaminhar",
+      "new": "Nova mensagem"
+    },
+    "newMessage": "Nova mensagem",
+    "noInbox": "Ligue uma caixa de correio para enviar a partir dela.",
+    "readOnly": "Pode ler esta caixa de correio, mas não enviar a partir dela.",
+    "from": "De",
+    "sending": "A enviar para {{name}}",
+    "sendingNoName": "A enviar",
+    "draftSaved": "Rascunho guardado",
+    "saveState": {
+      "saved": "Guardado",
+      "saving": "A guardar…",
+      "unsaved": "Ainda não guardado",
+      "failed": "Não foi possível guardar. O Campbooks vai tentar de novo."
+    },
+    "quote": {
+      "wrote": "Em {{date}}, {{name}} escreveu:",
+      "forwarded": "Mensagem reencaminhada",
+      "from": "De",
+      "date": "Data",
+      "subject": "Assunto",
+      "to": "Para"
+    },
+    "errors": {
+      "no_recipients": "Adicione pelo menos um destinatário.",
+      "invalid_address": "Um dos endereços não é válido.",
+      "attachments_too_large": "Os anexos são demasiado grandes para enviar (no máximo 25 MB).",
+      "draft_not_editable": "Esta mensagem já está a caminho.",
+      "not_connected": "Esta caixa de correio já não está ligada. Volte a ligá-la e envie de novo.",
+      "needs_reauth": "O Campbooks precisa de nova autorização para enviar a partir desta caixa de correio. Volte a ligá-la e envie de novo.",
+      "rejected": "O Gmail recusou esta mensagem. Verifique os endereços e tente de novo.",
+      "too_large": "Esta mensagem é demasiado grande para o Gmail a enviar.",
+      "unavailable": "Não foi possível contactar o Gmail, por isso nada foi enviado. Tente de novo.",
+      "unknown_outcome": "O Campbooks não conseguiu confirmar que esta mensagem foi enviada. Verifique a pasta Enviados antes de a enviar de novo.",
+      "unknown": "Algo correu mal. Tente de novo.",
+      "not_saved": "Não foi possível guardar as últimas alterações, por isso nada foi enviado. Tente de novo.",
+      "draft_changed": "Este rascunho foi alterado noutro sítio. Feche-o e abra-o de novo para ver a versão mais recente."
+    },
+    "shortcuts": {
+      "newMessage": "Nova mensagem"
+    },
+    "tooLate": "Já não é possível anular: a mensagem foi enviada."
   }
 }

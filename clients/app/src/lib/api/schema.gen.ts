@@ -480,6 +480,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/drafts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List your drafts. */
+        get: operations["conversations.list_drafts"];
+        put?: never;
+        /** Start a draft. */
+        post: operations["conversations.create_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one of your drafts. */
+        get: operations["conversations.get_draft"];
+        put?: never;
+        post?: never;
+        /** Discard a draft (also a scheduled one, which then never leaves). */
+        delete: operations["conversations.delete_draft"];
+        options?: never;
+        head?: never;
+        /** Save a draft. */
+        patch: operations["conversations.update_draft"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/cancel_send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take a send back within its undo window. */
+        post: operations["conversations.cancel_send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/drafts/{draft_id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a draft. */
+        post: operations["conversations.send_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
         parameters: {
             query?: never;
@@ -1247,6 +1318,116 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description A forwarded attachment, as the draft shows it. */
+        DraftAttachment: {
+            /** @description Its media type, as sent (not trusted). */
+            content_type: string;
+            /** @description Its file name. */
+            filename: string;
+            /** @description The original message's attachment. */
+            id: components["schemas"]["AttachmentId"];
+            /**
+             * Format: int64
+             * @description Its size in bytes.
+             */
+            size: number;
+        };
+        /** @description The fields to change; the others stay. */
+        DraftChanges: {
+            /** @description The forwarded attachments to keep (the others are dropped). */
+            attachments?: components["schemas"]["AttachmentId"][] | null;
+            /** @description Blind-copied recipients. */
+            bcc?: components["schemas"]["Address"][] | null;
+            /** @description The text. */
+            body?: string | null;
+            /** @description Copied recipients. */
+            cc?: components["schemas"]["Address"][] | null;
+            /** @description The quoted history. */
+            quoted?: string | null;
+            /** @description The subject. */
+            subject?: string | null;
+            /** @description Recipients. */
+            to?: components["schemas"]["Address"][] | null;
+            /**
+             * Format: int32
+             * @description The version this change was made on (from the draft last read).
+             */
+            version: number;
+        };
+        /**
+         * Format: uuid
+         * @description DraftId (UUIDv7)
+         */
+        DraftId: string;
+        /**
+         * @description What a draft answers.
+         * @enum {string}
+         */
+        DraftKind: "new" | "reply" | "reply_all" | "forward";
+        /** @description The caller's drafts. */
+        DraftList: {
+            /** @description Newest first, at most 50. */
+            drafts: components["schemas"]["DraftView"][];
+        };
+        /**
+         * @description Where a draft is in its life.
+         * @enum {string}
+         */
+        DraftState: "draft" | "scheduled" | "sending" | "failed";
+        /** @description A draft. */
+        DraftView: {
+            /** @description The forwarded attachments. */
+            attachments: components["schemas"]["DraftAttachment"][];
+            /** @description Blind-copied recipients. */
+            bcc: components["schemas"]["Address"][];
+            /** @description What the member writes: plain text with basic formatting. */
+            body: string;
+            /** @description Copied recipients. */
+            cc: components["schemas"]["Address"][];
+            conversation_id?: components["schemas"]["ConversationId"] | null;
+            /**
+             * Format: date-time
+             * @description When it was started.
+             */
+            created_at: string;
+            /**
+             * @description Why the last send failed (`not_connected`, `needs_reauth`,
+             *     `rejected`, `too_large`, `unknown_outcome`).
+             */
+            failure_reason?: string | null;
+            /** @description The inbox's address and name. */
+            from: components["schemas"]["Address"];
+            /** @description The draft. */
+            id: components["schemas"]["DraftId"];
+            /** @description The inbox it is sent from. */
+            inbox_id: components["schemas"]["InboxId"];
+            /** @description What it answers. */
+            kind: components["schemas"]["DraftKind"];
+            message_id?: components["schemas"]["MessageId"] | null;
+            /** @description The quoted history under it. */
+            quoted: string;
+            /**
+             * Format: date-time
+             * @description When a scheduled send leaves (until then it can be cancelled).
+             */
+            send_at?: string | null;
+            /** @description Where it is in its life. */
+            state: components["schemas"]["DraftState"];
+            /** @description The subject. */
+            subject: string;
+            /** @description Recipients. */
+            to: components["schemas"]["Address"][];
+            /**
+             * Format: date-time
+             * @description When it was last saved.
+             */
+            updated_at: string;
+            /**
+             * Format: int32
+             * @description Bumped by every save; name it when saving.
+             */
+            version: number;
+        };
         /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
         EndSession: {
             /** @description The client asking; must be the hint's audience when given. */
@@ -1511,6 +1692,28 @@ export interface components {
             /** @description The provider signed in with. */
             provider: string;
         };
+        /** @description A message to start. */
+        NewDraft: {
+            /** @description Blind-copied recipients. */
+            bcc?: components["schemas"]["Address"][] | null;
+            /** @description The text. */
+            body?: string | null;
+            /** @description Copied recipients, instead of the filled ones. */
+            cc?: components["schemas"]["Address"][] | null;
+            inbox_id?: components["schemas"]["InboxId"] | null;
+            /** @description What it answers. */
+            kind: components["schemas"]["DraftKind"];
+            message_id?: components["schemas"]["MessageId"] | null;
+            /**
+             * @description The quoted history (written by the client: an attribution line and
+             *     the message quoted with `> `, or a forwarded-message header).
+             */
+            quoted?: string | null;
+            /** @description The subject, instead of the filled one. */
+            subject?: string | null;
+            /** @description Recipients, instead of the filled ones. */
+            to?: components["schemas"]["Address"][] | null;
+        };
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -1620,6 +1823,15 @@ export interface components {
             /** @description Ids and roles involved; never secrets. */
             metadata: unknown;
             user_id?: components["schemas"]["UserId"] | null;
+        };
+        /** @description Which version of the draft to send: the one the member last saw saved. */
+        SendDraft: {
+            /**
+             * Format: int32
+             * @description The draft's version as last saved by the caller; any other answers
+             *     409 `draft_changed`, so what is sent is what the member saw.
+             */
+            version: number;
         };
         /** @description Who is signed in. Never contains a token. */
         SessionInfo: {
@@ -3480,6 +3692,442 @@ export interface operations {
             };
             /** @description No such conversation, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_drafts": {
+        parameters: {
+            query?: {
+                /** @description Only drafts answering this conversation. */
+                conversation_id?: components["schemas"]["ConversationId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your drafts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.create_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewDraft"];
+            };
+        };
+        responses: {
+            /** @description The draft. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description A missing inbox or message, or a field over its limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox or message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The draft. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.delete_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description On its way (`draft_not_editable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.update_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DraftChanges"];
+            };
+        };
+        responses: {
+            /** @description The draft, with its new version. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description A field over its limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Changed since that version (`draft_changed`), or on its way (`draft_not_editable`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.cancel_send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A draft again. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours (a sent draft is gone). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It has already left (`too_late`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.send_draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The draft. */
+                draft_id: components["schemas"]["DraftId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendDraft"];
+            };
+        };
+        responses: {
+            /** @description Scheduled: it leaves at `send_at` unless cancelled. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftView"];
+                };
+            };
+            /** @description No recipient (`no_recipients`), a malformed address (`invalid_address`) or too many attachments (`attachments_too_large`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you only read its inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such draft, or it is not yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

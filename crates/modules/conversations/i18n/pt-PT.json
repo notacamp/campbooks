@@ -3,6 +3,17 @@
     "invalid_limit": "O limite tem de estar entre 1 e {{max}}.",
     "invalid_cursor": "Esta ligação de página não é válida. Recomece pela primeira página.",
     "invalid_label_name": "O nome de uma etiqueta tem de ter entre 1 e {{max}} caracteres.",
-    "inbox_read_only": "Pode ler esta caixa de entrada, mas não alterar as suas conversas. Peça acesso de envio a quem a gere."
+    "inbox_read_only": "Pode ler esta caixa de entrada, mas não alterar as suas conversas. Peça acesso de envio a quem a gere.",
+    "draft_needs_inbox": "Uma mensagem nova precisa da caixa de correio de onde é enviada.",
+    "draft_needs_message": "Uma resposta ou um reencaminhamento precisa da mensagem a que responde.",
+    "too_many_recipients": "Uma mensagem pode ter no máximo {{max}} destinatários.",
+    "invalid_subject": "O assunto é uma só linha com no máximo {{max}} carateres.",
+    "draft_too_long": "Esta mensagem é demasiado longa para ser enviada.",
+    "draft_changed": "Este rascunho foi alterado noutro sítio. Recarregue-o para ver a versão mais recente.",
+    "draft_not_editable": "Esta mensagem já está a caminho e não pode ser alterada.",
+    "no_recipients": "Adicione pelo menos um destinatário.",
+    "invalid_address": "Este endereço não é válido: {{address}}",
+    "attachments_too_large": "Os anexos podem somar no máximo {{max}} MB.",
+    "too_late": "Já não é possível anular: a mensagem já foi enviada."
   }
 }

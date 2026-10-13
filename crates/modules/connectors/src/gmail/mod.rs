@@ -12,6 +12,7 @@
 //!   known messages are re-checked, and indexed messages in the window that
 //!   Gmail no longer lists are removed.
 
+pub mod compose;
 pub mod normalize;
 mod read;
 pub mod write;
@@ -21,7 +22,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-pub use read::{ReadError, Reader};
+pub use read::{ReadError, Reader, store_message};
 
 use crate::{contract::MessageChange, domain::model::Phase, google::LabelInfo};
 

@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.jobs SET state = 'failed' WHERE kind = 'connectors.send_message' AND payload->>'give_up' = 'false'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "d96f6d48caf66184785d5675b2a5eec120264dcd946761472ec50de2745176f7"
+}

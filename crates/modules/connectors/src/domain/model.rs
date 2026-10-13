@@ -25,6 +25,11 @@ campbooks_kernel::define_id!(
 );
 
 campbooks_kernel::define_id!(
+    /// A send asked for by the conversations module: its idempotency key.
+    SendId
+);
+
+campbooks_kernel::define_id!(
     /// A conversations inbox. Minted here when a connection gains the
     /// `messages` capability; the conversations module owns the inbox.
     InboxId

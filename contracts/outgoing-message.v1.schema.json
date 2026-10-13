@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/outgoing-message.v1.schema.json",
+  "title": "Outgoing message v1",
+  "description": "A message a member asked to send, as the conversations module writes it (a blob of the workspace, media type `application/vnd.campbooks.outgoing-message+json; version=1`) and a connector reads it to send through the provider. Provider neutral: an adapter builds RFC 5322, or the provider's JSON, from it. Bodies are inline; attachments are blobs of the same workspace.",
+  "type": "object",
+  "required": [
+    "version",
+    "inbox",
+    "send_id",
+    "rfc_message_id",
+    "from",
+    "to",
+    "cc",
+    "bcc",
+    "subject",
+    "date",
+    "references",
+    "text",
+    "attachments"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "inbox": {
+      "$ref": "#/$defs/uuid",
+      "description": "The conversations inbox it is sent from."
+    },
+    "send_id": {
+      "$ref": "#/$defs/uuid",
+      "description": "The send's id: the idempotency key of this send."
+    },
+    "rfc_message_id": {
+      "type": "string",
+      "minLength": 3,
+      "description": "The RFC 5322 `Message-ID` to send with, without angle brackets."
+    },
+    "from": {
+      "$ref": "#/$defs/address",
+      "description": "The inbox's address and name."
+    },
+    "to": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/address"
+      }
+    },
+    "cc": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/address"
+      }
+    },
+    "bcc": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/address"
+      }
+    },
+    "subject": {
+      "type": "string",
+      "maxLength": 998
+    },
+    "date": {
+      "type": "string",
+      "format": "date-time",
+      "description": "The `Date` header."
+    },
+    "in_reply_to": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "`In-Reply-To`, without angle brackets."
+    },
+    "references": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "description": "`References`, oldest first, without angle brackets."
+    },
+    "thread_key": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The provider's thread to send in (Gmail `threadId`), when replying or forwarding."
+    },
+    "text": {
+      "type": "string",
+      "description": "The plain-text part, UTF-8."
+    },
+    "html": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "The HTML alternative, UTF-8, rendered by Campbooks from the text's basic formatting."
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "filename",
+          "content_type",
+          "blob"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "filename": {
+            "type": "string"
+          },
+          "content_type": {
+            "type": "string"
+          },
+          "blob": {
+            "$ref": "#/$defs/blob"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "blob": {
+      "type": "object",
+      "required": [
+        "hash",
+        "size",
+        "content_type"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hash": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "content_type": {
+          "type": "string"
+        }
+      }
+    },
+    "address": {
+      "type": "object",
+      "required": [
+        "address"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "address": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 320
+        }
+      }
+    }
+  }
+}

@@ -14,6 +14,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Reply, reply all, forward and new messages, sent through your Gmail. The
+  composer opens under the thread (R, A, F) or on its own screen (C): From
+  your mailbox, To, Cc and Bcc as chips, the quoted history folded under your
+  text, forwarded attachments you can drop, and plain text with basic
+  formatting (⌘B, ⌘I, lists). Drafts save as you type and come back when you
+  reopen the conversation. ⌘↵ sends after a 10-second window in which Undo
+  takes it back (`CAMPBOOKS_CONVERSATIONS__UNDO_SEND_SECONDS`, 0 to 60). A
+  send never goes out twice, even after a timeout or a restart, and the sent
+  message appears in its conversation at once. Sending needs the `sender`
+  or `manager` role on the inbox and the new `conversations:send` scope,
+  which the web app asks for by itself; mailboxes already connected need no
+  new consent.
 - What you do to mail in Campbooks now happens in Gmail too: marking read or
   unread, starring, archiving and moving back to the inbox, adding or
   removing a Gmail label, and moving a conversation to Primary, Updates or
@@ -354,6 +366,8 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
+  new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes
   (`style-src-attr 'unsafe-inline'`) and `https:` images, which sanitised
   email bodies need inside their sandboxed frame; scripts, style sheets and

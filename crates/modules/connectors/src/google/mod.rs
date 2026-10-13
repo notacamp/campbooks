@@ -17,6 +17,9 @@ use url::Url;
 
 pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
+/// The longest any call to Google may take.
+pub const HTTP_TIMEOUT: Duration = Duration::from_mins(1);
+
 /// The scope the `messages` capability needs: read mail and change labels,
 /// no permanent deletion.
 pub const GMAIL_SCOPE: &str = "https://www.googleapis.com/auth/gmail.modify";
@@ -55,6 +58,8 @@ pub struct Endpoints {
     pub revoke: Url,
     /// The Gmail API base, up to `/gmail/v1/`.
     pub gmail: Url,
+    /// The Gmail upload base, up to `/upload/gmail/v1/` (sending).
+    pub gmail_upload: Url,
 }
 
 impl Endpoints {
@@ -65,6 +70,7 @@ impl Endpoints {
             token: parse("https://oauth2.googleapis.com/token"),
             revoke: parse("https://oauth2.googleapis.com/revoke"),
             gmail: parse("https://gmail.googleapis.com/gmail/v1/"),
+            gmail_upload: parse("https://gmail.googleapis.com/upload/gmail/v1/"),
         }
     }
 
@@ -78,6 +84,7 @@ impl Endpoints {
             token: join("token"),
             revoke: join("revoke"),
             gmail: join("gmail/v1/"),
+            gmail_upload: join("upload/gmail/v1/"),
         }
     }
 }
@@ -165,7 +172,7 @@ impl Google {
     ) -> Result<Self, String> {
         let http = reqwest::Client::builder()
             .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
-            .timeout(Duration::from_mins(1))
+            .timeout(HTTP_TIMEOUT)
             .connect_timeout(Duration::from_secs(10))
             .build()
             .map_err(|e| format!("could not build the Google client: {e}"))?;
@@ -179,7 +186,12 @@ impl Google {
 
     /// The Gmail API with `access_token`.
     pub fn gmail<'a>(&'a self, access_token: &'a str) -> Gmail<'a> {
-        Gmail::new(&self.http, &self.endpoints.gmail, access_token)
+        Gmail::new(
+            &self.http,
+            &self.endpoints.gmail,
+            &self.endpoints.gmail_upload,
+            access_token,
+        )
     }
 
     /// A fresh access token for `refresh_token`.

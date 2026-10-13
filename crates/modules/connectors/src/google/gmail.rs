@@ -11,6 +11,7 @@ use super::{GoogleError, failure, json, transport};
 pub struct Gmail<'a> {
     http: &'a reqwest::Client,
     base: &'a Url,
+    upload: &'a Url,
     token: &'a str,
 }
 
@@ -40,6 +41,19 @@ pub struct LabelInfo {
 pub struct MessageRef {
     /// The message id.
     pub id: String,
+}
+
+/// What `users.messages.send` answers.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SentMessage {
+    /// The sent message's id.
+    pub id: String,
+    /// Its thread.
+    pub thread_id: String,
+    /// Its labels (`SENT`, …).
+    #[serde(default)]
+    pub label_ids: Vec<String>,
 }
 
 /// One page of `users.messages.list`.
@@ -136,8 +150,18 @@ pub struct HistoryMessage {
 }
 
 impl<'a> Gmail<'a> {
-    pub(super) fn new(http: &'a reqwest::Client, base: &'a Url, token: &'a str) -> Self {
-        Self { http, base, token }
+    pub(super) fn new(
+        http: &'a reqwest::Client,
+        base: &'a Url,
+        upload: &'a Url,
+        token: &'a str,
+    ) -> Self {
+        Self {
+            http,
+            base,
+            upload,
+            token,
+        }
     }
 
     fn url(&self, path: &str) -> Result<Url, GoogleError> {
@@ -324,5 +348,69 @@ impl<'a> Gmail<'a> {
             params.push(("pageToken", token));
         }
         self.get("users/me/history", &params).await
+    }
+
+    /// `users.messages.send` of the RFC 5322 `raw` message, in `thread`
+    /// when given (a multipart upload: the metadata, then the message).
+    /// Never retried here: the caller decides, knowing whether Gmail may
+    /// have it.
+    pub async fn send(&self, raw: &[u8], thread: Option<&str>) -> Result<SentMessage, GoogleError> {
+        let mut url = self
+            .upload
+            .join("users/me/messages/send")
+            .map_err(|e| GoogleError::Unexpected(format!("Gmail URL: {e}")))?;
+        url.query_pairs_mut().append_pair("uploadType", "multipart");
+        let boundary = format!("campbooks-{}", uuid::Uuid::now_v7().simple());
+        let metadata = match thread {
+            Some(thread) => serde_json::json!({ "threadId": thread }),
+            None => serde_json::json!({}),
+        };
+        let mut body = Vec::with_capacity(raw.len() + 512);
+        body.extend_from_slice(
+            format!(
+                "--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{metadata}\r\n\
+                 --{boundary}\r\nContent-Type: message/rfc822\r\n\r\n"
+            )
+            .as_bytes(),
+        );
+        body.extend_from_slice(raw);
+        body.extend_from_slice(format!("\r\n--{boundary}--\r\n").as_bytes());
+        let response = self
+            .http
+            .post(url)
+            .bearer_auth(self.token)
+            .header(
+                reqwest::header::CONTENT_TYPE,
+                format!("multipart/related; boundary={boundary}"),
+            )
+            .body(body)
+            .send()
+            .await
+            .map_err(transport)?;
+        if !response.status().is_success() {
+            return Err(failure(response).await);
+        }
+        // Accepted: an answer we cannot read must not count as a refusal.
+        response.json().await.map_err(|e| {
+            GoogleError::Unavailable(format!("unreadable answer to a send: {}", e.without_url()))
+        })
+    }
+
+    /// The message with RFC 5322 `Message-ID` `rfc_message_id` (without
+    /// angle brackets), if the mailbox has it, spam and trash included.
+    pub async fn find_by_message_id(
+        &self,
+        rfc_message_id: &str,
+    ) -> Result<Option<MessageMeta>, GoogleError> {
+        let query = format!("rfc822msgid:{rfc_message_id}");
+        let page = self.list(&query, None, 1).await?;
+        match page.messages.first() {
+            Some(found) => match self.minimal(&found.id).await {
+                Ok(meta) => Ok(Some(meta)),
+                Err(GoogleError::NotFound) => Ok(None),
+                Err(other) => Err(other),
+            },
+            None => Ok(None),
+        }
     }
 }

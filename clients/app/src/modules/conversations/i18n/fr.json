@@ -153,5 +153,53 @@
     "replyAll": "Répondre à tous",
     "forward": "Transférer",
     "showImages": "Afficher les images"
+  },
+  "compose": {
+    "title": {
+      "reply": "Répondre à {{name}}",
+      "reply_all": "Répondre à tous",
+      "forward": "Transférer",
+      "new": "Nouveau message"
+    },
+    "newMessage": "Nouveau message",
+    "noInbox": "Connectez une boîte mail pour envoyer depuis celle-ci.",
+    "readOnly": "Vous pouvez lire cette boîte mail, mais pas envoyer depuis celle-ci.",
+    "from": "De",
+    "sending": "Envoi à {{name}}",
+    "sendingNoName": "Envoi en cours",
+    "draftSaved": "Brouillon enregistré",
+    "saveState": {
+      "saved": "Enregistré",
+      "saving": "Enregistrement…",
+      "unsaved": "Pas encore enregistré",
+      "failed": "Impossible d’enregistrer. Campbooks va réessayer."
+    },
+    "quote": {
+      "wrote": "Le {{date}}, {{name}} a écrit :",
+      "forwarded": "Message transféré",
+      "from": "De",
+      "date": "Date",
+      "subject": "Objet",
+      "to": "À"
+    },
+    "errors": {
+      "no_recipients": "Ajoutez au moins un destinataire.",
+      "invalid_address": "Une des adresses n’est pas valide.",
+      "attachments_too_large": "Les pièces jointes sont trop lourdes pour être envoyées (25 Mo au plus).",
+      "draft_not_editable": "Ce message est déjà en route.",
+      "not_connected": "Cette boîte mail n’est plus connectée. Reconnectez-la, puis renvoyez le message.",
+      "needs_reauth": "Campbooks a de nouveau besoin de votre autorisation pour envoyer depuis cette boîte mail. Reconnectez-la, puis renvoyez le message.",
+      "rejected": "Gmail a refusé ce message. Vérifiez les adresses et réessayez.",
+      "too_large": "Ce message est trop lourd pour que Gmail l’envoie.",
+      "unavailable": "Gmail était injoignable, rien n’a été envoyé. Réessayez.",
+      "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
+      "unknown": "Un problème est survenu. Réessayez.",
+      "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
+      "draft_changed": "Ce brouillon a été modifié ailleurs. Fermez-le et rouvrez-le pour voir la dernière version."
+    },
+    "shortcuts": {
+      "newMessage": "Nouveau message"
+    },
+    "tooLate": "Trop tard pour annuler : il a été envoyé."
   }
 }

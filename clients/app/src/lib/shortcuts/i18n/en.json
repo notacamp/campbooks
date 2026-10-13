@@ -24,7 +24,9 @@
   },
   "compose": {
     "draft": "Draft it for me",
-    "send": "Send"
+    "send": "Send",
+    "bold": "Bold",
+    "italic": "Italic"
   },
   "command": {
     "open": "Search or ask"

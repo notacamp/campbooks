@@ -24,7 +24,9 @@
   },
   "compose": {
     "draft": "Le rédiger pour moi",
-    "send": "Envoyer"
+    "send": "Envoyer",
+    "bold": "Gras",
+    "italic": "Italique"
   },
   "command": {
     "open": "Rechercher ou demander"

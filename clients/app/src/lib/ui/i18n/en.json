@@ -60,5 +60,34 @@
     "unread": "Unread",
     "starred": "Starred",
     "attachment": "Has attachments"
+  },
+  "recipients": {
+    "list": "{{label}} recipients",
+    "remove": "Remove {{name}}",
+    "invalid": "This is not an email address: {{address}}"
+  },
+  "composer": {
+    "from": "From",
+    "to": "To",
+    "cc": "Cc",
+    "bcc": "Bcc",
+    "copies": "Cc Bcc",
+    "subject": "Subject",
+    "body": "Message",
+    "formatting": "Formatting",
+    "format": {
+      "bold": "Bold",
+      "italic": "Italic",
+      "bullets": "Bulleted list",
+      "numbers": "Numbered list"
+    },
+    "showQuoted": "Show quoted text",
+    "hideQuoted": "Hide quoted text",
+    "quoted": "Quoted text",
+    "attachments": "Attachments",
+    "removeAttachment": "Remove {{name}}",
+    "discard": "Discard",
+    "send": "Send",
+    "close": "Close"
   }
 }

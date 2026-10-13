@@ -60,5 +60,34 @@
     "unread": "Não lida",
     "starred": "Com estrela",
     "attachment": "Tem anexos"
+  },
+  "recipients": {
+    "list": "Destinatários em {{label}}",
+    "remove": "Remover {{name}}",
+    "invalid": "Isto não é um endereço de email: {{address}}"
+  },
+  "composer": {
+    "from": "De",
+    "to": "Para",
+    "cc": "Cc",
+    "bcc": "Bcc",
+    "copies": "Cc Bcc",
+    "subject": "Assunto",
+    "body": "Mensagem",
+    "formatting": "Formatação",
+    "format": {
+      "bold": "Negrito",
+      "italic": "Itálico",
+      "bullets": "Lista com marcas",
+      "numbers": "Lista numerada"
+    },
+    "showQuoted": "Mostrar texto citado",
+    "hideQuoted": "Ocultar texto citado",
+    "quoted": "Texto citado",
+    "attachments": "Anexos",
+    "removeAttachment": "Remover {{name}}",
+    "discard": "Descartar",
+    "send": "Enviar",
+    "close": "Fechar"
   }
 }

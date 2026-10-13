@@ -153,5 +153,53 @@
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes"
+  },
+  "compose": {
+    "title": {
+      "reply": "Responder a {{name}}",
+      "reply_all": "Responder a todos",
+      "forward": "Reenviar",
+      "new": "Mensaje nuevo"
+    },
+    "newMessage": "Mensaje nuevo",
+    "noInbox": "Conecta un buzón para enviar desde él.",
+    "readOnly": "Puedes leer este buzón, pero no enviar desde él.",
+    "from": "De",
+    "sending": "Enviando a {{name}}",
+    "sendingNoName": "Enviando",
+    "draftSaved": "Borrador guardado",
+    "saveState": {
+      "saved": "Guardado",
+      "saving": "Guardando…",
+      "unsaved": "Sin guardar todavía",
+      "failed": "No se ha podido guardar. Campbooks lo volverá a intentar."
+    },
+    "quote": {
+      "wrote": "El {{date}}, {{name}} escribió:",
+      "forwarded": "Mensaje reenviado",
+      "from": "De",
+      "date": "Fecha",
+      "subject": "Asunto",
+      "to": "Para"
+    },
+    "errors": {
+      "no_recipients": "Añade al menos un destinatario.",
+      "invalid_address": "Una de las direcciones no es válida.",
+      "attachments_too_large": "Los archivos adjuntos son demasiado grandes para enviarlos (25 MB como máximo).",
+      "draft_not_editable": "Este mensaje ya está en camino.",
+      "not_connected": "Este buzón ya no está conectado. Vuelve a conectarlo y envíalo de nuevo.",
+      "needs_reauth": "Campbooks necesita tu permiso de nuevo para enviar desde este buzón. Vuelve a conectarlo y envíalo de nuevo.",
+      "rejected": "Gmail ha rechazado este mensaje. Revisa las direcciones e inténtalo de nuevo.",
+      "too_large": "Este mensaje es demasiado grande para que Gmail lo envíe.",
+      "unavailable": "No se ha podido contactar con Gmail, así que no se ha enviado nada. Inténtalo de nuevo.",
+      "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
+      "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
+      "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
+      "draft_changed": "Este borrador ha cambiado en otro sitio. Ciérralo y vuelve a abrirlo para ver la última versión."
+    },
+    "shortcuts": {
+      "newMessage": "Mensaje nuevo"
+    },
+    "tooLate": "Ya es tarde para deshacer: se ha enviado."
   }
 }

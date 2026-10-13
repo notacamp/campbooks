@@ -60,5 +60,34 @@
     "unread": "Non lue",
     "starred": "Suivie",
     "attachment": "Contient des pièces jointes"
+  },
+  "recipients": {
+    "list": "Destinataires en {{label}}",
+    "remove": "Retirer {{name}}",
+    "invalid": "Ce n’est pas une adresse e-mail : {{address}}"
+  },
+  "composer": {
+    "from": "De",
+    "to": "À",
+    "cc": "Cc",
+    "bcc": "Cci",
+    "copies": "Cc Cci",
+    "subject": "Objet",
+    "body": "Message",
+    "formatting": "Mise en forme",
+    "format": {
+      "bold": "Gras",
+      "italic": "Italique",
+      "bullets": "Liste à puces",
+      "numbers": "Liste numérotée"
+    },
+    "showQuoted": "Afficher le texte cité",
+    "hideQuoted": "Masquer le texte cité",
+    "quoted": "Texte cité",
+    "attachments": "Pièces jointes",
+    "removeAttachment": "Retirer {{name}}",
+    "discard": "Supprimer",
+    "send": "Envoyer",
+    "close": "Fermer"
   }
 }

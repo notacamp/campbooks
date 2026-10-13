@@ -486,10 +486,16 @@ export function handleGmail(
   if (path === "messages") {
     const query = url.searchParams.get("q") ?? "";
     const after = /after:(\d+)/u.exec(query)?.[1];
+    // `rfc822msgid:<id>`: how a sender checks whether a send it lost track of went out.
+    const wanted = /rfc822msgid:(\S+)/u.exec(query)?.[1]?.toLowerCase();
     const max = Number(url.searchParams.get("maxResults") ?? "100");
     const offset = Number(url.searchParams.get("pageToken") ?? "0");
     const matching = mailbox.messages
       .filter((message) => after === undefined || message.internalDate > Number(after) * 1000)
+      .filter(
+        (message) =>
+          wanted === undefined || message.raw.toLowerCase().includes(`message-id: <${wanted}>`),
+      )
       .toSorted((a, b) => b.internalDate - a.internalDate);
     const page = matching.slice(offset, offset + max);
     json(response, 200, {
@@ -529,6 +535,36 @@ export function handleGmail(
     return true;
   }
   return false;
+}
+
+/**
+ * `users.messages.send` as a multipart upload (`uploadType=multipart`): a
+ * JSON part with the `threadId`, then the RFC 5322 message. The message is
+ * stored as SENT in that thread (or a new one) and recorded in history, as
+ * Gmail does; nothing is delivered anywhere.
+ */
+export function sendMessage(
+  mailbox: Mailbox,
+  contentType: string,
+  body: string,
+): { status: number; value: unknown } {
+  const boundary = /boundary="?([^";]+)"?/u.exec(contentType)?.[1];
+  if (boundary === undefined) {
+    return { status: 400, value: { error: { code: 400, message: "Not a multipart upload" } } };
+  }
+  const parts = body.split(`--${boundary}`).slice(1, -1);
+  const content = (part: string) => part.slice(part.indexOf("\r\n\r\n") + 4).replace(/\r\n$/u, "");
+  const [metadataPart, messagePart] = parts;
+  if (metadataPart === undefined || messagePart === undefined) {
+    return { status: 400, value: { error: { code: 400, message: "Missing parts" } } };
+  }
+  const metadata = JSON.parse(content(metadataPart) || "{}") as { threadId?: string };
+  const known = mailbox.messages.some((message) => message.threadId === metadata.threadId);
+  const sent = appendMessage(mailbox, content(messagePart), ["SENT"], {
+    ...(metadata.threadId !== undefined && known ? { threadId: metadata.threadId } : {}),
+  });
+  console.log(`fake Google: sent a message in thread ${sent.threadId} (not delivered)`);
+  return { status: 200, value: { id: sent.id, threadId: sent.threadId, labelIds: sent.labelIds } };
 }
 
 /** The demo pictures the newsletters link to (served under `/images/`). */

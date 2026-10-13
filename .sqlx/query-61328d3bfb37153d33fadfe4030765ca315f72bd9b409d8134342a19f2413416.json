@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversations.drafts\n           SET state = $2, send_generation = send_generation + 1, send_at = $3,\n               failure_reason = NULL, updated_at = now()\n         WHERE id = $1\n        RETURNING send_generation\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "send_generation",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "send_generation"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "61328d3bfb37153d33fadfe4030765ca315f72bd9b409d8134342a19f2413416"
+}

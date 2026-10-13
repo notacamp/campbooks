@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::domain::model::{Capability, ConnectionId, InboxId, Provider};
+use crate::domain::model::{Capability, ConnectionId, InboxId, Provider, SendId};
 
 /// The record type of a connection in the client change feed.
 pub const CONNECTION_RECORD: &str = "connectors.connection";
@@ -187,6 +187,70 @@ pub struct MessagesChanged {
 
 impl DomainEvent for MessagesChanged {
     const NAME: &'static str = "connectors.messages_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// How a send ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SendOutcome {
+    /// The provider accepted it.
+    Sent,
+    /// It was not sent, or may not have been (`unknown_outcome`).
+    Failed,
+}
+
+/// A send asked for by `conversations.send_requested` ended
+/// (`contracts/connectors.send_completed.v1.schema.json`). Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SendCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox it was sent from.
+    pub inbox_id: InboxId,
+    /// The send.
+    pub send_id: SendId,
+    /// Sent or failed.
+    pub outcome: SendOutcome,
+    /// The provider's id of the sent message (sent only).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_message_id: Option<String>,
+    /// Why it failed (failed only): `not_connected`, `needs_reauth`,
+    /// `rejected`, `too_large`, `unavailable` (nothing was sent) or
+    /// `unknown_outcome` (it may have been).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl DomainEvent for SendCompleted {
+    const NAME: &'static str = "connectors.send_completed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `conversations.send_requested` v1, as this module reads it
+/// (`contracts/conversations.send_requested.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SendRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox to send from.
+    pub inbox_id: InboxId,
+    /// The send: recorded once.
+    pub send_id: SendId,
+    /// The outgoing-message v1 document, a blob of the workspace.
+    pub message: BlobRef,
+}
+
+impl DomainEvent for SendRequested {
+    const NAME: &'static str = "conversations.send_requested";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

@@ -33,6 +33,7 @@ import {
   demoImage,
   describeMailbox,
   handleGmail,
+  sendMessage,
   type Mailbox,
   writeGmail,
 } from "./fake-gmail.ts";
@@ -321,6 +322,19 @@ const server = createServer((request, response) => {
         if (await writeGmail(request, url, response, mailboxOf(sub))) {
           return;
         }
+      }
+      if (url.pathname === "/upload/gmail/v1/users/me/messages/send" && request.method === "POST") {
+        const sub = bearer(request);
+        if (sub === undefined) {
+          json(response, 401, { error: { code: 401, message: "Invalid Credentials" } });
+          return;
+        }
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) chunks.push(Buffer.from(chunk as Uint8Array));
+        const raw = Buffer.concat(chunks).toString("utf8");
+        const answer = sendMessage(mailboxOf(sub), request.headers["content-type"] ?? "", raw);
+        json(response, answer.status, answer.value);
+        return;
       }
       if (url.pathname.startsWith("/images/")) {
         const image = demoImage(url.pathname.slice("/images/".length));

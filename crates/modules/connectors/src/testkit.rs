@@ -545,6 +545,8 @@ struct Mailbox {
     rate_limit_next: Option<u64>,
     email_unverified: bool,
     unauthorized_next: bool,
+    /// What goes wrong with the next send.
+    send_fault: Option<SendFault>,
     calls: Vec<String>,
     /// Messages whose labels Gmail refuses to change (400).
     refusing: Vec<String>,
@@ -552,6 +554,17 @@ struct Mailbox {
     unavailable_next: u32,
     /// The next this many `getProfile` calls answer 503.
     profile_unavailable_next: u32,
+}
+
+/// What goes wrong with a send.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendFault {
+    /// Answer this status and send nothing.
+    Refuse(u16),
+    /// Send it, but answer 503, as when the answer is lost.
+    LoseAnswer,
+    /// Send it, and answer 200 with a body that does not parse.
+    GarbleAnswer,
 }
 
 /// Google's OAuth and Gmail endpoints, faked over a mutable mailbox.
@@ -757,6 +770,40 @@ impl FakeGoogle {
         self.lock().calls.clone()
     }
 
+    /// The next send answers `status` and sends nothing.
+    pub fn refuse_next_send(&self, status: u16) {
+        self.lock().send_fault = Some(SendFault::Refuse(status));
+    }
+
+    /// The next send goes out, but its answer is lost (503).
+    pub fn lose_next_send_answer(&self) {
+        self.lock().send_fault = Some(SendFault::LoseAnswer);
+    }
+
+    /// The next send goes out, with an answer that cannot be read.
+    pub fn garble_next_send_answer(&self) {
+        self.lock().send_fault = Some(SendFault::GarbleAnswer);
+    }
+
+    /// The messages sent, oldest first: their thread and raw bytes.
+    pub fn sent(&self) -> Vec<FakeMessage> {
+        self.lock()
+            .messages
+            .values()
+            .filter(|m| m.labels.iter().any(|l| l == "SENT") && m.id.starts_with("sent-"))
+            .cloned()
+            .collect()
+    }
+
+    /// How many `messages.send` calls were made.
+    pub fn send_calls(&self) -> usize {
+        self.lock()
+            .calls
+            .iter()
+            .filter(|c| c.starts_with("POST /upload/gmail/v1/users/me/messages/send"))
+            .count()
+    }
+
     /// How many raw downloads of `id` were made.
     pub fn raw_fetches(&self, id: &str) -> usize {
         let needle = format!("GET /gmail/v1/users/me/messages/{id}?format=raw");
@@ -802,6 +849,12 @@ impl Respond for Responder {
                 let token = form(&request.body).remove("token").unwrap_or_default();
                 mailbox.revoked.push(token);
                 ResponseTemplate::new(200)
+            }
+            ("POST", "/upload/gmail/v1/users/me/messages/send") => {
+                if !authorized(&mailbox, request) {
+                    return json(401, &serde_json::json!({"error": {"code": 401}}));
+                }
+                send(&mut mailbox, request)
             }
             (method @ ("GET" | "POST"), gmail) if gmail.starts_with("/gmail/v1/users/me/") => {
                 if let Some(seconds) = mailbox.rate_limit_next.take() {
@@ -870,6 +923,71 @@ fn token(mailbox: &mut Mailbox, form: &HashMap<String, String>) -> ResponseTempl
     }
 }
 
+/// `messages.send` (multipart upload): the metadata part's `threadId`, then
+/// the RFC 5322 message.
+fn send(mailbox: &mut Mailbox, request: &wiremock::Request) -> ResponseTemplate {
+    let fault = mailbox.send_fault.take();
+    if let Some(SendFault::Refuse(status)) = fault {
+        return json(status, &serde_json::json!({"error": {"code": status}}));
+    }
+    let content_type = request
+        .headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_default();
+    let Some(boundary) = content_type.split("boundary=").nth(1) else {
+        return json(400, &serde_json::json!({"error": {"code": 400}}));
+    };
+    let body = String::from_utf8_lossy(&request.body).into_owned();
+    let parts: Vec<&str> = body.split(&format!("--{boundary}")).collect();
+    let (Some(metadata), Some(message)) = (parts.get(1), parts.get(2)) else {
+        return json(400, &serde_json::json!({"error": {"code": 400}}));
+    };
+    let metadata: serde_json::Value = metadata
+        .split_once("\r\n\r\n")
+        .and_then(|(_, json)| serde_json::from_str(json.trim()).ok())
+        .unwrap_or_default();
+    let raw = message
+        .split_once("\r\n\r\n")
+        .map(|(_, raw)| raw.strip_suffix("\r\n").unwrap_or(raw))
+        .unwrap_or_default();
+    let id = format!("sent-{:04}", mailbox.next_id);
+    mailbox.next_id += 1;
+    let thread_id = metadata["threadId"]
+        .as_str()
+        .map_or_else(|| format!("thread-{id}"), ToOwned::to_owned);
+    let message = FakeMessage {
+        id: id.clone(),
+        thread_id: thread_id.clone(),
+        labels: vec!["SENT".to_owned()],
+        raw: raw.as_bytes().to_vec(),
+        internal_date: Utc::now(),
+    };
+    push_history(
+        mailbox,
+        serde_json::json!({"messagesAdded": [{"message": minimal(&message)}]}),
+    );
+    mailbox.messages.insert(id.clone(), message);
+    if fault == Some(SendFault::LoseAnswer) {
+        return json(503, &serde_json::json!({"error": {"code": 503}}));
+    }
+    if fault == Some(SendFault::GarbleAnswer) {
+        return ResponseTemplate::new(200).set_body_string("{\"id\": ");
+    }
+    json(
+        200,
+        &serde_json::json!({"id": id, "threadId": thread_id, "labelIds": ["SENT"]}),
+    )
+}
+
+/// Whether `raw` carries `Message-ID: <id>`.
+fn has_message_id(raw: &[u8], id: &str) -> bool {
+    let needle = format!("message-id: <{}>", id.to_ascii_lowercase());
+    String::from_utf8_lossy(raw)
+        .to_ascii_lowercase()
+        .contains(&needle)
+}
+
 fn gmail_api(mailbox: &Mailbox, path: &str, query: &HashMap<String, String>) -> ResponseTemplate {
     match path {
         "profile" => json(
@@ -903,10 +1021,14 @@ fn gmail_api(mailbox: &Mailbox, path: &str, query: &HashMap<String, String>) -> 
                 .get("pageToken")
                 .and_then(|p| p.parse().ok())
                 .unwrap_or(0);
+            let wanted = query.get("q").and_then(|q| q.strip_prefix("rfc822msgid:"));
             let mut listed: Vec<&FakeMessage> = mailbox
                 .messages
                 .values()
-                .filter(|m| m.internal_date.timestamp() > after)
+                .filter(|m| match wanted {
+                    Some(id) => has_message_id(&m.raw, id),
+                    None => m.internal_date.timestamp() > after,
+                })
                 .collect();
             listed.sort_by(|a, b| b.internal_date.cmp(&a.internal_date).then(b.id.cmp(&a.id)));
             let page: Vec<_> = listed
