@@ -3,8 +3,8 @@
 ## 1. Kernel: recording and sequencing
 
 - [ ] 1.1 Migration `kernel__changes` (`kernel.changes`, `kernel.change_heads`, indexes, grants to `campbooks_app`); `cargo xtask arch` passes
-- [ ] 1.2 `Change { record, op }` and `DomainEvent::changes()` (default none); `EventBus::publish` writes declared changes and the workspace's shared lock and one coalesced `kernel.sequence_changes` job (`unique_key` = workspace) in the publisher's transaction; verify rollback leaves nothing
-- [ ] 1.3 `kernel.sequence_changes` (queue `changes`): exclusive workspace lock, dense numbering of all unsequenced changes in publish order, one `NOTIFY kernel_changes`; verify out-of-order commits never produce a gap a reader can skip, a burst of 1 000 events takes a handful of jobs with gapless ordered cursors, and a re-run is a no-op
+- [ ] 1.2 `Change { record, op }` and `DomainEvent::changes()` (default none); `EventBus::publish` writes declared changes and the workspace's shared lock and one coalesced `kernel.sequence_changes` job (skipped while a committed one is pending) in the publisher's transaction; verify rollback leaves nothing
+- [ ] 1.3 `kernel.sequence_changes` (queue `changes`): exclusive workspace try-lock (busy: reschedule, no attempt spent), dense numbering of all unsequenced changes in publish order, one `NOTIFY kernel_changes`; verify out-of-order commits never produce a gap a reader can skip, a burst of 1 000 events takes a handful of jobs with gapless ordered cursors, producers are not delayed while a long producer blocks sequencing, and a re-run is a no-op
 - [ ] 1.4 `kernel.prune_changes` (hourly, `CAMPBOOKS_CHANGES__RETENTION_HOURS`; re-enqueues sequencing for leftovers) and `changes::purge_workspace`; verify
 - [ ] 1.5 `CAMPBOOKS_CHANGES__*` configuration with startup checks
 

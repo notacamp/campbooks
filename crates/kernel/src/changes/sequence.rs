@@ -6,23 +6,18 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 
 use super::{NOTIFY_CHANNEL, QUEUE, lock_key};
-use crate::jobs::{EnqueueOptions, Job, JobContext, JobError, enqueue};
+use crate::jobs::{Job, JobContext, JobError};
 
-/// Longest the sequencer waits for a workspace's producers in flight before
-/// it gives up and retries. While it waits, new producers of that workspace
-/// wait behind it, so this also bounds their stall.
-const LOCK_TIMEOUT: &str = "2s";
-
-/// Delay before a sequencer that timed out on the lock runs again.
-const LOCK_RETRY: Duration = Duration::from_millis(250);
+/// A sequencer that finds producers of its workspace in flight runs again
+/// after a delay between these, chosen at random so retries spread out.
+const BUSY_RETRY_MS: (u64, u64) = (50, 250);
 
 /// Unnumbered changes older than this are re-sequenced by
 /// [`PruneChanges`] (their sequencer ran out of attempts).
 const STRANDED_AFTER_SECONDS: f64 = 60.0;
 
-/// Number every unnumbered change of `workspace`: enqueued (once per
-/// workspace while one is unfinished) by every publish that declares
-/// changes.
+/// Number every unnumbered change of `workspace`: enqueued by publishes
+/// that declare changes, unless one is already pending for the workspace.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SequenceChanges {
     /// The workspace whose changes to number.
@@ -32,48 +27,40 @@ pub struct SequenceChanges {
 impl Job for SequenceChanges {
     const NAME: &'static str = "kernel.sequence_changes";
     const QUEUE: &'static str = QUEUE;
-    /// Lock timeouts count as attempts; a workspace whose producers keep a
-    /// transaction open that long is rare, and the hourly sweep picks up
-    /// whatever is left.
-    const MAX_ATTEMPTS: u32 = 50;
+    /// Attempts are spent on database failures only: finding producers in
+    /// flight is not a failure (see `run`).
+    const MAX_ATTEMPTS: u32 = 10;
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let tx = ctx.tx().await?;
-        sqlx::query_scalar!(
-            "SELECT set_config('lock_timeout', $1, true)",
-            LOCK_TIMEOUT
-        )
-        .fetch_one(&mut **tx)
-        .await?;
-        // Exclusive: waits until every producer holding the shared lock (one
-        // that may have found this job already pending or running) has
-        // committed, so all of their changes are visible below.
+        // Exclusive, and never waited for: a waiting exclusive request would
+        // queue every new producer's shared request behind it. Holding it
+        // means no producer of the workspace is in flight, so every change
+        // that will ever sit below the new cursors is visible below.
         let locked = sqlx::query_scalar!(
-            "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+            r#"SELECT pg_try_advisory_xact_lock(hashtextextended($1, 0)) AS "locked!""#,
             lock_key(&self.workspace)
         )
         .fetch_one(&mut **tx)
-        .await;
-        if let Err(err) = locked {
-            let timed_out = err
-                .as_database_error()
-                .and_then(sqlx::error::DatabaseError::code)
-                .is_some_and(|code| code == "55P03");
-            return Err(if timed_out {
-                JobError::retry_after("producers of the workspace are still committing", LOCK_RETRY)
-            } else {
-                err.into()
-            });
+        .await?;
+        if !locked {
+            // Producers are committing: come back shortly. This run succeeds
+            // (it is not a failure) and leaves a pending successor, which the
+            // producers in flight also see and skip enqueueing their own.
+            let delay = BUSY_RETRY_MS.0
+                + u64::from(uuid::Uuid::now_v7().as_bytes()[15])
+                    * (BUSY_RETRY_MS.1 - BUSY_RETRY_MS.0)
+                    / 255;
+            super::request_sequencing(tx, &self.workspace, Some(Duration::from_millis(delay)))
+                .await?;
+            tracing::debug!(delay_ms = delay, "producers in flight; sequencing later");
+            return Ok(());
         }
         let numbered = sequence(tx, &self.workspace).await?;
         if numbered > 0 {
-            sqlx::query_scalar!(
-                "SELECT pg_notify($1, $2)",
-                NOTIFY_CHANNEL,
-                self.workspace
-            )
-            .fetch_one(&mut **tx)
-            .await?;
+            sqlx::query_scalar!("SELECT pg_notify($1, $2)", NOTIFY_CHANNEL, self.workspace)
+                .fetch_one(&mut **tx)
+                .await?;
         }
         tracing::debug!(numbered, "sequenced changes");
         Ok(())
@@ -147,14 +134,7 @@ impl Job for PruneChanges {
         .fetch_all(&mut **tx)
         .await?;
         for workspace in &stranded {
-            enqueue(
-                tx,
-                &SequenceChanges {
-                    workspace: workspace.clone(),
-                },
-                EnqueueOptions::for_workspace(workspace.clone()).unique(workspace.clone()),
-            )
-            .await?;
+            super::request_sequencing(tx, workspace, None).await?;
         }
         tracing::info!(
             pruned,

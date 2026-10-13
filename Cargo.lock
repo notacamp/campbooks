@@ -394,6 +394,8 @@ dependencies = [
  "campbooks-workspaces",
  "chrono",
  "clap",
+ "futures-util",
+ "http-body-util",
  "reqwest",
  "secrecy",
  "serde",

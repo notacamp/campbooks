@@ -505,13 +505,21 @@ impl ChangesConfig {
     /// the offending setting.
     pub fn check(&self) -> Result<(), String> {
         let checks = [
-            ("HEARTBEAT_SECONDS", self.heartbeat_seconds >= 1, "at least 1"),
+            (
+                "HEARTBEAT_SECONDS",
+                self.heartbeat_seconds >= 1,
+                "at least 1",
+            ),
             (
                 "MAX_CONNECTION_SECONDS",
                 self.max_connection_seconds >= self.heartbeat_seconds,
                 "at least HEARTBEAT_SECONDS",
             ),
-            ("POLL_INTERVAL_MS", self.poll_interval_ms >= 10, "at least 10"),
+            (
+                "POLL_INTERVAL_MS",
+                self.poll_interval_ms >= 10,
+                "at least 10",
+            ),
             ("MAX_BACKLOG", self.max_backlog >= 1, "at least 1"),
             ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
             (

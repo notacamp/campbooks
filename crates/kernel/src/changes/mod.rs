@@ -6,12 +6,13 @@
 //!   [`RecordRef`] and an [`ChangeOp`] each, ids only.
 //! - **Record.** [`EventBus::publish`](crate::EventBus::publish) writes them to
 //!   `kernel.changes` in the publisher's transaction, unnumbered, under the
-//!   workspace's shared advisory lock, and enqueues one [`SequenceChanges`]
-//!   per workspace (`unique_key` = the workspace: a burst collapses into one
-//!   job).
-//! - **Sequence.** [`SequenceChanges`] takes the workspace's exclusive lock,
-//!   so every producer in flight has committed, numbers all of the
-//!   workspace's unnumbered changes from its head in publish order, and
+//!   workspace's shared advisory lock, and enqueues a [`SequenceChanges`]
+//!   for the workspace unless one is already pending (a burst collapses into
+//!   one job).
+//! - **Sequence.** [`SequenceChanges`] tries the workspace's exclusive lock
+//!   without waiting (busy means "run again in a moment", so producers never
+//!   wait for it). Holding it, no producer is in flight: it numbers all of
+//!   the workspace's unnumbered changes from its head in publish order and
 //!   notifies [`NOTIFY_CHANNEL`]. A cursor is handed out only once every
 //!   smaller one is committed: a reader never skips a change.
 //! - **Serve.** [`open`] streams a workspace's changes as Server-Sent Events
@@ -35,7 +36,7 @@ use utoipa::ToSchema;
 
 use crate::{
     events::EventId,
-    jobs::{self, EnqueueOptions},
+    jobs::{self, Job as _},
     records::RecordRef,
 };
 
@@ -181,14 +182,53 @@ pub(crate) async fn record(
     .execute(&mut **tx)
     .await?;
 
-    jobs::enqueue(
-        tx,
-        &SequenceChanges {
-            workspace: workspace.to_owned(),
-        },
-        EnqueueOptions::for_workspace(workspace).unique(workspace),
+    request_sequencing(tx, workspace, None).await
+}
+
+/// Enqueue [`SequenceChanges`] for `workspace` unless a committed one is
+/// already pending.
+///
+/// Deliberately not a `unique_key`: a unique index makes a concurrent insert
+/// of the same key wait for the first inserter's transaction to end, so
+/// every producer of a workspace would queue behind the first one in
+/// flight. Here a producer only skips a job that is committed and not yet
+/// started; producers in flight at the same instant may each add one (a
+/// handful, harmless: a run with nothing to number ends at once). The
+/// workspace lock pair, not this check, is what keeps the numbering correct.
+pub(crate) async fn request_sequencing(
+    conn: &mut sqlx::PgConnection,
+    workspace: &str,
+    delay: Option<std::time::Duration>,
+) -> Result<(), sqlx::Error> {
+    let run_at = delay
+        .and_then(|delay| chrono::TimeDelta::from_std(delay).ok())
+        .map(|delay| chrono::Utc::now() + delay);
+    let payload = serde_json::to_value(SequenceChanges {
+        workspace: workspace.to_owned(),
+    })
+    .map_err(|e| sqlx::Error::Encode(e.into()))?;
+    let created = sqlx::query_scalar!(
+        r#"
+        INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts, run_at)
+        SELECT $1, $2, $3, $4, $5, coalesce($6, now())
+         WHERE NOT EXISTS (
+            SELECT 1 FROM kernel.jobs
+             WHERE queue = $1 AND workspace_key = $4 AND kind = $2 AND state = 'pending'
+         )
+        RETURNING id
+        "#,
+        QUEUE,
+        SequenceChanges::NAME,
+        payload,
+        workspace,
+        jobs::attempts_to_db(SequenceChanges::MAX_ATTEMPTS),
+        run_at,
     )
+    .fetch_optional(&mut *conn)
     .await?;
+    if created.is_some() {
+        jobs::notify(conn, QUEUE).await?;
+    }
     Ok(())
 }
 

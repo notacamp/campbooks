@@ -61,7 +61,7 @@ workspace the caller was admitted to. No module touches it.
 
 | Event | Changes |
 | --- | --- |
-| `workspace_created` | upsert `workspaces.workspace`, upsert `workspaces.member` (owner) |
+| `workspace_created` | upsert `workspaces.workspace` (the owner's membership comes with the `member_joined` published alongside) |
 | `workspace_updated` | upsert `workspaces.workspace` |
 | `member_joined` | upsert `workspaces.member` (user) |
 | `member_role_changed` | upsert `workspaces.member` (user) |
@@ -98,37 +98,52 @@ publisher's transaction:
    (`pg_advisory_xact_lock_shared(hash('kernel.changes:' || ws))`), held
    until the publisher commits; producers never block each other;
 2. inserts the changes unsequenced (`seq` NULL);
-3. enqueues `kernel.sequence_changes` for the workspace with
-   `unique_key = <workspace>`: a burst of any size collapses into one
-   unfinished sequencing job per workspace.
+3. enqueues `kernel.sequence_changes` for the workspace unless a committed
+   one is already pending (`INSERT … WHERE NOT EXISTS (… state =
+   'pending')`): a burst of any size collapses into one pending sequencing
+   job per workspace (plus at most one per producer that was in flight at
+   the same instant).
 
 The sequencer job, in its transaction:
 
-1. takes the workspace's **exclusive** advisory lock (waiting at most
-   `lock_timeout` = 2 s, else it retries shortly): it now runs after every
-   producer that is in flight has committed or rolled back;
-2. numbers **all** unsequenced changes of the workspace from `head + 1`, in
-   publish order (`event_id`, then `id`, both UUIDv7), and moves
+1. **tries** the workspace's **exclusive** advisory lock
+   (`pg_try_advisory_xact_lock`), never waiting for it. Not getting it
+   means producers are in flight: the run leaves a pending successor with
+   `run_at` 50–250 ms later (random) and succeeds (no attempt is spent), so
+   the producers in flight see that successor and skip enqueueing;
+2. holding the lock, no producer of the workspace is in flight: it numbers
+   **all** unsequenced changes of the workspace from `head + 1`, in
+   publish order (`published`, an identity column: insertion order, which
+   keeps the order a transaction declared its changes in), and moves
    `kernel.change_heads.head`;
 3. sends one `NOTIFY kernel_changes, '<workspace>'` and commits (its lock is
    released with the job marked succeeded, in the same commit).
 
-Why the lock pair: the queue's unique key covers pending *and running*
-jobs, so a producer can find the key taken by a sequencer that is already
-running and has already numbered what it could see. Without the lock, that
-producer's changes would wait, unnumbered, for the next burst. With it, a
-producer that saw a running (or pending) job holds the shared lock until it
-commits, so that job cannot number anything before the producer's changes
-are visible; a producer that arrives after the sequencer took the lock
-waits for its (millisecond) commit and then finds no unfinished job and
-enqueues a new one. Cursor order is therefore commit order per workspace:
+Why not the queue's `unique_key`: a unique index makes a second insert of
+the same key *wait* for the first inserter's transaction to end, so every
+producer of a workspace would queue behind the first one in flight, the
+producer serialization this design avoids. The `NOT EXISTS` check never
+waits (it only sees committed rows); its duplicates are harmless.
+
+Why the lock pair: a producer can skip enqueueing because a job is pending,
+and that job may start before the producer commits (with a unique key, the
+same happens with a job that is already running). Without the lock, the
+job would number what it sees and the producer's changes would wait,
+unnumbered, for the next burst. With it, the producer holds the shared lock
+until it commits, so no sequencer numbers anything before its changes are
+visible; a producer that arrives after the sequencer took the lock waits
+for its (millisecond) commit, then finds no pending job and enqueues one. Cursor order is therefore commit order per workspace:
 a reader that has seen cursor N never finds a later-committed change below
-N. A waiting exclusive request queues ahead of new shared requests, so a
-busy workspace cannot starve its sequencer; the price is that new producers
-of that workspace wait for the in-flight ones while a sequencer waits (the
-2 s `lock_timeout` bounds it). An hourly sweep re-enqueues sequencing for
-any workspace left with unnumbered changes (a sequencer that ran out of
-attempts). Delivery is at least once; the job is database-only, so it takes
+N. **Producers never wait for the sequencer**: it only ever *tries* the
+lock, so it never sits in Postgres' lock queue ahead of a producer's shared
+request. The price is on the sequencer's side: a workspace that always has
+a producer in flight is numbered only in the gaps between its
+transactions (rescheduled every 50–250 ms until it finds one), and one
+long transaction holds back numbering, not writes.
+
+An hourly sweep re-enqueues sequencing for any workspace left with
+unnumbered changes (a sequencer that ran out of attempts on database
+errors). Delivery is at least once; the job is database-only, so it takes
 effect once. Queue `changes` keeps it clear of sync and AI backlogs.
 
 ### 2. Waking streams: one listener per process
@@ -262,9 +277,18 @@ by cursor), privacy (no contents) and the BFF fit (plain HTTP).
   from under clients. Rejected.
 - **One sequencing job per changing event** (the first draft). Simple and
   race-free without locks, but a burst of 1 000 events is 1 000 jobs that
-  each find nothing to do but the first. Replaced by one coalesced job per
-  workspace (`unique_key = <workspace>`) plus the shared/exclusive lock
-  pair, which closes the window a running job leaves open (decision 1).
+  each find nothing to do but the first. Replaced by one coalesced pending
+  job per workspace plus the shared/exclusive lock pair (decision 1).
+- **A blocking exclusive lock in the sequencer** (with a 2 s
+  `lock_timeout`). It guarantees the sequencer progress, but a *waiting*
+  exclusive request sits in Postgres' lock queue and every producer asking
+  for the shared lock after it waits too: up to 2 s added to ordinary
+  writes under load. Rejected for the try-lock and reschedule.
+- **Coalescing with the queue's `unique_key = <workspace>`** (as first
+  asked for). Rejected after a test deadlocked on it: a unique-index
+  conflict with an uncommitted row waits for that transaction, so producers
+  of a workspace serialize behind the first one in flight. The `NOT EXISTS`
+  check coalesces just as well without waiting.
 - **Projection table written by an event handler.** Faithful to "projections
   consume the log" and rebuildable by replay, but it needs a consumer per
   event type (registered by every publishing module) and still needs a

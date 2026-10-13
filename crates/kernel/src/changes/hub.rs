@@ -16,9 +16,6 @@ use crate::config::ChangesConfig;
 /// Wait before reconnecting a listener that failed.
 const LISTEN_RETRY: Duration = Duration::from_secs(5);
 
-/// How often an idle listener checks that the hub still exists.
-const LISTEN_CHECK: Duration = Duration::from_secs(30);
-
 /// Feed queries one process runs at once, whatever the number of open
 /// streams: a wake-up of thousands of streams queues here instead of
 /// taking the whole connection pool.
@@ -42,6 +39,9 @@ impl std::fmt::Debug for ChangeHub {
 struct Inner {
     db: PgPool,
     started: Once,
+    /// Dropped with the hub, which stops its listener (and returns the
+    /// listener's connection to the pool).
+    alive: watch::Sender<()>,
     /// One wake-up channel per workspace with open streams; its value counts
     /// notifications.
     workspaces: Mutex<HashMap<String, watch::Sender<u64>>>,
@@ -84,6 +84,7 @@ impl ChangeHub {
             inner: Arc::new(Inner {
                 db,
                 started: Once::new(),
+                alive: watch::channel(()).0,
                 workspaces: Mutex::new(HashMap::new()),
                 streams: Mutex::new(HashMap::new()),
                 max_streams: config.max_streams_per_principal,
@@ -110,7 +111,11 @@ impl ChangeHub {
     /// Wake-ups for `workspace`'s streams. Starts the listener on first use.
     pub(crate) fn watch(&self, workspace: &str) -> watch::Receiver<u64> {
         self.inner.started.call_once(|| {
-            tokio::spawn(listen(Arc::downgrade(&self.inner)));
+            tokio::spawn(listen(
+                Arc::downgrade(&self.inner),
+                self.inner.db.clone(),
+                self.inner.alive.subscribe(),
+            ));
         });
         let mut workspaces = lock(&self.inner.workspaces);
         workspaces.retain(|_, sender| sender.receiver_count() > 0);
@@ -146,51 +151,62 @@ impl Inner {
     }
 }
 
-/// The listener loop: lives as long as the hub, reconnects on failure.
-async fn listen(hub: Weak<Inner>) {
+/// The listener loop: lives as long as the hub (and its pool), reconnects
+/// on failure.
+async fn listen(hub: Weak<Inner>, db: PgPool, mut alive: watch::Receiver<()>) {
     loop {
-        let Some(db) = hub.upgrade().map(|inner| inner.db.clone()) else {
-            return;
+        let connected = tokio::select! {
+            connected = connect(&db) => connected,
+            _ = alive.changed() => return,
+            () = db.close_event() => return,
         };
-        let mut listener = match PgListener::connect_with(&db).await {
-            Ok(listener) => listener,
-            Err(e) => {
-                tracing::warn!(error = %e, "change feed: could not listen for changes; retrying");
-                tokio::time::sleep(LISTEN_RETRY).await;
-                continue;
+        let Some(mut listener) = connected else {
+            tokio::select! {
+                () = tokio::time::sleep(LISTEN_RETRY) => continue,
+                _ = alive.changed() => return,
+                () = db.close_event() => return,
             }
         };
-        if let Err(e) = listener.listen(NOTIFY_CHANNEL).await {
-            tracing::warn!(error = %e, "change feed: could not listen for changes; retrying");
-            tokio::time::sleep(LISTEN_RETRY).await;
-            continue;
-        }
-        drop(db);
         if let Some(inner) = hub.upgrade() {
             inner.wake_all();
         }
         loop {
-            match tokio::time::timeout(LISTEN_CHECK, listener.try_recv()).await {
-                Ok(Ok(Some(notification))) => match hub.upgrade() {
-                    Some(inner) => inner.wake(notification.payload()),
-                    None => return,
-                },
+            let received = tokio::select! {
+                received = listener.try_recv() => received,
+                _ = alive.changed() => return,
+                () = db.close_event() => return,
+            };
+            let Some(inner) = hub.upgrade() else {
+                return;
+            };
+            match received {
+                Ok(Some(notification)) => inner.wake(notification.payload()),
                 // The connection dropped and was re-established.
-                Ok(Ok(None)) => match hub.upgrade() {
-                    Some(inner) => inner.wake_all(),
-                    None => return,
-                },
-                Ok(Err(e)) => {
+                Ok(None) => inner.wake_all(),
+                Err(e) => {
                     tracing::warn!(error = %e, "change feed: listener failed; reconnecting");
-                    tokio::time::sleep(LISTEN_RETRY).await;
                     break;
-                }
-                Err(_elapsed) => {
-                    if hub.strong_count() == 0 {
-                        return;
-                    }
                 }
             }
         }
     }
+}
+
+/// A listener on [`NOTIFY_CHANNEL`], or `None` (logged) when the database
+/// refused.
+async fn connect(db: &PgPool) -> Option<PgListener> {
+    let mut listener = PgListener::connect_with(db)
+        .await
+        .inspect_err(
+            |e| tracing::warn!(error = %e, "change feed: could not listen for changes; retrying"),
+        )
+        .ok()?;
+    listener
+        .listen(NOTIFY_CHANNEL)
+        .await
+        .inspect_err(
+            |e| tracing::warn!(error = %e, "change feed: could not listen for changes; retrying"),
+        )
+        .ok()?;
+    Some(listener)
 }

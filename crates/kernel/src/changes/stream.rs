@@ -185,7 +185,7 @@ pub async fn open(
     let now = Instant::now();
     let max_age = Duration::from_secs(config.max_connection_seconds);
     let jitter = max_age / u32::try_from(JITTER_DIVISOR).unwrap_or(1);
-    let jitter = jitter.mul_f64(f64::from(uuid::Uuid::new_v4().as_bytes()[0]) / 255.0);
+    let jitter = jitter.mul_f64(f64::from(uuid::Uuid::now_v7().as_bytes()[15]) / 255.0);
     let mut deadline = now + max_age.saturating_sub(jitter);
     let mut deadline_reason = "max_age";
     if let Some(expires_at) = subscription.principal.expires_at {
@@ -265,7 +265,7 @@ impl Feed {
                 return None;
             }
             if Instant::now() >= self.deadline {
-                self.end("closing", json!({ "reason": self.deadline_reason }));
+                self.end("closing", &json!({ "reason": self.deadline_reason }));
                 continue;
             }
             match self.read_page().await {
@@ -273,7 +273,7 @@ impl Feed {
                 Ok(false) => {}
                 Err(e) => {
                     tracing::warn!(error = %e, "change feed: reading changes failed; closing the stream");
-                    self.end("closing", json!({ "reason": "unavailable" }));
+                    self.end("closing", &json!({ "reason": "unavailable" }));
                     continue;
                 }
             }
@@ -292,7 +292,7 @@ impl Feed {
                 () = heartbeat => {
                     if let Err(e) = self.heartbeat().await {
                         tracing::warn!(error = %e, "change feed: membership check failed; closing the stream");
-                        self.end("closing", json!({ "reason": "unavailable" }));
+                        self.end("closing", &json!({ "reason": "unavailable" }));
                     }
                 }
                 () = deadline => {}
@@ -300,7 +300,7 @@ impl Feed {
         }
     }
 
-    fn end(&mut self, event: &'static str, data: serde_json::Value) {
+    fn end(&mut self, event: &'static str, data: &serde_json::Value) {
         self.out
             .push_back(Frame::default().event(event).data(data.to_string()));
         self.done = true;
@@ -338,18 +338,17 @@ impl Feed {
                     id: row.record_id,
                 },
                 op: ChangeOp::parse(&row.op),
-                container: row.container_type.zip(row.container_id).map(|(t, id)| {
-                    RecordRef {
-                        record_type: t,
-                        id,
-                    }
-                }),
+                container: row
+                    .container_type
+                    .zip(row.container_id)
+                    .map(|(t, id)| RecordRef { record_type: t, id }),
             })
             .collect();
         self.cursor = last;
-        let access_changed = rows
-            .iter()
-            .any(|row| self.access_records.contains(&row.record.record_type.as_str()));
+        let access_changed = rows.iter().any(|row| {
+            self.access_records
+                .contains(&row.record.record_type.as_str())
+        });
 
         // Several changes of one record in a page: the last one is enough
         // (the client refetches the current state either way).
@@ -417,7 +416,7 @@ impl Feed {
                 }
             }
             None => {
-                self.end("revoked", json!({}));
+                self.end("revoked", &json!({}));
             }
         }
         Ok(())
@@ -479,11 +478,29 @@ mod tests {
 
     #[test]
     fn resets_unknown_expired_and_distant_cursors() {
-        assert_eq!(start(Some("x"), 7, Some(1), 100), Start::Reset("unknown_cursor"));
-        assert_eq!(start(Some("-1"), 7, Some(1), 100), Start::Reset("unknown_cursor"));
-        assert_eq!(start(Some("8"), 7, Some(1), 100), Start::Reset("unknown_cursor"));
-        assert_eq!(start(Some("2"), 7, Some(5), 100), Start::Reset("cursor_expired"));
-        assert_eq!(start(Some("2"), 7, None, 100), Start::Reset("cursor_expired"));
-        assert_eq!(start(Some("2"), 700, Some(1), 100), Start::Reset("too_far_behind"));
+        assert_eq!(
+            start(Some("x"), 7, Some(1), 100),
+            Start::Reset("unknown_cursor")
+        );
+        assert_eq!(
+            start(Some("-1"), 7, Some(1), 100),
+            Start::Reset("unknown_cursor")
+        );
+        assert_eq!(
+            start(Some("8"), 7, Some(1), 100),
+            Start::Reset("unknown_cursor")
+        );
+        assert_eq!(
+            start(Some("2"), 7, Some(5), 100),
+            Start::Reset("cursor_expired")
+        );
+        assert_eq!(
+            start(Some("2"), 7, None, 100),
+            Start::Reset("cursor_expired")
+        );
+        assert_eq!(
+            start(Some("2"), 700, Some(1), 100),
+            Start::Reset("too_far_behind")
+        );
     }
 }

@@ -41,6 +41,8 @@ uuid.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
+futures-util.workspace = true
+http-body-util.workspace = true
 
 [lints]
 workspace = true

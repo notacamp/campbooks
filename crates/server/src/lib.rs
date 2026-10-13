@@ -8,6 +8,7 @@
 #![forbid(unsafe_code)]
 
 pub mod bff;
+pub mod changes;
 pub mod web;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
@@ -149,6 +150,9 @@ fn security_scheme() -> SecurityScheme {
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
         // `cargo xtask new-module` inserts above this line.
+        (name = "changes", description = "The change feed: a Server-Sent Events stream per \
+            workspace of the records that changed (ids only), so clients refetch only what \
+            they show."),
     ),
 )]
 struct ApiDoc;
@@ -164,6 +168,7 @@ fn api() -> OpenApiRouter<AppState> {
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
         })
+        .merge(changes::router())
 }
 
 /// The OpenAPI document: every module's routes and the web BFF's.

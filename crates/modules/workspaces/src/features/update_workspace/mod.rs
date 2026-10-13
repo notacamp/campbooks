@@ -16,6 +16,7 @@ use crate::{
         access::{acting_manager, lock_workspace},
         model::{Accent, WorkspaceView, workspace_name},
     },
+    events::WorkspaceUpdated,
     features::get_workspace,
     scopes::WorkspacesAdmin,
 };
@@ -68,20 +69,42 @@ pub async fn execute(
     access: &Access,
     input: UpdateWorkspace,
 ) -> Result<WorkspaceView> {
-    acting_manager(access)?;
+    let (actor, _) = acting_manager(access)?;
     let name = input.name.as_deref().map(workspace_name).transpose()?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     lock_workspace(&mut tx, access.workspace).await?;
-    sqlx::query!(
-        "UPDATE workspaces.workspaces
-            SET name = coalesce($2, name), accent = coalesce($3, accent)
-          WHERE id = $1",
+    let changed = sqlx::query!(
+        r#"WITH old AS (SELECT name, accent FROM workspaces.workspaces WHERE id = $1)
+           UPDATE workspaces.workspaces w
+              SET name = coalesce($2, w.name), accent = coalesce($3, w.accent)
+             FROM old
+            WHERE w.id = $1
+        RETURNING w.name IS DISTINCT FROM old.name AS "name!",
+                  w.accent IS DISTINCT FROM old.accent AS "accent!""#,
         access.workspace as WorkspaceId,
         name,
         input.accent.map(Accent::as_str),
     )
-    .execute(&mut *tx)
+    .fetch_one(&mut *tx)
     .await?;
+    let fields: Vec<String> = [("name", changed.name), ("accent", changed.accent)]
+        .into_iter()
+        .filter(|(_, changed)| *changed)
+        .map(|(field, _)| field.to_owned())
+        .collect();
+    if !fields.is_empty() {
+        state
+            .events
+            .publish(
+                &mut tx,
+                &WorkspaceUpdated {
+                    workspace: access.workspace.to_string(),
+                    fields,
+                    updated_by: actor,
+                },
+            )
+            .await?;
+    }
     let view = get_workspace::load(&mut tx, access).await?;
     tx.commit().await?;
     Ok(view)
@@ -122,6 +145,29 @@ mod tests {
             .patch(&ana, &uri, serde_json::json!({ "name": "" }))
             .await;
         assert_eq!(bad.status, StatusCode::BAD_REQUEST);
+
+        // Two real changes, one event each, naming the settings, not values.
+        let updates: Vec<String> = kit
+            .events_of(&ws.to_string())
+            .await
+            .into_iter()
+            .filter(|name| name == "workspaces.workspace_updated")
+            .collect();
+        assert_eq!(updates.len(), 2);
+        let payload = kit.last_event_payload(&ws.to_string()).await;
+        assert_eq!(payload["fields"], serde_json::json!(["accent"]));
+        assert!(!payload.to_string().contains("Corner shop"));
+
+        // Setting what is already there publishes nothing.
+        kit.patch(&ana, &uri, serde_json::json!({ "accent": "business" }))
+            .await;
+        let after: usize = kit
+            .events_of(&ws.to_string())
+            .await
+            .iter()
+            .filter(|name| *name == "workspaces.workspace_updated")
+            .count();
+        assert_eq!(after, 2);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
