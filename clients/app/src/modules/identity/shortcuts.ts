@@ -44,4 +44,11 @@ export const IDENTITY_SHORTCUTS = [
     group: "general",
     label: "identity:shortcuts.addWayIn",
   },
+  {
+    id: "identity.add_passkey",
+    keys: "n p",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.addPasskey",
+  },
 ] as const satisfies readonly ShortcutDefinition[];

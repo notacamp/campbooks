@@ -13,6 +13,11 @@
     "last_way_in": "Es la única forma de iniciar sesión, así que no se puede quitar. Añade otra primero.",
     "link_incomplete": "Indica el proveedor, el espacio de trabajo o el buzón al que se refiere.",
     "mailbox_unsupported": "Campbooks todavía no puede conectar el buzón de este proveedor en esta instancia.",
+    "passkey_not_accepted": "No se ha aceptado esta llave de acceso. Inténtalo de nuevo o inicia sesión de otra forma.",
+    "passkey_expired": "Esta solicitud de llave de acceso ha tardado demasiado o ya se ha usado. Inténtalo de nuevo.",
+    "passkey_already_registered": "Esta llave de acceso ya da acceso a Campbooks.",
+    "display_name_required": "Dinos cómo quieres que te llamemos.",
+    "passkey_name_required": "Ponle a la llave de acceso un nombre de 1 a 64 caracteres.",
     "account_is_admin": "Esta cuenta es de un administrador. Revoca primero su perfil de administrador desde la línea de comandos del servidor (campbooks-server admin revoke) y después suspéndela."
   }
 }

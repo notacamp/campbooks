@@ -9,7 +9,8 @@
     "choice2": "Iniciar sessão com a segunda opção",
     "choice3": "Iniciar sessão com a terceira opção",
     "passkey": "Iniciar sessão com uma chave de acesso",
-    "addWayIn": "Adicionar uma forma de iniciar sessão"
+    "addWayIn": "Adicionar uma forma de iniciar sessão",
+    "addPasskey": "Adicionar uma chave de acesso"
   },
   "signIn": {
     "title": "Iniciar sessão no Campbooks",
@@ -48,6 +49,35 @@
     "failed": {
       "title": "Não foi possível carregar as formas de iniciar sessão",
       "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
+    },
+    "passkeyWaiting": "À espera da sua chave de acesso…",
+    "passkeySignUp": "Ainda não tem conta? Crie uma com uma chave de acesso",
+    "passkeyField": {
+      "label": "Chaves de acesso guardadas",
+      "hint": "O seu navegador mostra aqui as chaves de acesso que guardou para o Campbooks.",
+      "placeholder": "Escolha uma chave de acesso"
+    },
+    "passkeyProblem": {
+      "cancelled": {
+        "title": "Não foi usada nenhuma chave de acesso.",
+        "lead": "Tente novamente quando quiser ou inicie sessão de outra forma."
+      },
+      "not_accepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Pode ter sido removida da sua conta. Experimente outra chave de acesso ou inicie sessão de outra forma."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Tente novamente."
+      },
+      "rate_limited": {
+        "title": "Demasiadas tentativas.",
+        "lead": "Aguarde um minuto e tente novamente."
+      },
+      "failed": {
+        "title": "Não foi possível iniciar sessão com uma chave de acesso.",
+        "lead": "Algo correu mal. Tente novamente ou inicie sessão de outra forma."
+      }
     }
   },
   "errors": {
@@ -67,10 +97,6 @@
       "title": "O fornecedor de início de sessão não conseguiu confirmar quem é.",
       "lead": "Tente novamente ou inicie sessão de outra forma."
     },
-    "account_suspended": {
-      "title": "Esta conta está suspensa.",
-      "lead": "Quem gere este Campbooks suspendeu-a. Peça-lhe que a reponha."
-    },
     "way_in_belongs_to_another_account": {
       "title": "Esta conta já dá acesso a outra conta do Campbooks.",
       "lead": "Inicie sessão com ela para usar essa conta."
@@ -82,6 +108,10 @@
     "unknown": {
       "title": "Algo correu mal ao iniciar sessão.",
       "lead": "Nada mudou. Recomece."
+    },
+    "account_suspended": {
+      "title": "Esta conta está suspensa.",
+      "lead": "Quem gere este Campbooks suspendeu-a. Peça-lhe que a reponha."
     }
   },
   "newAccount": {
@@ -245,6 +275,104 @@
       "unknown": {
         "title": "Algo correu mal.",
         "lead": "Nada mudou. Tente novamente."
+      }
+    }
+  },
+  "passkeySignUp": {
+    "eyebrow": "Nova conta",
+    "title": "Criar uma conta com uma chave de acesso",
+    "lead": "O seu dispositivo guarda a chave de acesso e desbloqueia-a com o rosto, a impressão digital ou o bloqueio de ecrã. Não há palavra-passe.",
+    "footer": "Não é preciso endereço de email. Pode adicionar Google, Microsoft ou Zoho mais tarde.",
+    "name": {
+      "label": "Como lhe devemos chamar?",
+      "placeholder": "O seu nome",
+      "hint": "Aparece no Campbooks e às pessoas que convidar.",
+      "required": "Diga-nos como lhe devemos chamar.",
+      "tooLong": "Use 64 caracteres ou menos."
+    },
+    "create": "Criar com uma chave de acesso",
+    "creating": "À espera da sua chave de acesso…",
+    "another": "Iniciar sessão de outra forma",
+    "nextTitle": "O que acontece a seguir",
+    "next1": "O seu dispositivo pede para guardar uma chave de acesso para o Campbooks.",
+    "next2": "Cria o seu primeiro espaço de trabalho.",
+    "next3": "Liga uma caixa de correio quando quiser.",
+    "problem": {
+      "cancelled": {
+        "title": "Não foi criada nenhuma chave de acesso.",
+        "lead": "Nada foi criado. Tente novamente quando quiser."
+      },
+      "exists": {
+        "title": "Este dispositivo já tem uma chave de acesso para isso.",
+        "lead": "Inicie sessão com ela."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Nada foi criado. Tente novamente."
+      },
+      "not_accepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Nada foi criado. Tente novamente ou use outro dispositivo."
+      },
+      "failed": {
+        "title": "Não foi possível criar a conta.",
+        "lead": "Nada foi criado. Tente novamente."
+      }
+    },
+    "inviteOnly": {
+      "title": "Este Campbooks só aceita pessoas convidadas",
+      "lead": "Inicie sessão com a conta para a qual o convite foi enviado. Pode adicionar uma chave de acesso depois de entrar."
+    },
+    "unsupported": {
+      "title": "Este navegador não pode usar chaves de acesso",
+      "lead": "Use outro navegador ou dispositivo, ou inicie sessão de outra forma."
+    }
+  },
+  "passkeys": {
+    "title": "Chaves de acesso",
+    "lead": "Inicie sessão com o rosto, a impressão digital ou o bloqueio de ecrã em vez de um fornecedor. As chaves de acesso não podem ser roubadas por phishing.",
+    "list": "As suas chaves de acesso",
+    "loading": "A carregar as suas chaves de acesso…",
+    "loadError": "Não foi possível carregar as suas chaves de acesso.",
+    "retry": "Tentar novamente",
+    "none": "Ainda não tem chaves de acesso.",
+    "add": "Adicionar uma chave de acesso",
+    "adding": "À espera da sua chave de acesso…",
+    "added": "{{name}} foi adicionada. Já pode iniciar sessão com ela.",
+    "nameOn": "Chave de acesso em {{device}}",
+    "synced": "Sincronizada entre os seus dispositivos",
+    "thisDevice": "Num só dispositivo",
+    "rename": "Mudar o nome",
+    "renameLabel": "Mudar o nome de {{name}}",
+    "removeLabel": "Remover {{name}}",
+    "nameLabel": "Nome",
+    "save": "Guardar",
+    "confirmRemove": "Deixar de iniciar sessão com {{name}}? Fica no seu dispositivo até a apagar lá, e quem tiver sessão iniciada com ela termina a sessão.",
+    "renameFailed": {
+      "title": "Não foi possível mudar o nome.",
+      "lead": "Use entre 1 e 64 caracteres e tente novamente."
+    },
+    "unsupported": "Este navegador não consegue criar chaves de acesso. Use outro navegador ou dispositivo para adicionar uma.",
+    "problem": {
+      "cancelled": {
+        "title": "Não foi adicionada nenhuma chave de acesso.",
+        "lead": "Tente novamente quando quiser."
+      },
+      "exists": {
+        "title": "Este dispositivo já tem uma chave de acesso para a sua conta.",
+        "lead": "Está na lista."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Nada foi adicionado. Tente novamente."
+      },
+      "notAccepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Nada foi adicionado. Tente novamente ou use outro dispositivo."
+      },
+      "failed": {
+        "title": "Não foi possível adicionar uma chave de acesso.",
+        "lead": "Nada foi adicionado. Tente novamente."
       }
     }
   },

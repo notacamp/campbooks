@@ -196,6 +196,7 @@ function WaitingRequest({
     <SignInChoices
       request={request}
       providers={info.data.providers}
+      passkeySignUp={info.data.passkey_sign_up}
       error={error}
       returnTo={rememberedReturnTo()}
       leave={leave}

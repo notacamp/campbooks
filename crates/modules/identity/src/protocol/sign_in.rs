@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 use uuid::Uuid;
 
-use super::{Ctx, NEW_ACCOUNT_PATH, SIGN_IN_PATH, authorize, link};
+use super::{Ctx, NEW_ACCOUNT_PATH, SIGN_IN_PATH, authorize, link, passkey};
 use crate::{
     MESSAGES,
     deps::Issuer,
@@ -71,16 +71,25 @@ const CALLBACK_LIMIT: Limit = Limit::new("identity.finish_sign_in", 30, Duration
 pub struct RequestInfo {
     /// The client asking.
     pub client_id: String,
-    /// The providers configured on this instance, in display order.
+    /// The ways in this instance offers, in display order: the providers
+    /// configured, then `passkey` when it can offer passkeys (https, or
+    /// `localhost` in development).
     pub providers: Vec<String>,
+    /// Whether a passkey alone may create a new account here (not on an
+    /// invite-only instance).
+    pub passkey_sign_up: bool,
 }
 
 pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
-    issuer
+    let mut ways: Vec<String> = issuer
         .upstreams
         .iter()
         .map(|upstream| upstream.provider().as_str().to_owned())
-        .collect()
+        .collect();
+    if passkey::relying_party(issuer).is_some() {
+        ways.push("passkey".to_owned());
+    }
+    ways
 }
 
 /// The waiting authorization request `id`: who asks, and how one can sign in.
@@ -106,6 +115,8 @@ pub async fn request(State(ctx): State<Ctx>, Path(id): Path<String>) -> Result<J
     Ok(Json(RequestInfo {
         client_id: request.client_id,
         providers: providers(issuer),
+        passkey_sign_up: passkey::relying_party(issuer).is_some()
+            && passkey::signup_allows_passkey(&ctx),
     }))
 }
 

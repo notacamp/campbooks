@@ -13,6 +13,11 @@
     "last_way_in": "This is the only way you can sign in, so it can't be removed. Add another way first.",
     "link_incomplete": "Say which provider, workspace or mailbox this is for.",
     "mailbox_unsupported": "Campbooks can't connect this provider's mailbox on this instance yet.",
+    "passkey_not_accepted": "This passkey wasn't accepted. Try again, or sign in another way.",
+    "passkey_expired": "This passkey request took too long or was already used. Try again.",
+    "passkey_already_registered": "This passkey is already a way into Campbooks.",
+    "display_name_required": "Say what we should call you.",
+    "passkey_name_required": "Give the passkey a name of 1 to 64 characters.",
     "account_is_admin": "This account is an administrator. Revoke its admin profile with the server's command line first (campbooks-server admin revoke), then suspend it."
   }
 }

@@ -19,11 +19,10 @@ name: Release next
 # the Policy check verifies it. Tags are created only after the image passed
 # Trivy, so a failed scan leaves nothing to clean up; re-run the workflow.
 #
-# Future prod deploy hook: after the `release` job, add a job that sends a
-# `repository_dispatch` (event_type `campbooks-next-release`, payload
-# `{"tag":"next-vX.Y.Z"}`) to the cloud repo exactly like
-# `deploy-staging` in publish-next.yml. Deliberately absent today: staging
-# follows :next, and there is no production for next yet.
+# Deploys don't wait for releases: every green push to next is deployed to
+# staging AND production by the `deploy` job in publish-next.yml (a
+# repository_dispatch to the cloud repo). A release only tags an image that
+# was already deployed.
 
 on:
   workflow_run:

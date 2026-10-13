@@ -13,6 +13,11 @@
     "last_way_in": "Esta é a única forma de iniciar sessão, por isso não pode ser removida. Adicione outra primeiro.",
     "link_incomplete": "Indique o fornecedor, o espaço de trabalho ou a caixa de correio a que isto se refere.",
     "mailbox_unsupported": "O Campbooks ainda não consegue ligar a caixa de correio deste fornecedor nesta instância.",
+    "passkey_not_accepted": "Esta chave de acesso não foi aceite. Tente novamente ou inicie sessão de outra forma.",
+    "passkey_expired": "Este pedido de chave de acesso demorou demasiado tempo ou já foi usado. Tente novamente.",
+    "passkey_already_registered": "Esta chave de acesso já dá acesso ao Campbooks.",
+    "display_name_required": "Diga-nos como lhe devemos chamar.",
+    "passkey_name_required": "Dê à chave de acesso um nome com 1 a 64 caracteres.",
     "account_is_admin": "Esta conta é de um administrador. Revogue primeiro o perfil de administrador na linha de comandos do servidor (campbooks-server admin revoke) e depois suspenda-a."
   }
 }
