@@ -100,13 +100,15 @@ module implements.**
 pub trait SearchSource: Debug + Send + Sync + 'static {
     /// The group record type it serves, e.g. "conversations.conversation".
     fn group_type(&self) -> &'static str;
+    /// The container type of its groups, e.g. "conversations.inbox".
+    fn container_type(&self) -> &'static str;
     /// The group's current searchable form in the transaction's workspace,
-    /// with each entry's content stamp; `None` once the group is gone.
-    fn group<'a>(&'a self, ctx: SourceContext<'a>, id: &'a str) -> SourceFuture<'a, Option<Group>>;
-    /// The full text of these entries (the ones whose stamp changed).
-    fn entries<'a>(&'a self, ctx: SourceContext<'a>, ids: &'a [String]) -> SourceFuture<'a, Vec<Entry>>;
-    /// A page of group ids after `cursor`, for backfills.
-    fn page<'a>(&'a self, ctx: SourceContext<'a>, after: Option<&'a str>, limit: u32) -> SourceFuture<'a, Page>;
+    /// with each entry's facets and content stamp; `None` once it is gone.
+    fn group<'a>(&'a self, cx: SourceContext<'a>, id: &'a str) -> SourceFuture<'a, Option<Group>>;
+    /// The text of these entries (the ones whose stamp changed).
+    fn texts<'a>(&'a self, cx: SourceContext<'a>, entries: &'a [RecordRef]) -> SourceFuture<'a, Vec<EntryText>>;
+    /// Up to `limit` group ids after `after`, for backfills.
+    fn page<'a>(&'a self, cx: SourceContext<'a>, after: Option<&'a str>, limit: u32) -> SourceFuture<'a, Page>;
 }
 ```
 
@@ -121,24 +123,28 @@ fails closed (nothing indexed) when it is missing.
 
 ```
 conversations.message_received ─┐
-conversations.message_sent ─────┼─► search.on_* handlers ─► search.refresh_group { group }
-conversations.conversation_changed┘        (unique per group: bursts coalesce)
+conversations.message_sent ─────┼─► search.on_* handlers: refresh(group), in the delivery's
+conversations.conversation_changed┘   transaction, under a per-group transaction lock
                                                  │
                        SearchSource::group ◄─────┤ current facets, title, entry stamps
-                       SearchSource::entries ◄───┘ only entries whose stamp changed
+                       SearchSource::texts ◄─────┘ only entries whose stamp changed
                                                  │
                                    upsert group + entries, delete entries not returned,
                                    delete the group when the source says it is gone
 ```
 
 - The handlers mirror the three event types (as every consumer does) and
-  enqueue `search.refresh_group` with `unique_key = group` and
-  `ordering_key = group`. A refresh always reads the **current** state, so
-  out-of-order or repeated deliveries converge: no versions to compare.
+  refresh the group in the delivery's own transaction, after taking a
+  transaction-scoped advisory lock on the group, so two refreshes of one
+  group run one after the other. Each reads the **current** state once it
+  holds the lock, so out-of-order or repeated deliveries converge: no
+  versions to compare. (A separate refresh job with a unique key was
+  considered: the queue's unique key also covers a *running* job, so a
+  change arriving while the job ran would be dropped.)
 - Message removals need no message ids: `conversation_changed` with
   `messages` makes the refresh reconcile the group's entries against the
   source.
-- Freshness: the time from the event to the job, typically under two
+- Freshness: the time from the event to its delivery, typically under two
   seconds. Screens that need read-your-own-writes read conversations, as
   ADR 0011 says.
 
@@ -159,8 +165,9 @@ conversations.conversation_changed┘        (unique per group: bursts coalesce)
   touch of a workspace starts a backfill at the new version; queries keep
   using the existing rows meanwhile, since each refresh overwrites in place.
   A change that only needs new `tsvector`s is rebuilt from the stored text
-  without the source. `campbooks-server search reindex [--workspace <id>]`
-  starts one by hand.
+  without the source. `campbooks-server search reindex --workspace <id>`
+  starts one by hand (the command runs as the runtime role, which sees one
+  workspace at a time; an instance-wide rebuild is an `INDEX_VERSION` bump).
 - Event-log retention (#65) does not matter to search: it never replays.
 
 ### Deletion, purge and retention
@@ -214,14 +221,16 @@ grants `campbooks_app` DML. Other modules' records are referenced by
 
 | Table | Holds |
 | --- | --- |
-| `groups` | id, record_type, record_id, container_type, container_id, occurred_at, title, keywords (`text[]`), facets (`jsonb`), title_tsv (`tsvector`, weight A), index_version, refreshed_at. Unique `(workspace_id, record_type, record_id)`. |
-| `entries` | id, group_id (→ groups, cascade), record_type, record_id, occurred_at, language, people (`jsonb`), people_text (folded "name address" lines), body (≤ 32 KiB), attachments (`text[]`), facets (`jsonb`), stamp, tsv (`tsvector`: people B, attachment names B, body C). Unique `(workspace_id, record_type, record_id)`. |
-| `backfills` | source group type, state (`running`/`done`), cursor, index_version, started_at, finished_at. Primary key `(workspace_id, group_type)`. |
+| `groups` | id, record_type, record_id, container_type, container_id, occurred_at, title, title_folded (lower-cased, unaccented, for `subject:`), keywords (folded label names, for `label:`), facets (`jsonb`, plus `attachment` derived by search), index_version, refreshed_at. Unique `(workspace_id, record_type, record_id)`. |
+| `entries` | id, group_id (→ groups, cascade), record_type, record_id, occurred_at, language, people (`jsonb`), people_words and file_words (names, addresses and file names split into words), from_folded / to_folded / cc_folded (for `from:`, `to:`, `cc:`), body (≤ 32 KiB), attachments (`text[]`), facets (`jsonb`), stamp, tsv (`tsvector`: group title A, people and file names B unstemmed, body C, from `search.entry_vector`). Unique `(workspace_id, record_type, record_id)`. |
+| `backfills` | source group type, state (`running`/`done`), after_id (the last group done), index_version, started_at, finished_at. Primary key `(workspace_id, group_type)`. |
 
-Indexes: GIN on `entries.tsv` and `groups.title_tsv`; GIN `gin_trgm_ops` on
-`entries.people_text` and `groups.title`; `(workspace_id, container_id,
-occurred_at DESC, id DESC)` on `groups` for newest-first and filters;
-`(group_id)` on `entries`.
+The group's title is part of each entry's vector, so words split between
+the subject and a message still match together; a title change recomputes
+the vectors from stored text. Indexes: GIN on `entries.tsv`; GIN
+`gin_trgm_ops` on `entries.from_folded`, `to_folded`, `cc_folded` and
+`groups.title_folded`; `(workspace_id, container_id, occurred_at DESC, id
+DESC)` on `groups`; `(group_id)` on `entries`.
 
 Extensions are database-wide platform infrastructure, so a kernel migration
 installs them (`CREATE EXTENSION IF NOT EXISTS` `pg_trgm` and `unaccent`;
@@ -476,7 +485,7 @@ members already know it.
 - **Extensions on managed Postgres** must be allowed; the migration fails
   early with a message naming them.
 - **Pull load.** A refresh reads the group from conversations; flag changes
-  never re-read bodies (stamps), and bursts coalesce per group.
+  never re-read bodies (stamps).
 - **ADR numbering.** 0015 is taken on another branch; this change uses 0016.
 
 ## Decisions at the gate (owner, 2026-10-13)

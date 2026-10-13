@@ -56,7 +56,10 @@ async fn a_conversation_with_its_messages(db: PgPool) {
     let first = &group.entries[0];
     assert_eq!(first.facets[facet::MAILBOX], Facet::Text("inbox".into()));
     assert_eq!(first.facets[facet::ATTACHMENTS], Facet::Count(1));
-    assert_eq!(first.facets[facet::DIRECTION], Facet::Text("inbound".into()));
+    assert_eq!(
+        first.facets[facet::DIRECTION],
+        Facet::Text("inbound".into())
+    );
 
     let records: Vec<RecordRef> = group.entries.iter().map(|e| e.record.clone()).collect();
     let texts = texts_of(&kit, workspace, &records).await;
@@ -78,16 +81,23 @@ async fn a_flag_change_keeps_the_stamps(db: PgPool) {
     let (workspace, _, sam) = kit.sams_inbox().await;
     let id = kit.conversation_of("en-1").await;
     let before = group_of(&kit, workspace, &id).await.unwrap();
-    kit.post(&sam, &format!("/api/v1/w/{workspace}/conversations/{id}/read"), None)
-        .await;
-    kit.post(&sam, &format!("/api/v1/w/{workspace}/conversations/{id}/star"), None)
-        .await;
+    kit.post(
+        &sam,
+        &format!("/api/v1/w/{workspace}/conversations/{id}/read"),
+        None,
+    )
+    .await;
+    kit.post(
+        &sam,
+        &format!("/api/v1/w/{workspace}/conversations/{id}/star"),
+        None,
+    )
+    .await;
     let after = group_of(&kit, workspace, &id).await.unwrap();
     assert_eq!(after.facets[facet::UNREAD], Facet::Bool(false));
     assert_eq!(after.facets[facet::STARRED], Facet::Bool(true));
-    let stamps = |group: &Group| -> Vec<String> {
-        group.entries.iter().map(|e| e.stamp.clone()).collect()
-    };
+    let stamps =
+        |group: &Group| -> Vec<String> { group.entries.iter().map(|e| e.stamp.clone()).collect() };
     assert_eq!(stamps(&before), stamps(&after));
 }
 
@@ -97,9 +107,13 @@ async fn gone_and_unknown_conversations(db: PgPool) {
     let (workspace, _, _) = kit.sams_inbox().await;
     assert!(group_of(&kit, workspace, "not-an-id").await.is_none());
     assert!(
-        group_of(&kit, workspace, &crate::model::ConversationId::new().to_string())
-            .await
-            .is_none()
+        group_of(
+            &kit,
+            workspace,
+            &crate::model::ConversationId::new().to_string()
+        )
+        .await
+        .is_none()
     );
     // Another workspace's conversation is invisible under row-level security.
     let id = kit.conversation_of("en-1").await;
@@ -107,7 +121,10 @@ async fn gone_and_unknown_conversations(db: PgPool) {
     let texts = texts_of(
         &kit,
         workspace,
-        &[RecordRef::new(MESSAGE_RECORD, &crate::model::MessageId::new())],
+        &[RecordRef::new(
+            MESSAGE_RECORD,
+            &crate::model::MessageId::new(),
+        )],
     )
     .await;
     assert!(texts.is_empty());

@@ -50,6 +50,9 @@ crates/
                            implements the kernel's `GrantIntake` port.
     identity/              campbooks-identity — accounts and their ways in, provider
                            sign-in, and the in-process OAuth 2.1 issuer (ADR 0014).
+    search/                campbooks-search — one index over the records a member may
+                           see, in Postgres (ADR 0016): kept current from events
+                           through the kernel's `SearchSource` port; `search.query`.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
@@ -395,6 +398,23 @@ are `[operationId, params]` (`operationKey`) and `records.gen.ts` (generated
 from `x-campbooks.records`) says which operations read which record types.
 A module whose events change records says so in `changes()`; nothing else
 is needed for its screens to stay current.
+
+### Search (ADR 0016)
+
+The `search` module keeps one index, in its own schema, of the records other
+modules let it search: *groups* (what a result is shown as, a conversation,
+inside a container such as an inbox) and their *entries* (the text inside,
+its messages). It learns that something changed from the owning module's
+ordinary events (ids only), then reads the record's current state through
+the kernel's `SearchSource` port (`kernel::search`), which the owning module
+implements and the server registers with `AppState::with_search_sources`.
+Text is matched with Postgres full-text search in the four shipped languages
+(accents ignored by `unaccent`; `pg_trgm` for partial names and addresses).
+At query time, results are limited to the containers the `Visibility` port
+lists for the caller (`visible_containers`) and to record types the caller
+holds a read scope for (`operations::ReadRules`, shared with the change
+feed). A workspace's index is built in the background on its first event or
+query, by paging through the same port.
 
 ### The web BFF
 

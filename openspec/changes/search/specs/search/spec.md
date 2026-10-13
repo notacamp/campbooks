@@ -40,8 +40,8 @@ The module SHALL keep its index current by consuming
 group from the current state the group's `SearchSource` returns: upserting
 the group and its entries, deleting entries the source no longer returns,
 and deleting the group when the source says it is gone. Refreshes of one
-group SHALL be coalesced and run one at a time, and an entry's text SHALL be
-re-read only when its content stamp changed. Event payloads and job payloads
+group SHALL run one at a time, and an entry's text SHALL be re-read only when
+its content stamp changed. Event payloads and job payloads
 SHALL hold ids only.
 
 #### Scenario: A new message is findable
@@ -139,7 +139,7 @@ resuming where it stopped, starting at the first event or the first query
 seen for that workspace, and again whenever the module's index version
 changes. While a backfill runs, queries SHALL answer from what is indexed and
 say `indexing: true`. The command `campbooks-server search reindex
-[--workspace <id>]` SHALL start one by hand.
+--workspace <id>` SHALL start one by hand.
 
 #### Scenario: First search in an existing workspace
 - **WHEN** a member searches a workspace whose mail arrived before the module existed

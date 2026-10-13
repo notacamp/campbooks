@@ -248,7 +248,10 @@ async fn texts(
     .fetch_all(&mut *conn)
     .await?
     {
-        files.entry(file.message_id).or_default().push(file.filename);
+        files
+            .entry(file.message_id)
+            .or_default()
+            .push(file.filename);
     }
     let mut texts = Vec::with_capacity(rows.len());
     for row in rows {

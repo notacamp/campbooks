@@ -45,9 +45,10 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/40.
   - kept current by consuming `conversations.message_received`,
     `conversations.message_sent` and `conversations.conversation_changed`
     (ids only) and pulling the group's current state through the source
-    port, coalesced per group;
+    port, one refresh of a group at a time;
   - a lazy backfill per workspace and source (started by the first event or
-    the first query), resumable, plus `campbooks-server search reindex`;
+    the first query), resumable, plus `campbooks-server search reindex
+    --workspace <id>`;
   - deleted with the workspace on `workspaces.workspace_deleting`;
   - the operation `search.query`:
     `GET /api/v1/w/{workspace_id}/search?q=…`, with Gmail-style operators

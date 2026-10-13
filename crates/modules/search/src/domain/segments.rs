@@ -75,10 +75,22 @@ mod tests {
         assert_eq!(
             segments,
             vec![
-                Segment { text: "Your ".into(), hit: false },
-                Segment { text: "invoice".into(), hit: true },
-                Segment { text: " for ".into(), hit: false },
-                Segment { text: "October".into(), hit: true },
+                Segment {
+                    text: "Your ".into(),
+                    hit: false
+                },
+                Segment {
+                    text: "invoice".into(),
+                    hit: true
+                },
+                Segment {
+                    text: " for ".into(),
+                    hit: false
+                },
+                Segment {
+                    text: "October".into(),
+                    hit: true
+                },
             ]
         );
     }
@@ -88,6 +100,12 @@ mod tests {
         let segments = split("<b>urgent</b> \u{e001}x\u{e000}\u{e000}y\u{e001}");
         assert_eq!(segments[0].text, "<b>urgent</b> x");
         assert!(!segments[0].hit);
-        assert_eq!(segments[1], Segment { text: "y".into(), hit: true });
+        assert_eq!(
+            segments[1],
+            Segment {
+                text: "y".into(),
+                hit: true
+            }
+        );
     }
 }

@@ -206,7 +206,9 @@ impl SearchSources {
 
     /// The source of `group_type`.
     pub fn get(&self, group_type: &str) -> Option<&Arc<dyn SearchSource>> {
-        self.0.iter().find(|source| source.group_type() == group_type)
+        self.0
+            .iter()
+            .find(|source| source.group_type() == group_type)
     }
 
     /// Every source.

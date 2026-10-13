@@ -1,6 +1,6 @@
 //! Tests of `search.query` over a fake source (fictional mail only).
 
-use std::sync::atomic::Ordering;
+use std::{fmt::Write as _, sync::atomic::Ordering};
 
 use campbooks_kernel::tenancy::{UserId, WorkspaceId};
 use sqlx::PgPool;
@@ -92,7 +92,9 @@ fn q(text: &str) -> String {
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 encoded.push(char::from(byte));
             }
-            _ => encoded.push_str(&format!("%{byte:02X}")),
+            _ => {
+                let _ = write!(encoded, "%{byte:02X}");
+            }
         }
     }
     encoded
@@ -113,15 +115,25 @@ async fn anonymous_and_outsiders_are_refused(db: PgPool) {
 async fn accents_stems_and_languages(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, sam, _) = mailbox(&kit).await;
-    assert_eq!(kit.ids(&sam, workspace, &q("fatura joao")).await, ["c-water"]);
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("fatura joao")).await,
+        ["c-water"]
+    );
     assert_eq!(kit.ids(&sam, workspace, &q("FATURAS")).await, ["c-water"]);
     assert_eq!(kit.ids(&sam, workspace, &q("fuites")).await, ["c-fuite"]);
     assert_eq!(kit.ids(&sam, workspace, &q("reviewing")).await, ["c-q4"]);
     // A code and an attachment name.
-    assert_eq!(kit.ids(&sam, workspace, &q("F-2026-0457")).await, ["c-factura"]);
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("F-2026-0457")).await,
+        ["c-factura"]
+    );
     assert_eq!(kit.ids(&sam, workspace, &q("09812")).await, ["c-water"]);
     // Every word must match.
-    assert!(kit.ids(&sam, workspace, &q("fatura boiler")).await.is_empty());
+    assert!(
+        kit.ids(&sam, workspace, &q("fatura boiler"))
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -129,7 +141,10 @@ async fn people_partially(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, sam, _) = mailbox(&kit).await;
     assert_eq!(kit.ids(&sam, workspace, &q("from:lope")).await, ["c-q4"]);
-    assert_eq!(kit.ids(&sam, workspace, &q("from:aguas")).await, ["c-water"]);
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("from:aguas")).await,
+        ["c-water"]
+    );
     assert_eq!(kit.ids(&sam, workspace, &q("lopes")).await, ["c-q4"]);
     let mut to_sam = kit.ids(&sam, workspace, &q("to:sam@example")).await;
     to_sam.sort();
@@ -157,24 +172,41 @@ async fn operators_combined(db: PgPool) {
     assert_eq!(hits[0]["facets"]["attachment"], true);
     assert_eq!(hits[0]["facets"]["unread"], true);
     assert_eq!(hits[0]["matched"]["id"], "m-water");
-    assert_eq!(hits[0]["from"]["address"], "faturacao@aguas-do-vale.example");
+    assert_eq!(
+        hits[0]["from"]["address"],
+        "faturacao@aguas-do-vale.example"
+    );
     let filters: Vec<String> = response.json["query"]["filters"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|f| format!("{}:{}", f["operator"].as_str().unwrap(), f["value"].as_str().unwrap()))
+        .map(|f| {
+            format!(
+                "{}:{}",
+                f["operator"].as_str().unwrap(),
+                f["value"].as_str().unwrap()
+            )
+        })
         .collect();
     assert_eq!(filters, ["has:attachment", "is:unread", "newer_than:30d"]);
     // The read conversation has an attachment but is not unread.
-    assert!(kit.ids(&sam, workspace, &q("is:unread plan")).await.is_empty());
+    assert!(
+        kit.ids(&sam, workspace, &q("is:unread plan"))
+            .await
+            .is_empty()
+    );
     assert_eq!(kit.ids(&sam, workspace, &q("is:read")).await, ["c-q4"]);
-    assert_eq!(kit.ids(&sam, workspace, &q("subject:septiembre")).await, ["c-factura"]);
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("subject:septiembre")).await,
+        ["c-factura"]
+    );
     assert_eq!(
         kit.ids(&sam, workspace, &q("older_than:15d")).await,
         ["c-factura"]
     );
     assert_eq!(
-        kit.ids(&sam, workspace, &q("after:2000-01-01 before:2000-12-31")).await,
+        kit.ids(&sam, workspace, &q("after:2000-01-01 before:2000-12-31"))
+            .await,
         Vec::<String>::new()
     );
 }
@@ -200,9 +232,19 @@ async fn spam_and_trash_only_when_asked(db: PgPool) {
     kit.announce(workspace, "c-fuite").await;
     kit.run_jobs().await;
     assert!(kit.ids(&sam, workspace, &q("fuite")).await.is_empty());
-    assert_eq!(kit.ids(&sam, workspace, &q("fuite in:trash")).await, ["c-fuite"]);
-    assert_eq!(kit.ids(&sam, workspace, &q("fuite in:anywhere")).await, ["c-fuite"]);
-    assert!(kit.ids(&sam, workspace, &q("fuite in:inbox")).await.is_empty());
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("fuite in:trash")).await,
+        ["c-fuite"]
+    );
+    assert_eq!(
+        kit.ids(&sam, workspace, &q("fuite in:anywhere")).await,
+        ["c-fuite"]
+    );
+    assert!(
+        kit.ids(&sam, workspace, &q("fuite in:inbox"))
+            .await
+            .is_empty()
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -210,7 +252,8 @@ async fn the_last_word_as_a_prefix(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, sam, _) = mailbox(&kit).await;
     assert_eq!(
-        kit.ids(&sam, workspace, &format!("{}&prefix=true", q("boiler rep"))).await,
+        kit.ids(&sam, workspace, &format!("{}&prefix=true", q("boiler rep")))
+            .await,
         ["c-q4"]
     );
     assert!(kit.ids(&sam, workspace, &q("boiler rep")).await.is_empty());
@@ -247,7 +290,7 @@ async fn pages_and_cursors(db: PgPool) {
         loop {
             let mut query = format!("{}&sort={sort}&limit=3", q("receipt"));
             if let Some(cursor) = &cursor {
-                query.push_str(&format!("&cursor={cursor}"));
+                let _ = write!(query, "&cursor={cursor}");
             }
             let response = kit.search(&sam, workspace, &query).await;
             assert_eq!(response.status, 200, "{}", response.json);
@@ -279,7 +322,9 @@ async fn pages_and_cursors(db: PgPool) {
     let too_long = kit.search(&sam, workspace, &q(&"a".repeat(513))).await;
     assert_eq!(too_long.status, 400);
     assert_eq!(too_long.json["code"], "query_too_long");
-    let bad_limit = kit.search(&sam, workspace, &format!("{}&limit=51", q("x"))).await;
+    let bad_limit = kit
+        .search(&sam, workspace, &format!("{}&limit=51", q("x")))
+        .await;
     assert_eq!(bad_limit.status, 400);
 }
 
@@ -346,7 +391,12 @@ async fn only_inboxes_the_caller_may_see(db: PgPool) {
         Conversation::new(
             "inbox-rui",
             "Boiler repair quote",
-            vec![Message::new("m-rui", "plumber@example.com", "The boiler repair costs 90 €.", 1)],
+            vec![Message::new(
+                "m-rui",
+                "plumber@example.com",
+                "The boiler repair costs 90 €.",
+                1,
+            )],
         ),
     )
     .await;
@@ -390,12 +440,11 @@ async fn current_state_wins_whatever_the_order(db: PgPool) {
     kit.announce(workspace, "c-q4").await;
     kit.run_jobs().await;
     assert!(kit.ids(&sam, workspace, &q("budget")).await.is_empty());
-    let left: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM search.entries WHERE record_id LIKE 'm-q4-%'",
-    )
-    .fetch_one(&kit.db)
-    .await
-    .unwrap();
+    let left: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM search.entries WHERE record_id LIKE 'm-q4-%'")
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
     assert_eq!(left, 0);
 }
 
@@ -410,7 +459,9 @@ async fn a_flag_change_reads_no_text(db: PgPool) {
     assert_eq!(kit.source.texts_read.load(Ordering::SeqCst), before);
     assert_eq!(kit.ids(&sam, workspace, &q("is:starred")).await, ["c-q4"]);
     // A new title re-indexes the entries' vectors from stored text.
-    kit.edit(workspace, "c-q4", |c| "Quarterly roadmap".clone_into(&mut c.subject));
+    kit.edit(workspace, "c-q4", |c| {
+        "Quarterly roadmap".clone_into(&mut c.subject);
+    });
     kit.announce(workspace, "c-q4").await;
     kit.run_jobs().await;
     assert_eq!(kit.source.texts_read.load(Ordering::SeqCst), before);
@@ -430,7 +481,12 @@ async fn a_workspace_that_predates_search_is_backfilled(db: PgPool) {
             Conversation::new(
                 "inbox-sam",
                 &format!("Old newsletter {i}"),
-                vec![Message::new(&format!("m-{i:03}"), "news@example.com", "Archive issue", 400)],
+                vec![Message::new(
+                    &format!("m-{i:03}"),
+                    "news@example.com",
+                    "Archive issue",
+                    400,
+                )],
             ),
         );
     }
@@ -478,5 +534,72 @@ async fn a_deleted_workspace_is_purged(db: PgPool) {
         .await
         .unwrap();
         assert_eq!(left, 0, "{table}");
+    }
+}
+
+/// The instant query on a big workspace: 20,000 conversations, 100,000
+/// generated fictional messages. Run it by hand on the reference host:
+/// `cargo test -p campbooks-search --lib bench_instant_queries -- --ignored --nocapture`.
+#[sqlx::test(migrations = "../../../migrations")]
+#[ignore = "benchmark; run by hand (see the doc comment)"]
+#[allow(clippy::print_stderr, reason = "a benchmark reports its timings")]
+async fn bench_instant_queries(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, user) = kit.member("sam", workspace);
+    kit.share(workspace, "inbox-sam", &[user]);
+    sqlx::query(
+        "INSERT INTO search.groups (id, workspace_id, record_type, record_id, container_type,
+                                    container_id, occurred_at, title, title_folded, facets,
+                                    index_version)
+         SELECT gen_random_uuid(), $1, 'conversations.conversation', 'g' || i,
+                'conversations.inbox', 'inbox-sam', now() - make_interval(mins => i),
+                'Subject ' || i, 'subject ' || i, '{\"unread\": false}', 1
+           FROM generate_series(1, 20000) i",
+    )
+    .bind(workspace.as_uuid())
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "WITH words AS (SELECT ARRAY['invoice', 'meeting', 'boiler', 'repair', 'budget',
+                                     'fatura', 'factura', 'reçu', 'plan', 'friday', 'water',
+                                     'contract', 'delivery', 'order', 'payment', 'receipt',
+                                     'review', 'board', 'notes', 'thursday'] AS w)
+         INSERT INTO search.entries (id, workspace_id, group_id, record_type, record_id,
+                                     occurred_at, language, people_words, from_folded, body,
+                                     facets, stamp, tsv)
+         SELECT gen_random_uuid(), $1, g.id, 'conversations.message', g.record_id || '-' || k,
+                g.occurred_at, 'en', 'ana lopes example com', 'ana lopes ana@example.com',
+                b.body, '{\"mailbox\": \"inbox\"}', 's',
+                search.entry_vector(g.title, 'ana lopes example com', '', b.body, 'en')
+           FROM search.groups g CROSS JOIN generate_series(1, 5) k
+           CROSS JOIN LATERAL (
+               SELECT string_agg(words.w[1 + floor(random() * 20)::int], ' ') AS body
+                 FROM words, generate_series(1, 80 + k - k)
+           ) b
+          WHERE g.workspace_id = $1",
+    )
+    .bind(workspace.as_uuid())
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    sqlx::query("ANALYZE").execute(&kit.db).await.unwrap();
+    for query in [
+        "q=boi&prefix=true",
+        "q=boiler%20rep&prefix=true",
+        "q=invoice%20friday",
+        "q=from%3Alope%20budget",
+        "q=receipt&sort=newest",
+    ] {
+        let mut times = Vec::new();
+        for _ in 0..20 {
+            let started = std::time::Instant::now();
+            let response = kit.search(&sam, workspace, query).await;
+            times.push(started.elapsed());
+            assert_eq!(response.status, 200);
+        }
+        times.sort();
+        eprintln!("{query}: p50 {:?}, p95 {:?}", times[10], times[18]);
     }
 }

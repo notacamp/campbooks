@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search.backfills SET after_id = $3\n                  WHERE workspace_id = $1 AND group_type = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9fc8e982bfd2c7cd02be962bf59e2c199126743431aca3636c4fa3ed7ca6d865"
+}

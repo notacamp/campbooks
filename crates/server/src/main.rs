@@ -61,6 +61,11 @@ enum Command {
         #[command(subcommand)]
         command: EventsCommand,
     },
+    /// Work with the search index.
+    Search {
+        #[command(subcommand)]
+        command: SearchCommand,
+    },
     /// Print the OpenAPI document as JSON.
     Openapi,
     /// Print the OAuth scope catalogue as JSON (`[{name, description}]`), for
@@ -93,6 +98,17 @@ enum EventsCommand {
     /// holds): every event the modules publish, its version, whether it is
     /// workspace-scoped, and its payload schema.
     Catalogue,
+}
+
+#[derive(Debug, Subcommand)]
+enum SearchCommand {
+    /// Rebuild a workspace's search index from its sources, in the
+    /// background (a worker runs it). Search keeps answering meanwhile.
+    Reindex {
+        /// The workspace's id.
+        #[arg(long)]
+        workspace: String,
+    },
 }
 
 /// Which parts of the server a process runs (ADR 0011).
@@ -135,6 +151,9 @@ fn main() -> ExitCode {
             Ok(catalogue) => print_json(&catalogue, "events catalogue"),
             Err(e) => fail(&e.to_string()),
         },
+        Command::Search {
+            command: SearchCommand::Reindex { workspace },
+        } => reindex(&workspace),
         Command::Openapi => print_json(&campbooks_server::openapi(), "OpenAPI document"),
         Command::Scopes => print_json(&campbooks_server::scope_catalogue(), "scope catalogue"),
         Command::Healthcheck { port } => healthcheck(port.unwrap_or_else(port_from_env)),
@@ -458,6 +477,46 @@ fn replay(consumer: &str, since: Option<&str>) -> ExitCode {
             let _ = writeln!(
                 std::io::stdout(),
                 "enqueued {count} delivery(ies) to `{consumer}`; a worker runs them"
+            );
+            ExitCode::SUCCESS
+        }
+        Err(e) => fail(&e),
+    }
+}
+
+/// `search reindex --workspace <id>`.
+fn reindex(workspace: &str) -> ExitCode {
+    let Ok(workspace) = workspace.parse::<campbooks_kernel::tenancy::WorkspaceId>() else {
+        return fail("--workspace must be a workspace id (a UUID)");
+    };
+    let config = match Config::from_env() {
+        Ok(config) => config,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let registry = match campbooks_server::registry() {
+        Ok(registry) => registry,
+        Err(e) => return fail(&e.to_string()),
+    };
+    let runtime = match runtime() {
+        Ok(runtime) => runtime,
+        Err(e) => return fail(&e),
+    };
+    let restarted = runtime.block_on(async {
+        let db = connect(&config).await?;
+        let state =
+            campbooks_server::with_ports(AppState::new(db.clone(), config).with_registry(registry));
+        let restarted = campbooks_search::reindex(&state, workspace)
+            .await
+            .map_err(|e| e.to_string());
+        db.close().await;
+        restarted
+    });
+    match restarted {
+        Ok(sources) => {
+            let _ = writeln!(
+                std::io::stdout(),
+                "reindexing {} source(s) of the workspace; a worker runs it",
+                sources.len()
             );
             ExitCode::SUCCESS
         }

@@ -26,7 +26,7 @@ pub mod events;
 mod features;
 pub mod scopes;
 
-pub use features::backfill::Backfill;
+pub use features::backfill::{Backfill, reindex};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "search";

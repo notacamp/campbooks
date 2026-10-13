@@ -5,14 +5,13 @@ use campbooks_kernel::{
     RecordRef, Result,
     blobs::BlobStore,
     jobs,
-    search::{EntryHead, EntryText, Facet, PersonRole, SearchSource, SourceContext, facet},
+    search::{EntryHead, EntryText, Facet, Group, PersonRole, SearchSource, SourceContext, facet},
     tenancy::WorkspaceId,
 };
 use sqlx::PgConnection;
 
 use super::{
-    EntryId, GroupId,
-    language,
+    EntryId, GroupId, language,
     text::{clean, words},
 };
 
@@ -72,11 +71,37 @@ pub async fn refresh(
     };
 
     let title = clean(&group.title);
+    let (group_id, previous_title) =
+        write_group(conn, workspace, group_type, id, &group, &title).await?;
+    let read = write_entries(conn, blobs, workspace, source, group_id, &title, &group).await?;
+    if previous_title.is_some_and(|previous| previous != title) {
+        // The title is part of every entry's vector.
+        sqlx::query!(
+            "UPDATE search.entries
+                SET tsv = search.entry_vector($1, people_words, file_words, body, language)
+              WHERE group_id = $2",
+            title,
+            group_id as GroupId,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(Refreshed::Indexed { read })
+}
+
+/// Upsert the group's row; returns its id and the title it had before.
+async fn write_group(
+    conn: &mut PgConnection,
+    workspace: WorkspaceId,
+    group_type: &str,
+    id: &str,
+    group: &Group,
+    title: &str,
+) -> Result<(GroupId, Option<String>)> {
     let mut facets = group.facets.clone();
-    let attachment = group
-        .entries
-        .iter()
-        .any(|entry| matches!(entry.facets.get(facet::ATTACHMENTS), Some(Facet::Count(n)) if *n > 0));
+    let attachment = group.entries.iter().any(
+        |entry| matches!(entry.facets.get(facet::ATTACHMENTS), Some(Facet::Count(n)) if *n > 0),
+    );
     facets.insert(ATTACHMENT.to_owned(), Facet::Bool(attachment));
     let facets = serde_json::to_value(&facets).map_err(campbooks_kernel::Error::internal)?;
     let previous_title = sqlx::query_scalar!(
@@ -115,6 +140,21 @@ pub async fn refresh(
     .fetch_one(&mut *conn)
     .await?;
 
+    Ok((group_id, previous_title))
+}
+
+/// Bring the group's entries up to date: facets for every entry, text only
+/// for entries whose stamp changed, and entries no longer listed removed.
+/// Returns how many texts were read.
+async fn write_entries(
+    conn: &mut PgConnection,
+    blobs: &BlobStore,
+    workspace: WorkspaceId,
+    source: &dyn SearchSource,
+    group_id: GroupId,
+    title: &str,
+    group: &Group,
+) -> Result<usize> {
     let ids: Vec<String> = group.entries.iter().map(|e| e.record.id.clone()).collect();
     let stored = sqlx::query!(
         "SELECT record_type, record_id, stamp FROM search.entries
@@ -135,7 +175,8 @@ pub async fn refresh(
         group.entries.iter().partition(|head| unchanged(head));
 
     for head in &keep {
-        let facets = serde_json::to_value(&head.facets).map_err(campbooks_kernel::Error::internal)?;
+        let facets =
+            serde_json::to_value(&head.facets).map_err(campbooks_kernel::Error::internal)?;
         sqlx::query!(
             "UPDATE search.entries SET group_id = $1, occurred_at = $2, facets = $3
               WHERE workspace_id = $4 AND record_type = $5 AND record_id = $6",
@@ -164,19 +205,7 @@ pub async fn refresh(
         let Some(head) = read.iter().find(|head| head.record == text.record) else {
             continue;
         };
-        upsert_entry(conn, workspace, group_id, &title, head, text).await?;
-    }
-    if previous_title.is_some_and(|previous| previous != title) {
-        // The title is part of every entry's vector.
-        sqlx::query!(
-            "UPDATE search.entries
-                SET tsv = search.entry_vector($1, people_words, file_words, body, language)
-              WHERE group_id = $2",
-            title,
-            group_id as GroupId,
-        )
-        .execute(&mut *conn)
-        .await?;
+        upsert_entry(conn, workspace, group_id, title, head, text).await?;
     }
     sqlx::query!(
         "DELETE FROM search.entries WHERE group_id = $1 AND NOT (record_id = ANY($2))",
@@ -185,7 +214,7 @@ pub async fn refresh(
     )
     .execute(&mut *conn)
     .await?;
-    Ok(Refreshed::Indexed { read: texts.len() })
+    Ok(texts.len())
 }
 
 /// Write one entry's text and vector.

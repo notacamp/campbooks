@@ -4,8 +4,9 @@
 //! page records how far it got and enqueues the next one.
 
 use campbooks_kernel::{
-    Job, JobContext, JobError,
-    jobs::EnqueueOptions,
+    AppState, Job, JobContext, JobError, Result,
+    db::BeginFor as _,
+    jobs::{self, EnqueueOptions},
     search::SourceContext,
     tenancy::WorkspaceId,
 };
@@ -31,7 +32,10 @@ impl Backfill {
     pub fn options(&self, workspace: WorkspaceId) -> EnqueueOptions {
         let page = self.after.as_deref().unwrap_or("^");
         EnqueueOptions::for_workspace(workspace.to_string())
-            .unique(format!("search.backfill:{workspace}:{}:{page}", self.group_type))
+            .unique(format!(
+                "search.backfill:{workspace}:{}:{page}",
+                self.group_type
+            ))
             .priority(-10)
     }
 }
@@ -69,13 +73,13 @@ impl Job for Backfill {
             return Ok(());
         }
         let cx = SourceContext {
-            conn: &mut **tx,
+            conn: tx,
             blobs: &state.blobs,
             workspace,
         };
         let page = source.page(cx, self.after.as_deref(), PAGE).await?;
         for id in &page.groups {
-            index::refresh(&mut **tx, &state.blobs, workspace, source.as_ref(), id).await?;
+            index::refresh(tx, &state.blobs, workspace, source.as_ref(), id).await?;
         }
         if let Some(next) = page.next {
             sqlx::query!(
@@ -91,7 +95,7 @@ impl Job for Backfill {
                 group_type: self.group_type.clone(),
                 after: Some(next),
             };
-            campbooks_kernel::jobs::enqueue(&mut *tx, &job, job.options(workspace)).await?;
+            jobs::enqueue(&mut *tx, &job, job.options(workspace)).await?;
         } else {
             sqlx::query!(
                 "UPDATE search.backfills SET state = 'done', finished_at = now()
@@ -108,4 +112,36 @@ impl Job for Backfill {
         }
         Ok(())
     }
+}
+
+/// Rebuild `workspace`'s index from every registered source, from the first
+/// page (`campbooks-server search reindex --workspace <id>`). Queries keep
+/// answering from the current rows while it runs. Returns the sources
+/// restarted.
+pub async fn reindex(state: &AppState, workspace: WorkspaceId) -> Result<Vec<String>> {
+    let mut tx = state.db.begin_for(workspace).await?;
+    let mut restarted = Vec::new();
+    for source in state.search_sources.iter() {
+        let group_type = source.group_type();
+        sqlx::query!(
+            r#"INSERT INTO search.backfills (workspace_id, group_type, state, index_version)
+               VALUES ($1, $2, 'running', $3)
+               ON CONFLICT (workspace_id, group_type) DO UPDATE
+                  SET state = 'running', after_id = NULL, index_version = EXCLUDED.index_version,
+                      started_at = now(), finished_at = NULL"#,
+            workspace.as_uuid(),
+            group_type,
+            INDEX_VERSION,
+        )
+        .execute(&mut *tx)
+        .await?;
+        let job = Backfill {
+            group_type: group_type.to_owned(),
+            after: None,
+        };
+        jobs::enqueue(&mut tx, &job, job.options(workspace)).await?;
+        restarted.push(group_type.to_owned());
+    }
+    tx.commit().await?;
+    Ok(restarted)
 }

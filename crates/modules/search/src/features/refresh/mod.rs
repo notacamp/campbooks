@@ -27,7 +27,7 @@ async fn refresh(
         .map_err(|_| JobError::fatal("event with a malformed workspace"))?;
     let tx = ctx.tx().await?;
     index::ensure_backfill(tx, workspace, group_type).await?;
-    index::refresh(&mut **tx, &state.blobs, workspace, source.as_ref(), group).await?;
+    index::refresh(tx, &state.blobs, workspace, source.as_ref(), group).await?;
     Ok(())
 }
 

@@ -70,6 +70,7 @@ pub struct SearchParams {
     #[serde(default)]
     pub q: String,
     /// `relevance` (default) or `newest`.
+    #[param(inline)]
     pub sort: Option<Sort>,
     /// `true` while the member is typing: the last word matches as a prefix.
     #[serde(default)]
@@ -226,7 +227,9 @@ pub async fn handler(
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {
         return Err(Error::BadRequest(
-            crate::MESSAGES.reason("invalid_limit").arg("max", MAX_LIMIT),
+            crate::MESSAGES
+                .reason("invalid_limit")
+                .arg("max", MAX_LIMIT),
         ));
     }
     let mut parsed = query::parse(&params.q, params.prefix).map_err(too_long)?;
@@ -240,9 +243,49 @@ pub async fn handler(
         },
     };
 
-    // Where the caller may look: sources they hold a read scope for, and
-    // the containers the visibility port lists for them, asked now.
-    let rules = ReadRules::from_state(&state);
+    let access = &workspace.access;
+    let mut scope = scope(&state, &workspace).await?;
+
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    for group_type in &scope.group_types {
+        index::ensure_backfill(&mut tx, access.workspace, group_type).await?;
+    }
+    let indexing = index::indexing(&mut tx, access.workspace, &scope.group_types).await?;
+    if let Some(tz) = params.tz.as_deref().filter(|tz| *tz != "UTC") {
+        if uses_dates(&parsed) && known_zone(&mut tx, tz).await? {
+            tz.clone_into(&mut scope.tz);
+        } else if uses_dates(&parsed) {
+            parsed.warnings.push(Warning {
+                code: "invalid_value",
+                operator: "tz".to_owned(),
+            });
+        }
+    }
+
+    let searching = !(parsed.clauses.is_empty() && parsed.filters.is_empty());
+    let (hits, next_cursor) = if searching && !scope.containers.is_empty() {
+        let page = Page {
+            order,
+            limit,
+            fingerprint,
+        };
+        run(&mut tx, &parsed, &scope, &page).await?
+    } else {
+        (Vec::new(), None)
+    };
+    tx.commit().await?;
+    Ok(Json(SearchResults {
+        hits,
+        next_cursor,
+        indexing,
+        query: describe(parsed),
+    }))
+}
+
+/// Where the caller may look: the sources they hold a read scope for, and
+/// the containers the visibility port lists for them, asked now.
+async fn scope(state: &AppState, workspace: &Workspace<SearchRead>) -> Result<Scope> {
+    let rules = ReadRules::from_state(state);
     let access = &workspace.access;
     let mut scope = Scope {
         workspace: *access.workspace.as_uuid(),
@@ -266,87 +309,89 @@ pub async fn handler(
                 .map(|c| format!("{}:{}", c.record_type, c.id)),
         );
     }
+    Ok(scope)
+}
 
-    let mut tx = state.db.begin_for(access.workspace).await?;
-    for group_type in &scope.group_types {
-        index::ensure_backfill(&mut tx, access.workspace, group_type).await?;
-    }
-    let indexing = index::indexing(&mut tx, access.workspace, &scope.group_types).await?;
-    if let Some(tz) = params.tz.as_deref().filter(|tz| *tz != "UTC") {
-        if uses_dates(&parsed) && known_zone(&mut tx, tz).await? {
-            tz.clone_into(&mut scope.tz);
-        } else if uses_dates(&parsed) {
-            parsed.warnings.push(Warning {
-                code: "invalid_value",
-                operator: "tz".to_owned(),
-            });
-        }
-    }
+/// Which page to fetch.
+#[derive(Debug, Clone, Copy)]
+struct Page {
+    order: Order,
+    limit: u32,
+    fingerprint: u64,
+}
 
-    let mut hits = Vec::new();
-    let mut next_cursor = None;
-    let searching = !(parsed.clauses.is_empty() && parsed.filters.is_empty());
-    if searching && !scope.containers.is_empty() {
-        let fetch = i64::from(limit) + 1;
-        let rows = sql::page(&parsed, &scope, order, fetch)
+/// One page of hits for `parsed` within `scope`, and the next page's cursor.
+async fn run(
+    tx: &mut sqlx::PgConnection,
+    parsed: &Query,
+    scope: &Scope,
+    page: &Page,
+) -> Result<(Vec<Hit>, Option<String>)> {
+    let Page {
+        order,
+        limit,
+        fingerprint,
+    } = *page;
+    let fetch = i64::from(limit) + 1;
+    let rows = sql::page(parsed, scope, order, fetch)
+        .build()
+        .fetch_all(&mut *tx)
+        .await?;
+    let more = rows.len() > limit as usize;
+    let rows = &rows[..rows.len().min(limit as usize)];
+    let best: Vec<Uuid> = rows
+        .iter()
+        .filter_map(|row| row.try_get::<Option<Uuid>, _>("best").ok().flatten())
+        .collect();
+    let mut marks: HashMap<Uuid, Marks> = HashMap::new();
+    if !best.is_empty() {
+        for row in sql::highlights(parsed, best)
             .build()
             .fetch_all(&mut *tx)
-            .await?;
-        let more = rows.len() > limit as usize;
-        let rows = &rows[..rows.len().min(limit as usize)];
-        let best: Vec<Uuid> = rows
-            .iter()
-            .filter_map(|row| row.try_get::<Option<Uuid>, _>("best").ok().flatten())
-            .collect();
-        let mut marks: HashMap<Uuid, Marks> = HashMap::new();
-        if !best.is_empty() {
-            for row in sql::highlights(&parsed, best)
-                .build()
-                .fetch_all(&mut *tx)
-                .await?
-            {
-                let id: Uuid = row.try_get("id")?;
-                let people: serde_json::Value = row.try_get("people")?;
-                let title: Option<String> = row.try_get("title")?;
-                let snippet: Option<String> = row.try_get("snippet")?;
-                marks.insert(
-                    id,
-                    Marks {
-                        record: RecordRef::new(
-                            row.try_get::<String, _>("record_type")?,
-                            &row.try_get::<String, _>("record_id")?,
-                        ),
-                        people: serde_json::from_value(people).unwrap_or_default(),
-                        title: title.unwrap_or_default(),
-                        snippet: snippet.unwrap_or_default(),
-                    },
-                );
-            }
-        }
-        for row in rows {
-            hits.push(hit(row, &marks, parsed.clauses.is_empty())?);
-        }
-        if more {
-            next_cursor = match order {
-                Order::Relevance { offset } => {
-                    let next = offset + i64::from(limit);
-                    (next < MAX_RELEVANCE_RESULTS)
-                        .then(|| encode_cursor(&Cursor::relevance(fingerprint, next)))
-                }
-                Order::Newest { .. } => hits.last().and_then(|last| {
-                    let id = rows.last()?.try_get::<Uuid, _>("id").ok()?;
-                    Some(encode_cursor(&Cursor::newest(fingerprint, last.occurred_at, id)))
-                }),
-            };
+            .await?
+        {
+            let id: Uuid = row.try_get("id")?;
+            let people: serde_json::Value = row.try_get("people")?;
+            let title: Option<String> = row.try_get("title")?;
+            let snippet: Option<String> = row.try_get("snippet")?;
+            marks.insert(
+                id,
+                Marks {
+                    record: RecordRef::new(
+                        row.try_get::<String, _>("record_type")?,
+                        &row.try_get::<String, _>("record_id")?,
+                    ),
+                    people: serde_json::from_value(people).unwrap_or_default(),
+                    title: title.unwrap_or_default(),
+                    snippet: snippet.unwrap_or_default(),
+                },
+            );
         }
     }
-    tx.commit().await?;
-    Ok(Json(SearchResults {
-        hits,
-        next_cursor,
-        indexing,
-        query: describe(parsed),
-    }))
+    let hits = rows
+        .iter()
+        .map(|row| hit(row, &marks, parsed.clauses.is_empty()))
+        .collect::<Result<Vec<_>>>()?;
+    let next_cursor = if more {
+        match order {
+            Order::Relevance { offset } => {
+                let next = offset + i64::from(limit);
+                (next < MAX_RELEVANCE_RESULTS)
+                    .then(|| encode_cursor(&Cursor::relevance(fingerprint, next)))
+            }
+            Order::Newest { .. } => hits.last().and_then(|last| {
+                let id = rows.last()?.try_get::<Uuid, _>("id").ok()?;
+                Some(encode_cursor(&Cursor::newest(
+                    fingerprint,
+                    last.occurred_at,
+                    id,
+                )))
+            }),
+        }
+    } else {
+        None
+    };
+    Ok((hits, next_cursor))
 }
 
 /// Over a limit of the query language (characters, terms or operators).
@@ -551,9 +596,12 @@ fn decode_cursor(cursor: &str, sort: Sort, fingerprint: u64) -> Result<Order> {
         return Err(mismatch());
     }
     match (sort, cursor) {
-        (Sort::Relevance, Cursor { o: Some(offset), .. }) if (0..MAX_RELEVANCE_RESULTS).contains(&offset) => {
-            Ok(Order::Relevance { offset })
-        }
+        (
+            Sort::Relevance,
+            Cursor {
+                o: Some(offset), ..
+            },
+        ) if (0..MAX_RELEVANCE_RESULTS).contains(&offset) => Ok(Order::Relevance { offset }),
         (
             Sort::Newest,
             Cursor {

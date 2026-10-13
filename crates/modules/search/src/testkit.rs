@@ -184,7 +184,12 @@ impl FakeSource {
         .into();
         Some(Group {
             container: RecordRef::new(INBOX, &c.inbox),
-            occurred_at: c.messages.iter().map(|m| m.at).max().unwrap_or_else(Utc::now),
+            occurred_at: c
+                .messages
+                .iter()
+                .map(|m| m.at)
+                .max()
+                .unwrap_or_else(Utc::now),
             title: c.subject.clone(),
             keywords: c.labels.clone(),
             facets,
@@ -318,7 +323,8 @@ impl Visibility for FakeVisibility {
         access: &'a Access,
         container: &'a RecordRef,
     ) -> VisibilityFuture<'a> {
-        let visible = container.record_type == INBOX && self.visible(access).contains(&container.id);
+        let visible =
+            container.record_type == INBOX && self.visible(access).contains(&container.id);
         Box::pin(async move { Ok(visible) })
     }
 

@@ -171,11 +171,7 @@ pub fn parse(input: &str, prefix: bool) -> Result<Query, TooLong> {
                 continue;
             }
             Token::Operator { name, value } => {
-                if let Some(text) = operator(&name, &value, &mut query) {
-                    Some((Term::Word(text), false))
-                } else {
-                    None
-                }
+                operator(&name, &value, &mut query).map(|text| (Term::Word(text), false))
             }
             Token::Word { text, negated } => {
                 let is_prefix = prefix
@@ -365,9 +361,7 @@ fn tokenize(input: &str) -> Vec<Token> {
             Some((name, value))
                 if !negated
                     && !name.is_empty()
-                    && name
-                        .chars()
-                        .all(|c| c.is_ascii_alphabetic() || c == '_') =>
+                    && name.chars().all(|c| c.is_ascii_alphabetic() || c == '_') =>
             {
                 tokens.push(Token::Operator {
                     name: name.to_ascii_lowercase(),
@@ -478,7 +472,10 @@ mod tests {
         let query = parse("colour:red is:maybe before:soon", false).unwrap();
         assert_eq!(words(&query), ["colour:red", "maybe", "soon"]);
         let codes: Vec<_> = query.warnings.iter().map(|w| w.code).collect();
-        assert_eq!(codes, ["unknown_operator", "invalid_value", "invalid_value"]);
+        assert_eq!(
+            codes,
+            ["unknown_operator", "invalid_value", "invalid_value"]
+        );
         assert!(query.filters.is_empty());
     }
 
@@ -528,17 +525,31 @@ mod tests {
     fn limits() {
         assert_eq!(parse(&"a".repeat(513), false), Err(TooLong::Chars));
         assert!(parse(&"a".repeat(512), false).is_ok());
-        let seventeen = vec!["w"; 17].join(" ");
+        let seventeen = ["w"; 17].join(" ");
         assert_eq!(parse(&seventeen, false), Err(TooLong::Terms));
-        let nine = vec!["is:unread"; 9].join(" ");
+        let nine = ["is:unread"; 9].join(" ");
         assert_eq!(parse(&nine, false), Err(TooLong::Operators));
     }
 
     #[test]
     fn any_input_parses() {
         for input in [
-            "", " ", "-", "--", "\"", "\"\"", ":", "a:", ":b", "-\"x", "OR", "from:\"", "é:ç",
-            "\u{e000}x\u{e001}", "a\"b\"c", "-from:ana",
+            "",
+            " ",
+            "-",
+            "--",
+            "\"",
+            "\"\"",
+            ":",
+            "a:",
+            ":b",
+            "-\"x",
+            "OR",
+            "from:\"",
+            "é:ç",
+            "\u{e000}x\u{e001}",
+            "a\"b\"c",
+            "-from:ana",
         ] {
             assert!(parse(input, true).is_ok(), "{input:?}");
         }
