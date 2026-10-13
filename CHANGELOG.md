@@ -16,7 +16,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   deleting it revokes the grant at Google. Off until you register a Google
   OAuth client (`CAMPBOOKS_GOOGLE__CLIENT_ID`,
   `CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`; see `deploy/README.md` → Connected
-  accounts); tuning is `CAMPBOOKS_CONNECTORS__*`. Note: replacing the instance
+  accounts); tuning is `CAMPBOOKS_CONNECTORS__*`, including the largest
+  message kept (`…__GMAIL__MAX_MESSAGE_BYTES`, 50 MiB) and the bytes one sync
+  run may download (`…__GMAIL__RUN_BUDGET_BYTES`, 64 MiB). The web app's
+  callback screen at `/connections/google/callback` is not built yet, so
+  connecting goes through the API for now. Note: replacing the instance
   secret key now also asks members to connect their accounts again.
 - Live updates: the app learns what changed in a workspace (renamed, a
   member joined, left or changed role) as it happens and refreshes only what

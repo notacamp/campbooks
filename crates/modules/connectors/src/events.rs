@@ -107,6 +107,8 @@ pub struct AccountDocument {
     pub provider: Provider,
     /// The account's email address, lower-cased.
     pub address: String,
+    /// Whether the provider verified it.
+    pub address_verified: bool,
     /// The account's display name, when the provider gives one.
     pub display_name: Option<String>,
 }

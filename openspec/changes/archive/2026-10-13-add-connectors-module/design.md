@@ -84,13 +84,18 @@ api: find by state hash; caller == authorization.user, workspace == path, not ex
 - **Incremental consent:** `include_granted_scopes=true`; adding a
   capability passes the connection id, and completion requires the same
   `sub`. A different account becomes a new connection.
-- **Token refresh** happens before a job opens its transaction; the new
-  access token and expiry are sealed back. `invalid_grant` → health
+- **Token refresh** happens before a job opens its transaction, under a
+  per-connection advisory lock (concurrent runs refresh once and share the
+  result); the new access token and expiry are sealed back. `invalid_grant` → health
   `needs_reauth` (reason `grant_revoked`), event, streams paused.
 - **Disconnect** revokes at `oauth2.googleapis.com/revoke` (best effort,
   logged without the token), deletes credentials, streams, index rows and
   batch holds, publishes `connection_removed`. Allowed to the grantor and to
   owners/admins.
+- **Verified address:** the account's email is used as given only when
+  Google says `email_verified`; otherwise it is stored and announced with
+  `address_verified = false`, and must not be treated as the account's
+  identity.
 - **Ownership:** a connection belongs to the **workspace** (its inbox is a
   workspace record) and records the **member who granted it**. The grant
   is personal: when that member leaves (`workspaces.member_left`), their
@@ -141,8 +146,10 @@ credentials unreadable: the connection goes `needs_reauth` (reason
   are respected by one run per stream and bounded concurrency inside a page.
 - **Failures.** The stream row is the schedule, not the queue's retry:
   provider trouble is recorded on it and the run ends normally. 401 → the
-  access token is dropped and the stream runs again in seconds, refreshing
-  it (`invalid_grant` there → `needs_reauth`). 429 or `rateLimitExceeded` →
+  access token is dropped and the stream runs again after a backoff,
+  refreshing it (`invalid_grant` there → `needs_reauth`); after
+  `FAILING_AFTER` refused runs in a row the connection is `needs_reauth`
+  (`access_refused`). 429 or `rateLimitExceeded` →
   health `throttled`, `throttled_until` from `Retry-After` (else the
   minimum interval). 5xx and network errors → `consecutive_failures` grows
   and the next run backs off from the minimum, doubling per failure, up to
@@ -184,6 +191,16 @@ credentials unreadable: the connection goes `needs_reauth` (reason
   that are gone. Bounded by the window; older indexed messages are left
   alone.
 - **Skipped:** drafts (`DRAFT`) and chats (`CHAT`).
+- **Bounded memory:** new messages are downloaded at most five at a time and
+  stored as each arrives (raw bytes dropped once their blobs exist), and a
+  download is abandoned as soon as it grows past
+  `CAMPBOOKS_CONNECTORS__GMAIL__MAX_MESSAGE_BYTES` (default 50 MiB): such a
+  message is recorded in `connectors.gmail_oversized` and never fetched
+  again. A run starts no download once it has fetched
+  `…__RUN_BUDGET_BYTES` (default 64 MiB); the page is then incomplete, the
+  cursor stays put, and the next run reads the same page or history again,
+  skipping (window) or only re-checking (history) what is already indexed,
+  so nothing is lost or emitted twice.
 - **Normalising** (`format=raw` → MIME parsed with `mail-parser`):
   `INBOX` → `mailbox.in_inbox`; `SPAM`, `TRASH` → `in_spam`, `in_trash`;
   `UNREAD` absent → `read`; `STARRED` → `starred`; `SENT` without `INBOX`
@@ -293,8 +310,10 @@ All under `/api/v1/w/{workspace_id}`; scopes `connectors:read`,
 
 Visibility: a member sees the connections they granted; owners and admins
 see all of the workspace's (health matters to them). Anything else is 404.
-Client tokens see all connections of their workspace but cannot start or
-complete one (no user to bind it to: 403 `connection_needs_user`).
+Client tokens are bound to one workspace (their token claim, then row-level
+security) and see all of its connections, which is intended: they are the
+workspace's own integrations. They cannot start, complete or disconnect one
+(no member to bind the grant to: 403 `connection_needs_user`).
 
 ## Configuration
 

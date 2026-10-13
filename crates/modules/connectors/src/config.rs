@@ -31,6 +31,13 @@ pub struct ConnectorsConfig {
 pub struct GmailConfig {
     /// How far back a new connection reads, in days (default 90).
     pub backfill_days: u32,
+    /// Messages larger than this (bytes, as Gmail sends them) are skipped
+    /// and recorded as oversized instead of stored (default 50 MiB).
+    pub max_message_bytes: u64,
+    /// One run stops starting downloads once it has fetched this many
+    /// bytes and continues in the next run (default 64 MiB), so a run's
+    /// memory stays bounded.
+    pub run_budget_bytes: u64,
 }
 
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
@@ -66,7 +73,11 @@ impl Default for ConnectorsConfig {
 
 impl Default for GmailConfig {
     fn default() -> Self {
-        Self { backfill_days: 90 }
+        Self {
+            backfill_days: 90,
+            max_message_bytes: 50 * 1024 * 1024,
+            run_budget_bytes: 64 * 1024 * 1024,
+        }
     }
 }
 
@@ -104,6 +115,11 @@ impl ConnectorsConfig {
     fn check(&self) -> Result<(), String> {
         if self.gmail.backfill_days == 0 || self.gmail.backfill_days > 3650 {
             return Err("CAMPBOOKS_CONNECTORS__GMAIL__BACKFILL_DAYS must be 1 to 3650".to_owned());
+        }
+        if self.gmail.max_message_bytes == 0 || self.gmail.run_budget_bytes == 0 {
+            return Err("CAMPBOOKS_CONNECTORS__GMAIL__MAX_MESSAGE_BYTES and \
+                 CAMPBOOKS_CONNECTORS__GMAIL__RUN_BUDGET_BYTES must be positive"
+                .to_owned());
         }
         if self.poll.min_seconds == 0 || self.poll.min_seconds > self.poll.max_seconds {
             return Err(

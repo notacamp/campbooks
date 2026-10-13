@@ -429,3 +429,99 @@ async fn a_large_backfill_does_not_hold_up_another_workspace(db: PgPool) {
     let last_a = order.iter().rposition(|w| *w == a.to_string()).unwrap();
     assert!(first_b < last_a, "{order:?}");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_stops_at_its_byte_budget_and_the_next_one_resumes(db: PgPool) {
+    let mut config = crate::config::ConnectorsConfig::default();
+    // Every download goes over: a run fetches only what it already started
+    // (the concurrency, 5), then stops.
+    config.gmail.run_budget_bytes = 1;
+    let kit = Kit::with_config(db, config).await;
+    let mut seeded = Vec::new();
+    for n in 0..12 {
+        seeded.push(kit.google.seed(
+            &synthetic(n),
+            &["INBOX"],
+            ago(
+                &kit,
+                TimeDelta::hours(1) + TimeDelta::minutes(i64::try_from(n).unwrap()),
+            ),
+        ));
+    }
+    let (ws, _) = connected(&kit).await;
+    kit.run_jobs().await;
+    let sizes: Vec<usize> = kit
+        .batches(ws)
+        .await
+        .iter()
+        .map(|b| b["changes"].as_array().unwrap().len())
+        .collect();
+    assert_eq!(sizes, [5, 5, 2]);
+    let mut ids: Vec<String> = changes(&kit, ws)
+        .await
+        .iter()
+        .map(|c| {
+            c["message"]["provider_message_id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    ids.sort();
+    seeded.sort();
+    assert_eq!(ids, seeded, "every message once");
+    assert!(seeded.iter().all(|id| kit.google.raw_fetches(id) == 1));
+    assert_eq!(kit.stream().await["phase"], "incremental");
+
+    // History too: seven new messages over two runs, none lost or repeated.
+    let mut delivered: Vec<String> = (100..107)
+        .map(|n| {
+            kit.google
+                .deliver(&synthetic(n), &["INBOX"], kit.clock.now())
+        })
+        .collect();
+    kit.next_run().await;
+    let mut new_ids: Vec<String> = changes(&kit, ws).await[12..]
+        .iter()
+        .map(|c| {
+            c["message"]["provider_message_id"]
+                .as_str()
+                .unwrap()
+                .to_owned()
+        })
+        .collect();
+    new_ids.sort();
+    delivered.sort();
+    assert_eq!(new_ids, delivered);
+    assert!(delivered.iter().all(|id| kit.google.raw_fetches(id) == 1));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn oversized_messages_are_skipped_and_never_fetched_again(db: PgPool) {
+    let mut config = crate::config::ConnectorsConfig::default();
+    config.gmail.max_message_bytes = 2_000;
+    let kit = Kit::with_config(db, config).await;
+    let mut big = synthetic(1);
+    big.extend(std::iter::repeat_n(b'x', 10_000));
+    let big = kit
+        .google
+        .seed(&big, &["INBOX"], ago(&kit, TimeDelta::hours(2)));
+    let small = kit
+        .google
+        .seed(&synthetic(2), &["INBOX"], ago(&kit, TimeDelta::hours(1)));
+    let (ws, _) = connected(&kit).await;
+    kit.run_jobs().await;
+    let all = changes(&kit, ws).await;
+    assert_eq!(all.len(), 1);
+    upsert_of(&all, &small);
+    let recorded: Vec<String> =
+        sqlx::query_scalar!("SELECT provider_message_id FROM connectors.gmail_oversized")
+            .fetch_all(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(recorded, std::slice::from_ref(&big));
+    // A resync of the window does not download it again.
+    kit.google.expire_history();
+    kit.next_run().await;
+    assert_eq!(kit.google.raw_fetches(&big), 1);
+}

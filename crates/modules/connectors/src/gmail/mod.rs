@@ -37,7 +37,7 @@ pub const FETCH_CONCURRENCY: usize = 5;
 pub const UNITS_PER_GET: u32 = 5;
 
 /// The most quota units one run may spend: a list or history call plus a
-/// page of fetches.
+/// page of fetches and label checks.
 pub const UNITS_PER_RUN: u32 = 5 + UNITS_PER_GET * LIST_PAGE * 2;
 
 /// A Gmail stream's cursor (the `streams.cursor` column).
@@ -80,6 +80,9 @@ pub struct Page {
     pub phase: Phase,
     /// Whether more is waiting (run again at once).
     pub more: bool,
+    /// Whether every new message of the page was fetched; `false` when the
+    /// run's byte budget ran out (the cursor then stays put).
+    pub complete: bool,
 }
 
 /// One update to the adapter's index (`connectors.gmail_messages`).
@@ -119,5 +122,10 @@ pub enum IndexOp {
     Remove {
         /// The row.
         row: Uuid,
+    },
+    /// The message is over the size limit: record it, never fetch it again.
+    Oversized {
+        /// Gmail's id.
+        provider_message_id: String,
     },
 }

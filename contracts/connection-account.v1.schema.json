@@ -4,12 +4,13 @@
   "title": "Connection account v1",
   "description": "The outside account behind a connection, as the blob `connectors.capability_granted` points at (content type `application/vnd.campbooks.connection-account+json; version=1`). Personal data, so it travels as a blob of the workspace, never inline in an event.",
   "type": "object",
-  "required": ["version", "provider", "address"],
+  "required": ["version", "provider", "address", "address_verified"],
   "additionalProperties": false,
   "properties": {
     "version": { "const": 1 },
     "provider": { "enum": ["google"], "description": "The provider; more values arrive with their adapters." },
     "address": { "type": "string", "minLength": 1, "description": "The account's email address, lower-cased." },
+    "address_verified": { "type": "boolean", "description": "Whether the provider verified the address. An unverified address must not be treated as the account's identity." },
     "display_name": { "type": ["string", "null"], "description": "The account's display name, when the provider gives one." }
   }
 }

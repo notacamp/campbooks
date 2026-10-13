@@ -14,6 +14,8 @@ CREATE TABLE connectors.connections (
     account_subject text NOT NULL,
     -- The account's email address, lower-cased, and display name.
     address text NOT NULL,
+    -- Whether the provider verified that address.
+    address_verified boolean NOT NULL DEFAULT false,
     display_name text,
     granted_by uuid NOT NULL,
     capabilities text[] NOT NULL DEFAULT '{}'
@@ -109,6 +111,14 @@ CREATE TABLE connectors.gmail_messages (
 );
 CREATE INDEX gmail_messages_window_idx ON connectors.gmail_messages (stream_id, internal_date);
 
+-- Messages over the size limit: skipped, never fetched again.
+CREATE TABLE connectors.gmail_oversized (
+    workspace_id uuid NOT NULL,
+    stream_id uuid NOT NULL REFERENCES connectors.streams (id) ON DELETE CASCADE,
+    provider_message_id text NOT NULL,
+    PRIMARY KEY (stream_id, provider_message_id)
+);
+
 -- Gmail label names per stream (`labels.list`), for user labels.
 CREATE TABLE connectors.gmail_labels (
     workspace_id uuid NOT NULL,
@@ -146,7 +156,8 @@ DO $$
 DECLARE t text;
 BEGIN
     FOREACH t IN ARRAY ARRAY['connections', 'credentials', 'authorizations', 'streams',
-                             'sync_due', 'gmail_messages', 'gmail_labels', 'batches']
+                             'sync_due', 'gmail_messages', 'gmail_oversized', 'gmail_labels',
+                             'batches']
     LOOP
         EXECUTE format('ALTER TABLE connectors.%I ENABLE ROW LEVEL SECURITY', t);
         EXECUTE format('ALTER TABLE connectors.%I FORCE ROW LEVEL SECURITY', t);

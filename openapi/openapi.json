@@ -2669,6 +2669,7 @@
           "id",
           "provider",
           "address",
+          "address_verified",
           "granted_by",
           "capabilities",
           "health",
@@ -2680,6 +2681,10 @@
           "address": {
             "type": "string",
             "description": "The account's email address."
+          },
+          "address_verified": {
+            "type": "boolean",
+            "description": "Whether the provider verified it."
           },
           "capabilities": {
             "type": "array",

@@ -15,7 +15,7 @@ use crate::domain::model::Capability;
 use serde::Deserialize;
 use url::Url;
 
-pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw};
+pub use gmail::{Gmail, LabelInfo, MessageMeta, MessageRaw, RawFetch};
 
 /// Google's `OpenID` scopes asked with every consent: who the account is.
 pub const IDENTITY_SCOPES: [&str; 2] = ["openid", "email"];
@@ -174,6 +174,9 @@ pub struct Account {
     pub sub: String,
     /// The account's address.
     pub email: String,
+    /// Whether Google verified the address.
+    #[serde(default)]
+    pub email_verified: bool,
     /// Its display name.
     #[serde(default)]
     pub name: Option<String>,
@@ -360,9 +363,15 @@ async fn json<T: serde::de::DeserializeOwned>(
             .await
             .map_err(|e| GoogleError::Unexpected(format!("response: {}", e.without_url())));
     }
+    Err(failure(response).await)
+}
+
+/// What a non-success answer means.
+async fn failure(response: reqwest::Response) -> GoogleError {
+    let status = response.status();
     let headers = response.headers().clone();
     let reason = error_reason(response).await;
-    Err(classify(status, &headers, reason.as_deref()))
+    classify(status, &headers, reason.as_deref())
 }
 
 /// The `reason` of a Google API error body (`rateLimitExceeded`, …).

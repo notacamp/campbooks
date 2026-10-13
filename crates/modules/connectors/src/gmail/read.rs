@@ -1,6 +1,6 @@
 //! Reading one page of a Gmail stream.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use campbooks_kernel::{
     blobs::{BlobError, BlobRef, BlobStore},
@@ -8,7 +8,7 @@ use campbooks_kernel::{
     tenancy::WorkspaceId,
 };
 use chrono::{DateTime, TimeDelta, Utc};
-use futures_util::StreamExt as _;
+use futures_util::{StreamExt as _, stream::FuturesOrdered};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -19,7 +19,7 @@ use super::{
 use crate::{
     contract::{Attachment, MessageChange, NormalizedMessage},
     domain::model::{Phase, StreamId},
-    google::{Gmail, GoogleError, LabelInfo, MessageMeta, MessageRaw},
+    google::{Gmail, GoogleError, LabelInfo, MessageMeta, MessageRaw, RawFetch},
 };
 
 /// Why a page could not be read.
@@ -59,6 +59,10 @@ pub struct Reader<'a> {
     pub now: DateTime<Utc>,
     /// The window of a backfill or resync, in days.
     pub backfill_days: u32,
+    /// Messages larger than this are skipped as oversized.
+    pub max_message_bytes: u64,
+    /// No download starts once a run has fetched this many bytes.
+    pub run_budget_bytes: u64,
 }
 
 /// An indexed message.
@@ -107,10 +111,12 @@ impl Reader<'_> {
             .await?;
         let ids: Vec<String> = listed.messages.iter().map(|m| m.id.clone()).collect();
         let indexed = self.indexed(&ids).await?;
+        let oversized = self.oversized(&ids).await?;
         let mut work = Work::default();
         // Gmail lists newest first; a batch reads oldest first.
         for id in ids.iter().rev() {
             match indexed.get(id) {
+                None if oversized.contains(id) => {}
                 None => work.fetch_raw.push(id.clone()),
                 Some(known) if self.phase == Phase::Resync => {
                     work.recheck.push((id.clone(), known.clone()));
@@ -119,6 +125,14 @@ impl Reader<'_> {
             }
         }
         let mut page = self.run(work, cursor.generation).await?;
+        if !page.complete {
+            // Over the byte budget: the same page again next run (what was
+            // stored is indexed and skipped then).
+            page.phase = self.phase;
+            page.more = true;
+            page.cursor = cursor;
+            return Ok(page);
+        }
         cursor.page_token = listed.next_page_token;
         if cursor.page_token.is_none() {
             if self.phase == Phase::Resync {
@@ -189,13 +203,16 @@ impl Reader<'_> {
             }
         };
         let indexed = self.indexed(&order).await?;
+        let oversized = self.oversized(&order).await?;
         let mut work = Work::default();
         for id in &order {
             let state = seen[id];
             match (indexed.get(id), state.deleted) {
                 (Some(known), true) => work.removed.push((id.clone(), known.row)),
                 (Some(known), false) => work.recheck.push((id.clone(), known.clone())),
-                (None, false) if state.added => work.fetch_raw.push(id.clone()),
+                (None, false) if state.added && !oversized.contains(id) => {
+                    work.fetch_raw.push(id.clone());
+                }
                 // Deleted before we carried it, or label changes on a
                 // message we never carried (older than the window): stays
                 // out of Campbooks.
@@ -203,6 +220,14 @@ impl Reader<'_> {
             }
         }
         let mut page = self.run(work, cursor.generation).await?;
+        if !page.complete {
+            // Over the byte budget: read the same history again next run;
+            // stored messages are known by then and only re-checked.
+            page.more = true;
+            page.cursor = self.cursor.clone();
+            page.phase = Phase::Incremental;
+            return Ok(page);
+        }
         if let Some(history_id) = latest {
             cursor.history_id = Some(history_id);
             cursor.page_token = None;
@@ -224,18 +249,37 @@ impl Reader<'_> {
             cursor,
             phase,
             more,
+            complete: true,
         }
     }
 
     /// Fetch, normalise and store what `work` lists.
+    ///
+    /// New messages are downloaded at most [`FETCH_CONCURRENCY`] at a time
+    /// and stored as each arrives, so a run holds a handful of messages in
+    /// memory, not a page. No new download starts once the run has fetched
+    /// its byte budget: the page is then incomplete ([`Page::complete`]) and
+    /// the caller keeps its cursor, so the next run picks up the rest (what
+    /// was stored is in the index by then and is not fetched again).
+    /// Messages over the size limit are skipped and recorded as oversized.
     async fn run(&self, work: Work, generation: i32) -> Result<Page, ReadError> {
-        // The futures are built first (a `Vec`, not a lazy `map`), which
-        // keeps the job's future `Send`.
-        let fetches: Vec<_> = work.fetch_raw.iter().map(|id| self.gmail.raw(id)).collect();
-        let raws: Vec<Result<MessageRaw, GoogleError>> = futures_util::stream::iter(fetches)
-            .buffered(FETCH_CONCURRENCY)
-            .collect()
-            .await;
+        let mut names = self.label_names().await?;
+        let mut fresh_labels = None;
+        let mut changes = Vec::new();
+        let mut index = Vec::new();
+
+        let complete = self
+            .fetch_new(
+                &work.fetch_raw,
+                generation,
+                &mut names,
+                &mut fresh_labels,
+                &mut changes,
+                &mut index,
+            )
+            .await?;
+
+        // Known messages: labels only, small answers.
         let checks: Vec<_> = work
             .recheck
             .iter()
@@ -245,41 +289,15 @@ impl Reader<'_> {
             .buffered(FETCH_CONCURRENCY)
             .collect()
             .await;
-
-        // Label names, refreshed when a label we do not know shows up.
-        let mut names = self.label_names().await?;
-        let mut fresh_labels = None;
-        let label_ids = raws
+        let unknown = metas
             .iter()
-            .filter_map(|r| r.as_ref().ok().map(|r| &r.meta.label_ids))
-            .chain(
-                metas
-                    .iter()
-                    .filter_map(|m| m.as_ref().ok().map(|m| &m.label_ids)),
-            );
-        if label_ids.flatten().any(|id| !names.known.contains_key(id)) {
+            .filter_map(|m| m.as_ref().ok())
+            .flat_map(|m| &m.label_ids)
+            .any(|id| !names.known.contains_key(id));
+        if fresh_labels.is_none() && unknown {
             let labels = self.gmail.labels().await?;
             names = LabelNames::from_list(&labels);
             fresh_labels = Some(labels);
-        }
-
-        let mut changes = Vec::new();
-        let mut index = Vec::new();
-        for (id, raw) in work.fetch_raw.iter().zip(raws) {
-            let raw = match raw {
-                Ok(raw) => raw,
-                // Deleted between listing and fetching.
-                Err(GoogleError::NotFound) => continue,
-                Err(other) => return Err(other.into()),
-            };
-            if normalize::skipped(&raw.meta.label_ids) {
-                continue;
-            }
-            let (message, op) = self.store_new(id, raw, &names.user, generation).await?;
-            changes.push(MessageChange::Upsert {
-                message: Box::new(message),
-            });
-            index.push(op);
         }
         for ((id, known), meta) in work.recheck.into_iter().zip(metas) {
             let meta = match meta {
@@ -326,7 +344,74 @@ impl Reader<'_> {
             cursor: Cursor::default(),
             phase: self.phase,
             more: false,
+            complete,
         })
+    }
+
+    /// Download, store and emit the new messages `ids`, at most
+    /// [`FETCH_CONCURRENCY`] at a time, starting no download once the byte
+    /// budget is spent. Returns whether every one was handled.
+    async fn fetch_new(
+        &self,
+        ids: &[String],
+        generation: i32,
+        names: &mut LabelNames,
+        fresh: &mut Option<Vec<LabelInfo>>,
+        changes: &mut Vec<MessageChange>,
+        index: &mut Vec<IndexOp>,
+    ) -> Result<bool, ReadError> {
+        let mut fetched: u64 = 0;
+        let mut next = 0;
+        let mut in_flight = FuturesOrdered::new();
+        loop {
+            while in_flight.len() < FETCH_CONCURRENCY
+                && fetched < self.run_budget_bytes
+                && next < ids.len()
+            {
+                let id = &ids[next];
+                next += 1;
+                in_flight.push_back(async move {
+                    (id, self.gmail.raw(id, self.max_message_bytes).await)
+                });
+            }
+            let Some((id, result)) = in_flight.next().await else {
+                break;
+            };
+            let raw = match result {
+                Ok(RawFetch::Message(raw)) => raw,
+                Ok(RawFetch::TooLarge) => {
+                    tracing::info!(stream = %self.stream, "message over the size limit skipped");
+                    index.push(IndexOp::Oversized {
+                        provider_message_id: id.clone(),
+                    });
+                    continue;
+                }
+                // Deleted between listing and fetching.
+                Err(GoogleError::NotFound) => continue,
+                Err(other) => return Err(other.into()),
+            };
+            fetched = fetched.saturating_add(raw.fetched_bytes);
+            if normalize::skipped(&raw.meta.label_ids) {
+                continue;
+            }
+            if fresh.is_none()
+                && raw
+                    .meta
+                    .label_ids
+                    .iter()
+                    .any(|l| !names.known.contains_key(l))
+            {
+                let labels = self.gmail.labels().await?;
+                *names = LabelNames::from_list(&labels);
+                *fresh = Some(labels);
+            }
+            let (message, op) = self.store_new(id, raw, &names.user, generation).await?;
+            changes.push(MessageChange::Upsert {
+                message: Box::new(message),
+            });
+            index.push(op);
+        }
+        Ok(next >= ids.len())
     }
 
     /// Store a fetched message's blobs and build its upsert.
@@ -444,6 +529,24 @@ impl Reader<'_> {
             .map_err(|e| ReadError::Corrupt(format!("a stored message document: {e}")))
     }
 
+    /// Which of `ids` were skipped as oversized before.
+    async fn oversized(&self, ids: &[String]) -> Result<HashSet<String>, ReadError> {
+        if ids.is_empty() {
+            return Ok(HashSet::new());
+        }
+        let mut tx = self.pool.begin_for(self.workspace).await?;
+        let rows = sqlx::query_scalar!(
+            r#"SELECT provider_message_id FROM connectors.gmail_oversized
+                WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
+            self.stream as StreamId,
+            ids,
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        tx.commit().await?;
+        Ok(rows.into_iter().collect())
+    }
+
     /// The index rows of `ids` in this stream.
     async fn indexed(&self, ids: &[String]) -> Result<HashMap<String, Indexed>, ReadError> {
         if ids.is_empty() {
@@ -494,7 +597,7 @@ impl Reader<'_> {
             .iter()
             .filter_map(|op| match op {
                 IndexOp::Insert { row, .. } | IndexOp::Update { row, .. } => Some(*row),
-                IndexOp::Remove { .. } => None,
+                IndexOp::Remove { .. } | IndexOp::Oversized { .. } => None,
             })
             .collect();
         let mut tx = self.pool.begin_for(self.workspace).await?;

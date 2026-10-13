@@ -174,6 +174,8 @@ pub struct ConnectionView {
     pub provider: Provider,
     /// The account's email address.
     pub address: String,
+    /// Whether the provider verified it.
+    pub address_verified: bool,
     /// The account's display name, when the provider gives one.
     pub display_name: Option<String>,
     /// The member who granted it.

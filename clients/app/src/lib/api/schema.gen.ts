@@ -524,6 +524,8 @@ export interface components {
         ConnectionView: {
             /** @description The account's email address. */
             address: string;
+            /** @description Whether the provider verified it. */
+            address_verified: boolean;
             /** @description What it lets Campbooks do. */
             capabilities: components["schemas"]["Capability"][];
             /**

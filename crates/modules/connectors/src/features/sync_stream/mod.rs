@@ -137,6 +137,8 @@ impl JobHandler for SyncStream {
             cursor: target.cursor.clone(),
             now,
             backfill_days: self.deps.config.gmail.backfill_days,
+            max_message_bytes: self.deps.config.gmail.max_message_bytes,
+            run_budget_bytes: self.deps.config.gmail.run_budget_bytes,
         };
         let page = match reader.read().await {
             Ok(page) => page,
@@ -261,6 +263,58 @@ impl SyncStream {
         Ok(())
     }
 
+    /// The provider refused the access token: drop it so the next run
+    /// refreshes it, backing off; a grant refused run after run although it
+    /// refreshes needs the member (`needs_reauth`, `access_refused`).
+    async fn refused(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        target: &Target,
+        now: DateTime<Utc>,
+    ) -> Result<(), JobError> {
+        let poll = &self.deps.config.poll;
+        // The access token was refused: drop it so the next run
+        // refreshes it (and finds out if the grant is gone). A
+        // grant refused run after run although it refreshes needs
+        // the member.
+        let failures = target.consecutive_failures.saturating_add(1);
+        if u32::try_from(failures).unwrap_or(u32::MAX) >= self.deps.config.failing_after {
+            let events = ctx.state().events.clone();
+            health::needs_reauth(
+                ctx.tx().await?,
+                &events,
+                &workspace.to_string(),
+                target.connection,
+                target.granted_by,
+                "access_refused",
+                now,
+            )
+            .await?;
+            return Ok(());
+        }
+        let backoff = i64::from(poll.min_seconds)
+            .saturating_mul(1_i64 << failures.clamp(0, 16))
+            .min(i64::from(poll.max_seconds));
+        let tx = ctx.tx().await?;
+        credentials::forget_access_token(tx, target.connection).await?;
+        sqlx::query!(
+            "UPDATE connectors.streams SET consecutive_failures = $2 WHERE id = $1",
+            target.stream as StreamId,
+            failures,
+        )
+        .execute(&mut **tx)
+        .await?;
+        schedule::set_due(
+            tx,
+            workspace,
+            target.stream,
+            now + TimeDelta::seconds(backoff),
+        )
+        .await?;
+        Ok(())
+    }
+
     /// The provider failed: record it on the stream and the connection,
     /// and set the next run.
     async fn trouble(
@@ -273,15 +327,7 @@ impl SyncStream {
     ) -> Result<(), JobError> {
         let poll = &self.deps.config.poll;
         match err {
-            GoogleError::Unauthorized => {
-                // The access token was refused: drop it so the next run
-                // refreshes it (and finds out if the grant is gone).
-                let tx = ctx.tx().await?;
-                credentials::forget_access_token(tx, target.connection).await?;
-                schedule::set_due(tx, workspace, target.stream, now + TimeDelta::seconds(5))
-                    .await?;
-                Ok(())
-            }
+            GoogleError::Unauthorized => self.refused(ctx, workspace, target, now).await,
             GoogleError::InvalidGrant => {
                 let events = ctx.state().events.clone();
                 health::needs_reauth(
@@ -474,6 +520,20 @@ async fn apply_index(
                 sqlx::query!("DELETE FROM connectors.gmail_messages WHERE id = $1", row)
                     .execute(&mut **tx)
                     .await?;
+            }
+            IndexOp::Oversized {
+                provider_message_id,
+            } => {
+                sqlx::query!(
+                    r#"INSERT INTO connectors.gmail_oversized (workspace_id, stream_id, provider_message_id)
+                       VALUES ($1, $2, $3)
+                       ON CONFLICT DO NOTHING"#,
+                    workspace as WorkspaceId,
+                    stream as StreamId,
+                    provider_message_id,
+                )
+                .execute(&mut **tx)
+                .await?;
             }
         }
     }

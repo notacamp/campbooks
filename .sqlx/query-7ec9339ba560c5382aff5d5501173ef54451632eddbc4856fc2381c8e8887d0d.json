@@ -1,21 +1,10 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT refresh_token, access_token, access_expires_at\n             FROM connectors.credentials WHERE connection_id = $1",
+  "query": "SELECT access_token, access_expires_at\n             FROM connectors.credentials WHERE connection_id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "refresh_token",
-        "type_info": "Bytea",
-        "origin": {
-          "Table": {
-            "table": "connectors.credentials",
-            "name": "refresh_token"
-          }
-        }
-      },
-      {
-        "ordinal": 1,
         "name": "access_token",
         "type_info": "Bytea",
         "origin": {
@@ -26,7 +15,7 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 1,
         "name": "access_expires_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -43,10 +32,9 @@
       ]
     },
     "nullable": [
-      false,
       true,
       true
     ]
   },
-  "hash": "0f31ff9362fea8eb06d97946df8c707a488bd467deeef63a2b7017e6a4d8ea5d"
+  "hash": "7ec9339ba560c5382aff5d5501173ef54451632eddbc4856fc2381c8e8887d0d"
 }

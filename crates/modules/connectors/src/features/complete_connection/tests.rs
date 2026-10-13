@@ -20,6 +20,7 @@ async fn a_member_connects_gmail(db: PgPool) {
     let connection = kit.connect(&ana, ws).await;
     assert_eq!(connection["provider"], "google");
     assert_eq!(connection["address"], "sam@example.com");
+    assert_eq!(connection["address_verified"], true);
     assert_eq!(connection["display_name"], "Sam Rivera");
     assert_eq!(connection["granted_by"], ana_id.to_string());
     assert_eq!(connection["capabilities"], serde_json::json!(["messages"]));
@@ -226,4 +227,23 @@ async fn without_a_configured_provider_nothing_connects(db: PgPool) {
     let started = kit.start(&ana, ws).await;
     assert_eq!(started.status, StatusCode::CONFLICT);
     assert_eq!(started.json["code"], "provider_not_configured");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_unverified_address_is_kept_as_unverified(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.google.unverified_email();
+    let ws = WorkspaceId::new();
+    let ana = kit.user("ana");
+    kit.join(&ana, ws, Role::Member);
+    let connection = kit.connect(&ana, ws).await;
+    assert_eq!(connection["address_verified"], false);
+    let granted = kit
+        .payloads(ws, "connectors.capability_granted")
+        .await
+        .remove(0);
+    let account: BlobRef = serde_json::from_value(granted["account"].clone()).unwrap();
+    let account: serde_json::Value = serde_json::from_slice(&kit.blob(ws, &account).await).unwrap();
+    assert_contract("connection-account.v1.schema.json", &account);
+    assert_eq!(account["address_verified"], false);
 }

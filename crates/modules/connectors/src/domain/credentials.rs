@@ -112,32 +112,39 @@ pub async fn access_token(
     };
     let now = deps.clock.now();
     let mut tx = pool.begin_for(workspace).await?;
-    let row = sqlx::query!(
-        r#"SELECT refresh_token, access_token, access_expires_at
-             FROM connectors.credentials WHERE connection_id = $1"#,
+    let current = stored_access(&mut tx, cipher, id, now).await?;
+    tx.commit().await?;
+    if let Some(token) = current {
+        return Ok(token);
+    }
+    // Refresh under a per-connection lock, so concurrent runs (a sync and
+    // a disconnect, two workers) refresh once and share the result.
+    let mut tx = pool.begin_for(workspace).await?;
+    sqlx::query_scalar!(
+        "SELECT pg_advisory_xact_lock(hashtextextended('connectors.credentials:' || $1::text, 0))",
+        id.to_string()
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    if let Some(token) = stored_access(&mut tx, cipher, id, now).await? {
+        tx.commit().await?;
+        return Ok(token);
+    }
+    let sealed = sqlx::query_scalar!(
+        "SELECT refresh_token FROM connectors.credentials WHERE connection_id = $1",
         id as ConnectionId
     )
     .fetch_optional(&mut *tx)
-    .await?;
-    tx.commit().await?;
-    let Some(row) = row else {
-        return Err(TokenError::NeedsReauth("credentials_unreadable"));
-    };
-    if let (Some(sealed), Some(expires_at)) = (&row.access_token, row.access_expires_at)
-        && expires_at - EXPIRY_MARGIN > now
-        && let Ok(token) = cipher.open(sealed, &context("access_token", id))
-    {
-        return Ok(token);
-    }
+    .await?
+    .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
     let refresh = cipher
-        .open(&row.refresh_token, &context("refresh_token", id))
+        .open(&sealed, &context("refresh_token", id))
         .map_err(|_| TokenError::NeedsReauth("credentials_unreadable"))?;
     let grant = match google.refresh(&refresh).await {
         Ok(grant) => grant,
         Err(GoogleError::InvalidGrant) => return Err(TokenError::NeedsReauth("grant_revoked")),
         Err(other) => return Err(TokenError::Provider(other)),
     };
-    let mut tx = pool.begin_for(workspace).await?;
     store(
         &mut tx,
         cipher,
@@ -151,6 +158,29 @@ pub async fn access_token(
     .map_err(TokenError::Database)?;
     tx.commit().await?;
     Ok(grant.access_token)
+}
+
+/// The stored access token of connection `id`, while it is valid.
+async fn stored_access(
+    conn: &mut PgConnection,
+    cipher: &Cipher,
+    id: ConnectionId,
+    now: DateTime<Utc>,
+) -> Result<Option<String>, TokenError> {
+    let row = sqlx::query!(
+        r#"SELECT access_token, access_expires_at
+             FROM connectors.credentials WHERE connection_id = $1"#,
+        id as ConnectionId
+    )
+    .fetch_optional(conn)
+    .await?
+    .ok_or(TokenError::NeedsReauth("credentials_unreadable"))?;
+    Ok(match (row.access_token, row.access_expires_at) {
+        (Some(sealed), Some(expires_at)) if expires_at - EXPIRY_MARGIN > now => {
+            cipher.open(&sealed, &context("access_token", id)).ok()
+        }
+        _ => None,
+    })
 }
 
 /// Forget connection `id`'s access token, so the next run refreshes it

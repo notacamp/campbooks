@@ -134,6 +134,7 @@ pub async fn execute(
             provider: started.provider,
             account_subject: account.sub,
             address: account.email.trim().to_lowercase(),
+            address_verified: account.email_verified,
             display_name: account.name,
             capabilities: granted,
             tokens: grant,

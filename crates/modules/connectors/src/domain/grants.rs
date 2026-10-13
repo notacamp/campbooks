@@ -38,8 +38,11 @@ pub struct ProviderGrant {
     pub provider: Provider,
     /// The provider's stable account id (the `OpenID` `sub`).
     pub account_subject: String,
-    /// The account's verified email address.
+    /// The account's email address.
     pub address: String,
+    /// Whether the provider verified that address; an unverified one is
+    /// kept, marked as such, and never treated as the account's identity.
+    pub address_verified: bool,
     /// The account's display name.
     pub display_name: Option<String>,
     /// The capabilities granted (and wanted); never empty.
@@ -72,6 +75,7 @@ pub async fn create_or_refresh_connection(
         version: 1,
         provider: grant.provider,
         address: grant.address.trim().to_lowercase(),
+        address_verified: grant.address_verified,
         display_name: grant.display_name.clone(),
     };
     let account_blob = state
@@ -127,10 +131,12 @@ async fn save(
     sqlx::query!(
         r#"INSERT INTO connectors.connections
                (id, workspace_id, provider, account_subject, address, display_name, granted_by,
-                capabilities, scopes, health, health_reason, health_changed_at, created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10)
+                capabilities, scopes, health, health_reason, health_changed_at, created_at, updated_at,
+                address_verified)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'ok', NULL, $10, $10, $10, $11)
            ON CONFLICT (id) DO UPDATE
               SET address = $5, display_name = $6, capabilities = $8, scopes = $9,
+                  address_verified = $11,
                   health = 'ok', health_reason = NULL,
                   health_changed_at = CASE WHEN connectors.connections.health = 'ok'
                                            THEN connectors.connections.health_changed_at ELSE $10 END,
@@ -145,6 +151,7 @@ async fn save(
         &capability_names,
         g.grant.tokens.scope.clone().unwrap_or_default(),
         g.now,
+        g.grant.address_verified,
     )
     .execute(&mut **tx)
     .await?;

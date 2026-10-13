@@ -18,6 +18,7 @@ pub struct Connection {
     pub id: ConnectionId,
     pub provider: Provider,
     pub address: String,
+    pub address_verified: bool,
     pub display_name: Option<String>,
     pub granted_by: UserId,
     pub capabilities: Vec<Capability>,
@@ -52,7 +53,7 @@ pub async fn list(conn: &mut PgConnection) -> Result<Vec<Connection>> {
 /// Connections of the transaction's workspace: `id`, or all.
 async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec<Connection>> {
     let rows = sqlx::query!(
-        r#"SELECT id AS "id: ConnectionId", provider, address, display_name,
+        r#"SELECT id AS "id: ConnectionId", provider, address, address_verified, display_name,
                   granted_by AS "granted_by: UserId", capabilities, health, health_reason,
                   health_changed_at, created_at
              FROM connectors.connections
@@ -68,6 +69,7 @@ async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec
                 id: row.id,
                 provider: Provider::parse(&row.provider)?,
                 address: row.address,
+                address_verified: row.address_verified,
                 display_name: row.display_name,
                 granted_by: row.granted_by,
                 capabilities: parse_capabilities(&row.capabilities)?,
@@ -111,6 +113,7 @@ pub async fn view(conn: &mut PgConnection, connection: Connection) -> Result<Con
         id: connection.id,
         provider: connection.provider,
         address: connection.address,
+        address_verified: connection.address_verified,
         display_name: connection.display_name,
         granted_by: connection.granted_by,
         capabilities: connection.capabilities,

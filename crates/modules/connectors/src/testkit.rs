@@ -480,6 +480,7 @@ struct Mailbox {
     revoked: Vec<String>,
     refresh_invalid: bool,
     rate_limit_next: Option<u64>,
+    email_unverified: bool,
     unauthorized_next: bool,
     calls: Vec<String>,
 }
@@ -628,6 +629,11 @@ impl FakeGoogle {
         mailbox.access_tokens.clear();
     }
 
+    /// Google says the account's address is not verified.
+    pub fn unverified_email(&self) {
+        self.lock().email_unverified = true;
+    }
+
     /// Tokens revoked through the revocation endpoint.
     pub fn revoked(&self) -> Vec<String> {
         self.lock().revoked.clone()
@@ -695,7 +701,8 @@ impl Respond for Responder {
                 }
                 json(
                     200,
-                    &serde_json::json!({"sub": ACCOUNT_SUB, "email": "Sam@Example.com", "name": "Sam Rivera"}),
+                    &serde_json::json!({"sub": ACCOUNT_SUB, "email": "Sam@Example.com",
+                        "email_verified": !mailbox.email_unverified, "name": "Sam Rivera"}),
                 )
             }
             ("GET", gmail) if gmail.starts_with("/gmail/v1/users/me/") => {

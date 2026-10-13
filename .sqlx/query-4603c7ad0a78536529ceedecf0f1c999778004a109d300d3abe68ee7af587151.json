@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: ConnectionId\", provider, address, display_name,\n                  granted_by AS \"granted_by: UserId\", capabilities, health, health_reason,\n                  health_changed_at, created_at\n             FROM connectors.connections\n            WHERE $1::uuid IS NULL OR id = $1\n            ORDER BY created_at, id",
+  "query": "SELECT id AS \"id: ConnectionId\", provider, address, address_verified, display_name,\n                  granted_by AS \"granted_by: UserId\", capabilities, health, health_reason,\n                  health_changed_at, created_at\n             FROM connectors.connections\n            WHERE $1::uuid IS NULL OR id = $1\n            ORDER BY created_at, id",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,17 @@
       },
       {
         "ordinal": 3,
+        "name": "address_verified",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "address_verified"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "display_name",
         "type_info": "Text",
         "origin": {
@@ -48,7 +59,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "granted_by: UserId",
         "type_info": "Uuid",
         "origin": {
@@ -59,7 +70,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "capabilities",
         "type_info": "TextArray",
         "origin": {
@@ -70,7 +81,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "health",
         "type_info": "Text",
         "origin": {
@@ -81,7 +92,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "health_reason",
         "type_info": "Text",
         "origin": {
@@ -92,7 +103,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "health_changed_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -103,7 +114,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "created_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -123,6 +134,7 @@
       false,
       false,
       false,
+      false,
       true,
       false,
       false,
@@ -132,5 +144,5 @@
       false
     ]
   },
-  "hash": "6adc5e440ccc13cb8dfae9967bf069bd2f8e16eb954868f5e88d6351f3addaeb"
+  "hash": "4603c7ad0a78536529ceedecf0f1c999778004a109d300d3abe68ee7af587151"
 }

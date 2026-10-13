@@ -4,7 +4,7 @@ use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use serde::Deserialize;
 use url::Url;
 
-use super::{GoogleError, json, transport};
+use super::{GoogleError, failure, json, transport};
 
 /// The Gmail API for one access token.
 #[derive(Debug)]
@@ -76,6 +76,17 @@ pub struct MessageRaw {
     pub meta: MessageMeta,
     /// The RFC 5322 bytes.
     pub raw: Vec<u8>,
+    /// Bytes downloaded for it (the encoded answer).
+    pub fetched_bytes: u64,
+}
+
+/// What a raw download gave.
+#[derive(Debug, Clone)]
+pub enum RawFetch {
+    /// The message.
+    Message(MessageRaw),
+    /// It is larger than the limit; the download was abandoned.
+    TooLarge,
 }
 
 /// One page of `users.history.list`.
@@ -187,25 +198,54 @@ impl<'a> Gmail<'a> {
             .await
     }
 
-    /// A message's raw RFC 5322 bytes and labels (`format=raw`).
-    pub async fn raw(&self, id: &str) -> Result<MessageRaw, GoogleError> {
+    /// A message's raw RFC 5322 bytes and labels (`format=raw`), unless it
+    /// is larger than `max_bytes`: the answer is read as it arrives and
+    /// abandoned as soon as it grows past the limit.
+    pub async fn raw(&self, id: &str, max_bytes: u64) -> Result<RawFetch, GoogleError> {
         #[derive(Deserialize)]
         struct Raw {
             #[serde(flatten)]
             meta: MessageMeta,
             raw: String,
         }
-        let message: Raw = self
-            .get(&format!("users/me/messages/{id}"), &[("format", "raw")])
-            .await?;
+        let mut url = self.url(&format!("users/me/messages/{id}"))?;
+        url.query_pairs_mut().append_pair("format", "raw");
+        let mut response = self
+            .http
+            .get(url)
+            .bearer_auth(self.token)
+            .send()
+            .await
+            .map_err(transport)?;
+        if !response.status().is_success() {
+            return Err(failure(response).await);
+        }
+        // Base64url grows the message by a third; leave room for the JSON
+        // around it.
+        let cap = max_bytes.saturating_mul(4) / 3 + 64 * 1024;
+        let mut body: Vec<u8> = Vec::new();
+        while let Some(chunk) = response.chunk().await.map_err(transport)? {
+            if u64::try_from(body.len() + chunk.len()).unwrap_or(u64::MAX) > cap {
+                return Ok(RawFetch::TooLarge);
+            }
+            body.extend_from_slice(&chunk);
+        }
+        let fetched_bytes = u64::try_from(body.len()).unwrap_or(u64::MAX);
+        let message: Raw = serde_json::from_slice(&body)
+            .map_err(|e| GoogleError::Unexpected(format!("raw message answer: {e}")))?;
+        drop(body);
         // Gmail pads base64url; accept it with or without padding.
         let raw = URL_SAFE_NO_PAD
             .decode(message.raw.trim_end_matches('='))
             .map_err(|e| GoogleError::Unexpected(format!("raw message is not base64url: {e}")))?;
-        Ok(MessageRaw {
+        if u64::try_from(raw.len()).unwrap_or(u64::MAX) > max_bytes {
+            return Ok(RawFetch::TooLarge);
+        }
+        Ok(RawFetch::Message(MessageRaw {
             meta: message.meta,
             raw,
-        })
+            fetched_bytes,
+        }))
     }
 
     /// One page of `users.history.list` from `start`. `NotFound` means the

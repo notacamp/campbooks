@@ -133,6 +133,14 @@ downloading the message again. Drafts and chats SHALL be skipped.
 - **WHEN** a known message loses its `INBOX` label
 - **THEN** the next batch carries its upsert with `in_inbox` false, and the message was not downloaded again
 
+#### Scenario: A run stops at its byte budget
+- **WHEN** a page holds more new mail than one run's byte budget
+- **THEN** the run stores what it fetched, keeps its cursor, and the next run continues with the rest; every message is emitted once and downloaded once
+
+#### Scenario: Oversized message
+- **WHEN** a message is larger than the configured size limit
+- **THEN** its download is abandoned, it is recorded as oversized, no batch carries it, and it is never downloaded again
+
 #### Scenario: Expired history
 - **WHEN** `history.list` answers 404 for the stored history id
 - **THEN** the stream resyncs its window and emits a removal for an indexed message in the window that Gmail no longer lists
