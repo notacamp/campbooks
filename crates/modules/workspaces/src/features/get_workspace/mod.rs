@@ -2,7 +2,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Problem, Result,
+    AppState, Error, Operation, Problem, Result,
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
@@ -16,6 +16,7 @@ use crate::{domain::model::WorkspaceView, scopes::WorkspacesRead};
     operation_id = "workspaces.get",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.workspace"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The workspace.", body = WorkspaceView),
@@ -81,6 +82,58 @@ mod tests {
         assert_eq!(response.status, StatusCode::OK);
         assert_eq!(response.json["name"], "Shop");
         assert_eq!(response.json["role"], "member");
+    }
+
+    /// The assistant invoking `workspaces.get` by id goes through the same
+    /// `Workspace<S>` extractor: a member reads it, anyone else gets 404.
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn invoked_by_id_with_the_same_membership_check(db: PgPool) {
+        use campbooks_kernel::{
+            auth::{Principal, PrincipalKind, Scope},
+            operations::{self, Caller, Invocation, InvokeError},
+        };
+
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let eve = kit.user("eve");
+        kit.get(&eve, "/api/v1/workspaces").await; // eve exists, belongs nowhere
+        let state = operations::compose(crate::module().router, kit.state.clone()).state;
+        let principal = |subject: &str| Principal {
+            subject: subject.to_owned(),
+            kind: PrincipalKind::User,
+            client_id: None,
+            scopes: [Scope::new("workspaces:read")].into(),
+            workspace: None,
+            email: Some(format!("{subject}@example.com")),
+            email_verified: true,
+            name: None,
+        };
+        let get = |subject: &str| {
+            Invocation::new(
+                Caller::Assistant,
+                principal(subject),
+                "workspaces.get",
+                serde_json::Value::Null,
+            )
+            .in_workspace(ws.to_string())
+        };
+
+        let output = operations::invoke(&state, get("ana")).await.unwrap();
+        assert_eq!(output.body["name"], "Shop");
+        assert_eq!(output.body["role"], "owner");
+
+        let refused = operations::invoke(&state, get("eve")).await.unwrap_err();
+        assert!(
+            matches!(
+                refused,
+                InvokeError::Failed {
+                    status: StatusCode::NOT_FOUND,
+                    ..
+                }
+            ),
+            "{refused:?}"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

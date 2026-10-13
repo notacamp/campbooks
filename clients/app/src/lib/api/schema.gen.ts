@@ -12,7 +12,7 @@ export interface paths {
             cookie?: never;
         };
         /** Report instance health. */
-        get: operations["system_health"];
+        get: operations["system.health"];
         put?: never;
         post?: never;
         delete?: never;
@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** Report the server version. */
-        get: operations["system_version"];
+        get: operations["system.version"];
         put?: never;
         post?: never;
         delete?: never;
@@ -195,7 +195,7 @@ export interface paths {
          *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
          *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
          */
-        get: operations["bff_api_get"];
+        get: operations["bff.api_get"];
         /**
          * PUT to the API as the signed-in user.
          * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
@@ -205,7 +205,7 @@ export interface paths {
          *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
          *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
          */
-        put: operations["bff_api_put"];
+        put: operations["bff.api_put"];
         /**
          * POST to the API as the signed-in user.
          * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
@@ -215,7 +215,7 @@ export interface paths {
          *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
          *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
          */
-        post: operations["bff_api_post"];
+        post: operations["bff.api_post"];
         /**
          * DELETE in the API as the signed-in user.
          * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
@@ -225,7 +225,7 @@ export interface paths {
          *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
          *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
          */
-        delete: operations["bff_api_delete"];
+        delete: operations["bff.api_delete"];
         options?: never;
         head?: never;
         /**
@@ -237,7 +237,7 @@ export interface paths {
          *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
          *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
          */
-        patch: operations["bff_api_patch"];
+        patch: operations["bff.api_patch"];
         trace?: never;
     };
     "/bff/backchannel-logout": {
@@ -255,7 +255,7 @@ export interface paths {
          *     ends: ends the web sessions the signed logout token names (by IdP session
          *     id, or every session of the user).
          */
-        post: operations["bff_backchannel_logout"];
+        post: operations["bff.backchannel_logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -279,7 +279,7 @@ export interface paths {
          *     `return_to`: a browser treats the whole redirect chain from the IdP as
          *     cross-site and would not send the new cookie on a plain redirect.
          */
-        get: operations["bff_callback"];
+        get: operations["bff.callback"];
         put?: never;
         post?: never;
         delete?: never;
@@ -301,7 +301,7 @@ export interface paths {
          *     browser by a `SameSite=Lax` login cookie, and redirects to the identity
          *     provider's authorization endpoint.
          */
-        get: operations["bff_login"];
+        get: operations["bff.login"];
         put?: never;
         post?: never;
         delete?: never;
@@ -325,7 +325,7 @@ export interface paths {
          *     clears the cookie. Navigate to `logout_url` to end the identity
          *     provider's session too.
          */
-        post: operations["bff_logout"];
+        post: operations["bff.logout"];
         delete?: never;
         options?: never;
         head?: never;
@@ -344,7 +344,7 @@ export interface paths {
          * @description For the web app to bootstrap: whether someone is signed in, and who.
          *     Never returns a token.
          */
-        get: operations["bff_session"];
+        get: operations["bff.session"];
         put?: never;
         post?: never;
         delete?: never;
@@ -641,7 +641,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    system_health: {
+    "system.health": {
         parameters: {
             query?: never;
             header?: never;
@@ -670,7 +670,7 @@ export interface operations {
             };
         };
     };
-    system_version: {
+    "system.version": {
         parameters: {
             query?: never;
             header?: never;
@@ -1435,7 +1435,7 @@ export interface operations {
             };
         };
     };
-    bff_api_get: {
+    "bff.api_get": {
         parameters: {
             query?: never;
             header?: never;
@@ -1483,7 +1483,7 @@ export interface operations {
             };
         };
     };
-    bff_api_put: {
+    "bff.api_put": {
         parameters: {
             query?: never;
             header?: never;
@@ -1531,7 +1531,7 @@ export interface operations {
             };
         };
     };
-    bff_api_post: {
+    "bff.api_post": {
         parameters: {
             query?: never;
             header?: never;
@@ -1579,7 +1579,7 @@ export interface operations {
             };
         };
     };
-    bff_api_delete: {
+    "bff.api_delete": {
         parameters: {
             query?: never;
             header?: never;
@@ -1627,7 +1627,7 @@ export interface operations {
             };
         };
     };
-    bff_api_patch: {
+    "bff.api_patch": {
         parameters: {
             query?: never;
             header?: never;
@@ -1675,7 +1675,7 @@ export interface operations {
             };
         };
     };
-    bff_backchannel_logout: {
+    "bff.backchannel_logout": {
         parameters: {
             query?: never;
             header?: never;
@@ -1715,7 +1715,7 @@ export interface operations {
             };
         };
     };
-    bff_callback: {
+    "bff.callback": {
         parameters: {
             query?: {
                 /** @description The authorization code. */
@@ -1763,7 +1763,7 @@ export interface operations {
             };
         };
     };
-    bff_login: {
+    "bff.login": {
         parameters: {
             query?: {
                 /** @description Where to land after signing in: a path on this site (default `/`). */
@@ -1804,7 +1804,7 @@ export interface operations {
             };
         };
     };
-    bff_logout: {
+    "bff.logout": {
         parameters: {
             query?: never;
             header: {
@@ -1846,7 +1846,7 @@ export interface operations {
             };
         };
     };
-    bff_session: {
+    "bff.session": {
         parameters: {
             query?: never;
             header?: never;

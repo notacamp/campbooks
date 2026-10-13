@@ -3,12 +3,15 @@
 use axum::{
     Form, Json,
     body::Body,
-    extract::{Query, Request, State},
+    extract::{MatchedPath, Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, Uri, header},
     response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use campbooks_kernel::{Error, Problem};
+use campbooks_kernel::{
+    Error, Problem,
+    operations::{Operation, Risk},
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tower::ServiceExt as _;
@@ -104,7 +107,8 @@ pub struct LoginQuery {
     get,
     path = "/bff/login",
     tag = "bff",
-    operation_id = "bff_login",
+    operation_id = "bff.login",
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction"])))),
     params(LoginQuery),
     security(()),
     responses(
@@ -228,7 +232,8 @@ pub struct CallbackQuery {
     get,
     path = "/bff/callback",
     tag = "bff",
-    operation_id = "bff_callback",
+    operation_id = "bff.callback",
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction", "bff.session"])))),
     params(CallbackQuery),
     security(()),
     responses(
@@ -421,7 +426,8 @@ pub struct SessionUser {
     get,
     path = "/bff/session",
     tag = "bff",
-    operation_id = "bff_session",
+    operation_id = "bff.session",
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.session"])))),
     security((), ("session" = [])),
     responses(
         (status = 200, description = "The session, or `authenticated: false`.", body = SessionInfo),
@@ -481,7 +487,8 @@ pub struct LogoutResponse {
     post,
     path = "/bff/logout",
     tag = "bff",
-    operation_id = "bff_logout",
+    operation_id = "bff.logout",
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"])))),
     security(("session" = [])),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     responses(
@@ -541,7 +548,8 @@ pub struct BackchannelLogout {
     post,
     path = "/bff/backchannel-logout",
     tag = "bff",
-    operation_id = "bff_backchannel_logout",
+    operation_id = "bff.backchannel_logout",
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"])))),
     security(()),
     request_body(content = BackchannelLogout, content_type = "application/x-www-form-urlencoded"),
     responses(
@@ -588,7 +596,7 @@ pub async fn backchannel_logout(
 /// Documents `/bff/api/{path}` for one HTTP method; every method is served
 /// by [`api`]. One operation per method keeps operation ids unique.
 macro_rules! api_operation {
-    ($name:ident, $method:ident, $id:literal, $summary:literal) => {
+    ($name:ident, $method:ident, $id:literal, $meta:tt, $summary:literal) => {
         #[doc = $summary]
         ///
         /// `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
@@ -602,6 +610,7 @@ macro_rules! api_operation {
             path = "/bff/api/{path}",
             tag = "bff",
             operation_id = $id,
+            extensions(("x-campbooks" = json!($meta))),
             security(("session" = [])),
             params(
                 ("path" = String, Path, description = "The API path after `/api/`, e.g. \
@@ -627,31 +636,36 @@ macro_rules! api_operation {
 api_operation!(
     api_get,
     get,
-    "bff_api_get",
+    "bff.api_get",
+    (Operation::query()),
     "Read from the API as the signed-in user."
 );
 api_operation!(
     api_post,
     post,
-    "bff_api_post",
+    "bff.api_post",
+    (Operation::command(Risk::Low)),
     "POST to the API as the signed-in user."
 );
 api_operation!(
     api_put,
     put,
-    "bff_api_put",
+    "bff.api_put",
+    (Operation::command(Risk::Low)),
     "PUT to the API as the signed-in user."
 );
 api_operation!(
     api_patch,
     patch,
-    "bff_api_patch",
+    "bff.api_patch",
+    (Operation::command(Risk::Low)),
     "PATCH the API as the signed-in user."
 );
 api_operation!(
     api_delete,
     delete,
-    "bff_api_delete",
+    "bff.api_delete",
+    (Operation::command(Risk::Low)),
     "DELETE in the API as the signed-in user."
 );
 
@@ -689,6 +703,11 @@ async fn api(State(bff): State<Bff>, request: Request) -> Result<Response, Error
 /// cookies and CSRF header removed and the access token attached.
 fn to_api_request(request: Request, access_token: &str) -> Result<Request, Error> {
     let (mut parts, body): (_, Body) = request.into_parts();
+    // The API router is an app of its own, not nested under `/bff/api`:
+    // left in place, the outer route's template would prefix the API's
+    // (`/bff/api/{*path}/api/v1/…`), and the idempotency layer, which finds
+    // the operation by its template, would not recognise it.
+    parts.extensions.remove::<MatchedPath>();
     let path_and_query = parts
         .uri
         .path_and_query()

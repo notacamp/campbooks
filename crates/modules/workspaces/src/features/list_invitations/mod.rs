@@ -3,7 +3,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Problem, Result,
+    AppState, Operation, Problem, Result,
     db::BeginFor as _,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
 };
@@ -29,6 +29,7 @@ pub struct InvitationList {
     operation_id = "workspaces.list_invitations",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.invitation"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "Pending invitations.", body = InvitationList),

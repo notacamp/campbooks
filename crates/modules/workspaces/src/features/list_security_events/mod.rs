@@ -3,7 +3,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Problem, Result,
+    AppState, Operation, Problem, Result,
     db::BeginFor as _,
     extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
@@ -59,6 +59,8 @@ pub struct SecurityEventList {
     operation_id = "workspaces.list_security_events",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    // The audit log stays out of the assistant's context.
+    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.security_event"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), Page),
     responses(
         (status = OK, description = "The newest events.", body = SecurityEventList),

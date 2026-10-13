@@ -18,7 +18,7 @@ The rules are in [`AGENTS.md`](AGENTS.md); this is the walkthrough.
 5. **Run the gates** (all must pass):
    ```sh
    cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings
-   cargo test --workspace && cargo xtask arch && cargo xtask openapi --check
+   cargo test --workspace && cargo xtask arch && cargo xtask openapi --check && cargo xtask events --check
    cargo deny check && cargo machete
    pnpm --dir clients lint typecheck test deps:check deadcode format:check api:check i18n:check
    ```

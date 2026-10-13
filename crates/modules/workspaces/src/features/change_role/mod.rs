@@ -4,7 +4,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Problem, Result,
+    AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Role, UserId, Workspace, WorkspaceId},
@@ -38,6 +38,8 @@ pub struct ChangeRole {
     operation_id = "workspaces.change_role",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    // Changes someone's permissions: never on a rule or the assistant's initiative.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"])))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("user_id" = UserId, Path, description = "The member."),

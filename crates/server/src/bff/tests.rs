@@ -13,6 +13,7 @@ use axum::{
 use campbooks_kernel::{
     AppState,
     auth::{ScopeName, Scoped},
+    idempotency, operations,
     testing::{self, TestIdp, TestUser, WEB_CLIENT_SECRET},
 };
 use secrecy::SecretString;
@@ -93,15 +94,22 @@ async fn harness_with(db: PgPool, origin: &str, tweak: impl FnOnce(&mut BffConfi
     };
     // The app runs as the runtime role, like the server (row-level security
     // applies); the test's own queries keep the superuser pool.
-    let state = AppState::new(testing::app_role_pool(&db).await, config);
+    let state = crate::with_ports(AppState::new(testing::app_role_pool(&db).await, config));
     let app = app(state, Some(*settings));
     Harness { app, idp, db }
 }
 
-/// The full application, with the test route in the API.
+/// The full application as [`crate::router`] composes it (operations,
+/// idempotency), with the test route in the API.
 fn app(state: AppState, settings: Option<config::Settings>) -> Router {
-    let (routes, spec) = crate::api().split_for_parts();
-    let routes = routes.route("/api/v1/test/whoami", any(whoami));
+    let operations::Composed {
+        routes,
+        spec,
+        state,
+    } = operations::compose(
+        crate::api().route("/api/v1/test/whoami", any(whoami)),
+        state,
+    );
     let api_only: Router = routes
         .clone()
         .fallback(|| async { campbooks_kernel::Error::NotFound })
@@ -684,6 +692,54 @@ async fn api_calls_carry_the_sessions_token_in_process(db: PgPool) {
     assert_eq!(
         missing.header(header::CONTENT_TYPE),
         Some("application/problem+json")
+    );
+}
+
+/// `POST /bff/api/v1/workspaces` with a fixed `Idempotency-Key`.
+async fn create_workspace(browser: &mut Browser, name: &str) -> Reply {
+    browser
+        .send(
+            Request::post("/bff/api/v1/workspaces")
+                .header(CSRF_HEADER, "1")
+                .header("sec-fetch-site", "same-origin")
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(idempotency::HEADER, "bff-create-1"),
+            Body::from(json!({ "name": name, "kind": "personal" }).to_string()),
+        )
+        .await
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn api_calls_go_through_the_idempotency_layer(db: PgPool) {
+    let h = harness_with(db, ORIGIN, |bff| {
+        bff.scopes = Some("openid workspaces:write".to_owned());
+    })
+    .await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+
+    let first = create_workspace(&mut browser, "Household").await;
+    assert_eq!(first.status, StatusCode::CREATED, "{}", first.body);
+    assert_eq!(first.header(idempotency::REPLAYED_HEADER), None);
+
+    // The same key and request: the stored answer, not a second workspace.
+    let again = create_workspace(&mut browser, "Household").await;
+    assert_eq!(again.status, StatusCode::CREATED, "{}", again.body);
+    assert_eq!(again.header(idempotency::REPLAYED_HEADER), Some("true"));
+    assert_eq!(again.json()["id"], first.json()["id"]);
+    let workspaces: i64 = sqlx::query_scalar("SELECT count(*) FROM workspaces.workspaces")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    assert_eq!(workspaces, 1);
+
+    // The same key for another request is refused.
+    let other = create_workspace(&mut browser, "Office").await;
+    assert_eq!(
+        other.status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "{}",
+        other.body
     );
 }
 

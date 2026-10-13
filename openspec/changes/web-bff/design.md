@@ -28,7 +28,17 @@ Schema **`bff`**, owned by `campbooks-server`'s BFF, not by a module (like
 reference. The runtime role `campbooks_app` (row-level security, #442) is
 granted the two tables; they carry no workspace policies, because a session
 belongs to a person at the IdP, not to a workspace. No domain events are
-published or consumed. Background work:
+published or consumed.
+
+Operation catalogue (ADR 0013, #444): every `/bff/*` operation has an
+`operationId` `bff.<verb>` and an `x-campbooks` block (`mutates` only for
+POST/PUT/PATCH/DELETE, never offered to automation or the assistant).
+`cargo xtask arch` checks them like a module's, owned by `bff`. They are
+not in the invoke catalogue: the server composes that from the modules'
+routes only. `/bff/api/*` dispatches into those composed routes, so
+`Idempotency-Key` works through the BFF exactly as on `/api/*`. The outer
+route's `MatchedPath` is dropped first, so the layer still recognises the
+operation. Background work:
 `bff.prune_sessions` (queue `maintenance`, every 15 min), registered through
 `Registry::build_with` because the BFF is not a module.
 

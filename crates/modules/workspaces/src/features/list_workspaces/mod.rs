@@ -2,7 +2,7 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Problem, Result,
+    AppState, Operation, Problem, Result,
     auth::{Principal, Scoped},
     tenancy::{Role, WorkspaceId},
 };
@@ -28,6 +28,7 @@ pub struct WorkspaceList {
     operation_id = "workspaces.list",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.workspace"])))),
     responses(
         (status = OK, description = "The workspaces you belong to.", body = WorkspaceList),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,

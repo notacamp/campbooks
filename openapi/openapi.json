@@ -16,7 +16,7 @@
           "system"
         ],
         "summary": "Report instance health.",
-        "operationId": "system_health",
+        "operationId": "system.health",
         "responses": {
           "200": {
             "description": "The instance and its database are up.",
@@ -41,7 +41,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/system/version": {
@@ -50,7 +57,7 @@
           "system"
         ],
         "summary": "Report the server version.",
-        "operationId": "system_version",
+        "operationId": "system.version",
         "responses": {
           "200": {
             "description": "The running build.",
@@ -65,7 +72,14 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}": {
@@ -134,7 +148,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       },
       "delete": {
         "tags": [
@@ -201,7 +224,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "high"
+        }
       },
       "patch": {
         "tags": [
@@ -288,7 +320,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/invitations": {
@@ -357,7 +398,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "low"
+        }
       },
       "post": {
         "tags": [
@@ -454,7 +504,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/members": {
@@ -523,7 +582,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/members/{user_id}": {
@@ -604,7 +672,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       },
       "patch": {
         "tags": [
@@ -710,7 +787,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/membership": {
@@ -782,7 +868,16 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.member"
+          ],
+          "risk": "high"
+        }
       }
     },
     "/api/v1/w/{workspace_id}/security-events": {
@@ -872,7 +967,16 @@
               "workspaces:admin"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.security_event"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/workspaces": {
@@ -920,7 +1024,16 @@
               "workspaces:read"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
       },
       "post": {
         "tags": [
@@ -986,7 +1099,17 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.workspace",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/api/v1/workspaces/invitations/accept": {
@@ -1074,7 +1197,17 @@
               "workspaces:write"
             ]
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "workspaces.invitation",
+            "workspaces.member"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/bff/api/{path}": {
@@ -1084,7 +1217,7 @@
         ],
         "summary": "Read from the API as the signed-in user.",
         "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
-        "operationId": "bff_api_get",
+        "operationId": "bff.api_get",
         "parameters": [
           {
             "name": "path",
@@ -1135,7 +1268,14 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
       },
       "put": {
         "tags": [
@@ -1143,7 +1283,7 @@
         ],
         "summary": "PUT to the API as the signed-in user.",
         "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
-        "operationId": "bff_api_put",
+        "operationId": "bff.api_put",
         "parameters": [
           {
             "name": "path",
@@ -1194,7 +1334,14 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
       },
       "post": {
         "tags": [
@@ -1202,7 +1349,7 @@
         ],
         "summary": "POST to the API as the signed-in user.",
         "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
-        "operationId": "bff_api_post",
+        "operationId": "bff.api_post",
         "parameters": [
           {
             "name": "path",
@@ -1253,7 +1400,14 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
       },
       "delete": {
         "tags": [
@@ -1261,7 +1415,7 @@
         ],
         "summary": "DELETE in the API as the signed-in user.",
         "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
-        "operationId": "bff_api_delete",
+        "operationId": "bff.api_delete",
         "parameters": [
           {
             "name": "path",
@@ -1312,7 +1466,14 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
       },
       "patch": {
         "tags": [
@@ -1320,7 +1481,7 @@
         ],
         "summary": "PATCH the API as the signed-in user.",
         "description": " `/bff/api/<path>` is `/api/<path>` (same method, query, headers and\n body) with the session's access token attached, refreshed first when\n it is about to expire. The token never leaves the server. Answers are\n the API's own; without a live session the answer is 401\n `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and\n DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.",
-        "operationId": "bff_api_patch",
+        "operationId": "bff.api_patch",
         "parameters": [
           {
             "name": "path",
@@ -1371,7 +1532,14 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [],
+          "risk": "low"
+        }
       }
     },
     "/bff/backchannel-logout": {
@@ -1381,7 +1549,7 @@
         ],
         "summary": "Back-channel logout (OIDC Back-Channel Logout 1.0).",
         "description": "Called by the identity provider, not browsers, when a user's IdP session\nends: ends the web sessions the signed logout token names (by IdP session\nid, or every session of the user).",
-        "operationId": "bff_backchannel_logout",
+        "operationId": "bff.backchannel_logout",
         "requestBody": {
           "content": {
             "application/x-www-form-urlencoded": {
@@ -1419,7 +1587,16 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/bff/callback": {
@@ -1429,7 +1606,7 @@
         ],
         "summary": "Finish signing in.",
         "description": "The identity provider redirects here. Checks that `state` names a sign-in\nthis browser started (single use), exchanges the code with the PKCE\nverifier, validates the ID token (issuer, audience, nonce, expiry,\nsignature), starts a session and sets the `SameSite=Strict` session\ncookie. Answers with a small same-origin page that moves on to\n`return_to`: a browser treats the whole redirect chain from the IdP as\ncross-site and would not send the new cookie on a plain redirect.",
-        "operationId": "bff_callback",
+        "operationId": "bff.callback",
         "parameters": [
           {
             "name": "code",
@@ -1517,7 +1694,17 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.login_transaction",
+            "bff.session"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/bff/login": {
@@ -1527,7 +1714,7 @@
         ],
         "summary": "Start signing in.",
         "description": "Creates a short-lived sign-in (state, nonce, PKCE verifier) bound to this\nbrowser by a `SameSite=Lax` login cookie, and redirects to the identity\nprovider's authorization endpoint.",
-        "operationId": "bff_login",
+        "operationId": "bff.login",
         "parameters": [
           {
             "name": "return_to",
@@ -1581,7 +1768,16 @@
         },
         "security": [
           {}
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.login_transaction"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/bff/logout": {
@@ -1591,7 +1787,7 @@
         ],
         "summary": "Sign out.",
         "description": "Ends the session, revokes its refresh token at the identity provider and\nclears the cookie. Navigate to `logout_url` to end the identity\nprovider's session too.",
-        "operationId": "bff_logout",
+        "operationId": "bff.logout",
         "parameters": [
           {
             "name": "x-campbooks-csrf",
@@ -1646,7 +1842,16 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
       }
     },
     "/bff/session": {
@@ -1656,7 +1861,7 @@
         ],
         "summary": "The current session.",
         "description": "For the web app to bootstrap: whether someone is signed in, and who.\nNever returns a token.",
-        "operationId": "bff_session",
+        "operationId": "bff.session",
         "responses": {
           "200": {
             "description": "The session, or `authenticated: false`.",
@@ -1674,7 +1879,16 @@
           {
             "session": []
           }
-        ]
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "bff.session"
+          ],
+          "risk": "low"
+        }
       }
     }
   },

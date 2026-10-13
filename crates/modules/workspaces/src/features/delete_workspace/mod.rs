@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Job, JobContext, JobError, Problem, Result,
+    AppState, Error, Job, JobContext, JobError, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     jobs::{self, EnqueueOptions},
     tenancy::{Access, Role, Workspace, WorkspaceId},
@@ -47,6 +47,8 @@ pub struct WorkspaceDeletion {
     operation_id = "workspaces.delete",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    // Deletes everything in the workspace after the grace period.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.workspace"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = ACCEPTED, description = "Deleted; its records are purged after the grace \

@@ -8,7 +8,7 @@
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Problem, Result,
+    AppState, Error, Operation, Problem, Result, Risk,
     config::Environment,
     db::BeginFor as _,
     extract,
@@ -63,6 +63,8 @@ pub struct Issued {
     operation_id = "workspaces.invite_member",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
+    // Emails another person and grants access once accepted.
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"])))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = InviteMember,
     responses(

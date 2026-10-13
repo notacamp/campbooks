@@ -124,8 +124,11 @@ impl ScopeName for DemoNotesWrite {
 //! Declare each one here as a `campbooks_kernel::DomainEvent` named
 //! `demo_notes.<event>` with an explicit `VERSION`, publish it in the
 //! transaction that makes the change (`state.events.publish(&mut tx, &event)`),
-//! and describe it in the module's spec. Other modules subscribe to these
-//! types; they never call this module directly.
+//! and describe it in the module's spec. Derive `utoipa::ToSchema` too and
+//! declare it in the module's background (`Background::new().publishes::<E>()`)
+//! so it is listed in `openapi/events.json` (`cargo xtask events`; ADR 0013).
+//! Other modules subscribe to these types; they never call this module
+//! directly.
 
 ==> crates/modules/demo_notes/src/features/mod.rs <==
 //! One folder per use case.
@@ -384,7 +387,7 @@ export function DemoNotesHome() {
 //! too moves to `domain/`.
 
 use axum::Json;
-use campbooks_kernel::{Problem, auth::Scoped};
+use campbooks_kernel::{Operation, Problem, auth::Scoped};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -402,9 +405,16 @@ pub struct OverviewResponse {
 #[utoipa::path(
     get,
     path = "/api/v1/demo-notes/overview",
-    operation_id = "demo_notes_overview",
+    // `<module>.<verb>[_<noun>]`: a wire contract, never renamed (ADR 0013).
+    operation_id = "demo_notes.overview",
     tag = "demo_notes",
     security(("bearer" = ["demo_notes:read"])),
+    // TODO(new-feature): list the record types it touches
+    // (`.records(["demo_notes.<record>"])`), and opt in `.automation()` /
+    // `.assistant()` if rules or the assistant may call it. A write starts
+    // from `Operation::command(Risk::Low | Risk::High)` and names its
+    // inverse with `.undo("demo_notes.<verb>")`.
+    extensions(("x-campbooks" = json!(Operation::query()))),
     responses(
         (status = OK, description = "The answer for the caller.", body = OverviewResponse),
         (status = UNAUTHORIZED, description = "No valid access token.",
@@ -483,7 +493,7 @@ mod tests {
 //! too moves to `domain/`.
 
 use axum::Json;
-use campbooks_kernel::{Problem, auth::Scoped};
+use campbooks_kernel::{Operation, Problem, auth::Scoped};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -501,9 +511,16 @@ pub struct ListItemsResponse {
 #[utoipa::path(
     get,
     path = "/api/v1/demo-notes/list-items",
-    operation_id = "demo_notes_list_items",
+    // `<module>.<verb>[_<noun>]`: a wire contract, never renamed (ADR 0013).
+    operation_id = "demo_notes.list_items",
     tag = "demo_notes",
     security(("bearer" = ["demo_notes:read"])),
+    // TODO(new-feature): list the record types it touches
+    // (`.records(["demo_notes.<record>"])`), and opt in `.automation()` /
+    // `.assistant()` if rules or the assistant may call it. A write starts
+    // from `Operation::command(Risk::Low | Risk::High)` and names its
+    // inverse with `.undo("demo_notes.<verb>")`.
+    extensions(("x-campbooks" = json!(Operation::query()))),
     responses(
         (status = OK, description = "The answer for the caller.", body = ListItemsResponse),
         (status = UNAUTHORIZED, description = "No valid access token.",
