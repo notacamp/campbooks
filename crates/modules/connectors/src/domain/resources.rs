@@ -16,12 +16,12 @@ use sqlx::PgConnection;
 use super::model::ConnectionId;
 use crate::events::CONNECTION_RECORD;
 
-use Action::{Disconnect, Read, Write};
+use Action::{Create, Disconnect, Read, Write};
 
 /// The module's resource types.
 static TYPES: [ResourceType; 1] = [ResourceType {
     owner: Owner::Member,
-    owner_actions: &[Read, Write, Disconnect],
+    owner_actions: &[Create, Read, Write, Disconnect],
     grants: &[
         Grant::new(Grantee::WorkspaceRole(Role::Admin), &[Read, Write]),
         Grant::new(Grantee::Clients, &[Read, Write]),
@@ -29,7 +29,7 @@ static TYPES: [ResourceType; 1] = [ResourceType {
     ..ResourceType::new(
         CONNECTION_RECORD,
         "A connection to an outside account (a mailbox), owned by the member who connected \
-         it. Only they disconnect it (choosing whether its mail is deleted or kept read-only); \
+         it (only a member creates one). Only they disconnect it (choosing whether its mail is deleted or kept read-only); \
          owners and admins see its health and may sync it now, never read its mail through it.",
         Tenancy::Workspace,
     )

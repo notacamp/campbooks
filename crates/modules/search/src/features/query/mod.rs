@@ -273,7 +273,10 @@ pub async fn handler(
     for group_type in &scope.group_types {
         index::ensure_backfill(&mut tx, access.workspace, group_type).await?;
     }
-    let indexing = index::indexing(&mut tx, access.workspace, &scope.group_types).await?;
+    // Whether the index is still being built says something about the
+    // workspace's records: only a caller who may see some container hears it.
+    let indexing = !scope.containers.is_empty()
+        && index::indexing(&mut tx, access.workspace, &scope.group_types).await?;
     if let Some(tz) = params.tz.as_deref().filter(|tz| *tz != "UTC") {
         if uses_dates(&parsed) && known_zone(&mut tx, tz).await? {
             tz.clone_into(&mut scope.tz);

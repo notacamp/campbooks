@@ -6,6 +6,33 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- **Only the member who connected a mailbox can disconnect it.** Workspace owners and
+  admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
+- **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
+  attachments, conversations, labels, drafts, Campbooks' decisions, search entries and
+  inbox memberships, and its stored files are removed by the next blob sweep.
+  `DELETE …/connections/{id}?mail=keep` keeps the mail instead as read-only history
+  (no more syncing or sending). When an owner or admin removes a member,
+  `DELETE …/members/{user_id}?mail=keep` keeps the mail of the mailboxes that member
+  connected; otherwise it is deleted. A member who leaves loses every inbox
+  membership and their drafts, and gets none of it back if they rejoin. The inbox
+  list shows a kept mailbox as `read_only`.
+- **Workspace owners and admins never read an inbox they are not a member of**, and
+  the change feed, search and every operation now enforce this through one access
+  check. Each resource type declares its owner and who else may do what (ADR 0017).
+  `cargo xtask arch` fails any operation that does not declare the access it needs.
+- The change feed rechecks access on every page. A member taken out of an inbox gets
+  a `reset` (`access_changed`) and no more of its ids. Drafts reach only their author,
+  and connections only the member who connected them, owners, admins and client tokens.
+- A repeated request with the same `Idempotency-Key` is answered from the stored
+  response only while the caller still has the scope, the workspace and the inbox the
+  first request used.
+- Row-level security now also covers the kernel's change feed, file catalogue, event
+  log and job queue. A search cursor only works in the workspace it came from, and
+  search reports `indexing` only to callers who can see an inbox.
+- **Self-hosters:** three new migrations run on start, with nothing to configure.
+
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre

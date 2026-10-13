@@ -63,7 +63,7 @@ pub struct StartedConnection {
     operation_id = "connectors.start_connection",
     tag = "connectors",
     security(("bearer" = ["connectors:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Write)))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = StartConnection,
     responses(
@@ -111,7 +111,7 @@ pub async fn execute(
 ) -> Result<StartedConnection> {
     let user = acting_member(access)?;
     // A connection is owned by the member who makes it (ADR 0017).
-    authz::require_type(state, access, Action::Write, CONNECTION_RECORD, || {
+    authz::require_type(state, access, Action::Create, CONNECTION_RECORD, || {
         Error::Denied(MESSAGES.reason("connection_needs_user"))
     })?;
     let configured = match input.provider {

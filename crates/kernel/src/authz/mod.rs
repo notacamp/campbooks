@@ -67,17 +67,21 @@ pub enum Action {
     Share,
     /// Cut its link to the outside account (a connection).
     Disconnect,
+    /// Make a new one, becoming its owner (asked of the type, with
+    /// [`authorize_type`]).
+    Create,
 }
 
 impl Action {
     /// Every action, in order.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Read,
         Self::Write,
         Self::Delete,
         Self::Send,
         Self::Share,
         Self::Disconnect,
+        Self::Create,
     ];
 
     /// The wire name.
@@ -89,6 +93,7 @@ impl Action {
             Self::Send => "send",
             Self::Share => "share",
             Self::Disconnect => "disconnect",
+            Self::Create => "create",
         }
     }
 
@@ -397,6 +402,11 @@ impl Catalogue {
     /// The type named `name`.
     pub fn get(&self, name: &str) -> Option<&ResourceType> {
         self.types.get(name).map(|(declared, _)| declared)
+    }
+
+    /// Whether it holds no type.
+    pub fn is_empty(&self) -> bool {
+        self.types.is_empty()
     }
 
     /// Every type, by name.

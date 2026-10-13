@@ -100,6 +100,18 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   operation with no explicit `security`, an unknown scope, or a misnamed
   scope; a server test checks that every scoped operation refuses anonymous
   calls.)*
+- **One access model (ADR 0017).** Every resource type is declared once in
+  its module's `Module.resources`: its owner, the owner's actions, and who
+  else may do what (workspace role, container role, client tokens). Every
+  handler acting in a workspace or for an account asks
+  `kernel::authz::require` / `require_type` / `require_account` before it
+  reads or changes anything. Anyone who may not read a resource gets 404,
+  never 403. Every operation declares `x-campbooks.access` (`Operation::access`).
+  Module code queries workspace tables only in `begin_for` / a job's
+  `ctx.tx()`. *(CI: `cargo xtask arch` checks the declarations, the calls,
+  pool queries and consumer-less events; exceptions live in
+  `architecture.toml` `[access]`. The server's access matrix tests check
+  every resource type and operation against every kind of caller.)*
 - No `unsafe` (`#![forbid(unsafe_code)]` in every crate, workspace lint).
 - **Telemetry carries no personal data or secrets.** Span fields, log fields
   and metric attributes never hold message content, prompts, tokens, cookies,

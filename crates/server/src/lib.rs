@@ -15,6 +15,8 @@ pub mod telemetry;
 pub mod web;
 
 #[cfg(test)]
+mod access_matrix_tests;
+#[cfg(test)]
 mod admin_tests;
 #[cfg(test)]
 mod identity_tests;

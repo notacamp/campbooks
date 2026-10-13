@@ -36,6 +36,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -70,6 +74,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -135,6 +143,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -207,6 +219,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -314,6 +330,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -381,6 +401,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -466,6 +490,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -543,6 +571,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -625,6 +657,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -722,6 +758,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -789,6 +829,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -871,6 +915,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -914,6 +962,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "system.instance"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -945,6 +997,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "system.instance"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1021,6 +1077,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.workspace"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1097,6 +1157,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.workspace"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1193,6 +1257,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.workspace"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1303,6 +1371,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "changes.feed"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1379,6 +1451,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1487,6 +1563,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "connectors.connection"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1574,6 +1654,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1607,6 +1691,15 @@
             "schema": {
               "$ref": "#/components/schemas/ConnectionId"
             }
+          },
+          {
+            "name": "mail",
+            "in": "query",
+            "description": "`delete` (the default): the inboxes it fed are deleted, with their\nmessages, conversations, drafts, decisions, search entries and\nfiles. `keep`: they stay as read-only history, no longer synced.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MailChoice"
+            }
           }
         ],
         "responses": {
@@ -1624,7 +1717,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "description": "Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1652,6 +1745,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "disconnect",
+            "resource": "connectors.connection"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1749,6 +1846,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -1884,6 +1985,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1971,6 +2076,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -2059,6 +2168,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2167,6 +2280,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2258,6 +2375,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2374,6 +2495,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.attachment"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -2479,6 +2604,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -2566,6 +2695,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2654,6 +2787,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2762,6 +2899,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2850,6 +2991,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2938,6 +3083,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3026,6 +3175,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3114,6 +3267,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -3210,6 +3367,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3298,6 +3459,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -3386,6 +3551,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3501,6 +3670,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3598,6 +3771,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3715,6 +3892,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3815,6 +3996,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -3893,6 +4078,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -3971,6 +4160,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.invitation"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -4077,6 +4270,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.invitation"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -4155,6 +4352,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.member"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4189,6 +4390,15 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/UserId"
+            }
+          },
+          {
+            "name": "mail",
+            "in": "query",
+            "description": "`delete` (the default): the mailboxes they connected are\ndisconnected and their mail deleted. `keep`: their mail stays as\nread-only history, no longer synced.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/MailChoice"
             }
           }
         ],
@@ -4245,6 +4455,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -4360,6 +4574,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -4441,6 +4659,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -4600,6 +4822,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "search.result"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4699,6 +4925,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.security_event"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -4786,6 +5016,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4843,6 +5077,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.account"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4918,6 +5156,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.account"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5016,6 +5258,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.account"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5124,6 +5370,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5162,6 +5412,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5234,6 +5488,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5341,6 +5599,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5435,6 +5697,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5540,6 +5806,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5636,6 +5906,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5683,6 +5957,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5782,6 +6060,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5852,6 +6134,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5918,6 +6204,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5984,6 +6274,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6050,6 +6344,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6116,6 +6414,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6184,6 +6486,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -6250,6 +6556,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6316,6 +6626,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6382,6 +6696,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6448,6 +6766,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6503,6 +6825,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6610,6 +6936,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -6698,6 +7028,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -6772,6 +7106,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "bff.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6809,6 +7147,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -6948,6 +7290,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7036,6 +7382,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7093,6 +7443,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -7129,6 +7483,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.signing_key"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7171,6 +7529,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.token"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -7223,6 +7585,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.token"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8593,7 +8959,8 @@
           "id",
           "channel",
           "address",
-          "unread_count"
+          "unread_count",
+          "read_only"
         ],
         "properties": {
           "address": {
@@ -8615,6 +8982,10 @@
           "id": {
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox."
+          },
+          "read_only": {
+            "type": "boolean",
+            "description": "Kept as read-only history after its connection was removed: no\nlonger synced, nothing can be written or sent from it."
           },
           "role": {
             "oneOf": [
