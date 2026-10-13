@@ -204,22 +204,7 @@ async fn run(
         config.jobs.check()?;
     }
     let composition = campbooks_server::Composition::from_env(&config)?;
-    if composition.connectors.google.is_some() {
-        tracing::info!("Google accounts can be connected");
-    } else {
-        tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
-    }
-    match &composition.identity.issuer {
-        Some(issuer) => tracing::info!(
-            issuer = %issuer.url,
-            google = issuer.google.is_some(),
-            "this instance is its own identity provider (OAuth 2.1 issuer)"
-        ),
-        None => tracing::info!(
-            "the in-process identity provider is off: CAMPBOOKS_AUTH__ISSUER names another one, \
-             or CAMPBOOKS_SECRET_KEY is unset"
-        ),
-    }
+    log_composition(&composition);
     let registry = campbooks_server::registry_with(&composition)?;
     if config.run_migrations {
         migrate(&config).await?;
@@ -524,6 +509,27 @@ fn check_api_config(config: &Config) -> Result<Option<bff::Settings>, String> {
             tracing::warn!(reason, "web sign-in (BFF) disabled: /bff/* answers 503");
             Ok(None)
         }
+    }
+}
+
+/// Say which providers and which identity provider this instance runs with.
+fn log_composition(composition: &campbooks_server::Composition) {
+    if composition.connectors.google.is_some() {
+        tracing::info!("Google accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
+    }
+    if let Some(issuer) = &composition.identity.issuer {
+        tracing::info!(
+            issuer = %issuer.url,
+            google = issuer.google.is_some(),
+            "this instance is its own identity provider (OAuth 2.1 issuer)"
+        );
+    } else {
+        tracing::info!(
+            "the in-process identity provider is off: CAMPBOOKS_AUTH__ISSUER names another one, \
+             or CAMPBOOKS_SECRET_KEY is unset"
+        );
     }
 }
 

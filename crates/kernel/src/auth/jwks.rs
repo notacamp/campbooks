@@ -48,8 +48,9 @@ pub const LOCAL_TTL: Duration = Duration::from_mins(5);
 
 /// What a [`KeySource`] returns: the issuer's JWKS document, or why it could
 /// not be read (no secrets in the message).
-pub type KeySourceFuture<'a> =
-    std::pin::Pin<Box<dyn std::future::Future<Output = Result<serde_json::Value, String>> + Send + 'a>>;
+pub type KeySourceFuture<'a> = std::pin::Pin<
+    Box<dyn std::future::Future<Output = Result<serde_json::Value, String>> + Send + 'a>,
+>;
 
 /// An issuer that runs in this process hands the verifier its published
 /// signing keys directly: the JWKS document it also serves over HTTP. The
@@ -244,7 +245,11 @@ impl Jwks {
 }
 
 /// The usable keys of `document`, cached for `ttl` from `now`.
-fn key_set(document: JwksDocument, now: DateTime<Utc>, ttl: Duration) -> Result<KeySet, FetchError> {
+fn key_set(
+    document: JwksDocument,
+    now: DateTime<Utc>,
+    ttl: Duration,
+) -> Result<KeySet, FetchError> {
     let keys: Vec<CachedKey> = document.keys.into_iter().filter_map(usable_key).collect();
     if keys.is_empty() {
         return Err(FetchError::NoUsableKeys);

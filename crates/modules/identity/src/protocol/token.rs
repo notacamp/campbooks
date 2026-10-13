@@ -1,4 +1,4 @@
-//! `/oauth2/token` (authorization_code, refresh_token) and `/oauth2/revoke`
+//! `/oauth2/token` (`authorization_code`, `refresh_token`) and `/oauth2/revoke`
 //! (RFC 7009).
 //!
 //! Confidential clients authenticate with `client_secret_basic` or
@@ -154,7 +154,8 @@ pub async fn token(
             else {
                 return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request"));
             };
-            match tokens::redeem_code(&mut tx, code, client.id, redirect_uri, verifier, now).await? {
+            match tokens::redeem_code(&mut tx, code, client.id, redirect_uri, verifier, now).await?
+            {
                 Ok(redeemed) => {
                     let refresh = if has_scope(&redeemed.grant, OFFLINE_ACCESS) {
                         let (family, token) =
@@ -178,7 +179,12 @@ pub async fn token(
                 Err(refusal) => return refused(&ctx, tx, client, refusal).await,
             }
         }
-        Some(_) => return Ok(oauth_error(StatusCode::BAD_REQUEST, "unsupported_grant_type")),
+        Some(_) => {
+            return Ok(oauth_error(
+                StatusCode::BAD_REQUEST,
+                "unsupported_grant_type",
+            ));
+        }
         None => return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_request")),
     };
     let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
@@ -237,7 +243,10 @@ async fn refused(
         )
         .await?;
         ctx.state.events.publish(&mut tx, &event).await?;
-        tracing::warn!(client = client.id, "a spent code or rotated refresh token was used again; its tokens are revoked");
+        tracing::warn!(
+            client = client.id,
+            "a spent code or rotated refresh token was used again; its tokens are revoked"
+        );
     }
     tx.commit().await?;
     Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"))

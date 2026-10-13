@@ -16,7 +16,8 @@ pub struct IdentityRead;
 
 impl ScopeName for IdentityRead {
     const NAME: &'static str = "identity:read";
-    const DESCRIPTION: &'static str = "See your account, its ways in and the mailboxes waiting to be connected.";
+    const DESCRIPTION: &'static str =
+        "See your account, its ways in and the mailboxes waiting to be connected.";
 }
 
 /// `identity:write` — change your account.
@@ -25,5 +26,6 @@ pub struct IdentityWrite;
 
 impl ScopeName for IdentityWrite {
     const NAME: &'static str = "identity:write";
-    const DESCRIPTION: &'static str = "Change your account and connect or discard the mailboxes waiting on it.";
+    const DESCRIPTION: &'static str =
+        "Change your account and connect or discard the mailboxes waiting on it.";
 }

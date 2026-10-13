@@ -1,4 +1,4 @@
-//! Issuer metadata (OpenID Connect Discovery 1.0, RFC 8414) and the
+//! Issuer metadata (OIDC Discovery 1.0, RFC 8414) and the
 //! published signing keys.
 
 use axum::{
@@ -45,7 +45,7 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
     })
 }
 
-/// OpenID Connect Discovery metadata.
+/// OIDC Discovery metadata.
 #[utoipa::path(
     get,
     path = "/.well-known/openid-configuration",

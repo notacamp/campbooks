@@ -392,7 +392,10 @@ mod tests {
             ));
             assert!(here.in_process);
             assert_eq!(here.issuer, "http://localhost:8080");
-            assert_eq!(here.internal_issuer, "http://localhost:8080", "no hop through Rauthy");
+            assert_eq!(
+                here.internal_issuer, "http://localhost:8080",
+                "no hop through Rauthy"
+            );
             let ClientSecret::Inline(secret) = &here.client_secret else {
                 panic!("a derived secret");
             };

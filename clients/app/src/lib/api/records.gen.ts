@@ -6,6 +6,13 @@
  */
 export const recordReaders: Readonly<Record<string, readonly string[]>> = {
   "connectors.connection": ["connectors.get_connection", "connectors.list_connections"],
+  "identity.authorization_code": ["identity.authorize"],
+  "identity.authorize_request": ["identity.authorize", "identity.get_sign_in_request"],
+  "identity.held_grant": ["identity.list_held_grants"],
+  "identity.pending_sign_up": ["identity.finish_sign_in", "identity.get_new_account"],
+  "identity.session": ["identity.end_session", "identity.finish_sign_in"],
+  "identity.signing_key": ["identity.jwks"],
+  "identity.upstream_flow": ["identity.finish_sign_in", "identity.start_sign_in"],
   "workspaces.invitation": ["workspaces.list_invitations"],
   "workspaces.member": ["workspaces.list_members"],
   "workspaces.security_event": ["workspaces.list_security_events"],

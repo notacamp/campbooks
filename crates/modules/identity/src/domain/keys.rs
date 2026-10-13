@@ -59,7 +59,9 @@ pub struct Signer {
 
 impl std::fmt::Debug for Signer {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Signer").field("kid", &self.kid).finish_non_exhaustive()
+        f.debug_struct("Signer")
+            .field("kid", &self.kid)
+            .finish_non_exhaustive()
     }
 }
 
@@ -212,7 +214,9 @@ impl Keys {
         .await?;
         match latest {
             None => self.insert(&mut tx, now, now).await?,
-            Some((activate_at, retire_at)) if activate_at <= now && retire_at - now <= PUBLISH_AHEAD => {
+            Some((activate_at, retire_at))
+                if activate_at <= now && retire_at - now <= PUBLISH_AHEAD =>
+            {
                 self.insert(&mut tx, now, retire_at).await?;
             }
             Some(_) => {}
@@ -288,11 +292,7 @@ impl campbooks_kernel::auth::KeySource for LocalKeys {
 
 #[cfg(test)]
 mod tests {
-    use campbooks_kernel::{
-        clock::FixedClock,
-        crypto::SecretKey,
-        testing,
-    };
+    use campbooks_kernel::{clock::FixedClock, crypto::SecretKey, testing};
     use chrono::{TimeZone as _, Utc};
     use sqlx::PgPool;
 
@@ -300,7 +300,10 @@ mod tests {
 
     fn keys(clock: &Arc<FixedClock>, secret: u8) -> Keys {
         Keys::new(
-            Cipher::new(&SecretKey::from_bytes([secret; 32]), b"campbooks identity test v1"),
+            Cipher::new(
+                &SecretKey::from_bytes([secret; 32]),
+                b"campbooks identity test v1",
+            ),
             clock.clone(),
         )
     }
@@ -317,11 +320,16 @@ mod tests {
     #[sqlx::test(migrations = "../../../migrations")]
     async fn keys_rotate_on_schedule_with_overlap(db: PgPool) {
         let db = testing::app_role_pool(&db).await;
-        let clock = Arc::new(FixedClock::new(Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap()));
+        let clock = Arc::new(FixedClock::new(
+            Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap(),
+        ));
         let keys = keys(&clock, 1);
 
         let first = keys.signer(&db).await.unwrap().kid.clone();
-        assert_eq!(kids(&keys.jwks(&db).await.unwrap()), [first.clone()]);
+        assert_eq!(
+            kids(&keys.jwks(&db).await.unwrap()),
+            std::slice::from_ref(&first)
+        );
 
         // Within a week of retirement the successor is published, not used.
         clock.advance(TimeDelta::days(24));

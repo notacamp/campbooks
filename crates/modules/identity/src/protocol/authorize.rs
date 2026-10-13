@@ -81,11 +81,10 @@ pub struct Request {
 impl Request {
     /// The client's redirect URI with `params`, plus `state` and `iss`.
     pub fn redirect(&self, issuer: &str, params: &[(&str, &str)]) -> String {
-        let mut url = match url::Url::parse(&self.redirect_uri) {
-            Ok(url) => url,
-            // Registered redirect URIs are valid URLs; the private-use
-            // scheme one too.
-            Err(_) => return self.redirect_uri.clone(),
+        // Registered redirect URIs are valid URLs; the private-use scheme
+        // one too.
+        let Ok(mut url) = url::Url::parse(&self.redirect_uri) else {
+            return self.redirect_uri.clone();
         };
         {
             let mut query = url.query_pairs_mut();
@@ -128,7 +127,11 @@ pub async fn authorize(
     Query(query): Query<AuthorizeQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
-    let Some(client) = query.client_id.as_deref().and_then(|id| issuer.clients.get(id)) else {
+    let Some(client) = query
+        .client_id
+        .as_deref()
+        .and_then(|id| issuer.clients.get(id))
+    else {
         return Ok(problem(StatusCode::BAD_REQUEST, "invalid_client"));
     };
     let Some(redirect_uri) = query
@@ -146,11 +149,16 @@ pub async fn authorize(
         nonce: query.nonce.clone(),
         code_challenge: String::new(),
     };
-    let refuse = |request: &Request, error: &str| see_other(&request.redirect(&issuer.url, &[("error", error)]));
+    let refuse = |request: &Request, error: &str| {
+        see_other(&request.redirect(&issuer.url, &[("error", error)]))
+    };
     if query.response_type.as_deref() != Some("code") {
         return Ok(refuse(&request, "unsupported_response_type"));
     }
-    match (&query.code_challenge, query.code_challenge_method.as_deref()) {
+    match (
+        &query.code_challenge,
+        query.code_challenge_method.as_deref(),
+    ) {
         (Some(challenge), Some("S256")) if is_s256_challenge(challenge) => {
             challenge.clone_into(&mut request.code_challenge);
         }
@@ -189,7 +197,7 @@ pub async fn authorize(
     Ok(see_other(&format!("{SIGN_IN_PATH}?request={id}")))
 }
 
-/// The requested scopes when every one is known (the OpenID scopes and the
+/// The requested scopes when every one is known (the OIDC scopes and the
 /// API's catalogue), deduplicated; `None` otherwise. Missing means `openid`.
 fn allowed_scope(issuer: &Issuer, requested: Option<&str>) -> Option<String> {
     let requested = requested.unwrap_or("openid");
@@ -378,9 +386,13 @@ mod tests {
 
     #[test]
     fn s256_challenges_are_43_base64url_characters() {
-        assert!(is_s256_challenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"));
+        assert!(is_s256_challenge(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
+        ));
         assert!(!is_s256_challenge("short"));
-        assert!(!is_s256_challenge("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM"));
+        assert!(!is_s256_challenge(
+            "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw+cM"
+        ));
     }
 
     #[test]

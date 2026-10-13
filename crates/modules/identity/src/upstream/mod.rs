@@ -29,7 +29,7 @@ pub const SIGN_UP_LIFETIME: TimeDelta = TimeDelta::minutes(15);
 /// Zoho arrive with S2.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Provider {
-    /// Google (OpenID Connect).
+    /// Google (OIDC).
     Google,
 }
 

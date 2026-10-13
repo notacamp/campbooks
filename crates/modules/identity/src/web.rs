@@ -249,9 +249,15 @@ mod tests {
         );
 
         let mut request = HeaderMap::new();
-        request.insert(header::COOKIE, HeaderValue::from_static("a=1; campbooks_auth=tok"));
+        request.insert(
+            header::COOKIE,
+            HeaderValue::from_static("a=1; campbooks_auth=tok"),
+        );
         assert_eq!(plain.read(&request, SESSION_COOKIE).as_deref(), Some("tok"));
-        request.append(header::COOKIE, HeaderValue::from_static("campbooks_auth=other"));
+        request.append(
+            header::COOKIE,
+            HeaderValue::from_static("campbooks_auth=other"),
+        );
         assert_eq!(plain.read(&request, SESSION_COOKIE), None, "planted twice");
     }
 }

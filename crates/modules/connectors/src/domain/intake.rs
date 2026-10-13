@@ -138,10 +138,16 @@ mod tests {
         let ana = kit.user("ana");
         let ana_id = kit.join(&ana, ws, Role::Owner);
         let intake = grant_intake(kit.deps.clone());
-        assert_eq!(intake.mailbox_scopes("google"), [crate::google::GMAIL_SCOPE]);
+        assert_eq!(
+            intake.mailbox_scopes("google"),
+            [crate::google::GMAIL_SCOPE]
+        );
         assert!(intake.mailbox_scopes("zoho").is_empty());
 
-        let id = intake.adopt(&kit.state, grant(ws, "ana", "google")).await.unwrap();
+        let id = intake
+            .adopt(&kit.state, grant(ws, "ana", "google"))
+            .await
+            .unwrap();
         let list = kit
             .get(&ana.token, &format!("/api/v1/w/{ws}/connections"))
             .await;
@@ -152,11 +158,17 @@ mod tests {
         assert_eq!(connection["capabilities"], serde_json::json!(["messages"]));
         assert_eq!(
             kit.events_of(ws).await,
-            ["connectors.connection_added", "connectors.capability_granted"]
+            [
+                "connectors.connection_added",
+                "connectors.capability_granted"
+            ]
         );
 
         // The same account again refreshes it.
-        let again = intake.adopt(&kit.state, grant(ws, "ana", "google")).await.unwrap();
+        let again = intake
+            .adopt(&kit.state, grant(ws, "ana", "google"))
+            .await
+            .unwrap();
         assert_eq!(again, id);
     }
 

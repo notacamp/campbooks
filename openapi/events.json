@@ -187,6 +187,88 @@
       }
     },
     {
+      "name": "identity.account_created",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A person created an account (with its first way in).",
+        "required": [
+          "account",
+          "provider"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          },
+          "provider": {
+            "type": "string",
+            "description": "The provider of its first way in."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.refresh_reuse_detected",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A spent authorization code or a rotated refresh token was presented\nagain; every token of that sign-in was revoked.",
+        "required": [
+          "account",
+          "client"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account whose tokens were revoked."
+          },
+          "client": {
+            "type": "string",
+            "description": "The client they were issued to."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.signed_in",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A person signed in to the issuer.",
+        "required": [
+          "account",
+          "method"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account."
+          },
+          "method": {
+            "type": "string",
+            "description": "`provider` (later also `passkey`)."
+          },
+          "provider": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider, for a provider sign-in."
+          }
+        }
+      }
+    },
+    {
       "name": "workspaces.member_joined",
       "module": "workspaces",
       "version": 1,

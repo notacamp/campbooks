@@ -1,5 +1,5 @@
 //! The whole web sign-in with the in-process issuer (ADR 0014): the BFF is an
-//! OpenID client of the server's own issuer, reached through its router; a
+//! OIDC client of the server's own issuer, reached through its router; a
 //! new person signs up with a (fake) Google, lands in the app with a
 //! session, creates a workspace, and the mailbox their sign-up granted is
 //! handed to the grant-intake port for that workspace.
@@ -20,7 +20,9 @@ use campbooks_kernel::{
     clock::SystemClock,
     connections::{AdoptFuture, GrantIntake, ProviderGrant},
     crypto::SecretKey,
-    testing::{self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET},
+    testing::{
+        self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
+    },
 };
 use figment::{Figment, providers::Serialized};
 use http_body_util::BodyExt as _;
@@ -83,7 +85,11 @@ impl Browser {
         let path = url.strip_prefix(ORIGIN).unwrap_or(url);
         let mut request = Request::builder().method(method.clone()).uri(path);
         if !self.cookies.is_empty() {
-            let jar: Vec<String> = self.cookies.iter().map(|(k, v)| format!("{k}={v}")).collect();
+            let jar: Vec<String> = self
+                .cookies
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect();
             request = request.header(header::COOKIE, jar.join("; "));
         }
         if method != Method::GET {
@@ -133,15 +139,17 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
     assert!(config.auth.issuer.is_none(), "no other identity provider");
     let secret = SecretKey::from_bytes([5; 32]);
     let scopes: Vec<&str> = crate::scope_catalogue().iter().map(|s| s.name).collect();
-    let mut composition = crate::Composition::default();
-    composition.identity = campbooks_identity::Deps::from_figment(
-        &Figment::from(Serialized::defaults(serde_json::json!({}))),
-        &config,
-        Some(secret.clone()),
-        &scopes,
-        Arc::new(SystemClock),
-    )
-    .unwrap();
+    let mut composition = crate::Composition {
+        identity: campbooks_identity::Deps::from_figment(
+            &Figment::from(Serialized::defaults(serde_json::json!({}))),
+            &config,
+            Some(secret.clone()),
+            &scopes,
+            Arc::new(SystemClock),
+        )
+        .unwrap(),
+        ..crate::Composition::default()
+    };
     let issuer = composition
         .identity
         .issuer
@@ -159,7 +167,6 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
                 issuer: base.to_owned(),
                 authorize: at("oidc/authorize"),
                 token: at("oidc/token"),
-                revoke: at("oidc/token/revoke"),
                 jwks: url::Url::parse(&google.jwks_url()).unwrap(),
             },
         )
@@ -184,7 +191,11 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
 
     // The web app sends the browser to sign in; the issuer shows its screen.
     let to_issuer = browser.get("/bff/login?return_to=/welcome").await;
-    assert!(to_issuer.location().starts_with(&format!("{ORIGIN}/oauth2/authorize?")));
+    assert!(
+        to_issuer
+            .location()
+            .starts_with(&format!("{ORIGIN}/oauth2/authorize?"))
+    );
     let to_screen = browser.get(&to_issuer.location()).await;
     let screen = to_screen.location();
     assert!(screen.starts_with("/sign-in?request="), "{screen}");

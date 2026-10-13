@@ -43,7 +43,7 @@ use crate::{
     events::{AccountCreated, SignedIn},
     upstream::{
         self, FLOW_LIFETIME, Flow, PendingSignUp, Provider, SIGN_UP_LIFETIME,
-        google::{AuthorizeRequest, Google},
+        google::{AuthorizeRequest, Google, GoogleTokens, UpstreamError},
     },
     web::{
         self, SESSION_COOKIE, SIGN_UP_COOKIE, SameSite, UPSTREAM_COOKIE, see_other, with_cookie,
@@ -256,7 +256,10 @@ pub async fn callback(
         None => None,
     };
     let Some(flow) = flow else {
-        return Ok(with_cookie(sign_in_error("invalid_state", None), clear_flow));
+        return Ok(with_cookie(
+            sign_in_error("invalid_state", None),
+            clear_flow,
+        ));
     };
     let request = flow.request_id.as_deref();
     if let Some(error) = &query.error {
@@ -269,73 +272,28 @@ pub async fn callback(
     }
     let (Some(code), true) = (
         &query.code,
-        query.iss.as_deref().is_none_or(|iss| iss == google.issuer()),
+        query
+            .iss
+            .as_deref()
+            .is_none_or(|iss| iss == google.issuer()),
     ) else {
-        return Ok(with_cookie(sign_in_error("login_failed", request), clear_flow));
+        return Ok(with_cookie(
+            sign_in_error("login_failed", request),
+            clear_flow,
+        ));
     };
-    let tokens = match google.exchange(code, &flow.code_verifier).await {
-        Ok(tokens) => tokens,
-        Err(upstream::google::UpstreamError::Unavailable(reason)) => {
-            tracing::warn!(provider = provider.as_str(), %reason, "a provider could not finish a sign-in");
-            return Ok(with_cookie(sign_in_error("provider_unavailable", request), clear_flow));
-        }
-        Err(error) => {
-            tracing::info!(provider = provider.as_str(), %error, "a provider refused to finish a sign-in");
-            return Ok(with_cookie(sign_in_error("login_failed", request), clear_flow));
-        }
-    };
-    let id = match tokens.id_token.as_deref() {
-        Some(token) => google.verify_id_token(token, &flow.nonce).await.ok(),
-        None => None,
-    };
-    let Some(id) = id else {
-        return Ok(with_cookie(sign_in_error("login_failed", request), clear_flow));
-    };
-    let identity = ProviderIdentity {
-        provider: provider.as_str().to_owned(),
-        issuer: google.issuer().to_owned(),
-        subject: id.subject,
-        email: id.email,
-        email_verified: id.email_verified,
-        name: id.name,
+    let (identity, tokens) = match identify(google, provider, code, &flow).await {
+        Ok(found) => found,
+        Err(code) => return Ok(with_cookie(sign_in_error(code, request), clear_flow)),
     };
     let response = match accounts::find(&ctx.state.db, &identity).await? {
         Some(Linked { disabled: true, .. }) => sign_in_error("account_disabled", request),
-        Some(linked) => {
-            // A sign-in never changes a workspace's mailbox: a refresh token
-            // Google sent along is dropped, not stored.
-            accounts::touch(&ctx.state.db, linked.identity_id, now).await?;
-            let user_agent = headers
-                .get(header::USER_AGENT)
-                .and_then(|v| v.to_str().ok());
-            let mut tx = ctx.state.db.begin().await?;
-            let started =
-                sessions::start(&mut tx, linked.account_id, linked.identity_id, user_agent, now)
-                    .await?;
-            signed_in(&ctx, &mut tx, linked.account_id, provider, now).await?;
-            tx.commit().await?;
-            let location = continue_after_sign_in(
-                &ctx,
-                issuer,
-                flow.request_id.as_deref(),
-                &flow.return_to,
-                &started.session,
-                now,
-            )
-            .await?;
-            with_cookie(see_other(&location), session_cookie(issuer, &started.token))
-        }
+        // A sign-in never changes a workspace's mailbox: a refresh token
+        // Google sent along is dropped, not stored.
+        Some(linked) => sign_in_known(&ctx, issuer, &headers, linked, &flow, provider, now).await?,
         None => {
-            let granted: Vec<String> = tokens
-                .scope
-                .as_deref()
-                .unwrap_or_default()
-                .split_whitespace()
-                .map(ToOwned::to_owned)
-                .collect();
-            let wanted = ctx.state.grants.mailbox_scopes(provider.as_str());
-            let mail_granted = !wanted.is_empty() && wanted.iter().all(|s| granted.contains(s));
-            if mail_granted && tokens.refresh_token.is_none() && !flow.consent_retry {
+            let mail = MailGrant::of(&ctx, provider, &tokens);
+            if mail.granted && tokens.refresh_token.is_none() && !flow.consent_retry {
                 // Google sends a refresh token only on a fresh consent; this
                 // person consented before. Ask once more, for this account.
                 let retry = Flow {
@@ -348,37 +306,150 @@ pub async fn callback(
                 return redirect_to_provider(&ctx, issuer, google, retry, Some(&identity.subject))
                     .await;
             }
-            let held = (mail_granted && tokens.refresh_token.is_some()).then(|| ProviderTokens {
-                access_token: tokens.access_token.clone(),
-                refresh_token: tokens.refresh_token.clone(),
-                expires_in: tokens.expires_in,
-                scopes: granted,
-            });
-            let browser = random_token();
-            let pending = PendingSignUp {
-                id: Uuid::now_v7(),
-                identity,
-                tokens: held,
-                request_id: flow.request_id.clone(),
-                return_to: flow.return_to.clone(),
-            };
-            upstream::store_sign_up(&ctx.state.db, &issuer.cipher, &browser, &pending, now).await?;
-            let location = match &flow.request_id {
-                Some(request) => format!("{NEW_ACCOUNT_PATH}?request={request}"),
-                None => NEW_ACCOUNT_PATH.to_owned(),
-            };
-            with_cookie(
-                see_other(&location),
-                issuer.cookies.set(
-                    SIGN_UP_COOKIE,
-                    &browser,
-                    SIGN_UP_LIFETIME.num_seconds(),
-                    SameSite::Strict,
-                ),
-            )
+            pend_sign_up(&ctx, issuer, identity, &tokens, mail, &flow, now).await?
         }
     };
     Ok(with_cookie(response, clear_flow))
+}
+
+/// Redeem the provider's code and validate its ID token; on failure, the
+/// sign-in screen's error code.
+async fn identify(
+    google: &Google,
+    provider: Provider,
+    code: &str,
+    flow: &Flow,
+) -> Result<(ProviderIdentity, GoogleTokens), &'static str> {
+    let tokens = match google.exchange(code, &flow.code_verifier).await {
+        Ok(tokens) => tokens,
+        Err(UpstreamError::Unavailable(reason)) => {
+            tracing::warn!(provider = provider.as_str(), %reason, "a provider could not finish a sign-in");
+            return Err("provider_unavailable");
+        }
+        Err(error) => {
+            tracing::info!(provider = provider.as_str(), %error, "a provider refused to finish a sign-in");
+            return Err("login_failed");
+        }
+    };
+    let Some(token) = tokens.id_token.as_deref() else {
+        return Err("login_failed");
+    };
+    let id = google
+        .verify_id_token(token, &flow.nonce)
+        .await
+        .map_err(|_| "login_failed")?;
+    let identity = ProviderIdentity {
+        provider: provider.as_str().to_owned(),
+        issuer: google.issuer().to_owned(),
+        subject: id.subject,
+        email: id.email,
+        email_verified: id.email_verified,
+        name: id.name,
+    };
+    Ok((identity, tokens))
+}
+
+/// Sign the account `linked` belongs to in, and move on.
+async fn sign_in_known(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    headers: &HeaderMap,
+    linked: Linked,
+    flow: &Flow,
+    provider: Provider,
+    now: DateTime<Utc>,
+) -> Result<Response> {
+    accounts::touch(&ctx.state.db, linked.identity_id, now).await?;
+    let user_agent = headers
+        .get(header::USER_AGENT)
+        .and_then(|v| v.to_str().ok());
+    let mut tx = ctx.state.db.begin().await?;
+    let started = sessions::start(
+        &mut tx,
+        linked.account_id,
+        linked.identity_id,
+        user_agent,
+        now,
+    )
+    .await?;
+    signed_in(ctx, &mut tx, linked.account_id, provider, now).await?;
+    tx.commit().await?;
+    let location = continue_after_sign_in(
+        ctx,
+        issuer,
+        flow.request_id.as_deref(),
+        &flow.return_to,
+        &started.session,
+        now,
+    )
+    .await?;
+    Ok(with_cookie(
+        see_other(&location),
+        session_cookie(issuer, &started.token),
+    ))
+}
+
+/// Whether the provider granted every mailbox scope this instance asked
+/// for, and what it granted.
+struct MailGrant {
+    granted: bool,
+    scopes: Vec<String>,
+}
+
+impl MailGrant {
+    fn of(ctx: &Ctx, provider: Provider, tokens: &GoogleTokens) -> Self {
+        let scopes: Vec<String> = tokens
+            .scope
+            .as_deref()
+            .unwrap_or_default()
+            .split_whitespace()
+            .map(ToOwned::to_owned)
+            .collect();
+        let wanted = ctx.state.grants.mailbox_scopes(provider.as_str());
+        let granted = !wanted.is_empty() && wanted.iter().all(|s| scopes.contains(s));
+        Self { granted, scopes }
+    }
+}
+
+/// Keep `identity` (and its mailbox grant, when there is one with offline
+/// access) for the new-account screen, bound to this browser.
+async fn pend_sign_up(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    identity: ProviderIdentity,
+    tokens: &GoogleTokens,
+    mail: MailGrant,
+    flow: &Flow,
+    now: DateTime<Utc>,
+) -> Result<Response> {
+    let held = (mail.granted && tokens.refresh_token.is_some()).then(|| ProviderTokens {
+        access_token: tokens.access_token.clone(),
+        refresh_token: tokens.refresh_token.clone(),
+        expires_in: tokens.expires_in,
+        scopes: mail.scopes,
+    });
+    let browser = random_token();
+    let pending = PendingSignUp {
+        id: Uuid::now_v7(),
+        identity,
+        tokens: held,
+        request_id: flow.request_id.clone(),
+        return_to: flow.return_to.clone(),
+    };
+    upstream::store_sign_up(&ctx.state.db, &issuer.cipher, &browser, &pending, now).await?;
+    let location = match &flow.request_id {
+        Some(request) => format!("{NEW_ACCOUNT_PATH}?request={request}"),
+        None => NEW_ACCOUNT_PATH.to_owned(),
+    };
+    Ok(with_cookie(
+        see_other(&location),
+        issuer.cookies.set(
+            SIGN_UP_COOKIE,
+            &browser,
+            SIGN_UP_LIFETIME.num_seconds(),
+            SameSite::Strict,
+        ),
+    ))
 }
 
 fn session_cookie(issuer: &Issuer, token: &str) -> axum::http::HeaderValue {
@@ -470,9 +541,10 @@ pub async fn new_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Result<R
         .cookies
         .read(&headers, SIGN_UP_COOKIE)
         .ok_or(Error::NotFound)?;
-    let (provider, email, display_name) = upstream::peek_sign_up(&ctx.state.db, &token, issuer.now())
-        .await?
-        .ok_or(Error::NotFound)?;
+    let (provider, email, display_name) =
+        upstream::peek_sign_up(&ctx.state.db, &token, issuer.now())
+            .await?
+            .ok_or(Error::NotFound)?;
     Ok(web::no_store(
         Json(NewAccount {
             provider,
@@ -525,7 +597,9 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("sign_up_expired")))?;
     let Some(linked) = accounts::create(&mut tx, &pending.identity, now).await? else {
-        return Err(Error::Conflict(MESSAGES.reason("way_in_belongs_to_another_account")));
+        return Err(Error::Conflict(
+            MESSAGES.reason("way_in_belongs_to_another_account"),
+        ));
     };
     let provider = Provider::parse(&pending.identity.provider)
         .ok_or_else(|| Error::internal("a pending sign-up names an unknown provider"))?;
@@ -549,8 +623,14 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let user_agent = headers
         .get(header::USER_AGENT)
         .and_then(|v| v.to_str().ok());
-    let started =
-        sessions::start(&mut tx, linked.account_id, linked.identity_id, user_agent, now).await?;
+    let started = sessions::start(
+        &mut tx,
+        linked.account_id,
+        linked.identity_id,
+        user_agent,
+        now,
+    )
+    .await?;
     accounts::audit(
         &mut tx,
         Some(linked.account_id),
@@ -581,7 +661,10 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     )
     .await?;
     let response = (axum::http::StatusCode::CREATED, Json(Created { redirect })).into_response();
-    let response = with_cookie(web::no_store(response), session_cookie(issuer, &started.token));
+    let response = with_cookie(
+        web::no_store(response),
+        session_cookie(issuer, &started.token),
+    );
     Ok(with_cookie(
         response,
         issuer.cookies.clear(SIGN_UP_COOKIE, SameSite::Strict),

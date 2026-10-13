@@ -79,7 +79,11 @@ impl GrantIntake for NoGrantIntake {
     }
 
     fn adopt<'a>(&'a self, _state: &'a AppState, _grant: ProviderGrant) -> AdoptFuture<'a> {
-        Box::pin(async { Err(Error::Conflict(crate::i18n::MESSAGES.reason("mailbox_unsupported"))) })
+        Box::pin(async {
+            Err(Error::Conflict(
+                crate::i18n::MESSAGES.reason("mailbox_unsupported"),
+            ))
+        })
     }
 }
 

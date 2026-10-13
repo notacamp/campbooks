@@ -32,11 +32,26 @@ impl Job for Prune {
         let db = ctx.pool();
         let mut deleted = 0;
         for (sql, at) in [
-            ("DELETE FROM identity.authorize_requests WHERE expires_at <= $1", now),
-            ("DELETE FROM identity.upstream_flows WHERE expires_at <= $1", now),
-            ("DELETE FROM identity.pending_sign_ups WHERE expires_at <= $1", now),
-            ("DELETE FROM identity.held_grants WHERE expires_at <= $1", now),
-            ("DELETE FROM identity.authorization_codes WHERE expires_at <= $1", ended),
+            (
+                "DELETE FROM identity.authorize_requests WHERE expires_at <= $1",
+                now,
+            ),
+            (
+                "DELETE FROM identity.upstream_flows WHERE expires_at <= $1",
+                now,
+            ),
+            (
+                "DELETE FROM identity.pending_sign_ups WHERE expires_at <= $1",
+                now,
+            ),
+            (
+                "DELETE FROM identity.held_grants WHERE expires_at <= $1",
+                now,
+            ),
+            (
+                "DELETE FROM identity.authorization_codes WHERE expires_at <= $1",
+                ended,
+            ),
             (
                 "DELETE FROM identity.refresh_families
                   WHERE expires_at <= $1 OR revoked_at <= $1",

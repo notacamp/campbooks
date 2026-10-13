@@ -77,11 +77,13 @@ impl Client {
     pub fn authenticates(&self, presented: Option<&str>) -> bool {
         match (&self.authentication, presented) {
             (Authentication::None, None) => true,
-            (Authentication::Secret(secret), Some(presented)) => constant_time::verify_slices_are_equal(
-                secret.expose_secret().as_bytes(),
-                presented.as_bytes(),
-            )
-            .is_ok(),
+            (Authentication::Secret(secret), Some(presented)) => {
+                constant_time::verify_slices_are_equal(
+                    secret.expose_secret().as_bytes(),
+                    presented.as_bytes(),
+                )
+                .is_ok()
+            }
             _ => false,
         }
     }

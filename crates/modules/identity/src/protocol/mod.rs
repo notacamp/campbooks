@@ -1,4 +1,4 @@
-//! The issuer's protocol endpoints: OAuth 2.1 / OpenID Connect
+//! The issuer's protocol endpoints: OAuth 2.1 / OIDC
 //! (`/.well-known/*`, `/oauth2/*`) and the provider round trips and actions
 //! behind the sign-in screens (`/auth/*`).
 //!

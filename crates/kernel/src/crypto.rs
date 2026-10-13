@@ -252,9 +252,18 @@ mod tests {
     #[test]
     fn derived_secrets_are_stable_and_per_purpose() {
         let one = derive_secret(&key(7), b"campbooks one v1");
-        assert_eq!(one.expose_secret(), derive_secret(&key(7), b"campbooks one v1").expose_secret());
-        assert_ne!(one.expose_secret(), derive_secret(&key(7), b"campbooks two v1").expose_secret());
-        assert_ne!(one.expose_secret(), derive_secret(&key(8), b"campbooks one v1").expose_secret());
+        assert_eq!(
+            one.expose_secret(),
+            derive_secret(&key(7), b"campbooks one v1").expose_secret()
+        );
+        assert_ne!(
+            one.expose_secret(),
+            derive_secret(&key(7), b"campbooks two v1").expose_secret()
+        );
+        assert_ne!(
+            one.expose_secret(),
+            derive_secret(&key(8), b"campbooks one v1").expose_secret()
+        );
         assert_eq!(one.expose_secret().len(), 43);
     }
 

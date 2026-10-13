@@ -258,8 +258,14 @@ fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
 pub fn openapi() -> utoipa::openapi::OpenApi {
     let mut doc = api().into_openapi();
     doc.merge(bff::openapi());
-    doc.merge(campbooks_identity::protocol::openapi());
+    doc.merge(identity_protocol_openapi());
     doc
+}
+
+/// The identity issuer's protocol endpoints (`/.well-known/*`, `/oauth2/*`,
+/// `/auth/*`): owned by the `identity` module, outside its API router.
+pub fn identity_protocol_openapi() -> utoipa::openapi::OpenApi {
+    campbooks_identity::protocol::openapi()
 }
 
 /// The full HTTP application: module routes (behind the idempotency and
@@ -295,7 +301,8 @@ pub fn router_with(
 
     // The issuer's protocol endpoints (`/.well-known/*`, `/oauth2/*`,
     // `/auth/*`); the BFF reaches them in-process when the issuer runs here.
-    let identity = campbooks_identity::protocol::router(state.clone(), composition.identity.clone());
+    let identity =
+        campbooks_identity::protocol::router(state.clone(), composition.identity.clone());
 
     // What `/bff/api/*` runs requests through: the composed module routes
     // (idempotency included), without the middleware below (the outer

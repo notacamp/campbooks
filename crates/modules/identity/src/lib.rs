@@ -3,7 +3,7 @@
 //!
 //! The module owns **accounts** and their **ways in** (provider identities
 //! today; passkeys later), linked only by proven ownership, never by email.
-//! It is the instance's **OAuth 2.1 authorization server and OpenID
+//! It is the instance's **OAuth 2.1 authorization server and OIDC
 //! provider**, in-process, on the app's own origin: discovery, JWKS, the
 //! authorization and token endpoints, revocation and logout, with Ed25519
 //! keys it generates, seals and rotates itself. It runs the **provider round

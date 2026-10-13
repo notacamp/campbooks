@@ -1,4 +1,4 @@
-//! Google as an upstream OpenID provider: the authorization request, the
+//! Google as an upstream OIDC provider: the authorization request, the
 //! code exchange, ID-token validation and revocation.
 //!
 //! The ID token comes straight from Google's token endpoint over TLS, which
@@ -35,8 +35,6 @@ pub struct GoogleEndpoints {
     pub authorize: Url,
     /// The token endpoint.
     pub token: Url,
-    /// The revocation endpoint.
-    pub revoke: Url,
     /// The signing keys.
     pub jwks: Url,
 }
@@ -49,7 +47,6 @@ impl GoogleEndpoints {
             issuer: "https://accounts.google.com".to_owned(),
             authorize: parse("https://accounts.google.com/o/oauth2/v2/auth"),
             token: parse("https://oauth2.googleapis.com/token"),
-            revoke: parse("https://oauth2.googleapis.com/revoke"),
             jwks: parse("https://www.googleapis.com/oauth2/v3/certs"),
         }
     }
@@ -62,7 +59,6 @@ impl GoogleEndpoints {
         Ok(Self {
             authorize: base.join("o/oauth2/v2/auth")?,
             token: base.join("token")?,
-            revoke: base.join("revoke")?,
             jwks: base.join("oauth2/v3/certs")?,
             issuer,
         })
@@ -232,7 +228,11 @@ impl Google {
     }
 
     /// Exchange `code` (with the PKCE `verifier`) for tokens.
-    pub async fn exchange(&self, code: &str, verifier: &str) -> Result<GoogleTokens, UpstreamError> {
+    pub async fn exchange(
+        &self,
+        code: &str,
+        verifier: &str,
+    ) -> Result<GoogleTokens, UpstreamError> {
         let secret = self.secret().await?;
         let form = [
             ("grant_type", "authorization_code"),
@@ -270,28 +270,15 @@ impl Google {
 
     /// Validate an ID token from the token endpoint for the sign-in that
     /// sent `nonce`.
-    pub async fn verify_id_token(&self, token: &str, nonce: &str) -> Result<IdToken, UpstreamError> {
+    pub async fn verify_id_token(
+        &self,
+        token: &str,
+        nonce: &str,
+    ) -> Result<IdToken, UpstreamError> {
         self.verifier
             .verify_id_token(token, &self.client_id, nonce)
             .await
             .map_err(|_| UpstreamError::InvalidIdToken)
-    }
-
-    /// Revoke `token` (an access or refresh token) at Google. Best effort:
-    /// a failure is logged, never shown.
-    pub async fn revoke(&self, token: &str) {
-        let result = self
-            .http
-            .post(self.endpoints.revoke.clone())
-            .header(reqwest::header::CONTENT_TYPE, FORM)
-            .body(encode(&[("token", token)]))
-            .send()
-            .await;
-        match result {
-            Ok(response) if response.status().is_success() || response.status() == 400 => {}
-            Ok(response) => tracing::warn!(status = %response.status(), "Google refused a revocation"),
-            Err(e) => tracing::warn!(error = %e.without_url(), "could not reach Google to revoke a grant"),
-        }
     }
 }
 
@@ -331,7 +318,10 @@ mod tests {
     #[test]
     fn authorization_request_asks_for_offline_access_with_pkce() {
         let url = Url::parse(&google().authorize_url(&AuthorizeRequest {
-            scopes: &["openid".to_owned(), "https://www.googleapis.com/auth/gmail.modify".to_owned()],
+            scopes: &[
+                "openid".to_owned(),
+                "https://www.googleapis.com/auth/gmail.modify".to_owned(),
+            ],
             state: "st",
             nonce: "no",
             code_challenge: "ch",
@@ -341,8 +331,14 @@ mod tests {
         .unwrap();
         let query: std::collections::HashMap<_, _> = url.query_pairs().into_owned().collect();
         assert_eq!(url.host_str(), Some("accounts.google.com"));
-        assert_eq!(query["redirect_uri"], "https://app.example.com/auth/callback/google");
-        assert_eq!(query["scope"], "openid https://www.googleapis.com/auth/gmail.modify");
+        assert_eq!(
+            query["redirect_uri"],
+            "https://app.example.com/auth/callback/google"
+        );
+        assert_eq!(
+            query["scope"],
+            "openid https://www.googleapis.com/auth/gmail.modify"
+        );
         assert_eq!(query["code_challenge_method"], "S256");
         assert_eq!(query["access_type"], "offline");
         assert_eq!(query["include_granted_scopes"], "true");
@@ -370,6 +366,9 @@ mod tests {
         let endpoints = GoogleEndpoints::under("http://127.0.0.1:9000/").unwrap();
         assert_eq!(endpoints.issuer, "http://127.0.0.1:9000");
         assert_eq!(endpoints.token.as_str(), "http://127.0.0.1:9000/token");
-        assert_eq!(endpoints.jwks.as_str(), "http://127.0.0.1:9000/oauth2/v3/certs");
+        assert_eq!(
+            endpoints.jwks.as_str(),
+            "http://127.0.0.1:9000/oauth2/v3/certs"
+        );
     }
 }

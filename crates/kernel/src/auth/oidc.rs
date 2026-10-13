@@ -62,7 +62,7 @@ struct IdClaims {
     family_name: Option<String>,
     preferred_username: Option<String>,
     email: Option<String>,
-    /// A boolean, or the string `"true"`/`"false"` some IdPs send.
+    /// A boolean, or the string `"true"`/`"false"` some providers send.
     email_verified: Option<serde_json::Value>,
     auth_time: Option<i64>,
 }
@@ -122,10 +122,8 @@ impl TokenVerifier {
                 .or(full_name)
                 .or_else(|| non_blank(claims.preferred_username)),
             email: non_blank(claims.email),
-            email_verified: matches!(
-                claims.email_verified,
-                Some(serde_json::Value::Bool(true))
-            ) || matches!(&claims.email_verified, Some(serde_json::Value::String(v)) if v == "true"),
+            email_verified: matches!(claims.email_verified, Some(serde_json::Value::Bool(true)))
+                || matches!(&claims.email_verified, Some(serde_json::Value::String(v)) if v == "true"),
             auth_time: claims.auth_time,
         })
     }

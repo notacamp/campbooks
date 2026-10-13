@@ -202,11 +202,13 @@ pub async fn take(
 
 /// Delete held grant `id` of `account_id`; whether there was one.
 pub async fn delete(conn: &mut PgConnection, id: Uuid, account_id: Uuid) -> Result<bool> {
-    Ok(sqlx::query("DELETE FROM identity.held_grants WHERE id = $1 AND account_id = $2")
-        .bind(id)
-        .bind(account_id)
-        .execute(conn)
-        .await?
-        .rows_affected()
-        == 1)
+    Ok(
+        sqlx::query("DELETE FROM identity.held_grants WHERE id = $1 AND account_id = $2")
+            .bind(id)
+            .bind(account_id)
+            .execute(conn)
+            .await?
+            .rows_affected()
+            == 1,
+    )
 }

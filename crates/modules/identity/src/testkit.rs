@@ -24,7 +24,9 @@ use campbooks_kernel::{
     connections::{AdoptFuture, GrantIntake, ProviderGrant},
     crypto::{SecretKey, pkce_challenge, random_token},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
-    testing::{self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET},
+    testing::{
+        self, TestIdp, WEB_CLIENT_ID as FAKE_GOOGLE_CLIENT, WEB_CLIENT_SECRET as FAKE_GOOGLE_SECRET,
+    },
 };
 use figment::{Figment, providers::Serialized};
 use http_body_util::BodyExt as _;
@@ -44,15 +46,19 @@ pub const ORIGIN: &str = "http://localhost:8080";
 /// The scope the fake intake asks for.
 pub const MAIL_SCOPE: &str = "https://mail.example.com/modify";
 
+/// What the fake intake was handed: workspace, subject, address, refresh
+/// token, scopes.
+pub type Handed = (WorkspaceId, String, String, Option<String>, Vec<String>);
+
 /// Records the grants it is handed.
 #[derive(Debug, Default)]
 pub struct FakeIntake {
-    adopted: Mutex<Vec<(WorkspaceId, String, String, Option<String>, Vec<String>)>>,
+    adopted: Mutex<Vec<Handed>>,
 }
 
 impl FakeIntake {
     /// `(workspace, subject, address, refresh token, scopes)` of each grant.
-    pub fn adopted(&self) -> Vec<(WorkspaceId, String, String, Option<String>, Vec<String>)> {
+    pub fn adopted(&self) -> Vec<Handed> {
         self.adopted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -173,7 +179,11 @@ impl Kit {
             Arc::new(SystemClock),
         )
         .unwrap_or_else(|e| panic!("deps: {e}"));
-        let issuer = deps.issuer.as_mut().and_then(Arc::get_mut).unwrap_or_else(|| panic!("issuer"));
+        let issuer = deps
+            .issuer
+            .as_mut()
+            .and_then(Arc::get_mut)
+            .unwrap_or_else(|| panic!("issuer"));
         let base = google.issuer();
         issuer.google = Some(
             Google::new(
@@ -182,9 +192,10 @@ impl Kit {
                 ORIGIN,
                 GoogleEndpoints {
                     issuer: base.to_owned(),
-                    authorize: Url::parse(&format!("{base}oidc/authorize")).unwrap_or_else(|e| panic!("{e}")),
-                    token: Url::parse(&format!("{base}oidc/token")).unwrap_or_else(|e| panic!("{e}")),
-                    revoke: Url::parse(&format!("{base}oidc/token/revoke")).unwrap_or_else(|e| panic!("{e}")),
+                    authorize: Url::parse(&format!("{base}oidc/authorize"))
+                        .unwrap_or_else(|e| panic!("{e}")),
+                    token: Url::parse(&format!("{base}oidc/token"))
+                        .unwrap_or_else(|e| panic!("{e}")),
                     jwks: Url::parse(&google.jwks_url()).unwrap_or_else(|e| panic!("{e}")),
                 },
             )
@@ -226,7 +237,10 @@ impl Kit {
 
     /// Forget every cookie (another browser).
     pub fn new_browser(&self) {
-        self.cookies.lock().unwrap_or_else(PoisonError::into_inner).clear();
+        self.cookies
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
     }
 
     /// Send `method uri` from the browser, with `headers` and a form or JSON
@@ -311,7 +325,8 @@ impl Kit {
     /// URL and the verifier.
     pub fn authorize_url(client_id: &str, redirect_uri: &str, scope: &str) -> (String, String) {
         let verifier = random_token();
-        let mut url = Url::parse(&format!("{ORIGIN}/oauth2/authorize")).unwrap_or_else(|e| panic!("{e}"));
+        let mut url =
+            Url::parse(&format!("{ORIGIN}/oauth2/authorize")).unwrap_or_else(|e| panic!("{e}"));
         url.query_pairs_mut()
             .append_pair("response_type", "code")
             .append_pair("client_id", client_id)
@@ -363,7 +378,10 @@ impl Kit {
         assert!(to_new.location().starts_with("/sign-in/new"), "{to_new:?}");
         let created = self.create_account().await;
         assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
-        let redirect = created.json["redirect"].as_str().unwrap_or_default().to_owned();
+        let redirect = created.json["redirect"]
+            .as_str()
+            .unwrap_or_default()
+            .to_owned();
         (query(&redirect)["code"].clone(), verifier)
     }
 

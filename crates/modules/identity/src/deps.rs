@@ -124,7 +124,11 @@ impl Deps {
         clock: Arc<dyn Clock>,
     ) -> Result<Self, String> {
         let (url, secure) = public_origin(&config.public_url)?;
-        if config.auth.issuer().is_some_and(|issuer| issuer.trim_end_matches('/') != url) {
+        if config
+            .auth
+            .issuer()
+            .is_some_and(|issuer| issuer.trim_end_matches('/') != url)
+        {
             // Another identity provider (Rauthy) is configured.
             return Ok(Self::default());
         }
@@ -231,9 +235,15 @@ mod tests {
         config
     }
 
-    fn deps(config: &Config, secret: Option<SecretKey>, google: serde_json::Value) -> Result<Deps, String> {
+    fn deps(
+        config: &Config,
+        secret: Option<SecretKey>,
+        google: &serde_json::Value,
+    ) -> Result<Deps, String> {
         Deps::from_figment(
-            &Figment::from(Serialized::defaults(serde_json::json!({ "google": google }))),
+            &Figment::from(Serialized::defaults(
+                serde_json::json!({ "google": google }),
+            )),
             config,
             secret,
             &["system:read"],
@@ -241,36 +251,45 @@ mod tests {
         )
     }
 
-    fn key() -> Option<SecretKey> {
-        Some(SecretKey::from_bytes([7; 32]))
-    }
+    const KEY: Option<SecretKey> = Some(SecretKey::from_bytes([7; 32]));
 
     #[test]
     fn the_issuer_runs_here_unless_another_is_configured() {
-        let here = deps(&config("https://app.example.com/", None), key(), serde_json::json!({}))
-            .unwrap();
+        let here = deps(
+            &config("https://app.example.com/", None),
+            KEY,
+            &serde_json::json!({}),
+        )
+        .unwrap();
         let issuer = here.issuer.unwrap();
         assert_eq!(issuer.url, "https://app.example.com");
         assert!(issuer.google.is_none());
 
         let same = deps(
             &config("https://app.example.com", Some("https://app.example.com/")),
-            key(),
-            serde_json::json!({}),
+            KEY,
+            &serde_json::json!({}),
         )
         .unwrap();
         assert!(same.issuer.is_some());
 
         let rauthy = deps(
-            &config("https://app.example.com", Some("https://auth.example.com/auth/v1/")),
-            key(),
-            serde_json::json!({}),
+            &config(
+                "https://app.example.com",
+                Some("https://auth.example.com/auth/v1/"),
+            ),
+            KEY,
+            &serde_json::json!({}),
         )
         .unwrap();
         assert!(rauthy.issuer.is_none());
 
-        let no_secret = deps(&config("https://app.example.com", None), None, serde_json::json!({}))
-            .unwrap();
+        let no_secret = deps(
+            &config("https://app.example.com", None),
+            None,
+            &serde_json::json!({}),
+        )
+        .unwrap();
         assert!(no_secret.issuer.is_none());
     }
 
@@ -279,16 +298,16 @@ mod tests {
         let config = config("http://localhost:8080", None);
         let with_google = deps(
             &config,
-            key(),
-            serde_json::json!({ "client_id": "g-id", "client_secret": "g-secret", "unknown": 1 }),
+            KEY,
+            &serde_json::json!({ "client_id": "g-id", "client_secret": "g-secret", "unknown": 1 }),
         )
         .unwrap();
         assert!(with_google.issuer.unwrap().google.is_some());
 
         let fake = deps(
             &config,
-            key(),
-            serde_json::json!({ "client_id": "g", "client_secret": "s", "base_url": "http://127.0.0.1:9/" }),
+            KEY,
+            &serde_json::json!({ "client_id": "g", "client_secret": "s", "base_url": "http://127.0.0.1:9/" }),
         )
         .unwrap_err();
         assert!(fake.contains("development only"), "{fake}");
@@ -296,8 +315,12 @@ mod tests {
 
     #[test]
     fn the_public_url_must_be_an_origin() {
-        let err = deps(&config("https://app.example.com/app", None), key(), serde_json::json!({}))
-            .unwrap_err();
+        let err = deps(
+            &config("https://app.example.com/app", None),
+            KEY,
+            &serde_json::json!({}),
+        )
+        .unwrap_err();
         assert!(err.contains("CAMPBOOKS_PUBLIC_URL"), "{err}");
     }
 }

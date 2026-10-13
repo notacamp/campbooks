@@ -8,7 +8,7 @@
 //!   family (one sign-in). Presenting a rotated token again is reuse: the
 //!   whole family is revoked (OAuth 2.1 §4.3.1).
 //! - **Access tokens** are RFC 9068 JWTs (`typ: at+jwt`), **ID tokens** OIDC
-//!   JWTs (`typ: JWT`); both EdDSA, both [`TOKEN_LIFETIME`].
+//!   JWTs (`typ: JWT`); both `EdDSA`, both [`TOKEN_LIFETIME`].
 
 use campbooks_kernel::{
     Error, Result,

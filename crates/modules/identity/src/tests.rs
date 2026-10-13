@@ -19,14 +19,19 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     let (url, verifier) = Kit::web_authorize();
     let to_sign_in = kit.get(&url).await;
     assert_eq!(to_sign_in.status, StatusCode::SEE_OTHER);
-    assert!(to_sign_in.location().starts_with("/sign-in?request="), "{to_sign_in:?}");
+    assert!(
+        to_sign_in.location().starts_with("/sign-in?request="),
+        "{to_sign_in:?}"
+    );
     let request = to_sign_in.location_query()["request"].clone();
     let shown = kit.get(&format!("/auth/requests/{request}")).await;
     assert_eq!(shown.json["client_id"], WEB_CLIENT_ID);
     assert_eq!(shown.json["providers"], serde_json::json!(["google"]));
 
     // One consent: identity, the mailbox the instance can sync, offline.
-    let to_google = kit.get(&format!("/auth/start/google?request={request}")).await;
+    let to_google = kit
+        .get(&format!("/auth/start/google?request={request}"))
+        .await;
     let asked = query(&to_google.location());
     assert_eq!(asked["scope"], format!("openid email profile {MAIL_SCOPE}"));
     assert_eq!(asked["access_type"], "offline");
@@ -111,7 +116,8 @@ async fn a_known_identity_signs_in_without_a_new_account_or_a_new_grant(db: PgPo
     let request = kit.get(&url).await.location_query()["request"].clone();
     let back = kit.round_trip(Some(&request)).await;
     assert!(
-        back.location().starts_with(&format!("{ORIGIN}/bff/callback?code=")),
+        back.location()
+            .starts_with(&format!("{ORIGIN}/bff/callback?code=")),
         "{back:?}"
     );
     let tokens = kit.redeem(&back.location_query()["code"], &verifier).await;
@@ -131,10 +137,16 @@ async fn a_signed_in_browser_gets_a_code_at_once_unless_the_client_asks_otherwis
 
     let (url, _) = Kit::web_authorize();
     let at_once = kit.get(&url).await;
-    assert!(at_once.location().contains("/bff/callback?code="), "{at_once:?}");
+    assert!(
+        at_once.location().contains("/bff/callback?code="),
+        "{at_once:?}"
+    );
 
     let login = kit.get(&format!("{url}&prompt=login")).await;
-    assert!(login.location().starts_with("/sign-in?request="), "{login:?}");
+    assert!(
+        login.location().starts_with("/sign-in?request="),
+        "{login:?}"
+    );
 
     kit.new_browser();
     let none = kit.get(&format!("{url}&prompt=none")).await;
@@ -163,15 +175,28 @@ async fn other_authorization_errors_go_back_to_the_client(db: PgPool) {
     let kit = Kit::new(db).await;
     let (url, _) = Kit::web_authorize();
     for (edit, error) in [
-        (url.replace("code_challenge_method=S256", "code_challenge_method=plain"), "invalid_request"),
-        (url.replace("response_type=code", "response_type=token"), "unsupported_response_type"),
-        (url.replace("scope=openid", "scope=openid+admin%3Aeverything"), "invalid_scope"),
+        (
+            url.replace("code_challenge_method=S256", "code_challenge_method=plain"),
+            "invalid_request",
+        ),
+        (
+            url.replace("response_type=code", "response_type=token"),
+            "unsupported_response_type",
+        ),
+        (
+            url.replace("scope=openid", "scope=openid+admin%3Aeverything"),
+            "invalid_scope",
+        ),
     ] {
         let response = kit.get(&edit).await;
         let back = response.location_query();
         assert_eq!(back["error"], error, "{edit}");
         assert_eq!(back["iss"], ORIGIN);
-        assert!(response.location().starts_with(&format!("{ORIGIN}/bff/callback?")));
+        assert!(
+            response
+                .location()
+                .starts_with(&format!("{ORIGIN}/bff/callback?"))
+        );
     }
 }
 
@@ -183,7 +208,11 @@ async fn codes_are_single_use_and_bound_to_the_pkce_verifier(db: PgPool) {
     let wrong = kit.redeem(&code, &"x".repeat(43)).await;
     assert_eq!(wrong.json["error"], "invalid_grant");
     let tokens = kit.redeem(&code, &verifier).await;
-    assert_eq!(tokens.status, StatusCode::OK, "a failed attempt does not spend the code");
+    assert_eq!(
+        tokens.status,
+        StatusCode::OK,
+        "a failed attempt does not spend the code"
+    );
     let refresh = tokens.json["refresh_token"].as_str().unwrap().to_owned();
 
     let replay = kit.redeem(&code, &verifier).await;
@@ -209,7 +238,11 @@ async fn refresh_tokens_rotate_and_reuse_revokes_the_family(db: PgPool) {
 
     let reuse = kit.refresh(&r1).await;
     assert_eq!(reuse.json["error"], "invalid_grant");
-    assert_eq!(kit.refresh(&r2).await.json["error"], "invalid_grant", "the family is revoked");
+    assert_eq!(
+        kit.refresh(&r2).await.json["error"],
+        "invalid_grant",
+        "the family is revoked"
+    );
     let audited: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM identity.audit_events WHERE kind = 'refresh_reuse_detected'",
     )
@@ -271,7 +304,10 @@ async fn the_native_client_uses_pkce_on_any_loopback_port(db: PgPool) {
     let redirect = "http://127.0.0.1:53124/callback";
     let (url, verifier) = Kit::authorize_url(NATIVE_CLIENT_ID, redirect, "openid offline_access");
     let back = kit.get(&url).await;
-    assert!(back.location().starts_with(&format!("{redirect}?code=")), "{back:?}");
+    assert!(
+        back.location().starts_with(&format!("{redirect}?code=")),
+        "{back:?}"
+    );
     let tokens = kit
         .post_form(
             "/oauth2/token",
@@ -312,9 +348,14 @@ async fn cancelling_at_the_provider_returns_to_the_sign_in_screen(db: PgPool) {
     let to_google = kit.get("/auth/start/google?request=r1").await;
     let state = query(&to_google.location())["state"].clone();
     let back = kit
-        .get(&format!("/auth/callback/google?error=access_denied&state={state}"))
+        .get(&format!(
+            "/auth/callback/google?error=access_denied&state={state}"
+        ))
         .await;
-    assert_eq!(back.location(), "/sign-in?error=cancelled_at_provider&request=r1");
+    assert_eq!(
+        back.location(),
+        "/sign-in?error=cancelled_at_provider&request=r1"
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -341,9 +382,13 @@ async fn a_new_account_without_a_refresh_token_asks_google_for_consent_once(db: 
 async fn a_declined_mail_permission_signs_up_without_a_mailbox(db: PgPool) {
     let kit = Kit::new(db).await;
     let to_google = kit.get("/auth/start/google").await;
-    let without_mail = to_google
-        .location()
-        .replace(&format!("+{}", url::form_urlencoded::byte_serialize(MAIL_SCOPE.as_bytes()).collect::<String>()), "");
+    let without_mail = to_google.location().replace(
+        &format!(
+            "+{}",
+            url::form_urlencoded::byte_serialize(MAIL_SCOPE.as_bytes()).collect::<String>()
+        ),
+        "",
+    );
     let to_new = kit.via_google(&without_mail).await;
     assert!(to_new.location().starts_with("/sign-in/new"), "{to_new:?}");
     assert_eq!(kit.create_account().await.status, StatusCode::CREATED);
@@ -359,7 +404,12 @@ async fn creating_an_account_needs_the_csrf_header_and_the_pending_browser(db: P
     let kit = Kit::new(db).await;
     kit.round_trip(None).await;
     let no_header = kit
-        .request(Method::POST, "/auth/new-account", &[("sec-fetch-site", "same-origin")], None)
+        .request(
+            Method::POST,
+            "/auth/new-account",
+            &[("sec-fetch-site", "same-origin")],
+            None,
+        )
         .await;
     assert_eq!(no_header.status, StatusCode::FORBIDDEN);
     assert_eq!(no_header.json["code"], "csrf_check_failed");
@@ -371,7 +421,11 @@ async fn creating_an_account_needs_the_csrf_header_and_the_pending_browser(db: P
 async fn two_people_with_the_same_email_get_two_accounts(db: PgPool) {
     let kit = Kit::new(db).await;
     let (code, verifier) = kit.sign_up().await;
-    let (_, ana) = Kit::decode(kit.redeem(&code, &verifier).await.json["access_token"].as_str().unwrap());
+    let (_, ana) = Kit::decode(
+        kit.redeem(&code, &verifier).await.json["access_token"]
+            .as_str()
+            .unwrap(),
+    );
 
     // Another Google account claiming the same address is never linked by it.
     kit.new_browser();
@@ -380,7 +434,11 @@ async fn two_people_with_the_same_email_get_two_accounts(db: PgPool) {
         ..TestUser::default()
     });
     let (code, verifier) = kit.sign_up().await;
-    let (_, other) = Kit::decode(kit.redeem(&code, &verifier).await.json["access_token"].as_str().unwrap());
+    let (_, other) = Kit::decode(
+        kit.redeem(&code, &verifier).await.json["access_token"]
+            .as_str()
+            .unwrap(),
+    );
     assert_ne!(ana["sub"], other["sub"]);
 }
 
@@ -424,7 +482,11 @@ async fn revocation_ends_a_refresh_family_and_ignores_unknown_tokens(db: PgPool)
         let revoked = kit
             .post_form(
                 "/oauth2/revoke",
-                &[("token", token), ("client_id", WEB_CLIENT_ID), ("client_secret", &secret)],
+                &[
+                    ("token", token),
+                    ("client_id", WEB_CLIENT_ID),
+                    ("client_secret", &secret),
+                ],
             )
             .await;
         assert_eq!(revoked.status, StatusCode::OK);
@@ -441,9 +503,15 @@ async fn discovery_and_keys_describe_the_issuer(db: PgPool) {
     ] {
         let metadata = kit.get(path).await.json;
         assert_eq!(metadata["issuer"], ORIGIN);
-        assert_eq!(metadata["code_challenge_methods_supported"], serde_json::json!(["S256"]));
+        assert_eq!(
+            metadata["code_challenge_methods_supported"],
+            serde_json::json!(["S256"])
+        );
         assert_eq!(metadata["token_endpoint"], format!("{ORIGIN}/oauth2/token"));
-        assert_eq!(metadata["authorization_response_iss_parameter_supported"], true);
+        assert_eq!(
+            metadata["authorization_response_iss_parameter_supported"],
+            true
+        );
     }
     let (code, verifier) = kit.sign_up().await;
     let access = kit.redeem(&code, &verifier).await.json["access_token"]
@@ -454,7 +522,10 @@ async fn discovery_and_keys_describe_the_issuer(db: PgPool) {
     let (header, _) = Kit::decode(&access);
     let key = &jwks["keys"][0];
     assert_eq!(key["kid"], header["kid"]);
-    assert_eq!((key["kty"].as_str(), key["crv"].as_str()), (Some("OKP"), Some("Ed25519")));
+    assert_eq!(
+        (key["kty"].as_str(), key["crv"].as_str()),
+        (Some("OKP"), Some("Ed25519"))
+    );
     assert!(key.get("d").is_none(), "no private part");
 }
 

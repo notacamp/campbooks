@@ -4,6 +4,74 @@
  */
 
 export interface paths {
+    "/.well-known/oauth-authorization-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OAuth 2.0 authorization server metadata (RFC 8414): the same document. */
+        get: operations["identity.authorization_server_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/openid-configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC Discovery metadata. */
+        get: operations["identity.openid_configuration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/held-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the mailboxes waiting to be connected. */
+        get: operations["identity.list_held_grants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/held-grants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Discard a held mailbox grant. */
+        delete: operations["identity.discard_held_grant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/health": {
         parameters: {
             query?: never;
@@ -174,6 +242,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect a held mailbox to this workspace. */
+        post: operations["identity.adopt_held_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/invitations": {
         parameters: {
             query?: never;
@@ -290,6 +375,78 @@ export interface paths {
         put?: never;
         /** Accept an invitation. */
         post: operations["workspaces.accept_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/callback/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Finish a round trip. */
+        get: operations["identity.finish_sign_in"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/new-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The new account this browser may create (after a round trip with an
+         *     identity no account uses).
+         */
+        get: operations["identity.get_new_account"];
+        put?: never;
+        /** Create the pending account, sign in, and hold its mailbox grant. */
+        post: operations["identity.create_account"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The waiting authorization request `id`: who asks, and how one can sign in. */
+        get: operations["identity.get_sign_in_request"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/start/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a round trip to `provider`. */
+        get: operations["identity.start_sign_in"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -470,6 +627,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth2/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start (or, for a signed-in browser, complete at once) an authorization. */
+        get: operations["identity.authorize"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth2/end_session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * End the browser's issuer session (and the refresh tokens issued in it),
+         *     then return to the client when it registered `post_logout_redirect_uri`.
+         *     No confirmation page: the client asked for it, and ending a session is
+         *     harmless.
+         */
+        get: operations["identity.end_session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth2/jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issuer's published signing keys (JWKS): the key that signs now, its
+         *     successor once published, and recently retired ones.
+         */
+        get: operations["identity.jwks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth2/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a refresh token and every token rotated from the same sign-in.
+         *     Access tokens are not tracked: they live ten minutes. Unknown tokens
+         *     answer 200 too (RFC 7009 §2.2).
+         */
+        post: operations["identity.revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/oauth2/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange an authorization code or a refresh token for tokens. */
+        post: operations["identity.token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -483,6 +737,11 @@ export interface components {
         AcceptInvitation: {
             /** @description The token from the invitation link. */
             token: string;
+        };
+        /** @description The connection the mailbox became. */
+        Adopted: {
+            /** @description The connection's id (a `connectors.connection`). */
+            connection: string;
         };
         /**
          * Format: uuid
@@ -569,6 +828,11 @@ export interface components {
              */
             signup_code?: string | null;
         };
+        /** @description Where to go once the account exists. */
+        Created: {
+            /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
+            redirect: string;
+        };
         /**
          * @description How a connection is doing.
          * @enum {string}
@@ -586,6 +850,30 @@ export interface components {
              * @example ok
              */
             status: string;
+        };
+        /** @description A mailbox waiting to be connected. */
+        HeldGrant: {
+            /** @description The mailbox address. */
+            address: string;
+            /** @description The provider's display name. */
+            display_name?: string | null;
+            /**
+             * Format: date-time
+             * @description When it stops waiting.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /** @description `google`. */
+            provider: string;
+        };
+        /** @description The caller's held mailbox grants. */
+        HeldGrants: {
+            /** @description Oldest first. */
+            items: components["schemas"]["HeldGrant"][];
         };
         /**
          * Format: uuid
@@ -677,6 +965,15 @@ export interface components {
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
         };
+        /** @description The pending new account, as the new-account screen shows it. */
+        NewAccount: {
+            /** @description The name it gave. */
+            display_name?: string | null;
+            /** @description The address it gave. */
+            email?: string | null;
+            /** @description The provider signed in with. */
+            provider: string;
+        };
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -722,6 +1019,24 @@ export interface components {
          * @enum {string}
          */
         Provider: "google";
+        /** @description What the sign-in screen shows for a waiting authorization request. */
+        RequestInfo: {
+            /** @description The client asking. */
+            client_id: string;
+            /** @description The providers configured on this instance, in display order. */
+            providers: string[];
+        };
+        /** @description A revocation request (`application/x-www-form-urlencoded`). */
+        RevokeForm: {
+            /** @description The client (`client_secret_post`, or a public client). */
+            client_id?: string | null;
+            /** @description The client's secret (`client_secret_post`). */
+            client_secret?: string | null;
+            /** @description The token to revoke. */
+            token?: string | null;
+            /** @description `refresh_token` or `access_token`; a hint only. */
+            token_type_hint?: string | null;
+        };
         /**
          * @description A member's role in a workspace.
          * @enum {string}
@@ -829,6 +1144,41 @@ export interface components {
              */
             streams: number;
         };
+        /** @description A token request (`application/x-www-form-urlencoded`). */
+        TokenForm: {
+            /** @description The client (`client_secret_post`, or a public client). */
+            client_id?: string | null;
+            /** @description The client's secret (`client_secret_post`). */
+            client_secret?: string | null;
+            /** @description The authorization code. */
+            code?: string | null;
+            /** @description The PKCE verifier. */
+            code_verifier?: string | null;
+            /** @description `authorization_code` or `refresh_token`. */
+            grant_type?: string | null;
+            /** @description The redirect URI the code was issued for. */
+            redirect_uri?: string | null;
+            /** @description The refresh token. */
+            refresh_token?: string | null;
+        };
+        /** @description A successful token response (RFC 6749 §5.1). */
+        TokenResponse: {
+            /** @description The access token, a JWT for the API. */
+            access_token: string;
+            /**
+             * Format: int64
+             * @description Seconds until the access token expires.
+             */
+            expires_in: number;
+            /** @description The ID token (when `openid` was granted). */
+            id_token?: string | null;
+            /** @description A new refresh token (rotated on every use). */
+            refresh_token?: string | null;
+            /** @description The granted scopes. */
+            scope: string;
+            /** @description Always `Bearer`. */
+            token_type: string;
+        };
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -902,6 +1252,155 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    "identity.authorization_server_metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issuer's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.openid_configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issuer's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.list_held_grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's held grants. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldGrants"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.discard_held_grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The held grant. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "system.health": {
         parameters: {
             query?: never;
@@ -1540,6 +2039,67 @@ export interface operations {
             };
         };
     };
+    "identity.adopt_held_grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The held grant. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Adopted"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace, or the grant is not the caller's, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The connectors module refused it (e.g. `account_connected_by_another_member`, `mailbox_unsupported`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "workspaces.list_invitations": {
         parameters: {
             query?: never;
@@ -2122,6 +2682,195 @@ export interface operations {
             };
         };
     };
+    "identity.finish_sign_in": {
+        parameters: {
+            query?: {
+                /** @description The authorization code. */
+                code?: string;
+                /** @description The round trip's `state`. */
+                state?: string;
+                /** @description The provider's error (`access_denied` when the person cancelled). */
+                error?: string;
+                /** @description The provider's issuer (RFC 9207), when it sends one. */
+                iss?: string;
+            };
+            header?: never;
+            path: {
+                /** @description `google`. */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.get_new_account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pending account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewAccount"];
+                };
+            };
+            /** @description Nothing pending for this browser (or it expired). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.create_account": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created and signed in. */
+            201: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Created"];
+                };
+            };
+            /** @description `csrf_check_failed`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing pending for this browser. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.get_sign_in_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `request` the sign-in screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestInfo"];
+                };
+            };
+            /** @description No such request (or it expired), or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.start_sign_in": {
+        parameters: {
+            query?: {
+                /** @description The waiting authorization request to complete afterwards. */
+                request?: string;
+                /** @description Otherwise, a same-origin path to land on. */
+                return_to?: string;
+            };
+            header?: never;
+            path: {
+                /** @description `google`. */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the provider, with a round-trip cookie. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_return_to`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "bff.api_get": {
         parameters: {
             query?: never;
@@ -2550,6 +3299,210 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SessionInfo"];
                 };
+            };
+        };
+    };
+    "identity.authorize": {
+        parameters: {
+            query?: {
+                /** @description Must be `code`. */
+                response_type?: string;
+                /** @description The client. */
+                client_id?: string;
+                /** @description One of the client's registered redirect URIs. */
+                redirect_uri?: string;
+                /** @description Space-separated scopes. */
+                scope?: string;
+                /** @description Returned unchanged to the client. */
+                state?: string;
+                /** @description Echoed in the ID token. */
+                nonce?: string;
+                /** @description The PKCE challenge. */
+                code_challenge?: string;
+                /** @description Must be `S256`. */
+                code_challenge_method?: string;
+                /** @description `none`, `login`, `consent` or `select_account`. */
+                prompt?: string;
+                /** @description Seconds since the person last authenticated, at most. */
+                max_age?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client` or `invalid_redirect_uri`: nothing is redirected. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.end_session": {
+        parameters: {
+            query?: {
+                /** @description The client asking. */
+                client_id?: string;
+                /** @description Where to go afterwards; one of the client's registered values. */
+                post_logout_redirect_uri?: string;
+                /** @description Returned unchanged. */
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out; no registered place to return to. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Signed out; back to the client. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The JWKS. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["RevokeForm"];
+            };
+        };
+        responses: {
+            /** @description Revoked, or nothing to revoke. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client`. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["TokenForm"];
+            };
+        };
+        responses: {
+            /** @description Tokens. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description `invalid_request`, `invalid_grant` or `unsupported_grant_type`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client`. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
