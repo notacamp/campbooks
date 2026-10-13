@@ -17,7 +17,17 @@ umask 077
 IDP="${IDP_INTERNAL_URL:-http://idp:8080}/auth/v1"
 PUBLIC_URL="${CAMPBOOKS_PUBLIC_URL:?CAMPBOOKS_PUBLIC_URL must be set}"
 PUBLIC_URL="${PUBLIC_URL%/}"
+# Where the IdP delivers back-channel logouts to the server's BFF. Rauthy only
+# calls https URLs, so the default is the public URL when it is https, and
+# none (sessions then end on their own timeouts) when it is plain http.
+case "$PUBLIC_URL" in
+  https://*) BACKCHANNEL_LOGOUT_URL="${CAMPBOOKS_BACKCHANNEL_LOGOUT_URL:-$PUBLIC_URL/bff/backchannel-logout}" ;;
+  *) BACKCHANNEL_LOGOUT_URL="${CAMPBOOKS_BACKCHANNEL_LOGOUT_URL:-}" ;;
+esac
 STATE=/app/data/campbooks
+# The `server-secrets` volume (see deploy/server/init.sh): the server reads the
+# web client's secret from here.
+SECRETS=/secrets
 API_KEY="$(cat "$STATE/api-key")"
 BODY="$(mktemp)"
 
@@ -82,15 +92,17 @@ ensure_client() {
   echo "idp-provision: configured client $id"
 }
 
-# Saves a confidential client's secret where the Campbooks server can read it.
+# Saves a confidential client's secret where the Campbooks server can read it
+# (group-readable: the server runs with supplementary group 10001).
 save_secret() {
   id="$1"
-  file="$STATE/$id.client-secret"
+  file="$SECRETS/$id.client-secret"
   [ -s "$file" ] && return
   status="$(api POST "/clients/$id/secret")"
   [ "$status" = 200 ] || fail "cannot read the secret of client $id" "$status"
   sed -n 's/.*"secret":"\([^"]*\)".*/\1/p' "$BODY" >"$file.tmp"
   [ -s "$file.tmp" ] || fail "no secret in the response for client $id" "$status"
+  chmod 0440 "$file.tmp"
   mv "$file.tmp" "$file"
   echo "idp-provision: saved the secret of client $id"
 }
@@ -98,6 +110,11 @@ save_secret() {
 ensure_scopes
 
 # Web app: the server's BFF runs the authorization-code flow (ADR 0004).
+if [ -n "$BACKCHANNEL_LOGOUT_URL" ]; then
+  backchannel="\"backchannel_logout_uri\": \"$BACKCHANNEL_LOGOUT_URL\","
+else
+  backchannel=""
+fi
 ensure_client campbooks-web true "$(cat <<EOF
 {
   "name": "Campbooks Web",
@@ -105,6 +122,7 @@ ensure_client campbooks-web true "$(cat <<EOF
   "enabled": true,
   "redirect_uris": ["$PUBLIC_URL/bff/callback"],
   "post_logout_redirect_uris": ["$PUBLIC_URL/"],
+  $backchannel
   "flows_enabled": ["authorization_code", "refresh_token"],
   "challenges": ["S256"],
   "access_token_alg": "EdDSA",

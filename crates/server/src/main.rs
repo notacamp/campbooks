@@ -19,6 +19,7 @@ use campbooks_kernel::{
     events::{EventId, ReplayFrom},
     jobs::Worker,
 };
+use campbooks_server::bff;
 use clap::{Parser, Subcommand};
 use secrecy::ExposeSecret;
 use sqlx::{Connection as _, PgConnection, PgPool, postgres::PgPoolOptions};
@@ -172,9 +173,11 @@ fn runtime() -> Result<tokio::runtime::Runtime, String> {
 
 async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error>> {
     config.check()?;
-    if role.api() {
-        check_api_config(&config)?;
-    }
+    let bff = if role.api() {
+        check_api_config(&config)?
+    } else {
+        None
+    };
     if role.worker() {
         config.jobs.check()?;
     }
@@ -199,7 +202,7 @@ async fn run(config: Config, role: Role) -> Result<(), Box<dyn std::error::Error
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
-        let app = campbooks_server::router(state.clone());
+        let app = campbooks_server::router(state.clone(), bff);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
@@ -369,7 +372,9 @@ fn parse_since(since: Option<&str>) -> Result<ReplayFrom, String> {
         .map_err(|_| format!("--since {since}: expected an event id or an RFC 3339 time"))
 }
 
-fn check_api_config(config: &Config) -> Result<(), String> {
+/// Startup checks of the API role; the web BFF's settings when web sign-in
+/// is on.
+fn check_api_config(config: &Config) -> Result<Option<bff::Settings>, String> {
     config.auth.check()?;
     if let Some(issuer) = config.auth.issuer() {
         tracing::info!(
@@ -391,7 +396,33 @@ fn check_api_config(config: &Config) -> Result<(), String> {
     } else {
         tracing::info!("CAMPBOOKS_WEB_DIR unset: serving the API only");
     }
-    Ok(())
+
+    let scopes: Vec<&str> = campbooks_server::scope_catalogue()
+        .iter()
+        .map(|scope| scope.name)
+        .collect();
+    match bff::config::load(config, &scopes)? {
+        bff::Loaded::Enabled(settings) => {
+            tracing::info!(
+                client_id = %settings.client_id,
+                origin = %settings.public_origin,
+                idp = %settings.internal_issuer,
+                "web sign-in (BFF) enabled"
+            );
+            if !settings.secure_cookies {
+                tracing::warn!(
+                    "CAMPBOOKS_PUBLIC_URL is plain http: the session cookie is sent without \
+                     `Secure` and the `__Host-` prefix. Fine on localhost; serve the app over \
+                     https anywhere else"
+                );
+            }
+            Ok(Some(*settings))
+        }
+        bff::Loaded::Disabled(reason) => {
+            tracing::warn!(reason, "web sign-in (BFF) disabled: /bff/* answers 503");
+            Ok(None)
+        }
+    }
 }
 
 fn init_tracing(format: LogFormat) {

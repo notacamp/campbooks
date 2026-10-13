@@ -49,9 +49,11 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   `migrations/` named `<timestamp>_<module>__<description>.sql` and touch only
   that module's schema. No cross-schema joins or foreign keys — reference other
   modules by ID. The kernel's infrastructure (event log, job queue) lives in
-  schema `kernel`, migrated by `<timestamp>_kernel__<description>.sql`; modules
-  never touch it. *(CI: `cargo xtask arch` checks migration names and the
-  schemas each migration touches.)*
+  schema `kernel`, migrated by `<timestamp>_kernel__<description>.sql`, and the
+  server's web BFF keeps its sessions in schema `bff`
+  (`<timestamp>_bff__<description>.sql`); modules never touch either.
+  *(CI: `cargo xtask arch` checks migration names and the schemas each
+  migration touches.)*
 - **Background work is declared, named and owned.** Jobs, event handlers and
   schedules are registered in the module's `Module.background`, named
   `<module>.<name>`; events are `DomainEvent`s named `<module>.<event>` with
@@ -80,7 +82,12 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 ## Security rules
 
 - **Tokens never reach browser JavaScript.** The web client talks to the API
-  through the server's BFF with an httpOnly, `SameSite=Strict` session cookie.
+  through the server's BFF with an httpOnly, `SameSite=Strict` session cookie;
+  it sends `X-Campbooks-CSRF: 1` on every request, and the BFF refuses unsafe
+  methods without it or from another origin. BFF operations (`/bff/*` only)
+  declare `security(())` or the scope-less cookie scheme
+  `security(("session" = []))`; never log tokens, codes, cookies or session
+  ids.
   Native (Tauri) clients keep tokens in the OS keychain on the Rust side; the
   webview calls the API via Tauri commands. See ADR 0004.
 - The API is an OAuth 2.1 resource server: validate the JWT (issuer, audience,
