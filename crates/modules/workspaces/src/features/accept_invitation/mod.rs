@@ -255,15 +255,16 @@ mod tests {
         // A real secret moved to another workspace's prefix finds nothing.
         let (_, secret) = real.split_once('.').unwrap();
         let bea = kit.user("bea");
-        for token in [
+        let forged = [
             "nonsense".to_owned(),
             format!("{ws}.AAAA"),
             format!("{other}.{secret}"),
-        ] {
+        ];
+        for (case, token) in forged.iter().enumerate() {
             let response = kit
                 .post(&bea, ACCEPT, serde_json::json!({ "token": token }))
                 .await;
-            assert_eq!(response.status, StatusCode::NOT_FOUND, "{token}");
+            assert_eq!(response.status, StatusCode::NOT_FOUND, "forged token #{case}");
         }
     }
 
