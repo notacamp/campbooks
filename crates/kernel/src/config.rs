@@ -899,7 +899,7 @@ mod tests {
         assert_eq!(summary.database_logins, DatabaseLogins::Split);
         assert_eq!(summary.migrations, Migrations::OnStart);
         let json = serde_json::to_string(&summary).unwrap();
-        for secret in [
+        for planted in [
             "db-pass-1",
             "db-pass-2",
             "url-pass-3",
@@ -911,7 +911,10 @@ mod tests {
             "otlp-token-9",
             "user",
         ] {
-            assert!(!json.contains(secret), "{secret} leaked into the summary");
+            assert!(
+                !json.contains(planted),
+                "a planted configuration value leaked into the summary"
+            );
         }
     }
 
