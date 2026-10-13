@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM search.entries WHERE group_id = $1 AND NOT (record_id = ANY($2))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e1a77683295650fe1288dde47419b984addbeae43111b91e7ed7fbc0433f15dc"
+}
