@@ -60,6 +60,9 @@ jobs:
       - name: Events catalogue drift
         if: always()
         run: cargo xtask events --check
+      - name: decide eval holds its baseline (offline strategies, no network)
+        if: always()
+        run: cargo xtask eval decide --offline --check
       - name: Translations at parity (server)
         if: always()
         run: cargo xtask i18n

@@ -59,6 +59,10 @@ where
             let token = bearer_token(&parts.headers)?;
             verifier.verify(token).await?
         };
+        tracing::Span::current().record(
+            crate::telemetry::field::PRINCIPAL_KIND,
+            principal.kind.as_str(),
+        );
         if !principal.has_scope(S::NAME) {
             return Err(Error::InsufficientScope(S::NAME));
         }
