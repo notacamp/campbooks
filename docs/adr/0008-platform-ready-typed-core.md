@@ -1,6 +1,6 @@
 # 0008 — Typed core now, platform later, seams from day one
 
-**Status:** Accepted · 2026-10-13
+**Status:** Accepted · 2026-10-13 · declarations amended by [0013](0013-openapi-is-the-operation-catalogue.md)
 
 ## Context
 Campbooks could be built two ways:
