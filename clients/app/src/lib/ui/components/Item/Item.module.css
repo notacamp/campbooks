@@ -39,6 +39,7 @@
 
 .who {
   min-width: 0;
+  unicode-bidi: isolate;
   overflow: hidden;
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -58,6 +59,7 @@
 
 .excerpt {
   grid-column: 2 / 3;
+  unicode-bidi: isolate;
   min-width: 0;
   overflow: hidden;
   font-size: var(--text-sm);
@@ -121,6 +123,7 @@
 
 .quoteText {
   quotes: auto;
+  unicode-bidi: isolate;
 }
 
 .reasons {

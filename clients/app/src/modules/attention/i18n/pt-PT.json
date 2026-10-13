@@ -31,7 +31,8 @@
     "tomorrow": "Amanhã",
     "monday": "Segunda-feira",
     "toast": "Mais tarde · {{name}}, volta {{when}}",
-    "button": "Mais tarde"
+    "button": "Mais tarde",
+    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo."
   },
   "actions": {
     "reply": "Responder",

@@ -15,6 +15,30 @@ questions:
 From the review: the selected item has no coloured stripe on its left edge;
 selection is the selected background with a full focus ring.
 
+## Review fixes (2026-10-14)
+
+From the review of the PR, applied in it:
+
+- **Order-proof clears.** A clear delivered before its open leaves a tombstone
+  in `attention.items` (no reason, the clear's revision), so a late open
+  cannot reopen it; tested with every delivery order of random histories.
+- **The need the member saw.** `resolve_need` and `confirm_need` name the
+  message the need comes from; a need that changed meanwhile answers 409
+  `need_changed` and stores no correction. On Home the selection is an
+  explicit item id; when a live update removes it, its neighbour takes over.
+- **Clean quotes.** Quoted sentences drop bidi, zero-width and control
+  characters (`campbooks_kernel::text`, shared with attachment file names);
+  the client isolates them with `unicode-bidi: isolate`.
+- **Failures roll back** the optimistic hide, say so plainly and refetch.
+- **The sender writing again** ends Later even when the new message raises no
+  need (`latest_message` in `need_changed`).
+- **The caller's day.** `attention.list` takes the caller's UTC offset for
+  Done today and what is overdue. Deadline words still resolve against the
+  message's sent date in UTC: Next has no member time zone yet (no
+  `users.time_zone`), so that waits for one.
+- **Inbox deletion.** `attention::domain::purge_container` deletes a
+  container's items, for campbooks-cloud#117 to call.
+
 ## Context
 
 - **The decide pass** (`conversations`, `campbooks_ai::decide`). Every new

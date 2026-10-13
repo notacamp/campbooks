@@ -255,7 +255,9 @@
       "done": "Done · {{name}}",
       "notNeeded": "Not needed · {{name}}. Campbooks will learn from it",
       "safe": "Marked safe · {{name}}. Campbooks will learn from it",
-      "confirmed": "Thanks · {{name}} stays on your list"
+      "confirmed": "Thanks · {{name}} stays on your list",
+      "failed": "Could not change {{name}}: nothing changed. Try again.",
+      "changed": "{{name}} changed while you looked: have another look."
     }
   }
 }

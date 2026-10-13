@@ -1,5 +1,6 @@
 import { useTranslation } from "react-i18next";
 
+import { problemCode } from "~/lib/api";
 import { useUndoToast } from "~/lib/ui";
 
 import {
@@ -23,6 +24,8 @@ export interface NeedActionOptions {
   onUndo?: (conversation: ConversationSummary) => void;
   /** When an undone verdict is redone. */
   onRedo?: (conversation: ConversationSummary) => void;
+  /** When the server refused or failed: Home shows the item again. */
+  onFailed?: (conversation: ConversationSummary) => void;
 }
 
 /**
@@ -32,7 +35,7 @@ export interface NeedActionOptions {
  */
 export function useNeedActions(
   workspaceId: string,
-  { onChanged, onUndo, onRedo }: NeedActionOptions = {},
+  { onChanged, onUndo, onRedo, onFailed }: NeedActionOptions = {},
 ) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -43,6 +46,20 @@ export function useNeedActions(
     mutation.mutate(
       { conversation, action: { need: verdict } },
       {
+        onError: (error) => {
+          // Nothing changed on the server: put it back and say so plainly.
+          onFailed?.(conversation);
+          const need = conversation.need;
+          const name = need === null || need === undefined ? "" : needSender(need, conversation);
+          undo.notify(
+            t(
+              problemCode(error) === "need_changed" ? "needs.toast.changed" : "needs.toast.failed",
+              {
+                name,
+              },
+            ),
+          );
+        },
         onSettled: () => {
           onChanged?.();
         },

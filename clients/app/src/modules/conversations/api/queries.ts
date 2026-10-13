@@ -229,10 +229,15 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
 
 type ListData = InfiniteData<ConversationList, string | undefined>;
 
-/** The need operations: Done, Not needed, Yes to a question, and their undo. */
+/**
+ * The need operations: Done, Not needed, Yes to a question, and their undo.
+ * Each names the message the need the member saw comes from (`seen`), so the
+ * server refuses (409 `need_changed`) when the need changed meanwhile.
+ */
 async function needRequest(
   params: { path: { workspace_id: string; conversation_id: string } },
   verdict: NeedVerdict,
+  seen: string,
 ): Promise<ConversationSummary> {
   switch (verdict) {
     case "done":
@@ -240,7 +245,7 @@ async function needRequest(
       return unwrap(
         await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve", {
           params,
-          body: { outcome: verdict },
+          body: { outcome: verdict, message_id: seen },
         }),
       );
     }
@@ -248,6 +253,7 @@ async function needRequest(
       return unwrap(
         await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm", {
           params,
+          body: { message_id: seen },
         }),
       );
     }
@@ -333,7 +339,7 @@ export function useConversationAction(workspaceId: string) {
     }) => {
       const params = { path: { workspace_id: workspaceId, conversation_id: conversation.id } };
       if (typeof action === "object" && "need" in action) {
-        return needRequest(params, action.need);
+        return needRequest(params, action.need, conversation.need?.message_id ?? "");
       }
       if (typeof action === "object") {
         return unwrap(

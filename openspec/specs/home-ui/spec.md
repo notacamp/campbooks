@@ -34,12 +34,21 @@ conversation's composer, E SHALL mark it done (`conversations.resolve_need`),
 L SHALL offer Later today, Tomorrow, Monday or a date (`attention.snooze`),
 X SHALL mark it not needed, and 1 and 2 SHALL answer a Review question. Each
 action SHALL take the item off the list at once, show a toast with Undo, and
-Z SHALL undo it. Items in an inbox the user may only read SHALL offer no
-Reply, Done or Not needed.
+Z SHALL undo it. The selection SHALL be an explicit item from the first
+render; when a live update removes the selected item, its neighbour at the
+same position SHALL take the selection, and E and X SHALL act only on the
+selected item. When the server refuses or fails, the item SHALL come back with
+a plain message (and a changed need SHALL be said as such). The sender's words
+and name SHALL be isolated from the page's text direction. Items in an inbox
+the user may only read SHALL offer no Reply, Done or Not needed.
 
 #### Scenario: Done and Undo
 - **WHEN** the user presses J then E on Pedro's lease, then Z
 - **THEN** the item leaves the list with the toast "Done · Pedro Alves", and Z brings it back
+
+#### Scenario: The selected item goes away
+- **WHEN** the selected item is cleared elsewhere while Home is open
+- **THEN** the item below it is selected, and E acts on that one
 
 #### Scenario: Later
 - **WHEN** the user presses L and chooses Monday

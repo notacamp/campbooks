@@ -26,7 +26,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   bills and requests stay until Done. Only mail from the last
   `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) counts. A new
   module, `attention`, with the scopes `attention:read` and `attention:write`
-  (the web app gets them at the next sign-in). Migrations add
+  (the web app gets them at the next sign-in). "Done today" and what is
+  overdue follow your device's time zone; deadline words ("Thursday") are
+  read against the message's date in UTC until accounts carry a time zone. Migrations add
   `conversations.needs` and the `attention` schema; nothing to do.
 - Apps other than Campbooks on the web can use your account, with your say
   each time. A consent screen names the app, says whether anyone vouches for

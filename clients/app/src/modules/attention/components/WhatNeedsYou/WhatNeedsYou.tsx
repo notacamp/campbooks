@@ -125,22 +125,47 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   }));
   const order = groups.flatMap((group) => group.rows);
 
-  const [selectedId, setSelectedId] = useState<string | undefined>();
+  // The selection is always an explicit item id, with the position it was
+  // last seen at: when a live update takes it away, its neighbour at that
+  // position takes over, never the top of the list.
+  const [selection, setSelection] = useState<{ id?: string; index: number }>({ index: 0 });
   const [expandedId, setExpandedId] = useState<string | undefined>();
   const [laterId, setLaterId] = useState<string | undefined>();
-  const selected = order.find((row) => row.item.id === selectedId) ?? order[0];
+  const foundAt = order.findIndex((row) => row.item.id === selection.id);
+  if (order.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
+    // Adjusting state while rendering, so the change never shows a stale frame.
+    const index = foundAt === -1 ? Math.min(selection.index, order.length - 1) : foundAt;
+    const next = order[index];
+    if (next !== undefined && (next.item.id !== selection.id || index !== selection.index)) {
+      setSelection({ id: next.item.id, index });
+    }
+  }
+  const selected = order.find((row) => row.item.id === selection.id);
+  const select = (id: string) => {
+    setSelection({
+      id,
+      index: Math.max(
+        0,
+        order.findIndex((row) => row.item.id === id),
+      ),
+    });
+  };
 
   const hide = (row: Row) => {
     setGone((current) => new Map([...current, [goneKey(row.item), row]]));
     const index = order.findIndex((r) => r.item.id === row.item.id);
+    // The row below takes its place (or the one above, at the end).
     const next = order[index + 1] ?? order[index - 1];
-    setSelectedId(next?.item.id);
+    setSelection({
+      ...(next === undefined ? {} : { id: next.item.id }),
+      index: order[index + 1] === undefined ? Math.max(0, index - 1) : index,
+    });
     setExpandedId(undefined);
     setLaterId(undefined);
   };
   const show = (row: Row) => {
     setGone((current) => new Map([...current].filter(([key]) => key !== goneKey(row.item))));
-    setSelectedId(row.item.id);
+    select(row.item.id);
   };
   // A hidden row is found among the hidden ones: its summary may already say
   // it needs nothing.
@@ -160,6 +185,12 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
         hide(row);
       }
     },
+    onFailed: (conversation) => {
+      const row = rowOf(conversation);
+      if (row !== undefined) {
+        show(row);
+      }
+    },
   });
   const isQuestion = (row: Row) => row.need.trust === "check";
 
@@ -174,9 +205,24 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
   };
+  const snoozeOrRollBack = (row: Row, until?: Date) => {
+    snooze.mutate(
+      { item: row.item.id, until },
+      {
+        onError: () => {
+          if (until === undefined) {
+            hide(row);
+          } else {
+            show(row);
+          }
+          undo.notify(t("later.failed", { name: row.name }));
+        },
+      },
+    );
+  };
   const later = (row: Row, until: Date) => {
     hide(row);
-    snooze.mutate({ item: row.item.id, until });
+    snoozeOrRollBack(row, until);
     const when = new Intl.DateTimeFormat(i18n.language, {
       weekday: "short",
       hour: "2-digit",
@@ -186,11 +232,11 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
       label: t("later.toast", { name: row.name, when }),
       undo: () => {
         show(row);
-        snooze.mutate({ item: row.item.id, until: undefined });
+        snoozeOrRollBack(row);
       },
       redo: () => {
         hide(row);
-        snooze.mutate({ item: row.item.id, until });
+        snoozeOrRollBack(row, until);
       },
     });
   };
@@ -218,9 +264,10 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
 
   const move = (step: number) => {
     const index = order.findIndex((row) => row.item.id === selected?.item.id);
-    const next = order[Math.min(order.length - 1, Math.max(0, index + step))];
+    const target = Math.min(order.length - 1, Math.max(0, index + step));
+    const next = order[target];
     if (next !== undefined) {
-      setSelectedId(next.item.id);
+      setSelection({ id: next.item.id, index: target });
       const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
         document.getElementById(itemId(next.item.id));
       // Not every environment scrolls (tests run without layout).
@@ -400,7 +447,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
                   isQuestion(row) ? ["item.choice1", "item.choice2"] : ["item.done", "item.later"]
                 }
                 onToggle={() => {
-                  setSelectedId(row.item.id);
+                  select(row.item.id);
                   setExpandedId(expanded ? undefined : row.item.id);
                 }}
                 detail={

@@ -31,7 +31,8 @@
     "tomorrow": "Mañana",
     "monday": "El lunes",
     "toast": "Más tarde · {{name}}, vuelve {{when}}",
-    "button": "Más tarde"
+    "button": "Más tarde",
+    "failed": "No se ha podido posponer {{name}}: no ha cambiado nada. Vuelve a intentarlo."
   },
   "actions": {
     "reply": "Responder",

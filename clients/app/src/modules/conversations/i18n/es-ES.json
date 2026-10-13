@@ -255,7 +255,9 @@
       "done": "Hecho · {{name}}",
       "notNeeded": "No hace falta · {{name}}. Campbooks aprenderá de esto",
       "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
-      "confirmed": "Gracias · {{name}} sigue en tu lista"
+      "confirmed": "Gracias · {{name}} sigue en tu lista",
+      "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
+      "changed": "{{name}} ha cambiado mientras lo mirabas: vuelve a mirarlo."
     }
   }
 }

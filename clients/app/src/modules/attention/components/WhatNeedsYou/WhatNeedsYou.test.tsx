@@ -16,6 +16,7 @@ import {
   MARTA,
   MARTA_DETAIL,
   NEEDS,
+  JONAS,
   PEDRO,
   PHISH,
   PHISH_DETAIL,
@@ -48,20 +49,26 @@ function renderHome() {
   return { router, ...renderWithProviders(<RouterProvider router={router} />) };
 }
 
-function api(items = ITEMS) {
+function api(items = ITEMS, live?: { items: typeof ITEMS }) {
   return mockApi({
     [`GET ${W}/attention`]: (request) =>
       new URL(request.url).searchParams.get("state") === "cleared"
         ? { body: { items: CLEARED, counts: [] } }
-        : { body: { items, counts: COUNTS } },
+        : { body: { items: live?.items ?? items, counts: COUNTS } },
     [`GET ${W}/conversations`]: { body: { conversations: [...NEEDS, SOFIA], next_cursor: null } },
     [`GET ${W}/conversations/${MARTA.id}`]: { body: MARTA_DETAIL },
     [`GET ${W}/conversations/${PHISH.id}`]: { body: PHISH_DETAIL },
     [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: { body: { ...PHISH, need: null } },
     [`POST ${W}/conversations/${PHISH.id}/need/reopen`]: { body: PHISH },
     [`POST ${W}/conversations/${MARTA.id}/need/resolve`]: { body: { ...MARTA, need: null } },
+    [`POST ${W}/conversations/${JONAS.id}/need/resolve`]: { body: { ...JONAS, need: null } },
     [`POST ${W}/attention/${ITEMS[3]?.id ?? ""}/snooze`]: { body: ITEMS[3] },
   });
+}
+
+/** The row (button) holding `text`, and whether it is the selected one. */
+function isSelected(text: string): boolean {
+  return screen.getByText(text).closest("button")?.hasAttribute("data-selected") === true;
 }
 
 describe("What needs you", () => {
@@ -99,8 +106,10 @@ describe("What needs you", () => {
     await waitFor(() => {
       expect(screen.queryByText("This may be phishing. Don’t use its links.")).toBeNull();
     });
+    // It names the need it acted on: the server refuses one that changed.
     expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toEqual({
       outcome: "not_needed",
+      message_id: PHISH.need?.message_id,
     });
     fireEvent.keyDown(document, { key: "z" });
     await waitFor(() => {
@@ -153,6 +162,50 @@ describe("What needs you", () => {
     const snooze = calls.calls.find((c) => c.route.endsWith("/snooze"));
     expect(new Date((snooze?.body as { until: string }).until).getDay()).toBe(1);
     expect(PEDRO.need?.reason).toBe("do");
+  });
+
+  it("keeps the selection when a live update takes the selected item away", async () => {
+    const live = { items: ITEMS };
+    const calls = api(ITEMS, live);
+    const { queryClient } = renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    // The first item is selected from the start; J moves to Marta.
+    expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
+    fireEvent.keyDown(document, { key: "j" });
+    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    // Marta is replied to elsewhere: the live update drops her.
+    live.items = ITEMS.filter((item) => item.record.id !== MARTA.id);
+    await queryClient.invalidateQueries();
+    await waitFor(() => {
+      expect(screen.queryByText("Marta Ferreira is waiting for your reply")).toBeNull();
+    });
+    // Her neighbour takes the selection, not the top of the list.
+    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+    fireEvent.keyDown(document, { key: "e" });
+    await waitFor(() => {
+      expect(calls.calls.map((c) => c.route)).toContain(
+        `POST ${W}/conversations/${JONAS.id}/need/resolve`,
+      );
+    });
+    expect(calls.calls.map((c) => c.route)).not.toContain(
+      `POST ${W}/conversations/${PHISH.id}/need/resolve`,
+    );
+  });
+
+  it("puts the item back and says so when the need changed meanwhile", async () => {
+    mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
+      [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: problem(409, "need_changed"),
+    });
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "e" });
+    expect(await screen.findByText(/changed while you looked/u)).toBeVisible();
+    expect(screen.getByText("This may be phishing. Don’t use its links.")).toBeVisible();
   });
 
   it("says when nothing needs you", async () => {

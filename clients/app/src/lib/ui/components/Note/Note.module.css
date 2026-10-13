@@ -105,6 +105,9 @@
 
 .quoteText {
   display: block;
+  /* Mail text: its direction never spills into ours (bidi controls are also
+     stripped on the server). */
+  unicode-bidi: isolate;
   font-size: var(--text-md);
   line-height: var(--leading-relaxed);
   color: var(--text-primary);

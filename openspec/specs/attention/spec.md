@@ -37,12 +37,24 @@ The handler `attention.project_conversation_need` SHALL consume
 `conversations.need_changed` v1 and keep one item per conversation: it SHALL
 open or update the item when the event carries a need, clear it with the
 event's cause when it does not, and apply an event only when its revision is
-newer than the item's. The item table SHALL be rebuildable by replaying that
-handler from the event log; snoozes SHALL survive a rebuild.
+newer than the item's. A clear that arrives before any open SHALL leave a
+tombstone (a cleared item with no reason, at the clear's revision) that no
+list shows, so a late open of an older revision cannot reopen it. When the
+event's newest inbound message (`latest_message`) differs from the item's,
+every snooze of the item SHALL end. The item table SHALL be rebuildable by
+replaying that handler from the event log; snoozes SHALL survive a rebuild.
 
 #### Scenario: Deliveries out of order
 - **WHEN** revision 3 of a conversation's need is delivered before revision 2
 - **THEN** the item reflects revision 3 and revision 2 changes nothing
+
+#### Scenario: A clear before its open
+- **WHEN** the clear at revision 2 is delivered before the open at revision 1
+- **THEN** the item is cleared at revision 2, the open changes nothing, and nothing reaches Home or Done today
+
+#### Scenario: Any order
+- **WHEN** a conversation's opens and clears are delivered in any order
+- **THEN** the item ends in the state of the newest revision
 
 #### Scenario: Replay
 - **WHEN** the items table is emptied and `attention.project_conversation_need` is replayed from the start of the log
@@ -55,9 +67,11 @@ caller cannot see (the kernel's `Visibility` port), items the caller snoozed
 until a later time, and items more than 7 days past their due date. Items
 SHALL be ordered by reason (`review`, `reply`, `decide`, `do`, `pay`), then
 overdue first, then by due date, then urgent first, then oldest cause first,
-and the response SHALL carry the count per reason. With `state=cleared` it
-SHALL return the items cleared since the start of the caller's day, newest
-first, with what cleared them and who.
+and the response SHALL carry the count per reason. The caller's day (for what
+is overdue and for Done today) SHALL follow `utc_offset`, the caller's offset
+from UTC in minutes (default 0; beyond 14 hours, 400 `invalid_offset`). With
+`state=cleared` it SHALL return the items cleared since the start of the
+caller's day, newest first, with what cleared them and who.
 
 #### Scenario: Someone else's inbox
 - **WHEN** a member who is not in Sam's inbox lists their attention items
@@ -75,16 +89,16 @@ first, with what cleared them and who.
 `POST …/attention/{item_id}/snooze` (`attention.snooze`, `attention:write`)
 SHALL hide an item from the caller only, until the given time, which SHALL be
 in the future and at most a year ahead (else 400 `invalid_until`).
-`attention.unsnooze` SHALL undo it. A new cause for the item (a new message
-that raises it again) SHALL end the snooze. An item the caller cannot see
-SHALL answer 404.
+`attention.unsnooze` SHALL undo it. A newer message from the sender in the
+conversation SHALL end the snooze, whether or not it raises a new need. An
+item the caller cannot see SHALL answer 404.
 
 #### Scenario: Back on Monday
 - **WHEN** a member snoozes an item until Monday 08:00
 - **THEN** it is left out of their list until then, other members still see it, and it is listed again from Monday 08:00
 
 #### Scenario: A follow-up
-- **WHEN** the sender writes again while the item is snoozed
+- **WHEN** the sender writes again while the item is snoozed, asking nothing new
 - **THEN** the item is listed again at once
 
 ### Requirement: Attention in the change feed
@@ -95,6 +109,14 @@ upsert of `attention.item` within the item's container.
 #### Scenario: New mail needs a reply
 - **WHEN** a message that needs a reply is stored in Ana's inbox
 - **THEN** Ana's open change feed receives an upsert of `attention.item`, and a member who cannot see that inbox receives none
+
+### Requirement: Purging a container
+The module SHALL offer a way to delete every item (and its snoozes) inside
+one container, for when the owning module deletes it (an inbox).
+
+#### Scenario: An inbox goes
+- **WHEN** the items of a deleted inbox are purged
+- **THEN** none of them is left, and items of other inboxes are kept
 
 ### Requirement: Attention workspace deletion
 When `workspaces.workspace_deleting` is published, the module SHALL delete the

@@ -31,7 +31,8 @@
     "tomorrow": "Demain",
     "monday": "Lundi",
     "toast": "Plus tard · {{name}}, revient {{when}}",
-    "button": "Plus tard"
+    "button": "Plus tard",
+    "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez."
   },
   "actions": {
     "reply": "Répondre",

@@ -23,7 +23,11 @@ export function useAttention(workspaceId: string, state: ListState = "open") {
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET("/api/v1/w/{workspace_id}/attention", {
-          params: { path: { workspace_id: workspaceId }, query: { state } },
+          // Where the member's day starts: Done today and what is overdue.
+          params: {
+            path: { workspace_id: workspaceId },
+            query: { state, utc_offset: -new Date().getTimezoneOffset() },
+          },
           signal,
         }),
       ),

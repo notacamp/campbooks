@@ -495,8 +495,9 @@ Every change to a need SHALL publish `conversations.need_changed` v1
 (`contracts/conversations.need_changed.v1.schema.json`) in its transaction,
 carrying the workspace, inbox, conversation and message ids, a revision that
 grows with every change of that conversation's need, the message's sent time,
-the need (reason, trust, due date, urgent) or null, and the cause and the
-member when cleared. It SHALL carry no names, addresses, subjects or text, and
+the need (reason, trust, due date, urgent) or null, the cause and the
+member when cleared, and the conversation's newest inbound message. A newer
+inbound message SHALL be announced even when the need does not change. It SHALL carry no names, addresses, subjects or text, and
 SHALL declare an upsert of the conversation within its inbox.
 
 #### Scenario: Cleared by a member
@@ -506,7 +507,10 @@ SHALL declare an upsert of the conversation within its inbox.
 ### Requirement: Resolving a need
 `POST …/conversations/{conversation_id}/need/resolve`
 (`conversations.resolve_need`, `conversations:write`) SHALL clear the open
-need with outcome `done` or `not_needed`; `not_needed` SHALL also store a
+need with outcome `done` or `not_needed`, naming the message the need the
+member saw comes from (`message_id`): when the open need comes from another
+message, nothing SHALL be recorded and the answer SHALL be 409
+`need_changed` (the same for `confirm_need`); `not_needed` SHALL also store a
 correction of the question that raised it (true to false). `…/need/confirm`
 (`conversations.confirm_need`) SHALL turn a `check` need into a `sure` one
 and store a correction confirming the answer. `…/need/reopen`
@@ -524,6 +528,10 @@ above (a `reader` gets 403 `inbox_read_only`), and SHALL answer 409
 - **WHEN** the member then reopens it
 - **THEN** the same need is open again and the correction is marked withdrawn
 
+#### Scenario: The need changed meanwhile
+- **WHEN** a member resolves a need naming a message other than the one the open need comes from
+- **THEN** the response is 409 `need_changed` and no correction is stored
+
 #### Scenario: It's safe
 - **WHEN** a member marks a `review` need for a suspicious message Not needed
 - **THEN** a correction of `suspicious` from true to false is stored and no other need is raised for that message
@@ -531,9 +539,14 @@ above (a `reader` gets 403 `inbox_read_only`), and SHALL answer 409
 ### Requirement: The sender's sentence
 The email signals SHALL keep, with a reason whose evidence comes from the
 message's text, the sentence of the new part of the message (quoted history
-excluded) that holds the evidence, with whitespace collapsed and at most 240
+excluded) that holds the evidence, with whitespace collapsed, without
+bidirectional controls, zero-width or control characters, and at most 240
 characters, cut at a word. It SHALL be stored with the decision's reasons and
 SHALL NOT change any answer.
+
+#### Scenario: A reversed IBAN
+- **WHEN** a payment request hides a right-to-left override and a zero-width space inside an IBAN
+- **THEN** the quoted sentence holds neither, and the IBAN reads in order
 
 #### Scenario: A request inside a long paragraph
 - **WHEN** a message says "Hope the move went well. Could you confirm Thursday's walkthrough? Thanks!"

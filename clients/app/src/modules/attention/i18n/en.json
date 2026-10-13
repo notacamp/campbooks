@@ -31,7 +31,8 @@
     "tomorrow": "Tomorrow",
     "monday": "Monday",
     "toast": "Later · {{name}}, back {{when}}",
-    "button": "Later"
+    "button": "Later",
+    "failed": "Could not put {{name}} off: nothing changed. Try again."
   },
   "actions": {
     "reply": "Reply",
