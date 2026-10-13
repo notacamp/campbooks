@@ -18,6 +18,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::MESSAGES;
+
 use crate::{
     domain::{
         access::{acting_manager, lock_workspace},
@@ -106,9 +108,7 @@ pub async fn handler(
 pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> Result<Issued> {
     let (actor, _) = acting_manager(access)?;
     if input.role == Role::Owner {
-        return Err(Error::BadRequest(
-            "role must be `admin` or `member`".to_owned(),
-        ));
+        return Err(Error::BadRequest(MESSAGES.reason("invalid_role")));
     }
     let email = invitation::normalize_email(&input.email)?;
     let id = access.workspace;
@@ -126,7 +126,7 @@ pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> 
     .fetch_one(&mut *tx)
     .await?;
     if already_member {
-        return Err(Error::Conflict("already_a_member".to_owned()));
+        return Err(Error::Conflict(MESSAGES.reason("already_a_member")));
     }
     sqlx::query!(
         "DELETE FROM workspaces.invitations
@@ -256,7 +256,7 @@ mod tests {
             )
             .await;
         assert_eq!(member.status, StatusCode::CONFLICT);
-        assert_eq!(member.json["detail"], "already_a_member");
+        assert_eq!(member.json["code"], "already_a_member");
         let not_manager = kit
             .post(
                 &cid,

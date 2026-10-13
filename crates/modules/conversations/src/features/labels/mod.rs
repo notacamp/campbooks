@@ -75,9 +75,11 @@ pub async fn add(
     let id = path.conversation_id;
     let name = body.name.trim();
     if name.is_empty() || name.chars().count() > MAX_NAME_CHARS {
-        return Err(Error::BadRequest(format!(
-            "a label name is 1 to {MAX_NAME_CHARS} characters"
-        )));
+        return Err(Error::BadRequest(
+            crate::MESSAGES
+                .reason("invalid_label_name")
+                .arg("max", MAX_NAME_CHARS),
+        ));
     }
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;

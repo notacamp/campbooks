@@ -277,9 +277,15 @@ impl From<BlobError> for crate::Error {
     fn from(err: BlobError) -> Self {
         match err {
             BlobError::NotFound => Self::NotFound,
-            BlobError::TooLarge { .. } | BlobError::Mismatch(_) | BlobError::Read(_) => {
-                Self::BadRequest(err.to_string())
+            BlobError::TooLarge { limit } => Self::BadRequest(
+                crate::i18n::MESSAGES
+                    .reason("file_too_large")
+                    .arg("limit", limit),
+            ),
+            BlobError::Mismatch(_) => {
+                Self::BadRequest(crate::i18n::MESSAGES.reason("upload_mismatch"))
             }
+            BlobError::Read(_) => Self::BadRequest(crate::i18n::MESSAGES.reason("upload_failed")),
             other => Self::internal(other),
         }
     }

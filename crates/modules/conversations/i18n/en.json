@@ -1,0 +1,7 @@
+{
+  "errors": {
+    "invalid_limit": "The limit must be between 1 and {{max}}.",
+    "invalid_cursor": "This page link is not valid. Start again from the first page.",
+    "invalid_label_name": "A label name must be 1 to {{max}} characters long."
+  }
+}

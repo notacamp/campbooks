@@ -336,6 +336,26 @@ async fn a_batch_for_another_inbox_or_version_fails_for_good(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_batch_for_an_inbox_not_created_yet_waits(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let batch = kit.batch(workspace, InboxId::new(), "en").await;
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+    let (state, error): (String, Option<String>) = sqlx::query_as(
+        "SELECT state, last_error FROM kernel.jobs WHERE kind = 'conversations.apply_changes'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(state, "pending");
+    assert_eq!(
+        error.as_deref(),
+        Some("the change batch's inbox does not exist yet")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn workspaces_never_see_each_other(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, inbox) = setup(&kit, "sam@example.com").await;

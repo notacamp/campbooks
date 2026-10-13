@@ -263,7 +263,10 @@ All under `/api/v1/w/{workspace_id}`.
 | `conversations.add_label` / `conversations.remove_label` | `POST …/labels` `{name}`, `DELETE …/labels/{label_id}` | `conversations:write` | low, undo each other |
 
 The list is ordered by `last_message_at DESC, id DESC`; the cursor is that
-pair, opaque (base64url). HTML is never served as `text/html`: it is a JSON
+pair, opaque (base64url). Errors the module raises carry a stable `code` and a
+message from its catalogue (`crates/modules/conversations/i18n/`:
+`invalid_limit`, `invalid_cursor`, `invalid_label_name`), rendered in the
+caller's locale like every problem+json. HTML is never served as `text/html`: it is a JSON
 string the client renders only in its sandboxed iframe (`lib/ui/safe-html`).
 
 ## Composition: constructor injection

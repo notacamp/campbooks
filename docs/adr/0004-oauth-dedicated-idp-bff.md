@@ -118,6 +118,9 @@ needs no route to the public URL), and for the BFF
 `CAMPBOOKS_AUTH__WEB_CLIENT_ID` (`campbooks-web`) and
 `CAMPBOOKS_AUTH__WEB_CLIENT_SECRET_FILE`
 (`/run/idp/campbooks/campbooks-web.client-secret`).
+*(The BFF, #16, shipped these as `CAMPBOOKS_BFF__CLIENT_ID` and
+`CAMPBOOKS_BFF__CLIENT_SECRET_FILE`, with the secret in a separate
+`server-secrets` volume; see `openspec/changes/web-bff/design.md`.)*
 
 ## Alternatives considered
 - Auth server embedded in the API — one binary, but we would own and audit

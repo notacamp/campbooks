@@ -12,6 +12,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::MESSAGES;
+
 use crate::{
     domain::{access::acting_manager, model::SecurityEventId},
     scopes::WorkspacesAdmin,
@@ -87,9 +89,9 @@ pub async fn execute(state: &AppState, access: &Access, page: Page) -> Result<Se
     acting_manager(access)?;
     let limit = page.limit.unwrap_or(50);
     if limit == 0 || limit > MAX_LIMIT {
-        return Err(campbooks_kernel::Error::BadRequest(format!(
-            "limit must be 1 to {MAX_LIMIT}"
-        )));
+        return Err(campbooks_kernel::Error::BadRequest(
+            MESSAGES.reason("invalid_limit").arg("max", MAX_LIMIT),
+        ));
     }
     let mut tx = state.db.begin_for(access.workspace).await?;
     let events = sqlx::query!(

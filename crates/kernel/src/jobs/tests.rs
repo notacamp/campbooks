@@ -1226,6 +1226,26 @@ fn registry_rejects_bad_registrations() {
 }
 
 #[test]
+fn registry_takes_work_owned_outside_modules() {
+    #[derive(Debug, Default, Serialize, Deserialize)]
+    struct Sweep;
+    impl Job for Sweep {
+        const NAME: &'static str = "web.sweep";
+        const QUEUE: &'static str = "maintenance";
+        async fn run(self, _ctx: &mut JobContext) -> Result<(), JobError> {
+            Ok(())
+        }
+    }
+    let web = Background::new().schedule::<Sweep>(Duration::from_mins(15));
+    let registry = Registry::build_with(&[], &[("web", &web)]).unwrap();
+    assert!(registry.schedule_names().contains(&"web.sweep"));
+    assert!(registry.schedule_names().contains(&"kernel.prune_jobs"));
+
+    let err = Registry::build_with(&[], &[("other", &web)]).unwrap_err();
+    assert!(err.0.join("\n").contains("must be `other.<name>`"), "{err}");
+}
+
+#[test]
 fn errors_are_truncated() {
     let long = "x".repeat(MAX_ERROR_LEN + 10);
     assert_eq!(truncate_error(&long).chars().count(), MAX_ERROR_LEN + 1);

@@ -82,7 +82,11 @@ pub async fn handler(
 ) -> Result<Json<ConversationList>> {
     let limit = query.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {
-        return Err(Error::BadRequest(format!("limit must be 1 to {MAX_LIMIT}")));
+        return Err(Error::BadRequest(
+            crate::MESSAGES
+                .reason("invalid_limit")
+                .arg("max", MAX_LIMIT),
+        ));
     }
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let access = &workspace.access;
@@ -202,7 +206,7 @@ fn encode_cursor(at: DateTime<Utc>, id: ConversationId) -> String {
 }
 
 fn decode_cursor(cursor: &str) -> Result<(DateTime<Utc>, ConversationId)> {
-    let bad = || Error::BadRequest("the cursor is not one this API gave".to_owned());
+    let bad = || Error::BadRequest(crate::MESSAGES.reason("invalid_cursor"));
     let bytes = URL_SAFE_NO_PAD.decode(cursor).map_err(|_| bad())?;
     let text = String::from_utf8(bytes).map_err(|_| bad())?;
     let (at, id) = text.split_once('|').ok_or_else(bad)?;
@@ -286,10 +290,9 @@ mod http_tests {
                 .is_empty()
         );
 
-        assert_eq!(
-            kit.get(&sam, &format!("{base}?cursor=junk")).await.status,
-            StatusCode::BAD_REQUEST
-        );
+        let junk = kit.get(&sam, &format!("{base}?cursor=junk")).await;
+        assert_eq!(junk.status, StatusCode::BAD_REQUEST);
+        assert_eq!(junk.json["code"], "invalid_cursor");
         assert_eq!(
             kit.get(&sam, &format!("{base}?limit=0")).await.status,
             StatusCode::BAD_REQUEST

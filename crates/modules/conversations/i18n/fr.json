@@ -1,0 +1,7 @@
+{
+  "errors": {
+    "invalid_limit": "La limite doit être comprise entre 1 et {{max}}.",
+    "invalid_cursor": "Ce lien de page n’est pas valide. Recommencez à la première page.",
+    "invalid_label_name": "Le nom d’une étiquette doit comporter entre 1 et {{max}} caractères."
+  }
+}

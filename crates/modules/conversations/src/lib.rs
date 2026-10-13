@@ -26,7 +26,7 @@
 use std::sync::Arc;
 
 use campbooks_ai::{Gateway, Role};
-use campbooks_kernel::{AppState, Background, Module};
+use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 mod config;
@@ -48,6 +48,9 @@ pub use domain::decide::{
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
+
+/// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
+pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// What the module is composed with.
 #[derive(Clone)]
@@ -149,6 +152,11 @@ mod tests {
     use sqlx::PgPool;
 
     use super::*;
+
+    #[test]
+    fn catalogue_is_at_parity() {
+        assert_eq!(MESSAGES.check(), Vec::<String>::new());
+    }
 
     #[test]
     fn module_is_named_after_its_schema() {

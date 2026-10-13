@@ -67,7 +67,7 @@ pub async fn record(
     recorded: &Value,
 ) -> Result<MessageChangeBatch> {
     let ws = workspace.to_string();
-    let bad = |what: &str| Error::BadRequest(format!("recorded batch: {what}"));
+    let bad = |what: &str| Error::internal(format!("recorded batch: {what}"));
     let mut changes = recorded
         .get("changes")
         .and_then(Value::as_array)

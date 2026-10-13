@@ -1,0 +1,36 @@
+{
+  "status": {
+    "400": "Pedido inválido",
+    "401": "Não autenticado",
+    "403": "Acesso negado",
+    "404": "Não encontrado",
+    "409": "Conflito",
+    "413": "Conteúdo demasiado grande",
+    "422": "Conteúdo não processável",
+    "500": "Erro interno do servidor",
+    "503": "Serviço indisponível"
+  },
+  "errors": {
+    "not_found": "Este recurso não existe ou não tem permissão para o ver.",
+    "forbidden": "Não tem permissão para fazer isto.",
+    "internal_error": "Algo correu mal do nosso lado. Tente novamente.",
+    "insufficient_scope": "Este token de acesso não tem a permissão {{scope}}.",
+    "auth_not_configured": "Este servidor não tem o início de sessão configurado, por isso não pode aceitar tokens de acesso.",
+    "missing_token": "Inicie sessão para continuar: o pedido não traz nenhum token de acesso.",
+    "invalid_token": "O token de acesso não é válido. Inicie sessão novamente.",
+    "token_expired": "A sua sessão expirou. Inicie sessão novamente.",
+    "idp_unavailable": "Não é possível contactar o serviço de início de sessão neste momento. Tente novamente daqui a pouco.",
+    "missing_json_content_type": "O corpo do pedido tem de ser JSON (Content-Type: application/json).",
+    "invalid_json": "O corpo do pedido não é JSON válido: {{reason}}",
+    "invalid_body": "O corpo do pedido não corresponde ao que esta operação espera: {{reason}}",
+    "invalid_query": "Os parâmetros do pedido não correspondem ao que esta operação espera: {{reason}}",
+    "idempotency_key_invalid": "A Idempotency-Key tem de ter entre 1 e {{max}} caracteres ASCII visíveis.",
+    "idempotency_key_reused": "Esta Idempotency-Key já foi usada noutro pedido.",
+    "idempotency_key_in_flight": "Um pedido com esta Idempotency-Key ainda está a ser processado.",
+    "idempotency_body_too_large": "O corpo do pedido é demasiado grande para ser usado com uma Idempotency-Key.",
+    "database_unavailable": "A base de dados está indisponível neste momento. Tente novamente daqui a pouco.",
+    "file_too_large": "O ficheiro excede o limite de {{limit}} bytes.",
+    "upload_mismatch": "O ficheiro enviado não corresponde ao esperado. Envie-o novamente.",
+    "upload_failed": "Não foi possível ler o envio. Tente novamente."
+  }
+}

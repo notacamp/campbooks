@@ -49,9 +49,11 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
   `migrations/` named `<timestamp>_<module>__<description>.sql` and touch only
   that module's schema. No cross-schema joins or foreign keys — reference other
   modules by ID. The kernel's infrastructure (event log, job queue) lives in
-  schema `kernel`, migrated by `<timestamp>_kernel__<description>.sql`; modules
-  never touch it. *(CI: `cargo xtask arch` checks migration names and the
-  schemas each migration touches.)*
+  schema `kernel`, migrated by `<timestamp>_kernel__<description>.sql`, and the
+  server's web BFF keeps its sessions in schema `bff`
+  (`<timestamp>_bff__<description>.sql`); modules never touch either.
+  *(CI: `cargo xtask arch` checks migration names and the schemas each
+  migration touches.)*
 - **Background work is declared, named and owned.** Jobs, event handlers and
   schedules are registered in the module's `Module.background`, named
   `<module>.<name>`; events are `DomainEvent`s named `<module>.<event>` with
@@ -80,7 +82,12 @@ Use `ENV` with neutral `example.com` defaults. *(gitleaks in CI.)*
 ## Security rules
 
 - **Tokens never reach browser JavaScript.** The web client talks to the API
-  through the server's BFF with an httpOnly, `SameSite=Strict` session cookie.
+  through the server's BFF with an httpOnly, `SameSite=Strict` session cookie;
+  it sends `X-Campbooks-CSRF: 1` on every request, and the BFF refuses unsafe
+  methods without it or from another origin. BFF operations (`/bff/*` only)
+  declare `security(())` or the scope-less cookie scheme
+  `security(("session" = []))`; never log tokens, codes, cookies or session
+  ids.
   Native (Tauri) clients keep tokens in the OS keychain on the Rust side; the
   webview calls the API via Tauri commands. See ADR 0004.
 - The API is an OAuth 2.1 resource server: validate the JWT (issuer, audience,
@@ -107,9 +114,15 @@ plurals). Every string a user can see exists in all four before it ships.
 - **Our UI:** every `i18n/` namespace has `en`, `pt-PT`, `es-ES` and `fr` files with
   exactly the same keys and no empty values. *(CI: `pnpm i18n:check`.)*
 - **Our server:** messages a user reads (problem+json `title`/`detail`,
-  emails, notifications) are rendered in the recipient's locale, from
-  catalogues held to the same parity. *(Lands with the i18n foundation issue;
-  until then, no user-facing server text.)*
+  emails, notifications) are rendered in the recipient's locale from the
+  crate's catalogue (`crates/<crate>/i18n/<locale>.json`, the client's
+  format, declared with `kernel::catalogue!`), never from string literals.
+  Errors name a `Reason` (`MESSAGES.reason("code")`, a stable code plus the
+  message `errors.<code>`); handlers that render text take `Locale`; jobs
+  carry the recipient's `Locale` in their payload. Clients match on the
+  problem's `code`, never on `title` or `detail`. *(CI: `cargo xtask
+  i18n` — same keys, plural forms and placeholders in all four, no empty
+  values; each catalogue's unit test runs the same check.)*
 - **Other people's screens we put in front of users** — the identity
   provider's login, sign-up, account pages and emails, and any future
   component that renders UI or mail to end users — count as ours. A component

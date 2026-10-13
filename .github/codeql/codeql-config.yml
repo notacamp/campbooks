@@ -1,0 +1,14 @@
+# CodeQL scans product code. Test code deliberately uses fixed keys, nonces and
+# tokens (fake IdPs, fixtures), which generic "hard-coded cryptographic value"
+# rules flag; those files are excluded here instead of dismissing alerts one by
+# one. Production code stays fully scanned.
+name: campbooks-next
+paths-ignore:
+  - "**/tests.rs"
+  - "**/tests/**"
+  - "**/testing.rs"
+  - "**/testing/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.stories.tsx"
+  - "clients/app/test/**"

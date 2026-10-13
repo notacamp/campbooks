@@ -24,7 +24,7 @@ campbooks-workspaces = { path = "crates/modules/workspaces" }
 campbooks-conversations = { path = "crates/modules/conversations" }
 
 # HTTP / async
-axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "tokio", "tower-log", "tracing", "matched-path"] }
+axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }
 tokio = { version = "1.53.2", features = ["macros", "rt-multi-thread", "signal", "net", "sync", "time", "io-util"] }
 tower = { version = "0.5.3", features = ["util"] }
 tower-http = { version = "0.7.1", features = ["trace", "request-id", "timeout", "compression-gzip", "compression-br", "util", "fs", "set-header"] }
@@ -52,6 +52,12 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 figment = { version = "0.10.19", features = ["env"] }
 toml = "1.1.8"
+
+# Internationalization: CLDR plural rules for the server's message catalogues
+# (the same rules as the browser's `Intl.PluralRules`). ICU4X; its locale and
+# provider core crates are already in the graph through `url` -> `idna`.
+icu_plurals = "2.3.0"
+icu_locale_core = "2.3.0"
 
 # Errors, observability, misc
 thiserror = "2.0.21"

@@ -1,0 +1,13 @@
+{
+  "errors": {
+    "bff_not_configured": "La connexion web n’est pas configurée sur ce serveur.",
+    "session_required": "Votre session a pris fin. Reconnectez-vous.",
+    "invalid_return_to": "La page où revenir après la connexion doit appartenir à ce site.",
+    "invalid_state": "Cette connexion a expiré ou a déjà été utilisée. Recommencez.",
+    "login_failed": "La connexion n’a pas abouti. Réessayez.",
+    "code_rejected": "Le service de connexion a refusé cette connexion. Réessayez.",
+    "invalid_id_token": "Le service de connexion a envoyé une identité impossible à vérifier. Réessayez.",
+    "invalid_logout_token": "La demande de déconnexion n’a pas pu être vérifiée.",
+    "csrf_check_failed": "Cette requête a été refusée car elle ne provient pas de l’application Campbooks. Rechargez la page et réessayez."
+  }
+}
