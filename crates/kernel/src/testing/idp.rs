@@ -134,6 +134,8 @@ impl Default for TestUser {
 #[derive(Debug, Clone)]
 struct Grant {
     user: TestUser,
+    /// When the user signed in (`auth_time`): when the code was approved.
+    auth_time: u64,
     sid: String,
     scope: String,
     nonce: Option<String>,
@@ -427,6 +429,7 @@ impl TestIdp {
         );
         let grant = Grant {
             user: lock(&self.shared.user).clone(),
+            auth_time: jsonwebtoken::get_current_timestamp(),
             sid,
             scope: param("scope"),
             nonce: params.get("nonce").cloned(),
@@ -605,6 +608,7 @@ async fn token(
     access["sub"] = grant.user.subject.clone().into();
     access["exp"] = (jsonwebtoken::get_current_timestamp() + lifetime).into();
     access["jti"] = random_token().into();
+    access["auth_time"] = grant.auth_time.into();
     let mut id = idp.id_token_claims(
         &grant.user.subject,
         grant.nonce.as_deref().unwrap_or_default(),

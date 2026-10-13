@@ -219,7 +219,7 @@ pub struct AuthorizationRequest<'a> {
     /// The PKCE S256 challenge.
     pub code_challenge: &'a str,
     /// `max_age`: sign in again unless the person did within this many
-    /// seconds (step-up).
+    /// seconds (step-up); `Some(0)` always asks (OIDC Core §3.1.2.1).
     pub max_age: Option<u32>,
 }
 

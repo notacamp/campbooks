@@ -9,12 +9,13 @@
 //!
 //! | Endpoint | Does |
 //! | --- | --- |
-//! | `GET /bff/login?return_to=` | starts a sign-in, redirects to the IdP |
+//! | `GET /bff/login?return_to=&max_age=` | starts a sign-in, redirects to the IdP |
 //! | `GET /bff/callback` | finishes it: code exchange, ID token check, session |
 //! | `GET /bff/session` | who is signed in (never a token) |
 //! | `POST /bff/logout` | ends the session, revokes, returns the IdP logout URL |
 //! | `POST /bff/backchannel-logout` | the IdP ends sessions (logout token) |
 //! | `/bff/api/*` | the API, with the session's access token attached |
+//! | `/bff/admin/*` | the admin API (ADR 0015), the same way |
 //!
 //! Unsafe methods on cookie-authenticated endpoints pass a CSRF check
 //! ([`csrf`]). The design and threat model are in
@@ -111,6 +112,8 @@ struct Inner {
     /// The API's routes (no middleware, no web client): `/bff/api/*` runs
     /// requests through it in-process.
     api: Router,
+    /// The admin API's routes: `/bff/admin/*` runs requests through them.
+    admin: Router,
     /// Serialize refreshes within this process; a row lock serializes them
     /// across processes.
     refresh_locks: Box<[tokio::sync::Mutex<()>]>,
@@ -119,8 +122,14 @@ struct Inner {
 impl Bff {
     /// The BFF for `settings` (`None`: web sign-in is off and every endpoint
     /// but `/bff/session` answers 503). `api` is the API router requests to
-    /// `/bff/api/*` run through.
-    pub fn new(settings: Option<Settings>, state: &AppState, api: Router, issuer: Router) -> Self {
+    /// `/bff/api/*` run through, `admin` the admin API's for `/bff/admin/*`.
+    pub fn new(
+        settings: Option<Settings>,
+        state: &AppState,
+        api: Router,
+        admin: Router,
+        issuer: Router,
+    ) -> Self {
         let inner = settings.map(|settings| {
             Arc::new(Inner {
                 db: state.db.clone(),
@@ -131,6 +140,7 @@ impl Bff {
                 public_origin: settings.public_origin.into(),
                 timeouts: settings.timeouts,
                 api,
+                admin,
                 refresh_locks: (0..REFRESH_LOCKS)
                     .map(|_| tokio::sync::Mutex::new(()))
                     .collect(),
@@ -158,6 +168,14 @@ impl Bff {
                     .put(handlers::api_put)
                     .patch(handlers::api_patch)
                     .delete(handlers::api_delete),
+            )
+            .route(
+                "/bff/admin/{*path}",
+                get(handlers::admin_get)
+                    .post(handlers::admin_post)
+                    .put(handlers::admin_put)
+                    .patch(handlers::admin_patch)
+                    .delete(handlers::admin_delete),
             );
         if let Some(inner) = &self.inner {
             protected = protected.layer(axum::middleware::from_fn_with_state(

@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-system"
-description = "Campbooks system module: health and version. The reference vertical slice for new modules."
+description = "Campbooks system module: health, version and the admin system overview. The reference vertical slice for new modules."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,7 +10,9 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
+chrono.workspace = true
 serde.workspace = true
 sqlx.workspace = true
 tokio.workspace = true
@@ -21,6 +23,7 @@ utoipa-axum.workspace = true
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
 serde_json.workspace = true
+wiremock.workspace = true
 
 [lints]
 workspace = true

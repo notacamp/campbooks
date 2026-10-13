@@ -917,6 +917,77 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/bff/admin/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read from the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        get: operations["bff.admin_get"];
+        /**
+         * PUT to the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        put: operations["bff.admin_put"];
+        /**
+         * POST to the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        post: operations["bff.admin_post"];
+        /**
+         * DELETE in the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        delete: operations["bff.admin_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH the admin API as the signed-in administrator.
+         * @description `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with
+         *      the session's access token attached, exactly like `/bff/api/*`. Its
+         *      answers are the admin API's own: 404 for anyone who is not an
+         *      administrator with the operation's permission, 401
+         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      old (sign in again at `/bff/login?max_age=0`). Without a live session
+         *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
+         *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        patch: operations["bff.admin_patch"];
+        trace?: never;
+    };
     "/bff/api/{path}": {
         parameters: {
             query?: never;
@@ -5950,6 +6021,246 @@ export interface operations {
             };
         };
     };
+    "bff.admin_get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.admin_patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The admin API path after `/admin/`, e.g. `v1/system/overview`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The admin API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "bff.api_get": {
         parameters: {
             query?: never;
@@ -6285,7 +6596,8 @@ export interface operations {
                 return_to?: string | null;
                 /**
                  * @description Sign in again unless the person did within this many seconds: the
-                 *     step-up an operation asks for with `step_up_required`.
+                 *     step-up an operation asks for with `step_up_required`, or `0` after
+                 *     the admin API's `admin_reauth_required`.
                  */
                 max_age?: number | null;
             };

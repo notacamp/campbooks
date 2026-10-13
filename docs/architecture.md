@@ -50,11 +50,16 @@ crates/
                            implements the kernel's `GrantIntake` port.
     identity/              campbooks-identity — accounts and their ways in, provider
                            sign-in, and the in-process OAuth 2.1 issuer (ADR 0014).
+    admin/                 campbooks-admin — instance administrators' profiles and the
+                           admin audit trail (ADR 0015). Serves no route; profiles change
+                           only through `campbooks-server admin`.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
 openapi/openapi.json       generated, committed; the operation catalogue and the
                            contract for every client (ADR 0013)
+openapi/admin.json         generated, committed; the admin API (ADR 0015), outside the
+                           operation catalogue
 openapi/events.json        generated, committed; the events catalogue
 xtask/                     `cargo xtask arch | openapi [--check] | events [--check] |
                            new-module | new-feature`
@@ -431,6 +436,38 @@ provider sign-in asks for their mailbox in the same consent; `identity` holds
 that grant until they put it in a workspace, then hands it to `connectors`
 through the kernel's `GrantIntake` port (`kernel::connections`), which
 `connectors` implements.
+
+### Instance administration (ADR 0015)
+
+An administrator is a user whose identity account has an **admin profile**
+in the `admin` module: a set of `kernel::admin::Permission`s (`super`
+implies all). The module serves no route; profiles are written only by
+`campbooks-server admin grant|revoke|list|log`, on the migration login, and
+the runtime role may only read profiles and append to `admin.actions`. The
+rest of the system reads them through the kernel ports `AdminProfiles` and
+`AdminAudit`, which the server wires to the `admin` module.
+
+A module offers admin operations through `Module.admin_router`, at
+`/admin/v1/<module>/…`. The server serves them as a separate API with its own
+document, `openapi/admin.json`, never merged into `openapi/openapi.json`, so
+`kernel::operations::invoke`, automation, the assistant and MCP cannot reach
+them. Each handler takes `kernel::admin::Admin<P>`: a user's bearer token
+with the `admin:access` scope (which the built-in issuer grants to
+first-party clients only) and a profile allowing `P`, else **404** like an
+unknown route; then a sign-in at most 12 hours old (`auth_time`), else 401
+`admin_reauth_required`. The `kernel::admin::audit` middleware records every
+request that passed the profile check. The web app reaches the admin API
+through `/bff/admin/*`, like `/bff/api/*`; its Admin section lives in
+`clients/app/src/app/admin/`, with panels contributed by client modules.
+
+Admin reads across workspaces open `kernel::db::begin_admin` (only an
+`AdminGrant` from `Admin<P>` can), which turns on the setting that
+admin-read row-level-security policies check, on metadata tables only;
+content tables never get one, and a server test pins the list. `cargo xtask
+arch` keeps it that way: the admin module owns no operation, admin
+operations sit under their module's prefix with the `admin` security scheme
+and a known `x-campbooks-admin.permission`, and only the admin module and the
+server's CLI name schema `admin`, only the kernel the admin-read setting.
 
 ## Domains and scaling
 

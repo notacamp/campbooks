@@ -63,6 +63,18 @@ All notable changes to Campbooks Next are documented here. The format follows
   (scripts, style sheets, forms, frames and tracking pixels removed, links
   open in a new tab), shown only in a sandboxed frame, and remote images stay
   blocked until you choose "Show images" for a message.
+- Instance administrators (ADR 0015). An operator makes someone an
+  administrator from the server's command line,
+  `campbooks-server admin grant --email you@example.com --permission super`
+  (`docker compose exec server …`; also `revoke`, `list` and `log`), never
+  from the app or the API. Administrators get an **Admin** section in the
+  app (account menu → Admin) with a System panel: version, uptime, database
+  and migrations, the effective configuration without any secret, and
+  whether each AI role's provider answers. The admin API is separate
+  (`/admin/v1/*`, `openapi/admin.json`), answers 404 to everyone else, asks
+  for a sign-in less than 12 hours old, and records every request in an
+  audit trail. A new `admin` database schema is created by the migrations.
+  See `deploy/README.md` → Administrators.
 - The sign-in screens are Campbooks screens, in English, Portuguese, Spanish
   and French. Opening the app signed out goes straight to "Sign in to
   Campbooks" (and back to the page you opened afterwards), with one button

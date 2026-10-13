@@ -22,8 +22,8 @@
     "test:watch": "vitest",
     "test-storybook": "vitest run --config vitest.storybook.config.ts && VITE_STORYBOOK_THEME=dark vitest run --config vitest.storybook.config.ts",
     "deps:check": "depcruise src --config .dependency-cruiser.cjs",
-    "api:generate": "openapi-typescript ../../openapi/openapi.json --output src/lib/api/schema.gen.ts && node scripts/records-gen.ts",
-    "api:check": "pnpm run api:generate && git diff --exit-code -- src/lib/api/schema.gen.ts src/lib/api/records.gen.ts",
+    "api:generate": "openapi-typescript ../../openapi/openapi.json --output src/lib/api/schema.gen.ts && openapi-typescript ../../openapi/admin.json --output src/lib/api/admin.gen.ts && node scripts/records-gen.ts",
+    "api:check": "pnpm run api:generate && git diff --exit-code -- src/lib/api/schema.gen.ts src/lib/api/admin.gen.ts src/lib/api/records.gen.ts",
     "storybook": "storybook dev --port 6006 --no-open",
     "build-storybook": "storybook build --output-dir storybook-static"
   },

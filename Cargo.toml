@@ -24,6 +24,7 @@ campbooks-workspaces = { path = "crates/modules/workspaces" }
 campbooks-conversations = { path = "crates/modules/conversations" }
 campbooks-connectors = { path = "crates/modules/connectors" }
 campbooks-identity = { path = "crates/modules/identity" }
+campbooks-admin = { path = "crates/modules/admin" }
 
 # HTTP / async
 axum = { version = "0.8.9", default-features = false, features = ["http1", "http2", "json", "query", "form", "tokio", "tower-log", "tracing", "matched-path"] }

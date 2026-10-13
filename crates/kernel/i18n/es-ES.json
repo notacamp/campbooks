@@ -20,6 +20,7 @@
     "missing_token": "Inicia sesión para continuar: la solicitud no incluye ningún token de acceso.",
     "invalid_token": "El token de acceso no es válido. Vuelve a iniciar sesión.",
     "token_expired": "Tu sesión ha caducado. Vuelve a iniciar sesión.",
+    "admin_reauth_required": "Por seguridad, la administración requiere un inicio de sesión reciente. Vuelve a iniciar sesión para continuar.",
     "idp_unavailable": "No se puede contactar con el servicio de inicio de sesión en este momento. Vuelve a intentarlo en un rato.",
     "missing_json_content_type": "El cuerpo de la solicitud debe ser JSON (Content-Type: application/json).",
     "invalid_json": "El cuerpo de la solicitud no es JSON válido: {{reason}}",

@@ -17,6 +17,11 @@ pub struct VersionResponse {
 }
 
 impl VersionResponse {
+    /// The running build (`GIT_SHA` read now).
+    pub(crate) fn current() -> Self {
+        Self::new(std::env::var("GIT_SHA").ok())
+    }
+
     fn new(commit: Option<String>) -> Self {
         Self {
             version: env!("CARGO_PKG_VERSION").to_owned(),
@@ -42,7 +47,7 @@ impl VersionResponse {
     )
 )]
 pub async fn handler() -> Json<VersionResponse> {
-    Json(VersionResponse::new(std::env::var("GIT_SHA").ok()))
+    Json(VersionResponse::current())
 }
 
 #[cfg(test)]
