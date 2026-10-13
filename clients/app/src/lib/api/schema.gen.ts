@@ -4,4741 +4,4741 @@
  */
 
 export interface paths {
-  "/.well-known/oauth-authorization-server": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/.well-known/oauth-authorization-server": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OAuth 2.0 authorization server metadata (RFC 8414): the same document. */
+        get: operations["identity.authorization_server_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** OAuth 2.0 authorization server metadata (RFC 8414): the same document. */
-    get: operations["identity.authorization_server_metadata"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/.well-known/openid-configuration": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/.well-known/openid-configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** OIDC Discovery metadata. */
+        get: operations["identity.openid_configuration"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** OIDC Discovery metadata. */
-    get: operations["identity.openid_configuration"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/identity/held-grants": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/identity/held-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the mailboxes waiting to be connected. */
+        get: operations["identity.list_held_grants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List the mailboxes waiting to be connected. */
-    get: operations["identity.list_held_grants"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/identity/held-grants/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/identity/held-grants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Discard a held mailbox grant. */
+        delete: operations["identity.discard_held_grant"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Discard a held mailbox grant. */
-    delete: operations["identity.discard_held_grant"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/system/health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report instance health. */
+        get: operations["system.health"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Report instance health. */
-    get: operations["system.health"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/system/version": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/system/version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Report the server version. */
+        get: operations["system.version"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Report the server version. */
-    get: operations["system.version"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a workspace. */
+        get: operations["workspaces.get"];
+        put?: never;
+        post?: never;
+        /** Delete a workspace. */
+        delete: operations["workspaces.delete"];
+        options?: never;
+        head?: never;
+        /** Update a workspace. */
+        patch: operations["workspaces.update"];
+        trace?: never;
     };
-    /** Read a workspace. */
-    get: operations["workspaces.get"];
-    put?: never;
-    post?: never;
-    /** Delete a workspace. */
-    delete: operations["workspaces.delete"];
-    options?: never;
-    head?: never;
-    /** Update a workspace. */
-    patch: operations["workspaces.update"];
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/changes": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Follow a workspace's changes.
+         * @description A Server-Sent Events stream of what changed in the workspace, for clients
+         *     that keep a cache: each `change` frame names a record and an operation
+         *     (`{"cursor","record":{"type","id"},"op":"upsert"|"delete","version"}`),
+         *     never its contents; refetch what you show. Frames: `ready` (where the
+         *     stream starts), `change`, `heartbeat` (an SSE comment, or the cursor when
+         *     it moved past changes you may not see), `reset` (your cursor is unknown,
+         *     expired or too far behind: refetch everything, continue from the
+         *     cursor given), `revoked` (you no longer belong to the workspace) and
+         *     `closing` (the stream ends; reconnect with your cursor). Every frame
+         *     that carries a cursor sets the SSE `id`, so `EventSource` resumes on its
+         *     own. You only receive changes of records a read operation you hold a
+         *     scope for returns.
+         */
+        get: operations["changes.stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Follow a workspace's changes.
-     * @description A Server-Sent Events stream of what changed in the workspace, for clients
-     *     that keep a cache: each `change` frame names a record and an operation
-     *     (`{"cursor","record":{"type","id"},"op":"upsert"|"delete","version"}`),
-     *     never its contents; refetch what you show. Frames: `ready` (where the
-     *     stream starts), `change`, `heartbeat` (an SSE comment, or the cursor when
-     *     it moved past changes you may not see), `reset` (your cursor is unknown,
-     *     expired or too far behind: refetch everything, continue from the
-     *     cursor given), `revoked` (you no longer belong to the workspace) and
-     *     `closing` (the stream ends; reconnect with your cursor). Every frame
-     *     that carries a cursor sets the SSE `id`, so `EventSource` resumes on its
-     *     own. You only receive changes of records a read operation you hold a
-     *     scope for returns.
-     */
-    get: operations["changes.stream"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/connections": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List connections. */
+        get: operations["connectors.list_connections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List connections. */
-    get: operations["connectors.list_connections"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/connections/authorizations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/connections/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start connecting an account. */
+        post: operations["connectors.start_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Start connecting an account. */
-    post: operations["connectors.start_connection"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete a connection. */
+        post: operations["connectors.complete_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Complete a connection. */
-    post: operations["connectors.complete_connection"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/connections/{connection_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a connection. */
+        get: operations["connectors.get_connection"];
+        put?: never;
+        post?: never;
+        /** Disconnect a connection. */
+        delete: operations["connectors.disconnect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Read a connection. */
-    get: operations["connectors.get_connection"];
-    put?: never;
-    post?: never;
-    /** Disconnect a connection. */
-    delete: operations["connectors.disconnect"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync a connection now. */
+        post: operations["connectors.sync_now"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Sync a connection now. */
-    post: operations["connectors.sync_now"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List conversations, newest first. */
+        get: operations["conversations.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List conversations, newest first. */
-    get: operations["conversations.list"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a conversation and its messages. */
+        get: operations["conversations.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Read a conversation and its messages. */
-    get: operations["conversations.get"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a conversation. */
+        post: operations["conversations.archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Archive a conversation. */
-    post: operations["conversations.archive"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a label on a conversation. */
+        post: operations["conversations.add_label"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Put a label on a conversation. */
-    post: operations["conversations.add_label"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels/{label_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels/{label_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a label off a conversation. */
+        delete: operations["conversations.remove_label"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Take a label off a conversation. */
-    delete: operations["conversations.remove_label"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one message's text and HTML bodies. */
+        get: operations["conversations.get_message_body"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Read one message's text and HTML bodies. */
-    get: operations["conversations.get_message_body"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a conversation read. */
+        post: operations["conversations.mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Mark a conversation read. */
-    post: operations["conversations.mark_read"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star a conversation. */
+        post: operations["conversations.star"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Star a conversation. */
-    post: operations["conversations.star"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a conversation to another stream. */
+        post: operations["conversations.move_to_stream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Move a conversation to another stream. */
-    post: operations["conversations.move_to_stream"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unarchive": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a conversation back to the inbox. */
+        post: operations["conversations.unarchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Move a conversation back to the inbox. */
-    post: operations["conversations.unarchive"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a conversation unread (its newest message). */
+        post: operations["conversations.mark_unread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Mark a conversation unread (its newest message). */
-    post: operations["conversations.mark_unread"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unstar a conversation. */
+        post: operations["conversations.unstar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Unstar a conversation. */
-    post: operations["conversations.unstar"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Connect a held mailbox to this workspace. */
+        post: operations["identity.adopt_held_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Connect a held mailbox to this workspace. */
-    post: operations["identity.adopt_held_grant"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/inboxes": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/inboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the inboxes you can read. */
+        get: operations["conversations.list_inboxes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List the inboxes you can read. */
-    get: operations["conversations.list_inboxes"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/invitations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List pending invitations. */
+        get: operations["workspaces.list_invitations"];
+        put?: never;
+        /** Invite someone. */
+        post: operations["workspaces.invite_member"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List pending invitations. */
-    get: operations["workspaces.list_invitations"];
-    put?: never;
-    /** Invite someone. */
-    post: operations["workspaces.invite_member"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/members": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List a workspace's members. */
+        get: operations["workspaces.list_members"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List a workspace's members. */
-    get: operations["workspaces.list_members"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/members/{user_id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/members/{user_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a member. */
+        delete: operations["workspaces.remove_member"];
+        options?: never;
+        head?: never;
+        /** Change a member's role. */
+        patch: operations["workspaces.change_role"];
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Remove a member. */
-    delete: operations["workspaces.remove_member"];
-    options?: never;
-    head?: never;
-    /** Change a member's role. */
-    patch: operations["workspaces.change_role"];
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/membership": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/membership": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Leave a workspace. */
+        delete: operations["workspaces.leave"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    post?: never;
-    /** Leave a workspace. */
-    delete: operations["workspaces.leave"];
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/w/{workspace_id}/security-events": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/w/{workspace_id}/security-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read the security log. */
+        get: operations["workspaces.list_security_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Read the security log. */
-    get: operations["workspaces.list_security_events"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/workspaces": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/workspaces": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List my workspaces. */
+        get: operations["workspaces.list"];
+        put?: never;
+        /** Create a workspace. */
+        post: operations["workspaces.create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** List my workspaces. */
-    get: operations["workspaces.list"];
-    put?: never;
-    /** Create a workspace. */
-    post: operations["workspaces.create"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/api/v1/workspaces/invitations/accept": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/api/v1/workspaces/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept an invitation. */
+        post: operations["workspaces.accept_invitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Accept an invitation. */
-    post: operations["workspaces.accept_invitation"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/auth/callback/{provider}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/auth/callback/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Finish a round trip. */
+        get: operations["identity.finish_sign_in"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Finish a round trip. */
-    get: operations["identity.finish_sign_in"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/auth/new-account": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/auth/new-account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The new account this browser may create (after a round trip with an
+         *     identity no account uses).
+         */
+        get: operations["identity.get_new_account"];
+        put?: never;
+        /** Create the pending account, sign in, and hold its mailbox grant. */
+        post: operations["identity.create_account"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * The new account this browser may create (after a round trip with an
-     *     identity no account uses).
-     */
-    get: operations["identity.get_new_account"];
-    put?: never;
-    /** Create the pending account, sign in, and hold its mailbox grant. */
-    post: operations["identity.create_account"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/auth/requests/{id}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/auth/requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The waiting authorization request `id`: who asks, and how one can sign in. */
+        get: operations["identity.get_sign_in_request"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** The waiting authorization request `id`: who asks, and how one can sign in. */
-    get: operations["identity.get_sign_in_request"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/auth/start/{provider}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/auth/start/{provider}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start a round trip to `provider`. */
+        get: operations["identity.start_sign_in"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Start a round trip to `provider`. */
-    get: operations["identity.start_sign_in"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/bff/api/{path}": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/api/{path}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read from the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        get: operations["bff.api_get"];
+        /**
+         * PUT to the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        put: operations["bff.api_put"];
+        /**
+         * POST to the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        post: operations["bff.api_post"];
+        /**
+         * DELETE in the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        delete: operations["bff.api_delete"];
+        options?: never;
+        head?: never;
+        /**
+         * PATCH the API as the signed-in user.
+         * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
+         *      body) with the session's access token attached, refreshed first when
+         *      it is about to expire. The token never leaves the server. Answers are
+         *      the API's own; without a live session the answer is 401
+         *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
+         *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
+         */
+        patch: operations["bff.api_patch"];
+        trace?: never;
     };
-    /**
-     * Read from the API as the signed-in user.
-     * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
-     *      body) with the session's access token attached, refreshed first when
-     *      it is about to expire. The token never leaves the server. Answers are
-     *      the API's own; without a live session the answer is 401
-     *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
-     *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
-     */
-    get: operations["bff.api_get"];
-    /**
-     * PUT to the API as the signed-in user.
-     * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
-     *      body) with the session's access token attached, refreshed first when
-     *      it is about to expire. The token never leaves the server. Answers are
-     *      the API's own; without a live session the answer is 401
-     *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
-     *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
-     */
-    put: operations["bff.api_put"];
-    /**
-     * POST to the API as the signed-in user.
-     * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
-     *      body) with the session's access token attached, refreshed first when
-     *      it is about to expire. The token never leaves the server. Answers are
-     *      the API's own; without a live session the answer is 401
-     *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
-     *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
-     */
-    post: operations["bff.api_post"];
-    /**
-     * DELETE in the API as the signed-in user.
-     * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
-     *      body) with the session's access token attached, refreshed first when
-     *      it is about to expire. The token never leaves the server. Answers are
-     *      the API's own; without a live session the answer is 401
-     *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
-     *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
-     */
-    delete: operations["bff.api_delete"];
-    options?: never;
-    head?: never;
-    /**
-     * PATCH the API as the signed-in user.
-     * @description `/bff/api/<path>` is `/api/<path>` (same method, query, headers and
-     *      body) with the session's access token attached, refreshed first when
-     *      it is about to expire. The token never leaves the server. Answers are
-     *      the API's own; without a live session the answer is 401
-     *      `session_required` (sign in at `/bff/login`). POST, PUT, PATCH and
-     *      DELETE need the `X-Campbooks-CSRF: 1` header from the app's origin.
-     */
-    patch: operations["bff.api_patch"];
-    trace?: never;
-  };
-  "/bff/backchannel-logout": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/backchannel-logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Back-channel logout (OIDC Back-Channel Logout 1.0).
+         * @description Called by the identity provider, not browsers, when a user's IdP session
+         *     ends: ends the web sessions the signed logout token names (by IdP session
+         *     id, or every session of the user).
+         */
+        post: operations["bff.backchannel_logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Back-channel logout (OIDC Back-Channel Logout 1.0).
-     * @description Called by the identity provider, not browsers, when a user's IdP session
-     *     ends: ends the web sessions the signed logout token names (by IdP session
-     *     id, or every session of the user).
-     */
-    post: operations["bff.backchannel_logout"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/bff/callback": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Finish signing in.
+         * @description The identity provider redirects here. Checks that `state` names a sign-in
+         *     this browser started (single use), exchanges the code with the PKCE
+         *     verifier, validates the ID token (issuer, audience, nonce, expiry,
+         *     signature), starts a session and sets the `SameSite=Strict` session
+         *     cookie. Answers with a small same-origin page that moves on to
+         *     `return_to`: a browser treats the whole redirect chain from the IdP as
+         *     cross-site and would not send the new cookie on a plain redirect.
+         */
+        get: operations["bff.callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Finish signing in.
-     * @description The identity provider redirects here. Checks that `state` names a sign-in
-     *     this browser started (single use), exchanges the code with the PKCE
-     *     verifier, validates the ID token (issuer, audience, nonce, expiry,
-     *     signature), starts a session and sets the `SameSite=Strict` session
-     *     cookie. Answers with a small same-origin page that moves on to
-     *     `return_to`: a browser treats the whole redirect chain from the IdP as
-     *     cross-site and would not send the new cookie on a plain redirect.
-     */
-    get: operations["bff.callback"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/bff/login": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start signing in.
+         * @description Creates a short-lived sign-in (state, nonce, PKCE verifier) bound to this
+         *     browser by a `SameSite=Lax` login cookie, and redirects to the identity
+         *     provider's authorization endpoint.
+         */
+        get: operations["bff.login"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * Start signing in.
-     * @description Creates a short-lived sign-in (state, nonce, PKCE verifier) bound to this
-     *     browser by a `SameSite=Lax` login cookie, and redirects to the identity
-     *     provider's authorization endpoint.
-     */
-    get: operations["bff.login"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/bff/logout": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign out.
+         * @description Ends the session, revokes its refresh token at the identity provider and
+         *     clears the cookie. Navigate to `logout_url` to end the identity
+         *     provider's session too.
+         */
+        post: operations["bff.logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Sign out.
-     * @description Ends the session, revokes its refresh token at the identity provider and
-     *     clears the cookie. Navigate to `logout_url` to end the identity
-     *     provider's session too.
-     */
-    post: operations["bff.logout"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/bff/session": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/bff/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The current session.
+         * @description For the web app to bootstrap: whether someone is signed in, and who.
+         *     Never returns a token.
+         */
+        get: operations["bff.session"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * The current session.
-     * @description For the web app to bootstrap: whether someone is signed in, and who.
-     *     Never returns a token.
-     */
-    get: operations["bff.session"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/oauth2/authorize": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/oauth2/authorize": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Start (or, for a signed-in browser, complete at once) an authorization. */
+        get: operations["identity.authorize"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /** Start (or, for a signed-in browser, complete at once) an authorization. */
-    get: operations["identity.authorize"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/oauth2/end_session": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/oauth2/end_session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * End the session `id_token_hint` names, then return to its client when it
+         *     registered `post_logout_redirect_uri`. No confirmation page.
+         */
+        get: operations["identity.end_session"];
+        put?: never;
+        /** The same, as a form POST (what the web BFF sends, in-process). */
+        post: operations["identity.end_session_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * End the session `id_token_hint` names, then return to its client when it
-     *     registered `post_logout_redirect_uri`. No confirmation page.
-     */
-    get: operations["identity.end_session"];
-    put?: never;
-    /** The same, as a form POST (what the web BFF sends, in-process). */
-    post: operations["identity.end_session_post"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/oauth2/jwks": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/oauth2/jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The issuer's published signing keys (JWKS): the key that signs now, its
+         *     successor once published, and recently retired ones.
+         */
+        get: operations["identity.jwks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    /**
-     * The issuer's published signing keys (JWKS): the key that signs now, its
-     *     successor once published, and recently retired ones.
-     */
-    get: operations["identity.jwks"];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/oauth2/revoke": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/oauth2/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke a refresh token and every token rotated from the same sign-in.
+         *     Access tokens are not tracked: they live ten minutes. Unknown tokens
+         *     answer 200 too (RFC 7009 §2.2).
+         */
+        post: operations["identity.revoke"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /**
-     * Revoke a refresh token and every token rotated from the same sign-in.
-     *     Access tokens are not tracked: they live ten minutes. Unknown tokens
-     *     answer 200 too (RFC 7009 §2.2).
-     */
-    post: operations["identity.revoke"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  "/oauth2/token": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
+    "/oauth2/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange an authorization code or a refresh token for tokens. */
+        post: operations["identity.token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
     };
-    get?: never;
-    put?: never;
-    /** Exchange an authorization code or a refresh token for tokens. */
-    post: operations["identity.token"];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-  schemas: {
-    /**
-     * @description The workspace's colour, one of the design system's accent presets.
-     * @enum {string}
-     */
-    Accent: "business" | "personal" | "forest";
-    /** @description The invitation to accept. */
-    AcceptInvitation: {
-      /** @description The token from the invitation link. */
-      token: string;
+    schemas: {
+        /**
+         * @description The workspace's colour, one of the design system's accent presets.
+         * @enum {string}
+         */
+        Accent: "business" | "personal" | "forest";
+        /** @description The invitation to accept. */
+        AcceptInvitation: {
+            /** @description The token from the invitation link. */
+            token: string;
+        };
+        /** @description The label to add. */
+        AddLabel: {
+            /**
+             * @description Its name; created in the conversation's inbox when new.
+             * @example Accountant
+             */
+            name: string;
+        };
+        /** @description One way to reach someone on a channel: a display name and an address. */
+        Address: {
+            /**
+             * @description The address, as given.
+             * @example ana@example.com
+             */
+            address: string;
+            /**
+             * @description The display name, when the message gave one.
+             * @example Ana Lopes
+             */
+            name?: string | null;
+        };
+        /** @description The connection the mailbox became. */
+        Adopted: {
+            /** @description The connection's id (a `connectors.connection`). */
+            connection: string;
+        };
+        /**
+         * Format: uuid
+         * @description AttachmentId (UUIDv7)
+         */
+        AttachmentId: string;
+        /** @description An attachment of a message. */
+        AttachmentView: {
+            /** @description Its media type, as sent (not trusted). */
+            content_type: string;
+            /** @description Its file name, as sent. */
+            filename: string;
+            /** @description The attachment. */
+            id: components["schemas"]["AttachmentId"];
+            /** @description Shown inside the body rather than attached. */
+            inline: boolean;
+            /**
+             * Format: int64
+             * @description Its size in bytes.
+             */
+            size: number;
+        };
+        /**
+         * Format: uuid
+         * @description AuthorizationId (UUIDv7)
+         */
+        AuthorizationId: string;
+        BackchannelLogout: {
+            /** @description The identity provider's signed logout token. */
+            logout_token: string;
+        };
+        /**
+         * @description What a connection lets Campbooks do with the account.
+         * @enum {string}
+         */
+        Capability: "messages" | "calendar" | "files" | "bank";
+        /** @description The new role. */
+        ChangeRole: {
+            /** @description The member's new role. */
+            role: components["schemas"]["Role"];
+        };
+        /**
+         * @description A kind of messaging. Email is the first.
+         * @enum {string}
+         */
+        Channel: "email";
+        /** @description What Google redirected the browser with. */
+        CompleteConnection: {
+            /** @description The `code` query parameter. */
+            code: string;
+            /** @description The `state` query parameter. */
+            state: string;
+        };
+        /**
+         * Format: uuid
+         * @description ConnectionId (UUIDv7)
+         */
+        ConnectionId: string;
+        /** @description The caller's connections. */
+        ConnectionList: {
+            /** @description Oldest first. */
+            connections: components["schemas"]["ConnectionView"][];
+        };
+        /** @description A connection as the API shows it. Never carries a credential. */
+        ConnectionView: {
+            /** @description The account's email address. */
+            address: string;
+            /** @description Whether the provider verified it. */
+            address_verified: boolean;
+            /** @description What it lets Campbooks do. */
+            capabilities: components["schemas"]["Capability"][];
+            /**
+             * Format: date-time
+             * @description When it was connected.
+             */
+            created_at: string;
+            /** @description The account's display name, when the provider gives one. */
+            display_name?: string | null;
+            /** @description The member who granted it. */
+            granted_by: components["schemas"]["UserId"];
+            /** @description How it is doing. */
+            health: components["schemas"]["Health"];
+            /**
+             * Format: date-time
+             * @description Since when it has had this health.
+             */
+            health_changed_at: string;
+            /** @description Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …). */
+            health_reason?: string | null;
+            /** @description The connection. */
+            id: components["schemas"]["ConnectionId"];
+            /** @description The provider. */
+            provider: components["schemas"]["Provider"];
+            /** @description Its change streams. */
+            streams: components["schemas"]["StreamView"][];
+        };
+        /** @description A conversation and its newest messages, oldest first. */
+        ConversationDetail: {
+            /** @description The conversation. */
+            conversation: components["schemas"]["ConversationSummary"];
+            /** @description Up to the 100 newest messages, oldest first. */
+            messages: components["schemas"]["MessageView"][];
+        };
+        /**
+         * Format: uuid
+         * @description ConversationId (UUIDv7)
+         */
+        ConversationId: string;
+        /** @description A page of conversations. */
+        ConversationList: {
+            /** @description Newest first. */
+            conversations: components["schemas"]["ConversationSummary"][];
+            /** @description Pass it as `cursor` for the next page; `None` on the last page. */
+            next_cursor?: string | null;
+        };
+        /** @description A conversation as lists show it. */
+        ConversationSummary: {
+            /** @description Whether no message is in the inbox. */
+            archived: boolean;
+            /** @description The conversation. */
+            id: components["schemas"]["ConversationId"];
+            /** @description Its inbox. */
+            inbox_id: components["schemas"]["InboxId"];
+            /** @description Its labels, by name. */
+            labels: components["schemas"]["LabelView"][];
+            /**
+             * Format: date-time
+             * @description When its newest message was sent.
+             */
+            last_message_at: string;
+            latest_from?: components["schemas"]["Address"] | null;
+            /**
+             * Format: int32
+             * @description Messages in it.
+             */
+            message_count: number;
+            /** @description The start of the newest message's text. */
+            snippet: string;
+            /** @description Whether any message is starred. */
+            starred: boolean;
+            /** @description Its stream. */
+            stream: components["schemas"]["Stream"];
+            /** @description Who put it there. */
+            stream_source: components["schemas"]["StreamSource"];
+            /** @description The first message's subject. */
+            subject: string;
+            /**
+             * Format: int32
+             * @description Unread inbound messages.
+             */
+            unread_count: number;
+        };
+        /** @description A new workspace. */
+        CreateWorkspace: {
+            accent?: components["schemas"]["Accent"] | null;
+            /** @description What it is for. */
+            kind: components["schemas"]["Kind"];
+            /**
+             * @description Its name, 1 to 100 characters (trimmed).
+             * @example Household
+             */
+            name: string;
+            /**
+             * @description The signup code, when the instance's policy is `code` and this is the
+             *     caller's first workspace.
+             */
+            signup_code?: string | null;
+        };
+        /** @description Where to go once the account exists. */
+        Created: {
+            /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
+            redirect: string;
+        };
+        /** @description A new invitation, as the inviter sees it once: with the link to pass on. */
+        CreatedInvitation: components["schemas"]["InvitationView"] & {
+            /**
+             * @description The link that accepts it (it carries the token). Returned only here,
+             *     once: no other endpoint, log or event ever shows it.
+             * @example https://campbooks.example.com/invitations/accept?token=…
+             */
+            accept_url: string;
+        };
+        /**
+         * @description Whether a message came in or went out.
+         * @enum {string}
+         */
+        Direction: "inbound" | "outbound";
+        /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
+        EndSession: {
+            /** @description The client asking; must be the hint's audience when given. */
+            client_id?: string | null;
+            /** @description An ID token the issuer gave the client for this sign-in. */
+            id_token_hint?: string | null;
+            /** @description Where to go afterwards; one of the client's registered values. */
+            post_logout_redirect_uri?: string | null;
+            /** @description Returned unchanged. */
+            state?: string | null;
+        };
+        /**
+         * @description How a connection is doing.
+         * @enum {string}
+         */
+        Health: "ok" | "needs_reauth" | "throttled" | "failing";
+        /** @description The instance is healthy. */
+        HealthResponse: {
+            /**
+             * @description Database status; always `ok` in a 200 response.
+             * @example ok
+             */
+            database: string;
+            /**
+             * @description Overall status; always `ok` in a 200 response.
+             * @example ok
+             */
+            status: string;
+        };
+        /** @description A mailbox waiting to be connected. */
+        HeldGrant: {
+            /** @description The mailbox address. */
+            address: string;
+            /** @description The provider's display name. */
+            display_name?: string | null;
+            /**
+             * Format: date-time
+             * @description When it stops waiting.
+             */
+            expires_at: string;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /** @description `google`. */
+            provider: string;
+        };
+        /** @description The caller's held mailbox grants. */
+        HeldGrants: {
+            /** @description Oldest first. */
+            items: components["schemas"]["HeldGrant"][];
+        };
+        /**
+         * Format: uuid
+         * @description InboxId (UUIDv7)
+         */
+        InboxId: string;
+        /** @description The inboxes, by address. */
+        InboxList: {
+            /** @description The inboxes. */
+            inboxes: components["schemas"]["InboxView"][];
+        };
+        /**
+         * @description A member's access to an inbox.
+         * @enum {string}
+         */
+        InboxRole: "reader" | "sender" | "manager";
+        /** @description An inbox. */
+        InboxView: {
+            /**
+             * @description Its address.
+             * @example office@example.com
+             */
+            address: string;
+            /** @description Its channel. */
+            channel: components["schemas"]["Channel"];
+            /** @description Its display name. */
+            display_name?: string | null;
+            /** @description The inbox. */
+            id: components["schemas"]["InboxId"];
+            role?: components["schemas"]["InboxRole"] | null;
+            /**
+             * Format: int32
+             * @description Unread inbound messages in conversations still in the inbox.
+             */
+            unread_count: number;
+        };
+        /**
+         * Format: uuid
+         * @description InvitationId (UUIDv7)
+         */
+        InvitationId: string;
+        /** @description Pending (not yet accepted) invitations, expired ones included. */
+        InvitationList: {
+            /** @description The invitations. */
+            invitations: components["schemas"]["InvitationView"][];
+        };
+        /**
+         * @description A pending invitation, as owners and admins see it. Never carries the
+         *     token.
+         */
+        InvitationView: {
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            created_at: string;
+            /**
+             * @description The invited address.
+             * @example someone@example.com
+             */
+            email: string;
+            /**
+             * Format: date-time
+             * @description When it stops working.
+             */
+            expires_at: string;
+            /** @description Its id. */
+            id: components["schemas"]["InvitationId"];
+            /** @description Who invited them. */
+            invited_by: components["schemas"]["UserId"];
+            /** @description The role they get on accepting. */
+            role: components["schemas"]["Role"];
+        };
+        /** @description Whom to invite. */
+        InviteMember: {
+            /**
+             * @description Their email address; the invitation can only be accepted by a user
+             *     whose verified email is this one.
+             * @example someone@example.com
+             */
+            email: string;
+            /**
+             * @description The role they get: `admin` or `member` (the default). Owners are made
+             *     by promotion, never by invitation.
+             */
+            role?: components["schemas"]["Role"];
+        };
+        /**
+         * @description What a workspace is for.
+         * @enum {string}
+         */
+        Kind: "business" | "personal";
+        /**
+         * Format: uuid
+         * @description LabelId (UUIDv7)
+         */
+        LabelId: string;
+        /** @description A label as shown on a conversation. */
+        LabelView: {
+            /** @description The label. */
+            id: components["schemas"]["LabelId"];
+            /** @description Its name. */
+            name: string;
+        };
+        /** @description Where to send the browser to sign out of the identity provider too. */
+        LogoutResponse: {
+            /**
+             * @description The identity provider's end-session URL (RP-initiated logout), which
+             *     comes back to the app's root; `null` when it has none.
+             */
+            logout_url?: string | null;
+        };
+        /** @description The members, in the order they joined. */
+        MemberList: {
+            /** @description The members. */
+            members: components["schemas"]["MemberView"][];
+        };
+        /** @description A member of a workspace. */
+        MemberView: {
+            /** @description Their name, as their identity provider gives it. */
+            display_name?: string | null;
+            /** @description Their email address, as their identity provider gives it. */
+            email?: string | null;
+            /**
+             * Format: date-time
+             * @description When they joined.
+             */
+            joined_at: string;
+            /** @description Their role. */
+            role: components["schemas"]["Role"];
+            /** @description The user. */
+            user_id: components["schemas"]["UserId"];
+        };
+        /** @description A message's bodies. */
+        MessageBody: {
+            /** @description The HTML part: untrusted, to be shown only in a sandboxed frame. */
+            html?: string | null;
+            /** @description The plain-text part. */
+            text?: string | null;
+            /** @description Whether either part was cut short. */
+            truncated: boolean;
+        };
+        /**
+         * Format: uuid
+         * @description MessageId (UUIDv7)
+         */
+        MessageId: string;
+        /** @description A message's plain-text body. */
+        MessageText: {
+            /** @description The text, up to 256 KiB. */
+            content: string;
+            /** @description Whether it was cut short. */
+            truncated: boolean;
+        };
+        /** @description A message, with its plain-text body. */
+        MessageView: {
+            /** @description Its attachments, in order. */
+            attachments: components["schemas"]["AttachmentView"][];
+            /** @description Copied recipients. */
+            cc: components["schemas"]["Address"][];
+            /** @description Received or sent. */
+            direction: components["schemas"]["Direction"];
+            /** @description The sender. */
+            from: components["schemas"]["Address"];
+            /** @description Whether it has an HTML body (`conversations.get_message_body`). */
+            has_html: boolean;
+            /** @description The message. */
+            id: components["schemas"]["MessageId"];
+            /** @description Read. */
+            read: boolean;
+            /** @description Where replies go, when not to the sender. */
+            reply_to: components["schemas"]["Address"][];
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+            /** @description Starred. */
+            starred: boolean;
+            /** @description The subject. */
+            subject: string;
+            text?: components["schemas"]["MessageText"] | null;
+            /** @description Recipients. */
+            to: components["schemas"]["Address"][];
+        };
+        /** @description Where to move the conversation. */
+        MoveToStream: {
+            /** @description The stream. */
+            stream: components["schemas"]["Stream"];
+        };
+        /** @description The pending new account, as the new-account screen shows it. */
+        NewAccount: {
+            /** @description The name it gave. */
+            display_name?: string | null;
+            /** @description The address it gave. */
+            email?: string | null;
+            /** @description The provider signed in with. */
+            provider: string;
+        };
+        /**
+         * @description Where a stream is in its reading.
+         * @enum {string}
+         */
+        Phase: "backfill" | "incremental" | "resync";
+        /**
+         * @description RFC 9457 problem details.
+         * @example {
+         *       "code": "not_found",
+         *       "detail": "This resource does not exist, or you cannot see it.",
+         *       "status": 404,
+         *       "title": "Not found",
+         *       "type": "about:blank"
+         *     }
+         */
+        Problem: {
+            /**
+             * @description Stable machine-readable reason (`not_found`, `invalid_token`,
+             *     `last_owner`, …); the same in every locale. Match on this, never on
+             *     `title` or `detail`.
+             */
+            code: string;
+            /** @description What went wrong in this occurrence, in the request's locale. */
+            detail: string;
+            /**
+             * Format: int32
+             * @description HTTP status code.
+             */
+            status: number;
+            /**
+             * @description Short summary of the problem type, in the request's locale
+             *     (`Content-Language`).
+             */
+            title: string;
+            /**
+             * @description URI identifying the problem type; `about:blank` when the HTTP status
+             *     says it all.
+             */
+            type: string;
+        };
+        /**
+         * @description An outside provider.
+         * @enum {string}
+         */
+        Provider: "google";
+        /** @description What the sign-in screen shows for a waiting authorization request. */
+        RequestInfo: {
+            /** @description The client asking. */
+            client_id: string;
+            /** @description The providers configured on this instance, in display order. */
+            providers: string[];
+        };
+        /** @description A revocation request (`application/x-www-form-urlencoded`). */
+        RevokeForm: {
+            /** @description The client (`client_secret_post`, or a public client). */
+            client_id?: string | null;
+            /** @description The client's secret (`client_secret_post`). */
+            client_secret?: string | null;
+            /** @description The token to revoke. */
+            token?: string | null;
+            /** @description `refresh_token` or `access_token`; a hint only. */
+            token_type_hint?: string | null;
+        };
+        /**
+         * @description A member's role in a workspace.
+         * @enum {string}
+         */
+        Role: "owner" | "admin" | "member";
+        /**
+         * Format: uuid
+         * @description SecurityEventId (UUIDv7)
+         */
+        SecurityEventId: string;
+        /** @description The log. */
+        SecurityEventList: {
+            /** @description The events, newest first. */
+            events: components["schemas"]["SecurityEventView"][];
+        };
+        /** @description One entry of the security log. */
+        SecurityEventView: {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            at: string;
+            /** @description Its id. */
+            id: components["schemas"]["SecurityEventId"];
+            /**
+             * @description What happened: `workspace_created`, `role_changed`, `invitation_created`,
+             *     `invitation_accepted`, `member_removed`, `member_left`, `workspace_deleted`.
+             * @example role_changed
+             */
+            kind: string;
+            /** @description Ids and roles involved; never secrets. */
+            metadata: unknown;
+            user_id?: components["schemas"]["UserId"] | null;
+        };
+        /** @description Who is signed in. Never contains a token. */
+        SessionInfo: {
+            /** @description Whether the request carries a live session. */
+            authenticated: boolean;
+            /**
+             * Format: date-time
+             * @description When the session ends at the latest (it ends sooner if left unused).
+             */
+            expires_at?: string | null;
+            user?: components["schemas"]["SessionUser"] | null;
+        };
+        /** @description The signed-in user, as the identity provider describes them. */
+        SessionUser: {
+            /** @description Email address. */
+            email?: string | null;
+            /** @description Display name. */
+            name?: string | null;
+            /** @description Stable user id at the identity provider. */
+            sub: string;
+        };
+        /** @description What to connect. */
+        StartConnection: {
+            /** @description The capabilities to ask for (`messages` is offered today). */
+            capabilities: components["schemas"]["Capability"][];
+            connection?: components["schemas"]["ConnectionId"] | null;
+            /** @description The provider. */
+            provider: components["schemas"]["Provider"];
+        };
+        /** @description A started consent. */
+        StartedConnection: {
+            /** @description The started authorization. */
+            authorization: components["schemas"]["AuthorizationId"];
+            /** @description Where to send the browser. */
+            authorize_url: string;
+            /**
+             * Format: date-time
+             * @description When the consent must be completed by.
+             */
+            expires_at: string;
+        };
+        /**
+         * @description The one place Campbooks sorts a conversation into. The built-in set; the
+         *     workspace's own streams come later.
+         * @enum {string}
+         */
+        Stream: "primary" | "updates" | "receipts" | "newsletters";
+        /**
+         * @description Who put a conversation in its stream.
+         * @enum {string}
+         */
+        StreamSource: "default" | "rules" | "model" | "member";
+        /** @description A change stream as the API shows it. */
+        StreamView: {
+            /** @description The capability it reads. */
+            capability: components["schemas"]["Capability"];
+            inbox_id?: components["schemas"]["InboxId"] | null;
+            /**
+             * Format: date-time
+             * @description When a run last found a change.
+             */
+            last_change_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When a run last finished.
+             */
+            last_synced_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it is next due.
+             */
+            next_sync_at?: string | null;
+            /** @description Paused until the member connects again. */
+            paused: boolean;
+            /** @description Where it is in its reading. */
+            phase: components["schemas"]["Phase"];
+        };
+        /** @description What was scheduled. */
+        SyncScheduled: {
+            /**
+             * Format: int32
+             * @description How many streams will run now.
+             */
+            streams: number;
+        };
+        /** @description A token request (`application/x-www-form-urlencoded`). */
+        TokenForm: {
+            /** @description The client (`client_secret_post`, or a public client). */
+            client_id?: string | null;
+            /** @description The client's secret (`client_secret_post`). */
+            client_secret?: string | null;
+            /** @description The authorization code. */
+            code?: string | null;
+            /** @description The PKCE verifier. */
+            code_verifier?: string | null;
+            /** @description `authorization_code` or `refresh_token`. */
+            grant_type?: string | null;
+            /** @description The redirect URI the code was issued for. */
+            redirect_uri?: string | null;
+            /** @description The refresh token. */
+            refresh_token?: string | null;
+        };
+        /** @description A successful token response (RFC 6749 §5.1). */
+        TokenResponse: {
+            /** @description The access token, a JWT for the API. */
+            access_token: string;
+            /**
+             * Format: int64
+             * @description Seconds until the access token expires.
+             */
+            expires_in: number;
+            /** @description The ID token (when `openid` was granted). */
+            id_token?: string | null;
+            /** @description A new refresh token (rotated on every use). */
+            refresh_token?: string | null;
+            /** @description The granted scopes. */
+            scope: string;
+            /** @description Always `Bearer`. */
+            token_type: string;
+        };
+        /** @description The settings to change; absent fields stay as they are. */
+        UpdateWorkspace: {
+            accent?: components["schemas"]["Accent"] | null;
+            /** @description A new name, 1 to 100 characters (trimmed). */
+            name?: string | null;
+        };
+        /**
+         * Format: uuid
+         * @description UserId (UUIDv7)
+         */
+        UserId: string;
+        /** @description The running build. */
+        VersionResponse: {
+            /**
+             * @description Git commit the build came from, when known (`GIT_SHA` at runtime).
+             * @example 3f2c1e0
+             */
+            commit?: string | null;
+            /**
+             * @description Semantic version of the server.
+             * @example 0.1.0
+             */
+            version: string;
+        };
+        /** @description A deleted workspace. */
+        WorkspaceDeletion: {
+            /** @description The workspace. */
+            id: components["schemas"]["WorkspaceId"];
+            /**
+             * Format: date-time
+             * @description When its records will be purged for good.
+             */
+            purge_after: string;
+        };
+        /**
+         * Format: uuid
+         * @description WorkspaceId (UUIDv7)
+         */
+        WorkspaceId: string;
+        /** @description The caller's workspaces, oldest first, each with their role. */
+        WorkspaceList: {
+            /** @description The workspaces. */
+            workspaces: components["schemas"]["WorkspaceView"][];
+        };
+        /** @description A workspace, as its members see it. */
+        WorkspaceView: {
+            /** @description Its colour. */
+            accent: components["schemas"]["Accent"];
+            /**
+             * Format: date-time
+             * @description When it was created.
+             */
+            created_at: string;
+            /** @description Its id. */
+            id: components["schemas"]["WorkspaceId"];
+            /** @description What it is for. */
+            kind: components["schemas"]["Kind"];
+            /**
+             * @description Its name.
+             * @example Household
+             */
+            name: string;
+            role?: components["schemas"]["Role"] | null;
+        };
     };
-    /** @description The label to add. */
-    AddLabel: {
-      /**
-       * @description Its name; created in the conversation's inbox when new.
-       * @example Accountant
-       */
-      name: string;
-    };
-    /** @description One way to reach someone on a channel: a display name and an address. */
-    Address: {
-      /**
-       * @description The address, as given.
-       * @example ana@example.com
-       */
-      address: string;
-      /**
-       * @description The display name, when the message gave one.
-       * @example Ana Lopes
-       */
-      name?: string | null;
-    };
-    /** @description The connection the mailbox became. */
-    Adopted: {
-      /** @description The connection's id (a `connectors.connection`). */
-      connection: string;
-    };
-    /**
-     * Format: uuid
-     * @description AttachmentId (UUIDv7)
-     */
-    AttachmentId: string;
-    /** @description An attachment of a message. */
-    AttachmentView: {
-      /** @description Its media type, as sent (not trusted). */
-      content_type: string;
-      /** @description Its file name, as sent. */
-      filename: string;
-      /** @description The attachment. */
-      id: components["schemas"]["AttachmentId"];
-      /** @description Shown inside the body rather than attached. */
-      inline: boolean;
-      /**
-       * Format: int64
-       * @description Its size in bytes.
-       */
-      size: number;
-    };
-    /**
-     * Format: uuid
-     * @description AuthorizationId (UUIDv7)
-     */
-    AuthorizationId: string;
-    BackchannelLogout: {
-      /** @description The identity provider's signed logout token. */
-      logout_token: string;
-    };
-    /**
-     * @description What a connection lets Campbooks do with the account.
-     * @enum {string}
-     */
-    Capability: "messages" | "calendar" | "files" | "bank";
-    /** @description The new role. */
-    ChangeRole: {
-      /** @description The member's new role. */
-      role: components["schemas"]["Role"];
-    };
-    /**
-     * @description A kind of messaging. Email is the first.
-     * @enum {string}
-     */
-    Channel: "email";
-    /** @description What Google redirected the browser with. */
-    CompleteConnection: {
-      /** @description The `code` query parameter. */
-      code: string;
-      /** @description The `state` query parameter. */
-      state: string;
-    };
-    /**
-     * Format: uuid
-     * @description ConnectionId (UUIDv7)
-     */
-    ConnectionId: string;
-    /** @description The caller's connections. */
-    ConnectionList: {
-      /** @description Oldest first. */
-      connections: components["schemas"]["ConnectionView"][];
-    };
-    /** @description A connection as the API shows it. Never carries a credential. */
-    ConnectionView: {
-      /** @description The account's email address. */
-      address: string;
-      /** @description Whether the provider verified it. */
-      address_verified: boolean;
-      /** @description What it lets Campbooks do. */
-      capabilities: components["schemas"]["Capability"][];
-      /**
-       * Format: date-time
-       * @description When it was connected.
-       */
-      created_at: string;
-      /** @description The account's display name, when the provider gives one. */
-      display_name?: string | null;
-      /** @description The member who granted it. */
-      granted_by: components["schemas"]["UserId"];
-      /** @description How it is doing. */
-      health: components["schemas"]["Health"];
-      /**
-       * Format: date-time
-       * @description Since when it has had this health.
-       */
-      health_changed_at: string;
-      /** @description Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …). */
-      health_reason?: string | null;
-      /** @description The connection. */
-      id: components["schemas"]["ConnectionId"];
-      /** @description The provider. */
-      provider: components["schemas"]["Provider"];
-      /** @description Its change streams. */
-      streams: components["schemas"]["StreamView"][];
-    };
-    /** @description A conversation and its newest messages, oldest first. */
-    ConversationDetail: {
-      /** @description The conversation. */
-      conversation: components["schemas"]["ConversationSummary"];
-      /** @description Up to the 100 newest messages, oldest first. */
-      messages: components["schemas"]["MessageView"][];
-    };
-    /**
-     * Format: uuid
-     * @description ConversationId (UUIDv7)
-     */
-    ConversationId: string;
-    /** @description A page of conversations. */
-    ConversationList: {
-      /** @description Newest first. */
-      conversations: components["schemas"]["ConversationSummary"][];
-      /** @description Pass it as `cursor` for the next page; `None` on the last page. */
-      next_cursor?: string | null;
-    };
-    /** @description A conversation as lists show it. */
-    ConversationSummary: {
-      /** @description Whether no message is in the inbox. */
-      archived: boolean;
-      /** @description The conversation. */
-      id: components["schemas"]["ConversationId"];
-      /** @description Its inbox. */
-      inbox_id: components["schemas"]["InboxId"];
-      /** @description Its labels, by name. */
-      labels: components["schemas"]["LabelView"][];
-      /**
-       * Format: date-time
-       * @description When its newest message was sent.
-       */
-      last_message_at: string;
-      latest_from?: components["schemas"]["Address"] | null;
-      /**
-       * Format: int32
-       * @description Messages in it.
-       */
-      message_count: number;
-      /** @description The start of the newest message's text. */
-      snippet: string;
-      /** @description Whether any message is starred. */
-      starred: boolean;
-      /** @description Its stream. */
-      stream: components["schemas"]["Stream"];
-      /** @description Who put it there. */
-      stream_source: components["schemas"]["StreamSource"];
-      /** @description The first message's subject. */
-      subject: string;
-      /**
-       * Format: int32
-       * @description Unread inbound messages.
-       */
-      unread_count: number;
-    };
-    /** @description A new workspace. */
-    CreateWorkspace: {
-      accent?: components["schemas"]["Accent"] | null;
-      /** @description What it is for. */
-      kind: components["schemas"]["Kind"];
-      /**
-       * @description Its name, 1 to 100 characters (trimmed).
-       * @example Household
-       */
-      name: string;
-      /**
-       * @description The signup code, when the instance's policy is `code` and this is the
-       *     caller's first workspace.
-       */
-      signup_code?: string | null;
-    };
-    /** @description Where to go once the account exists. */
-    Created: {
-      /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
-      redirect: string;
-    };
-    /** @description A new invitation, as the inviter sees it once: with the link to pass on. */
-    CreatedInvitation: components["schemas"]["InvitationView"] & {
-      /**
-       * @description The link that accepts it (it carries the token). Returned only here,
-       *     once: no other endpoint, log or event ever shows it.
-       * @example https://campbooks.example.com/invitations/accept?token=…
-       */
-      accept_url: string;
-    };
-    /**
-     * @description Whether a message came in or went out.
-     * @enum {string}
-     */
-    Direction: "inbound" | "outbound";
-    /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
-    EndSession: {
-      /** @description The client asking; must be the hint's audience when given. */
-      client_id?: string | null;
-      /** @description An ID token the issuer gave the client for this sign-in. */
-      id_token_hint?: string | null;
-      /** @description Where to go afterwards; one of the client's registered values. */
-      post_logout_redirect_uri?: string | null;
-      /** @description Returned unchanged. */
-      state?: string | null;
-    };
-    /**
-     * @description How a connection is doing.
-     * @enum {string}
-     */
-    Health: "ok" | "needs_reauth" | "throttled" | "failing";
-    /** @description The instance is healthy. */
-    HealthResponse: {
-      /**
-       * @description Database status; always `ok` in a 200 response.
-       * @example ok
-       */
-      database: string;
-      /**
-       * @description Overall status; always `ok` in a 200 response.
-       * @example ok
-       */
-      status: string;
-    };
-    /** @description A mailbox waiting to be connected. */
-    HeldGrant: {
-      /** @description The mailbox address. */
-      address: string;
-      /** @description The provider's display name. */
-      display_name?: string | null;
-      /**
-       * Format: date-time
-       * @description When it stops waiting.
-       */
-      expires_at: string;
-      /**
-       * Format: uuid
-       * @description Its id.
-       */
-      id: string;
-      /** @description `google`. */
-      provider: string;
-    };
-    /** @description The caller's held mailbox grants. */
-    HeldGrants: {
-      /** @description Oldest first. */
-      items: components["schemas"]["HeldGrant"][];
-    };
-    /**
-     * Format: uuid
-     * @description InboxId (UUIDv7)
-     */
-    InboxId: string;
-    /** @description The inboxes, by address. */
-    InboxList: {
-      /** @description The inboxes. */
-      inboxes: components["schemas"]["InboxView"][];
-    };
-    /**
-     * @description A member's access to an inbox.
-     * @enum {string}
-     */
-    InboxRole: "reader" | "sender" | "manager";
-    /** @description An inbox. */
-    InboxView: {
-      /**
-       * @description Its address.
-       * @example office@example.com
-       */
-      address: string;
-      /** @description Its channel. */
-      channel: components["schemas"]["Channel"];
-      /** @description Its display name. */
-      display_name?: string | null;
-      /** @description The inbox. */
-      id: components["schemas"]["InboxId"];
-      role?: components["schemas"]["InboxRole"] | null;
-      /**
-       * Format: int32
-       * @description Unread inbound messages in conversations still in the inbox.
-       */
-      unread_count: number;
-    };
-    /**
-     * Format: uuid
-     * @description InvitationId (UUIDv7)
-     */
-    InvitationId: string;
-    /** @description Pending (not yet accepted) invitations, expired ones included. */
-    InvitationList: {
-      /** @description The invitations. */
-      invitations: components["schemas"]["InvitationView"][];
-    };
-    /**
-     * @description A pending invitation, as owners and admins see it. Never carries the
-     *     token.
-     */
-    InvitationView: {
-      /**
-       * Format: date-time
-       * @description When it was sent.
-       */
-      created_at: string;
-      /**
-       * @description The invited address.
-       * @example someone@example.com
-       */
-      email: string;
-      /**
-       * Format: date-time
-       * @description When it stops working.
-       */
-      expires_at: string;
-      /** @description Its id. */
-      id: components["schemas"]["InvitationId"];
-      /** @description Who invited them. */
-      invited_by: components["schemas"]["UserId"];
-      /** @description The role they get on accepting. */
-      role: components["schemas"]["Role"];
-    };
-    /** @description Whom to invite. */
-    InviteMember: {
-      /**
-       * @description Their email address; the invitation can only be accepted by a user
-       *     whose verified email is this one.
-       * @example someone@example.com
-       */
-      email: string;
-      /**
-       * @description The role they get: `admin` or `member` (the default). Owners are made
-       *     by promotion, never by invitation.
-       */
-      role?: components["schemas"]["Role"];
-    };
-    /**
-     * @description What a workspace is for.
-     * @enum {string}
-     */
-    Kind: "business" | "personal";
-    /**
-     * Format: uuid
-     * @description LabelId (UUIDv7)
-     */
-    LabelId: string;
-    /** @description A label as shown on a conversation. */
-    LabelView: {
-      /** @description The label. */
-      id: components["schemas"]["LabelId"];
-      /** @description Its name. */
-      name: string;
-    };
-    /** @description Where to send the browser to sign out of the identity provider too. */
-    LogoutResponse: {
-      /**
-       * @description The identity provider's end-session URL (RP-initiated logout), which
-       *     comes back to the app's root; `null` when it has none.
-       */
-      logout_url?: string | null;
-    };
-    /** @description The members, in the order they joined. */
-    MemberList: {
-      /** @description The members. */
-      members: components["schemas"]["MemberView"][];
-    };
-    /** @description A member of a workspace. */
-    MemberView: {
-      /** @description Their name, as their identity provider gives it. */
-      display_name?: string | null;
-      /** @description Their email address, as their identity provider gives it. */
-      email?: string | null;
-      /**
-       * Format: date-time
-       * @description When they joined.
-       */
-      joined_at: string;
-      /** @description Their role. */
-      role: components["schemas"]["Role"];
-      /** @description The user. */
-      user_id: components["schemas"]["UserId"];
-    };
-    /** @description A message's bodies. */
-    MessageBody: {
-      /** @description The HTML part: untrusted, to be shown only in a sandboxed frame. */
-      html?: string | null;
-      /** @description The plain-text part. */
-      text?: string | null;
-      /** @description Whether either part was cut short. */
-      truncated: boolean;
-    };
-    /**
-     * Format: uuid
-     * @description MessageId (UUIDv7)
-     */
-    MessageId: string;
-    /** @description A message's plain-text body. */
-    MessageText: {
-      /** @description The text, up to 256 KiB. */
-      content: string;
-      /** @description Whether it was cut short. */
-      truncated: boolean;
-    };
-    /** @description A message, with its plain-text body. */
-    MessageView: {
-      /** @description Its attachments, in order. */
-      attachments: components["schemas"]["AttachmentView"][];
-      /** @description Copied recipients. */
-      cc: components["schemas"]["Address"][];
-      /** @description Received or sent. */
-      direction: components["schemas"]["Direction"];
-      /** @description The sender. */
-      from: components["schemas"]["Address"];
-      /** @description Whether it has an HTML body (`conversations.get_message_body`). */
-      has_html: boolean;
-      /** @description The message. */
-      id: components["schemas"]["MessageId"];
-      /** @description Read. */
-      read: boolean;
-      /** @description Where replies go, when not to the sender. */
-      reply_to: components["schemas"]["Address"][];
-      /**
-       * Format: date-time
-       * @description When it was sent.
-       */
-      sent_at: string;
-      /** @description Starred. */
-      starred: boolean;
-      /** @description The subject. */
-      subject: string;
-      text?: components["schemas"]["MessageText"] | null;
-      /** @description Recipients. */
-      to: components["schemas"]["Address"][];
-    };
-    /** @description Where to move the conversation. */
-    MoveToStream: {
-      /** @description The stream. */
-      stream: components["schemas"]["Stream"];
-    };
-    /** @description The pending new account, as the new-account screen shows it. */
-    NewAccount: {
-      /** @description The name it gave. */
-      display_name?: string | null;
-      /** @description The address it gave. */
-      email?: string | null;
-      /** @description The provider signed in with. */
-      provider: string;
-    };
-    /**
-     * @description Where a stream is in its reading.
-     * @enum {string}
-     */
-    Phase: "backfill" | "incremental" | "resync";
-    /**
-     * @description RFC 9457 problem details.
-     * @example {
-     *       "code": "not_found",
-     *       "detail": "This resource does not exist, or you cannot see it.",
-     *       "status": 404,
-     *       "title": "Not found",
-     *       "type": "about:blank"
-     *     }
-     */
-    Problem: {
-      /**
-       * @description Stable machine-readable reason (`not_found`, `invalid_token`,
-       *     `last_owner`, …); the same in every locale. Match on this, never on
-       *     `title` or `detail`.
-       */
-      code: string;
-      /** @description What went wrong in this occurrence, in the request's locale. */
-      detail: string;
-      /**
-       * Format: int32
-       * @description HTTP status code.
-       */
-      status: number;
-      /**
-       * @description Short summary of the problem type, in the request's locale
-       *     (`Content-Language`).
-       */
-      title: string;
-      /**
-       * @description URI identifying the problem type; `about:blank` when the HTTP status
-       *     says it all.
-       */
-      type: string;
-    };
-    /**
-     * @description An outside provider.
-     * @enum {string}
-     */
-    Provider: "google";
-    /** @description What the sign-in screen shows for a waiting authorization request. */
-    RequestInfo: {
-      /** @description The client asking. */
-      client_id: string;
-      /** @description The providers configured on this instance, in display order. */
-      providers: string[];
-    };
-    /** @description A revocation request (`application/x-www-form-urlencoded`). */
-    RevokeForm: {
-      /** @description The client (`client_secret_post`, or a public client). */
-      client_id?: string | null;
-      /** @description The client's secret (`client_secret_post`). */
-      client_secret?: string | null;
-      /** @description The token to revoke. */
-      token?: string | null;
-      /** @description `refresh_token` or `access_token`; a hint only. */
-      token_type_hint?: string | null;
-    };
-    /**
-     * @description A member's role in a workspace.
-     * @enum {string}
-     */
-    Role: "owner" | "admin" | "member";
-    /**
-     * Format: uuid
-     * @description SecurityEventId (UUIDv7)
-     */
-    SecurityEventId: string;
-    /** @description The log. */
-    SecurityEventList: {
-      /** @description The events, newest first. */
-      events: components["schemas"]["SecurityEventView"][];
-    };
-    /** @description One entry of the security log. */
-    SecurityEventView: {
-      /**
-       * Format: date-time
-       * @description When.
-       */
-      at: string;
-      /** @description Its id. */
-      id: components["schemas"]["SecurityEventId"];
-      /**
-       * @description What happened: `workspace_created`, `role_changed`, `invitation_created`,
-       *     `invitation_accepted`, `member_removed`, `member_left`, `workspace_deleted`.
-       * @example role_changed
-       */
-      kind: string;
-      /** @description Ids and roles involved; never secrets. */
-      metadata: unknown;
-      user_id?: components["schemas"]["UserId"] | null;
-    };
-    /** @description Who is signed in. Never contains a token. */
-    SessionInfo: {
-      /** @description Whether the request carries a live session. */
-      authenticated: boolean;
-      /**
-       * Format: date-time
-       * @description When the session ends at the latest (it ends sooner if left unused).
-       */
-      expires_at?: string | null;
-      user?: components["schemas"]["SessionUser"] | null;
-    };
-    /** @description The signed-in user, as the identity provider describes them. */
-    SessionUser: {
-      /** @description Email address. */
-      email?: string | null;
-      /** @description Display name. */
-      name?: string | null;
-      /** @description Stable user id at the identity provider. */
-      sub: string;
-    };
-    /** @description What to connect. */
-    StartConnection: {
-      /** @description The capabilities to ask for (`messages` is offered today). */
-      capabilities: components["schemas"]["Capability"][];
-      connection?: components["schemas"]["ConnectionId"] | null;
-      /** @description The provider. */
-      provider: components["schemas"]["Provider"];
-    };
-    /** @description A started consent. */
-    StartedConnection: {
-      /** @description The started authorization. */
-      authorization: components["schemas"]["AuthorizationId"];
-      /** @description Where to send the browser. */
-      authorize_url: string;
-      /**
-       * Format: date-time
-       * @description When the consent must be completed by.
-       */
-      expires_at: string;
-    };
-    /**
-     * @description The one place Campbooks sorts a conversation into. The built-in set; the
-     *     workspace's own streams come later.
-     * @enum {string}
-     */
-    Stream: "primary" | "updates" | "receipts" | "newsletters";
-    /**
-     * @description Who put a conversation in its stream.
-     * @enum {string}
-     */
-    StreamSource: "default" | "rules" | "model" | "member";
-    /** @description A change stream as the API shows it. */
-    StreamView: {
-      /** @description The capability it reads. */
-      capability: components["schemas"]["Capability"];
-      inbox_id?: components["schemas"]["InboxId"] | null;
-      /**
-       * Format: date-time
-       * @description When a run last found a change.
-       */
-      last_change_at?: string | null;
-      /**
-       * Format: date-time
-       * @description When a run last finished.
-       */
-      last_synced_at?: string | null;
-      /**
-       * Format: date-time
-       * @description When it is next due.
-       */
-      next_sync_at?: string | null;
-      /** @description Paused until the member connects again. */
-      paused: boolean;
-      /** @description Where it is in its reading. */
-      phase: components["schemas"]["Phase"];
-    };
-    /** @description What was scheduled. */
-    SyncScheduled: {
-      /**
-       * Format: int32
-       * @description How many streams will run now.
-       */
-      streams: number;
-    };
-    /** @description A token request (`application/x-www-form-urlencoded`). */
-    TokenForm: {
-      /** @description The client (`client_secret_post`, or a public client). */
-      client_id?: string | null;
-      /** @description The client's secret (`client_secret_post`). */
-      client_secret?: string | null;
-      /** @description The authorization code. */
-      code?: string | null;
-      /** @description The PKCE verifier. */
-      code_verifier?: string | null;
-      /** @description `authorization_code` or `refresh_token`. */
-      grant_type?: string | null;
-      /** @description The redirect URI the code was issued for. */
-      redirect_uri?: string | null;
-      /** @description The refresh token. */
-      refresh_token?: string | null;
-    };
-    /** @description A successful token response (RFC 6749 §5.1). */
-    TokenResponse: {
-      /** @description The access token, a JWT for the API. */
-      access_token: string;
-      /**
-       * Format: int64
-       * @description Seconds until the access token expires.
-       */
-      expires_in: number;
-      /** @description The ID token (when `openid` was granted). */
-      id_token?: string | null;
-      /** @description A new refresh token (rotated on every use). */
-      refresh_token?: string | null;
-      /** @description The granted scopes. */
-      scope: string;
-      /** @description Always `Bearer`. */
-      token_type: string;
-    };
-    /** @description The settings to change; absent fields stay as they are. */
-    UpdateWorkspace: {
-      accent?: components["schemas"]["Accent"] | null;
-      /** @description A new name, 1 to 100 characters (trimmed). */
-      name?: string | null;
-    };
-    /**
-     * Format: uuid
-     * @description UserId (UUIDv7)
-     */
-    UserId: string;
-    /** @description The running build. */
-    VersionResponse: {
-      /**
-       * @description Git commit the build came from, when known (`GIT_SHA` at runtime).
-       * @example 3f2c1e0
-       */
-      commit?: string | null;
-      /**
-       * @description Semantic version of the server.
-       * @example 0.1.0
-       */
-      version: string;
-    };
-    /** @description A deleted workspace. */
-    WorkspaceDeletion: {
-      /** @description The workspace. */
-      id: components["schemas"]["WorkspaceId"];
-      /**
-       * Format: date-time
-       * @description When its records will be purged for good.
-       */
-      purge_after: string;
-    };
-    /**
-     * Format: uuid
-     * @description WorkspaceId (UUIDv7)
-     */
-    WorkspaceId: string;
-    /** @description The caller's workspaces, oldest first, each with their role. */
-    WorkspaceList: {
-      /** @description The workspaces. */
-      workspaces: components["schemas"]["WorkspaceView"][];
-    };
-    /** @description A workspace, as its members see it. */
-    WorkspaceView: {
-      /** @description Its colour. */
-      accent: components["schemas"]["Accent"];
-      /**
-       * Format: date-time
-       * @description When it was created.
-       */
-      created_at: string;
-      /** @description Its id. */
-      id: components["schemas"]["WorkspaceId"];
-      /** @description What it is for. */
-      kind: components["schemas"]["Kind"];
-      /**
-       * @description Its name.
-       * @example Household
-       */
-      name: string;
-      role?: components["schemas"]["Role"] | null;
-    };
-  };
-  responses: never;
-  parameters: never;
-  requestBodies: never;
-  headers: never;
-  pathItems: never;
+    responses: never;
+    parameters: never;
+    requestBodies: never;
+    headers: never;
+    pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  "identity.authorization_server_metadata": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The issuer's metadata. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": Record<string, never>;
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.openid_configuration": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The issuer's metadata. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": Record<string, never>;
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.list_held_grants": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The caller's held grants. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HeldGrants"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The token lacks `identity:read`. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "identity.discard_held_grant": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The held grant. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Discarded. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The token lacks `identity:write`. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Not the caller's, or gone. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "system.health": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The instance and its database are up. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["HealthResponse"];
-        };
-      };
-      /** @description The database is unreachable. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "system.version": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The running build. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["VersionResponse"];
-        };
-      };
-    };
-  };
-  "workspaces.get": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The workspace. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceView"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.delete": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Deleted; its records are purged after the grace period. */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceDeletion"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not an owner. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.update": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UpdateWorkspace"];
-      };
-    };
-    responses: {
-      /** @description The updated workspace. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceView"];
-        };
-      };
-      /** @description Invalid name or body. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not an owner or admin. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "changes.stream": {
-    parameters: {
-      query?: {
-        /**
-         * @description The last cursor received, for clients that cannot send
-         *     `Last-Event-ID` (the header wins when both are present). Omit it to
-         *     start from now.
-         */
-        after?: string;
-      };
-      header?: {
-        /** @description The last cursor received; resumes after it. */
-        "Last-Event-ID"?: string | null;
-      };
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The change stream. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "text/event-stream": string;
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `too_many_streams`: you hold the maximum number of open streams. */
-      429: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.list_connections": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The connections you may see. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConnectionList"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.start_connection": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["StartConnection"];
-      };
-    };
-    responses: {
-      /** @description Send the browser to `authorize_url`. */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["StartedConnection"];
-        };
-      };
-      /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`). */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or a client token (`connection_needs_user`). */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or no such connection of yours. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The provider is not configured on this instance (`provider_not_configured`). */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.complete_connection": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CompleteConnection"];
-      };
-    };
-    responses: {
-      /** @description The connection, syncing. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConnectionView"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`). */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such started connection of yours in this workspace, or it expired. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The provider could not be reached (`provider_unavailable`). */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.get_connection": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The connection. */
-        connection_id: components["schemas"]["ConnectionId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The connection. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConnectionView"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such connection, or you may not see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.disconnect": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The connection. */
-        connection_id: components["schemas"]["ConnectionId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Disconnected. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or a client token (`connection_needs_user`). */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such connection, or you may not see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "connectors.sync_now": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The connection. */
-        connection_id: components["schemas"]["ConnectionId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Its streams run now; a run already waiting absorbs this one. */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["SyncScheduled"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such connection, or you may not see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The member must connect it again first (`needs_reauth`). */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.list": {
-    parameters: {
-      query?: {
-        /** @description Only this stream; every stream when absent. */
-        stream?: components["schemas"]["Stream"];
-        /** @description Only this inbox; every inbox you can read when absent. */
-        inbox?: components["schemas"]["InboxId"];
-        /** @description `true` for archived conversations instead of those in the inbox. */
-        archived?: boolean;
-        /** @description `next_cursor` of the previous page. */
-        cursor?: string;
-        /** @description Page size, 1 to 100 (default 50). */
-        limit?: number;
-      };
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description A page of conversations. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationList"];
-        };
-      };
-      /** @description A malformed cursor or limit. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace or inbox, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.get": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationDetail"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.archive": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.add_label": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["AddLabel"];
-      };
-    };
-    responses: {
-      /** @description The label, now on the conversation. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["LabelView"];
-        };
-      };
-      /** @description An empty or too long name. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.remove_label": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-        /** @description The label. */
-        label_id: components["schemas"]["LabelId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The label is off the conversation. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or the label is not on it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.get_message_body": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-        /** @description The message. */
-        message_id: components["schemas"]["MessageId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The bodies. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["MessageBody"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such message, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.mark_read": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.star": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.move_to_stream": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MoveToStream"];
-      };
-    };
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description Not a stream. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.unarchive": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.mark_unread": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.unstar": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The conversation. */
-        conversation_id: components["schemas"]["ConversationId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The conversation afterwards. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["ConversationSummary"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such conversation, or you cannot see it. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "identity.adopt_held_grant": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The held grant. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Connected. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Adopted"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The token lacks `identity:write` or `connectors:write`. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Not a member of the workspace, or the grant is not the caller's, or gone. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description The connectors module refused it (e.g. `account_connected_by_another_member`, `mailbox_unsupported`). */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "conversations.list_inboxes": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The inboxes. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["InboxList"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.list_invitations": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Pending invitations. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["InvitationList"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not an owner or admin. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.invite_member": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["InviteMember"];
-      };
-    };
-    responses: {
-      /** @description Invited, with the accept link to pass on (shown only in this response). A previous pending invitation to the same address is replaced. */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["CreatedInvitation"];
-        };
-      };
-      /** @description Invalid email, role or body. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not an owner or admin. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `already_a_member`. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.list_members": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The members. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["MemberList"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.remove_member": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The member. */
-        user_id: components["schemas"]["UserId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Removed. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, not an owner or admin, or an admin removing an owner. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace or member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `last_owner`: the workspace would have no owner. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.change_role": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-        /** @description The member. */
-        user_id: components["schemas"]["UserId"];
-      };
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ChangeRole"];
-      };
-    };
-    responses: {
-      /** @description The member with their new role. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["MemberView"];
-        };
-      };
-      /** @description Invalid body. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, not an owner or admin, or an admin acting on the owner role. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace or member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `last_owner`: the workspace would have no owner. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.leave": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description You are no longer a member. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or a client token. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `last_owner`: you are its only owner. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.list_security_events": {
-    parameters: {
-      query?: {
-        /** @description How many, newest first: 1 to 200, default 50. */
-        limit?: number;
-      };
-      header?: never;
-      path: {
-        /** @description The workspace. */
-        workspace_id: components["schemas"]["WorkspaceId"];
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The newest events. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["SecurityEventList"];
-        };
-      };
-      /** @description Invalid limit. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not an owner or admin. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such workspace, or you are not a member. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.list": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The workspaces you belong to. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceList"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, or not a user token. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.create": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CreateWorkspace"];
-      };
-    };
-    responses: {
-      /** @description Created; you are its owner. */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceView"];
-        };
-      };
-      /** @description Invalid name or body. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`). */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "workspaces.accept_invitation": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["AcceptInvitation"];
-      };
-    };
-    responses: {
-      /** @description You are a member; the workspace with your role. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["WorkspaceView"];
-        };
-      };
-      /** @description Invalid body. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No valid access token. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Missing scope, a client token, or `invitation_email_mismatch`: your verified email is not the invited one. */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description No such invitation. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "identity.finish_sign_in": {
-    parameters: {
-      query?: {
-        /** @description The authorization code. */
-        code?: string;
-        /** @description The round trip's `state`. */
-        state?: string;
-        /** @description The provider's error (`access_denied` when the person cancelled). */
-        error?: string;
-        /** @description The provider's issuer (RFC 9207), when it sends one. */
-        iss?: string;
-      };
-      header?: never;
-      path: {
-        /** @description `google`. */
-        provider: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. */
-      303: {
-        headers: {
-          location?: string;
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.get_new_account": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The pending account. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["NewAccount"];
-        };
-      };
-      /** @description Nothing pending for this browser (or it expired). */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.create_account": {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Must be `1`. */
-        "x-campbooks-csrf": string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Created and signed in. */
-      201: {
-        headers: {
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["Created"];
-        };
-      };
-      /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept). */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Nothing pending for this browser. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile). */
-      409: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "identity.get_sign_in_request": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The `request` the sign-in screen was given. */
-        id: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The request. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["RequestInfo"];
-        };
-      };
-      /** @description No such request (or it expired), or another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.start_sign_in": {
-    parameters: {
-      query?: {
-        /** @description The waiting authorization request to complete afterwards. */
-        request?: string;
-        /** @description Otherwise, a same-origin path to land on. */
-        return_to?: string;
-      };
-      header?: never;
-      path: {
-        /** @description `google`. */
-        provider: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description To the provider, with a round-trip cookie. */
-      303: {
-        headers: {
-          location?: string;
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_return_to`. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "bff.api_get": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
-        path: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The API's response, whatever its status. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `session_required`: no live session. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.api_put": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
-        path: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The API's response, whatever its status. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `session_required`: no live session. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.api_post": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
-        path: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The API's response, whatever its status. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `session_required`: no live session. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.api_delete": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
-        path: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The API's response, whatever its status. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `session_required`: no live session. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.api_patch": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
-        path: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The API's response, whatever its status. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `session_required`: no live session. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.backchannel_logout": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/x-www-form-urlencoded": components["schemas"]["BackchannelLogout"];
-      };
-    };
-    responses: {
-      /** @description The sessions named by the token are ended. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_logout_token` */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider's keys are unavailable. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.callback": {
-    parameters: {
-      query?: {
-        /** @description The authorization code. */
-        code?: string | null;
-        /** @description The `state` sent with the authorization request. */
-        state?: string | null;
-        /** @description The issuer that answered (RFC 9207). */
-        iss?: string | null;
-        /** @description An error code instead of a code. */
-        error?: string | null;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Signed in; the page moves on to `return_to`. */
-      200: {
-        headers: {
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "text/html": unknown;
-        };
-      };
-      /** @description `invalid_state`, `login_failed`, `code_rejected` or `invalid_id_token`. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unreachable. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.login": {
-    parameters: {
-      query?: {
-        /** @description Where to land after signing in: a path on this site (default `/`). */
-        return_to?: string | null;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Redirect to the identity provider. */
-      303: {
-        headers: {
-          location?: string;
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_return_to` */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured`, or the identity provider is unreachable. */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.logout": {
-    parameters: {
-      query?: never;
-      header: {
-        /** @description Must be `1`. */
-        "x-campbooks-csrf": string;
-      };
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Signed out (also when there was no session). */
-      200: {
-        headers: {
-          "set-cookie"?: string;
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["LogoutResponse"];
-        };
-      };
-      /** @description `csrf_check_failed` */
-      403: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description `bff_not_configured` */
-      503: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-    };
-  };
-  "bff.session": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The session, or `authenticated: false`. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["SessionInfo"];
-        };
-      };
-    };
-  };
-  "identity.authorize": {
-    parameters: {
-      query?: {
-        /** @description Must be `code`. */
-        response_type?: string;
-        /** @description The client. */
-        client_id?: string;
-        /** @description One of the client's registered redirect URIs. */
-        redirect_uri?: string;
-        /** @description Space-separated scopes. */
-        scope?: string;
-        /** @description Returned unchanged to the client. */
-        state?: string;
-        /** @description Echoed in the ID token. */
-        nonce?: string;
-        /** @description The PKCE challenge. */
-        code_challenge?: string;
-        /** @description Must be `S256`. */
-        code_challenge_method?: string;
-        /** @description `none`, `login`, `consent` or `select_account`. */
-        prompt?: string;
-        /** @description Seconds since the person last authenticated, at most. */
-        max_age?: number;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen. */
-      303: {
-        headers: {
-          location?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_client` or `invalid_redirect_uri`: nothing is redirected. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.end_session": {
-    parameters: {
-      query?: {
-        /** @description An ID token the issuer gave the client for this sign-in. */
-        id_token_hint?: string;
-        /** @description The client asking; must be the hint's audience when given. */
-        client_id?: string;
-        /** @description Where to go afterwards; one of the client's registered values. */
-        post_logout_redirect_uri?: string;
-        /** @description Returned unchanged. */
-        state?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Signed out; no registered place to return to. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Signed out; back to the client. */
-      303: {
-        headers: {
-          location?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_id_token_hint`: nothing was ended. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.end_session_post": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/x-www-form-urlencoded": components["schemas"]["EndSession"];
-      };
-    };
-    responses: {
-      /** @description Signed out; no registered place to return to. */
-      204: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Signed out; back to the client. */
-      303: {
-        headers: {
-          location?: string;
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_id_token_hint`: nothing was ended. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/problem+json": components["schemas"]["Problem"];
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.jwks": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description The JWKS. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": Record<string, never>;
-        };
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.revoke": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/x-www-form-urlencoded": components["schemas"]["RevokeForm"];
-      };
-    };
-    responses: {
-      /** @description Revoked, or nothing to revoke. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_client`. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-    };
-  };
-  "identity.token": {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        "application/x-www-form-urlencoded": components["schemas"]["TokenForm"];
-      };
-    };
-    responses: {
-      /** @description Tokens. */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          "application/json": components["schemas"]["TokenResponse"];
-        };
-      };
-      /** @description `invalid_request`, `invalid_grant` or `unsupported_grant_type`. */
-      400: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description `invalid_client`. */
-      401: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
-      /** @description Another identity provider serves this instance. */
-      404: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content?: never;
-      };
+    "identity.authorization_server_metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issuer's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.openid_configuration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The issuer's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.list_held_grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's held grants. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HeldGrants"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.discard_held_grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The held grant. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Discarded. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The instance and its database are up. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+            /** @description The database is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The running build. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VersionResponse"];
+                };
+            };
+        };
+    };
+    "workspaces.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted; its records are purged after the grace period. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceDeletion"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not an owner. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.update": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateWorkspace"];
+            };
+        };
+        responses: {
+            /** @description The updated workspace. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceView"];
+                };
+            };
+            /** @description Invalid name or body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "changes.stream": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The last cursor received, for clients that cannot send
+                 *     `Last-Event-ID` (the header wins when both are present). Omit it to
+                 *     start from now.
+                 */
+                after?: string;
+            };
+            header?: {
+                /** @description The last cursor received; resumes after it. */
+                "Last-Event-ID"?: string | null;
+            };
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The change stream. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `too_many_streams`: you hold the maximum number of open streams. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.list_connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connections you may see. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.start_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartConnection"];
+            };
+        };
+        responses: {
+            /** @description Send the browser to `authorize_url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedConnection"];
+                };
+            };
+            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or no such connection of yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The provider is not configured on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.complete_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteConnection"];
+            };
+        };
+        responses: {
+            /** @description The connection, syncing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such started connection of yours in this workspace, or it expired. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The provider could not be reached (`provider_unavailable`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.get_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.sync_now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its streams run now; a run already waiting absorbs this one. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncScheduled"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The member must connect it again first (`needs_reauth`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list": {
+        parameters: {
+            query?: {
+                /** @description Only this stream; every stream when absent. */
+                stream?: components["schemas"]["Stream"];
+                /** @description Only this inbox; every inbox you can read when absent. */
+                inbox?: components["schemas"]["InboxId"];
+                /** @description `true` for archived conversations instead of those in the inbox. */
+                archived?: boolean;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1 to 100 (default 50). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of conversations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationList"];
+                };
+            };
+            /** @description A malformed cursor or limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.add_label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLabel"];
+            };
+        };
+        responses: {
+            /** @description The label, now on the conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelView"];
+                };
+            };
+            /** @description An empty or too long name. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.remove_label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The label. */
+                label_id: components["schemas"]["LabelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The label is off the conversation. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or the label is not on it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_message_body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bodies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageBody"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.mark_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.move_to_stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveToStream"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Not a stream. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.mark_unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.adopt_held_grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The held grant. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Connected. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Adopted"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write` or `connectors:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace, or the grant is not the caller's, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The connectors module refused it (e.g. `account_connected_by_another_member`, `mailbox_unsupported`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_inboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The inboxes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.list_invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending invitations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.invite_member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InviteMember"];
+            };
+        };
+        responses: {
+            /** @description Invited, with the accept link to pass on (shown only in this response). A previous pending invitation to the same address is replaced. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedInvitation"];
+                };
+            };
+            /** @description Invalid email, role or body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `already_a_member`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.list_members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The members. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.remove_member": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The member. */
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, not an owner or admin, or an admin removing an owner. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `last_owner`: the workspace would have no owner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.change_role": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The member. */
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeRole"];
+            };
+        };
+        responses: {
+            /** @description The member with their new role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemberView"];
+                };
+            };
+            /** @description Invalid body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, not an owner or admin, or an admin acting on the owner role. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `last_owner`: the workspace would have no owner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description You are no longer a member. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `last_owner`: you are its only owner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.list_security_events": {
+        parameters: {
+            query?: {
+                /** @description How many, newest first: 1 to 200, default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The newest events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SecurityEventList"];
+                };
+            };
+            /** @description Invalid limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspaces you belong to. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a user token. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateWorkspace"];
+            };
+        };
+        responses: {
+            /** @description Created; you are its owner. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceView"];
+                };
+            };
+            /** @description Invalid name or body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.accept_invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptInvitation"];
+            };
+        };
+        responses: {
+            /** @description You are a member; the workspace with your role. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceView"];
+                };
+            };
+            /** @description Invalid body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, a client token, or `invitation_email_mismatch`: your verified email is not the invited one. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such invitation. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.finish_sign_in": {
+        parameters: {
+            query?: {
+                /** @description The authorization code. */
+                code?: string;
+                /** @description The round trip's `state`. */
+                state?: string;
+                /** @description The provider's error (`access_denied` when the person cancelled). */
+                error?: string;
+                /** @description The provider's issuer (RFC 9207), when it sends one. */
+                iss?: string;
+            };
+            header?: never;
+            path: {
+                /** @description `google`. */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in (to the client, or `return_to`), to the new-account screen, back to the provider for consent, or to the sign-in screen with `?error=`. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.get_new_account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The pending account. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewAccount"];
+                };
+            };
+            /** @description Nothing pending for this browser (or it expired). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.create_account": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created and signed in. */
+            201: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Created"];
+                };
+            };
+            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing pending for this browser. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.get_sign_in_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `request` the sign-in screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestInfo"];
+                };
+            };
+            /** @description No such request (or it expired), or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.start_sign_in": {
+        parameters: {
+            query?: {
+                /** @description The waiting authorization request to complete afterwards. */
+                request?: string;
+                /** @description Otherwise, a same-origin path to land on. */
+                return_to?: string;
+            };
+            header?: never;
+            path: {
+                /** @description `google`. */
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the provider, with a round-trip cookie. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_return_to`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unknown or unconfigured provider, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "bff.api_get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.api_put": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.api_post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.api_delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.api_patch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The API path after `/api/`, e.g. `v1/system/version`; may contain slashes. */
+                path: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's response, whatever its status. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `session_required`: no live session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unavailable while the access token needs refreshing. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.backchannel_logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["BackchannelLogout"];
+            };
+        };
+        responses: {
+            /** @description The sessions named by the token are ended. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_logout_token` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider's keys are unavailable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.callback": {
+        parameters: {
+            query?: {
+                /** @description The authorization code. */
+                code?: string | null;
+                /** @description The `state` sent with the authorization request. */
+                state?: string | null;
+                /** @description The issuer that answered (RFC 9207). */
+                iss?: string | null;
+                /** @description An error code instead of a code. */
+                error?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in; the page moves on to `return_to`. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/html": unknown;
+                };
+            };
+            /** @description `invalid_state`, `login_failed`, `code_rejected` or `invalid_id_token`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.login": {
+        parameters: {
+            query?: {
+                /** @description Where to land after signing in: a path on this site (default `/`). */
+                return_to?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the identity provider. */
+            303: {
+                headers: {
+                    location?: string;
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_return_to` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured`, or the identity provider is unreachable. */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.logout": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out (also when there was no session). */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogoutResponse"];
+                };
+            };
+            /** @description `csrf_check_failed` */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `bff_not_configured` */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "bff.session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session, or `authenticated: false`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionInfo"];
+                };
+            };
+        };
+    };
+    "identity.authorize": {
+        parameters: {
+            query?: {
+                /** @description Must be `code`. */
+                response_type?: string;
+                /** @description The client. */
+                client_id?: string;
+                /** @description One of the client's registered redirect URIs. */
+                redirect_uri?: string;
+                /** @description Space-separated scopes. */
+                scope?: string;
+                /** @description Returned unchanged to the client. */
+                state?: string;
+                /** @description Echoed in the ID token. */
+                nonce?: string;
+                /** @description The PKCE challenge. */
+                code_challenge?: string;
+                /** @description Must be `S256`. */
+                code_challenge_method?: string;
+                /** @description `none`, `login`, `consent` or `select_account`. */
+                prompt?: string;
+                /** @description Seconds since the person last authenticated, at most. */
+                max_age?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client` or `invalid_redirect_uri`: nothing is redirected. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.end_session": {
+        parameters: {
+            query?: {
+                /** @description An ID token the issuer gave the client for this sign-in. */
+                id_token_hint?: string;
+                /** @description The client asking; must be the hint's audience when given. */
+                client_id?: string;
+                /** @description Where to go afterwards; one of the client's registered values. */
+                post_logout_redirect_uri?: string;
+                /** @description Returned unchanged. */
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed out; no registered place to return to. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Signed out; back to the client. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_id_token_hint`: nothing was ended. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.end_session_post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["EndSession"];
+            };
+        };
+        responses: {
+            /** @description Signed out; no registered place to return to. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Signed out; back to the client. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_id_token_hint`: nothing was ended. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.jwks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The JWKS. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["RevokeForm"];
+            };
+        };
+        responses: {
+            /** @description Revoked, or nothing to revoke. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client`. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["TokenForm"];
+            };
+        };
+        responses: {
+            /** @description Tokens. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenResponse"];
+                };
+            };
+            /** @description `invalid_request`, `invalid_grant` or `unsupported_grant_type`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_client`. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
     };
-  };
 }
