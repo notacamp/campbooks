@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search.backfills\n                  SET after_id = $3,\n                      state = CASE WHEN $3::text IS NULL THEN 'done' ELSE state END,\n                      finished_at = CASE WHEN $3::text IS NULL THEN now() END\n                WHERE workspace_id = $1 AND group_type = $2 AND state = 'running'\n                  AND index_version = $4 AND after_id IS NOT DISTINCT FROM $5\n               RETURNING group_type",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "group_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.backfills",
+            "name": "group_type"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Int2",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9f2c40e70edb76fc7619714b1665f0b09e5efcd9dd9005573c5f36e43a0904e3"
+}

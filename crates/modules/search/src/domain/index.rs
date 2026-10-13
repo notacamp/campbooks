@@ -294,37 +294,74 @@ async fn upsert_entry(
     Ok(())
 }
 
-/// The backfill of `source` that `workspace` still needs, if any: records it
-/// as running and enqueues its first page. A workspace's index is built once
-/// per [`INDEX_VERSION`]; calling this again is a cheap no-op.
+/// Where a workspace's index of one source stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Standing {
+    /// Built (or being built) at the current [`INDEX_VERSION`].
+    Current,
+    /// A backfill was just started (its first page enqueued).
+    Started,
+    /// The workspace is being deleted: index nothing more for it.
+    Deleting,
+}
+
+/// Start the backfill of `group_type` that `workspace` still needs, if any,
+/// and say where its index stands. A plain read answers the common case
+/// (nothing to do) without locking anything, so searches and event
+/// deliveries never wait on a backfill page; only a missing or outdated row
+/// is written, by a statement that cannot wait on a running page either.
 pub async fn ensure_backfill(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     workspace: WorkspaceId,
     group_type: &str,
-) -> Result<bool> {
-    let started = sqlx::query_scalar!(
-        r#"INSERT INTO search.backfills (workspace_id, group_type, state, index_version)
-           VALUES ($1, $2, 'running', $3)
-           ON CONFLICT (workspace_id, group_type) DO UPDATE
-              SET state = 'running', after_id = NULL, index_version = EXCLUDED.index_version,
-                  started_at = now(), finished_at = NULL
-            WHERE search.backfills.index_version < EXCLUDED.index_version
-           RETURNING group_type"#,
+) -> Result<Standing> {
+    let row = sqlx::query!(
+        "SELECT state, index_version FROM search.backfills
+          WHERE workspace_id = $1 AND group_type = $2",
         workspace.as_uuid(),
         group_type,
-        INDEX_VERSION,
     )
     .fetch_optional(&mut **tx)
     .await?;
-    if started.is_none() {
-        return Ok(false);
+    let started = match row {
+        Some(row) if row.state == "deleting" => return Ok(Standing::Deleting),
+        Some(row) if row.index_version >= INDEX_VERSION => return Ok(Standing::Current),
+        None => sqlx::query_scalar!(
+            r#"INSERT INTO search.backfills (workspace_id, group_type, state, index_version)
+               VALUES ($1, $2, 'running', $3)
+               ON CONFLICT (workspace_id, group_type) DO NOTHING
+               RETURNING group_type"#,
+            workspace.as_uuid(),
+            group_type,
+            INDEX_VERSION,
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .is_some(),
+        Some(_) => sqlx::query_scalar!(
+            r#"UPDATE search.backfills
+                  SET state = 'running', after_id = NULL, index_version = $3,
+                      started_at = now(), finished_at = NULL
+                WHERE workspace_id = $1 AND group_type = $2 AND index_version < $3
+                  AND state <> 'deleting'
+               RETURNING group_type"#,
+            workspace.as_uuid(),
+            group_type,
+            INDEX_VERSION,
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .is_some(),
+    };
+    if !started {
+        return Ok(Standing::Current);
     }
     let job = crate::features::backfill::Backfill {
         group_type: group_type.to_owned(),
         after: None,
     };
     jobs::enqueue(&mut *tx, &job, job.options(workspace)).await?;
-    Ok(true)
+    Ok(Standing::Started)
 }
 
 /// Whether a backfill of any of `group_types` is still running.

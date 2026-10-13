@@ -147,6 +147,7 @@ impl Role {
 }
 
 fn main() -> ExitCode {
+    campbooks_server::telemetry::install_panic_hook();
     match Cli::parse().command.unwrap_or(Command::All) {
         Command::All | Command::Serve => serve(Role::All),
         Command::Api => serve(Role::Api),
@@ -220,6 +221,16 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
     })
 }
 
+/// The signer of opaque values (cursors) keyed by the instance secret, so
+/// every process of the install verifies them; without one, each process
+/// signs alone.
+fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
+    Ok(match campbooks_kernel::crypto::SecretKey::from_env()? {
+        Some(secret) => campbooks_kernel::crypto::Signer::new(&secret),
+        None => campbooks_kernel::crypto::Signer::default(),
+    })
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -258,6 +269,7 @@ async fn run(
     let state = campbooks_server::with_composed_ports(
         AppState::new(db.clone(), config)
             .with_rate_limits(rate_limits()?)
+            .with_signer(signer()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
             .with_blobs(blobs),
@@ -606,6 +618,11 @@ fn log_composition(composition: &campbooks_server::Composition) {
         tracing::info!("Google accounts can be connected");
     } else {
         tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
+    }
+    if composition.connectors.zoho.is_some() {
+        tracing::info!("Zoho Mail accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_ZOHO__CLIENT_ID unset: Zoho Mail accounts cannot be connected");
     }
     if let Some(issuer) = &composition.identity.issuer {
         let providers: Vec<&str> = issuer

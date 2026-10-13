@@ -4,7 +4,7 @@
 //! [`Warning`], never an error, so a half-typed query still answers. Only
 //! the size limits ([`Limits`]) refuse a query.
 
-use chrono::NaiveDate;
+use chrono::{Datelike as _, NaiveDate};
 use serde::Serialize;
 use utoipa::ToSchema;
 
@@ -33,6 +33,22 @@ pub struct Clause {
     pub any: Vec<Term>,
     /// The clause must *not* match (`-word`, `-"a phrase"`).
     pub negated: bool,
+}
+
+impl Query {
+    /// Whether the query only excludes (`-word` and nothing else): it would
+    /// match nearly everything, so it is refused.
+    pub fn only_excludes(&self) -> bool {
+        self.filters.is_empty()
+            && !self.clauses.is_empty()
+            && self.clauses.iter().all(|clause| clause.negated)
+    }
+
+    /// Whether some text term must match, so the text index narrows the
+    /// search (filters alone scan more and are rate-limited harder).
+    pub fn has_text(&self) -> bool {
+        self.clauses.iter().any(|clause| !clause.negated)
+    }
 }
 
 /// One text term.
@@ -294,19 +310,24 @@ fn operator(name: &str, value: &str, query: &mut Query) -> Option<String> {
 }
 
 /// `2026-10-01` or `2026/10/01`.
+/// `2026-10-01` or `2026/10/01`, years 1 to 9999 (what the database's
+/// timestamps hold comfortably).
 fn date(value: &str) -> Option<NaiveDate> {
-    NaiveDate::parse_from_str(&value.replace('/', "-"), "%Y-%m-%d").ok()
+    NaiveDate::parse_from_str(&value.replace('/', "-"), "%Y-%m-%d")
+        .ok()
+        .filter(|day| (1..=9999).contains(&day.year()))
 }
 
 /// `7d`, `2w`, `3m`, `1y` in days (a month is 30 days, a year 365).
 fn days(value: &str) -> Option<u32> {
-    let (number, unit) = value.split_at(value.len().checked_sub(1)?);
-    let number: u32 = number.parse().ok()?;
+    // The unit is the last character, whatever its width in bytes.
+    let unit = value.chars().next_back()?;
+    let number: u32 = value.strip_suffix(unit)?.parse().ok()?;
     let per = match unit {
-        "d" => 1,
-        "w" => 7,
-        "m" => 30,
-        "y" => 365,
+        'd' => 1,
+        'w' => 7,
+        'm' => 30,
+        'y' => 365,
         _ => return None,
     };
     number.checked_mul(per).filter(|days| *days <= 365 * 100)
@@ -547,6 +568,18 @@ mod tests {
             "OR",
             "from:\"",
             "é:ç",
+            "older_than:5é",
+            "newer_than:é",
+            "older_than:日",
+            "newer_than:12日",
+            "older_than:🙂",
+            "before:2026-1é-01",
+            "after:99999-01-01",
+            "before:0000-01-01",
+            "is:ü",
+            "in:straße",
+            "label:\"日本\"",
+            "from:\u{301}",
             "\u{e000}x\u{e001}",
             "a\"b\"c",
             "-from:ana",
@@ -555,5 +588,47 @@ mod tests {
         }
         // `-from:ana` is a negated word, not a filter.
         assert!(parse("-from:ana", false).unwrap().filters.is_empty());
+        // Bad values are text with a warning, never a panic.
+        for input in ["older_than:5é", "after:99999-01-01", "before:0000-01-01"] {
+            let query = parse(input, false).unwrap();
+            assert!(query.filters.is_empty(), "{input}");
+            assert_eq!(query.warnings[0].code, "invalid_value", "{input}");
+        }
+        // Every operator with values ending in characters of 1 to 4 bytes.
+        let operators = [
+            "from",
+            "to",
+            "cc",
+            "subject",
+            "has",
+            "in",
+            "is",
+            "label",
+            "before",
+            "after",
+            "older_than",
+            "newer_than",
+            "x",
+        ];
+        let tails = [
+            "", "5", "5é", "é5", "日", "12日", "🙂", "\u{301}", "-", "\"\"", ":",
+        ];
+        for operator in operators {
+            for tail in tails {
+                for prefix in [true, false] {
+                    let input = format!("{operator}:{tail} a{tail} -{tail}");
+                    assert!(parse(&input, prefix).is_ok(), "{input:?}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn exclusions_alone_are_flagged() {
+        assert!(parse("-draft -spam", false).unwrap().only_excludes());
+        assert!(!parse("-draft is:unread", false).unwrap().only_excludes());
+        assert!(!parse("invoice -draft", false).unwrap().only_excludes());
+        assert!(!parse("is:unread", false).unwrap().has_text());
+        assert!(parse("invoice", false).unwrap().has_text());
     }
 }

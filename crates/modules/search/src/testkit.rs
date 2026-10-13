@@ -165,6 +165,10 @@ pub struct FakeSource {
     conversations: Mutex<BTreeMap<(WorkspaceId, String), Conversation>>,
     /// How many entry texts were read.
     pub texts_read: AtomicUsize,
+    /// Signalled when a backfill page starts.
+    pub page_entered: Arc<tokio::sync::Notify>,
+    /// While set, a backfill page waits for it before answering.
+    pub page_gate: Mutex<Option<Arc<tokio::sync::Notify>>>,
 }
 
 impl FakeSource {
@@ -288,7 +292,15 @@ impl SearchSource for FakeSource {
         let next = (ids.len() == limit as usize)
             .then(|| ids.last().cloned())
             .flatten();
-        Box::pin(async move { Ok(Page { groups: ids, next }) })
+        let entered = Arc::clone(&self.page_entered);
+        let gate = self.page_gate.lock().ok().and_then(|gate| gate.clone());
+        Box::pin(async move {
+            entered.notify_one();
+            if let Some(gate) = gate {
+                gate.notified().await;
+            }
+            Ok(Page { groups: ids, next })
+        })
     }
 }
 

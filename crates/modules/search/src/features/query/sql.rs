@@ -82,6 +82,15 @@ pub fn push_tsquery(builder: &mut QueryBuilder<Postgres>, clauses: &[Clause]) {
     builder.push(")");
 }
 
+/// The query's `tsquery`, or an empty one when it has no text.
+fn push_query(builder: &mut QueryBuilder<Postgres>, query: &Query) {
+    if query.clauses.is_empty() {
+        builder.push("NULL::tsquery");
+    } else {
+        push_tsquery(builder, &query.clauses);
+    }
+}
+
 /// One term, looked up in every configuration.
 fn push_term(builder: &mut QueryBuilder<Postgres>, term: &Term) {
     builder.push("(");
@@ -208,17 +217,20 @@ fn push_filters(builder: &mut QueryBuilder<Postgres>, query: &Query, tz: &str) {
 /// facets, score, best`.
 pub fn page(query: &Query, scope: &Scope, order: Order, fetch: i64) -> QueryBuilder<Postgres> {
     let text = !query.clauses.is_empty();
-    let mut b = QueryBuilder::new("WITH matched AS (SELECT e.id, e.group_id, g.occurred_at, ");
+    // The `tsquery` is built once, in `q`.
+    let mut b = QueryBuilder::new("WITH q AS (SELECT ");
+    push_query(&mut b, query);
+    b.push(" AS query), matched AS (SELECT e.id, e.group_id, g.occurred_at, ");
     if text {
-        b.push(format!("ts_rank_cd('{WEIGHTS}'::real[], e.tsv, "));
-        push_tsquery(&mut b, &query.clauses);
-        b.push(", 1)");
+        b.push(format!(
+            "ts_rank_cd('{WEIGHTS}'::real[], e.tsv, q.query, 1)"
+        ));
     } else {
         b.push("0::real");
     }
     b.push(
         " AS rank FROM search.entries e JOIN search.groups g ON g.id = e.group_id \
-         WHERE e.workspace_id = ",
+         CROSS JOIN q WHERE e.workspace_id = ",
     );
     b.push_bind(scope.workspace);
     b.push(" AND g.workspace_id = ");
@@ -229,8 +241,7 @@ pub fn page(query: &Query, scope: &Scope, order: Order, fetch: i64) -> QueryBuil
     b.push_bind(scope.containers.clone());
     b.push(")");
     if text {
-        b.push(" AND e.tsv @@ ");
-        push_tsquery(&mut b, &query.clauses);
+        b.push(" AND e.tsv @@ q.query");
     }
     push_filters(&mut b, query, &scope.tz);
     if let Order::Newest {
@@ -276,21 +287,25 @@ pub fn page(query: &Query, scope: &Scope, order: Order, fetch: i64) -> QueryBuil
 /// title, snippet`: highlighted when the query has text, else plain (the
 /// start of the body).
 pub fn highlights(query: &Query, entries: Vec<Uuid>) -> QueryBuilder<Postgres> {
-    let mut b = QueryBuilder::new("SELECT e.id, e.record_type, e.record_id, e.people, ");
+    let mut b = QueryBuilder::new("WITH q AS (SELECT ");
+    push_query(&mut b, query);
+    b.push(" AS query) SELECT e.id, e.record_type, e.record_id, e.people, ");
     if query.clauses.is_empty() {
         b.push("g.title AS title, left(regexp_replace(e.body, '\\s+', ' ', 'g'), 240) AS snippet");
     } else {
-        b.push("ts_headline(('search.' || e.language)::regconfig, g.title, ");
-        push_tsquery(&mut b, &query.clauses);
-        b.push(", ");
+        b.push("ts_headline(('search.' || e.language)::regconfig, g.title, q.query, ");
         b.push_bind(headline_options(true));
-        b.push(") AS title, ts_headline(('search.' || e.language)::regconfig, regexp_replace(e.body, '\\s+', ' ', 'g'), ");
-        push_tsquery(&mut b, &query.clauses);
-        b.push(", ");
+        b.push(
+            ") AS title, ts_headline(('search.' || e.language)::regconfig, \
+             regexp_replace(e.body, '\\s+', ' ', 'g'), q.query, ",
+        );
         b.push_bind(headline_options(false));
         b.push(") AS snippet");
     }
-    b.push(" FROM search.entries e JOIN search.groups g ON g.id = e.group_id WHERE e.id = ANY(");
+    b.push(
+        " FROM search.entries e JOIN search.groups g ON g.id = e.group_id CROSS JOIN q \
+         WHERE e.id = ANY(",
+    );
     b.push_bind(entries);
     b.push(")");
     b

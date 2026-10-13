@@ -508,7 +508,7 @@ async fn a_workspace_that_predates_search_is_backfilled(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_deleted_workspace_is_purged(db: PgPool) {
+async fn a_deleted_workspace_is_purged_and_stays_unindexed(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, _) = mailbox(&kit).await;
     let mut tx = kit.state.db.begin().await.unwrap();
@@ -525,15 +525,135 @@ async fn a_deleted_workspace_is_purged(db: PgPool) {
         .unwrap();
     tx.commit().await.unwrap();
     kit.run_jobs().await;
-    for table in ["search.groups", "search.entries", "search.backfills"] {
-        let left: i64 = sqlx::query_scalar(sqlx::AssertSqlSafe(format!(
-            "SELECT count(*) FROM {table} WHERE workspace_id = $1"
-        )))
-        .bind(workspace.as_uuid())
-        .fetch_one(&kit.db)
-        .await
-        .unwrap();
-        assert_eq!(left, 0, "{table}");
+    let count = |table: &'static str| {
+        let db = kit.db.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>(sqlx::AssertSqlSafe(format!(
+                "SELECT count(*) FROM {table} WHERE workspace_id = $1"
+            )))
+            .bind(workspace.as_uuid())
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    assert_eq!(count("search.groups").await, 0);
+    assert_eq!(count("search.entries").await, 0);
+    // A late delivery indexes nothing and starts no backfill.
+    kit.announce(workspace, "c-q4").await;
+    kit.run_jobs().await;
+    assert_eq!(count("search.groups").await, 0);
+    let states: Vec<String> =
+        sqlx::query_scalar("SELECT state FROM search.backfills WHERE workspace_id = $1")
+            .bind(workspace.as_uuid())
+            .fetch_all(&kit.db)
+            .await
+            .unwrap();
+    assert_eq!(states, ["deleting"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_search_does_not_wait_for_a_backfill_page(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, user) = kit.member("sam", workspace);
+    kit.share(workspace, "inbox-sam", &[user]);
+    kit.put(
+        workspace,
+        "c-old",
+        Conversation::new(
+            "inbox-sam",
+            "Old receipt",
+            vec![Message::new("m-old", "shop@example.com", "Receipt", 30)],
+        ),
+    );
+    // The first search starts the backfill; its page then stops half-way,
+    // its transaction open.
+    let gate = std::sync::Arc::new(tokio::sync::Notify::new());
+    *kit.source.page_gate.lock().unwrap() = Some(std::sync::Arc::clone(&gate));
+    assert_eq!(kit.search(&sam, workspace, &q("receipt")).await.status, 200);
+    let worker = {
+        let state = kit.state.clone();
+        tokio::spawn(async move {
+            campbooks_kernel::jobs::Worker::new(state)
+                .run_until_idle()
+                .await
+        })
+    };
+    kit.source.page_entered.notified().await;
+    let during = tokio::time::timeout(
+        std::time::Duration::from_secs(5),
+        kit.search(&sam, workspace, &q("receipt")),
+    )
+    .await
+    .expect("a search while a backfill page runs answers at once");
+    assert_eq!(during.status, 200);
+    assert_eq!(during.json["indexing"], true);
+    gate.notify_one();
+    worker.await.unwrap();
+    let after = kit.search(&sam, workspace, &q("receipt")).await;
+    assert_eq!(after.json["indexing"], false);
+    assert_eq!(after.json["hits"].as_array().unwrap().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn cursors_belong_to_their_caller_and_cannot_be_altered(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, sam, sam_id) = mailbox(&kit).await;
+    let (rui, rui_id) = kit.member("rui", workspace);
+    kit.share(workspace, "inbox-sam", &[sam_id, rui_id]);
+    let page = format!("{}&limit=1&sort=newest", q("to:sam"));
+    let first = kit.search(&sam, workspace, &page).await;
+    let cursor = first.json["next_cursor"].as_str().unwrap().to_owned();
+    let mine = kit
+        .search(&sam, workspace, &format!("{page}&cursor={cursor}"))
+        .await;
+    assert_eq!(mine.status, 200);
+    let theirs = kit
+        .search(&rui, workspace, &format!("{page}&cursor={cursor}"))
+        .await;
+    assert_eq!(theirs.status, 400);
+    assert_eq!(theirs.json["code"], "cursor_mismatch");
+    // An altered payload (another position) no longer verifies.
+    let (payload, tag) = cursor.split_once('.').unwrap();
+    let mut forged = payload.to_owned();
+    let last = forged.pop().unwrap();
+    forged.push(if last == 'A' { 'B' } else { 'A' });
+    let altered = kit
+        .search(&sam, workspace, &format!("{page}&cursor={forged}.{tag}"))
+        .await;
+    assert_eq!(altered.status, 400);
+    let unsigned = kit
+        .search(&sam, workspace, &format!("{page}&cursor={payload}"))
+        .await;
+    assert_eq!(unsigned.status, 400);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn exclusions_alone_and_impossible_dates(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, sam, _) = mailbox(&kit).await;
+    let excluded = kit.search(&sam, workspace, &q("-fatura -plan")).await;
+    assert_eq!(excluded.status, 400);
+    assert_eq!(excluded.json["code"], "query_only_excludes");
+    // Filters with an exclusion are fine.
+    assert_eq!(
+        kit.search(&sam, workspace, &q("is:unread -fatura"))
+            .await
+            .status,
+        200
+    );
+    for query in [
+        "after:99999-01-01 fatura",
+        "before:0000-12-31 fatura",
+        "older_than:5é",
+    ] {
+        let response = kit.search(&sam, workspace, &q(query)).await;
+        assert_eq!(response.status, 200, "{query}: {}", response.json);
+        assert_eq!(
+            response.json["query"]["warnings"][0]["code"],
+            "invalid_value"
+        );
     }
 }
 
@@ -542,7 +662,6 @@ async fn a_deleted_workspace_is_purged(db: PgPool) {
 /// `cargo test -p campbooks-search --lib bench_instant_queries -- --ignored --nocapture`.
 #[sqlx::test(migrations = "../../../migrations")]
 #[ignore = "benchmark; run by hand (see the doc comment)"]
-#[allow(clippy::print_stderr, reason = "a benchmark reports its timings")]
 async fn bench_instant_queries(db: PgPool) {
     let kit = Kit::new(db).await;
     let workspace = WorkspaceId::new();

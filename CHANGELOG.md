@@ -29,6 +29,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   stored or logged. **Self-hosters on managed Postgres:** the server now
   creates the `unaccent` and `pg_trgm` extensions (both ship with Postgres and
   are in the default image); allow them if your provider asks.
+- Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
+  asks a second time, for the mail, only when the account is new; signing
+  in again never asks), and members can connect more Zoho logins; every
+  mail account of a login becomes its own inbox, beside Gmail in the same
+  streams. Mail is read from the account's own data centre and polled (Zoho
+  has no push); read, star (flag), archive and unarchive go back to Zoho;
+  unarchiving never moves your own sent mail into the Inbox; replies and new
+  messages are sent through Zoho, never twice. Uses the Zoho
+  app of Sign in with Zoho, which must allow `ZohoMail.accounts.READ`,
+  `ZohoMail.folders.READ` and `ZohoMail.messages.ALL`. New settings
+  `CAMPBOOKS_CONNECTORS__ZOHO__*` (window, size limits,
+  `REQUESTS_PER_MINUTE` per Zoho login, default 60, and `SWEEP_MINUTES`).
+  Zoho labels are not synced yet. A migration renames the connectors' message
+  index (`connectors.messages`); nothing to do.
 - Attachments open from the reader. Each message lists its files with their
   size, Download and, for pictures and PDFs, Preview: a picture opens in a
   dialog, a PDF in your browser's own viewer in a new tab. V moves through

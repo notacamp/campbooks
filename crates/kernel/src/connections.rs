@@ -33,6 +33,11 @@ pub struct ProviderGrant {
     pub provider: String,
     /// The provider's stable id of the account (`sub`).
     pub account_subject: String,
+    /// Who vouched for the account: the ID token's `iss`, as the identity
+    /// module validated it. For Zoho, the accounts server of the account's
+    /// data centre (`https://accounts.zoho.eu`), which says where its mail
+    /// and tokens live.
+    pub issuer: String,
     /// The account's email address, as the provider gave it.
     pub address: String,
     /// Whether the provider says it verified the address.
@@ -57,6 +62,7 @@ impl std::fmt::Debug for ProviderGrant {
         f.debug_struct("ProviderGrant")
             .field("workspace", &self.workspace)
             .field("provider", &self.provider)
+            .field("issuer", &self.issuer)
             .field("scopes", &self.scopes)
             .field("refresh_token", &self.refresh_token.is_some())
             .field("extending", &self.extending)

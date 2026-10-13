@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use crate::domain::index::{self, INDEX_VERSION};
 
 /// Groups refreshed per job.
-pub const PAGE: u32 = 100;
+pub const PAGE: u32 = 50;
 
 /// One page of a workspace's backfill of one source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,7 +56,7 @@ impl Job for Backfill {
         let tx = ctx.tx().await?;
         let current = sqlx::query!(
             "SELECT state, after_id, index_version FROM search.backfills
-              WHERE workspace_id = $1 AND group_type = $2 FOR UPDATE",
+              WHERE workspace_id = $1 AND group_type = $2",
             workspace.as_uuid(),
             self.group_type,
         )
@@ -81,30 +81,36 @@ impl Job for Backfill {
         for id in &page.groups {
             index::refresh(tx, &state.blobs, workspace, source.as_ref(), id).await?;
         }
+        // Compare and set: move the backfill on only if nothing replaced it
+        // while the page ran (no row lock is held across the page, so
+        // searches and live deliveries never wait on it).
+        let moved = sqlx::query_scalar!(
+            r#"UPDATE search.backfills
+                  SET after_id = $3,
+                      state = CASE WHEN $3::text IS NULL THEN 'done' ELSE state END,
+                      finished_at = CASE WHEN $3::text IS NULL THEN now() END
+                WHERE workspace_id = $1 AND group_type = $2 AND state = 'running'
+                  AND index_version = $4 AND after_id IS NOT DISTINCT FROM $5
+               RETURNING group_type"#,
+            workspace.as_uuid(),
+            self.group_type,
+            page.next.as_deref(),
+            INDEX_VERSION,
+            self.after.as_deref(),
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .is_some();
+        if !moved {
+            return Ok(());
+        }
         if let Some(next) = page.next {
-            sqlx::query!(
-                "UPDATE search.backfills SET after_id = $3
-                  WHERE workspace_id = $1 AND group_type = $2",
-                workspace.as_uuid(),
-                self.group_type,
-                next,
-            )
-            .execute(&mut **tx)
-            .await?;
             let job = Self {
                 group_type: self.group_type.clone(),
                 after: Some(next),
             };
             jobs::enqueue(&mut *tx, &job, job.options(workspace)).await?;
         } else {
-            sqlx::query!(
-                "UPDATE search.backfills SET state = 'done', finished_at = now()
-                  WHERE workspace_id = $1 AND group_type = $2",
-                workspace.as_uuid(),
-                self.group_type,
-            )
-            .execute(&mut **tx)
-            .await?;
             tracing::info!(
                 groups = page.groups.len(),
                 "search backfill finished for a workspace"
@@ -128,7 +134,8 @@ pub async fn reindex(state: &AppState, workspace: WorkspaceId) -> Result<Vec<Str
                VALUES ($1, $2, 'running', $3)
                ON CONFLICT (workspace_id, group_type) DO UPDATE
                   SET state = 'running', after_id = NULL, index_version = EXCLUDED.index_version,
-                      started_at = now(), finished_at = NULL"#,
+                      started_at = now(), finished_at = NULL
+                WHERE search.backfills.state <> 'deleting'"#,
             workspace.as_uuid(),
             group_type,
             INDEX_VERSION,

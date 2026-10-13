@@ -82,9 +82,34 @@ pub type Handed = (
 #[derive(Debug, Default)]
 pub struct FakeIntake {
     adopted: Mutex<Vec<Handed>>,
+    /// The issuer of each grant handed over, in order.
+    issuers: Mutex<Vec<String>>,
+    /// Whether the instance syncs Zoho mailboxes too.
+    zoho_mail: std::sync::atomic::AtomicBool,
 }
 
+/// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
+pub const ZOHO_MAIL_SCOPES: [&str; 3] = [
+    "ZohoMail.accounts.READ",
+    "ZohoMail.folders.READ",
+    "ZohoMail.messages.ALL",
+];
+
 impl FakeIntake {
+    /// The issuer of each grant handed over, in order.
+    pub fn issuers(&self) -> Vec<String> {
+        self.issuers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
+    pub fn sync_zoho(&self) {
+        self.zoho_mail
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
     /// `(workspace, subject, address, refresh token, scopes)` of each grant.
     pub fn adopted(&self) -> Vec<Handed> {
         self.adopted
@@ -96,14 +121,20 @@ impl FakeIntake {
 
 impl GrantIntake for FakeIntake {
     fn mailbox_scopes(&self, provider: &str) -> Vec<String> {
-        if provider == "google" {
-            vec![MAIL_SCOPE.to_owned()]
-        } else {
-            Vec::new()
+        match provider {
+            "google" => vec![MAIL_SCOPE.to_owned()],
+            "zoho" if self.zoho_mail.load(std::sync::atomic::Ordering::SeqCst) => {
+                ZOHO_MAIL_SCOPES.map(str::to_owned).to_vec()
+            }
+            _ => Vec::new(),
         }
     }
 
     fn adopt<'a>(&'a self, _state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a> {
+        self.issuers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(grant.issuer.clone());
         self.adopted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

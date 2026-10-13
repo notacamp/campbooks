@@ -298,7 +298,7 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
-        (name = "connectors", description = "Connections to outside accounts (Gmail first): \
+        (name = "connectors", description = "Connections to outside accounts (Gmail, Zoho Mail): \
             connect with the provider's consent, see their health, sync now, disconnect. \
             Credentials are never returned."),
         (name = "conversations", description = "Inboxes, conversations and messages on any \
@@ -554,6 +554,16 @@ mod tests {
 
     fn app() -> Router {
         router(testing::state(testing::unreachable_pool()), None)
+    }
+
+    #[test]
+    fn identity_and_connectors_know_the_same_zoho_data_centres() {
+        // Identity validates the accounts server a Zoho grant comes from;
+        // connectors maps that server to the data centre's mail host.
+        assert_eq!(
+            campbooks_identity::upstream::client::ZOHO_ACCOUNTS_SERVERS,
+            campbooks_connectors::ZOHO_ACCOUNTS_SERVERS
+        );
     }
 
     #[test]

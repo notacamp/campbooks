@@ -108,7 +108,11 @@ pub async fn execute(
     input: StartConnection,
 ) -> Result<StartedConnection> {
     let user = acting_member(access)?;
-    if deps.google.is_none() || deps.cipher.is_none() {
+    let configured = match input.provider {
+        Provider::Google => deps.google.is_some(),
+        Provider::Zoho => deps.zoho.is_some(),
+    };
+    if !configured || deps.cipher.is_none() {
         return Err(Error::Conflict(MESSAGES.reason("provider_not_configured")));
     }
     let mut capabilities = input.capabilities.clone();
@@ -118,7 +122,11 @@ pub async fn execute(
         return Err(Error::BadRequest(MESSAGES.reason("capabilities_required")));
     }
     for &capability in &capabilities {
-        if google::capability_scope(capability).is_none() {
+        let offered = match input.provider {
+            Provider::Google => google::capability_scope(capability).is_some(),
+            Provider::Zoho => capability == Capability::Messages,
+        };
+        if !offered {
             return Err(Error::BadRequest(
                 MESSAGES
                     .reason("capability_not_offered")

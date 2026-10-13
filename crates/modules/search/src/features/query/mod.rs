@@ -5,11 +5,7 @@ mod sql;
 #[cfg(test)]
 mod tests;
 
-use std::{
-    collections::HashMap,
-    hash::{DefaultHasher, Hash as _, Hasher as _},
-    time::Duration,
-};
+use std::{collections::HashMap, time::Duration};
 
 use axum::{Json, extract::State};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
@@ -47,6 +43,9 @@ pub const MAX_RELEVANCE_RESULTS: i64 = 1_000;
 
 /// Queries per caller per minute: generous for typing, a ceiling for scripts.
 const LIMIT: Limit = Limit::new("search.query", 600, Duration::from_mins(1));
+/// Queries per caller per minute that only filter (no text the index can
+/// narrow by): they scan more.
+const SCAN_LIMIT: Limit = Limit::new("search.query_scan", 60, Duration::from_mins(1));
 
 /// How results are ordered.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -220,10 +219,6 @@ pub async fn handler(
         Some(client) if workspace.access.user.is_none() => format!("client:{client}"),
         _ => format!("subject:{}", workspace.principal.subject),
     };
-    state
-        .rate_limits
-        .check(&state.db, &LIMIT, &RateKey::text(&caller))
-        .await?;
     let limit = params.limit.unwrap_or(DEFAULT_LIMIT);
     if !(1..=MAX_LIMIT).contains(&limit) {
         return Err(Error::BadRequest(
@@ -233,10 +228,29 @@ pub async fn handler(
         ));
     }
     let mut parsed = query::parse(&params.q, params.prefix).map_err(too_long)?;
+    if parsed.only_excludes() {
+        return Err(Error::BadRequest(
+            crate::MESSAGES.reason("query_only_excludes"),
+        ));
+    }
+    // Every query counts; one the text index cannot narrow (filters only)
+    // counts against a tighter limit too.
+    let key = RateKey::text(&caller);
+    state.rate_limits.check(&state.db, &LIMIT, &key).await?;
+    if !parsed.has_text() {
+        state
+            .rate_limits
+            .check(&state.db, &SCAN_LIMIT, &key)
+            .await?;
+    }
     let sort = params.sort.unwrap_or_default();
-    let fingerprint = fingerprint(&params, sort);
+    let cursors = Cursors {
+        state: &state,
+        caller: &caller,
+        binding: binding(&params, sort),
+    };
     let order = match params.cursor.as_deref() {
-        Some(cursor) => decode_cursor(cursor, sort, fingerprint)?,
+        Some(cursor) => cursors.decode(cursor, sort)?,
         None => match sort {
             Sort::Relevance => Order::Relevance { offset: 0 },
             Sort::Newest => Order::Newest { after: None },
@@ -264,12 +278,8 @@ pub async fn handler(
 
     let searching = !(parsed.clauses.is_empty() && parsed.filters.is_empty());
     let (hits, next_cursor) = if searching && !scope.containers.is_empty() {
-        let page = Page {
-            order,
-            limit,
-            fingerprint,
-        };
-        run(&mut tx, &parsed, &scope, &page).await?
+        let (hits, next) = run(&mut tx, &parsed, &scope, order, limit).await?;
+        (hits, next.map(|cursor| cursors.encode(&cursor)))
     } else {
         (Vec::new(), None)
     };
@@ -312,26 +322,14 @@ async fn scope(state: &AppState, workspace: &Workspace<SearchRead>) -> Result<Sc
     Ok(scope)
 }
 
-/// Which page to fetch.
-#[derive(Debug, Clone, Copy)]
-struct Page {
-    order: Order,
-    limit: u32,
-    fingerprint: u64,
-}
-
 /// One page of hits for `parsed` within `scope`, and the next page's cursor.
 async fn run(
     tx: &mut sqlx::PgConnection,
     parsed: &Query,
     scope: &Scope,
-    page: &Page,
-) -> Result<(Vec<Hit>, Option<String>)> {
-    let Page {
-        order,
-        limit,
-        fingerprint,
-    } = *page;
+    order: Order,
+    limit: u32,
+) -> Result<(Vec<Hit>, Option<Cursor>)> {
     let fetch = i64::from(limit) + 1;
     let rows = sql::page(parsed, scope, order, fetch)
         .build()
@@ -376,16 +374,11 @@ async fn run(
         match order {
             Order::Relevance { offset } => {
                 let next = offset + i64::from(limit);
-                (next < MAX_RELEVANCE_RESULTS)
-                    .then(|| encode_cursor(&Cursor::relevance(fingerprint, next)))
+                (next < MAX_RELEVANCE_RESULTS).then_some(Cursor::relevance(next))
             }
             Order::Newest { .. } => hits.last().and_then(|last| {
                 let id = rows.last()?.try_get::<Uuid, _>("id").ok()?;
-                Some(encode_cursor(&Cursor::newest(
-                    fingerprint,
-                    last.occurred_at,
-                    id,
-                )))
+                Some(Cursor::newest(last.occurred_at, id))
             }),
         }
     } else {
@@ -541,8 +534,6 @@ fn describe(query: Query) -> ParsedQuery {
 /// A cursor's content.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct Cursor {
-    /// The query and order it belongs to.
-    q: u64,
     /// The offset (relevance).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     o: Option<i64>,
@@ -554,18 +545,16 @@ struct Cursor {
 }
 
 impl Cursor {
-    fn relevance(q: u64, offset: i64) -> Self {
+    fn relevance(offset: i64) -> Self {
         Self {
-            q,
             o: Some(offset),
             t: None,
             i: None,
         }
     }
 
-    fn newest(q: u64, at: DateTime<Utc>, id: Uuid) -> Self {
+    fn newest(at: DateTime<Utc>, id: Uuid) -> Self {
         Self {
-            q,
             o: None,
             t: Some(at),
             i: Some(id),
@@ -573,45 +562,90 @@ impl Cursor {
     }
 }
 
-/// What a cursor is bound to: the query text, prefix mode, time zone and
-/// order. Stable for the same server build, which is all a cursor needs.
-fn fingerprint(params: &SearchParams, sort: Sort) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    params.q.trim().hash(&mut hasher);
-    params.prefix.hash(&mut hasher);
-    params.tz.hash(&mut hasher);
-    (sort == Sort::Newest).hash(&mut hasher);
-    hasher.finish()
+/// The signing context of cursors.
+const CURSOR_CONTEXT: &[u8] = b"search.cursor";
+
+/// What a cursor is bound to besides its caller: the query text, prefix
+/// mode, time zone and order.
+fn binding(params: &SearchParams, sort: Sort) -> String {
+    format!(
+        "{}\0{}\0{}\0{}",
+        params.q.trim(),
+        params.prefix,
+        params.tz.as_deref().unwrap_or_default(),
+        if sort == Sort::Newest {
+            "newest"
+        } else {
+            "relevance"
+        },
+    )
 }
 
-fn encode_cursor(cursor: &Cursor) -> String {
-    URL_SAFE_NO_PAD.encode(serde_json::to_vec(cursor).unwrap_or_default())
+/// Cursors for one caller and query: `<payload>.<tag>`, the tag an HMAC of
+/// the caller, the query and the payload under the instance's signer, so a
+/// cursor cannot be forged, altered, or used by someone else or for another
+/// query.
+struct Cursors<'a> {
+    state: &'a AppState,
+    caller: &'a str,
+    binding: String,
 }
 
-fn decode_cursor(cursor: &str, sort: Sort, fingerprint: u64) -> Result<Order> {
-    let mismatch = || Error::BadRequest(crate::MESSAGES.reason("cursor_mismatch"));
-    let bytes = URL_SAFE_NO_PAD.decode(cursor).map_err(|_| mismatch())?;
-    let cursor: Cursor = serde_json::from_slice(&bytes).map_err(|_| mismatch())?;
-    if cursor.q != fingerprint {
-        return Err(mismatch());
+impl Cursors<'_> {
+    fn signed(&self, payload: &[u8]) -> Vec<u8> {
+        let mut value = Vec::new();
+        value.extend_from_slice(self.caller.as_bytes());
+        value.push(0);
+        value.extend_from_slice(self.binding.as_bytes());
+        value.push(0);
+        value.extend_from_slice(payload);
+        value
     }
-    match (sort, cursor) {
-        (
-            Sort::Relevance,
-            Cursor {
-                o: Some(offset), ..
-            },
-        ) if (0..MAX_RELEVANCE_RESULTS).contains(&offset) => Ok(Order::Relevance { offset }),
-        (
-            Sort::Newest,
-            Cursor {
-                t: Some(at),
-                i: Some(id),
-                ..
-            },
-        ) => Ok(Order::Newest {
-            after: Some((at, id)),
-        }),
-        _ => Err(mismatch()),
+
+    fn encode(&self, cursor: &Cursor) -> String {
+        let payload = serde_json::to_vec(cursor).unwrap_or_default();
+        let tag = self
+            .state
+            .signer
+            .sign(CURSOR_CONTEXT, &self.signed(&payload));
+        format!(
+            "{}.{}",
+            URL_SAFE_NO_PAD.encode(&payload),
+            URL_SAFE_NO_PAD.encode(tag)
+        )
+    }
+
+    fn decode(&self, token: &str, sort: Sort) -> Result<Order> {
+        let mismatch = || Error::BadRequest(crate::MESSAGES.reason("cursor_mismatch"));
+        let (payload, tag) = token.split_once('.').ok_or_else(mismatch)?;
+        let payload = URL_SAFE_NO_PAD.decode(payload).map_err(|_| mismatch())?;
+        let tag = URL_SAFE_NO_PAD.decode(tag).map_err(|_| mismatch())?;
+        if !self
+            .state
+            .signer
+            .verify(CURSOR_CONTEXT, &self.signed(&payload), &tag)
+        {
+            return Err(mismatch());
+        }
+        let cursor: Cursor = serde_json::from_slice(&payload).map_err(|_| mismatch())?;
+        match (sort, cursor) {
+            (
+                Sort::Relevance,
+                Cursor {
+                    o: Some(offset), ..
+                },
+            ) if (0..MAX_RELEVANCE_RESULTS).contains(&offset) => Ok(Order::Relevance { offset }),
+            (
+                Sort::Newest,
+                Cursor {
+                    t: Some(at),
+                    i: Some(id),
+                    ..
+                },
+            ) => Ok(Order::Newest {
+                after: Some((at, id)),
+            }),
+            _ => Err(mismatch()),
+        }
     }
 }

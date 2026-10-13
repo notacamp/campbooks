@@ -11,6 +11,7 @@ use crate::{
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
     connections::{ConsentDoorPort, GrantIntakePort, NoConsentDoor, NoGrantIntake},
+    crypto::Signer,
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
@@ -73,6 +74,10 @@ pub struct AppState {
     /// The server installs one keyed by the instance secret, shared by all
     /// its processes; until then it counts per process.
     pub rate_limits: RateLimits,
+    /// Signs opaque values the server hands out (cursors). The server
+    /// installs one keyed by the instance secret; until then it signs per
+    /// process.
+    pub signer: Signer,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -110,6 +115,7 @@ impl AppState {
             admin_profiles: Arc::new(NoAdmins),
             admin_audit: Arc::new(NoAudit),
             rate_limits: RateLimits::default(),
+            signer: Signer::default(),
         }
     }
 
@@ -185,6 +191,13 @@ impl AppState {
     #[must_use]
     pub fn with_rate_limits(mut self, rate_limits: RateLimits) -> Self {
         self.rate_limits = rate_limits;
+        self
+    }
+
+    /// The same state, signing with `signer`.
+    #[must_use]
+    pub fn with_signer(mut self, signer: Signer) -> Self {
+        self.signer = signer;
         self
     }
 

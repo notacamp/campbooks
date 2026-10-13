@@ -1,7 +1,8 @@
 //! Keeping the index current from the sources' events: each event names a
 //! group whose current state is pulled through its `SearchSource` and
 //! written in the delivery's transaction (`domain::index::refresh`). The
-//! first event from a workspace also starts its backfill.
+//! first event from a workspace also starts its backfill. Nothing is indexed
+//! for a workspace being deleted.
 
 use campbooks_kernel::{Event, EventHandler, JobContext, JobError, tenancy::WorkspaceId};
 
@@ -26,7 +27,10 @@ async fn refresh(
         .parse()
         .map_err(|_| JobError::fatal("event with a malformed workspace"))?;
     let tx = ctx.tx().await?;
-    index::ensure_backfill(tx, workspace, group_type).await?;
+    if index::ensure_backfill(tx, workspace, group_type).await? == index::Standing::Deleting {
+        // The workspace is being deleted: its index is purged, not refreshed.
+        return Ok(());
+    }
     index::refresh(tx, &state.blobs, workspace, source.as_ref(), group).await?;
     Ok(())
 }
