@@ -3,7 +3,7 @@
 
 use serde::Deserialize;
 
-use crate::model::{ConversationId, LabelId, MessageId};
+use crate::model::{ConversationId, DraftId, LabelId, MessageId};
 
 /// `/api/v1/w/{workspace_id}/conversations/{conversation_id}…`
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -28,4 +28,11 @@ pub struct LabelPath {
     pub conversation_id: ConversationId,
     /// The label.
     pub label_id: LabelId,
+}
+
+/// `/api/v1/w/{workspace_id}/drafts/{draft_id}…`
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct DraftPath {
+    /// The draft.
+    pub draft_id: DraftId,
 }

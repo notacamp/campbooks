@@ -11,7 +11,7 @@ use crate::{
     documents::ParticipantsDocument,
     events::{MessageReceived, MessageSent},
     model::InboxId,
-    testkit::{Kit, fixture},
+    testkit::{Kit, contract, fixture},
 };
 
 const FIXTURES: [&str; 6] = ["en", "pt-PT", "es-ES", "fr", "followup", "late-parent"];
@@ -45,18 +45,6 @@ async fn recorded_batches_follow_the_contract(db: PgPool) {
     ]});
     assert!(schemas.validate(&bad, index).is_err());
     assert!(fixture("en").contains("example"));
-}
-
-/// A compiled contract from `contracts/`.
-fn contract(file: &str) -> (boon::Schemas, boon::SchemaIndex) {
-    let path = format!("{}/../../../contracts/{file}", env!("CARGO_MANIFEST_DIR"));
-    let schema: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-    let mut schemas = boon::Schemas::new();
-    let mut compiler = boon::Compiler::new();
-    compiler.enable_format_assertions();
-    compiler.add_resource(file, schema).unwrap();
-    let index = compiler.compile(file, &mut schemas).unwrap();
-    (schemas, index)
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

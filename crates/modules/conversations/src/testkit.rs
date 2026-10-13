@@ -23,6 +23,7 @@ use campbooks_kernel::{
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
     testing::{self, TestIdp, TestResponse},
 };
+use serde_json::Value;
 use sqlx::PgPool;
 
 use crate::{
@@ -37,7 +38,7 @@ use crate::{
 };
 
 /// Every scope of this module.
-pub const ALL_SCOPES: &str = "conversations:read conversations:write";
+pub const ALL_SCOPES: &str = "conversations:read conversations:write conversations:send";
 
 /// The membership port, as the workspaces module would answer it: users
 /// registered with [`Kit::member`], and clients bound to the workspace.
@@ -227,6 +228,36 @@ impl Kit {
         self.call(Method::DELETE, token, uri, None).await
     }
 
+    /// `PATCH uri` with a JSON body.
+    pub async fn patch(&self, token: &str, uri: &str, body: serde_json::Value) -> TestResponse {
+        self.call(Method::PATCH, token, uri, Some(body)).await
+    }
+
+    /// The id of message `provider_message_id`.
+    pub async fn message_of(&self, provider_message_id: &str) -> String {
+        sqlx::query_scalar(
+            "SELECT id::text FROM conversations.messages WHERE provider_message_id = $1",
+        )
+        .bind(provider_message_id)
+        .fetch_one(&self.db)
+        .await
+        .unwrap()
+    }
+
+    /// Add user `user` to `inbox` with `role`.
+    pub async fn add_to_inbox(&self, inbox: InboxId, user: UserId, role: InboxRole) {
+        sqlx::query(
+            "INSERT INTO conversations.inbox_members (workspace_id, inbox_id, user_id, role)
+             SELECT workspace_id, id, $2, $3 FROM conversations.inboxes WHERE id = $1",
+        )
+        .bind(inbox)
+        .bind(user.as_uuid())
+        .bind(role.as_str())
+        .execute(&self.db)
+        .await
+        .unwrap();
+    }
+
     async fn call(
         &self,
         method: Method,
@@ -299,4 +330,16 @@ pub fn sorting_deps() -> ConversationsDeps {
 pub fn fixture(name: &str) -> String {
     let path = format!("{}/fixtures/{name}.json", env!("CARGO_MANIFEST_DIR"));
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("{path}: {e}"))
+}
+
+/// A compiled contract from `contracts/`.
+pub fn contract(file: &str) -> (boon::Schemas, boon::SchemaIndex) {
+    let path = format!("{}/../../../contracts/{file}", env!("CARGO_MANIFEST_DIR"));
+    let schema: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let mut schemas = boon::Schemas::new();
+    let mut compiler = boon::Compiler::new();
+    compiler.enable_format_assertions();
+    compiler.add_resource(file, schema).unwrap();
+    let index = compiler.compile(file, &mut schemas).unwrap();
+    (schemas, index)
 }

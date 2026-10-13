@@ -7,6 +7,7 @@
   "required": [
     "workspace",
     "inbox_id",
+    "draft",
     "send_id",
     "message"
   ],
@@ -17,6 +18,10 @@
     },
     "inbox_id": {
       "$ref": "#/$defs/uuid"
+    },
+    "draft": {
+      "$ref": "#/$defs/uuid",
+      "description": "The draft being sent (an id of the conversations module)."
     },
     "send_id": {
       "$ref": "#/$defs/uuid",

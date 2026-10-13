@@ -17,7 +17,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ConnectionId, ConversationId, InboxId, LabelId, MessageId, Stream,
+    BlobPointer, Channel, ConnectionId, ConversationId, DraftId, InboxId, LabelId, MessageId,
+    SendId, Stream,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -27,6 +28,9 @@ pub const INBOX_RECORD: &str = "conversations.inbox";
 pub const CONVERSATION_RECORD: &str = "conversations.conversation";
 /// Record type of a message.
 pub const MESSAGE_RECORD: &str = "conversations.message";
+/// Record type of a draft (visible to its author only; the feed carries
+/// its id, never its content).
+pub const DRAFT_RECORD: &str = "conversations.draft";
 
 /// `inbox` as the container of a change.
 fn inbox_record(inbox: InboxId) -> RecordRef {
@@ -280,6 +284,140 @@ pub enum RequestOrigin {
 
 impl DomainEvent for ChangesRequested {
     const NAME: &'static str = "conversations.changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// A member's send left its undo window: the connector's outbound work
+/// (`contracts/conversations.send_requested.v1.schema.json`). The message
+/// is an outgoing-message v1 blob; the event carries ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SendRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox it is sent from.
+    pub inbox_id: InboxId,
+    /// The draft being sent.
+    pub draft: DraftId,
+    /// This send: unique, the connector records it once.
+    pub send_id: SendId,
+    /// The outgoing-message v1 document, a blob of the workspace.
+    #[schema(value_type = BlobPointer)]
+    pub message: BlobRef,
+}
+
+impl DomainEvent for SendRequested {
+    const NAME: &'static str = "conversations.send_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
+                .within(inbox_record(self.inbox_id)),
+        ]
+    }
+}
+
+/// A draft was sent: the provider accepted it and the draft is gone. The
+/// message itself arrives like any other (`message_sent`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct DraftSent {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+    /// The draft, now deleted.
+    pub draft: DraftId,
+    /// The conversation it answered, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub conversation: Option<ConversationId>,
+}
+
+impl DomainEvent for DraftSent {
+    const NAME: &'static str = "conversations.draft_sent";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::delete(RecordRef::new(DRAFT_RECORD, &self.draft))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
+/// A send failed: the draft is editable again and says why.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SendFailed {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+    /// The draft.
+    pub draft: DraftId,
+    /// Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,
+    /// `unknown_outcome`).
+    pub reason: String,
+}
+
+impl DomainEvent for SendFailed {
+    const NAME: &'static str = "conversations.send_failed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
+/// How a send ended, as the connector reports it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SendOutcome {
+    /// The provider accepted it.
+    Sent,
+    /// It was not sent (or may not have been: `unknown_outcome`).
+    Failed,
+}
+
+/// `connectors.send_completed` v1, as this module reads it
+/// (`contracts/connectors.send_completed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SendCompleted {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox_id: InboxId,
+    /// The send.
+    pub send_id: SendId,
+    /// Sent or failed.
+    pub outcome: SendOutcome,
+    /// The provider's id of the sent message.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_message_id: Option<String>,
+    /// Why it failed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reason: Option<String>,
+}
+
+impl DomainEvent for SendCompleted {
+    const NAME: &'static str = "connectors.send_completed";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {
