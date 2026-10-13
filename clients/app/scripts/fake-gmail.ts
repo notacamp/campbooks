@@ -6,6 +6,7 @@
 // fictional; domains are `.example`.
 import { randomBytes } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { crc32, deflateSync } from "node:zlib";
 
 /** One stored message. */
 interface StoredMessage {
@@ -62,7 +63,13 @@ const hex = (bytes: number) => randomBytes(bytes).toString("hex");
 interface DemoFile {
   name: string;
   type: string;
-  content: string;
+  content: string | Buffer;
+}
+
+/** A picture shown inside the HTML body (`cid:`), in a multipart/related. */
+interface DemoInline extends DemoFile {
+  /** Its Content-ID, without angle brackets. */
+  cid: string;
 }
 
 /** A message of the demo mailbox, before it is laid out as RFC 5322. */
@@ -82,6 +89,7 @@ interface DemoMessage {
   replyTo?: string;
   headers?: Record<string, string>;
   files?: DemoFile[];
+  inline?: DemoInline[];
 }
 
 /** A tiny but valid PDF, so attachments are real files. */
@@ -98,6 +106,75 @@ function pdf(title: string): string {
     "trailer<</Root 1 0 R>>",
     "%%EOF",
   ].join("\n");
+}
+
+/** A PNG of `width` × `height` whose pixels `paint` gives as [r, g, b]. */
+function png(
+  width: number,
+  height: number,
+  paint: (x: number, y: number) => [number, number, number],
+): Buffer {
+  const chunk = (type: string, data: Buffer) => {
+    const length = Buffer.alloc(4);
+    length.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type, "latin1"), data]);
+    const crc = Buffer.alloc(4);
+    crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  header.writeUInt8(8, 8); // bit depth
+  header.writeUInt8(2, 9); // truecolour
+  const rows = Buffer.alloc(height * (1 + width * 3));
+  for (let y = 0; y < height; y += 1) {
+    const row = y * (1 + width * 3);
+    for (let x = 0; x < width; x += 1) {
+      const [r, g, b] = paint(x, y);
+      rows.writeUInt8(r, row + 1 + x * 3);
+      rows.writeUInt8(g, row + 2 + x * 3);
+      rows.writeUInt8(b, row + 3 + x * 3);
+    }
+  }
+  return Buffer.concat([
+    Buffer.from("89504e470d0a1a0a", "hex"),
+    chunk("IHDR", header),
+    chunk("IDAT", deflateSync(rows)),
+    chunk("IEND", Buffer.alloc(0)),
+  ]);
+}
+
+/** A harbour at dusk: a sky gradient, a sun, hills and water. */
+function harbourPhoto(): Buffer {
+  const width = 640;
+  const height = 420;
+  return png(width, height, (x, y) => {
+    const sun = Math.hypot(x - 450, y - 150) < 46;
+    const hill = y > 250 + 40 * Math.sin(x / 70) - x / 16;
+    const water = y > 330;
+    if (water) {
+      const ripple = Math.sin(x / 9 + y / 3) > 0.92 ? 40 : 0;
+      return [24 + ripple, 52 + ripple, 74 + ripple];
+    }
+    if (hill) {
+      return [30, 59, 51];
+    }
+    if (sun) {
+      return [246, 196, 92];
+    }
+    const t = y / 330;
+    return [Math.round(242 - 120 * t), Math.round(160 - 70 * t), Math.round(120 + 40 * t)];
+  });
+}
+
+/** A small wordmark-like logo, sent inline. */
+function brightloopLogo(): Buffer {
+  return png(120, 32, (x, y) => {
+    const ring = Math.abs(Math.hypot(x - 16, y - 16) - 10) < 3;
+    const bar = x > 34 && x < 112 && y > 12 && y < 20;
+    return ring || bar ? [216, 90, 48] : [255, 255, 255];
+  });
 }
 
 /**
@@ -214,14 +291,48 @@ function demoMessages(me: string, images: string): DemoMessage[] {
         { name: "q4-plan-v3.pdf", type: "application/pdf", content: pdf("Q4 plan, version 3") },
       ],
     },
+    {
+      from: "Ana Lopes <ana@brightloop.example>",
+      to: me,
+      subject: "Photos and tickets for the harbour walk",
+      hoursAgo: 1,
+      labels: ["INBOX", "UNREAD", "CATEGORY_PERSONAL"],
+      text: "Hi Sam,\n\nHere is the photo from Saturday, the tickets for the boat and the itinerary. The route map is on the walking site.\n\nAna",
+      html: `<p><img src="cid:logo@brightloop.example" alt="Brightloop" width="120" height="32"></p>
+<p>Hi Sam,</p><p>Here is the photo from Saturday, the tickets for the boat and the itinerary.</p>
+<p>The route map, from the walking site:</p>
+<p><img src="${images}/route-map.svg" alt="Route map" width="480" height="160" style="width:100%;max-width:480px;height:auto"></p>
+<p>Ana</p>`,
+      inline: [
+        {
+          cid: "logo@brightloop.example",
+          name: "brightloop-logo.png",
+          type: "image/png",
+          content: brightloopLogo(),
+        },
+      ],
+      files: [
+        { name: "harbour-at-dusk.png", type: "image/png", content: harbourPhoto() },
+        {
+          name: "boat-tickets.pdf",
+          type: "application/pdf",
+          content: pdf("Boat tickets, 2 adults"),
+        },
+        {
+          name: "itinerary.html",
+          type: "text/html",
+          content: `<html><body><h1>Itinerary</h1><script>alert(document.cookie)</script></body></html>`,
+        },
+      ],
+    },
   ];
 }
 
 const CRLF = "\r\n";
 
-function wrap64(text: string): string {
+function wrap64(text: string | Buffer): string {
   return (
-    Buffer.from(text)
+    (typeof text === "string" ? Buffer.from(text) : text)
       .toString("base64")
       .match(/.{1,76}/gu)
       ?.join(CRLF) ?? ""
@@ -261,22 +372,51 @@ function rfc822(message: DemoMessage, date: Date, messageId: string, parent?: st
     `--${alt}--`,
   ].join(CRLF);
   const files = message.files ?? [];
+  const inline = message.inline ?? [];
+  // The body: text, text and HTML, or text and HTML with the pictures the
+  // HTML shows (`cid:`) beside it in a multipart/related.
+  const related = `rel-${hex(6)}`;
+  const relatedBody = [
+    `--${related}`,
+    [`Content-Type: multipart/alternative; boundary="${alt}"`, "", alternative].join(CRLF),
+    ...inline.flatMap((part) => [
+      `--${related}`,
+      `Content-Type: ${part.type}; name="${part.name}"`,
+      `Content-Disposition: inline; filename="${part.name}"`,
+      `Content-ID: <${part.cid}>`,
+      "Content-Transfer-Encoding: base64",
+      "",
+      wrap64(part.content),
+    ]),
+    `--${related}--`,
+  ].join(CRLF);
   let type: string;
   let body: string;
   if (files.length === 0 && message.html === undefined) {
     type = "text/plain; charset=utf-8";
     headers.push(["Content-Transfer-Encoding", "base64"]);
     body = wrap64(message.text);
-  } else if (files.length === 0) {
+  } else if (files.length === 0 && inline.length === 0) {
     type = `multipart/alternative; boundary="${alt}"`;
     body = alternative;
+  } else if (files.length === 0) {
+    type = `multipart/related; boundary="${related}"`;
+    body = relatedBody;
   } else {
     const mixed = `mixed-${hex(6)}`;
     type = `multipart/mixed; boundary="${mixed}"`;
-    const first =
-      message.html === undefined
-        ? textPart
-        : [`Content-Type: multipart/alternative; boundary="${alt}"`, "", alternative].join(CRLF);
+    let first: string;
+    if (message.html === undefined) {
+      first = textPart;
+    } else if (inline.length === 0) {
+      first = [`Content-Type: multipart/alternative; boundary="${alt}"`, "", alternative].join(
+        CRLF,
+      );
+    } else {
+      first = [`Content-Type: multipart/related; boundary="${related}"`, "", relatedBody].join(
+        CRLF,
+      );
+    }
     body = [
       `--${mixed}`,
       first,
@@ -580,6 +720,9 @@ export function demoImage(name: string): { type: string; body: string } | undefi
     }
     case "northwind-logo.svg": {
       return { type: "image/svg+xml", body: svg(140, 40, "#3d3d3d", "Northwind") };
+    }
+    case "route-map.svg": {
+      return { type: "image/svg+xml", body: svg(480, 160, "#3a6f8f", "Harbour walk, 6 km") };
     }
     case "track.png": {
       // A 1×1 transparent PNG: what a tracking pixel looks like.

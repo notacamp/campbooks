@@ -122,6 +122,11 @@ const ICONS = {
     path("M6 9h8.5a5.5 5.5 0 0 1 0 11H12"),
   ],
   unread: [<circle key="c" cx="12" cy="12" r="4" fill="currentColor" />],
+  download: [path("M12 4v11M7.5 10.5 12 15l4.5-4.5"), path("M5 19.5h14")],
+  preview: [
+    path("M2.8 12S6.2 5.5 12 5.5 21.2 12 21.2 12 17.8 18.5 12 18.5 2.8 12 2.8 12Z"),
+    <circle key="c" cx="12" cy="12" r="2.8" />,
+  ],
 } satisfies Record<string, ReactElement[]>;
 
 export type IconName = keyof typeof ICONS;

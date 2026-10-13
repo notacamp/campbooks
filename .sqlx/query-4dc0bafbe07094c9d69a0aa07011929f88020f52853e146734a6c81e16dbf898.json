@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id AS \"id: AttachmentId\", message_id AS \"message_id: MessageId\", filename,\n               content_type, size, inline\n          FROM conversations.attachments\n         WHERE message_id = ANY($1)\n         ORDER BY message_id, position\n        ",
+  "query": "\n        SELECT id AS \"id: AttachmentId\", message_id AS \"message_id: MessageId\", filename,\n               content_type, size, inline, content_id IS NOT NULL AS \"has_content_id!\"\n          FROM conversations.attachments\n         WHERE message_id = ANY($1)\n         ORDER BY message_id, position\n        ",
   "describe": {
     "columns": [
       {
@@ -68,6 +68,12 @@
             "name": "inline"
           }
         }
+      },
+      {
+        "ordinal": 6,
+        "name": "has_content_id!",
+        "type_info": "Bool",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -81,8 +87,9 @@
       false,
       false,
       false,
-      false
+      false,
+      null
     ]
   },
-  "hash": "a9446adb7d7a349f3e212584b93bf619fde4e0b1dd0e84babadab24cd070432d"
+  "hash": "4dc0bafbe07094c9d69a0aa07011929f88020f52853e146734a6c81e16dbf898"
 }

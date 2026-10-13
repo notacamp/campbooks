@@ -21,6 +21,7 @@ use crate::{
     domain::paths::ConversationPath,
     domain::{
         access::visible_inboxes,
+        attachments::is_raster,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
         suggestions::{self, DecisionView},
@@ -47,6 +48,9 @@ pub struct AttachmentView {
     pub size: u64,
     /// Shown inside the body rather than attached.
     pub inline: bool,
+    /// Shown by the HTML body (an inline raster image its `cid:` source
+    /// names), so a reader need not list it with the files.
+    pub in_body: bool,
 }
 
 /// A message's plain-text body.
@@ -242,7 +246,7 @@ async fn attachments_of(
     for a in sqlx::query!(
         r#"
         SELECT id AS "id: AttachmentId", message_id AS "message_id: MessageId", filename,
-               content_type, size, inline
+               content_type, size, inline, content_id IS NOT NULL AS "has_content_id!"
           FROM conversations.attachments
          WHERE message_id = ANY($1)
          ORDER BY message_id, position
@@ -252,6 +256,7 @@ async fn attachments_of(
     .fetch_all(conn)
     .await?
     {
+        let in_body = a.inline && a.has_content_id && is_raster(&a.content_type);
         attachments
             .entry(a.message_id)
             .or_default()
@@ -261,6 +266,7 @@ async fn attachments_of(
                 content_type: a.content_type,
                 size: u64::try_from(a.size).unwrap_or_default(),
                 inline: a.inline,
+                in_body,
             });
     }
     Ok(attachments)
