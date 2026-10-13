@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO conversations.attachments\n                    (id, workspace_id, message_id, position, filename, content_type, size,\n                     inline, blob)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Int4",
+        "Text",
+        "Text",
+        "Int8",
+        "Bool",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3db1e82e0db4be51134cc23aa8bf3e75fd707a1159573906a7350c1ce60d8f18"
+}

@@ -187,6 +187,139 @@
       }
     },
     {
+      "name": "conversations.changes_requested",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member (or automation, or the assistant, through an operation) asked\nfor changes the provider should make too: the connector's outbound work.\nNever published for changes that came from the provider.",
+        "required": [
+          "workspace",
+          "inbox_id",
+          "conversation",
+          "origin",
+          "items"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox the messages belong to."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RequestedItem"
+            },
+            "description": "The changes, message by message."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/RequestOrigin",
+            "description": "Always `user`: changes from the provider produce no request."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.conversation_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A conversation's state changed.",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "origin",
+          "changes",
+          "provider_message_ids"
+        ],
+        "properties": {
+          "changes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "description": "What changed."
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/Origin",
+            "description": "Where the change came from."
+          },
+          "provider_message_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The provider ids of the messages the change applies to, for carrying a\nmember's change to the provider."
+          },
+          "state": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConversationState",
+                "description": "The state afterwards; `None` once the conversation is gone."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.message_received",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MessageFacts",
+            "description": "The message."
+          }
+        ],
+        "description": "An inbound message was stored for the first time."
+      }
+    },
+    {
+      "name": "conversations.message_sent",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MessageFacts",
+            "description": "The message."
+          }
+        ],
+        "description": "An outbound message was stored for the first time (sent from the\nprovider's own client today; from Campbooks once sending lands)."
+      }
+    },
+    {
       "name": "identity.account_created",
       "module": "identity",
       "version": 1,
@@ -465,6 +598,33 @@
   ],
   "components": {
     "schemas": {
+      "BlobPointer": {
+        "type": "object",
+        "description": "The schema of a stored blob reference (`campbooks_kernel::blobs::BlobRef`)\nas it appears in events and documents: read the bytes with\n`BlobStore::get` in the event's workspace.",
+        "required": [
+          "hash",
+          "size",
+          "content_type"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "The media type recorded with it.",
+            "example": "text/plain; charset=utf-8"
+          },
+          "hash": {
+            "type": "string",
+            "description": "SHA-256 of the bytes, 64 lower-case hex digits.",
+            "example": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Length in bytes.",
+            "minimum": 0
+          }
+        }
+      },
       "BlobRef": {
         "type": "object",
         "description": "How a [`BlobRef`] looks on the wire, for the events catalogue.",
@@ -500,10 +660,70 @@
           "bank"
         ]
       },
+      "Change": {
+        "type": "string",
+        "description": "What changed about a conversation.",
+        "enum": [
+          "read",
+          "starred",
+          "archived",
+          "stream",
+          "labels",
+          "messages",
+          "removed"
+        ]
+      },
+      "Channel": {
+        "type": "string",
+        "description": "A kind of messaging. Email is the first.",
+        "enum": [
+          "email"
+        ]
+      },
       "ConnectionId": {
         "type": "string",
         "format": "uuid",
         "description": "ConnectionId (UUIDv7)"
+      },
+      "ConversationId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ConversationId (UUIDv7)"
+      },
+      "ConversationState": {
+        "type": "object",
+        "description": "A conversation's state after a change.",
+        "required": [
+          "stream",
+          "unread_count",
+          "starred",
+          "archived",
+          "trashed"
+        ],
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether no message is in the inbox."
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Whether any message is starred."
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "Its stream."
+          },
+          "trashed": {
+            "type": "boolean",
+            "description": "Whether every message is in the trash or spam."
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unread inbound messages.",
+            "minimum": 0
+          }
+        }
       },
       "InboxId": {
         "type": "string",
@@ -518,12 +738,296 @@
           "personal"
         ]
       },
+      "LabelId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "LabelId (UUIDv7)"
+      },
+      "MessageFacts": {
+        "type": "object",
+        "description": "Facts about one message, shared by [`MessageReceived`] and\n[`MessageSent`].",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message",
+          "provider_message_id",
+          "channel",
+          "stream",
+          "sent_at",
+          "participants",
+          "attachment_count"
+        ],
+        "properties": {
+          "attachment_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many attachments it carries.",
+            "minimum": 0
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel",
+            "description": "Its channel."
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "Its conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox it belongs to."
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message."
+          },
+          "participants": {
+            "$ref": "#/components/schemas/BlobPointer",
+            "description": "The participants document (addresses and subject)."
+          },
+          "provider_message_id": {
+            "type": "string",
+            "description": "The provider's id for it, unique within the inbox."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The conversation's stream when the message was stored."
+          },
+          "text": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/BlobPointer",
+                "description": "The plain-text body, when there is one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      },
+      "MessageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "MessageId (UUIDv7)"
+      },
+      "Origin": {
+        "type": "string",
+        "description": "Where a change came from.",
+        "enum": [
+          "provider",
+          "member"
+        ]
+      },
       "Provider": {
         "type": "string",
         "description": "An outside provider.",
         "enum": [
           "google"
         ]
+      },
+      "RequestOrigin": {
+        "type": "string",
+        "description": "Who asked for a requested change.",
+        "enum": [
+          "user"
+        ]
+      },
+      "RequestedChange": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Mark the message read.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mark_read"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Mark the message unread.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mark_unread"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Star (flag) the message.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "star"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Unstar the message.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "unstar"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take the message out of the inbox.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "archive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Put the message back in the inbox.",
+            "required": [
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "unarchive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Put a label on the message.",
+            "required": [
+              "label",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "add_label"
+                ]
+              },
+              "label": {
+                "$ref": "#/components/schemas/LabelId",
+                "description": "The label."
+              },
+              "provider_key": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The provider's key for it, when the provider already has it."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take a label off the message.",
+            "required": [
+              "label",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "remove_label"
+                ]
+              },
+              "label": {
+                "$ref": "#/components/schemas/LabelId",
+                "description": "The label."
+              },
+              "provider_key": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The provider's key for it, when the provider has it."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation was moved to another stream (providers with their\nown categories may mirror it; others ignore it).",
+            "required": [
+              "stream",
+              "kind"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "move_to_stream"
+                ]
+              },
+              "stream": {
+                "$ref": "#/components/schemas/Stream",
+                "description": "The stream."
+              }
+            }
+          }
+        ],
+        "description": "A change a member asked for, to be made at the provider too."
+      },
+      "RequestedItem": {
+        "type": "object",
+        "description": "One message and the change asked for it.",
+        "required": [
+          "provider_message_id",
+          "change"
+        ],
+        "properties": {
+          "change": {
+            "$ref": "#/components/schemas/RequestedChange",
+            "description": "The change."
+          },
+          "provider_message_id": {
+            "type": "string",
+            "description": "The provider's id for the message."
+          }
+        }
       },
       "Role": {
         "type": "string",
@@ -532,6 +1036,16 @@
           "owner",
           "admin",
           "member"
+        ]
+      },
+      "Stream": {
+        "type": "string",
+        "description": "The one place Campbooks sorts a conversation into. The built-in set; the\nworkspace's own streams come later.",
+        "enum": [
+          "primary",
+          "updates",
+          "receipts",
+          "newsletters"
         ]
       },
       "UserId": {

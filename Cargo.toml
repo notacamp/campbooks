@@ -21,6 +21,7 @@ campbooks-ai = { path = "crates/ai" }
 campbooks-server = { path = "crates/server" }
 campbooks-system = { path = "crates/modules/system" }
 campbooks-workspaces = { path = "crates/modules/workspaces" }
+campbooks-conversations = { path = "crates/modules/conversations" }
 campbooks-connectors = { path = "crates/modules/connectors" }
 campbooks-identity = { path = "crates/modules/identity" }
 

@@ -1,0 +1,46 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "pt-1",
+      "thread_key": "thr-pt-agua",
+      "rfc_message_id": "fatura-2026-09@aguas-do-vale.example",
+      "from": {"name": "Águas do Vale", "address": "faturacao@aguas-do-vale.example"},
+      "to": [{"address": "ines.cardoso@example.com"}],
+      "subject": "A sua fatura de setembro está disponível",
+      "sent_at": "2026-10-02T09:00:00Z",
+      "direction": "inbound",
+      "headers": {"auto_submitted": "auto-generated"},
+      "text": "Olá Inês,\n\nA fatura n.º FT 2026/09812, no valor de 23,47 €, já está disponível. O pagamento por débito direto será feito a 20 de outubro.\n\nObrigado,\nÁguas do Vale",
+      "attachments": [{"filename": "Fatura_FT2026-09812.pdf", "content_type": "application/pdf", "content": "%PDF-1.7 fatura ficticia"}],
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "pt-2",
+      "thread_key": "thr-pt-jantar",
+      "rfc_message_id": "jantar-1@correio.example",
+      "from": {"name": "Rui Tavares", "address": "rui.tavares@correio.example"},
+      "to": [{"name": "Inês", "address": "ines.cardoso@example.com"}],
+      "subject": "Jantar no sábado?",
+      "sent_at": "2026-10-03T18:45:00Z",
+      "direction": "inbound",
+      "text": "Olá Inês! Fazemos o jantar de anos da Marta no sábado às 20h? Diz-me até quinta para eu reservar a mesa. Beijinhos, Rui",
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "pt-3",
+      "thread_key": "thr-pt-promo",
+      "from": {"name": "Livraria Alfarroba", "address": "novidades@alfarroba.example"},
+      "to": [{"address": "ines.cardoso@example.com"}],
+      "subject": "Outono com 20% de desconto em todos os livros",
+      "sent_at": "2026-10-04T07:30:00Z",
+      "direction": "inbound",
+      "headers": {"list_unsubscribe": "<mailto:sair@alfarroba.example>"},
+      "text": "Esta semana, 20% de desconto em todos os livros. Válido até domingo.",
+      "mailbox": {"in_inbox": true},
+      "categories": ["promotions"],
+      "read": false, "starred": false
+    }}
+  ]
+}

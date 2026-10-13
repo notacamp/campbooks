@@ -15,8 +15,10 @@ path = "src/main.rs"
 [dependencies]
 axum.workspace = true
 base64.workspace = true
+campbooks-ai.workspace = true
 campbooks-connectors.workspace = true
 campbooks-identity.workspace = true
+campbooks-conversations.workspace = true
 campbooks-kernel.workspace = true
 campbooks-system.workspace = true
 campbooks-workspaces.workspace = true

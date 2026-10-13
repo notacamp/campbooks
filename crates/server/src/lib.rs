@@ -79,6 +79,9 @@ pub struct Composition {
     /// The connectors module's settings, Google client and credentials
     /// cipher.
     pub connectors: campbooks_connectors::Deps,
+    /// The conversations module's AI gateway (when an AI role is set),
+    /// settings, rules strategy and per-question policy.
+    pub conversations: campbooks_conversations::ConversationsDeps,
     /// The identity module's in-process issuer, when it serves this
     /// instance (ADR 0014).
     pub identity: campbooks_identity::Deps,
@@ -88,10 +91,20 @@ impl Composition {
     /// Read every module's dependencies from the environment. A broken
     /// setting is an error naming it.
     pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
+        let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
+        let gateway = if ai.roles.is_empty() {
+            None
+        } else {
+            Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
+        };
         let scopes: Vec<&str> = scope_catalogue().iter().map(|scope| scope.name).collect();
         Ok(Self {
             connectors: campbooks_connectors::Deps::from_env(config)?,
             identity: campbooks_identity::Deps::from_env(config, &scopes)?,
+            conversations: campbooks_conversations::ConversationsDeps::new(
+                gateway,
+                campbooks_conversations::ConversationsConfig::from_env()?,
+            ),
         })
     }
 }
@@ -107,6 +120,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_system::module(),
         campbooks_workspaces::module(),
         campbooks_connectors::module(composition.connectors.clone()),
+        campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
@@ -114,11 +128,13 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 
 /// `state` with the ports modules implement for the kernel registered: the
 /// `workspaces` module answers who belongs to which workspace and which
-/// language each user chose.
+/// language each user chose; the `conversations` module, who may see the
+/// change feed's records inside an inbox.
 pub fn with_ports(state: AppState) -> AppState {
     state
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_visibility(campbooks_conversations::visibility())
 }
 
 /// [`with_ports`], plus the ports of the modules composed with
@@ -221,6 +237,9 @@ fn security_scheme() -> SecurityScheme {
         (name = "connectors", description = "Connections to outside accounts (Gmail first): \
             connect with the provider's consent, see their health, sync now, disconnect. \
             Credentials are never returned."),
+        (name = "conversations", description = "Inboxes, conversations and messages on any \
+            channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes \
+            they are a member of; a client token bound to the workspace sees them all."),
         (name = "identity", description = "Accounts and their ways in, and this instance's \
             OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, \
             sign-in with a provider, and the mailboxes a sign-up granted, waiting for a \

@@ -1,0 +1,54 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "imap-12",
+      "rfc_message_id": "reply-a@club.example",
+      "in_reply_to": "kickoff@club.example",
+      "references": ["kickoff@club.example"],
+      "from": {"name": "Ana", "address": "ana@club.example"},
+      "to": [{"address": "team@example.com"}],
+      "subject": "Re: Season kick-off",
+      "sent_at": "2026-10-07T10:00:00Z",
+      "direction": "inbound",
+      "text": "Count me in.",
+      "mailbox": {"in_inbox": true}
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "imap-13",
+      "rfc_message_id": "reply-b@club.example",
+      "in_reply_to": "kickoff@club.example",
+      "references": ["kickoff@club.example"],
+      "from": {"name": "Bruno", "address": "bruno@club.example"},
+      "to": [{"address": "team@example.com"}],
+      "subject": "Re: Season kick-off",
+      "sent_at": "2026-10-07T10:05:00Z",
+      "direction": "inbound",
+      "text": "Me too, I'll bring the balls.",
+      "mailbox": {"in_inbox": true}
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "imap-11",
+      "rfc_message_id": "kickoff@club.example",
+      "from": {"name": "Coach Dee", "address": "dee@club.example"},
+      "to": [{"address": "team@example.com"}],
+      "subject": "Season kick-off",
+      "sent_at": "2026-10-07T09:00:00Z",
+      "direction": "inbound",
+      "text": "First training is Saturday at 10. Who's in?",
+      "mailbox": {"in_inbox": true}
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "imap-14",
+      "rfc_message_id": "reply-c@club.example",
+      "in_reply_to": "reply-b@club.example",
+      "references": ["kickoff@club.example", "reply-b@club.example"],
+      "from": {"name": "Coach Dee", "address": "dee@club.example"},
+      "to": [{"address": "team@example.com"}],
+      "subject": "Re: Season kick-off",
+      "sent_at": "2026-10-07T11:00:00Z",
+      "direction": "inbound",
+      "text": "Great, see you Saturday.",
+      "mailbox": {"in_inbox": true}
+    }}
+  ]
+}

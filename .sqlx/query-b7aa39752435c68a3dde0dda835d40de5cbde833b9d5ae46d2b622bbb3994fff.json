@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: DecisionId\" FROM conversations.decisions\n                WHERE conversation_id = $1 AND question = $2 ORDER BY created_at, id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: DecisionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.decisions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b7aa39752435c68a3dde0dda835d40de5cbde833b9d5ae46d2b622bbb3994fff"
+}

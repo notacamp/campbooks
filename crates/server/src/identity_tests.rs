@@ -177,6 +177,7 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
             Arc::new(SystemClock),
         )
         .unwrap(),
+        ..crate::Composition::default()
     };
     let issuer = composition
         .identity
