@@ -1,0 +1,12 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.outbound_changes SET applied_to = NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": []
+  },
+  "hash": "da900309ad3af43bd32bc5e2f004e68ad9135d3beae11f60202ad2fd6b7f653f"
+}

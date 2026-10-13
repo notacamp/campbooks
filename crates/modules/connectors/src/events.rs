@@ -229,3 +229,83 @@ impl DomainEvent for WorkspaceDeleting {
         Some(&self.workspace)
     }
 }
+
+/// `conversations.changes_requested` v1, as this module reads it
+/// (`contracts/conversations.changes_requested.v1.schema.json`): a member's
+/// changes the provider should mirror. Changes from the provider never
+/// produce it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChangesRequested {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox the messages belong to (minted here, owned by
+    /// conversations).
+    pub inbox_id: InboxId,
+    /// The conversation (an id of the conversations module).
+    pub conversation: uuid::Uuid,
+    /// Always `user`.
+    pub origin: String,
+    /// The changes, message by message.
+    pub items: Vec<RequestedItem>,
+}
+
+impl DomainEvent for ChangesRequested {
+    const NAME: &'static str = "conversations.changes_requested";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// One message and the change asked for it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RequestedItem {
+    /// The provider's id for the message.
+    pub provider_message_id: String,
+    /// The change.
+    pub change: RequestedChange,
+}
+
+/// A change a member asked for. Kinds and streams a later contract version
+/// adds read as [`Unsupported`](Self::Unsupported) and are skipped.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum RequestedChange {
+    /// Mark read.
+    MarkRead,
+    /// Mark unread.
+    MarkUnread,
+    /// Star.
+    Star,
+    /// Unstar.
+    Unstar,
+    /// Out of the inbox.
+    Archive,
+    /// Back in the inbox.
+    Unarchive,
+    /// Put a label on.
+    AddLabel {
+        /// The conversations label (not used here).
+        label: uuid::Uuid,
+        /// The provider's key, when the provider has the label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        provider_key: Option<String>,
+    },
+    /// Take a label off.
+    RemoveLabel {
+        /// The conversations label (not used here).
+        label: uuid::Uuid,
+        /// The provider's key, when the provider has the label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        provider_key: Option<String>,
+    },
+    /// The conversation moved to another stream.
+    MoveToStream {
+        /// The stream (`primary`, `updates`, `receipts`, `newsletters`).
+        stream: String,
+    },
+    /// A kind this version does not know.
+    #[serde(other)]
+    Unsupported,
+}

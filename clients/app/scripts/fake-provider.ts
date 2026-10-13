@@ -19,13 +19,23 @@
 //   `accounts-server`, as Zoho's does.
 //
 // Each fake Google account also has a demo Gmail mailbox (scripts/
-// fake-gmail.ts) that the connectors module syncs: `POST /fake/deliver` drops
-// one more message into every mailbox, to show mail arriving live.
+// fake-gmail.ts) that the connectors module syncs and writes members'
+// changes back to: `POST /fake/deliver` drops one more message into every
+// mailbox, to show mail arriving live, and `GET /fake/mailbox` lists what each
+// holds (subjects and labels), to show write-backs landing.
 import { createHash, generateKeyPairSync, randomBytes, sign } from "node:crypto";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { parseArgs } from "node:util";
 
-import { createMailbox, deliverDemo, demoImage, handleGmail, type Mailbox } from "./fake-gmail.ts";
+import {
+  createMailbox,
+  deliverDemo,
+  demoImage,
+  describeMailbox,
+  handleGmail,
+  type Mailbox,
+  writeGmail,
+} from "./fake-gmail.ts";
 
 type Provider = "google" | "microsoft" | "zoho";
 
@@ -308,6 +318,9 @@ const server = createServer((request, response) => {
         if (handleGmail(request, url, response, mailboxOf(sub))) {
           return;
         }
+        if (await writeGmail(request, url, response, mailboxOf(sub))) {
+          return;
+        }
       }
       if (url.pathname.startsWith("/images/")) {
         const image = demoImage(url.pathname.slice("/images/".length));
@@ -316,6 +329,11 @@ const server = createServer((request, response) => {
           response.end(Buffer.from(image.body, "latin1"));
           return;
         }
+      }
+      if (url.pathname === "/fake/mailbox" && request.method === "GET") {
+        // What the demo mailboxes hold (subjects and labels), for recordings.
+        json(response, 200, { mailboxes: [...mailboxes.values()].map(describeMailbox) });
+        return;
       }
       if (url.pathname === "/fake/deliver" && request.method === "POST") {
         const delivered = [...mailboxes.values()].map((mailbox) => deliverDemo(mailbox).id);
