@@ -31,7 +31,7 @@
       "existing": "If you already have an account, signing in doesn’t change any mailbox you’ve connected."
     },
     "unverified": "Google may warn that it hasn’t verified this app. Google checks every app that can read Gmail, and that check isn’t finished yet. To carry on, choose “Advanced”, then continue to the app.",
-    "footer": "Open source. Your mail stays in your workspace.",
+    "footer": "Source available. Your mail stays in your workspace.",
     "starting": "Opening sign-in…",
     "loading": "Loading the ways to sign in…",
     "startAgain": "Start again",

@@ -31,7 +31,7 @@
       "existing": "Si vous avez déjà un compte, vous connecter ne modifie aucune boîte mail que vous avez reliée."
     },
     "unverified": "Google peut indiquer qu’il n’a pas encore validé cette application. Google examine toutes les applications qui peuvent lire Gmail, et cet examen n’est pas encore terminé. Pour continuer, choisissez « Paramètres avancés », puis accédez à l’application.",
-    "footer": "Open source. Votre courrier reste dans votre espace de travail.",
+    "footer": "Code source disponible. Votre courrier reste dans votre espace de travail.",
     "starting": "Ouverture de la connexion…",
     "loading": "Chargement des façons de se connecter…",
     "startAgain": "Recommencer",
