@@ -275,7 +275,7 @@ It needs no setup: three compose services take care of it.
 | --- | --- | --- |
 | `idp-init` | before `idp`, every `up` | Generates the secrets once (first boot), rewrites the config from `.env` |
 | `idp` | always | The IdP. Issuer `${CAMPBOOKS_IDP_URL}/auth/v1/`, data in the `idp-data` volume |
-| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once, and saves the web client's secret for the server |
+| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once, saves the web client's secret for the server, and registers the sign-in providers you configure (see "Sign in with Google, Microsoft or Zoho") |
 
 A fourth one-shot, `server-init`, prepares the `server-secrets` volume for the
 Campbooks server (see "Web sign-in").
@@ -324,9 +324,10 @@ variables to the `idp` service.
 | --- | --- |
 | `secrets.toml` | Encryption key and cluster secrets. Without it the database cannot be read |
 | `config.toml` | Generated from `.env` on every start. Do not edit |
-| `campbooks/api-key` | Admin API key used by `idp-provision` (clients, scopes, client secrets) |
+| `campbooks/api-key` | Admin API key used by `idp-provision` (clients, scopes, client secrets, sign-in providers) |
 | `campbooks/initial-admin-password` | The first admin password |
 | `campbooks/provisioned/<client>` | Markers: the client was set up, never touch it again |
+| `campbooks/provisioned/provider-<name>` | Markers: the sign-in provider's id and a fingerprint of its settings |
 | everything else | Rauthy's embedded database, with a nightly local backup in `state_machine/backups/` |
 
 Back up the whole volume, for example:
@@ -411,3 +412,150 @@ with `CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/`, the same
 `CAMPBOOKS_BFF__CLIENT_SECRET` (read it with
 `docker compose -f deploy/compose.yaml run --rm --no-deps server-init cat /secrets/campbooks-web.client-secret`);
 `clients/README.md` has the full recipe.
+
+## Sign in with Google, Microsoft or Zoho
+
+Besides passkeys and passwords, the identity provider's login page can offer **Google**,
+**Microsoft** and **Zoho**. Each one is optional and appears once you give it a client ID
+and a client secret; `idp-provision` registers it in Rauthy on the next
+`docker compose up -d`. Leave them unset and the login page offers passkey and password
+only.
+
+### 1. The redirect URI
+
+All three send people back to the same address, which you register in each provider's
+console:
+
+```
+${CAMPBOOKS_IDP_URL}/auth/v1/providers/callback
+```
+
+For example `https://auth.example.com/auth/v1/providers/callback`, or
+`http://localhost:8081/auth/v1/providers/callback` on your own machine. Serve the IdP over
+https before you invite anyone (see "Serving it on a real domain"); the providers only
+accept plain http for `localhost`. `idp-provision` prints the exact URI in its log
+(`docker compose logs idp-provision`).
+
+### 2. Create the app in the provider's console
+
+The scopes are `openid email profile` for all three; Campbooks asks for nothing else.
+
+**Google** (Google Cloud console, `console.cloud.google.com`):
+
+1. Pick or create a project. Open **APIs & Services → OAuth consent screen** (Google Auth
+   Platform): app name, support email, audience **External**. Under **Data access** add
+   `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile` (non-sensitive, no
+   review needed). Publish the app: while it is in *Testing*, only the listed test users can
+   sign in.
+2. **Clients** (or **Credentials**) → **Create client** → application type **Web
+   application** → **Authorized redirect URIs**: the URI above. No JavaScript origins.
+3. Put the **Client ID** in `.env` as `CAMPBOOKS_IDP_GOOGLE_CLIENT_ID` and the **Client
+   secret** in `secrets/google-client-secret`.
+
+**Microsoft** (Microsoft Entra admin center, `entra.microsoft.com`):
+
+1. **App registrations → New registration**. Supported account types must match
+   `CAMPBOOKS_IDP_MICROSOFT_TENANT`:
+
+   | `CAMPBOOKS_IDP_MICROSOFT_TENANT` | Supported account types |
+   | --- | --- |
+   | `common` (default) | Accounts in any organizational directory and personal Microsoft accounts |
+   | `organizations` | Accounts in any organizational directory (work and school only) |
+   | `consumers` | Personal Microsoft accounts only |
+   | your tenant ID | Accounts in this organizational directory only |
+
+2. Redirect URI: platform **Web**, the URI above.
+3. **Certificates & secrets → New client secret**. Copy its **Value** (not the Secret ID)
+   into `secrets/microsoft-client-secret`. Secrets expire (at most two years): put a
+   reminder in your calendar and rotate it (below) before then.
+4. **API permissions**: the default Microsoft Graph `User.Read` is enough.
+5. Put the **Application (client) ID** from **Overview** in `.env` as
+   `CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID`.
+
+Register a new app rather than reusing an old one: multi-tenant apps created since June 2023
+leave the email out of the sign-in when its domain is not verified by its owner, so nobody
+can sign in as an address they do not own. For an older app, set `removeUnverifiedEmailClaim`
+to `true` in its `authenticationBehaviors` (Microsoft Graph).
+
+**Zoho** (the API console of your data centre: `api-console.zoho.eu` for the EU,
+`api-console.zoho.com` for the US, and so on):
+
+1. **Add client → Server-based Applications**.
+2. Client name, homepage URL (your `CAMPBOOKS_PUBLIC_URL`), **Authorized redirect URIs**:
+   the URI above. **Create**.
+3. Put the **Client ID** in `.env` as `CAMPBOOKS_IDP_ZOHO_CLIENT_ID` and the **Client
+   Secret** in `secrets/zoho-client-secret`. Set `CAMPBOOKS_IDP_ZOHO_ISSUER` to the
+   accounts server of that data centre (default `https://accounts.zoho.eu`; also
+   `https://accounts.zoho.com`, `https://accounts.zoho.in`, `https://accounts.zoho.com.au`,
+   `https://accounts.zoho.jp`, ...).
+
+People whose Zoho account lives in another data centre cannot sign in with Zoho here: Zoho
+expects the sign-in to be finished at their own data centre, which the IdP does not do.
+
+### 3. Put the secret in place and start
+
+Secrets are files in `deploy/secrets/` (ignored by git), mounted read-only into
+`idp-provision`, which runs as uid 10001; never put them in `.env`.
+
+```sh
+cd deploy
+nano secrets/google-client-secret     # paste the secret on one line, save
+sudo chown 10001:10001 secrets/google-client-secret
+sudo chmod 0400 secrets/google-client-secret
+```
+
+(Docker Desktop on macOS or Windows does not need the `chown`.) Set the client ID in
+`.env`, then `docker compose up -d` and check `docker compose logs idp-provision`. Open the
+app: the login page now shows a button per provider (with its name; upload a logo under
+**Providers** in the admin UI if you want one).
+
+**Installs from before sign-in providers existed:** the IdP's `campbooks` API key may not
+manage providers yet, and `idp-provision` stops with a message saying so (everything else is
+already provisioned). Grant it once: admin UI → **API Keys** → `campbooks` → **Auth
+Providers**: read, create, update. Then `docker compose up -d` again.
+
+### Who can get in
+
+Whether someone without an account may create one by signing in with a provider follows
+`CAMPBOOKS_SIGNUP__POLICY`, so a provider never opens an instance you closed:
+
+| `CAMPBOOKS_SIGNUP__POLICY` | Someone new signs in with a provider |
+| --- | --- |
+| `open` | Gets an account and may create a workspace |
+| `code` | Gets an account; creating a workspace needs a signup code |
+| `approval` | Gets an account; asking for a workspace records a request, nobody is let in until it is approved |
+| `invite_only` | Refused. An admin creates their account first (**Users** in the admin UI); once they have set a password or passkey and signed in, they link the provider from their account page |
+
+`CAMPBOOKS_IDP_PROVIDER_SIGNUP=open` lets new people create accounts through a provider even
+on an `invite_only` instance (they still need an invitation to join a workspace);
+`closed` never lets them. The instance's first user may always create a workspace, so on a
+fresh instance sign in yourself before you share the address.
+
+### Accounts and linking
+
+- An account is linked to **one** provider at most. The first sign-in with a provider
+  creates the account (as above) and links it; later sign-ins with that provider land on
+  the same account, even if the email there changes.
+- If an account with the same email already exists (made with a password or passkey, or by
+  another provider), signing in with a provider is refused ("already exists but is not
+  linked"). Sign in the usual way, open your account page
+  (`${CAMPBOOKS_IDP_URL}/auth/v1/account`) and link the provider there; the emails must
+  match. Automatic linking by email is off on purpose: the IdP would link without checking
+  that the provider verified the address.
+- An account linked to Google cannot also sign in with Microsoft or Zoho. To switch, unlink
+  it on the account page (it needs a password or passkey first) and link the other one.
+- Microsoft does not say whether an email is verified, so accounts created through Microsoft
+  start with an unverified email, and accepting a Campbooks invitation needs a verified one.
+  An admin can mark it verified (**Users** → the user → E-Mail verified).
+
+### Changing or removing a provider
+
+- **Rotating a secret:** replace the file, `docker compose up -d`. A provider is configured
+  again whenever its client ID, secret, tenant or issuer, or whether it creates accounts,
+  changes; the log says so. Other edits made under **Providers** in the admin UI are kept
+  until then, and replaced by Campbooks' settings when that happens.
+- **Removing one:** remove its client ID from `.env`. It stays registered (deleting it would
+  strand the accounts linked to it) and the log reminds you; disable or delete it under
+  **Providers** in the admin UI. To have `idp-provision` set it up from scratch again, delete
+  it there and remove its marker:
+  `docker compose run --rm idp-init rm /app/data/campbooks/provisioned/provider-<google|microsoft|zoho>`.

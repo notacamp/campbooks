@@ -7,6 +7,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Added
+- Sign in with Google, Microsoft or Zoho. Set a provider's client ID in
+  `.env` (`CAMPBOOKS_IDP_GOOGLE_CLIENT_ID`, `CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID`,
+  `CAMPBOOKS_IDP_ZOHO_CLIENT_ID`) and put its secret in
+  `deploy/secrets/<provider>-client-secret`; `idp-provision` registers it in
+  the identity provider and the login page shows its button. Whether a
+  provider may create accounts for new people follows
+  `CAMPBOOKS_SIGNUP__POLICY` (not under `invite_only`), overridable with
+  `CAMPBOOKS_IDP_PROVIDER_SIGNUP`. Microsoft's tenant
+  (`CAMPBOOKS_IDP_MICROSOFT_TENANT`, default `common`) and Zoho's data centre
+  (`CAMPBOOKS_IDP_ZOHO_ISSUER`, default `https://accounts.zoho.eu`) are
+  settings. Existing installs grant the IdP's `campbooks` API key the
+  "Auth Providers" right once in the admin UI before enabling a provider. See
+  `deploy/README.md` → "Sign in with Google, Microsoft or Zoho".
 - A way to measure the AI's sorting before it acts: a fictional, labelled set
   of 320 emails in English, Portuguese, Spanish and French
   (`crates/ai/evals/decide/mail-triage/`, with its labelling guide), and
