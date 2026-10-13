@@ -23,6 +23,7 @@
 //!
 //! Tokens are never logged.
 
+mod challenge;
 mod jwks;
 mod oidc;
 mod scoped;
@@ -32,6 +33,7 @@ use std::{borrow::Borrow, collections::BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub use challenge::challenge_with_resource_metadata;
 pub use jwks::{KeySource, KeySourceFuture};
 pub use oidc::{BACKCHANNEL_LOGOUT_EVENT, IdToken, LogoutToken};
 pub use scoped::Scoped;
