@@ -123,7 +123,11 @@ impl JobHandler for SyncStream {
                 Err(TokenError::Database(err)) => return Err(err.into()),
             };
 
-        let backlog = outbound::backlog(ctx.pool(), workspace, target.stream).await?;
+        // Stale changes are given up before anything is taken: never made
+        // late after a long pause.
+        let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
+        outbound::expire(ctx.pool(), workspace, target.stream, now - retention, now).await?;
+        let backlog = outbound::backlog(ctx.pool(), workspace, target.stream, now).await?;
         let messages: std::collections::HashSet<&str> = backlog
             .pending
             .iter()
@@ -220,25 +224,7 @@ impl SyncStream {
 
         let tx = ctx.tx().await?;
         if let Some(labels) = &page.labels {
-            sqlx::query!(
-                "DELETE FROM connectors.gmail_labels WHERE stream_id = $1",
-                target.stream as StreamId
-            )
-            .execute(&mut **tx)
-            .await?;
-            for label in labels {
-                sqlx::query!(
-                    r#"INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)
-                       VALUES ($1, $2, $3, $4, $5)"#,
-                    workspace as WorkspaceId,
-                    target.stream as StreamId,
-                    label.id,
-                    label.name,
-                    label.kind.as_deref().unwrap_or("system"),
-                )
-                .execute(&mut **tx)
-                .await?;
-            }
+            replace_labels(tx, workspace, target.stream, labels).await?;
         }
         apply_index(tx, &state, workspace, target.stream, page.index).await?;
         if let Some(batch) = &batch {
@@ -274,7 +260,15 @@ impl SyncStream {
         if matches!(target.health, Health::Throttled | Health::Failing) {
             health::set(tx, target.connection, Health::Ok, None, now).await?;
         }
-        if settle_outbound(tx, target.stream, pushed_up_to, now - retention, now).await? {
+        if settle_outbound(
+            tx,
+            target.stream,
+            pushed_up_to,
+            now - retention,
+            &page.cursor,
+        )
+        .await?
+        {
             page.more = true;
         }
         if page.more {
@@ -447,30 +441,53 @@ impl SyncStream {
     }
 }
 
+/// Replace the cached Gmail label names of `stream` with `labels`.
+async fn replace_labels(
+    tx: &mut Transaction<'static, Postgres>,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    labels: &[crate::google::LabelInfo],
+) -> Result<(), JobError> {
+    sqlx::query!(
+        "DELETE FROM connectors.gmail_labels WHERE stream_id = $1",
+        stream as StreamId
+    )
+    .execute(&mut **tx)
+    .await?;
+    for label in labels {
+        sqlx::query!(
+            r#"INSERT INTO connectors.gmail_labels (workspace_id, stream_id, label_id, name, kind)
+                       VALUES ($1, $2, $3, $4, $5)"#,
+            workspace as WorkspaceId,
+            stream as StreamId,
+            label.id,
+            label.name,
+            label.kind.as_deref().unwrap_or("system"),
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(())
+}
+
 /// The end of a run's outbound work, in its transaction (after the stream
 /// row is locked by the run's update, so a change recorded concurrently is
-/// either seen here or enqueues its own run): prune and expire old changes,
-/// flag the expired ones' messages for re-emitting. Returns whether another
-/// run is needed now (changes arrived during this one, or expired).
+/// either seen here or enqueues its own run): prune old changes and close
+/// open write windows at the history id the run read up to. Returns whether changes arrived
+/// during this run (another run is needed now).
 async fn settle_outbound(
     tx: &mut Transaction<'static, Postgres>,
     stream: StreamId,
     pushed_up_to: Option<uuid::Uuid>,
     before: DateTime<Utc>,
-    now: DateTime<Utc>,
+    cursor: &Cursor,
 ) -> Result<bool, JobError> {
-    let expired = outbound::prune(tx, stream, before, now).await?;
-    if !expired.is_empty() {
-        sqlx::query!(
-            r#"UPDATE connectors.gmail_messages SET reemit = true
-                WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
-            stream as StreamId,
-            &expired,
-        )
-        .execute(&mut **tx)
-        .await?;
-    }
-    Ok(outbound::more_pending(tx, stream, pushed_up_to).await? || !expired.is_empty())
+    let read_up_to = cursor
+        .history_id
+        .as_deref()
+        .and_then(|h| h.parse::<i64>().ok());
+    outbound::prune(tx, stream, before, read_up_to).await?;
+    Ok(outbound::more_pending(tx, stream, pushed_up_to).await?)
 }
 
 /// The stream and its connection, read in a short transaction of its own.

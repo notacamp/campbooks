@@ -550,6 +550,8 @@ struct Mailbox {
     refusing: Vec<String>,
     /// The next this many Gmail calls answer 503.
     unavailable_next: u32,
+    /// The next this many `getProfile` calls answer 503.
+    profile_unavailable_next: u32,
 }
 
 /// Google's OAuth and Gmail endpoints, faked over a mutable mailbox.
@@ -696,6 +698,11 @@ impl FakeGoogle {
         self.lock().unavailable_next = calls;
     }
 
+    /// The next `getProfile` answers 503.
+    pub fn profile_unavailable_next(&self) {
+        self.lock().profile_unavailable_next = 1;
+    }
+
     /// Gmail refuses every change to message `id` (400).
     pub fn refuse_changes(&self, id: &str) {
         self.lock().refusing.push(id.to_owned());
@@ -807,6 +814,10 @@ impl Respond for Responder {
                 if std::mem::take(&mut mailbox.unauthorized_next) || !authorized(&mailbox, request)
                 {
                     return json(401, &serde_json::json!({"error": {"code": 401}}));
+                }
+                if gmail.ends_with("/profile") && mailbox.profile_unavailable_next > 0 {
+                    mailbox.profile_unavailable_next -= 1;
+                    return json(503, &serde_json::json!({"error": {"code": 503}}));
                 }
                 if mailbox.unavailable_next > 0 {
                     mailbox.unavailable_next -= 1;

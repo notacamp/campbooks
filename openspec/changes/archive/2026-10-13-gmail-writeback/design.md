@@ -57,6 +57,10 @@ health live.
    | `move_to_stream` primary / updates / newsletters | add `CATEGORY_PERSONAL` / `CATEGORY_UPDATES` / `CATEGORY_PROMOTIONS`, remove the other four categories |
    | `move_to_stream` receipts | `skipped`, `no_provider_equivalent` |
 
+   Only `UNREAD`, `STARRED`, `INBOX`, the five categories and user labels
+   (the stream's label cache, `kind = user`) are ever written: a label
+   change naming a system label is skipped, and a mapped change that
+   would touch any other label is recorded `skipped` (`unsupported`).
    Stamp the rows with Gmail's current history id (`getProfile`, 1 unit,
    from the provider budget); when Gmail cannot be asked (throttled, no
    budget, refused token) the stamp is empty and the change simply applies
@@ -66,8 +70,14 @@ health live.
    one run). A paused stream (needs re-authorisation) keeps its rows
    pending until it is connected again.
 2. **Push** (first step of `connectors.sync_stream`, after the token and
-   before the page is read). Take up to 500 pending rows of the stream in
+   before the page is read). First, pending rows older than the batch
+   retention are given up (`failed`, `expired`) and their messages flagged
+   `reemit`: a change is never made late after a long pause or a
+   re-authorisation. Then take up to 500 pending rows of the stream in
    recording order and:
+   - **skip what would undo the trash**: a row that would put `INBOX` or a
+     category on a message the index holds in `TRASH` or `SPAM` ends
+     `skipped` (`in_trash`), and the message is re-emitted.
    - **merge** them per (message, label): the latest row wins; earlier rows
      for the same label end `superseded` (`replaced`). Archive then undo
      before the run is one no-op, not two writes.
@@ -77,8 +87,10 @@ health live.
      winning row's stamp, and is not inside the history window of one of
      Campbooks' own earlier writes of that label, means someone changed it
      in Gmail later: the write is dropped (`superseded`,
-     `changed_at_provider`) and the message is flagged `reemit`. A deleted
-     message ends `skipped` (`message_gone`). History Gmail no longer has
+     `changed_at_provider`) and the message is flagged `reemit`. A row is
+     **atomic**: when any label it won is overtaken, none of it is written
+     (a move between categories must never leave two). A deleted message
+     ends `skipped` (`message_gone`). History Gmail no longer has
      (404), or more than four pages of it, skip the check: arrival order.
    - **write**: group messages by identical (add, remove) sets. A group of
      more than ten uses `messages.batchModify` (50 units for up to 1,000
@@ -98,7 +110,11 @@ health live.
      (`applied_from` = Gmail's history id before writing, from the history
      page or `getProfile`; `applied_to` = `getProfile` after writing) on
      every applied row, and the index of each written message advanced to
-     `labels ∪ add − remove`.
+     `labels ∪ add − remove`. When the `getProfile` after writing fails, the
+     window is left open and the run's read closes it at the history id it
+     reaches (past our writes, since the read comes after them); a window
+     still open after ten minutes covers nothing (our own write may then be
+     taken for Gmail's, which only means Gmail's state wins).
    - The run's budget is taken once for pushing and reading together.
 3. **Pull** (the existing read). Messages flagged `reemit` are re-checked
    and emitted even when their labels did not change. For a message with

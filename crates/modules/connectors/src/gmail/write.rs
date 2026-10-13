@@ -75,6 +75,11 @@ type Fates = BTreeMap<(String, String), Fate>;
 struct Plan {
     wants: Wants,
     fates: Fates,
+    /// The (message, label) pairs each change won.
+    won: HashMap<Uuid, Vec<(String, String)>>,
+    /// Changes that would bring a message in the trash or spam back into
+    /// the inbox or a category: skipped.
+    in_trash: HashSet<Uuid>,
 }
 
 /// What the writes did, per message.
@@ -90,7 +95,20 @@ impl Plan {
     /// index does not carry are gone.
     fn merge(backlog: &Backlog) -> Self {
         let mut wants = Wants::new();
+        let mut in_trash = HashSet::new();
         for change in &backlog.pending {
+            let trashed = backlog
+                .labels
+                .get(&change.provider_message_id)
+                .is_some_and(|labels| labels.iter().any(|l| l == "TRASH" || l == "SPAM"));
+            let restores = change
+                .add
+                .iter()
+                .any(|l| l == "INBOX" || l.starts_with("CATEGORY_"));
+            if trashed && restores {
+                in_trash.insert(change.id);
+                continue;
+            }
             let labels = wants.entry(change.provider_message_id.clone()).or_default();
             let adds = change.add.iter().map(|l| (l, true));
             for (label, present) in adds.chain(change.remove.iter().map(|l| (l, false))) {
@@ -113,7 +131,35 @@ impl Plan {
                 fates.insert((message.clone(), label.clone()), fate);
             }
         }
-        Self { wants, fates }
+        let mut won: HashMap<Uuid, Vec<(String, String)>> = HashMap::new();
+        for (message, labels) in &wants {
+            for (label, want) in labels {
+                won.entry(want.row)
+                    .or_default()
+                    .push((message.clone(), label.clone()));
+            }
+        }
+        Self {
+            wants,
+            fates,
+            won,
+            in_trash,
+        }
+    }
+
+    /// A change is made whole or not at all: when any label it won was
+    /// changed at Gmail later, none of it is written (a move between
+    /// categories must never leave two).
+    fn atomic(&mut self) {
+        for pairs in self.won.values() {
+            if pairs.iter().any(|p| self.fates[p] == Fate::Overtaken) {
+                for pair in pairs {
+                    if self.fates[pair] == Fate::Write {
+                        self.fates.insert(pair.clone(), Fate::Overtaken);
+                    }
+                }
+            }
+        }
     }
 
     /// What is still to be written on `message`.
@@ -145,17 +191,19 @@ impl Plan {
 
     /// How each change of `backlog` ended, into `outcome`.
     fn ends(&self, backlog: &Backlog, done: &Results, outcome: &mut Outcome) {
-        let mut won: HashMap<Uuid, Vec<(String, String)>> = HashMap::new();
-        for (message, labels) in &self.wants {
-            for (label, want) in labels {
-                won.entry(want.row)
-                    .or_default()
-                    .push((message.clone(), label.clone()));
-            }
-        }
         for change in &backlog.pending {
             let (id, message) = (change.id, &change.provider_message_id);
-            let pairs = won.get(&id).map(Vec::as_slice).unwrap_or_default();
+            if self.in_trash.contains(&id) {
+                // Gmail has it in the trash or spam: Campbooks is told so.
+                outcome.reemit.push(message.clone());
+                outcome.ends.push(End {
+                    id,
+                    state: State::Skipped,
+                    reason: Some("in_trash"),
+                });
+                continue;
+            }
+            let pairs = self.won.get(&id).map(Vec::as_slice).unwrap_or_default();
             let fate_is = |fate| move |p: &(String, String)| self.fates[p] == fate;
             let ended = |state, reason| End { id, state, reason };
             let end = if pairs.is_empty() {
@@ -200,6 +248,7 @@ pub async fn push(gmail: &Gmail<'_>, backlog: &Backlog) -> Push {
             return push;
         }
     };
+    plan.atomic();
     let mut done = Results::default();
     push.trouble = write(gmail, &plan.groups(), &mut done).await;
     // After writing: the window our writes fall in.

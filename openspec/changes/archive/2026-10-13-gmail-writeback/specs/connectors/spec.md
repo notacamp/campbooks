@@ -15,7 +15,13 @@ Changes recorded before a run SHALL be merged per message and label, the
 latest winning. Every recorded change SHALL end `applied`, `superseded`,
 `skipped` or `failed` with a stable reason code and no message content. A
 label without a provider key, or that Gmail no longer has, and a move to the
-Receipts stream, SHALL be recorded as `skipped`.
+Receipts stream, SHALL be recorded as `skipped`. Only `UNREAD`, `STARRED`,
+`INBOX`, the categories and user labels SHALL ever be written; a label change
+naming a system label SHALL be skipped. A change that would bring a message
+Gmail holds in the trash or spam back to the inbox or a category SHALL be
+recorded `skipped` (`in_trash`). A change still pending after the batch
+retention period SHALL be recorded `failed` (`expired`) before any run takes
+it, and never made.
 
 #### Scenario: Archive reaches Gmail
 - **WHEN** a member archives a conversation whose message is in Gmail's inbox
@@ -28,6 +34,14 @@ Receipts stream, SHALL be recorded as `skipped`.
 #### Scenario: Undo before the run
 - **WHEN** a member archives and unarchives a conversation before the stream runs
 - **THEN** no write is made, the archive is recorded `superseded` (`replaced`) and the unarchive `applied`
+
+#### Scenario: A stale change
+- **WHEN** a change recorded ten days ago is still pending when the stream runs
+- **THEN** it is recorded `failed` (`expired`), no write is made, and the message's Gmail state is emitted again
+
+#### Scenario: In the trash
+- **WHEN** a member unarchives a message, or moves one to Primary, that Gmail holds in the trash or spam
+- **THEN** no write is made and the change is recorded `skipped` (`in_trash`)
 
 #### Scenario: Many messages, one call
 - **WHEN** one intent marks twelve messages read
@@ -54,13 +68,21 @@ member's change SHALL be placed at the history id stamped when it was
 recorded: a Gmail change to the same label after that point SHALL win (the
 write is dropped as `superseded`, `changed_at_provider`, and the message's
 Gmail state is emitted again), and a Gmail change before it SHALL be
-overwritten. History records inside the write window of one of the module's
-own runs SHALL count as its own writes. Without a stamp, or when Gmail no
+overwritten. A change SHALL be made whole or not at all: when any label it
+would write was changed at Gmail later, none of it is written. History
+records inside the write window of one of the module's own runs SHALL count
+as its own writes; a window the run could not close (Gmail's history id after
+the write could not be read) SHALL be closed at the history id the next read
+reaches, and SHALL cover nothing once open for ten minutes. Without a stamp, or when Gmail no
 longer has the history, a change SHALL apply in arrival order.
 
 #### Scenario: Changed in Gmail after the member
 - **WHEN** a member stars a message and, before the write-back, it is starred and unstarred again in Gmail
 - **THEN** Gmail stays unstarred, the change is `superseded` (`changed_at_provider`), and the next batch tells conversations the message is not starred
+
+#### Scenario: A move overtaken in part
+- **WHEN** a member moves a conversation to Newsletters and, before the write-back, it is moved to Social in Gmail
+- **THEN** no category is written, Gmail keeps Social only, and the change is `superseded` (`changed_at_provider`)
 
 #### Scenario: Changed in Gmail before the member
 - **WHEN** a message is archived in Gmail, and then a member who has not yet seen it unarchives it in Campbooks

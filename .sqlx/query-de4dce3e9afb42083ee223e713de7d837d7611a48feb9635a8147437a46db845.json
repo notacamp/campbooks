@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT provider_message_id, add_labels, remove_labels,\n                  applied_from AS \"from!\", applied_to\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND state = 'applied' AND applied_from IS NOT NULL",
+  "query": "SELECT provider_message_id, add_labels, remove_labels,\n                  applied_from AS \"from!\", applied_to, done_at\n             FROM connectors.outbound_changes\n            WHERE stream_id = $1 AND provider_message_id = ANY($2)\n              AND state = 'applied' AND applied_from IS NOT NULL",
   "describe": {
     "columns": [
       {
@@ -57,6 +57,17 @@
             "name": "applied_to"
           }
         }
+      },
+      {
+        "ordinal": 5,
+        "name": "done_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "connectors.outbound_changes",
+            "name": "done_at"
+          }
+        }
       }
     ],
     "parameters": {
@@ -70,8 +81,9 @@
       false,
       false,
       true,
+      true,
       true
     ]
   },
-  "hash": "811cc1e5b830949a4c8ad1285297b0bf692bbeb337ca0959b887b39eef509875"
+  "hash": "de4dce3e9afb42083ee223e713de7d837d7611a48feb9635a8147437a46db845"
 }

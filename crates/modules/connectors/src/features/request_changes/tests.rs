@@ -571,3 +571,168 @@ async fn a_pending_change_shows_as_the_member_left_it(db: PgPool) {
     assert_eq!(message["message"]["read"], true);
     assert_eq!(message["message"]["mailbox"]["in_inbox"], false);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_stale_change_is_given_up_not_made_late(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    // Recorded ten days ago and never made (a long pause, a reconnect).
+    sqlx::query!(
+        r#"INSERT INTO connectors.outbound_changes
+               (id, workspace_id, stream_id, request_id, provider_message_id, kind,
+                remove_labels, created_at)
+           VALUES ($1, $2, $3, $4, $5, 'archive', '{INBOX}', $6)"#,
+        uuid::Uuid::now_v7(),
+        *m.ws.as_uuid(),
+        m.stream as StreamId,
+        uuid::Uuid::now_v7(),
+        m.ids[0],
+        kit.clock.now() - TimeDelta::days(10),
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let batches = kit.batches(m.ws).await.len();
+    kit.google.clear_calls();
+    m.run(&kit).await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["INBOX"]));
+    assert_eq!(ends(&kit).await, [end("failed", Some("expired"))]);
+    // Campbooks is told Gmail's state: still in the inbox.
+    let new = &kit.batches(m.ws).await[batches..];
+    assert_eq!(new.len(), 1);
+    assert_eq!(new[0]["changes"][0]["message"]["mailbox"]["in_inbox"], true);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_partly_overtaken_move_is_not_made_at_all(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX", "CATEGORY_UPDATES"]]).await;
+    m.pause(&kit, true).await;
+    m.request(
+        &kit,
+        &[(
+            m.ids[0].as_str(),
+            json!({"kind": "move_to_stream", "stream": "newsletters"}),
+        )],
+    )
+    .await;
+    // Later, in Gmail: moved to Social.
+    kit.google
+        .relabel(&m.ids[0], &["CATEGORY_SOCIAL"], &["CATEGORY_UPDATES"]);
+    m.pause(&kit, false).await;
+    kit.google.clear_calls();
+    m.run(&kit).await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(
+        kit.google.labels_of(&m.ids[0]),
+        labels(&["CATEGORY_SOCIAL", "INBOX"])
+    );
+    assert_eq!(
+        ends(&kit).await,
+        [end("superseded", Some("changed_at_provider"))]
+    );
+    let last = changes(&kit, m.ws).await.pop().unwrap();
+    assert_eq!(last["message"]["provider_message_id"], m.ids[0].as_str());
+    assert_eq!(last["message"]["categories"], json!(["social"]));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_write_window_left_open_is_closed(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(&kit, &[&["INBOX"]]).await;
+    m.pause(&kit, true).await;
+    m.request(&kit, &[(m.ids[0].as_str(), json!({"kind": "archive"}))])
+        .await;
+    m.pause(&kit, false).await;
+    // The profile call after the write fails: the window has no end yet,
+    // and the same run's read (which follows Gmail past the write) closes it.
+    kit.google.profile_unavailable_next();
+    m.run(&kit).await;
+    assert!(kit.google.labels_of(&m.ids[0]).is_empty());
+    let row = sqlx::query!("SELECT applied_from, applied_to FROM connectors.outbound_changes")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    let cursor: i64 = kit.stream().await["cursor"]["history_id"]
+        .as_str()
+        .unwrap()
+        .parse()
+        .unwrap();
+    assert_eq!(row.applied_to, Some(cursor));
+    assert!(row.applied_from.unwrap() < cursor);
+
+    // A window no run could close covers nothing after ten minutes.
+    sqlx::query!("UPDATE connectors.outbound_changes SET applied_to = NULL")
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    sqlx::query!(
+        r#"INSERT INTO connectors.outbound_changes
+               (id, workspace_id, stream_id, request_id, provider_message_id, kind, add_labels)
+           VALUES ($1, $2, $3, $4, $5, 'unarchive', '{INBOX}')"#,
+        uuid::Uuid::now_v7(),
+        *m.ws.as_uuid(),
+        m.stream as StreamId,
+        uuid::Uuid::now_v7(),
+        m.ids[0],
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let own = |backlog: crate::domain::outbound::Backlog| backlog.own[&m.ids[0]][0].to;
+    let fresh = crate::domain::outbound::backlog(&kit.state.db, m.ws, m.stream, kit.clock.now())
+        .await
+        .unwrap();
+    assert_eq!(own(fresh), None);
+    let later = kit.clock.now() + TimeDelta::minutes(11);
+    let stale = crate::domain::outbound::backlog(&kit.state.db, m.ws, m.stream, later)
+        .await
+        .unwrap();
+    assert_eq!(own(stale), row.applied_from);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_message_in_the_trash_or_spam_is_not_brought_back(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let m = mailbox(
+        &kit,
+        &[&["TRASH"], &["SPAM", "CATEGORY_UPDATES"], &["INBOX"]],
+    )
+    .await;
+    kit.google.clear_calls();
+    m.request(&kit, &[(m.ids[0].as_str(), json!({"kind": "unarchive"}))])
+        .await;
+    m.request(
+        &kit,
+        &[(
+            m.ids[1].as_str(),
+            json!({"kind": "move_to_stream", "stream": "primary"}),
+        )],
+    )
+    .await;
+    // A system label is never a label change, whatever the intent says.
+    m.request(
+        &kit,
+        &[(
+            m.ids[2].as_str(),
+            json!({"kind": "add_label", "label": uuid::Uuid::now_v7(), "provider_key": "TRASH"}),
+        )],
+    )
+    .await;
+    assert!(kit.google.writes().is_empty(), "{:?}", kit.google.writes());
+    assert_eq!(kit.google.labels_of(&m.ids[0]), labels(&["TRASH"]));
+    assert_eq!(
+        kit.google.labels_of(&m.ids[1]),
+        labels(&["CATEGORY_UPDATES", "SPAM"])
+    );
+    assert_eq!(kit.google.labels_of(&m.ids[2]), labels(&["INBOX"]));
+    assert_eq!(
+        ends(&kit).await,
+        [
+            end("skipped", Some("in_trash")),
+            end("skipped", Some("in_trash")),
+            end("skipped", Some("label_not_at_provider")),
+        ]
+    );
+}

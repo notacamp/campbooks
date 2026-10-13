@@ -22,6 +22,38 @@ pub const CATEGORIES: [&str; 5] = [
     "CATEGORY_FORUMS",
 ];
 
+/// Gmail's system labels, never written except through their own intents
+/// (`UNREAD`, `STARRED`, `INBOX`, the categories) and never through a label
+/// change.
+pub const SYSTEM_LABELS: [&str; 9] = [
+    "INBOX",
+    "UNREAD",
+    "STARRED",
+    "IMPORTANT",
+    "SENT",
+    "DRAFT",
+    "CHAT",
+    "SPAM",
+    "TRASH",
+];
+
+/// Whether `label` is a Gmail system label (or category).
+pub fn is_system(label: &str) -> bool {
+    label.starts_with("CATEGORY_") || SYSTEM_LABELS.contains(&label)
+}
+
+/// Whether a change may put on or take off `label`: the labels of the
+/// flag intents and the categories, or a user label.
+pub fn writable(label: &str) -> bool {
+    matches!(label, "UNREAD" | "STARRED" | "INBOX")
+        || CATEGORIES.contains(&label)
+        || !is_system(label)
+}
+
+/// How long a write window may stay open (the profile call after the write
+/// failed and no later run closed it) before it is taken to cover nothing.
+pub const OPEN_WINDOW: chrono::TimeDelta = chrono::TimeDelta::minutes(10);
+
 /// Most pending changes one run takes.
 pub const PUSH_LIMIT: i64 = 500;
 
@@ -86,8 +118,9 @@ pub const fn kind(change: &RequestedChange) -> &'static str {
     }
 }
 
-/// `change` in Gmail labels. `known` holds the stream's label ids (from
-/// `labels.list`): a provider key Gmail no longer has is skipped.
+/// `change` in Gmail labels. `known` holds the stream's *user* label ids
+/// (from `labels.list`): a provider key Gmail no longer has, or a system
+/// label, is skipped.
 pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
     let add = |label: &str| Mapped::Labels {
         add: vec![label.to_owned()],
@@ -106,7 +139,10 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
         RequestedChange::Unarchive => add("INBOX"),
         RequestedChange::AddLabel { provider_key, .. }
         | RequestedChange::RemoveLabel { provider_key, .. } => {
-            match provider_key.as_deref().filter(|key| known.contains(*key)) {
+            let key = provider_key
+                .as_deref()
+                .filter(|key| known.contains(*key) && !is_system(key));
+            match key {
                 None => Mapped::Skip("label_not_at_provider"),
                 Some(key) if matches!(change, RequestedChange::AddLabel { .. }) => add(key),
                 Some(key) => remove(key),
@@ -198,7 +234,12 @@ impl Backlog {
 
 /// The pending changes of `stream` (at most [`PUSH_LIMIT`]) with what the
 /// push needs to know about their messages.
-pub async fn backlog(pool: &PgPool, workspace: WorkspaceId, stream: StreamId) -> Result<Backlog> {
+pub async fn backlog(
+    pool: &PgPool,
+    workspace: WorkspaceId,
+    stream: StreamId,
+    now: DateTime<Utc>,
+) -> Result<Backlog> {
     let mut tx = pool.begin_for(workspace).await?;
     let pending: Vec<Pending> = sqlx::query!(
         r#"SELECT id, provider_message_id, add_labels, remove_labels, stamp_history_id,
@@ -246,7 +287,7 @@ pub async fn backlog(pool: &PgPool, workspace: WorkspaceId, stream: StreamId) ->
     let mut own: HashMap<String, Vec<OwnWrite>> = HashMap::new();
     for row in sqlx::query!(
         r#"SELECT provider_message_id, add_labels, remove_labels,
-                  applied_from AS "from!", applied_to
+                  applied_from AS "from!", applied_to, done_at
              FROM connectors.outbound_changes
             WHERE stream_id = $1 AND provider_message_id = ANY($2)
               AND state = 'applied' AND applied_from IS NOT NULL"#,
@@ -265,7 +306,15 @@ pub async fn backlog(pool: &PgPool, workspace: WorkspaceId, stream: StreamId) ->
                     .chain(row.remove_labels)
                     .collect(),
                 from: row.from,
-                to: row.applied_to,
+                // A window left open longer than [`OPEN_WINDOW`] covers
+                // nothing: better a write of ours taken for Gmail's (Gmail
+                // wins, the member sees Gmail's state) than real Gmail
+                // changes hidden for days.
+                to: row.applied_to.or_else(|| {
+                    row.done_at
+                        .is_some_and(|done| now - done > OPEN_WINDOW)
+                        .then_some(row.from)
+                }),
             });
     }
     tx.commit().await?;
@@ -360,23 +409,19 @@ pub async fn record_outcome(
     Ok(())
 }
 
-/// Release the finished changes of `stream` older than `before`, and give
-/// up (`failed`, `expired`) the pending ones recorded before it: they are
-/// returned, for their messages to be re-emitted.
-pub async fn prune(
-    conn: &mut PgConnection,
+/// Give up (`failed`, `expired`) the pending changes of `stream` recorded
+/// before `before`, and flag their messages to be re-emitted with Gmail's
+/// state: a change that waited that long (a long pause, a re-authorisation)
+/// is never made late. Runs before a run takes its backlog. Returns how many
+/// expired.
+pub async fn expire(
+    pool: &PgPool,
+    workspace: WorkspaceId,
     stream: StreamId,
     before: DateTime<Utc>,
     now: DateTime<Utc>,
-) -> Result<Vec<String>> {
-    sqlx::query!(
-        r#"DELETE FROM connectors.outbound_changes
-            WHERE stream_id = $1 AND state <> 'pending' AND done_at < $2"#,
-        stream as StreamId,
-        before,
-    )
-    .execute(&mut *conn)
-    .await?;
+) -> Result<usize> {
+    let mut tx = pool.begin_for(workspace).await?;
     let expired = sqlx::query_scalar!(
         r#"UPDATE connectors.outbound_changes
               SET state = 'failed', reason = 'expired', done_at = $3
@@ -386,9 +431,53 @@ pub async fn prune(
         before,
         now,
     )
-    .fetch_all(&mut *conn)
+    .fetch_all(&mut *tx)
     .await?;
-    Ok(expired)
+    if !expired.is_empty() {
+        sqlx::query!(
+            r#"UPDATE connectors.gmail_messages SET reemit = true
+                WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
+            stream as StreamId,
+            &expired,
+        )
+        .execute(&mut *tx)
+        .await?;
+        tracing::info!(%stream, expired = expired.len(), "stale outbound changes given up");
+    }
+    tx.commit().await?;
+    Ok(expired.len())
+}
+
+/// Release the finished changes of `stream` older than `before`, and close
+/// the write windows left open (the profile call after a write failed) at
+/// `history_id`, Gmail's history id this run read up to, when it is past
+/// their start.
+pub async fn prune(
+    conn: &mut PgConnection,
+    stream: StreamId,
+    before: DateTime<Utc>,
+    history_id: Option<i64>,
+) -> Result<()> {
+    sqlx::query!(
+        r#"DELETE FROM connectors.outbound_changes
+            WHERE stream_id = $1 AND state <> 'pending' AND done_at < $2"#,
+        stream as StreamId,
+        before,
+    )
+    .execute(&mut *conn)
+    .await?;
+    if let Some(history_id) = history_id {
+        sqlx::query!(
+            r#"UPDATE connectors.outbound_changes SET applied_to = $2
+                WHERE stream_id = $1 AND state = 'applied' AND applied_to IS NULL
+                  AND applied_from IS NOT NULL AND applied_from < $2"#,
+            stream as StreamId,
+            history_id,
+        )
+        .execute(&mut *conn)
+        .await?;
+    }
+    Ok(())
 }
 
 /// Whether `stream` has pending changes newer than `after` (all of them
@@ -539,6 +628,65 @@ mod tests {
             map(&RequestedChange::Unsupported, &known),
             Mapped::Skip("unsupported")
         );
+    }
+
+    #[test]
+    fn system_labels_are_never_label_changes() {
+        // Even if a cache listed them as known, a label change never
+        // touches a system label or a category.
+        let known: HashSet<String> = [
+            "TRASH",
+            "SPAM",
+            "SENT",
+            "DRAFT",
+            "CHAT",
+            "IMPORTANT",
+            "UNREAD",
+            "INBOX",
+            "STARRED",
+            "CATEGORY_SOCIAL",
+            "Label_7",
+        ]
+        .map(str::to_owned)
+        .into();
+        for key in known.iter().filter(|k| *k != "Label_7") {
+            for change in [
+                RequestedChange::AddLabel {
+                    label: uuid::Uuid::nil(),
+                    provider_key: Some(key.clone()),
+                },
+                RequestedChange::RemoveLabel {
+                    label: uuid::Uuid::nil(),
+                    provider_key: Some(key.clone()),
+                },
+            ] {
+                assert_eq!(
+                    map(&change, &known),
+                    Mapped::Skip("label_not_at_provider"),
+                    "{key}"
+                );
+            }
+        }
+        for label in [
+            "TRASH",
+            "SPAM",
+            "SENT",
+            "DRAFT",
+            "CHAT",
+            "IMPORTANT",
+            "CATEGORY_NEW",
+        ] {
+            assert!(!writable(label), "{label}");
+        }
+        for label in [
+            "UNREAD",
+            "STARRED",
+            "INBOX",
+            "CATEGORY_PROMOTIONS",
+            "Label_7",
+        ] {
+            assert!(writable(label), "{label}");
+        }
     }
 
     #[test]

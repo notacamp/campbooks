@@ -16,7 +16,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   changed it in Campbooks, the later change wins and Campbooks shows it.
   Throttling and outages are retried with backoff within the shared Google
   quota; a change Gmail refuses is recorded (without any message content)
-  and Campbooks shows the message as Gmail has it. Labels you create in
+  and Campbooks shows the message as Gmail has it. A change that could not
+  reach Gmail within 7 days (a long pause, a reconnect) is dropped rather
+  than made late, mail in Gmail's trash or spam is never brought back to the
+  inbox, and only read, star, inbox, category and your own labels are ever
+  touched. Labels you create in
   Campbooks and the Receipts stream stay in Campbooks for now. New table
   `connectors.outbound_changes` (migration applied on start).
 - The sign-in screens are Campbooks screens, in English, Portuguese, Spanish

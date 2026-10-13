@@ -84,7 +84,7 @@ impl EventConsumer for RequestChanges {
             health: Health::parse(&row.health)?,
         };
         let known: HashSet<String> = sqlx::query_scalar!(
-            "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1",
+            "SELECT label_id FROM connectors.gmail_labels WHERE stream_id = $1 AND kind = 'user'",
             target.stream as StreamId
         )
         .fetch_all(&mut *tx)
@@ -106,6 +106,13 @@ impl EventConsumer for RequestChanges {
         let mut pending = 0;
         for item in &event.payload.items {
             let (state, reason, add, remove) = match outbound::map(&item.change, &known) {
+                // Defence in depth: only the flag labels, categories and
+                // user labels are ever written.
+                Mapped::Labels { add, remove }
+                    if !add.iter().chain(&remove).all(|l| outbound::writable(l)) =>
+                {
+                    (State::Skipped, Some("unsupported"), Vec::new(), Vec::new())
+                }
                 Mapped::Labels { add, remove } => (State::Pending, None, add, remove),
                 Mapped::Skip(reason) => (State::Skipped, Some(reason), Vec::new(), Vec::new()),
             };
