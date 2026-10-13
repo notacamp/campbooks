@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { MessageComposer, useUndoToast } from "~/lib/ui";
 
 import type { Draft } from "../../api/drafts";
+import type { Translate } from "../../model";
 import { addressLine, displayName } from "../../compose/quote";
 import { useDraftEditor } from "../../compose/useDraftEditor";
 
@@ -47,7 +48,8 @@ export function DraftComposer({
   onDone,
   onUndone,
 }: DraftComposerProps) {
-  const { t } = useTranslation("conversations");
+  const { t: typed } = useTranslation("conversations");
+  const t = typed as unknown as Translate;
   const undoToast = useUndoToast();
   const editor = useDraftEditor(workspaceId, draft);
   const { fields, update } = editor;

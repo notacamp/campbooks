@@ -67,6 +67,16 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     await queryClient.invalidateQueries({ queryKey: draftKeys.all(workspaceId) });
   }, [queryClient, workspaceId]);
 
+  /** Put `next` (or nothing, once discarded) in every cached list of drafts at once. */
+  const replace = useCallback(
+    (next: Draft | null) => {
+      queryClient.setQueriesData<Draft[]>({ queryKey: draftKeys.all(workspaceId) }, (list) =>
+        list?.flatMap((d) => (d.id === draft.id ? (next === null ? [] : [next]) : [d])),
+      );
+    },
+    [draft.id, queryClient, workspaceId],
+  );
+
   /** Save what is there now, after any save already running. */
   const flush = useCallback(async (): Promise<void> => {
     if (timer.current !== null) {
@@ -139,6 +149,7 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     try {
       await flush();
       const scheduled = await sendDraft(workspaceId, draft.id);
+      replace(scheduled);
       void refresh();
       return scheduled;
     } catch (thrown) {
@@ -147,20 +158,21 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     } finally {
       setSending(false);
     }
-  }, [draft.id, flush, refresh, workspaceId]);
+  }, [draft.id, flush, refresh, replace, workspaceId]);
 
   /** Take a scheduled send back. Whether it was in time. */
   const undo = useCallback(async (): Promise<boolean> => {
     try {
       const back = await cancelSend(workspaceId, draft.id);
       version.current = back.version;
+      replace(back);
       return true;
     } catch {
       return false;
     } finally {
       void refresh();
     }
-  }, [draft.id, refresh, workspaceId]);
+  }, [draft.id, refresh, replace, workspaceId]);
 
   /** Throw the draft away. */
   const discard = useCallback(async () => {
@@ -170,8 +182,9 @@ export function useDraftEditor(workspaceId: string, draft: Draft) {
     }
     latest.current = saved.current;
     await deleteDraft(workspaceId, draft.id);
+    replace(null);
     await refresh();
-  }, [draft.id, refresh, workspaceId]);
+  }, [draft.id, refresh, replace, workspaceId]);
 
   return { fields, update, saveState, error, sending, send, undo, discard, flush };
 }

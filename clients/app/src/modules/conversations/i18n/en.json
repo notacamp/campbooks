@@ -153,5 +153,50 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "showImages": "Show images"
+  },
+  "compose": {
+    "title": {
+      "reply": "Reply to {{name}}",
+      "reply_all": "Reply all",
+      "forward": "Forward",
+      "new": "New message"
+    },
+    "newMessage": "New message",
+    "noInbox": "Connect a mailbox to send from it.",
+    "readOnly": "You can read this inbox but not send from it.",
+    "from": "From",
+    "sending": "Sending to {{name}}",
+    "sendingNoName": "Sending",
+    "draftSaved": "Draft saved",
+    "saveState": {
+      "saved": "Saved",
+      "saving": "Saving…",
+      "unsaved": "Not saved yet",
+      "failed": "Could not save. Campbooks will try again."
+    },
+    "quote": {
+      "wrote": "On {{date}}, {{name}} wrote:",
+      "forwarded": "Forwarded message",
+      "from": "From",
+      "date": "Date",
+      "subject": "Subject",
+      "to": "To"
+    },
+    "errors": {
+      "no_recipients": "Add at least one recipient.",
+      "invalid_address": "One of the addresses is not valid.",
+      "attachments_too_large": "The attachments are too large to send (25 MB at most).",
+      "draft_not_editable": "This message is already on its way.",
+      "not_connected": "This mailbox is no longer connected. Reconnect it, then send again.",
+      "needs_reauth": "Campbooks needs your permission again to send from this mailbox. Reconnect it, then send again.",
+      "rejected": "Gmail refused this message. Check the addresses and try again.",
+      "too_large": "This message is too large for Gmail to send.",
+      "unavailable": "Gmail could not be reached, so nothing was sent. Try again.",
+      "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
+      "unknown": "Something went wrong. Try again."
+    },
+    "shortcuts": {
+      "newMessage": "New message"
+    }
   }
 }

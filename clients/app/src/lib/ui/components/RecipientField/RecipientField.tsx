@@ -7,7 +7,7 @@ import styles from "./RecipientField.module.css";
 
 /** Someone a message goes to. */
 export interface Recipient {
-  name?: string | null | undefined;
+  name?: string | null;
   address: string;
 }
 

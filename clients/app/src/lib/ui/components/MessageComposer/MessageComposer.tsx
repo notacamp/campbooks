@@ -118,9 +118,6 @@ export function MessageComposer({
   // Where the cursor starts, read once: the composer focuses when it opens.
   const startAt = useRef(focus);
 
-  useEffect(() => {
-    (startAt.current === "to" ? toRef.current : bodyRef.current)?.focus();
-  }, []);
 
   function format(kind: Format) {
     const box = bodyRef.current;
@@ -176,6 +173,11 @@ export function MessageComposer({
       section.removeEventListener("focusin", enter);
       section.removeEventListener("focusout", leave);
     };
+  }, []);
+
+  // After the listeners above, so the first focus makes the shortcuts live.
+  useEffect(() => {
+    (startAt.current === "to" ? toRef.current : bodyRef.current)?.focus();
   }, []);
 
   return (
