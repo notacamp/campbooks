@@ -12,3 +12,13 @@
     var(--shadow-overlay),
     inset 0 0 0 var(--border-width) var(--border-strong);
 }
+
+.bar[data-above-tab-bar] {
+  bottom: calc(var(--size-hit) + var(--space-6));
+}
+
+@media (width >= 48rem) {
+  .bar[data-phone-only] {
+    display: none;
+  }
+}

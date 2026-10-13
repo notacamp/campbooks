@@ -24,6 +24,19 @@ All notable changes to Campbooks Next are documented here. The format follows
   path Campbooks sends to Google when your OAuth app registered another one, with a
   reverse proxy rewriting it to `/auth/callback/google`. The same
   `CAMPBOOKS_<PROVIDER>__REDIRECT_PATH` pattern applies to future sign-in providers.
+- The inbox: the four streams (Primary, Updates, Receipts, Newsletters) under
+  Inbox with their unread counts, each stream's conversations newest first,
+  and a reader with the thread (older messages folded, attachments listed).
+  Campbooks' sorting shows only as a suggestion ("Suggests Newsletters"),
+  with "Why?" listing the stored reasons and "Move to …" one key away; Done,
+  star, read/unread and move all have shortcuts and Undo. On phones the list
+  and the reader are separate screens. New read operation
+  `conversations.list_streams`; conversation summaries carry `suggestion`
+  and details carry `decisions`.
+- Email bodies are sanitised on the server before they reach the app
+  (scripts, style sheets, forms, frames and tracking pixels removed, links
+  open in a new tab), shown only in a sandboxed frame, and remote images stay
+  blocked until you choose "Show images" for a message.
 - Campbooks can be its own identity provider (ADR 0014), replacing Rauthy in
   a later release. With `CAMPBOOKS_AUTH__ISSUER` unset and
   `CAMPBOOKS_SECRET_KEY` set, the server is an OAuth 2.1 / OpenID Connect
@@ -302,6 +315,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- The web app's Content-Security-Policy now allows inline `style` attributes
+  (`style-src-attr 'unsafe-inline'`) and `https:` images, which sanitised
+  email bodies need inside their sandboxed frame; scripts, style sheets and
+  connections stay same-origin. Reverse proxies that set their own CSP need
+  the same two additions.
 - **API clients:** `POST /api/v1/w/{workspace_id}/invitations` now answers
   with `accept_url`, the invitation's accept link, built from
   `CAMPBOOKS_PUBLIC_URL`. It is returned only in that response (never listed,

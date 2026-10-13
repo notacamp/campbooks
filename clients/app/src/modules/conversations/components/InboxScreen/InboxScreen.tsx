@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut } from "~/lib/shortcuts";
@@ -51,6 +51,8 @@ export interface InboxScreenProps {
    * ReplySlot.ts); the reader hides those actions without it.
    */
   renderReplySlot?: RenderReplySlot | undefined;
+  /** A list-header action from the send slice ("New message", C). */
+  composeAction?: ReactNode | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -66,6 +68,7 @@ export function InboxScreen({
   stream,
   conversationId,
   renderReplySlot,
+  composeAction,
   now,
 }: InboxScreenProps) {
   const { t: typed } = useTranslation("conversations");
@@ -97,7 +100,11 @@ export function InboxScreen({
 
   const current = conversationId ?? cursor ?? ids[0];
   const step = (by: number) => {
-    const index = current === undefined ? -1 : ids.indexOf(current);
+    // The first J or K in a list lands on its first row.
+    const index =
+      current === undefined || (conversationId === undefined && cursor === undefined)
+        ? -by
+        : ids.indexOf(current);
     const next = ids[Math.min(ids.length - 1, Math.max(0, index + by))];
     if (next === undefined) {
       return;
@@ -197,6 +204,7 @@ export function InboxScreen({
             {name}
           </Heading>
           <Spacer />
+          {composeAction}
           <Segmented
             label={t("list.show")}
             value={show}
@@ -241,7 +249,7 @@ export function InboxScreen({
               void list.fetchNextPage();
             }}
             openId={conversationId}
-            cursorId={current}
+            cursorId={cursor}
             onOpen={(conversation) => {
               open(conversation.id);
             }}

@@ -31,7 +31,7 @@ import {
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
 import { MovePicker } from "./MovePicker";
-import type { RenderReplySlot, ReplyMode, ReplyRequest } from "./ReplySlot";
+import type { RenderReplySlot, ReplyMode, ReplyRequest, ReplySlotContext } from "./ReplySlot";
 import { ThreadMessage } from "./ThreadMessage";
 
 export interface ConversationReaderProps {
@@ -264,6 +264,17 @@ export function ConversationReader({
       </span>
     );
 
+  const replyContext: ReplySlotContext = {
+    workspaceId,
+    inboxId: conversation.inbox_id,
+    conversation,
+    messages,
+    request: reply,
+    onClose: () => {
+      setReply(null);
+    },
+  };
+
   return (
     <>
       <PaneHeader>
@@ -378,44 +389,33 @@ export function ConversationReader({
             now={now}
           />
         ))}
-        {renderReplySlot?.({
-          workspaceId,
-          inboxId: conversation.inbox_id,
-          conversation,
-          messages,
-          request: reply,
-          onClose: () => {
-            setReply(null);
-          },
-        })}
+        {renderReplySlot?.(replyContext)}
       </ReaderBody>
-      <div className="md:hidden">
-        <ActionBar label={t("reader.actions")}>
-          {renderReplySlot === undefined ? null : (
-            <Button
-              variant="primary"
-              size="lg"
-              icon="reply"
-              grow
-              onClick={() => {
-                askReply("reply");
-              }}
-            >
-              {tShortcuts("item.reply")}
-            </Button>
-          )}
+      <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
+        {renderReplySlot === undefined ? null : (
           <Button
+            variant="primary"
             size="lg"
-            icon="archive"
+            icon="reply"
             grow
             onClick={() => {
-              onDone(conversation);
+              askReply("reply");
             }}
           >
-            {tShortcuts("item.done")}
+            {tShortcuts("item.reply")}
           </Button>
-        </ActionBar>
-      </div>
+        )}
+        <Button
+          size="lg"
+          icon="archive"
+          grow
+          onClick={() => {
+            onDone(conversation);
+          }}
+        >
+          {tShortcuts("item.done")}
+        </Button>
+      </ActionBar>
     </>
   );
 }

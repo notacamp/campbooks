@@ -287,7 +287,7 @@ function rfc822(message: DemoMessage, date: Date, messageId: string, parent?: st
 }
 
 /** Store `raw` in `mailbox` as a new message and record it in history. */
-export function appendMessage(
+function appendMessage(
   mailbox: Mailbox,
   raw: string,
   labelIds: string[],

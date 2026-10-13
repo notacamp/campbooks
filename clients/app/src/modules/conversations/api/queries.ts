@@ -14,14 +14,10 @@ import { api, operationKey, unwrap, type Schema } from "~/lib/api";
 export type Stream = Schema<"Stream">;
 export type ConversationSummary = Schema<"ConversationSummary">;
 export type ConversationDetail = Schema<"ConversationDetail">;
-export type ConversationList = Schema<"ConversationList">;
+type ConversationList = Schema<"ConversationList">;
 export type MessageView = Schema<"MessageView">;
-export type MessageBody = Schema<"MessageBody">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
-export type StreamSuggestion = Schema<"StreamSuggestion">;
-export type StreamCount = Schema<"StreamCount">;
-export type InboxView = Schema<"InboxView">;
 
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];
@@ -32,7 +28,7 @@ export function isStream(value: string): value is Stream {
 
 // Keyed by operationId (`operationKey`), so the change feed refetches them
 // when a conversation or message changes.
-export const keys = {
+const keys = {
   inboxes: (workspaceId: string) =>
     operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
   streams: (workspaceId: string) =>
@@ -86,7 +82,7 @@ export function useStreams(workspaceId: string) {
   });
 }
 
-export const conversationsQuery = (workspaceId: string, stream: Stream) =>
+const conversationsQuery = (workspaceId: string, stream: Stream) =>
   infiniteQueryOptions({
     queryKey: keys.list(workspaceId, stream),
     initialPageParam: undefined as string | undefined,
