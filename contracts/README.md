@@ -13,6 +13,9 @@ produce or accept against the file.
 | `conversations.changes_requested.v1.schema.json` | `conversations` | `connectors` | A member's change the provider should mirror (outbound intent; ids and change kinds only) |
 | `connectors.capability_granted.v1.schema.json` | `connectors` | `conversations` | The event announcing a connection's new capability; for `messages`, the inbox to create |
 | `connection-account.v1.schema.json` | `connectors` | `conversations` | The account behind a connection (address, name), as the blob that event points at |
+| `outgoing-message.v1.schema.json` | `conversations` | `connectors` | A message a member asked to send (addresses, subject, bodies, attachment blobs), as a blob (`application/vnd.campbooks.outgoing-message+json; version=1`) |
+| `conversations.send_requested.v1.schema.json` | `conversations` | `connectors` | The event announcing a send once its undo window ends (ids and the outgoing message blob) |
+| `connectors.send_completed.v1.schema.json` | `connectors` | `conversations` | The event telling how a send ended: sent (with the provider's id) or failed (with a reason) |
 
 Rules:
 

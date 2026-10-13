@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.send_completed.v1.schema.json",
+  "title": "connectors.send_completed v1 (event payload)",
+  "description": "Published by the connectors module when a send asked for by `conversations.send_requested` ends: sent (the provider accepted it) or failed (with a reason). Ids only. Workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "inbox_id",
+    "send_id",
+    "outcome"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "inbox_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "send_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "outcome": {
+      "enum": [
+        "sent",
+        "failed"
+      ]
+    },
+    "provider_message_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The provider's id of the sent message (sent only)."
+    },
+    "reason": {
+      "enum": [
+        "not_connected",
+        "needs_reauth",
+        "rejected",
+        "too_large",
+        "unknown_outcome"
+      ],
+      "description": "Why it failed (failed only). `unknown_outcome`: the provider may have sent it."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "sent"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "provider_message_id"
+        ],
+        "not": {
+          "required": [
+            "reason"
+          ]
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "reason"
+        ],
+        "not": {
+          "required": [
+            "provider_message_id"
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}
