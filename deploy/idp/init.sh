@@ -5,7 +5,9 @@
 # Once, on the very first run, it generates every secret into the `idp-data`
 # volume and never overwrites them afterwards:
 #   secrets.toml                     encryption key + cluster secrets
-#   bootstrap/api_keys.json          the `campbooks` admin API key (first boot)
+#   bootstrap/api_keys.json          the `campbooks` admin API key (first boot):
+#                                    clients, scopes, client secrets and
+#                                    sign-in providers
 #   campbooks/api-key                that key's token, used by provision.sh
 #   campbooks/initial-admin-password the first admin password
 #
@@ -58,7 +60,8 @@ EOF
     "access": [
       { "group": "Clients", "access_rights": ["read", "create", "update", "delete"] },
       { "group": "Scopes", "access_rights": ["read", "create", "update", "delete"] },
-      { "group": "Secrets", "access_rights": ["read"] }
+      { "group": "Secrets", "access_rights": ["read"] },
+      { "group": "AuthProviders", "access_rights": ["read", "create", "update"] }
     ]
   }
 ]
