@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
@@ -34,12 +34,7 @@ import {
   type NeedView,
 } from "~/modules/conversations";
 
-import {
-  useAttention,
-  useRefreshAttention,
-  useSnooze,
-  type ItemView,
-} from "../../api/queries";
+import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
 import { doneTodayKind, groupByReason, laterOptions } from "../../model";
 
 /** `t` for keys only known at runtime. */
@@ -96,16 +91,10 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const needActions = useNeedActions(workspaceId, refresh);
   const snooze = useSnooze(workspaceId);
 
-  // Items acted on, hidden at once; the projection catches up a moment later.
+  // Items acted on, hidden at once while the projection catches up; keyed
+  // by their cause, so a follow-up from the sender shows again.
   const [gone, setGone] = useState<ReadonlySet<string>>(new Set());
   const openItems = open.data?.items ?? [];
-  useEffect(() => {
-    const present = new Set(openItems.map((item) => item.id));
-    setGone((current) => {
-      const kept = [...current].filter((id) => present.has(id));
-      return kept.length === current.size ? current : new Set(kept);
-    });
-  }, [openItems]);
 
   const clearedItems = cleared.data?.items ?? [];
   const ids = [
@@ -121,7 +110,12 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const rows: Row[] = openItems.flatMap((item) => {
     const conversation = byId.get(item.record.id);
     const need = conversation?.need;
-    if (gone.has(item.id) || conversation === undefined || need === null || need === undefined) {
+    if (
+      gone.has(goneKey(item)) ||
+      conversation === undefined ||
+      need === null ||
+      need === undefined
+    ) {
       return [];
     }
     return [{ item, conversation, need, name: needSender(need, conversation) }];
@@ -138,7 +132,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
   const selected = order.find((row) => row.item.id === selectedId) ?? order[0];
 
   const hide = (row: Row) => {
-    setGone((current) => new Set([...current, row.item.id]));
+    setGone((current) => new Set([...current, goneKey(row.item)]));
     const index = order.findIndex((r) => r.item.id === row.item.id);
     const next = order[index + 1] ?? order[index - 1];
     setSelectedId(next?.item.id);
@@ -146,7 +140,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
     setLaterId(undefined);
   };
   const show = (row: Row) => {
-    setGone((current) => new Set([...current].filter((id) => id !== row.item.id)));
+    setGone((current) => new Set([...current].filter((key) => key !== goneKey(row.item))));
     setSelectedId(row.item.id);
   };
   const isQuestion = (row: Row) => row.need.trust === "check";
@@ -209,7 +203,10 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
     const next = order[Math.min(order.length - 1, Math.max(0, index + step))];
     if (next !== undefined) {
       setSelectedId(next.item.id);
-      document.getElementById(itemId(next.item.id))?.scrollIntoView({ block: "nearest" });
+      const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+        document.getElementById(itemId(next.item.id));
+      // Not every environment scrolls (tests run without layout).
+      element?.scrollIntoView?.({ block: "nearest" });
     }
   };
   const hasRows = selected !== undefined;
@@ -381,7 +378,9 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
                 soon={due?.soon === true}
                 selected={row.item.id === selected?.item.id}
                 expanded={expanded}
-                hints={isQuestion(row) ? ["item.choice1", "item.choice2"] : ["item.done", "item.later"]}
+                hints={
+                  isQuestion(row) ? ["item.choice1", "item.choice2"] : ["item.done", "item.later"]
+                }
                 onToggle={() => {
                   setSelectedId(row.item.id);
                   setExpandedId(expanded ? undefined : row.item.id);
@@ -428,6 +427,8 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
 }
 
 const itemId = (id: string) => `attention-${id}`;
+
+const goneKey = (item: ItemView) => `${item.id}:${item.cause.id}`;
 
 interface NeedDetailProps {
   workspaceId: string;
@@ -493,7 +494,11 @@ function NeedDetail({
                   {t("actions.reply")}
                 </Button>
               )}
-              <Button variant={warning ? "primary" : "secondary"} shortcut="item.done" onClick={onDone}>
+              <Button
+                variant={warning ? "primary" : "secondary"}
+                shortcut="item.done"
+                onClick={onDone}
+              >
                 {tc("needs.actions.done")}
               </Button>
               <Popover

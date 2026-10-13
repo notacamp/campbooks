@@ -3,7 +3,7 @@
 import type { ItemView, Reason } from "./api/queries";
 
 /** The groups, in the order Home shows them. */
-export const REASONS: readonly Reason[] = ["review", "reply", "decide", "do", "pay"];
+const REASONS: readonly Reason[] = ["review", "reply", "decide", "do", "pay"];
 
 /** Items by reason, in display order, keeping the server's order inside each group. */
 export function groupByReason(items: readonly ItemView[]): { reason: Reason; items: ItemView[] }[] {
@@ -22,14 +22,13 @@ export function laterOptions(now: Date): { key: "today" | "tomorrow" | "monday";
     return date;
   };
   const toMonday = ((8 - now.getDay()) % 7) + (now.getDay() === 1 ? 7 : 0);
-  const options: { key: "today" | "tomorrow" | "monday"; until: Date }[] = [];
   const evening = at(0, 18);
-  if (evening.getTime() - now.getTime() > 60 * 60 * 1000) {
-    options.push({ key: "today", until: evening });
-  }
-  options.push({ key: "tomorrow", until: at(1, 8) });
-  options.push({ key: "monday", until: at(toMonday === 0 ? 7 : toMonday, 8) });
-  return options;
+  const worthIt = evening.getTime() - now.getTime() > 60 * 60 * 1000;
+  return [
+    ...(worthIt ? [{ key: "today" as const, until: evening }] : []),
+    { key: "tomorrow" as const, until: at(1, 8) },
+    { key: "monday" as const, until: at(toMonday === 0 ? 7 : toMonday, 8) },
+  ];
 }
 
 /** Which sentence Done today uses for an item, and how it can be undone. */

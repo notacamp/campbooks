@@ -238,10 +238,10 @@ async function needRequest(
     case "done":
     case "not_needed": {
       return unwrap(
-        await api.POST(
-          "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve",
-          { params, body: { outcome: verdict } },
-        ),
+        await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve", {
+          params,
+          body: { outcome: verdict },
+        }),
       );
     }
     case "confirm": {

@@ -10,8 +10,7 @@ export {
   type ConversationSummary,
   type NeedView,
 } from "./api/queries";
-export { useNeedActions, type NeedActions } from "./components/Needs/use-need-actions";
-export { NeedChips } from "./components/Needs/NeedChips";
+export { useNeedActions } from "./components/Needs/use-need-actions";
 export {
   dueLabel,
   howRows,

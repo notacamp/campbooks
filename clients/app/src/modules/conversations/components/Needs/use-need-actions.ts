@@ -76,5 +76,3 @@ export function useNeedActions(workspaceId: string, onChanged?: () => void) {
     failed: mutation.isError,
   };
 }
-
-export type NeedActions = ReturnType<typeof useNeedActions>;

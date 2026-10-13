@@ -76,9 +76,7 @@ export function Item({
         ) : null}
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
-      {excerpt === undefined || expanded ? null : (
-        <q className={styles["excerpt"]}>{excerpt}</q>
-      )}
+      {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}
       {tags.length > 0 ? (
         <span className={styles["meta"]}>
           {tags.map((tag) => (

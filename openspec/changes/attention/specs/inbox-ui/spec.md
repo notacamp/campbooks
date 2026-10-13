@@ -6,14 +6,15 @@ reply", "To do", "Pay", "Looks suspicious", or "Check" for a question) and,
 when it has one, its due date ("Due Thu", "Overdue"). The reader's note SHALL
 lead with the need's sentence, in the user's language, naming the sender (by
 address for a `review` need), then the sender's sentence quoted as plain text
-with who wrote it and when, then the chips, then Done (E) and Not needed (X);
-a `check` need SHALL ask its question with Yes (1) and No (2). Every action
+with who wrote it and when, then the chips, then Done and Not needed (X)
+(E stays the inbox's Done, which archives); a `check` need SHALL ask its
+question with Yes (1) and No (2). Every action
 SHALL push an entry Undo (Z) takes back. The quote SHALL never be rendered as
 HTML or turned into links.
 
 #### Scenario: A question with a date
 - **WHEN** the user opens Marta's conversation whose `reply` need is due Wednesday
-- **THEN** the note says "Marta Ferreira is waiting for your reply", quotes "Could you confirm Thursday's walkthrough? The builders need to know by Wednesday.", shows "Needs a reply" and "Due Wed", and E clears it with Undo in the toast
+- **THEN** the note says "Marta Ferreira is waiting for your reply", quotes "Could you confirm Thursday's walkthrough? The builders need to know by Wednesday.", shows "Needs a reply" and "Due Wed", and its Done clears it with Undo in the toast
 
 #### Scenario: Phishing
 - **WHEN** the user opens a conversation with a `review` need for suspicious mail

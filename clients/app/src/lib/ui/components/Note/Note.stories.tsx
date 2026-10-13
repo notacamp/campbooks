@@ -51,9 +51,7 @@ const meta = {
       </>
     ),
     how,
-    links: [
-      { icon: "document", title: "Walkthrough-plan.pdf", kind: "Document", onSelect: fn() },
-    ],
+    links: [{ icon: "document", title: "Walkthrough-plan.pdf", kind: "Document", onSelect: fn() }],
   },
 } satisfies Meta<typeof Note>;
 

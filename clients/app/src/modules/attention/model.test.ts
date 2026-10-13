@@ -39,7 +39,11 @@ describe("attention model", () => {
     const evening = new Date(2026, 9, 13, 17, 30);
     expect(laterOptions(evening).map((o) => o.key)).toEqual(["tomorrow", "monday"]);
     // On a Monday, Monday means next week.
-    expect(laterOptions(new Date(2026, 9, 19, 9, 0)).at(-1)?.until.getDate()).toBe(26);
+    expect(
+      laterOptions(new Date(2026, 9, 19, 9, 0))
+        .at(-1)
+        ?.until.getDate(),
+    ).toBe(26);
   });
 
   it("words Done today and says what can be undone", () => {

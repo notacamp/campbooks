@@ -316,7 +316,7 @@ export const EmptyStream: Story = { args: { initialStream: "clients" } };
 
 export const Dark: Story = { globals: { theme: "dark" } };
 
-/** J/K walk the list; "Why?" explains the sorting. */
+/** J/K walk the list; "How Campbooks decided" explains the sorting. */
 export const KeyboardFlow: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -327,7 +327,7 @@ export const KeyboardFlow: Story = {
       ).toBeVisible(),
     );
     await userEvent.keyboard("k");
-    await userEvent.click(canvas.getByRole("button", { name: "Why?" }));
+    await userEvent.click(canvas.getByText("How Campbooks decided"));
     await expect(canvas.getByText("You have replied to Sofia 14 times this year.")).toBeVisible();
   },
 };

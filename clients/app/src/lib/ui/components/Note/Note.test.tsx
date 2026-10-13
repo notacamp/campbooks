@@ -42,7 +42,9 @@ describe("Note", () => {
 
   it("keeps how it decided behind a disclosure", () => {
     renderUi(
-      <Note how={<HowDecided rows={[{ question: "Needs a reply", answer: "Yes.", source: "0.90" }]} />}>
+      <Note
+        how={<HowDecided rows={[{ question: "Needs a reply", answer: "Yes.", source: "0.90" }]} />}
+      >
         Note text
       </Note>,
     );

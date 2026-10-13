@@ -119,7 +119,12 @@ export function ConversationReader({
   // Home's R: answer the newest message as soon as it is here (once).
   const repliedOnce = useRef(false);
   useEffect(() => {
-    if (startReply && !repliedOnce.current && newest !== undefined && renderReplySlot !== undefined) {
+    if (
+      startReply &&
+      !repliedOnce.current &&
+      newest !== undefined &&
+      renderReplySlot !== undefined
+    ) {
       repliedOnce.current = true;
       nonce.current += 1;
       setReply({ mode: "reply", messageId: newest.id, nonce: nonce.current });
@@ -420,7 +425,9 @@ export function ConversationReader({
             label={t("scout.label")}
             visor={suggestion === undefined ? "idle" : "unsure"}
             footer={placementLine(t, conversation)}
-            how={<HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />}
+            how={
+              <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
+            }
             {...(suggestion === undefined
               ? {}
               : {
@@ -511,7 +518,9 @@ export function ConversationReader({
                   ),
                 })}
             footer={placementLine(t, conversation)}
-            how={<HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />}
+            how={
+              <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
+            }
           >
             {needSentence(t, need, needSender(need, conversation))}
           </Note>
