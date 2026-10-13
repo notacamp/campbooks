@@ -79,7 +79,8 @@ Every response, API or web client, SHALL carry
 `X-Frame-Options: DENY`. Every HTML response from the web client SHALL carry a
 Content-Security-Policy that allows scripts, style sheets and connections only
 from the same origin, inline `style` attributes, images from the same origin,
-`data:` URLs or `https` (for the remote images of an email the member chose to
+`data:` URLs, `blob:` URLs (an attachment's preview, fetched through the
+API) or `https` (for the remote images of an email the member chose to
 show, inside its sandboxed frame), no plugins, no `<base>` element, no framing
 by any origin, and form submissions only to the same origin.
 
@@ -89,7 +90,7 @@ by any origin, and form submissions only to the same origin.
 
 #### Scenario: HTML response
 - **WHEN** a client requests `/`
-- **THEN** the response carries the three security headers and a Content-Security-Policy with `default-src 'self'`, `script-src 'self'`, `style-src 'self'`, `style-src-attr 'unsafe-inline'`, `object-src 'none'` and `frame-ancestors 'none'`
+- **THEN** the response carries the three security headers and a Content-Security-Policy with `default-src 'self'`, `script-src 'self'`, `style-src 'self'`, `style-src-attr 'unsafe-inline'`, `img-src 'self' data: blob: https:`, `object-src 'none'` and `frame-ancestors 'none'`
 
 ### Requirement: Interim BFF passthrough
 Until the backend-for-frontend described in ADR 0004 exists, the server SHALL

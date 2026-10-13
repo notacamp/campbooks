@@ -26,6 +26,8 @@ export interface MessageCardProps {
   attachments?: readonly string[] | undefined;
   /** Actions for this one message ("Show images"), under the body. */
   actions?: ReactNode | undefined;
+  /** Its files with their actions (an `AttachmentList`), last. */
+  files?: ReactNode | undefined;
 }
 
 /** One message of a conversation. */
@@ -40,6 +42,7 @@ export function MessageCard({
   attachment,
   attachments = [],
   actions,
+  files: fileList,
 }: MessageCardProps) {
   const files = attachment === undefined ? attachments : [attachment, ...attachments];
   return (
@@ -66,6 +69,7 @@ export function MessageCard({
             ))}
           </div>
         )}
+        {fileList}
       </div>
     </article>
   );

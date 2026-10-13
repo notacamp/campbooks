@@ -7,6 +7,7 @@ import {
   ActionBar,
   Button,
   EmptyState,
+  focusNextAttachment,
   Heading,
   IconButton,
   MetaLine,
@@ -145,6 +146,13 @@ export function ConversationReader({
     { enabled: active },
   );
   useShortcut("inbox.show_images", showAllImages, { enabled: active });
+  useShortcut(
+    "inbox.next_attachment",
+    () => {
+      focusNextAttachment();
+    },
+    { enabled: active },
+  );
   useShortcut("overlay.close", onBack, { enabled: !moving });
   useShortcut("list.next", onNext);
   useShortcut("list.previous", onPrevious);
