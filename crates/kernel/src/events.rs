@@ -47,7 +47,10 @@ use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{PgPool, Postgres, Transaction};
 use utoipa::openapi::{RefOr, schema::Schema};
 
-use crate::jobs::{self, JobContext, JobError, Registry};
+use crate::{
+    changes::{self, Change},
+    jobs::{self, JobContext, JobError, Registry},
+};
 
 crate::define_id!(
     /// A published domain event, in `kernel.events`.
@@ -74,6 +77,14 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// events. Its deliveries run with that workspace set
     /// (`campbooks.workspace_id`) and count towards its fair share.
     fn workspace(&self) -> Option<&str>;
+
+    /// The records this event's change touched, for the client change feed
+    /// ([`changes`](crate::changes)): references and operations only, never
+    /// contents. Recorded with the event when it belongs to a workspace.
+    /// None by default.
+    fn changes(&self) -> Vec<Change> {
+        Vec::new()
+    }
 }
 
 /// A published event as a handler receives it.
@@ -199,6 +210,11 @@ impl EventBus {
         )
         .fetch_one(&mut **tx)
         .await?;
+
+        let changes = event.changes();
+        if let (false, Some(workspace)) = (changes.is_empty(), event.workspace()) {
+            changes::record(tx, id, workspace, &changes).await?;
+        }
 
         let mut notified: Vec<&str> = queues.clone();
         notified.sort_unstable();

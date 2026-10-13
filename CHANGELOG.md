@@ -26,6 +26,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   invitations. Invitation links open a page that signs you in if needed and
   joins the workspace. Campbooks does not email invitations yet: whoever runs
   the instance passes the link on.
+- Live updates: the app learns what changed in a workspace (renamed, a
+  member joined, left or changed role) as it happens and refreshes only what
+  it shows, catching up after a lost connection or a sleeping laptop. API
+  clients can follow the same stream at `GET /api/v1/w/{workspace_id}/changes`
+  (Server-Sent Events, ids only). Self-hosters behind a reverse proxy must
+  let `text/event-stream` responses through unbuffered; tuning lives in the
+  new `CAMPBOOKS_CHANGES__*` settings (see `deploy/.env.example`).
 - Sign in with Google, Microsoft or Zoho. Set a provider's client ID in
   `.env` (`CAMPBOOKS_IDP_GOOGLE_CLIENT_ID`, `CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID`,
   `CAMPBOOKS_IDP_ZOHO_CLIENT_ID`) and put its secret in

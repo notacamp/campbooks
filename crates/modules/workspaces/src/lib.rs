@@ -75,6 +75,7 @@ pub fn module() -> Module {
             .routes(routes!(features::list_security_events::handler)),
         background: Background::new()
             .publishes::<events::WorkspaceCreated>()
+            .publishes::<events::WorkspaceUpdated>()
             .publishes::<events::MemberJoined>()
             .publishes::<events::MemberLeft>()
             .publishes::<events::MemberRoleChanged>()

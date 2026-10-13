@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use crate::{
     auth::TokenVerifier,
     blobs::BlobStore,
+    changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
     events::EventBus,
     i18n::{LocalePreferencePort, NoLocalePreference},
@@ -43,6 +44,12 @@ pub struct AppState {
     /// The composed API, for running operations by id
     /// ([`invoke`](crate::operations::invoke)). Installed by the server.
     pub operations: Operations,
+    /// This process's change-feed hub: wakes open change streams.
+    pub changes: ChangeHub,
+    /// Answers whether a member may see changes inside a container (an
+    /// inbox, a calendar). Until a module registers one, such changes are
+    /// shown to nobody.
+    pub visibility: VisibilityPort,
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
@@ -55,6 +62,8 @@ impl AppState {
     pub fn new(db: PgPool, config: Config) -> Self {
         let metrics = Metrics::new(&telemetry::meter(), config.telemetry.exports_metrics());
         Self {
+            changes: ChangeHub::new(db.clone(), &config.changes),
+            visibility: Arc::new(NoContainers),
             metrics,
             db,
             auth: TokenVerifier::new(&config.auth),
@@ -71,6 +80,14 @@ impl AppState {
     #[must_use]
     pub fn with_membership(mut self, membership: MembershipPort) -> Self {
         self.membership = membership;
+        self
+    }
+
+    /// The same state, deciding container visibility in the change feed
+    /// through `visibility`.
+    #[must_use]
+    pub fn with_visibility(mut self, visibility: VisibilityPort) -> Self {
+        self.visibility = visibility;
         self
     }
 

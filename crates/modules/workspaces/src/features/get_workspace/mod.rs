@@ -108,6 +108,7 @@ mod tests {
             email: Some(format!("{subject}@example.com")),
             email_verified: true,
             name: None,
+            expires_at: None,
         };
         let get = |subject: &str| {
             Invocation::new(

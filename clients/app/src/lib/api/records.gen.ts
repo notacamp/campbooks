@@ -1,0 +1,12 @@
+/**
+ * Generated from openapi/openapi.json by scripts/records-gen.ts. Do not edit.
+ *
+ * For each record type, the read operations that return it: a change to a
+ * record of that type invalidates the queries keyed by those operationIds.
+ */
+export const recordReaders: Readonly<Record<string, readonly string[]>> = {
+  "workspaces.invitation": ["workspaces.list_invitations"],
+  "workspaces.member": ["workspaces.list_members"],
+  "workspaces.security_event": ["workspaces.list_security_events"],
+  "workspaces.workspace": ["workspaces.get", "workspaces.list"],
+};
