@@ -174,6 +174,227 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List conversations, newest first. */
+        get: operations["conversations.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a conversation and its messages. */
+        get: operations["conversations.get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive a conversation. */
+        post: operations["conversations.archive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put a label on a conversation. */
+        post: operations["conversations.add_label"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels/{label_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Take a label off a conversation. */
+        delete: operations["conversations.remove_label"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one message's text and HTML bodies. */
+        get: operations["conversations.get_message_body"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a conversation read. */
+        post: operations["conversations.mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Star a conversation. */
+        post: operations["conversations.star"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a conversation to another stream. */
+        post: operations["conversations.move_to_stream"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Move a conversation back to the inbox. */
+        post: operations["conversations.unarchive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark a conversation unread (its newest message). */
+        post: operations["conversations.mark_unread"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unstar a conversation. */
+        post: operations["conversations.unstar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/inboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the inboxes you can read. */
+        get: operations["conversations.list_inboxes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/invitations": {
         parameters: {
             query?: never;
@@ -484,6 +705,48 @@ export interface components {
             /** @description The token from the invitation link. */
             token: string;
         };
+        /** @description The label to add. */
+        AddLabel: {
+            /**
+             * @description Its name; created in the conversation's inbox when new.
+             * @example Accountant
+             */
+            name: string;
+        };
+        /** @description One way to reach someone on a channel: a display name and an address. */
+        Address: {
+            /**
+             * @description The address, as given.
+             * @example ana@example.com
+             */
+            address: string;
+            /**
+             * @description The display name, when the message gave one.
+             * @example Ana Lopes
+             */
+            name?: string | null;
+        };
+        /**
+         * Format: uuid
+         * @description AttachmentId (UUIDv7)
+         */
+        AttachmentId: string;
+        /** @description An attachment of a message. */
+        AttachmentView: {
+            /** @description Its media type, as sent (not trusted). */
+            content_type: string;
+            /** @description Its file name, as sent. */
+            filename: string;
+            /** @description The attachment. */
+            id: components["schemas"]["AttachmentId"];
+            /** @description Shown inside the body rather than attached. */
+            inline: boolean;
+            /**
+             * Format: int64
+             * @description Its size in bytes.
+             */
+            size: number;
+        };
         /**
          * Format: uuid
          * @description AuthorizationId (UUIDv7)
@@ -503,6 +766,11 @@ export interface components {
             /** @description The member's new role. */
             role: components["schemas"]["Role"];
         };
+        /**
+         * @description A kind of messaging. Email is the first.
+         * @enum {string}
+         */
+        Channel: "email";
         /** @description What Google redirected the browser with. */
         CompleteConnection: {
             /** @description The `code` query parameter. */
@@ -553,6 +821,62 @@ export interface components {
             /** @description Its change streams. */
             streams: components["schemas"]["StreamView"][];
         };
+        /** @description A conversation and its newest messages, oldest first. */
+        ConversationDetail: {
+            /** @description The conversation. */
+            conversation: components["schemas"]["ConversationSummary"];
+            /** @description Up to the 100 newest messages, oldest first. */
+            messages: components["schemas"]["MessageView"][];
+        };
+        /**
+         * Format: uuid
+         * @description ConversationId (UUIDv7)
+         */
+        ConversationId: string;
+        /** @description A page of conversations. */
+        ConversationList: {
+            /** @description Newest first. */
+            conversations: components["schemas"]["ConversationSummary"][];
+            /** @description Pass it as `cursor` for the next page; `None` on the last page. */
+            next_cursor?: string | null;
+        };
+        /** @description A conversation as lists show it. */
+        ConversationSummary: {
+            /** @description Whether no message is in the inbox. */
+            archived: boolean;
+            /** @description The conversation. */
+            id: components["schemas"]["ConversationId"];
+            /** @description Its inbox. */
+            inbox_id: components["schemas"]["InboxId"];
+            /** @description Its labels, by name. */
+            labels: components["schemas"]["LabelView"][];
+            /**
+             * Format: date-time
+             * @description When its newest message was sent.
+             */
+            last_message_at: string;
+            latest_from?: components["schemas"]["Address"] | null;
+            /**
+             * Format: int32
+             * @description Messages in it.
+             */
+            message_count: number;
+            /** @description The start of the newest message's text. */
+            snippet: string;
+            /** @description Whether any message is starred. */
+            starred: boolean;
+            /** @description Its stream. */
+            stream: components["schemas"]["Stream"];
+            /** @description Who put it there. */
+            stream_source: components["schemas"]["StreamSource"];
+            /** @description The first message's subject. */
+            subject: string;
+            /**
+             * Format: int32
+             * @description Unread inbound messages.
+             */
+            unread_count: number;
+        };
         /** @description A new workspace. */
         CreateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -579,6 +903,11 @@ export interface components {
             accept_url: string;
         };
         /**
+         * @description Whether a message came in or went out.
+         * @enum {string}
+         */
+        Direction: "inbound" | "outbound";
+        /**
          * @description How a connection is doing.
          * @enum {string}
          */
@@ -601,6 +930,36 @@ export interface components {
          * @description InboxId (UUIDv7)
          */
         InboxId: string;
+        /** @description The inboxes, by address. */
+        InboxList: {
+            /** @description The inboxes. */
+            inboxes: components["schemas"]["InboxView"][];
+        };
+        /**
+         * @description A member's access to an inbox.
+         * @enum {string}
+         */
+        InboxRole: "reader" | "sender" | "manager";
+        /** @description An inbox. */
+        InboxView: {
+            /**
+             * @description Its address.
+             * @example office@example.com
+             */
+            address: string;
+            /** @description Its channel. */
+            channel: components["schemas"]["Channel"];
+            /** @description Its display name. */
+            display_name?: string | null;
+            /** @description The inbox. */
+            id: components["schemas"]["InboxId"];
+            role?: components["schemas"]["InboxRole"] | null;
+            /**
+             * Format: int32
+             * @description Unread inbound messages in conversations still in the inbox.
+             */
+            unread_count: number;
+        };
         /**
          * Format: uuid
          * @description InvitationId (UUIDv7)
@@ -657,6 +1016,18 @@ export interface components {
          * @enum {string}
          */
         Kind: "business" | "personal";
+        /**
+         * Format: uuid
+         * @description LabelId (UUIDv7)
+         */
+        LabelId: string;
+        /** @description A label as shown on a conversation. */
+        LabelView: {
+            /** @description The label. */
+            id: components["schemas"]["LabelId"];
+            /** @description Its name. */
+            name: string;
+        };
         /** @description Where to send the browser to sign out of the identity provider too. */
         LogoutResponse: {
             /**
@@ -685,6 +1056,63 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
+        };
+        /** @description A message's bodies. */
+        MessageBody: {
+            /** @description The HTML part: untrusted, to be shown only in a sandboxed frame. */
+            html?: string | null;
+            /** @description The plain-text part. */
+            text?: string | null;
+            /** @description Whether either part was cut short. */
+            truncated: boolean;
+        };
+        /**
+         * Format: uuid
+         * @description MessageId (UUIDv7)
+         */
+        MessageId: string;
+        /** @description A message's plain-text body. */
+        MessageText: {
+            /** @description The text, up to 256 KiB. */
+            content: string;
+            /** @description Whether it was cut short. */
+            truncated: boolean;
+        };
+        /** @description A message, with its plain-text body. */
+        MessageView: {
+            /** @description Its attachments, in order. */
+            attachments: components["schemas"]["AttachmentView"][];
+            /** @description Copied recipients. */
+            cc: components["schemas"]["Address"][];
+            /** @description Received or sent. */
+            direction: components["schemas"]["Direction"];
+            /** @description The sender. */
+            from: components["schemas"]["Address"];
+            /** @description Whether it has an HTML body (`conversations.get_message_body`). */
+            has_html: boolean;
+            /** @description The message. */
+            id: components["schemas"]["MessageId"];
+            /** @description Read. */
+            read: boolean;
+            /** @description Where replies go, when not to the sender. */
+            reply_to: components["schemas"]["Address"][];
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+            /** @description Starred. */
+            starred: boolean;
+            /** @description The subject. */
+            subject: string;
+            text?: components["schemas"]["MessageText"] | null;
+            /** @description Recipients. */
+            to: components["schemas"]["Address"][];
+        };
+        /** @description Where to move the conversation. */
+        MoveToStream: {
+            /** @description The stream. */
+            stream: components["schemas"]["Stream"];
         };
         /**
          * @description Where a stream is in its reading.
@@ -805,6 +1233,17 @@ export interface components {
              */
             expires_at: string;
         };
+        /**
+         * @description The one place Campbooks sorts a conversation into. The built-in set; the
+         *     workspace's own streams come later.
+         * @enum {string}
+         */
+        Stream: "primary" | "updates" | "receipts" | "newsletters";
+        /**
+         * @description Who put a conversation in its stream.
+         * @enum {string}
+         */
+        StreamSource: "default" | "rules" | "model" | "member";
         /** @description A change stream as the API shows it. */
         StreamView: {
             /** @description The capability it reads. */
@@ -1540,6 +1979,726 @@ export interface operations {
             };
             /** @description The member must connect it again first (`needs_reauth`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list": {
+        parameters: {
+            query?: {
+                /** @description Only this stream; every stream when absent. */
+                stream?: components["schemas"]["Stream"];
+                /** @description Only this inbox; every inbox you can read when absent. */
+                inbox?: components["schemas"]["InboxId"];
+                /** @description `true` for archived conversations instead of those in the inbox. */
+                archived?: boolean;
+                /** @description `next_cursor` of the previous page. */
+                cursor?: string;
+                /** @description Page size, 1 to 100 (default 50). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of conversations. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationList"];
+                };
+            };
+            /** @description A malformed cursor or limit. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace or inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationDetail"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.add_label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddLabel"];
+            };
+        };
+        responses: {
+            /** @description The label, now on the conversation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelView"];
+                };
+            };
+            /** @description An empty or too long name. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.remove_label": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The label. */
+                label_id: components["schemas"]["LabelId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The label is off the conversation. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or the label is not on it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_message_body": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+                /** @description The message. */
+                message_id: components["schemas"]["MessageId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The bodies. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageBody"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such message, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.mark_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.star": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.move_to_stream": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MoveToStream"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Not a stream. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.unarchive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.mark_unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.unstar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_inboxes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The inboxes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

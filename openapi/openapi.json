@@ -996,6 +996,1239 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List conversations, newest first.",
+        "operationId": "conversations.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "description": "Only this stream; every stream when absent.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Stream"
+            }
+          },
+          {
+            "name": "inbox",
+            "in": "query",
+            "description": "Only this inbox; every inbox you can read when absent.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          },
+          {
+            "name": "archived",
+            "in": "query",
+            "description": "`true` for archived conversations instead of those in the inbox.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1 to 100 (default 50).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of conversations.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A malformed cursor or limit.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace or inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Read a conversation and its messages.",
+        "operationId": "conversations.get",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.conversation",
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Archive a conversation.",
+        "operationId": "conversations.archive",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.unarchive"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Put a label on a conversation.",
+        "operationId": "conversations.add_label",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddLabel"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The label, now on the conversation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "An empty or too long name.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.label"
+          ],
+          "risk": "low",
+          "undo": "conversations.remove_label"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/labels/{label_id}": {
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take a label off a conversation.",
+        "operationId": "conversations.remove_label",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "label_id",
+            "in": "path",
+            "description": "The label.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/LabelId"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "The label is off the conversation."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or the label is not on it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.label"
+          ],
+          "risk": "low",
+          "undo": "conversations.add_label"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/messages/{message_id}/body": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Read one message's text and HTML bodies.",
+        "operationId": "conversations.get_message_body",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "message_id",
+            "in": "path",
+            "description": "The message.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/MessageId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bodies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageBody"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such message, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.message"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Mark a conversation read.",
+        "operationId": "conversations.mark_read",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.mark_unread"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Star a conversation.",
+        "operationId": "conversations.star",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.unstar"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Move a conversation to another stream.",
+        "operationId": "conversations.move_to_stream",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MoveToStream"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a stream.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unarchive": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Move a conversation back to the inbox.",
+        "operationId": "conversations.unarchive",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.archive"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unread": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Mark a conversation unread (its newest message).",
+        "operationId": "conversations.mark_unread",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.mark_read"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/unstar": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Unstar a conversation.",
+        "operationId": "conversations.unstar",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.star"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/inboxes": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the inboxes you can read.",
+        "operationId": "conversations.list_inboxes",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The inboxes.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InboxList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -2581,6 +3814,83 @@
         },
         "additionalProperties": false
       },
+      "AddLabel": {
+        "type": "object",
+        "description": "The label to add.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name; created in the conversation's inbox when new.",
+            "example": "Accountant"
+          }
+        },
+        "additionalProperties": false
+      },
+      "Address": {
+        "type": "object",
+        "description": "One way to reach someone on a channel: a display name and an address.",
+        "required": [
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "The address, as given.",
+            "example": "ana@example.com"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The display name, when the message gave one.",
+            "example": "Ana Lopes"
+          }
+        }
+      },
+      "AttachmentId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "AttachmentId (UUIDv7)"
+      },
+      "AttachmentView": {
+        "type": "object",
+        "description": "An attachment of a message.",
+        "required": [
+          "id",
+          "filename",
+          "content_type",
+          "size",
+          "inline"
+        ],
+        "properties": {
+          "content_type": {
+            "type": "string",
+            "description": "Its media type, as sent (not trusted)."
+          },
+          "filename": {
+            "type": "string",
+            "description": "Its file name, as sent."
+          },
+          "id": {
+            "$ref": "#/components/schemas/AttachmentId",
+            "description": "The attachment."
+          },
+          "inline": {
+            "type": "boolean",
+            "description": "Shown inside the body rather than attached."
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Its size in bytes.",
+            "minimum": 0
+          }
+        }
+      },
       "AuthorizationId": {
         "type": "string",
         "format": "uuid",
@@ -2621,6 +3931,13 @@
           }
         },
         "additionalProperties": false
+      },
+      "Channel": {
+        "type": "string",
+        "description": "A kind of messaging. Email is the first.",
+        "enum": [
+          "email"
+        ]
       },
       "CompleteConnection": {
         "type": "object",
@@ -2742,6 +4059,142 @@
           }
         }
       },
+      "ConversationDetail": {
+        "type": "object",
+        "description": "A conversation and its newest messages, oldest first.",
+        "required": [
+          "conversation",
+          "messages"
+        ],
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationSummary",
+            "description": "The conversation."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageView"
+            },
+            "description": "Up to the 100 newest messages, oldest first."
+          }
+        }
+      },
+      "ConversationId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ConversationId (UUIDv7)"
+      },
+      "ConversationList": {
+        "type": "object",
+        "description": "A page of conversations.",
+        "required": [
+          "conversations"
+        ],
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "description": "Newest first."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass it as `cursor` for the next page; `None` on the last page."
+          }
+        }
+      },
+      "ConversationSummary": {
+        "type": "object",
+        "description": "A conversation as lists show it.",
+        "required": [
+          "id",
+          "inbox_id",
+          "subject",
+          "stream",
+          "stream_source",
+          "last_message_at",
+          "message_count",
+          "unread_count",
+          "starred",
+          "archived",
+          "snippet",
+          "labels"
+        ],
+        "properties": {
+          "archived": {
+            "type": "boolean",
+            "description": "Whether no message is in the inbox."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LabelView"
+            },
+            "description": "Its labels, by name."
+          },
+          "last_message_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its newest message was sent."
+          },
+          "latest_from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Address",
+                "description": "The sender of the newest message."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages in it.",
+            "minimum": 0
+          },
+          "snippet": {
+            "type": "string",
+            "description": "The start of the newest message's text."
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Whether any message is starred."
+          },
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "Its stream."
+          },
+          "stream_source": {
+            "$ref": "#/components/schemas/StreamSource",
+            "description": "Who put it there."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The first message's subject."
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unread inbound messages.",
+            "minimum": 0
+          }
+        }
+      },
       "CreateWorkspace": {
         "type": "object",
         "description": "A new workspace.",
@@ -2802,6 +4255,14 @@
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
       },
+      "Direction": {
+        "type": "string",
+        "description": "Whether a message came in or went out.",
+        "enum": [
+          "inbound",
+          "outbound"
+        ]
+      },
       "Health": {
         "type": "string",
         "description": "How a connection is doing.",
@@ -2836,6 +4297,80 @@
         "type": "string",
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
+      },
+      "InboxList": {
+        "type": "object",
+        "description": "The inboxes, by address.",
+        "required": [
+          "inboxes"
+        ],
+        "properties": {
+          "inboxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxView"
+            },
+            "description": "The inboxes."
+          }
+        }
+      },
+      "InboxRole": {
+        "type": "string",
+        "description": "A member's access to an inbox.",
+        "enum": [
+          "reader",
+          "sender",
+          "manager"
+        ]
+      },
+      "InboxView": {
+        "type": "object",
+        "description": "An inbox.",
+        "required": [
+          "id",
+          "channel",
+          "address",
+          "unread_count"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Its address.",
+            "example": "office@example.com"
+          },
+          "channel": {
+            "$ref": "#/components/schemas/Channel",
+            "description": "Its channel."
+          },
+          "display_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its display name."
+          },
+          "id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "role": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/InboxRole",
+                "description": "The caller's access to it; `None` for a client token."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unread_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Unread inbound messages in conversations still in the inbox.",
+            "minimum": 0
+          }
+        }
       },
       "InvitationId": {
         "type": "string",
@@ -2926,6 +4461,29 @@
           "personal"
         ]
       },
+      "LabelId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "LabelId (UUIDv7)"
+      },
+      "LabelView": {
+        "type": "object",
+        "description": "A label as shown on a conversation.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/LabelId",
+            "description": "The label."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          }
+        }
+      },
       "LogoutResponse": {
         "type": "object",
         "description": "Where to send the browser to sign out of the identity provider too.",
@@ -2992,6 +4550,162 @@
             "description": "The user."
           }
         }
+      },
+      "MessageBody": {
+        "type": "object",
+        "description": "A message's bodies.",
+        "required": [
+          "truncated"
+        ],
+        "properties": {
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The HTML part: untrusted, to be shown only in a sandboxed frame."
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The plain-text part."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether either part was cut short."
+          }
+        }
+      },
+      "MessageId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "MessageId (UUIDv7)"
+      },
+      "MessageText": {
+        "type": "object",
+        "description": "A message's plain-text body.",
+        "required": [
+          "content",
+          "truncated"
+        ],
+        "properties": {
+          "content": {
+            "type": "string",
+            "description": "The text, up to 256 KiB."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether it was cut short."
+          }
+        }
+      },
+      "MessageView": {
+        "type": "object",
+        "description": "A message, with its plain-text body.",
+        "required": [
+          "id",
+          "direction",
+          "from",
+          "to",
+          "cc",
+          "reply_to",
+          "subject",
+          "sent_at",
+          "read",
+          "starred",
+          "has_html",
+          "attachments"
+        ],
+        "properties": {
+          "attachments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AttachmentView"
+            },
+            "description": "Its attachments, in order."
+          },
+          "cc": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Copied recipients."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction",
+            "description": "Received or sent."
+          },
+          "from": {
+            "$ref": "#/components/schemas/Address",
+            "description": "The sender."
+          },
+          "has_html": {
+            "type": "boolean",
+            "description": "Whether it has an HTML body (`conversations.get_message_body`)."
+          },
+          "id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message."
+          },
+          "read": {
+            "type": "boolean",
+            "description": "Read."
+          },
+          "reply_to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Where replies go, when not to the sender."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Starred."
+          },
+          "subject": {
+            "type": "string",
+            "description": "The subject."
+          },
+          "text": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageText",
+                "description": "The plain-text body, when it has one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "to": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Address"
+            },
+            "description": "Recipients."
+          }
+        }
+      },
+      "MoveToStream": {
+        "type": "object",
+        "description": "Where to move the conversation.",
+        "required": [
+          "stream"
+        ],
+        "properties": {
+          "stream": {
+            "$ref": "#/components/schemas/Stream",
+            "description": "The stream."
+          }
+        },
+        "additionalProperties": false
       },
       "Phase": {
         "type": "string",
@@ -3237,6 +4951,26 @@
           }
         }
       },
+      "Stream": {
+        "type": "string",
+        "description": "The one place Campbooks sorts a conversation into. The built-in set; the\nworkspace's own streams come later.",
+        "enum": [
+          "primary",
+          "updates",
+          "receipts",
+          "newsletters"
+        ]
+      },
+      "StreamSource": {
+        "type": "string",
+        "description": "Who put a conversation in its stream.",
+        "enum": [
+          "default",
+          "rules",
+          "model",
+          "member"
+        ]
+      },
       "StreamView": {
         "type": "object",
         "description": "A change stream as the API shows it.",
@@ -3454,7 +5188,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -3476,6 +5210,10 @@
     {
       "name": "connectors",
       "description": "Connections to outside accounts (Gmail first): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
+    },
+    {
+      "name": "conversations",
+      "description": "Inboxes, conversations and messages on any channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes they are a member of; a client token bound to the workspace sees them all."
     },
     {
       "name": "changes",

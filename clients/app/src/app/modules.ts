@@ -5,6 +5,7 @@ import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { buildConnectorsRoutes } from "~/modules/connectors";
+import { buildConversationsRoutes } from "~/modules/conversations";
 import { buildSystemRoutes } from "~/modules/system";
 import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
 
@@ -26,6 +27,7 @@ export function buildModuleRoutes<TRoot extends AnyRoute, TWorkspace extends Any
     // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
     workspace: [
       ...workspaces.workspace,
+      ...buildConversationsRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.
     ],

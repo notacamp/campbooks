@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/conversations.changes_requested.v1.schema.json",
+  "title": "conversations.changes_requested v1 (event payload)",
+  "description": "Published by the conversations module when a member (or automation, or the assistant, through an operation) changes a conversation in a way the provider should mirror: the connectors module's outbound work. Ids and change kinds only. Changes that came from the provider never produce it. Workspace-scoped; also listed in openapi/events.json.",
+  "type": "object",
+  "required": ["workspace", "inbox_id", "conversation", "origin", "items"],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": { "type": "string" },
+    "inbox_id": { "$ref": "#/$defs/uuid" },
+    "conversation": { "$ref": "#/$defs/uuid" },
+    "origin": { "const": "user" },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["provider_message_id", "change"],
+        "additionalProperties": false,
+        "properties": {
+          "provider_message_id": { "type": "string", "minLength": 1 },
+          "change": { "$ref": "#/$defs/change" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "change": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["mark_read", "mark_unread", "star", "unstar", "archive", "unarchive"] }
+          }
+        },
+        {
+          "type": "object",
+          "description": "A label put on or taken off. `provider_key` is the provider's key when the provider already has the label; without it, the connector creates the label (asking conversations for its name) or skips the change.",
+          "required": ["kind", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["add_label", "remove_label"] },
+            "label": { "$ref": "#/$defs/uuid" },
+            "provider_key": { "type": "string" }
+          }
+        },
+        {
+          "type": "object",
+          "description": "The conversation moved to another stream; providers with their own categories may mirror it, others ignore it.",
+          "required": ["kind", "stream"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "move_to_stream" },
+            "stream": { "enum": ["primary", "updates", "receipts", "newsletters"] }
+          }
+        }
+      ]
+    }
+  }
+}

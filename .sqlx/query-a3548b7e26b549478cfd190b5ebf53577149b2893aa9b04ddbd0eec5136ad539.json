@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.messages SET in_inbox = true, updated_at = now()\n                  WHERE conversation_id = $1 AND NOT in_inbox AND NOT in_trash AND NOT in_spam\n                 RETURNING provider_message_id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_message_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "provider_message_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a3548b7e26b549478cfd190b5ebf53577149b2893aa9b04ddbd0eec5136ad539"
+}

@@ -1,0 +1,31 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "es-1",
+      "thread_key": "thr-es-factura",
+      "rfc_message_id": "factura-0457@harinas-del-sur.example",
+      "from": {"name": "Harinas del Sur S.L.", "address": "administracion@harinas-del-sur.example"},
+      "to": [{"name": "Panadería Lucía", "address": "pedidos@example.com"}],
+      "subject": "Factura F-2026-0457 – pedido de septiembre",
+      "sent_at": "2026-10-01T11:20:00Z",
+      "direction": "inbound",
+      "text": "Buenos días,\n\nAdjuntamos la factura F-2026-0457 por importe de 1.284,60 € correspondiente al pedido de septiembre. Vencimiento: 31 de octubre.\n\nUn saludo,\nAdministración",
+      "attachments": [{"filename": "Factura_F-2026-0457.pdf", "content_type": "application/pdf", "content": "%PDF-1.7 factura ficticia"}],
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "es-2",
+      "thread_key": "thr-es-gremio",
+      "from": {"name": "Gremio de Panaderos", "address": "boletin@gremio-panaderos.example"},
+      "to": [{"address": "pedidos@example.com"}],
+      "subject": "Boletín semanal: precios de la harina y nuevas normas de etiquetado",
+      "sent_at": "2026-10-03T08:00:00Z",
+      "direction": "inbound",
+      "headers": {"list_id": "Boletín <boletin.gremio-panaderos.example>", "precedence": "list"},
+      "text": "Resumen de la semana: los precios de la harina bajan un 2 % y llegan nuevas normas de etiquetado.",
+      "mailbox": {"in_inbox": true},
+      "read": false, "starred": false
+    }}
+  ]
+}

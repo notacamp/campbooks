@@ -1,0 +1,27 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH found AS (\n            SELECT id FROM conversations.labels WHERE inbox_id = $2 AND provider_key = $3\n        ), named AS (\n            -- A member's label of the same name becomes the provider's.\n            UPDATE conversations.labels SET provider_key = $3\n             WHERE inbox_id = $2 AND name = $4 AND provider_key IS NULL\n               AND NOT EXISTS (SELECT 1 FROM found)\n            RETURNING id\n        ), created AS (\n            INSERT INTO conversations.labels (id, workspace_id, inbox_id, name, provider_key)\n            SELECT $1, $5, $2, $4, $3\n             WHERE NOT EXISTS (SELECT 1 FROM found) AND NOT EXISTS (SELECT 1 FROM named)\n            ON CONFLICT DO NOTHING\n            RETURNING id\n        )\n        SELECT id AS \"id!: LabelId\" FROM found\n        UNION ALL SELECT id FROM named\n        UNION ALL SELECT id FROM created\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!: LabelId",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "e69d0cba9ae3222658d2f897e9d12cdf0dc9fb427448c146423b30b29a0ebff9"
+}

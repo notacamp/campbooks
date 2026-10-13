@@ -1,0 +1,72 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-1",
+      "thread_key": "thr-en-q4",
+      "rfc_message_id": "q4-plan-1@studio.example",
+      "from": {"name": "Maya Okafor", "address": "maya@northwind-studio.example"},
+      "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+      "cc": [{"name": "Leo Park", "address": "leo@northwind-studio.example"}],
+      "subject": "Q4 plan: can you review by Friday?",
+      "sent_at": "2026-10-05T08:30:00Z",
+      "direction": "inbound",
+      "text": "Hi Sam,\n\nI've attached the Q4 plan. Could you review the budget section and send me your comments by Friday 10 October? We present it to the board on Monday.\n\nThanks,\nMaya",
+      "html": "<p>Hi Sam,</p><p>I've attached the Q4 plan. Could you review the budget section and send me your comments by <b>Friday 10 October</b>?</p><p>Thanks,<br>Maya</p>",
+      "raw": "From: Maya Okafor <maya@northwind-studio.example>\r\nTo: Sam Rivers <sam@example.com>\r\nSubject: Q4 plan: can you review by Friday?\r\nMessage-ID: <q4-plan-1@studio.example>\r\n\r\nHi Sam, ...",
+      "attachments": [{"filename": "q4-plan.pdf", "content_type": "application/pdf", "content": "%PDF-1.7 fictional Q4 plan"}],
+      "mailbox": {"in_inbox": true},
+      "labels": [{"key": "Label_7", "name": "Clients"}],
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-2",
+      "thread_key": "thr-en-q4",
+      "rfc_message_id": "q4-plan-2@example.com",
+      "in_reply_to": "q4-plan-1@studio.example",
+      "references": ["q4-plan-1@studio.example"],
+      "from": {"name": "Sam Rivers", "address": "sam@example.com"},
+      "to": [{"name": "Maya Okafor", "address": "maya@northwind-studio.example"}],
+      "subject": "Re: Q4 plan: can you review by Friday?",
+      "sent_at": "2026-10-05T10:02:00Z",
+      "direction": "outbound",
+      "text": "Will do, you'll have my notes on Thursday.",
+      "mailbox": {"in_inbox": true},
+      "read": true, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-3",
+      "thread_key": "thr-en-news",
+      "rfc_message_id": "issue-142@letters.paperkite.example",
+      "from": {"name": "The Paper Kite", "address": "hello@letters.paperkite.example"},
+      "to": [{"address": "sam@example.com"}],
+      "subject": "Issue 142: five tools for calmer mornings",
+      "sent_at": "2026-10-06T06:00:00Z",
+      "direction": "inbound",
+      "headers": {
+        "list_id": "The Paper Kite <letters.paperkite.example>",
+        "list_unsubscribe": "<https://paperkite.example/unsubscribe?u=1>",
+        "precedence": "bulk"
+      },
+      "text": "This week: five tools for calmer mornings, and a reader's question about inbox zero.",
+      "html": "<h1>Issue 142</h1><p>This week: five tools for calmer mornings.</p><img src=\"https://paperkite.example/pixel.gif\">",
+      "mailbox": {"in_inbox": true},
+      "categories": ["promotions"],
+      "read": false, "starred": false
+    }},
+    {"op": "upsert", "message": {
+      "provider_message_id": "en-4",
+      "thread_key": "thr-en-security",
+      "rfc_message_id": "alert-77@accounts.cloudvault.example",
+      "from": {"name": "CloudVault Security", "address": "no-reply@accounts.cloudvault.example"},
+      "to": [{"address": "sam@example.com"}],
+      "subject": "New sign-in to your account from Linux",
+      "sent_at": "2026-10-06T21:14:00Z",
+      "direction": "inbound",
+      "headers": {"auto_submitted": "auto-generated"},
+      "text": "We noticed a new sign-in to your CloudVault account from Linux in Lisbon, Portugal. If this was you, you don't need to do anything. If not, secure your account.",
+      "mailbox": {"in_inbox": true},
+      "categories": ["updates"],
+      "read": false, "starred": false
+    }}
+  ]
+}

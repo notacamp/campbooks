@@ -27,6 +27,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   inviting you get the invitation link once, with a Copy button (C), to send
   it on yourself; inviting again gives a fresh link. The link opens a page
   that signs you in if needed and joins the workspace.
+- Conversations, the first piece of the inbox: inboxes, conversations and
+  messages (email first), threaded by the provider's thread or by replies,
+  with bodies and attachments kept in blob storage. Conversations are sorted
+  into Primary, Updates, Receipts and Newsletters, and can be read, marked
+  read or unread, starred, archived, labelled and moved to another stream
+  through the API; a move is remembered as a correction. Connecting a Gmail
+  account creates its inbox (the member who connected it manages it) and
+  fills it with the synced mail; other members see an inbox once they are
+  added to it, and only those who can send from it can change its
+  conversations. Conversation changes reach the live updates stream, shown
+  only to the inbox's members.
+- Every new message gets the AI pass when the `decide` role is configured;
+  its answers are recorded as suggestions only and change nothing yet. Mail
+  older than `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14) gets
+  no AI pass, so importing an old mailbox costs no AI.
 - Connect a Gmail account (API only for now; the screen comes next): Campbooks
   asks Google for consent, keeps the grant encrypted with the instance secret
   key, reads the last 90 days of mail and then follows new mail and label
