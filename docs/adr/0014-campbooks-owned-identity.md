@@ -70,7 +70,7 @@ client registration, per workspace; per-client claims such as
   `deploy/idp/`, its settings and its docs.
 
 The design and its alternatives are in the first slice's change,
-`openspec/changes/campbooks-identity-s1a/design.md` (archived with it).
+`openspec/changes/archive/2026-10-13-campbooks-identity-s1a/design.md`.
 
 ## Slices
 Each is one pull request with its own OpenSpec change and recording,
