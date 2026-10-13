@@ -133,7 +133,10 @@ export default async function adminPeople({ page }: ScenarioContext): Promise<vo
   await page.getByRole("button", { name: "Suspend…" }).click();
   await page.getByRole("button", { name: "Suspend", exact: true }).click();
   await page.getByText("This person is an administrator.").waitFor();
-  await caption(page, "An administrator's account is refused: revoke the profile with the CLI first");
+  await caption(
+    page,
+    "An administrator's account is refused: revoke the profile with the CLI first",
+  );
   await hideCaption(page);
 
   // Workspaces: members and the health of each connected mailbox.
