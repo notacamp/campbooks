@@ -55,13 +55,35 @@ the round trip; otherwise it SHALL answer 403 `csrf_check_failed` or 404.
 - **WHEN** a cross-site form posts to `/auth/new-account`
 - **THEN** the response is 403 with `code` = `csrf_check_failed`
 
+### Requirement: New accounts follow the signup policy
+On an `invite_only` instance, an unknown provider identity SHALL become an
+account only when the provider verified its address and that address has a
+pending invitation; otherwise the round trip SHALL end at the sign-in screen
+with `error=signup_invite_only`, and no account, pending sign-up, tokens or
+held grant SHALL be kept. The policy SHALL be checked again when the account
+is created. `open`, `code` and `approval` instances SHALL let new accounts
+in; their gate is creating a workspace.
+
+#### Scenario: Invite only, not invited
+- **WHEN** an `invite_only` instance has no pending invitation for the Google account's verified address
+- **THEN** the browser lands on `/sign-in?error=signup_invite_only` and nothing about that person is stored
+
+#### Scenario: Invite only, invited
+- **WHEN** the verified address has a pending invitation
+- **THEN** the new-account step is offered and creating the account succeeds
+
+#### Scenario: Open, code or approval
+- **WHEN** the instance's policy is `open`, `code` or `approval`
+- **THEN** a new Google account can create a Campbooks account
+
 ### Requirement: The first mailbox comes with sign-up
 A Google round trip SHALL ask in one consent for `openid email profile`, the
 mailbox scopes the grant-intake port reports for Google, and offline access.
 When a new account is created from a round trip that granted every mailbox
 scope and a refresh token, the grant SHALL be held, sealed, for that account
 for seven days. When the person adopts it into a workspace they belong to,
-it SHALL be handed to the grant-intake port and then forgotten. A grant not
+it SHALL be handed to the grant-intake port and then forgotten; adopting
+needs both `identity:write` and `connectors:write`. A grant not
 adopted in time SHALL be deleted. A sign-in to an existing account SHALL NOT
 store or hand over a grant. When Google returns no refresh token for a new
 account whose mailbox was granted, the server SHALL ask Google once more

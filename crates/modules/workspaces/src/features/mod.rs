@@ -5,6 +5,7 @@ pub mod change_role;
 pub mod create_workspace;
 pub mod delete_workspace;
 pub mod get_workspace;
+pub mod invitations_port;
 pub mod invite_member;
 pub mod leave_workspace;
 pub mod list_invitations;

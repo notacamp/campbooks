@@ -15,9 +15,15 @@
 //! or publishes its keys and its view is more than [`RECHECK_EVERY`] old, it
 //! checks (under an advisory lock, so concurrent processes create one key)
 //! and creates or deletes what the schedule says. An idle instance issues no
-//! tokens, so it needs no rotation either. If the instance secret changed and
-//! a private key can no longer be opened, that key is dropped and a new one
-//! made: everyone signs in again, as when the web sessions' key changes.
+//! tokens, so it needs no rotation either.
+//!
+//! If the signing key cannot be opened, the instance secret key is not the
+//! one the keys were sealed with (a replica with the wrong
+//! `CAMPBOOKS_SECRET_KEY`, or a changed one). The issuer then fails closed: it
+//! signs nothing and deletes nothing, and the server refuses to start
+//! ([`Keys::check`]). Restoring the right key fixes it; starting over is a
+//! deliberate operator step (deleting `identity.signing_keys`), which signs
+//! everyone out.
 
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -43,6 +49,11 @@ pub const PUBLISH_AHEAD: TimeDelta = TimeDelta::days(7);
 pub const KEEP_RETIRED: TimeDelta = TimeDelta::days(2);
 /// How often the schedule is checked while the issuer is busy.
 pub const RECHECK_EVERY: TimeDelta = TimeDelta::minutes(1);
+
+/// What is wrong, and what to do, when the signing key does not open.
+pub const KEY_MISMATCH: &str = "CAMPBOOKS_SECRET_KEY does not match the stored signing keys: \
+    restore the secret key they were sealed with. (To start over instead, delete the rows of \
+    identity.signing_keys; everyone has to sign in again.)";
 
 /// Advisory lock id serializing key creation across processes
 /// (`hashtext('identity.signing_keys')` would vary by version; a constant
@@ -138,47 +149,44 @@ impl Keys {
             .cloned()
     }
 
+    /// Startup check: the signing keys exist and open with this instance's
+    /// secret key. The error says what to do.
+    pub async fn check(&self, db: &PgPool) -> std::result::Result<(), String> {
+        self.signer(db)
+            .await
+            .map(|_| ())
+            .map_err(|_| KEY_MISMATCH.to_owned())
+    }
+
     async fn load(&self, db: &PgPool) -> Result<View> {
         let now = self.clock.now();
-        // At most two passes: the second runs after dropping a key that can
-        // no longer be opened.
-        for _ in 0..2 {
-            self.keep_schedule(db, now).await?;
-            let rows: Vec<KeyRow> = sqlx::query_as(
-                "SELECT kid, public_jwk, private_key, activate_at, retire_at
-                   FROM identity.signing_keys
-                  WHERE publish_at <= $1 AND delete_after > $1
-                  ORDER BY activate_at",
-            )
-            .bind(now)
-            .fetch_all(db)
-            .await?;
-            let active = rows
-                .iter()
-                .filter(|row| row.activate_at <= now && now < row.retire_at)
-                .max_by_key(|row| row.activate_at)
-                .ok_or_else(|| Error::internal("no active signing key after scheduling"))?;
-            let Ok(signer) = self.open(active) else {
-                tracing::warn!(
-                    kid = %active.kid,
-                    "a signing key cannot be opened (the instance secret changed?); replacing it"
-                );
-                sqlx::query("DELETE FROM identity.signing_keys WHERE kid = $1")
-                    .bind(&active.kid)
-                    .execute(db)
-                    .await?;
-                continue;
-            };
-            let jwks = serde_json::json!({
-                "keys": rows.iter().map(|row| row.public_jwk.clone()).collect::<Vec<_>>(),
-            });
-            return Ok(View {
-                checked_at: now,
-                signer: Arc::new(signer),
-                jwks,
-            });
-        }
-        Err(Error::internal("could not make a usable signing key"))
+        self.keep_schedule(db, now).await?;
+        let rows: Vec<KeyRow> = sqlx::query_as(
+            "SELECT kid, public_jwk, private_key, activate_at, retire_at
+               FROM identity.signing_keys
+              WHERE publish_at <= $1 AND delete_after > $1
+              ORDER BY activate_at",
+        )
+        .bind(now)
+        .fetch_all(db)
+        .await?;
+        let active = rows
+            .iter()
+            .filter(|row| row.activate_at <= now && now < row.retire_at)
+            .max_by_key(|row| row.activate_at)
+            .ok_or_else(|| Error::internal("no active signing key after scheduling"))?;
+        let signer = self.open(active).map_err(|()| {
+            tracing::error!(kid = %active.kid, "{KEY_MISMATCH}");
+            Error::internal(KEY_MISMATCH)
+        })?;
+        let jwks = serde_json::json!({
+            "keys": rows.iter().map(|row| row.public_jwk.clone()).collect::<Vec<_>>(),
+        });
+        Ok(View {
+            checked_at: now,
+            signer: Arc::new(signer),
+            jwks,
+        })
     }
 
     fn open(&self, row: &KeyRow) -> Result<Signer, ()> {
@@ -376,12 +384,21 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn a_key_sealed_under_another_secret_is_replaced(db: PgPool) {
+    async fn another_secret_key_fails_closed_and_deletes_nothing(db: PgPool) {
         let db = testing::app_role_pool(&db).await;
         let clock = Arc::new(FixedClock::new(Utc::now()));
-        let before = keys(&clock, 1).signer(&db).await.unwrap().kid.clone();
-        let after = keys(&clock, 2).signer(&db).await.unwrap().kid.clone();
-        assert_ne!(before, after);
+        let kid = keys(&clock, 1).signer(&db).await.unwrap().kid.clone();
+
+        let wrong = keys(&clock, 2);
+        assert!(wrong.signer(&db).await.is_err());
+        let refused = wrong.check(&db).await.unwrap_err();
+        assert!(refused.contains("CAMPBOOKS_SECRET_KEY"), "{refused}");
+        let kept: Vec<String> = sqlx::query_scalar("SELECT kid FROM identity.signing_keys")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+        assert_eq!(kept, [kid]);
+        assert!(keys(&clock, 1).check(&db).await.is_ok());
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

@@ -134,6 +134,7 @@ pub fn with_ports(state: AppState) -> AppState {
     state
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
 }
 

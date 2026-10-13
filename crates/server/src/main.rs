@@ -230,6 +230,10 @@ async fn run(
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
+        if let Some(issuer) = &composition.identity.issuer {
+            // Fail closed: never serve with signing keys this secret cannot open.
+            issuer.keys.check(&db).await?;
+        }
         let app = campbooks_server::router_with(state.clone(), bff, &composition);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await

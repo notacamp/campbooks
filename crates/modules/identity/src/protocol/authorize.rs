@@ -12,7 +12,7 @@ use axum::{
     response::{IntoResponse as _, Response},
 };
 use campbooks_kernel::{
-    Error, Operation, Result,
+    Operation, Result,
     crypto::{hash, random_token},
     error::LocalizableProblem,
 };
@@ -29,7 +29,7 @@ use crate::{
         sessions::{self, Session},
         tokens::{self, Grant},
     },
-    web::{self, SESSION_COOKIE, SameSite, see_other, with_cookie},
+    web::{self, see_other},
 };
 
 /// How long an authorization request waits for the person to sign in.
@@ -306,74 +306,6 @@ async fn complete(
     )
     .await?;
     Ok(request.redirect(&issuer.url, &[("code", &code)]))
-}
-
-/// `/oauth2/end_session` parameters.
-#[derive(Debug, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct EndSessionQuery {
-    /// The client asking.
-    pub client_id: Option<String>,
-    /// Where to go afterwards; one of the client's registered values.
-    pub post_logout_redirect_uri: Option<String>,
-    /// Returned unchanged.
-    pub state: Option<String>,
-}
-
-/// End the browser's issuer session (and the refresh tokens issued in it),
-/// then return to the client when it registered `post_logout_redirect_uri`.
-/// No confirmation page: the client asked for it, and ending a session is
-/// harmless.
-#[utoipa::path(
-    get,
-    path = "/oauth2/end_session",
-    tag = "identity",
-    operation_id = "identity.end_session",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.session"])))),
-    params(EndSessionQuery),
-    security(()),
-    responses(
-        (status = 303, description = "Signed out; back to the client.", headers(("location" = String))),
-        (status = 204, description = "Signed out; no registered place to return to."),
-        (status = 404, description = "Another identity provider serves this instance."),
-    ),
-)]
-pub async fn end_session(
-    State(ctx): State<Ctx>,
-    headers: HeaderMap,
-    Query(query): Query<EndSessionQuery>,
-) -> Result<Response> {
-    let issuer = ctx.issuer()?;
-    let now = issuer.now();
-    if let Some(token) = issuer.session_cookie(&headers)
-        && let Some(session) = sessions::current(&ctx.state.db, &token, now).await?
-    {
-        let mut tx = ctx.state.db.begin().await?;
-        sessions::end(&mut tx, session.id, now).await?;
-        tx.commit().await?;
-    }
-    let client = query
-        .client_id
-        .as_deref()
-        .and_then(|id| issuer.clients.get(id));
-    let target = query
-        .post_logout_redirect_uri
-        .as_deref()
-        .filter(|uri| client.is_some_and(|c| c.post_logout_redirect_uris.iter().any(|u| u == uri)));
-    let response = match target {
-        Some(uri) => {
-            let mut url = url::Url::parse(uri).map_err(Error::internal)?;
-            if let Some(state) = &query.state {
-                url.query_pairs_mut().append_pair("state", state);
-            }
-            see_other(url.as_str())
-        }
-        None => web::no_store(StatusCode::NO_CONTENT.into_response()),
-    };
-    Ok(with_cookie(
-        response,
-        issuer.cookies.clear(SESSION_COOKIE, SameSite::Lax),
-    ))
 }
 
 #[cfg(test)]

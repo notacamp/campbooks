@@ -6,6 +6,8 @@
     "way_in_belongs_to_another_account": "Esta conta já dá acesso a outra conta Campbooks. Inicie sessão com ela para usar essa conta.",
     "sign_up_expired": "O registo demorou demasiado tempo. Inicie sessão novamente para recomeçar.",
     "invalid_return_to": "Depois de iniciar sessão, o Campbooks só pode regressar a uma das suas próprias páginas.",
-    "held_grant_not_found": "Não há nenhuma caixa de correio à espera de ser ligada."
+    "held_grant_not_found": "Não há nenhuma caixa de correio à espera de ser ligada.",
+    "invalid_id_token_hint": "Este pedido para terminar sessão não foi assinado pelo Campbooks para esta aplicação; nada foi terminado.",
+    "signup_invite_only": "Este Campbooks só aceita pessoas convidadas. Peça a alguém que convide este endereço e inicie sessão novamente."
   }
 }

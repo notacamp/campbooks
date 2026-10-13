@@ -3,7 +3,7 @@
 //! to a workspace; and the protocol's refusals, one by one.
 
 use axum::http::{Method, StatusCode};
-use campbooks_kernel::testing::TestUser;
+use campbooks_kernel::{config::SignupPolicy, testing::TestUser};
 use sqlx::PgPool;
 
 use crate::{
@@ -298,30 +298,33 @@ async fn the_token_endpoint_authenticates_clients(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_native_client_uses_pkce_on_any_loopback_port(db: PgPool) {
+async fn the_native_client_is_refused_until_native_sign_in_ships(db: PgPool) {
     let kit = Kit::new(db).await;
     kit.sign_up().await;
-    let redirect = "http://127.0.0.1:53124/callback";
-    let (url, verifier) = Kit::authorize_url(NATIVE_CLIENT_ID, redirect, "openid offline_access");
-    let back = kit.get(&url).await;
-    assert!(
-        back.location().starts_with(&format!("{redirect}?code=")),
-        "{back:?}"
+    // A signed-in browser must not hand a code to whatever listens on a
+    // loopback port (RFC 8252 §8.6).
+    let (url, verifier) = Kit::authorize_url(
+        NATIVE_CLIENT_ID,
+        "http://127.0.0.1:53124/callback",
+        "openid offline_access",
     );
-    let tokens = kit
+    let refused = kit.get(&url).await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    assert_eq!(refused.json["code"], "invalid_client");
+    assert!(refused.headers.get("location").is_none());
+    let token = kit
         .post_form(
             "/oauth2/token",
             &[
                 ("grant_type", "authorization_code"),
-                ("code", &back.location_query()["code"]),
-                ("redirect_uri", redirect),
+                ("code", "anything"),
+                ("redirect_uri", "http://127.0.0.1:53124/callback"),
                 ("code_verifier", &verifier),
                 ("client_id", NATIVE_CLIENT_ID),
             ],
         )
         .await;
-    assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
-    assert!(tokens.json["refresh_token"].is_string());
+    assert_eq!(token.status, StatusCode::UNAUTHORIZED);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -446,13 +449,12 @@ async fn two_people_with_the_same_email_get_two_accounts(db: PgPool) {
 async fn logout_ends_the_session_and_its_refresh_tokens(db: PgPool) {
     let kit = Kit::new(db).await;
     let (code, verifier) = kit.sign_up().await;
-    let refresh = kit.redeem(&code, &verifier).await.json["refresh_token"]
-        .as_str()
-        .unwrap()
-        .to_owned();
+    let tokens = kit.redeem(&code, &verifier).await;
+    let refresh = tokens.json["refresh_token"].as_str().unwrap().to_owned();
+    let hint = tokens.json["id_token"].as_str().unwrap().to_owned();
     let out = kit
         .get(&format!(
-            "/oauth2/end_session?client_id={WEB_CLIENT_ID}&post_logout_redirect_uri={ORIGIN}/"
+            "/oauth2/end_session?id_token_hint={hint}&client_id={WEB_CLIENT_ID}&post_logout_redirect_uri={ORIGIN}/"
         ))
         .await;
     assert_eq!(out.location(), format!("{ORIGIN}/"));
@@ -463,7 +465,7 @@ async fn logout_ends_the_session_and_its_refresh_tokens(db: PgPool) {
     // Somewhere it did not register: signed out, not redirected.
     let elsewhere = kit
         .get(&format!(
-            "/oauth2/end_session?client_id={WEB_CLIENT_ID}&post_logout_redirect_uri=https://evil.example.com/"
+            "/oauth2/end_session?id_token_hint={hint}&post_logout_redirect_uri=https://evil.example.com/"
         ))
         .await;
     assert_eq!(elsewhere.status, StatusCode::NO_CONTENT);
@@ -541,4 +543,149 @@ async fn nothing_answers_while_another_identity_provider_serves_the_instance(db:
         let response = campbooks_kernel::testing::get(&app, path).await;
         assert_eq!(response.status, StatusCode::NOT_FOUND, "{path}");
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn open_code_and_approval_instances_let_new_accounts_in(db: PgPool) {
+    // Their gate is creating a workspace (a code, or an administrator).
+    for policy in [
+        SignupPolicy::Open,
+        SignupPolicy::Code,
+        SignupPolicy::Approval,
+    ] {
+        let kit = Kit::with_signup(db.clone(), policy, &[]).await;
+        kit.new_browser();
+        kit.google.set_user(TestUser {
+            subject: format!("{policy:?}"),
+            ..TestUser::default()
+        });
+        let to_new = kit.round_trip(None).await;
+        assert!(to_new.location().starts_with("/sign-in/new"), "{policy:?}");
+        assert_eq!(
+            kit.create_account().await.status,
+            StatusCode::CREATED,
+            "{policy:?}"
+        );
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_invite_only_instance_keeps_nothing_of_an_uninvited_person(db: PgPool) {
+    let kit = Kit::with_signup(db, SignupPolicy::InviteOnly, &["someone-else@example.com"]).await;
+    let to_google = kit.get("/auth/start/google?request=r%201").await;
+    let refused = kit.via_google(&to_google.location()).await;
+    assert_eq!(
+        refused.location(),
+        "/sign-in?error=signup_invite_only&request=r+1"
+    );
+    for count in [
+        "SELECT count(*) FROM identity.accounts",
+        "SELECT count(*) FROM identity.pending_sign_ups",
+        "SELECT count(*) FROM identity.held_grants",
+        "SELECT count(*) FROM identity.sessions",
+    ] {
+        let rows: i64 = sqlx::query_scalar(count)
+            .fetch_one(&kit.state.db)
+            .await
+            .unwrap();
+        assert_eq!(rows, 0, "{count}");
+    }
+    assert_eq!(kit.create_account().await.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_invite_only_instance_lets_an_invited_verified_address_in(db: PgPool) {
+    let kit = Kit::with_signup(db, SignupPolicy::InviteOnly, &["test-user@example.com"]).await;
+    let to_new = kit.round_trip(None).await;
+    assert!(to_new.location().starts_with("/sign-in/new"), "{to_new:?}");
+    assert_eq!(kit.create_account().await.status, StatusCode::CREATED);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_pending_sign_up_is_refused_if_the_invitation_went_meanwhile(db: PgPool) {
+    // The pending sign-up was made while invited; the policy is checked
+    // again when the account would be created.
+    let open = Kit::with_signup(db.clone(), SignupPolicy::Open, &[]).await;
+    open.round_trip(None).await;
+    let strict = Kit::with_signup(db, SignupPolicy::InviteOnly, &[]).await;
+    strict.share_cookies_with(&open);
+    let refused = strict.create_account().await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["code"], "signup_invite_only");
+    let left: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.pending_sign_ups")
+        .fetch_one(&strict.state.db)
+        .await
+        .unwrap();
+    assert_eq!(left, 0, "the refused sign-up and its tokens are gone");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn sign_out_needs_an_id_token_of_this_issuer(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (code, verifier) = kit.sign_up().await;
+    let tokens = kit.redeem(&code, &verifier).await;
+    let refresh = tokens.json["refresh_token"].as_str().unwrap().to_owned();
+    let id_token = tokens.json["id_token"].as_str().unwrap().to_owned();
+
+    // Another site linking or posting here signs nobody out.
+    for forged in [
+        format!("/oauth2/end_session?client_id={WEB_CLIENT_ID}&post_logout_redirect_uri={ORIGIN}/"),
+        "/oauth2/end_session?id_token_hint=not.a.token".to_owned(),
+        format!(
+            "/oauth2/end_session?id_token_hint={}",
+            kit.google
+                .id_token(&kit.google.id_token_claims("x", "n", "s"))
+        ),
+    ] {
+        let refused = kit.get(&forged).await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{forged}");
+        assert_eq!(refused.json["code"], "invalid_id_token_hint");
+    }
+    let still = kit.refresh(&refresh).await;
+    assert_eq!(still.status, StatusCode::OK, "the session survived");
+    let refresh = still.json["refresh_token"].as_str().unwrap().to_owned();
+
+    // The client's own hint (also as a form POST) ends it.
+    let out = kit
+        .post_form(
+            "/oauth2/end_session",
+            &[("id_token_hint", &id_token), ("client_id", WEB_CLIENT_ID)],
+        )
+        .await;
+    assert_eq!(out.status, StatusCode::NO_CONTENT);
+    assert_eq!(kit.refresh(&refresh).await.json["error"], "invalid_grant");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn adopting_a_mailbox_needs_the_connectors_write_scope_too(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (url, verifier) = Kit::authorize_url(
+        WEB_CLIENT_ID,
+        &format!("{ORIGIN}/bff/callback"),
+        "openid email identity:read identity:write",
+    );
+    let request = kit.get(&url).await.location_query()["request"].clone();
+    kit.round_trip(Some(&request)).await;
+    let created = kit.create_account().await;
+    let code = query(created.json["redirect"].as_str().unwrap())["code"].clone();
+    let access = kit.redeem(&code, &verifier).await.json["access_token"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let held = kit
+        .api(Method::GET, "/api/v1/identity/held-grants", &access)
+        .await;
+    let grant = held.json["items"][0]["id"].as_str().unwrap().to_owned();
+    let refused = kit
+        .api(
+            Method::POST,
+            &format!(
+                "/api/v1/w/{}/identity/held-grants/{grant}/adopt",
+                uuid::Uuid::now_v7()
+            ),
+            &access,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert!(kit.intake.adopted().is_empty());
 }

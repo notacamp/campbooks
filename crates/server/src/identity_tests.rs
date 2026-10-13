@@ -155,8 +155,10 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
             .finish(),
     );
     let google = TestIdp::start().await;
-    let config = testing::config("postgres://test@localhost/test");
+    let mut config = testing::config("postgres://test@localhost/test");
     assert!(config.auth.issuer.is_none(), "no other identity provider");
+    // Plain-http public URL (the tests' localhost): development only.
+    config.env = campbooks_kernel::config::Environment::Development;
     let secret = SecretKey::from_bytes([5; 32]);
     let scopes: Vec<&str> = crate::scope_catalogue().iter().map(|s| s.name).collect();
     let google_settings = Figment::from(Serialized::defaults(serde_json::json!({
@@ -307,9 +309,9 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
 
     // Signing out ends the issuer's session too, with no confirmation page.
     let out = browser.send(Method::POST, "/bff/logout", None).await;
-    let url = out.json()["logout_url"].as_str().unwrap().to_owned();
-    let back = browser.get(&url).await;
-    assert_eq!(back.location(), format!("{ORIGIN}/"));
+    // The BFF ended the issuer session itself, with the ID token it keeps:
+    // nothing for the browser to visit.
+    assert_eq!(out.json()["logout_url"], serde_json::Value::Null);
     let again = browser.get(&to_issuer.location()).await;
     assert!(again.location().starts_with("/sign-in?request="));
     step("sign out -> issuer session ended, no confirmation page");

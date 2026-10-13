@@ -882,3 +882,43 @@ async fn in_process_issuer_that_never_answered_is_503() {
     let reply = call_with(&app(verifier), &idp.token(&idp.claims("test:read"))).await;
     assert_eq!(reply.status, StatusCode::SERVICE_UNAVAILABLE);
 }
+
+#[tokio::test]
+async fn the_in_process_issuer_requires_at_jwt_on_access_tokens() {
+    let idp = TestIdp::start().await;
+    let local = Arc::new(Local {
+        idp: idp.clone(),
+        reads: 0.into(),
+        broken: false.into(),
+    });
+    let in_process = app(TokenVerifier::in_process(
+        &AuthConfig::default(),
+        idp.issuer(),
+        local,
+    ));
+    assert_eq!(
+        call_with(&in_process, &idp.token(&idp.claims("test:read")))
+            .await
+            .status,
+        StatusCode::OK
+    );
+    // An ID token (`JWT`), or no `typ` at all, never passes, whatever its aud.
+    call_with(&in_process, &idp.id_token(&idp.claims("test:read")))
+        .await
+        .assert_invalid();
+    let mut untyped = Header::new(Algorithm::EdDSA);
+    untyped.typ = None;
+    untyped.kid = Some(idp.current_kid());
+    call_with(&in_process, &idp.sign(untyped, &idp.claims("test:read")))
+        .await
+        .assert_invalid();
+
+    // An outside identity provider may still say `JWT` (Rauthy 0.36).
+    let (remote, _) = verifier(&idp);
+    assert_eq!(
+        call_with(&app(remote), &idp.id_token(&idp.claims("test:read")))
+            .await
+            .status,
+        StatusCode::OK
+    );
+}

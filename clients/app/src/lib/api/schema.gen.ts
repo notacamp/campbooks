@@ -873,14 +873,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * End the browser's issuer session (and the refresh tokens issued in it),
-         *     then return to the client when it registered `post_logout_redirect_uri`.
-         *     No confirmation page: the client asked for it, and ending a session is
-         *     harmless.
+         * End the session `id_token_hint` names, then return to its client when it
+         *     registered `post_logout_redirect_uri`. No confirmation page.
          */
         get: operations["identity.end_session"];
         put?: never;
-        post?: never;
+        /** The same, as a form POST (what the web BFF sends, in-process). */
+        post: operations["identity.end_session_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1171,6 +1170,17 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description `/oauth2/end_session` parameters (query for GET, form for POST). */
+        EndSession: {
+            /** @description The client asking; must be the hint's audience when given. */
+            client_id?: string | null;
+            /** @description An ID token the issuer gave the client for this sign-in. */
+            id_token_hint?: string | null;
+            /** @description Where to go afterwards; one of the client's registered values. */
+            post_logout_redirect_uri?: string | null;
+            /** @description Returned unchanged. */
+            state?: string | null;
+        };
         /**
          * @description How a connection is doing.
          * @enum {string}
@@ -3189,7 +3199,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The token lacks `identity:write`. */
+            /** @description The token lacks `identity:write` or `connectors:write`. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3938,7 +3948,7 @@ export interface operations {
                     "application/json": components["schemas"]["Created"];
                 };
             };
-            /** @description `csrf_check_failed`. */
+            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4529,7 +4539,9 @@ export interface operations {
     "identity.end_session": {
         parameters: {
             query?: {
-                /** @description The client asking. */
+                /** @description An ID token the issuer gave the client for this sign-in. */
+                id_token_hint?: string;
+                /** @description The client asking; must be the hint's audience when given. */
                 client_id?: string;
                 /** @description Where to go afterwards; one of the client's registered values. */
                 post_logout_redirect_uri?: string;
@@ -4556,6 +4568,61 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `invalid_id_token_hint`: nothing was ended. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.end_session_post": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/x-www-form-urlencoded": components["schemas"]["EndSession"];
+            };
+        };
+        responses: {
+            /** @description Signed out; no registered place to return to. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Signed out; back to the client. */
+            303: {
+                headers: {
+                    location?: string;
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `invalid_id_token_hint`: nothing was ended. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
             /** @description Another identity provider serves this instance. */
             404: {

@@ -21,8 +21,13 @@ use crate::{
 pub(super) const ALLOWED_ALGORITHMS: [Algorithm; 2] = [Algorithm::EdDSA, Algorithm::RS256];
 
 /// Header `typ` values accepted when present (RFC 9068 §2.1; compared without
-/// regard to case, with or without the `application/` prefix).
+/// regard to case, with or without the `application/` prefix). An outside
+/// identity provider may still label access tokens `JWT` (Rauthy 0.36).
 const ALLOWED_TYPES: [&str; 2] = ["jwt", "at+jwt"];
+
+/// The only header `typ` accepted, and required, on access tokens of the
+/// in-process issuer: its ID tokens (`JWT`) can never pass as access tokens.
+const STRICT_TYPES: [&str; 1] = ["at+jwt"];
 
 /// Validates access tokens against the configured identity provider. Cheap to
 /// clone; clones share the signing-key cache.
@@ -36,6 +41,8 @@ pub(super) struct Inner {
     audience: String,
     leeway_seconds: u64,
     keys: Jwks,
+    /// Access tokens must say `typ: at+jwt` (the in-process issuer).
+    strict_type: bool,
 }
 
 impl std::fmt::Debug for TokenVerifier {
@@ -68,6 +75,7 @@ impl TokenVerifier {
                 audience: config.audience.trim().to_owned(),
                 leeway_seconds: config.leeway_seconds,
                 keys: Jwks::new(issuer, config.jwks_url(), clock),
+                strict_type: false,
             })
         });
         Self { inner }
@@ -75,7 +83,8 @@ impl TokenVerifier {
 
     /// A verifier for tokens of `issuer`, an issuer running in this process
     /// whose signing keys `keys` hands over directly. Audience and leeway
-    /// come from `config`; its issuer and JWKS URL are not used.
+    /// come from `config`; its issuer and JWKS URL are not used. Access
+    /// tokens must carry `typ: at+jwt`.
     pub fn in_process(config: &AuthConfig, issuer: &str, keys: Arc<dyn KeySource>) -> Self {
         Self::in_process_with_clock(config, issuer, keys, Arc::new(SystemClock))
     }
@@ -93,6 +102,7 @@ impl TokenVerifier {
                 audience: config.audience.trim().to_owned(),
                 leeway_seconds: config.leeway_seconds,
                 keys: Jwks::local(issuer, keys, clock),
+                strict_type: true,
             })),
         }
     }
@@ -131,6 +141,14 @@ impl FromRef<AppState> for TokenVerifier {
 
 impl Inner {
     async fn verify(&self, token: &str) -> Result<Principal, Error> {
+        if self.strict_type {
+            let typ = jsonwebtoken::decode_header(token)
+                .ok()
+                .and_then(|header| header.typ);
+            if !typ.is_some_and(|typ| is_allowed_type(&typ, &STRICT_TYPES)) {
+                return Err(Error::Unauthorized(AuthFailure::InvalidToken));
+            }
+        }
         let claims: Claims = self
             .decode(token, &self.audience, &ALLOWED_TYPES, false)
             .await?;

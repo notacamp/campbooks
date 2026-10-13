@@ -198,15 +198,19 @@ pub async fn update_tokens(
     Ok(())
 }
 
-/// Delete one session; its refresh token (if any) for revoking.
-pub async fn delete_session(db: &mut PgConnection, id: Uuid) -> sqlx::Result<Option<Vec<u8>>> {
+/// Delete one session; its sealed refresh token (if any) for revoking and
+/// its sealed ID token for ending the identity provider's session.
+pub async fn delete_session(
+    db: &mut PgConnection,
+    id: Uuid,
+) -> sqlx::Result<Option<(Option<Vec<u8>>, Vec<u8>)>> {
     let row = sqlx::query!(
-        "DELETE FROM bff.sessions WHERE id = $1 RETURNING refresh_token",
+        "DELETE FROM bff.sessions WHERE id = $1 RETURNING refresh_token, id_token",
         id
     )
     .fetch_optional(db)
     .await?;
-    Ok(row.and_then(|row| row.refresh_token))
+    Ok(row.map(|row| (row.refresh_token, row.id_token)))
 }
 
 /// Delete the session whose current token hashes to `hash`, if any.

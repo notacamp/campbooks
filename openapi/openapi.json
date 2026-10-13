@@ -2408,7 +2408,7 @@
             }
           },
           "403": {
-            "description": "The token lacks `identity:write`.",
+            "description": "The token lacks `identity:write` or `connectors:write`.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2441,7 +2441,8 @@
         "security": [
           {
             "bearer": [
-              "identity:write"
+              "identity:write",
+              "connectors:write"
             ]
           }
         ],
@@ -3573,7 +3574,7 @@
             }
           },
           "403": {
-            "description": "`csrf_check_failed`.",
+            "description": "`csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4565,13 +4566,22 @@
         "tags": [
           "identity"
         ],
-        "summary": "End the browser's issuer session (and the refresh tokens issued in it),\nthen return to the client when it registered `post_logout_redirect_uri`.\nNo confirmation page: the client asked for it, and ending a session is\nharmless.",
+        "summary": "End the session `id_token_hint` names, then return to its client when it\nregistered `post_logout_redirect_uri`. No confirmation page.",
         "operationId": "identity.end_session",
         "parameters": [
           {
+            "name": "id_token_hint",
+            "in": "query",
+            "description": "An ID token the issuer gave the client for this sign-in.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "client_id",
             "in": "query",
-            "description": "The client asking.",
+            "description": "The client asking; must be the hint's audience when given.",
             "required": false,
             "schema": {
               "type": "string"
@@ -4610,6 +4620,16 @@
               }
             }
           },
+          "400": {
+            "description": "`invalid_id_token_hint`: nothing was ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Another identity provider serves this instance."
           }
@@ -4621,6 +4641,63 @@
           "assistant": false,
           "automation": false,
           "mutates": false,
+          "records": [
+            "identity.session"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The same, as a form POST (what the web BFF sends, in-process).",
+        "operationId": "identity.end_session_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/EndSession"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Signed out; no registered place to return to."
+          },
+          "303": {
+            "description": "Signed out; back to the client.",
+            "headers": {
+              "location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_id_token_hint`: nothing was ended.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
           "records": [
             "identity.session"
           ],
@@ -5259,6 +5336,40 @@
           "inbound",
           "outbound"
         ]
+      },
+      "EndSession": {
+        "type": "object",
+        "description": "`/oauth2/end_session` parameters (query for GET, form for POST).",
+        "properties": {
+          "client_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The client asking; must be the hint's audience when given."
+          },
+          "id_token_hint": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "An ID token the issuer gave the client for this sign-in."
+          },
+          "post_logout_redirect_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where to go afterwards; one of the client's registered values."
+          },
+          "state": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Returned unchanged."
+          }
+        }
       },
       "Health": {
         "type": "string",

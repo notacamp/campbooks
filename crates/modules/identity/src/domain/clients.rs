@@ -31,6 +31,11 @@ pub enum Authentication {
 pub struct Client {
     /// `client_id`.
     pub id: &'static str,
+    /// Whether it may get codes and tokens. The native client is defined but
+    /// off until native sign-in ships with its own safeguards (slice S4): a
+    /// signed-in browser would otherwise hand a code to any local process
+    /// listening on a loopback port, with no one asked (RFC 8252 §8.6).
+    pub active: bool,
     /// How it authenticates.
     pub authentication: Authentication,
     /// Exact redirect URIs it registered.
@@ -107,6 +112,7 @@ impl Clients {
             clients: vec![
                 Client {
                     id: WEB_CLIENT_ID,
+                    active: true,
                     authentication: Authentication::Secret(web_secret),
                     redirect_uris: vec![format!("{origin}/bff/callback")],
                     loopback_any_port: false,
@@ -116,6 +122,7 @@ impl Clients {
                 },
                 Client {
                     id: NATIVE_CLIENT_ID,
+                    active: false,
                     authentication: Authentication::None,
                     redirect_uris: vec![NATIVE_SCHEME_REDIRECT.to_owned()],
                     loopback_any_port: true,
@@ -127,8 +134,16 @@ impl Clients {
         }
     }
 
-    /// The client `id`.
+    /// The active client `id`; an inactive one is as unknown.
     pub fn get(&self, id: &str) -> Option<&Client> {
+        self.clients
+            .iter()
+            .find(|client| client.id == id && client.active)
+    }
+
+    /// The client `id`, active or not (for its redirect rules' tests).
+    #[cfg(test)]
+    fn any(&self, id: &str) -> Option<&Client> {
         self.clients.iter().find(|client| client.id == id)
     }
 }
@@ -159,7 +174,7 @@ mod tests {
     #[test]
     fn native_accepts_any_loopback_port_and_its_scheme() {
         let clients = clients();
-        let native = clients.get(NATIVE_CLIENT_ID).unwrap();
+        let native = clients.any(NATIVE_CLIENT_ID).unwrap();
         for good in [
             "http://127.0.0.1:53124/callback",
             "http://127.0.0.1/callback",
@@ -187,8 +202,12 @@ mod tests {
         assert!(web.authenticates(Some("s3cret")));
         assert!(!web.authenticates(Some("s3cre")));
         assert!(!web.authenticates(None));
-        let native = clients.get(NATIVE_CLIENT_ID).unwrap();
+        let native = clients.any(NATIVE_CLIENT_ID).unwrap();
         assert!(native.authenticates(None));
+        assert!(
+            clients.get(NATIVE_CLIENT_ID).is_none(),
+            "off until slice S4"
+        );
         assert!(!native.authenticates(Some("anything")));
         assert!(clients.get("other").is_none());
     }
