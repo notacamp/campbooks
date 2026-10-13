@@ -10,7 +10,11 @@
 //! adaptive intervals, a per-provider budget, and **health** (`ok`,
 //! `needs_reauth`, `throttled`, `failing`). **Adapters** read a page from a
 //! cursor; the Gmail adapter produces `MessageChangeBatch` v1 documents
-//! (`contracts/`) announced by `connectors.messages_changed`.
+//! (`contracts/`) announced by `connectors.messages_changed`. Members'
+//! changes (`conversations.changes_requested`) are recorded as **outbound
+//! changes** and made at Gmail by the stream's next run before it reads
+//! (`gmail/write.rs`): last writer wins in Gmail's history order, and a
+//! write never comes back as a change.
 //!
 //! `lib.rs` assembles [`module`]; each use case is a slice under
 //! `features/`, shared rules live in `domain/`, provider HTTP in `google/`
@@ -79,6 +83,7 @@ pub fn module(deps: Deps) -> Module {
             .consumer(features::member_left::RevokeDepartedGrants::new(
                 deps.clone(),
             ))
+            .consumer(features::request_changes::RequestChanges::new(deps.clone()))
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
                 deps,
             )),

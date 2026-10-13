@@ -4,6 +4,11 @@
 //! the batch (`connectors.messages_changed`), advance the cursor and set the
 //! next run.
 //!
+//! A run first makes the stream's pending outbound changes at the provider
+//! (`gmail::write`), records how each ended, and only then reads: pushes
+//! and pulls of one stream never interleave, and share its budget, backoff
+//! and health.
+//!
 //! The stream row is the schedule: provider trouble (throttling, outages)
 //! is recorded on it and the run ends normally, with the next run set by
 //! the backoff, rather than failing the job.
@@ -25,11 +30,12 @@ use crate::{
         credentials::{self, TokenError},
         health,
         model::{ConnectionId, Health, InboxId, Phase, Provider, StreamId},
+        outbound,
         removal::{BATCH_OWNER, GMAIL_MESSAGE_OWNER},
         schedule::{self, LEASE, SYNC_STREAM, SyncStreamPayload},
     },
     events::MessagesChanged,
-    gmail::{self, Cursor, IndexOp, Page, Reader},
+    gmail::{self, Cursor, IndexOp, Page, Reader, write},
     google::GoogleError,
 };
 
@@ -117,13 +123,36 @@ impl JobHandler for SyncStream {
                 Err(TokenError::Database(err)) => return Err(err.into()),
             };
 
+        let backlog = outbound::backlog(ctx.pool(), workspace, target.stream).await?;
+        let messages: std::collections::HashSet<&str> = backlog
+            .pending
+            .iter()
+            .map(|p| p.provider_message_id.as_str())
+            .collect();
+        let cost = gmail::UNITS_PER_RUN
+            + if messages.is_empty() {
+                0
+            } else {
+                write::units(messages.len())
+            };
         let rate = self.deps.config.google.units_per_second;
-        if let Err(wait) =
-            schedule::take_budget(ctx.pool(), target.provider, gmail::UNITS_PER_RUN, rate).await?
-        {
+        if let Err(wait) = schedule::take_budget(ctx.pool(), target.provider, cost, rate).await? {
             let at = now + TimeDelta::from_std(wait).unwrap_or(TimeDelta::seconds(1));
             schedule::set_due(ctx.tx().await?, workspace, target.stream, at).await?;
             return Ok(());
+        }
+
+        let pushed_up_to = backlog.last();
+        if pushed_up_to.is_some() {
+            let pushed = write::push(&google.gmail(&token), &backlog).await;
+            // Recorded on its own: the writes happened, whatever the read
+            // does next.
+            let mut tx = ctx.pool().begin_for(workspace).await?;
+            outbound::record_outcome(&mut tx, target.stream, &pushed.outcome, now).await?;
+            tx.commit().await?;
+            if let Some(err) = pushed.trouble {
+                return self.trouble(ctx, workspace, &target, &err, now).await;
+            }
         }
 
         let state = ctx.state().clone();
@@ -147,19 +176,27 @@ impl JobHandler for SyncStream {
             }
             Err(other) => return Err(JobError::retry(other.to_string())),
         };
-        self.apply(ctx, workspace, &target, inbox, page, now).await
+        self.apply(ctx, workspace, &target, inbox, page, pushed_up_to, now)
+            .await
     }
 }
 
 impl SyncStream {
-    /// Apply a page in the job's transaction.
+    /// Apply a page in the job's transaction. `pushed_up_to` is the newest
+    /// outbound change this run made: newer ones arrived during the run and
+    /// call for another at once.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "one call site; the values are distinct"
+    )]
     async fn apply(
         &self,
         ctx: &mut JobContext,
         workspace: WorkspaceId,
         target: &Target,
         inbox: InboxId,
-        page: Page,
+        mut page: Page,
+        pushed_up_to: Option<uuid::Uuid>,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
         let state = ctx.state().clone();
@@ -236,6 +273,9 @@ impl SyncStream {
         .await?;
         if matches!(target.health, Health::Throttled | Health::Failing) {
             health::set(tx, target.connection, Health::Ok, None, now).await?;
+        }
+        if settle_outbound(tx, target.stream, pushed_up_to, now - retention, now).await? {
+            page.more = true;
         }
         if page.more {
             // More is waiting: run again straight away, holding the
@@ -407,6 +447,32 @@ impl SyncStream {
     }
 }
 
+/// The end of a run's outbound work, in its transaction (after the stream
+/// row is locked by the run's update, so a change recorded concurrently is
+/// either seen here or enqueues its own run): prune and expire old changes,
+/// flag the expired ones' messages for re-emitting. Returns whether another
+/// run is needed now (changes arrived during this one, or expired).
+async fn settle_outbound(
+    tx: &mut Transaction<'static, Postgres>,
+    stream: StreamId,
+    pushed_up_to: Option<uuid::Uuid>,
+    before: DateTime<Utc>,
+    now: DateTime<Utc>,
+) -> Result<bool, JobError> {
+    let expired = outbound::prune(tx, stream, before, now).await?;
+    if !expired.is_empty() {
+        sqlx::query!(
+            r#"UPDATE connectors.gmail_messages SET reemit = true
+                WHERE stream_id = $1 AND provider_message_id = ANY($2)"#,
+            stream as StreamId,
+            &expired,
+        )
+        .execute(&mut **tx)
+        .await?;
+    }
+    Ok(outbound::more_pending(tx, stream, pushed_up_to).await? || !expired.is_empty())
+}
+
 /// The stream and its connection, read in a short transaction of its own.
 async fn load(
     ctx: &JobContext,
@@ -503,7 +569,8 @@ async fn apply_index(
             } => {
                 sqlx::query!(
                     r#"UPDATE connectors.gmail_messages
-                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3)
+                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3),
+                              reemit = false
                         WHERE id = $1"#,
                     row,
                     &label_ids,
@@ -615,6 +682,49 @@ async fn prune_batches(
             .await?;
     }
     Ok(())
+}
+
+/// Read one page of `stream` without pushing or applying it: the changes
+/// it would emit, as JSON (tests of the reader's overlay).
+#[cfg(test)]
+pub(crate) async fn read_page(
+    state: &campbooks_kernel::AppState,
+    deps: &Deps,
+    workspace: WorkspaceId,
+    stream: StreamId,
+) -> Vec<serde_json::Value> {
+    let mut tx = state.db.begin_for(workspace).await.unwrap();
+    let row = sqlx::query!(
+        r#"SELECT connection_id AS "connection: ConnectionId", phase, cursor
+             FROM connectors.streams WHERE id = $1"#,
+        stream as StreamId
+    )
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let token = credentials::access_token(&state.db, deps, workspace, row.connection)
+        .await
+        .unwrap_or_else(|_| panic!("a token"));
+    let google = deps.google.clone().unwrap();
+    let reader = Reader {
+        gmail: google.gmail(&token),
+        pool: &state.db,
+        blobs: &state.blobs,
+        workspace,
+        stream,
+        phase: Phase::parse(&row.phase).unwrap(),
+        cursor: serde_json::from_value(row.cursor).unwrap(),
+        now: deps.clock.now(),
+        backfill_days: deps.config.gmail.backfill_days,
+        max_message_bytes: deps.config.gmail.max_message_bytes,
+        run_budget_bytes: deps.config.gmail.run_budget_bytes,
+    };
+    let page = reader.read().await.unwrap();
+    page.changes
+        .iter()
+        .map(|c| serde_json::to_value(c).unwrap())
+        .collect()
 }
 
 #[cfg(test)]
