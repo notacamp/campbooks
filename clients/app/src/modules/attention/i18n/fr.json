@@ -30,7 +30,8 @@
     "today": "Plus tard aujourd’hui",
     "tomorrow": "Demain",
     "monday": "Lundi",
-    "toast": "Plus tard · {{name}}, revient {{when}}"
+    "toast": "Plus tard · {{name}}, revient {{when}}",
+    "button": "Plus tard"
   },
   "actions": {
     "reply": "Répondre",

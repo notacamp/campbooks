@@ -30,7 +30,8 @@
     "today": "Later today",
     "tomorrow": "Tomorrow",
     "monday": "Monday",
-    "toast": "Later · {{name}}, back {{when}}"
+    "toast": "Later · {{name}}, back {{when}}",
+    "button": "Later"
   },
   "actions": {
     "reply": "Reply",

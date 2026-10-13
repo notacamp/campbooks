@@ -215,7 +215,8 @@ Everything that arrives and leaves as a message. Email is the first
 
 **Publishes** `MessageReceived`, `MessageSent`, `MessageDecided` (the AI
 pass result), `ConversationSorted`, `AttachmentReceived`,
-`ConversationAwaitingReply`. **Consumes** its change streams;
+`ConversationAwaitingReply`, `NeedChanged` (what a conversation needs from
+its inbox's members). **Consumes** its change streams;
 `PartyKindChanged`.
 **AI** one pass per inbound message: stream (`choice`), needs a reply
 (`noul`), asks the member for something (`noul`), contains a deadline
@@ -244,16 +245,25 @@ or behind a gate: drafts, rewrites, summaries.
 One queue of what needs each member, fed by every module.
 
 **Language**
-- **Attention item** — one thing that needs a member, pointing at a record
-  (`RecordRef`), with a **reason** declared by the module that raised it
-  (reply, decide, do, pay, chase, review, …) and the time it matters by.
+- **Need** — what one record needs from the members who can see it, declared
+  by the module that owns the record (a conversation's need: reply, do, pay
+  or review, with a due date). _Avoid_: task, flag.
+- **Attention item** — one need as the queue holds it, pointing at the record
+  (`RecordRef`), the container that decides who may see it, and the record
+  that caused it, with a **reason** (review, reply, decide, do, pay), a
+  **trust** (`sure`, or `check` for a question to the member) and the date it
+  matters by. Ids, enums and dates only: the owning module renders it.
   _Avoid_: feed item, card.
+- **Later** — a member putting an item off until a time, for themselves only;
+  a new cause brings it back.
 - **Log** — what Campbooks did on someone's behalf, each entry undoable while
-  the owning module allows it.
+  the owning module allows it (Home's "Done today" for now; the full log is
+  campbooks-cloud#89).
 
-**Consumes** every module's "needs attention" and "resolved" events.
-**Publishes** `NoticeRaised`. **AI** none in the queue itself; ranking is
-deterministic and explainable.
+**Consumes** `conversations.need_changed` (and every later module's need
+event), `workspaces.workspace_deleting`, `workspaces.member_left`.
+**Publishes** `attention.item_changed`; later `NoticeRaised`. **AI** none in
+the queue itself; ranking is deterministic and explainable.
 
 ### search
 

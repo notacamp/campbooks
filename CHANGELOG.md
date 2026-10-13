@@ -14,6 +14,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- What needs you. Home now lists what your mail asks of you, grouped Review,
+  Reply, Decide, Do and Pay, due soonest first: a question you owe an answer
+  to, a request, a bill, a phishing warning. Each says why in a sentence and
+  quotes the sender's own words; the numbers stay behind "How Campbooks
+  decided". J/K, Enter, R reply, E done, L later, X not needed (or "It's
+  safe"), Z undo, and "Done today" lists what left your list. The inbox shows
+  the same as chips on rows and in the reader's note, which no longer shows a
+  percentage. It runs on the rules alone (no AI role needed); replying from
+  any client, archiving a reply or a warning, and the trash clear an item;
+  bills and requests stay until Done. Only mail from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) counts. A new
+  module, `attention`, with the scopes `attention:read` and `attention:write`
+  (the web app gets them at the next sign-in). Migrations add
+  `conversations.needs` and the `attention` schema; nothing to do.
 - Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
   asks a second time, for the mail, only when the account is new; signing
   in again never asks), and members can connect more Zoho logins; every

@@ -30,7 +30,8 @@
     "today": "Más tarde hoy",
     "tomorrow": "Mañana",
     "monday": "El lunes",
-    "toast": "Más tarde · {{name}}, vuelve {{when}}"
+    "toast": "Más tarde · {{name}}, vuelve {{when}}",
+    "button": "Más tarde"
   },
   "actions": {
     "reply": "Responder",

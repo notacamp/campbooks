@@ -508,7 +508,7 @@ function NeedDetail({
                 onOpenChange={onLaterOpenChange}
                 renderTrigger={(trigger) => (
                   <Button variant="ghost" shortcut="item.later" {...trigger}>
-                    {t("later.title")}
+                    {t("later.button")}
                   </Button>
                 )}
               >

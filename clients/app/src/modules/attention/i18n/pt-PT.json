@@ -30,7 +30,8 @@
     "today": "Mais logo",
     "tomorrow": "Amanhã",
     "monday": "Segunda-feira",
-    "toast": "Mais tarde · {{name}}, volta {{when}}"
+    "toast": "Mais tarde · {{name}}, volta {{when}}",
+    "button": "Mais tarde"
   },
   "actions": {
     "reply": "Responder",
