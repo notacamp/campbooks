@@ -485,11 +485,18 @@ struct Mailbox {
     rate_limit_next: Option<u64>,
     email_unverified: bool,
     unauthorized_next: bool,
-    /// The next send answers this status without sending.
-    send_refused_next: Option<u16>,
-    /// The next send is sent, but answers 503 (as a lost answer would).
-    send_lost_next: bool,
+    /// What goes wrong with the next send.
+    send_fault: Option<SendFault>,
     calls: Vec<String>,
+}
+
+/// What goes wrong with a send.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SendFault {
+    /// Answer this status and send nothing.
+    Refuse(u16),
+    /// Send it, but answer 503, as when the answer is lost.
+    LoseAnswer,
 }
 
 /// Google's OAuth and Gmail endpoints, faked over a mutable mailbox.
@@ -658,12 +665,12 @@ impl FakeGoogle {
 
     /// The next send answers `status` and sends nothing.
     pub fn refuse_next_send(&self, status: u16) {
-        self.lock().send_refused_next = Some(status);
+        self.lock().send_fault = Some(SendFault::Refuse(status));
     }
 
     /// The next send goes out, but its answer is lost (503).
     pub fn lose_next_send_answer(&self) {
-        self.lock().send_lost_next = true;
+        self.lock().send_fault = Some(SendFault::LoseAnswer);
     }
 
     /// The messages sent, oldest first: their thread and raw bytes.
@@ -826,7 +833,8 @@ fn token(mailbox: &mut Mailbox, form: &HashMap<String, String>) -> ResponseTempl
 /// `messages.send` (multipart upload): the metadata part's `threadId`, then
 /// the RFC 5322 message.
 fn send(mailbox: &mut Mailbox, request: &wiremock::Request) -> ResponseTemplate {
-    if let Some(status) = mailbox.send_refused_next.take() {
+    let fault = mailbox.send_fault.take();
+    if let Some(SendFault::Refuse(status)) = fault {
         return json(status, &serde_json::json!({"error": {"code": status}}));
     }
     let content_type = request
@@ -867,7 +875,7 @@ fn send(mailbox: &mut Mailbox, request: &wiremock::Request) -> ResponseTemplate 
         serde_json::json!({"messagesAdded": [{"message": minimal(&message)}]}),
     );
     mailbox.messages.insert(id.clone(), message);
-    if std::mem::take(&mut mailbox.send_lost_next) {
+    if fault == Some(SendFault::LoseAnswer) {
         return json(503, &serde_json::json!({"error": {"code": 503}}));
     }
     json(

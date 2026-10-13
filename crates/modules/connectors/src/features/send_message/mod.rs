@@ -122,35 +122,16 @@ impl JobHandler for SendMessage {
         }
         let now = self.deps.clock.now();
 
-        let token =
-            match credentials::access_token(ctx.pool(), &self.deps, workspace, connection).await {
-                Ok(token) => token,
-                Err(TokenError::NeedsReauth(reason)) => {
-                    let events = ctx.state().events.clone();
-                    if let Some(granted_by) = target.granted_by {
-                        health::needs_reauth(
-                            ctx.tx().await?,
-                            &events,
-                            &workspace.to_string(),
-                            connection,
-                            granted_by,
-                            reason,
-                            now,
-                        )
-                        .await?;
-                    }
-                    return finish_failed(ctx, workspace, send, &target, "needs_reauth").await;
-                }
-                Err(TokenError::Provider(err)) => {
-                    return self.not_sent(ctx, workspace, send, &target, &err).await;
-                }
-                Err(TokenError::Database(err)) => return Err(err.into()),
-            };
+        let Some(token) = self
+            .token(ctx, workspace, send, &target, connection)
+            .await?
+        else {
+            return Ok(());
+        };
 
         let document = read_document(ctx, workspace, &target.document).await?;
-        let raw = match message_bytes(ctx, workspace, &document).await? {
-            Some(raw) => raw,
-            None => return finish_failed(ctx, workspace, send, &target, "too_large").await,
+        let Some(raw) = message_bytes(ctx, workspace, &document).await? else {
+            return finish_failed(ctx, workspace, send, &target, "too_large").await;
         };
         let gmail = google.gmail(&token);
 
@@ -169,9 +150,9 @@ impl JobHandler for SendMessage {
             match gmail.find_by_message_id(&document.rfc_message_id).await {
                 Ok(Some(meta)) => {
                     tracing::info!(%workspace, %send, "an earlier attempt was sent");
-                    let sent = Sent::from_meta(meta);
+                    let accepted = Accepted::from_meta(meta);
                     return self
-                        .finish_sent(ctx, workspace, send, &target, stream, sent, raw, now)
+                        .finish_sent(ctx, workspace, send, &target, stream, accepted, raw, now)
                         .await;
                 }
                 Ok(None) => {}
@@ -181,14 +162,14 @@ impl JobHandler for SendMessage {
 
         record_attempt(ctx, workspace, send, now).await?;
         match gmail.send(&raw, document.thread_key.as_deref()).await {
-            Ok(sent) => {
-                let sent = Sent {
-                    id: sent.id,
-                    thread_id: sent.thread_id,
-                    label_ids: sent.label_ids,
+            Ok(answer) => {
+                let accepted = Accepted {
+                    id: answer.id,
+                    thread_id: answer.thread_id,
+                    label_ids: answer.label_ids,
                     internal_date: None,
                 };
-                self.finish_sent(ctx, workspace, send, &target, stream, sent, raw, now)
+                self.finish_sent(ctx, workspace, send, &target, stream, accepted, raw, now)
                     .await
             }
             Err(GoogleError::Unavailable(reason)) => {
@@ -211,14 +192,14 @@ impl JobHandler for SendMessage {
 }
 
 /// A message Gmail has, as the send needs it.
-struct Sent {
+struct Accepted {
     id: String,
     thread_id: String,
     label_ids: Vec<String>,
     internal_date: Option<String>,
 }
 
-impl Sent {
+impl Accepted {
     fn from_meta(meta: MessageMeta) -> Self {
         Self {
             id: meta.id,
@@ -230,6 +211,44 @@ impl Sent {
 }
 
 impl SendMessage {
+    /// A valid access token, or `None` once the send was settled without
+    /// one (the grant is gone, or the provider could not be reached for the
+    /// last time).
+    async fn token(
+        &self,
+        ctx: &mut JobContext,
+        workspace: WorkspaceId,
+        send: SendId,
+        target: &Target,
+        connection: ConnectionId,
+    ) -> Result<Option<String>, JobError> {
+        match credentials::access_token(ctx.pool(), &self.deps, workspace, connection).await {
+            Ok(token) => Ok(Some(token)),
+            Err(TokenError::NeedsReauth(reason)) => {
+                let events = ctx.state().events.clone();
+                if let Some(granted_by) = target.granted_by {
+                    health::needs_reauth(
+                        ctx.tx().await?,
+                        &events,
+                        &workspace.to_string(),
+                        connection,
+                        granted_by,
+                        reason,
+                        self.deps.clock.now(),
+                    )
+                    .await?;
+                }
+                finish_failed(ctx, workspace, send, target, "needs_reauth").await?;
+                Ok(None)
+            }
+            Err(TokenError::Provider(err)) => {
+                self.not_sent(ctx, workspace, send, target, &err).await?;
+                Ok(None)
+            }
+            Err(TokenError::Database(err)) => Err(err.into()),
+        }
+    }
+
     /// Gmail did not send it (or could not be asked): try again later, or
     /// fail for good on a refusal or once the attempts run out.
     async fn not_sent(
@@ -280,7 +299,7 @@ impl SendMessage {
         send: SendId,
         target: &Target,
         stream: StreamId,
-        sent: Sent,
+        accepted: Accepted,
         raw: Vec<u8>,
         now: DateTime<Utc>,
     ) -> Result<(), JobError> {
@@ -294,10 +313,10 @@ impl SendMessage {
             .map_err(|e| JobError::fatal(format!("stream {stream} has an unreadable cursor: {e}")))?
             .unwrap_or_default();
         let meta = MessageMeta {
-            id: sent.id.clone(),
-            thread_id: sent.thread_id.clone(),
-            label_ids: sent.label_ids,
-            internal_date: sent
+            id: accepted.id.clone(),
+            thread_id: accepted.thread_id.clone(),
+            label_ids: accepted.label_ids,
+            internal_date: accepted
                 .internal_date
                 .or_else(|| Some(now.timestamp_millis().to_string())),
         };
@@ -307,7 +326,7 @@ impl SendMessage {
             &state.blobs,
             &ws,
             now,
-            &sent.id,
+            &accepted.id,
             MessageRaw {
                 meta,
                 raw,
@@ -347,8 +366,8 @@ impl SendMessage {
                   SET state = 'sent', provider_message_id = $2, thread_key = $3, updated_at = now()
                 WHERE id = $1"#,
             send as SendId,
-            sent.id,
-            sent.thread_id,
+            accepted.id,
+            accepted.thread_id,
         )
         .execute(&mut **tx)
         .await?;
@@ -365,7 +384,7 @@ impl SendMessage {
                     inbox_id: target.inbox,
                     send_id: send,
                     outcome: SendOutcome::Sent,
-                    provider_message_id: Some(sent.id),
+                    provider_message_id: Some(accepted.id),
                     reason: None,
                 },
             )

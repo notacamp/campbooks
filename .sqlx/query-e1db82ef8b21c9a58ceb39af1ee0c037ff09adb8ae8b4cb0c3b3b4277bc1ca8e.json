@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends SET state = 'failed', failure_reason = $2, updated_at = now()\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "e1db82ef8b21c9a58ceb39af1ee0c037ff09adb8ae8b4cb0c3b3b4277bc1ca8e"
+}

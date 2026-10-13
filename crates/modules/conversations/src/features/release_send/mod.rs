@@ -74,43 +74,8 @@ impl JobHandler for ReleaseSend {
         }
 
         let send_id = SendId::new();
-        let domain = row
-            .inbox_address
-            .rsplit_once('@')
-            .map_or("campbooks.invalid", |(_, d)| d);
-        let rfc_message_id = format!("{send_id}@{domain}");
-        let (to, cc, bcc) = row.recipients()?;
-        let text = if row.quoted.trim().is_empty() {
-            row.body.clone()
-        } else {
-            format!("{}\n\n{}", row.body.trim_end(), row.quoted)
-        };
-        let document = OutgoingMessage {
-            version: OUTGOING_VERSION,
-            inbox: row.inbox_id,
-            send_id,
-            rfc_message_id: rfc_message_id.clone(),
-            from: row.from(),
-            to,
-            cc,
-            bcc,
-            subject: row.subject.clone(),
-            date: Utc::now(),
-            in_reply_to: row.in_reply_to.clone(),
-            references: row.reference_ids.clone(),
-            thread_key: row.thread_key.clone(),
-            html: Some(format::to_html(&text)),
-            text,
-            attachments: row
-                .stored_attachments()?
-                .into_iter()
-                .map(|a| OutgoingAttachment {
-                    filename: a.filename,
-                    content_type: a.content_type,
-                    blob: a.blob,
-                })
-                .collect(),
-        };
+        let document = outgoing(&row, send_id)?;
+        let rfc_message_id = document.rfc_message_id.clone();
         let bytes = serde_json::to_vec(&document).map_err(|e| JobError::fatal(redact::json(&e)))?;
         let blob = state.blobs.put(&ws, bytes, OUTGOING_CONTENT_TYPE).await?;
 
@@ -153,4 +118,45 @@ impl JobHandler for ReleaseSend {
         tracing::info!(%workspace, draft = %payload.draft, %send_id, "send released");
         Ok(())
     }
+}
+
+/// The outgoing message document of `row`, sent as `send_id`.
+fn outgoing(row: &drafts::DraftRow, send_id: SendId) -> Result<OutgoingMessage, JobError> {
+    let domain = row
+        .inbox_address
+        .rsplit_once('@')
+        .map_or("campbooks.invalid", |(_, d)| d);
+    let rfc_message_id = format!("{send_id}@{domain}");
+    let (to, cc, bcc) = row.recipients()?;
+    let text = if row.quoted.trim().is_empty() {
+        row.body.clone()
+    } else {
+        format!("{}\n\n{}", row.body.trim_end(), row.quoted)
+    };
+    Ok(OutgoingMessage {
+        version: OUTGOING_VERSION,
+        inbox: row.inbox_id,
+        send_id,
+        rfc_message_id,
+        from: row.from(),
+        to,
+        cc,
+        bcc,
+        subject: row.subject.clone(),
+        date: Utc::now(),
+        in_reply_to: row.in_reply_to.clone(),
+        references: row.reference_ids.clone(),
+        thread_key: row.thread_key.clone(),
+        html: Some(format::to_html(&text)),
+        text,
+        attachments: row
+            .stored_attachments()?
+            .into_iter()
+            .map(|a| OutgoingAttachment {
+                filename: a.filename,
+                content_type: a.content_type,
+                blob: a.blob,
+            })
+            .collect(),
+    })
 }

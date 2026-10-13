@@ -187,6 +187,54 @@
       }
     },
     {
+      "name": "connectors.send_completed",
+      "module": "connectors",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A send asked for by `conversations.send_requested` ended\n(`contracts/connectors.send_completed.v1.schema.json`). Ids only.",
+        "required": [
+          "workspace",
+          "inbox_id",
+          "send_id",
+          "outcome"
+        ],
+        "properties": {
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox it was sent from."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/SendOutcome",
+            "description": "Sent or failed."
+          },
+          "provider_message_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's id of the sent message (sent only)."
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed (failed only): `not_connected`, `needs_reauth`,\n`rejected`, `too_large`, `unavailable` (nothing was sent) or\n`unknown_outcome` (it may have been)."
+          },
+          "send_id": {
+            "$ref": "#/components/schemas/SendId",
+            "description": "The send."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.changes_requested",
       "module": "conversations",
       "version": 1,
@@ -290,6 +338,46 @@
       }
     },
     {
+      "name": "conversations.draft_sent",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A draft was sent: the provider accepted it and the draft is gone. The\nmessage itself arrives like any other (`message_sent`).",
+        "required": [
+          "workspace",
+          "inbox",
+          "draft"
+        ],
+        "properties": {
+          "conversation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConversationId",
+                "description": "The conversation it answered, if any."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "draft": {
+            "$ref": "#/components/schemas/DraftId",
+            "description": "The draft, now deleted."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.message_received",
       "module": "conversations",
       "version": 1,
@@ -317,6 +405,79 @@
           }
         ],
         "description": "An outbound message was stored for the first time (sent from the\nprovider's own client today; from Campbooks once sending lands)."
+      }
+    },
+    {
+      "name": "conversations.send_failed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A send failed: the draft is editable again and says why.",
+        "required": [
+          "workspace",
+          "inbox",
+          "draft",
+          "reason"
+        ],
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/DraftId",
+            "description": "The draft."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,\n`unknown_outcome`)."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.send_requested",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's send left its undo window: the connector's outbound work\n(`contracts/conversations.send_requested.v1.schema.json`). The message\nis an outgoing-message v1 blob; the event carries ids only.",
+        "required": [
+          "workspace",
+          "inbox_id",
+          "draft",
+          "send_id",
+          "message"
+        ],
+        "properties": {
+          "draft": {
+            "$ref": "#/components/schemas/DraftId",
+            "description": "The draft being sent."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox it is sent from."
+          },
+          "message": {
+            "$ref": "#/components/schemas/BlobPointer",
+            "description": "The outgoing-message v1 document, a blob of the workspace."
+          },
+          "send_id": {
+            "$ref": "#/components/schemas/SendId",
+            "description": "This send: unique, the connector records it once."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
       }
     },
     {
@@ -725,6 +886,11 @@
           }
         }
       },
+      "DraftId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "DraftId (UUIDv7)"
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -1036,6 +1202,19 @@
           "owner",
           "admin",
           "member"
+        ]
+      },
+      "SendId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "SendId (UUIDv7)"
+      },
+      "SendOutcome": {
+        "type": "string",
+        "description": "How a send ended.",
+        "enum": [
+          "sent",
+          "failed"
         ]
       },
       "Stream": {

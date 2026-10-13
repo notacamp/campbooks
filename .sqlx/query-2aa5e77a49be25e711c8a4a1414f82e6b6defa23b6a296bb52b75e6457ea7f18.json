@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE kernel.jobs SET run_at = now()\n                WHERE state = 'pending' AND kind = 'connectors.send_message' RETURNING id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "kernel.jobs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2aa5e77a49be25e711c8a4a1414f82e6b6defa23b6a296bb52b75e6457ea7f18"
+}

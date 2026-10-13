@@ -1,0 +1,160 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT s.inbox_id AS \"inbox: InboxId\", s.document, s.state, s.attempts, s.unclear,\n                  st.id AS \"stream?: StreamId\", st.paused AS \"paused?\", st.cursor AS \"cursor?\",\n                  c.id AS \"connection?: ConnectionId\", c.provider AS \"provider?\",\n                  c.granted_by AS \"granted_by?: UserId\", c.health AS \"health?\"\n             FROM connectors.sends s\n             LEFT JOIN connectors.streams st ON st.id = s.stream_id\n             LEFT JOIN connectors.connections c ON c.id = st.connection_id\n            WHERE s.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "document",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "document"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "attempts",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "attempts"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "unclear",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.sends",
+            "name": "unclear"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "stream?: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "paused?",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "paused"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "cursor?",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "cursor"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "connection?: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "provider?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "provider"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "granted_by?: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "granted_by"
+          }
+        }
+      },
+      {
+        "ordinal": 11,
+        "name": "health?",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "health"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "b148410e0ac82bc00ba813f1daefc0cf2365bdfd0b762623f94c0f20fc3235d9"
+}

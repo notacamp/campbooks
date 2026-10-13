@@ -54,7 +54,7 @@ fn blocks(lines: &[&str], html: &mut String) {
         if line.trim().is_empty() {
             i += 1;
         } else if is_quote(line) {
-            let end = run(lines, i, |l| is_quote(l));
+            let end = run(lines, i, is_quote);
             html.push_str("<blockquote>");
             blocks(&unquote(&lines[i..end]), html);
             html.push_str("</blockquote>");
@@ -109,21 +109,21 @@ fn inline(line: &str, html: &mut String) {
     let mut bold = false;
     let mut italic = false;
     while !rest.is_empty() {
-        if let Some(after) = rest.strip_prefix("**") {
-            if bold || after.contains("**") {
-                html.push_str(if bold { "</strong>" } else { "<strong>" });
-                bold = !bold;
-                rest = after;
-                continue;
-            }
+        if let Some(after) = rest.strip_prefix("**")
+            && (bold || after.contains("**"))
+        {
+            html.push_str(if bold { "</strong>" } else { "<strong>" });
+            bold = !bold;
+            rest = after;
+            continue;
         }
-        if let Some(after) = rest.strip_prefix('*') {
-            if italic || closes_italic(after) {
-                html.push_str(if italic { "</em>" } else { "<em>" });
-                italic = !italic;
-                rest = after;
-                continue;
-            }
+        if let Some(after) = rest.strip_prefix('*')
+            && (italic || closes_italic(after))
+        {
+            html.push_str(if italic { "</em>" } else { "<em>" });
+            italic = !italic;
+            rest = after;
+            continue;
         }
         if let Some(len) = link_len(rest) {
             let (url, after) = rest.split_at(len);

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.sends\n                  SET state = 'sent', provider_message_id = $2, thread_key = $3, updated_at = now()\n                WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "37105015c002c5d119bd6a2aaf41b15ddad07614c3c1fdc303306a11c3f57271"
+}
