@@ -460,13 +460,13 @@ impl Upstream {
     /// The server a callback's code is redeemed at: Zoho's must be named by
     /// the callback's `accounts-server` and be on the list; the others have
     /// one. `None` refuses the callback before any request.
-    fn server(&self, accounts_server: Option<&str>) -> Option<&Verified> {
+    fn server(&self, data_centre: Option<&str>) -> Option<&Verified> {
         match &self.rule {
             Rule::Fixed(verified) | Rule::Tenant { verified, .. } => Some(verified),
             Rule::Servers(servers) => {
                 // Only a position in the configured list comes out of the
                 // callback's value: the server used is always one of ours.
-                let named = accounts_server?.trim_end_matches('/');
+                let named = data_centre?.trim_end_matches('/');
                 let index = servers
                     .iter()
                     .position(|v| v.server.issuer.trim_end_matches('/') == named)?;
@@ -507,7 +507,7 @@ impl Upstream {
     }
 
     /// Redeem `code` (with the PKCE `verifier`) at the server the callback
-    /// named (`accounts_server`, Zoho) and validate the ID token for the
+    /// named (`data_centre`, Zoho's `accounts-server`) and validate the ID token for the
     /// round trip that sent `nonce`. `iss` is the callback's RFC 9207
     /// parameter, if any.
     pub async fn sign_in(
@@ -515,11 +515,11 @@ impl Upstream {
         code: &str,
         verifier: &str,
         nonce: &str,
-        accounts_server: Option<&str>,
+        data_centre: Option<&str>,
         iss: Option<&str>,
     ) -> Result<SignedIn, UpstreamError> {
         let server = self
-            .server(accounts_server)
+            .server(data_centre)
             .ok_or_else(|| UpstreamError::Rejected("not one of the provider's servers".into()))?;
         if !self.callback_issuer_matches(server, iss) {
             return Err(UpstreamError::Rejected("another issuer".into()));

@@ -274,7 +274,7 @@ pub struct CallbackQuery {
     pub iss: Option<String>,
     /// Zoho's accounts server of the person's data centre.
     #[serde(rename = "accounts-server")]
-    pub accounts_server: Option<String>,
+    pub data_centre: Option<String>,
 }
 
 /// Finish a round trip.
@@ -423,7 +423,7 @@ async fn identify(
             code,
             &flow.code_verifier,
             &flow.nonce,
-            query.accounts_server.as_deref(),
+            query.data_centre.as_deref(),
             query.iss.as_deref(),
         )
         .await
