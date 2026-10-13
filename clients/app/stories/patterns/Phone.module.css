@@ -1,0 +1,42 @@
+/* A phone-sized column for the phone patterns (stories only). */
+.phone {
+  --toast-offset: calc(var(--size-hit) + var(--space-10));
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-width: var(--list-width);
+  min-height: var(--size-viewport-min);
+  margin: 0 auto;
+  background: var(--surface-base);
+  color: var(--text-primary);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2) var(--space-1);
+}
+
+.content {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: 0 var(--space-2) var(--space-12);
+}
+
+.thread {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-2) var(--space-4) var(--space-6);
+}
+
+.tabs {
+  position: sticky;
+  bottom: 0;
+  margin-top: auto;
+}

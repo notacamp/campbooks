@@ -1,0 +1,110 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, userEvent, within } from "storybook/test";
+
+import { Button } from "../Button/Button";
+
+import { Item, ItemDetail, SwipeAction } from "./Item";
+
+const meta = {
+  title: "Components/Item",
+  component: Item,
+  args: {
+    who: "Sofia Pessoa · Brightloop",
+    what: "Waiting on your review of the Q4 proposal; offers a call on Thursday",
+    avatar: { name: "Sofia Pessoa" },
+    due: "Thu",
+    tags: ["2 messages", "Brightloop-Q4-scope-v3.pdf · 2.4 MB", "€18,500 proposal"],
+    onToggle: fn(),
+  },
+  decorators: [
+    (Story) => (
+      <div className="flex max-w-measure flex-col">
+        <Story />
+      </div>
+    ),
+  ],
+} satisfies Meta<typeof Item>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+const detail = (
+  <ItemDetail
+    quoteFrom="Sofia, Friday 17:42"
+    quote="Attached the revised scope. We moved the launch to 30 November and kept the price at €18,500. Thursday works for a call if that is easier."
+    context="Version 3 moves the timeline two weeks; the price is unchanged. You held Thursday 09:00 for it."
+    actions={
+      <>
+        <Button variant="primary" shortcut="list.open">
+          Open proposal
+        </Button>
+        <Button shortcut="item.reply">Reply</Button>
+        <Button variant="ghost" shortcut="item.later">
+          Later
+        </Button>
+        <Button variant="ghost" shortcut="item.done">
+          Done
+        </Button>
+      </>
+    }
+  />
+);
+
+export const Default: Story = {};
+
+/** The keyboard cursor (J/K) is here: hints show. */
+export const Selected: Story = { args: { selected: true } };
+
+export const Expanded: Story = {
+  args: { selected: true, expanded: true, detail },
+  play: async ({ canvasElement }) => {
+    const row = within(canvasElement).getByRole("button", { name: /Sofia Pessoa · Brightloop/ });
+    await expect(row).toHaveAttribute("aria-expanded", "true");
+  },
+};
+
+export const Collapsible: Story = {
+  args: { detail },
+  play: async ({ canvasElement, args }) => {
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /Sofia Pessoa/ }));
+    await expect(args.onToggle).toHaveBeenCalledOnce();
+  },
+};
+
+/** Due soon is drawn in the danger colour. */
+export const DueSoon: Story = {
+  args: {
+    who: "Bankly",
+    avatar: { name: "Bankly", kind: "service" },
+    due: "Today",
+    soon: true,
+    what: "New sign-in from Lisbon, Sunday 21:14, on a Windows laptop",
+    tags: ["Security alert", "Not a device Campbooks has seen"],
+  },
+};
+
+/** Phone: a link to the conversation, with the swipe actions revealed. */
+export const Swiped: Story = {
+  args: {
+    who: "Sofia Pessoa",
+    what: "Waiting on your review of the Q4 proposal",
+    tags: [],
+    hints: [],
+    swipeActions: (
+      <>
+        <SwipeAction tone="later" icon="clock" label="Later" onClick={fn()} />
+        <SwipeAction tone="done" icon="check" label="Done" onClick={fn()} />
+      </>
+    ),
+  },
+};
+
+export const AsLink: Story = {
+  args: {
+    href: "#conversation",
+    tags: [],
+    hints: [],
+    who: "Rui Matos",
+    what: "Send two August receipts",
+  },
+};

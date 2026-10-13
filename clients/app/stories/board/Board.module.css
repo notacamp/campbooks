@@ -1,0 +1,70 @@
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-height: var(--size-viewport-min);
+  padding: var(--space-10);
+  background: var(--surface-base);
+  color: var(--text-primary);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-4);
+}
+
+.title {
+  font: var(--weight-bold) var(--text-2xl) / var(--leading-tight) var(--font-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.intro {
+  color: var(--text-tertiary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-6);
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4);
+  border-radius: var(--panel-radius);
+  background: var(--surface-raised);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.cell[data-tile] {
+  background: var(--surface-base);
+}
+
+.cellTitle {
+  font: var(--weight-semibold) var(--text-xs) / var(--leading-none) var(--font-sans);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.code {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: pre-line;
+}
+
+@media (width < 64rem) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .board {
+    padding: var(--space-4);
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT 1 AS \"one!\" FROM kernel.blobs\n             WHERE workspace_id = $1 AND hash = $2\n               FOR KEY SHARE\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "one!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7793954782125da3b48fa8eacb0f4b9f0a441d644dc57bdaa0de76118714421c"
+}

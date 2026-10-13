@@ -1,0 +1,31 @@
+//! The OAuth scopes of the `{{name}}` module (see `campbooks_kernel::auth`).
+//!
+//! A scope name is a wire contract with the identity provider and every
+//! client: never rename one. Add a scope here and to [`ALL`] before an
+//! endpoint requires it.
+
+use campbooks_kernel::auth::{ScopeInfo, ScopeName};
+
+/// Every scope of this module, for its `Module` descriptor.
+pub const ALL: &[ScopeInfo] = &[
+    ScopeInfo::of::<{{pascal}}Read>(),
+    ScopeInfo::of::<{{pascal}}Write>(),
+];
+
+/// `{{name}}:read` — read this module's data.
+#[derive(Debug, Clone, Copy)]
+pub struct {{pascal}}Read;
+
+impl ScopeName for {{pascal}}Read {
+    const NAME: &'static str = "{{name}}:read";
+    const DESCRIPTION: &'static str = "Read your {{title_lower}} data.";
+}
+
+/// `{{name}}:write` — change this module's data.
+#[derive(Debug, Clone, Copy)]
+pub struct {{pascal}}Write;
+
+impl ScopeName for {{pascal}}Write {
+    const NAME: &'static str = "{{name}}:write";
+    const DESCRIPTION: &'static str = "Change your {{title_lower}} data.";
+}

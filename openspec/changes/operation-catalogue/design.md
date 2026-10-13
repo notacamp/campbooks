@@ -10,7 +10,7 @@ jobs are durable (ADR 0012) and registered per module in `Background`. ADR
 ## Data ownership and events
 
 - **Schema `kernel`**, table `kernel.idempotency`, migration
-  `20261013000000_kernel__idempotency.sql`. Written only by the kernel's
+  `20261013170000_kernel__idempotency.sql`. Written only by the kernel's
   idempotency layer and its prune job. Primary key `(principal, key)`:
   `principal` is `user:<sub>` or `client:<client id>`; the row holds the
   `operation_id`, a SHA-256 of method, path, query and body, a state

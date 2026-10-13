@@ -63,7 +63,10 @@ pub const SECURITY_SCHEME: &str = "bearer";
 
 /// Every module, in mount order.
 pub fn modules() -> Vec<Module> {
-    vec![campbooks_system::module()]
+    vec![
+        campbooks_system::module(),
+        // `cargo xtask new-module` inserts above this line.
+    ]
 }
 
 /// Every job kind, event handler and schedule of every module, plus the
@@ -123,7 +126,10 @@ fn security_scheme() -> SecurityScheme {
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
     ),
     components(schemas(Problem)),
-    tags((name = "system", description = "Instance health and version.")),
+    tags(
+        (name = "system", description = "Instance health and version."),
+        // `cargo xtask new-module` inserts above this line.
+    ),
 )]
 struct ApiDoc;
 

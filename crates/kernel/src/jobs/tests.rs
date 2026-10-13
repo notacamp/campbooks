@@ -876,6 +876,24 @@ async fn wait_for_state(db: &PgPool, id: JobId, wanted: &str) {
     panic!("job {id} never reached `{wanted}`: {:?}", job(db, id).await);
 }
 
+/// Wait until every kernel schedule enqueued at start-up has succeeded, so a
+/// worker's stats are not racing them.
+async fn wait_for_kernel_schedules(db: &PgPool) {
+    let schedules = i64::try_from(Registry::build(&[]).unwrap().schedule_names().len()).unwrap();
+    for _ in 0..200 {
+        let done = count(
+            db,
+            "SELECT count(*) FROM kernel.jobs WHERE kind LIKE 'kernel.%' AND state = 'succeeded'",
+        )
+        .await;
+        if done >= schedules {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    panic!("the kernel's start-up schedules never all succeeded");
+}
+
 #[sqlx::test(migrations = "../../migrations")]
 async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     // A poll interval far longer than the test: only NOTIFY can wake it.
@@ -907,9 +925,10 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
         "{:?}",
         enqueued_at.elapsed()
     );
+    wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
-    // The probe, and the kernel's two prunes scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 3);
+    // The probe, and the kernel's prunes and blob sweep scheduled at start-up.
+    assert_eq!(worker.await.unwrap().succeeded, 4);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -917,6 +936,10 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
     let state = state_with(db.clone(), |jobs| {
         jobs.shutdown_grace_seconds = 1;
         jobs.poll_interval_ms = 50;
+        // Room for both probes and every start-up schedule at once (all
+        // instance-wide, so one fairness bucket).
+        jobs.concurrency = 8;
+        jobs.per_workspace = 8;
     })
     .await;
     let quick = created(
@@ -947,11 +970,13 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
     }));
     wait_for_state(&db, quick, "running").await;
     wait_for_state(&db, slow, "running").await;
+    wait_for_kernel_schedules(&db).await;
 
     stop.send(()).unwrap();
     let stats = worker.await.unwrap();
-    // The quick probe and the kernel's two prunes scheduled at start-up.
-    assert_eq!((stats.succeeded, stats.released), (3, 1));
+    // The quick probe and the kernel's prunes and blob sweep scheduled at
+    // start-up.
+    assert_eq!((stats.succeeded, stats.released), (4, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -981,6 +1006,7 @@ fn registry_collects_kernel_and_module_work() {
         [
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
+            "kernel.sweep_blobs",
             "test.count_a",
             "test.count_b",
             "test.probe"
@@ -988,7 +1014,11 @@ fn registry_collects_kernel_and_module_work() {
     );
     assert_eq!(
         registry.schedule_names(),
-        ["kernel.prune_jobs", "kernel.prune_idempotency"]
+        [
+            "kernel.prune_jobs",
+            "kernel.sweep_blobs",
+            "kernel.prune_idempotency"
+        ]
     );
     assert_eq!(registry.queues(), ["default", "events", "maintenance"]);
     let consumers: Vec<_> = registry

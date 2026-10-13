@@ -1,0 +1,7 @@
+.dot {
+  flex: none;
+  width: var(--dot-size);
+  height: var(--dot-size);
+  border-radius: var(--radius-full);
+  background: var(--sig, var(--text-tertiary));
+}

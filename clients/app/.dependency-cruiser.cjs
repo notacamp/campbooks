@@ -37,6 +37,29 @@ module.exports = {
       to: { path: "^src/(modules|app)/" },
     },
     {
+      name: "ui-public-surface",
+      comment:
+        "Modules and the app shell use the design system only through src/lib/ui/index.ts, so components stay refactorable and nothing reaches past the tokens.",
+      severity: "error",
+      from: { path: "^src/(modules|app)/" },
+      to: { path: "^src/lib/ui/", pathNot: String.raw`^src/lib/ui/index\.ts$` },
+    },
+    {
+      name: "modules-have-no-stylesheets",
+      comment:
+        "Visual styling lives in lib/ui components (token-only CSS); modules compose them and use Tailwind for layout only.",
+      severity: "error",
+      from: { path: "^src/modules/" },
+      to: { path: String.raw`\.css$` },
+    },
+    {
+      name: "shortcuts-below-ui",
+      comment: "lib/ui renders the shortcut registry; the registry never depends on lib/ui.",
+      severity: "error",
+      from: { path: "^src/lib/shortcuts/" },
+      to: { path: "^src/lib/ui/" },
+    },
+    {
       name: "schema-is-private-to-lib-api",
       comment:
         "The generated OpenAPI types are an implementation detail of lib/api; use its client and ApiSchema<> instead.",
@@ -61,7 +84,7 @@ module.exports = {
       comment:
         "Shipped code must not depend on devDependencies (they are absent from the production install).",
       severity: "error",
-      from: { path: "^src/", pathNot: String.raw`\.test\.tsx?$` },
+      from: { path: "^src/", pathNot: [String.raw`\.test\.tsx?$`, String.raw`\.stories\.tsx$`] },
       to: { dependencyTypes: ["npm-dev"], dependencyTypesNot: ["type-only"] },
     },
     {
@@ -69,7 +92,12 @@ module.exports = {
       severity: "warn",
       from: {
         orphan: true,
-        pathNot: [String.raw`\.d\.ts$`, String.raw`\.test\.tsx?$`, String.raw`^src/app/main\.tsx$`],
+        pathNot: [
+          String.raw`\.d\.ts$`,
+          String.raw`\.test\.tsx?$`,
+          String.raw`\.stories\.tsx$`,
+          String.raw`^src/app/main\.tsx$`,
+        ],
       },
       to: {},
     },

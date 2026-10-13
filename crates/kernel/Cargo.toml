@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-kernel"
-description = "Campbooks kernel: config, errors, state, ids, clock, durable events and jobs, module contract. Knows no domain."
+description = "Campbooks kernel: config, errors, state, ids, clock, durable events and jobs, blob storage, module contract. Knows no domain."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -13,13 +13,17 @@ publish.workspace = true
 test-util = ["dep:http-body-util"]
 
 [dependencies]
-# SHA-256 of idempotent requests; already the TLS and JWT crypto backend.
+# SHA-256 of blobs and of idempotent requests; already the crypto backend of
+# rustls and jsonwebtoken.
 aws-lc-rs.workspace = true
 axum.workspace = true
+bytes.workspace = true
 chrono.workspace = true
 figment.workspace = true
+futures-util.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
+object_store.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true
 serde.workspace = true

@@ -1,0 +1,18 @@
+# Tasks
+
+## 1. Scaffold
+
+- [x] 1.1 `cargo xtask new-module {{name}}`: crate, scopes, `overview` slice, schema migration, client module, i18n files, this change
+- [ ] 1.2 Fill in proposal.md, design.md and `specs/{{name}}/spec.md` (every `TODO(new-module)`); `openspec validate add-{{kebab}}-module --strict` passes
+- [ ] 1.3 Translate the module title in `clients/app/src/modules/{{kebab}}/i18n/{pt-PT,es-ES,fr}.json`
+
+## 2. Behaviour
+
+- [ ] 2.1 TODO(new-module): one task per slice (`cargo xtask new-feature {{name}} <feature>`), each with its tests
+
+## 3. Wrap-up
+
+- [ ] 3.1 OpenAPI regenerated (`cargo xtask openapi`) and client types regenerated (`pnpm --dir clients api:generate`)
+- [ ] 3.2 CHANGELOG updated
+- [ ] 3.3 Gates green (AGENTS.md → Code quality)
+- [ ] 3.4 UI verified at 375px and desktop, recording in the PR

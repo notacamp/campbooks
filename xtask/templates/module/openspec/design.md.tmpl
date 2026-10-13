@@ -1,0 +1,31 @@
+# Design
+
+## Context
+
+TODO(new-module): what exists today and what this module builds on.
+
+## Data ownership and events
+
+- Schema: `{{name}}`, owned by this module alone. TODO(new-module): its
+  tables, each with `workspace_id` and row-level security.
+- Events published: none yet. TODO(new-module): each `{{name}}.<event>` with
+  its `VERSION` and payload (ids, never secrets or message bodies).
+- Events consumed: none yet. TODO(new-module): each handler
+  `{{name}}.<handler>` and the event it consumes.
+
+## Endpoints and scopes
+
+| Endpoint | Scope |
+| --- | --- |
+| `GET /api/v1/{{kebab}}/overview` | `{{name}}:read` |
+
+TODO(new-module): every endpoint the change adds, with its scope. A read the
+caller may not see answers 404.
+
+## Decisions
+
+TODO(new-module): the choices made and the alternatives rejected.
+
+## Risks / Trade-offs
+
+TODO(new-module): what could go wrong and how it is contained.

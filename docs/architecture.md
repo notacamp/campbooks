@@ -29,7 +29,7 @@ architecture.toml          module dependency allowlist, read by `cargo xtask arc
 crates/
   kernel/                  campbooks-kernel — config, errors (problem+json), db pool,
                            auth extractors, ids, clock, durable event bus and job
-                           queue (schema `kernel`), Module trait.
+                           queue (schema `kernel`), blob storage, Module trait.
                            Depends on NO internal crate.
   ai/                      campbooks-ai — role-based AI gateway: decide (typed decision
                            model, ADR 0009), embed/complete/vision (OpenAI-compatible
@@ -46,7 +46,8 @@ migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per mo
 openapi/openapi.json       generated, committed; the operation catalogue and the
                            contract for every client (ADR 0013)
 openapi/events.json        generated, committed; the events catalogue
-xtask/                     `cargo xtask arch | openapi [--check] | events [--check]`
+xtask/                     `cargo xtask arch | openapi [--check] | events [--check] |
+                           new-module | new-feature`
 clients/                   pnpm workspace
   app/                     the one UI (React + TypeScript + Vite)
     src/app/               shell: entry, router, providers, module manifest
@@ -68,7 +69,10 @@ A module is a Rust crate that hands the server one value:
 pub fn module() -> campbooks_kernel::Module { … }   // name, scopes, router, background work
 ```
 
-Inside it, code is sliced **by use case**, not by layer:
+`cargo xtask new-module <name>` scaffolds one (crate, schema migration,
+OpenSpec change, client module) and `cargo xtask new-feature <module>
+<feature>` adds a slice. Inside it, code is sliced **by use case**, not by
+layer:
 
 ```
 crates/modules/mail/src/
@@ -93,6 +97,22 @@ API. `cargo xtask arch` checks that each migration touches only its owner's
 schema. A read that needs data from two modules is composed in the
 client, or by subscribing to the other module's events and keeping a local
 projection.
+
+### Files (blobs)
+
+Message bodies (raw MIME), attachments and files are not stored in
+Postgres but in object storage (ADR 0011), through `state.blobs`
+(`kernel::blobs::BlobStore`): local disk by default, any S3-compatible
+bucket otherwise (`CAMPBOOKS_BLOBS__*`). Blobs are content-addressed per
+workspace (`<workspace>/<aa>/<sha256>`), so the same bytes are stored once.
+A module `put`s the bytes (streamed and hashed; it gets a `BlobRef` of
+hash, size and content type to keep on its record), then `attach`es the blob
+to its record in the transaction that writes the record, and `detach`es it in
+the transaction that removes it. The kernel's hourly `kernel.sweep_blobs`
+deletes blobs nothing holds once `CAMPBOOKS_BLOBS__SWEEP_GRACE_HOURS` have
+passed, and `purge_workspace` removes a deleted workspace's blobs. The store
+never serves blobs by URL: a module's download endpoint checks access, then
+streams `get`.
 
 ### Endpoints and auth
 
@@ -253,6 +273,11 @@ One React/TypeScript UI, three delivery targets (ADR 0003):
 
 `src/lib/api` hides the difference behind one typed client generated from
 `openapi/openapi.json`, so modules never know which target they run on.
+
+Screens are composed from the design system in `src/lib/ui` (three-layer
+tokens, themes, components) and `src/lib/shortcuts` (one keyboard shortcut
+registry); modules use them through `lib/ui/index.ts` and style nothing
+themselves. See [`design-system.md`](design-system.md).
 
 The web target is served by `campbooks-server` itself (ADR 0006): the release
 image builds `clients/app` and sets `CAMPBOOKS_WEB_DIR`, so UI and API share

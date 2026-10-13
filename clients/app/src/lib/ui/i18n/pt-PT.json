@@ -1,0 +1,58 @@
+{
+  "close": "Fechar",
+  "undo": "Anular",
+  "redo": "Refazer",
+  "loading": "A carregar",
+  "kbd": {
+    "then": "depois",
+    "shortcut": "Atalho: {{keys}}"
+  },
+  "toast": {
+    "region": "Notificações",
+    "undone": "Anulado: {{label}}",
+    "redone": "Refeito: {{label}}"
+  },
+  "note": {
+    "label": "Ponto da situação",
+    "why": "Porquê?",
+    "hideWhy": "Ocultar o porquê"
+  },
+  "search": {
+    "label": "Pesquisar ou perguntar"
+  },
+  "commandMenu": {
+    "label": "Menu de comandos",
+    "placeholder": "Pesquise, pergunte ou execute um comando",
+    "empty": "Nada corresponde a «{{query}}»",
+    "results": "Comandos",
+    "ask": "Perguntar ao Campbooks: {{query}}",
+    "askGroup": "Perguntar"
+  },
+  "shortcutSheet": {
+    "title": "Atalhos de teclado"
+  },
+  "workspace": {
+    "switch": "Mudar de espaço de trabalho",
+    "current": "Mudar de espaço de trabalho (atual: {{name}})"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "O Campbooks está a ler",
+    "thinking": "O Campbooks está a pensar",
+    "unsure": "O Campbooks não tem a certeza",
+    "happy": "O Campbooks está satisfeito",
+    "alert": "O Campbooks precisa da sua atenção",
+    "asleep": "O Campbooks está em pausa"
+  },
+  "signal": {
+    "review": "Rever",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Fazer",
+    "pay": "Pagar",
+    "sort": "Organizar"
+  },
+  "navigation": {
+    "main": "Principal"
+  }
+}

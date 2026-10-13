@@ -22,6 +22,10 @@ services:
     # Web app and API on one port (the image sets CAMPBOOKS_WEB_DIR).
     ports:
       - "${CAMPBOOKS_PORT:-8080}:8080"
+    # Message bodies, attachments and files (CAMPBOOKS_BLOBS__PATH). Back it
+    # up with Postgres; unused when CAMPBOOKS_BLOBS__BACKEND=s3.
+    volumes:
+      - blobs-data:/data/blobs
     depends_on:
       postgres:
         condition: service_healthy
@@ -147,6 +151,7 @@ services:
 
 volumes:
   postgres-data:
+  blobs-data:
   idp-data:
   laya-models:
   ollama-data:

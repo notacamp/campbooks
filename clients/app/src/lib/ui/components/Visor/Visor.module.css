@@ -1,0 +1,119 @@
+.visor {
+  --s: var(--visor-size);
+
+  display: inline-grid;
+  flex: none;
+  grid-auto-flow: column;
+  align-content: center;
+  justify-content: center;
+  gap: calc(var(--s) * 0.15);
+  width: var(--s);
+  height: calc(var(--s) * 0.6);
+  border-radius: calc(var(--s) * 0.22);
+  vertical-align: middle;
+  background: linear-gradient(180deg, var(--visor-glass-top), var(--visor-glass-bottom));
+  box-shadow:
+    inset 0 var(--border-width) 0 var(--edge-highlight),
+    0 0 0 var(--border-width) var(--visor-rim);
+}
+
+.visor[data-size="md"] {
+  --s: calc(var(--visor-size) * 1.4);
+}
+
+.visor[data-size="lg"] {
+  --s: calc(var(--visor-size) * 2);
+}
+
+.visor[data-size="xl"] {
+  --s: calc(var(--visor-size) * 2.8);
+}
+
+.eye {
+  display: block;
+  width: calc(var(--s) * 0.155);
+  height: calc(var(--s) * 0.33);
+  border-radius: var(--radius-full);
+  background: var(--visor-eye);
+  box-shadow: 0 0 calc(var(--s) * 0.13) var(--visor-eye-glow);
+  animation: visor-blink var(--duration-blink) infinite;
+  transition:
+    height var(--duration-base) var(--ease-out),
+    width var(--duration-base) var(--ease-out);
+}
+
+.visor[data-state="reading"] .eye {
+  height: calc(var(--s) * 0.25);
+  animation: visor-scan var(--duration-scan) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="thinking"] .eye {
+  width: calc(var(--s) * 0.19);
+  height: calc(var(--s) * 0.11);
+  animation: visor-think var(--duration-pulse) var(--ease-in-out) infinite;
+}
+
+.visor[data-state="unsure"] .eye:first-child {
+  height: calc(var(--s) * 0.2);
+}
+
+.visor[data-state="happy"] .eye {
+  width: calc(var(--s) * 0.21);
+  height: calc(var(--s) * 0.17);
+  border-radius: var(--radius-full) var(--radius-full) 0 0 / 190% 190% 0 0;
+  animation: none;
+}
+
+.visor[data-state="asleep"] .eye {
+  width: calc(var(--s) * 0.2);
+  height: calc(var(--s) * 0.05);
+  box-shadow: none;
+  opacity: var(--visor-asleep-opacity);
+  animation: none;
+}
+
+.visor[data-state="alert"] .eye {
+  width: calc(var(--s) * 0.17);
+  height: calc(var(--s) * 0.4);
+  animation: none;
+}
+
+@keyframes visor-blink {
+  0%,
+  92.5%,
+  100% {
+    scale: 1 1;
+  }
+
+  96% {
+    scale: 1 0.08;
+  }
+}
+
+@keyframes visor-scan {
+  0%,
+  100% {
+    translate: calc(var(--s) * -0.075) 0;
+  }
+
+  50% {
+    translate: calc(var(--s) * 0.075) 0;
+  }
+}
+
+@keyframes visor-think {
+  0%,
+  100% {
+    opacity: var(--opacity-dim);
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eye {
+    animation: none;
+  }
+}

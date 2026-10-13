@@ -3,6 +3,7 @@
 #   docker compose -f compose.dev.yaml up -d
 #   export DATABASE_URL=postgres://postgres:postgres@localhost:55432/campbooks
 #   export CAMPBOOKS_DATABASE_URL=$DATABASE_URL
+#   export CAMPBOOKS_BLOBS__PATH=$PWD/.data/blobs   # files; the default /data/blobs is for the image
 name: campbooks-dev
 
 services:

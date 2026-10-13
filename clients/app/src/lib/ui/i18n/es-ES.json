@@ -1,0 +1,58 @@
+{
+  "close": "Cerrar",
+  "undo": "Deshacer",
+  "redo": "Rehacer",
+  "loading": "Cargando",
+  "kbd": {
+    "then": "después",
+    "shortcut": "Atajo: {{keys}}"
+  },
+  "toast": {
+    "region": "Notificaciones",
+    "undone": "Deshecho: {{label}}",
+    "redone": "Rehecho: {{label}}"
+  },
+  "note": {
+    "label": "Cómo están las cosas",
+    "why": "¿Por qué?",
+    "hideWhy": "Ocultar el porqué"
+  },
+  "search": {
+    "label": "Buscar o preguntar"
+  },
+  "commandMenu": {
+    "label": "Menú de comandos",
+    "placeholder": "Busca, pregunta o ejecuta un comando",
+    "empty": "Nada coincide con «{{query}}»",
+    "results": "Comandos",
+    "ask": "Preguntar a Campbooks: {{query}}",
+    "askGroup": "Preguntar"
+  },
+  "shortcutSheet": {
+    "title": "Atajos de teclado"
+  },
+  "workspace": {
+    "switch": "Cambiar de espacio de trabajo",
+    "current": "Cambiar de espacio de trabajo (actual: {{name}})"
+  },
+  "visor": {
+    "idle": "Campbooks",
+    "reading": "Campbooks está leyendo",
+    "thinking": "Campbooks está pensando",
+    "unsure": "Campbooks no está seguro",
+    "happy": "Campbooks está contento",
+    "alert": "Campbooks necesita tu atención",
+    "asleep": "Campbooks está en pausa"
+  },
+  "signal": {
+    "review": "Revisar",
+    "reply": "Responder",
+    "decide": "Decidir",
+    "do": "Hacer",
+    "pay": "Pagar",
+    "sort": "Ordenar"
+  },
+  "navigation": {
+    "main": "Principal"
+  }
+}

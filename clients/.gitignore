@@ -5,3 +5,4 @@ coverage/
 *.local
 .vite/
 app/recordings/out/
+storybook-static/

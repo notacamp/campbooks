@@ -5,7 +5,8 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use crate::{
-    auth::TokenVerifier, config::Config, events::EventBus, jobs::Registry, operations::Operations,
+    auth::TokenVerifier, blobs::BlobStore, config::Config, events::EventBus, jobs::Registry,
+    operations::Operations,
 };
 
 /// What every handler can reach. Cheap to clone.
@@ -19,6 +20,9 @@ pub struct AppState {
     pub events: EventBus,
     /// Validates access tokens for [`Scoped`](crate::auth::Scoped) handlers.
     pub auth: TokenVerifier,
+    /// Message bodies, attachments and files (ADR 0011). Not configured
+    /// until the server attaches one with [`with_blobs`](Self::with_blobs).
+    pub blobs: BlobStore,
     /// The composed API, for running operations by id
     /// ([`invoke`](crate::operations::invoke)). Installed by the server.
     pub operations: Operations,
@@ -34,6 +38,7 @@ impl AppState {
             auth: TokenVerifier::new(&config.auth),
             config: Arc::new(config),
             events: EventBus::default(),
+            blobs: BlobStore::default(),
             operations: Operations::default(),
         }
     }
@@ -42,6 +47,13 @@ impl AppState {
     #[must_use]
     pub fn with_registry(mut self, registry: Registry) -> Self {
         self.events = EventBus::new(Arc::new(registry));
+        self
+    }
+
+    /// The same state, storing blobs in `blobs`.
+    #[must_use]
+    pub fn with_blobs(mut self, blobs: BlobStore) -> Self {
+        self.blobs = blobs;
         self
     }
 
