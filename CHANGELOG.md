@@ -14,6 +14,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- A ready-made image for the local `decide` model: `ghcr.io/notacamp/campbooks-laya`,
+  published for linux/amd64 and linux/arm64 with the same tags as the Campbooks image
+  and scanned the same way. `docker compose --profile ai` now pulls it instead of
+  building `deploy/laya` on your machine (the `build:` line is still there, commented,
+  if you prefer to build it). The model checkpoint still downloads into the
+  `laya-models` volume on first start. Pin it to the same tag as the server image.
 - Reply, reply all, forward and new messages, sent through your Gmail. The
   composer opens under the thread (R, A, F) or on its own screen (C): From
   your mailbox, To, Cc and Bcc as chips, the quoted history folded under your

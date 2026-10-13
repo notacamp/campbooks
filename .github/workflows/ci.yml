@@ -201,3 +201,49 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  laya-image:
+    # Builds the Laya model server image (deploy/laya, the `decide` role) as
+    # published, natively on both architectures, and scans it. Not pushed. The
+    # image is large, so the build is skipped unless something it is built
+    # from (or its recipe) changed.
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - name: Changed?
+        id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          paths=(deploy/laya .github/workflows/ci.yml .github/workflows/image.yml)
+          if ! files=$(git diff --name-only "$BASE" HEAD -- "${paths[@]}" 2>/dev/null); then
+            files=unknown   # no usable base (new branch, force push): build anyway
+          fi
+          if [ -n "$files" ]; then echo "run=true"; else echo "run=false"; fi >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+        if: steps.changed.outputs.run == 'true'
+      - uses: docker/build-push-action@v7
+        if: steps.changed.outputs.run == 'true'
+        with:
+          context: deploy/laya
+          load: true
+          tags: campbooks-laya:ci
+          cache-from: type=gha,scope=laya-${{ matrix.arch }}
+          cache-to: type=gha,scope=laya-${{ matrix.arch }},mode=max
+      - name: Trivy (HIGH/CRITICAL, fixable)
+        if: steps.changed.outputs.run == 'true'
+        # Pinned by SHA: this action's tags have been tampered with before.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: campbooks-laya:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"

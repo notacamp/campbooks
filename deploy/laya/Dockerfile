@@ -1,5 +1,7 @@
 # laya-serve: the `decide` role's default model server (ADR 0009). Optional,
 # used by the compose `ai` profile; Campbooks itself does not need it.
+# Published by the release pipeline as ghcr.io/notacamp/campbooks-laya, with
+# the same tags as the server image (.github/workflows/image.yml).
 #
 #   docker build -t campbooks-laya deploy/laya
 #
