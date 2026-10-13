@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.skipped_messages\n               (workspace_id, stream_id, provider_message_id, failures, retry_at)\n           VALUES ($1, $2, $3, 1, $4::timestamptz + interval '1 minute')\n           ON CONFLICT (stream_id, provider_message_id) DO UPDATE\n              SET failures = connectors.skipped_messages.failures + 1,\n                  retry_at = $4::timestamptz + least(interval '1 day',\n                      interval '1 minute' * power(2, least(connectors.skipped_messages.failures, 12)))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "bc385977c89ced65562927560e8eae1748e07c434a6f5c9952af6ee76feb0617"
+}

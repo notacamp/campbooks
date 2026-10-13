@@ -28,7 +28,7 @@ use uuid::Uuid;
 
 use super::{
     Ctx,
-    sign_in::{MailGrant, Prompt, redirect_to_provider},
+    sign_in::{MailGrant, Prompt, drop_refresh, redirect_to_provider},
 };
 use crate::{
     deps::Issuer,
@@ -124,6 +124,7 @@ async fn signed_in_as(
 pub(super) async fn finish(
     ctx: &Ctx,
     issuer: &Issuer,
+    upstream: &Upstream,
     headers: &HeaderMap,
     flow: Flow,
     signed_in: SignedIn,
@@ -147,9 +148,10 @@ pub(super) async fn finish(
                 provider = provider.as_str(),
                 "refused a reconnect by another provider account"
             );
+            drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
             return Ok(back(&flow.return_to, "link_error", "account_mismatch"));
         }
-        return Ok(hand_over(ctx, flow, identity, tokens).await);
+        return Ok(hand_over(ctx, upstream, flow, identity, tokens).await);
     }
     let via = if flow.purpose == Purpose::Link {
         "link"
@@ -160,6 +162,7 @@ pub(super) async fn finish(
     match accounts::link(&mut tx, account, &identity, via, now).await? {
         LinkOutcome::Another => {
             tx.commit().await?;
+            drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
             tracing::info!(
                 provider = provider.as_str(),
                 purpose = flow.purpose.as_str(),
@@ -197,43 +200,58 @@ pub(super) async fn finish(
     }
     tx.commit().await?;
     if !flow.purpose.wants_mailbox() {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
         return Ok(back(&flow.return_to, "linked", provider.as_str()));
     }
-    Ok(hand_over(ctx, flow, identity, tokens).await)
+    Ok(hand_over(ctx, upstream, flow, identity, tokens).await)
 }
 
 /// Hand the mailbox grant of a connect or reconnect to the connectors
 /// module; where the browser goes next.
-async fn hand_over(ctx: &Ctx, flow: Flow, identity: ProviderIdentity, tokens: Tokens) -> Response {
+async fn hand_over(
+    ctx: &Ctx,
+    upstream: &Upstream,
+    flow: Flow,
+    identity: ProviderIdentity,
+    tokens: Tokens,
+) -> Response {
     let provider = flow.provider;
     let (Some(account), Some(workspace)) = (flow.account_id, flow.workspace_id) else {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
         return back(&flow.return_to, "link_error", "link_expired");
     };
-    let mail = MailGrant::of(ctx, provider, &tokens);
-    let (true, Some(refresh), Some(address)) =
-        (mail.granted, tokens.refresh_token, identity.email.clone())
-    else {
+    let mail = MailGrant::of(ctx, provider, &tokens, true);
+    let (true, Some(refresh), Some(address)) = (
+        mail.granted,
+        tokens.refresh_token.clone(),
+        identity.email.clone(),
+    ) else {
         // A way in it may have become stays: the round trip proved the
         // account is theirs.
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
         return back(&flow.return_to, "link_error", "consent_incomplete");
     };
+    let issuer = identity.issuer.clone();
     let grant = ProviderGrant {
         workspace: WorkspaceId::from_uuid(workspace),
         subject: account.to_string(),
         provider: provider.as_str().to_owned(),
         account_subject: identity.subject,
+        issuer: identity.issuer,
         address,
         address_verified: identity.email_verified,
         display_name: identity.name,
         scopes: mail.scopes,
         access_token: SecretString::from(tokens.access_token),
-        refresh_token: Some(SecretString::from(refresh)),
+        refresh_token: Some(SecretString::from(refresh.clone())),
         expires_in: tokens.expires_in,
         extending: flow.connection_id,
     };
     match ctx.state.grants.adopt(&ctx.state, grant).await {
         Ok(connection) => back(&flow.return_to, "connected", &connection),
         Err(error) => {
+            // Refused: the token is not kept anywhere.
+            drop_refresh(upstream, &issuer, Some(&refresh)).await;
             tracing::info!(
                 provider = provider.as_str(),
                 purpose = flow.purpose.as_str(),

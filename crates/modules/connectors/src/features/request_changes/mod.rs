@@ -20,6 +20,7 @@ use crate::{
         schedule,
     },
     events::ChangesRequested,
+    zoho,
 };
 
 /// Records a member's changes for the connector to make.
@@ -104,12 +105,21 @@ impl EventConsumer for RequestChanges {
         .fetch_one(&mut **tx)
         .await?;
         let mut pending = 0;
+        let writable = |label: &str| match target.provider {
+            Provider::Google => outbound::writable(label),
+            Provider::Zoho => zoho::state::writable(label),
+        };
         for item in &event.payload.items {
-            let (state, reason, add, remove) = match outbound::map(&item.change, &known) {
+            let mapped = match target.provider {
+                Provider::Google => outbound::map(&item.change, &known),
+                Provider::Zoho => outbound::map_zoho(&item.change),
+            };
+            let (state, reason, add, remove) = match mapped {
                 // Defence in depth: only the flag labels, categories and
-                // user labels are ever written.
+                // user labels (Gmail), or read, flag and inbox (Zoho), are
+                // ever written.
                 Mapped::Labels { add, remove }
-                    if !add.iter().chain(&remove).all(|l| outbound::writable(l)) =>
+                    if !add.iter().chain(&remove).all(|l| writable(l)) =>
                 {
                     (State::Skipped, Some("unsupported"), Vec::new(), Vec::new())
                 }
@@ -161,8 +171,9 @@ impl RequestChanges {
         workspace: WorkspaceId,
         target: &Target,
     ) -> Option<i64> {
+        // Zoho keeps no history: its changes apply in arrival order.
         let google = self.deps.google.as_ref()?;
-        if target.health == Health::NeedsReauth {
+        if target.provider != Provider::Google || target.health == Health::NeedsReauth {
             return None;
         }
         let rate = self.deps.config.google.units_per_second;

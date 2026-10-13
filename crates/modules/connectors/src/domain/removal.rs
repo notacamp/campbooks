@@ -9,15 +9,17 @@ use uuid::Uuid;
 
 use super::{
     credentials,
-    model::{ConnectionId, InboxId},
+    model::{ConnectionId, InboxId, Provider},
+    schedule,
 };
 use crate::{deps::Deps, events::ConnectionRemoved};
 
 /// The blob owner type of a connection (its account document).
 pub const CONNECTION_OWNER: &str = "connectors.connection";
 
-/// The blob owner type of a Gmail index row.
-pub const GMAIL_MESSAGE_OWNER: &str = "connectors.gmail_message";
+/// The blob owner type of an index row (`connectors.messages`). The name
+/// predates the second adapter; stored holds use it, so it never changes.
+pub const MESSAGE_OWNER: &str = "connectors.gmail_message";
 
 /// The blob owner type of a batch row.
 pub const BATCH_OWNER: &str = "connectors.batch";
@@ -27,29 +29,53 @@ pub const BATCH_OWNER: &str = "connectors.batch";
 /// member asked for the link to be cut and the credentials are deleted
 /// either way.
 pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: ConnectionId) {
-    let (Some(cipher), Some(google)) = (&deps.cipher, &deps.google) else {
+    let Some(cipher) = &deps.cipher else {
         return;
     };
-    let token = async {
+    let found = async {
         let mut tx = state.db.begin_for(workspace).await?;
         let token = credentials::refresh_token(&mut tx, cipher, id).await;
+        let target = sqlx::query!(
+            "SELECT provider, provider_server FROM connectors.connections WHERE id = $1",
+            id as ConnectionId
+        )
+        .fetch_optional(&mut *tx)
+        .await?;
         tx.commit().await?;
-        Ok::<_, sqlx::Error>(token)
+        Ok::<_, sqlx::Error>((token, target))
     }
     .await;
-    match token {
-        Ok(Ok(Some(token))) => {
-            if let Err(err) = google.revoke(&token).await {
-                tracing::warn!(%workspace, connection = %id, error = %err, "could not revoke the grant at Google");
-            }
-        }
-        Ok(Ok(None)) => {}
-        Ok(Err(_)) => {
+    let (token, target) = match found {
+        Ok((Ok(Some(token)), Some(target))) => (token, target),
+        Ok((Ok(_), _)) => return,
+        Ok((Err(_), _)) => {
             tracing::warn!(%workspace, connection = %id, "stored credentials unreadable: nothing to revoke");
+            return;
         }
         Err(err) => {
             tracing::warn!(%workspace, connection = %id, error = %err, "could not read credentials to revoke");
+            return;
         }
+    };
+    let revoked = match Provider::parse(&target.provider) {
+        Ok(Provider::Google) => match &deps.google {
+            Some(google) => google.revoke(&token).await,
+            None => return,
+        },
+        Ok(Provider::Zoho) => {
+            let centre = deps.zoho.as_ref().and_then(|zoho| {
+                let server = target.provider_server.as_deref()?;
+                Some((zoho, zoho.centre(server)?))
+            });
+            match centre {
+                Some((zoho, centre)) => zoho.revoke(&centre, &token).await,
+                None => return,
+            }
+        }
+        Err(_) => return,
+    };
+    if let Err(err) = revoked {
+        tracing::warn!(%workspace, connection = %id, provider = target.provider, error = %err, "could not revoke the grant at the provider");
     }
 }
 
@@ -70,7 +96,7 @@ pub async fn delete(
     .fetch_all(&mut **tx)
     .await?;
     let owners = sqlx::query!(
-        r#"SELECT m.id AS "id!", 'm' AS "kind!" FROM connectors.gmail_messages m
+        r#"SELECT m.id AS "id!", 'm' AS "kind!" FROM connectors.messages m
              JOIN connectors.streams s ON s.id = m.stream_id WHERE s.connection_id = $1
            UNION ALL
            SELECT b.id AS "id!", 'b' AS "kind!" FROM connectors.batches b
@@ -81,7 +107,7 @@ pub async fn delete(
     .await?;
     for owner in owners {
         let kind = if owner.kind == "m" {
-            GMAIL_MESSAGE_OWNER
+            MESSAGE_OWNER
         } else {
             BATCH_OWNER
         };
@@ -108,6 +134,7 @@ pub async fn delete(
     if deleted == 0 {
         return Ok(false);
     }
+    schedule::forget_budget(tx, &schedule::connection_budget(id)).await?;
     state
         .events
         .publish(
