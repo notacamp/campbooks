@@ -332,6 +332,114 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/changes": {
+      "get": {
+        "tags": [
+          "changes"
+        ],
+        "summary": "Follow a workspace's changes.",
+        "description": "A Server-Sent Events stream of what changed in the workspace, for clients\nthat keep a cache: each `change` frame names a record and an operation\n(`{\"cursor\",\"record\":{\"type\",\"id\"},\"op\":\"upsert\"|\"delete\",\"version\"}`),\nnever its contents; refetch what you show. Frames: `ready` (where the\nstream starts), `change`, `heartbeat` (an SSE comment, or the cursor when\nit moved past changes you may not see), `reset` (your cursor is unknown,\nexpired or too far behind: refetch everything, continue from the\ncursor given), `revoked` (you no longer belong to the workspace) and\n`closing` (the stream ends; reconnect with your cursor). Every frame\nthat carries a cursor sets the SSE `id`, so `EventSource` resumes on its\nown. You only receive changes of records a read operation you hold a\nscope for returns.",
+        "operationId": "changes.stream",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "Last-Event-ID",
+            "in": "header",
+            "description": "The last cursor received; resumes after it.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The last cursor received, for clients that cannot send\n`Last-Event-ID` (the header wins when both are present). Omit it to\nstart from now.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The change stream.",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`too_many_streams`: you hold the maximum number of open streams.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "workspaces:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -2490,6 +2598,10 @@
     {
       "name": "workspaces",
       "description": "Workspaces, members and roles, invitations and the security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a caller who is not a member (or a client token bound to another workspace) gets 404."
+    },
+    {
+      "name": "changes",
+      "description": "The change feed: a Server-Sent Events stream per workspace of the records that changed (ids only), so clients refetch only what they show."
     },
     {
       "name": "bff",

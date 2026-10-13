@@ -403,6 +403,8 @@ dependencies = [
  "campbooks-workspaces",
  "chrono",
  "clap",
+ "futures-util",
+ "http-body-util",
  "log",
  "opentelemetry",
  "opentelemetry-otlp",

@@ -163,6 +163,38 @@
           }
         }
       }
+    },
+    {
+      "name": "workspaces.workspace_updated",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A workspace setting changed (its name or its colour). Carries which\nsettings changed, never their values.",
+        "required": [
+          "workspace",
+          "fields",
+          "updated_by"
+        ],
+        "properties": {
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The settings that changed: `name`, `accent`."
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "Who changed them."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
     }
   ],
   "components": {
