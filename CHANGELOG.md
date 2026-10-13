@@ -22,6 +22,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   last way in; removing one signs out whoever used it), and adding or removing one needs
   a sign-in in the last ten minutes. They need `https://` (or `http://localhost`), and are
   bound to the host of `CAMPBOOKS_PUBLIC_URL`: changing that host retires them.
+- A ready-made image for the local `decide` model: `ghcr.io/notacamp/campbooks-laya`,
+  published for linux/amd64 and linux/arm64 with the same tags as the Campbooks image
+  and scanned the same way. `docker compose --profile ai` now pulls it instead of
+  building `deploy/laya` on your machine (the `build:` line is still there, commented,
+  if you prefer to build it). The model checkpoint still downloads into the
+  `laya-models` volume on first start. Pin it to the same tag as the server image.
 - Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
   asks a second time, for the mail, only when the account is new; signing
   in again never asks), and members can connect more Zoho logins; every
