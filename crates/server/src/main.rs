@@ -203,8 +203,13 @@ async fn run(
     if role.worker() {
         config.jobs.check()?;
     }
-    let deps = campbooks_server::Deps::from_env()?;
-    let registry = campbooks_server::registry(&deps)?;
+    let composition = campbooks_server::Composition::from_env(&config)?;
+    if composition.connectors.google.is_some() {
+        tracing::info!("Google accounts can be connected");
+    } else {
+        tracing::info!("CAMPBOOKS_GOOGLE__CLIENT_ID unset: Google accounts cannot be connected");
+    }
+    let registry = campbooks_server::registry_with(&composition)?;
     if config.run_migrations {
         migrate(&config).await?;
     }
@@ -228,7 +233,7 @@ async fn run(
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
     if role.api() {
-        let app = campbooks_server::router(state.clone(), &deps, bff);
+        let app = campbooks_server::router_with(state.clone(), bff, &composition);
         let listener = tokio::net::TcpListener::bind(bind_addr)
             .await
             .map_err(|e| format!("could not bind {bind_addr}: {e}"))?;
@@ -413,9 +418,7 @@ fn replay(consumer: &str, since: Option<&str>) -> ExitCode {
         Ok(config) => config,
         Err(e) => return fail(&e.to_string()),
     };
-    // Replay only enqueues deliveries; it runs nothing, so it needs no
-    // configured dependencies.
-    let registry = match campbooks_server::registry(&campbooks_server::Deps::offline()) {
+    let registry = match campbooks_server::registry() {
         Ok(registry) => registry,
         Err(e) => return fail(&e.to_string()),
     };

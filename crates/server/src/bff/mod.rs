@@ -22,7 +22,6 @@
 
 pub mod config;
 mod cookies;
-mod crypto;
 mod csrf;
 mod handlers;
 mod oidc;
@@ -54,10 +53,11 @@ pub use config::{Loaded, Settings};
 pub use cookies::SESSION_COOKIE;
 pub use csrf::CSRF_HEADER;
 
+use campbooks_kernel::crypto::{self, Cipher, hash, random_token};
+
 use self::{
     config::{ROTATION_GRACE, Timeouts},
     cookies::Cookies,
-    crypto::{Cipher, hash, random_token},
     oidc::{Oidc, OidcError},
     store::Session,
 };

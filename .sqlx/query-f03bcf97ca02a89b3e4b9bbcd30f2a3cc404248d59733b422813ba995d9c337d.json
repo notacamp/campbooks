@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT (SELECT count(*) FROM connectors.connections)\n                + (SELECT count(*) FROM connectors.credentials)\n                + (SELECT count(*) FROM connectors.streams)\n                + (SELECT count(*) FROM connectors.sync_due)\n                + (SELECT count(*) FROM connectors.gmail_messages)\n                + (SELECT count(*) FROM connectors.batches)\n                + (SELECT count(*) FROM kernel.blob_refs WHERE owner_type LIKE 'connectors.%')\n           AS \"n!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f03bcf97ca02a89b3e4b9bbcd30f2a3cc404248d59733b422813ba995d9c337d"
+}

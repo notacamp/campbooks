@@ -9,12 +9,41 @@
 //! with `BlobStore::get` in the event's workspace, and it is deleted with the
 //! workspace.
 
-use campbooks_kernel::DomainEvent;
+use campbooks_kernel::{
+    DomainEvent, RecordRef, blobs::BlobRef, changes::Change as FeedChange, tenancy::UserId,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::model::{BlobPointer, Channel, ConversationId, InboxId, LabelId, MessageId, Stream};
+use crate::model::{
+    BlobPointer, Channel, ConnectionId, ConversationId, InboxId, LabelId, MessageId, Stream,
+};
+
+/// Record type of an inbox: the container a conversation's changes are
+/// visible within (the change feed's `Visibility` port).
+pub const INBOX_RECORD: &str = "conversations.inbox";
+/// Record type of a conversation.
+pub const CONVERSATION_RECORD: &str = "conversations.conversation";
+/// Record type of a message.
+pub const MESSAGE_RECORD: &str = "conversations.message";
+
+/// `inbox` as the container of a change.
+fn inbox_record(inbox: InboxId) -> RecordRef {
+    RecordRef::new(INBOX_RECORD, &inbox)
+}
+
+impl MessageFacts {
+    /// The conversation and the message, upserted, within their inbox.
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+            FeedChange::upsert(RecordRef::new(MESSAGE_RECORD, &self.message))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
 
 /// Facts about one message, shared by [`MessageReceived`] and
 /// [`MessageSent`].
@@ -60,6 +89,10 @@ impl DomainEvent for MessageReceived {
     fn workspace(&self) -> Option<&str> {
         Some(&self.message.workspace)
     }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        self.message.changes()
+    }
 }
 
 /// An outbound message was stored for the first time (sent from the
@@ -77,6 +110,10 @@ impl DomainEvent for MessageSent {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.message.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        self.message.changes()
     }
 }
 
@@ -154,6 +191,16 @@ impl DomainEvent for ConversationChanged {
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        let record = RecordRef::new(CONVERSATION_RECORD, &self.conversation);
+        let change = if self.state.is_some() {
+            FeedChange::upsert(record)
+        } else {
+            FeedChange::delete(record)
+        };
+        vec![change.within(inbox_record(self.inbox))]
     }
 }
 
@@ -257,4 +304,66 @@ impl DomainEvent for WorkspaceDeleting {
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)
     }
+}
+
+/// `connectors.messages_changed` v1, as this module reads it
+/// (`contracts/connectors.messages_changed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MessagesChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox; equals the batch's `inbox`.
+    pub inbox_id: InboxId,
+    /// The `MessageChangeBatch` v1 document, a blob of the workspace.
+    pub batch: BlobRef,
+}
+
+impl DomainEvent for MessagesChanged {
+    const NAME: &'static str = "connectors.messages_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.capability_granted` v1, as this module reads it
+/// (`contracts/connectors.capability_granted.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CapabilityGranted {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (an id owned by the connectors module).
+    pub connection: ConnectionId,
+    /// The capability granted (`messages`, `calendar`, …).
+    pub capability: String,
+    /// The member whose consent it is: the new inbox's manager.
+    pub granted_by: UserId,
+    /// The inbox to create (`messages` only).
+    #[serde(default)]
+    pub inbox_id: Option<InboxId>,
+    /// The connection-account v1 document (address, display name), a blob.
+    pub account: BlobRef,
+}
+
+impl DomainEvent for CapabilityGranted {
+    const NAME: &'static str = "connectors.capability_granted";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// The connection-account v1 document, as this module reads it
+/// (`contracts/connection-account.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct AccountDocument {
+    /// The format version, 1.
+    pub version: u16,
+    /// The account's email address, lower-cased.
+    pub address: String,
+    /// The account's display name, when the provider gives one.
+    #[serde(default)]
+    pub display_name: Option<String>,
 }

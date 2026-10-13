@@ -23,7 +23,7 @@ use campbooks_kernel::{
     jobs::{self, EnqueueOptions, PruneJobs, Worker},
     testing::{self, TestIdp, TestResponse},
 };
-use campbooks_server::{Deps, registry, router, telemetry, with_ports};
+use campbooks_server::{registry, router, telemetry, with_ports};
 use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_sdk::trace::{InMemorySpanExporter, SdkTracerProvider, SpanData};
 use sqlx::{PgPool, postgres::PgPoolOptions};
@@ -140,9 +140,9 @@ async fn requests_and_jobs_carry_no_personal_data_or_secrets(db: PgPool) {
     let state = with_ports(
         idp.state(pool.clone())
             .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
-            .with_registry(registry(&Deps::offline()).unwrap()),
+            .with_registry(registry().unwrap()),
     );
-    let app = router(state.clone(), &Deps::offline(), None);
+    let app = router(state.clone(), None);
     let mut claims = idp.claims("workspaces:read workspaces:write workspaces:admin");
     claims["email"] = ALICE.into();
     claims["email_verified"] = true.into();
@@ -341,10 +341,10 @@ async fn the_metrics_page_has_low_cardinality_series(db: PgPool) {
             testing::config("postgres://test@localhost/test"),
         )
         .with_metrics(telemetry.metrics())
-        .with_registry(registry(&Deps::offline()).unwrap()),
+        .with_registry(registry().unwrap()),
     );
 
-    let app = router(state.clone(), &Deps::offline(), None);
+    let app = router(state.clone(), None);
     let ids = [
         "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5b",
         "0192a1b2-c3d4-7e5f-8a9b-0c1d2e3f4a5c",

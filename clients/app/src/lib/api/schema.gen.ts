@@ -88,6 +88,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List connections. */
+        get: operations["connectors.list_connections"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/authorizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start connecting an account. */
+        post: operations["connectors.start_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/authorizations/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Complete a connection. */
+        post: operations["connectors.complete_connection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/{connection_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read a connection. */
+        get: operations["connectors.get_connection"];
+        put?: never;
+        post?: never;
+        /** Disconnect a connection. */
+        delete: operations["connectors.disconnect"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/connections/{connection_id}/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sync a connection now. */
+        post: operations["connectors.sync_now"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations": {
         parameters: {
             query?: never;
@@ -661,10 +747,20 @@ export interface components {
              */
             size: number;
         };
+        /**
+         * Format: uuid
+         * @description AuthorizationId (UUIDv7)
+         */
+        AuthorizationId: string;
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
         };
+        /**
+         * @description What a connection lets Campbooks do with the account.
+         * @enum {string}
+         */
+        Capability: "messages" | "calendar" | "files" | "bank";
         /** @description The new role. */
         ChangeRole: {
             /** @description The member's new role. */
@@ -675,6 +771,56 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /** @description What Google redirected the browser with. */
+        CompleteConnection: {
+            /** @description The `code` query parameter. */
+            code: string;
+            /** @description The `state` query parameter. */
+            state: string;
+        };
+        /**
+         * Format: uuid
+         * @description ConnectionId (UUIDv7)
+         */
+        ConnectionId: string;
+        /** @description The caller's connections. */
+        ConnectionList: {
+            /** @description Oldest first. */
+            connections: components["schemas"]["ConnectionView"][];
+        };
+        /** @description A connection as the API shows it. Never carries a credential. */
+        ConnectionView: {
+            /** @description The account's email address. */
+            address: string;
+            /** @description Whether the provider verified it. */
+            address_verified: boolean;
+            /** @description What it lets Campbooks do. */
+            capabilities: components["schemas"]["Capability"][];
+            /**
+             * Format: date-time
+             * @description When it was connected.
+             */
+            created_at: string;
+            /** @description The account's display name, when the provider gives one. */
+            display_name?: string | null;
+            /** @description The member who granted it. */
+            granted_by: components["schemas"]["UserId"];
+            /** @description How it is doing. */
+            health: components["schemas"]["Health"];
+            /**
+             * Format: date-time
+             * @description Since when it has had this health.
+             */
+            health_changed_at: string;
+            /** @description Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …). */
+            health_reason?: string | null;
+            /** @description The connection. */
+            id: components["schemas"]["ConnectionId"];
+            /** @description The provider. */
+            provider: components["schemas"]["Provider"];
+            /** @description Its change streams. */
+            streams: components["schemas"]["StreamView"][];
+        };
         /** @description A conversation and its newest messages, oldest first. */
         ConversationDetail: {
             /** @description The conversation. */
@@ -752,6 +898,11 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /**
+         * @description How a connection is doing.
+         * @enum {string}
+         */
+        Health: "ok" | "needs_reauth" | "throttled" | "failing";
         /** @description The instance is healthy. */
         HealthResponse: {
             /**
@@ -955,6 +1106,11 @@ export interface components {
             stream: components["schemas"]["Stream"];
         };
         /**
+         * @description Where a stream is in its reading.
+         * @enum {string}
+         */
+        Phase: "backfill" | "incremental" | "resync";
+        /**
          * @description RFC 9457 problem details.
          * @example {
          *       "code": "not_found",
@@ -989,6 +1145,11 @@ export interface components {
              */
             type: string;
         };
+        /**
+         * @description An outside provider.
+         * @enum {string}
+         */
+        Provider: "google";
         /**
          * @description A member's role in a workspace.
          * @enum {string}
@@ -1043,6 +1204,26 @@ export interface components {
             /** @description Stable user id at the identity provider. */
             sub: string;
         };
+        /** @description What to connect. */
+        StartConnection: {
+            /** @description The capabilities to ask for (`messages` is offered today). */
+            capabilities: components["schemas"]["Capability"][];
+            connection?: components["schemas"]["ConnectionId"] | null;
+            /** @description The provider. */
+            provider: components["schemas"]["Provider"];
+        };
+        /** @description A started consent. */
+        StartedConnection: {
+            /** @description The started authorization. */
+            authorization: components["schemas"]["AuthorizationId"];
+            /** @description Where to send the browser. */
+            authorize_url: string;
+            /**
+             * Format: date-time
+             * @description When the consent must be completed by.
+             */
+            expires_at: string;
+        };
         /**
          * @description The one place Campbooks sorts a conversation into. The built-in set; the
          *     workspace's own streams come later.
@@ -1054,6 +1235,39 @@ export interface components {
          * @enum {string}
          */
         StreamSource: "default" | "rules" | "model" | "member";
+        /** @description A change stream as the API shows it. */
+        StreamView: {
+            /** @description The capability it reads. */
+            capability: components["schemas"]["Capability"];
+            inbox_id?: components["schemas"]["InboxId"] | null;
+            /**
+             * Format: date-time
+             * @description When a run last found a change.
+             */
+            last_change_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When a run last finished.
+             */
+            last_synced_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it is next due.
+             */
+            next_sync_at?: string | null;
+            /** @description Paused until the member connects again. */
+            paused: boolean;
+            /** @description Where it is in its reading. */
+            phase: components["schemas"]["Phase"];
+        };
+        /** @description What was scheduled. */
+        SyncScheduled: {
+            /**
+             * Format: int32
+             * @description How many streams will run now.
+             */
+            streams: number;
+        };
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -1399,6 +1613,363 @@ export interface operations {
             };
             /** @description `too_many_streams`: you hold the maximum number of open streams. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.list_connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connections you may see. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.start_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartConnection"];
+            };
+        };
+        responses: {
+            /** @description Send the browser to `authorize_url`. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartedConnection"];
+                };
+            };
+            /** @description No capability, or one that is not offered (`capabilities_required`, `capability_not_offered`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or no such connection of yours. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The provider is not configured on this instance (`provider_not_configured`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.complete_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompleteConnection"];
+            };
+        };
+        responses: {
+            /** @description The connection, syncing. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope; a client token (`connection_needs_user`); no capability granted (`consent_incomplete`); or no offline access (`no_offline_access`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such started connection of yours in this workspace, or it expired. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The code was refused (`authorization_code_invalid`), another account consented (`account_mismatch`), another member connected this account (`account_connected_by_another_member`), or the provider is not configured. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The provider could not be reached (`provider_unavailable`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.get_connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectionView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.disconnect": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "connectors.sync_now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The connection. */
+                connection_id: components["schemas"]["ConnectionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Its streams run now; a run already waiting absorbs this one. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncScheduled"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such connection, or you may not see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The member must connect it again first (`needs_reauth`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

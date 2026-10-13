@@ -10,6 +10,7 @@ pub mod blobs;
 pub mod changes;
 pub mod clock;
 pub mod config;
+pub mod crypto;
 pub mod db;
 pub mod error;
 pub mod events;

@@ -16,6 +16,10 @@ define_id!(
     ConversationId
 );
 define_id!(
+    /// A connection, owned by the connectors module (referenced by id only).
+    ConnectionId
+);
+define_id!(
     /// A message: one item of a conversation.
     MessageId
 );

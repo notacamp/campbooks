@@ -5,6 +5,7 @@
  * record of that type invalidates the queries keyed by those operationIds.
  */
 export const recordReaders: Readonly<Record<string, readonly string[]>> = {
+  "connectors.connection": ["connectors.get_connection", "connectors.list_connections"],
   "conversations.conversation": ["conversations.get", "conversations.list"],
   "conversations.inbox": ["conversations.list_inboxes"],
   "conversations.message": ["conversations.get", "conversations.get_message_body"],

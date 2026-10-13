@@ -211,7 +211,7 @@ fn run_arch(root: &Path) -> Result<String> {
         campbooks_server::changes::OWNER,
     ));
     violations.extend(arch::check_migration_schemas(&migration_sql, &modules));
-    let registry = campbooks_server::registry(&campbooks_server::Deps::offline());
+    let registry = campbooks_server::registry();
     let background = registry
         .as_ref()
         .err()
@@ -241,17 +241,16 @@ fn run_arch(root: &Path) -> Result<String> {
     }
     violations.extend(arch::check_versions(&version, &crates));
 
-    let scopes: Vec<arch::DeclaredScope> =
-        campbooks_server::modules(&campbooks_server::Deps::offline())
-            .iter()
-            .flat_map(|module| {
-                module.scopes.iter().map(|scope| arch::DeclaredScope {
-                    module: module.name.to_owned(),
-                    name: scope.name.to_owned(),
-                    description: scope.description.to_owned(),
-                })
+    let scopes: Vec<arch::DeclaredScope> = campbooks_server::modules()
+        .iter()
+        .flat_map(|module| {
+            module.scopes.iter().map(|scope| arch::DeclaredScope {
+                module: module.name.to_owned(),
+                name: scope.name.to_owned(),
+                description: scope.description.to_owned(),
             })
-            .collect();
+        })
+        .collect();
     violations.extend(arch::check_scopes(&scopes));
     let catalogue: BTreeSet<String> = scopes.iter().map(|s| s.name.clone()).collect();
     let spec = serde_json::to_value(campbooks_server::openapi())
@@ -289,7 +288,7 @@ fn run_arch(root: &Path) -> Result<String> {
 /// change feed (no module may take either name).
 fn operation_owners() -> Result<arch::Owners> {
     let mut owners = arch::Owners::new();
-    let documents = campbooks_server::modules(&campbooks_server::Deps::offline())
+    let documents = campbooks_server::modules()
         .into_iter()
         .map(|module| (module.name, module.router.into_openapi()))
         .chain([

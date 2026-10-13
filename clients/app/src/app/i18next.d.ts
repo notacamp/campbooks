@@ -6,6 +6,7 @@ import type { ShortcutMessages } from "~/lib/shortcuts";
 import type { UiMessages } from "~/lib/ui";
 import type system from "~/modules/system/i18n/en.json";
 import type conversations from "~/modules/conversations/i18n/en.json";
+import type connectors from "~/modules/connectors/i18n/en.json";
 
 declare module "i18next" {
   interface CustomTypeOptions {
@@ -16,6 +17,7 @@ declare module "i18next" {
       shortcuts: ShortcutMessages;
       system: typeof system;
       conversations: typeof conversations;
+      connectors: typeof connectors;
       // `cargo xtask new-module` inserts above this line.
     };
   }

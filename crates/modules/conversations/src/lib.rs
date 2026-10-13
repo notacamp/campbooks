@@ -52,6 +52,7 @@ pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
+pub use features::inbox_visibility::visibility;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
@@ -71,6 +72,13 @@ pub struct ConversationsDeps {
     pub rules: Arc<dyn Strategy>,
     /// Which answers may act, per question and source.
     pub policy: Policy,
+}
+
+impl Default for ConversationsDeps {
+    /// [`offline`](Self::offline).
+    fn default() -> Self {
+        Self::offline()
+    }
 }
 
 impl std::fmt::Debug for ConversationsDeps {
@@ -145,6 +153,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.config.decide_backfill_days,
                 deps.policy,
             ))
+            .on_event::<features::ingest_messages::IngestMessages>()
+            .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
     }

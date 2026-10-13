@@ -1,9 +1,7 @@
 //! `campbooks-server` — composes the modules into one HTTP API.
 //!
 //! This is the only crate that knows the full list of modules. Adding a module
-//! means adding one line to [`modules`], which composes each module with the
-//! dependencies it takes ([`Deps`]: built from the environment to run, or
-//! [`Deps::offline`] to describe the modules without running them). Their background work (jobs, event
+//! means adding one line to [`modules`]. Their background work (jobs, event
 //! handlers, schedules, published events) is collected by [`registry`]; their
 //! operations form the catalogue of [`openapi`] (ADR 0013).
 
@@ -70,77 +68,91 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
 /// `security(("bearer" = ["<scope>"]))`.
 pub const SECURITY_SCHEME: &str = "bearer";
 
-/// What modules are composed with. Modules never look dependencies up: the
-/// server builds them once and hands each module its own.
-#[derive(Debug, Clone)]
-pub struct Deps {
-    /// The `conversations` module's: the AI gateway and its settings.
+/// What the modules are composed with (constructor injection), read from
+/// the environment at startup. `Default` is inert (no provider configured):
+/// what the catalogues (OpenAPI, events, scopes) are built from.
+#[derive(Debug, Clone, Default)]
+pub struct Composition {
+    /// The connectors module's settings, Google client and credentials
+    /// cipher.
+    pub connectors: campbooks_connectors::Deps,
+    /// The conversations module's AI gateway (when an AI role is set),
+    /// settings, rules strategy and per-question policy.
     pub conversations: campbooks_conversations::ConversationsDeps,
 }
 
-impl Deps {
-    /// Dependencies from the environment (`CAMPBOOKS_AI__*`,
-    /// `CAMPBOOKS_CONVERSATIONS__*`). The AI gateway exists only when some
-    /// AI role is configured.
-    pub fn from_env() -> Result<Self, String> {
+impl Composition {
+    /// Read every module's dependencies from the environment. A broken
+    /// setting is an error naming it.
+    pub fn from_env(config: &campbooks_kernel::Config) -> Result<Self, String> {
         let ai = campbooks_ai::AiConfig::from_env().map_err(|e| e.to_string())?;
         let gateway = if ai.roles.is_empty() {
             None
         } else {
             Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
         };
-        let config = campbooks_conversations::ConversationsConfig::from_env()?;
         Ok(Self {
-            conversations: campbooks_conversations::ConversationsDeps::new(gateway, config),
+            connectors: campbooks_connectors::Deps::from_env(config)?,
+            conversations: campbooks_conversations::ConversationsDeps::new(
+                gateway,
+                campbooks_conversations::ConversationsConfig::from_env()?,
+            ),
         })
-    }
-
-    /// No AI and default settings: for describing the modules (OpenAPI,
-    /// scopes, the events catalogue, `cargo xtask`) without running them.
-    pub fn offline() -> Self {
-        Self {
-            conversations: campbooks_conversations::ConversationsDeps::offline(),
-        }
     }
 }
 
-/// Every module, composed with `deps`, in mount order.
-pub fn modules(deps: &Deps) -> Vec<Module> {
+/// Every module, in mount order, composed inertly (for catalogues).
+pub fn modules() -> Vec<Module> {
+    modules_with(&Composition::default())
+}
+
+/// Every module, in mount order, composed with `composition`.
+pub fn modules_with(composition: &Composition) -> Vec<Module> {
     vec![
         campbooks_system::module(),
         campbooks_workspaces::module(),
-        campbooks_conversations::module(deps.conversations.clone()),
+        campbooks_connectors::module(composition.connectors.clone()),
+        campbooks_conversations::module(composition.conversations.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
 
 /// `state` with the ports modules implement for the kernel registered: the
 /// `workspaces` module answers who belongs to which workspace and which
-/// language each user chose.
+/// language each user chose; the `conversations` module, who may see the
+/// change feed's records inside an inbox.
 pub fn with_ports(state: AppState) -> AppState {
     state
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
+        .with_visibility(campbooks_conversations::visibility())
 }
 
-/// Every job kind, event handler and schedule of every module (composed
-/// with `deps`), plus the kernel's maintenance and the web BFF's. Fails when
-/// a registration breaks a naming rule or is duplicated (also checked by
-/// `cargo xtask arch`).
-pub fn registry(deps: &Deps) -> Result<Registry, RegistryError> {
-    Registry::build_with(&modules(deps), &[(bff::OWNER, &bff::background())])
+/// Every job kind, event handler and schedule of every module, plus the
+/// kernel's maintenance and the web BFF's. Fails when a registration breaks
+/// a naming rule or is duplicated (also checked by `cargo xtask arch`).
+pub fn registry() -> Result<Registry, RegistryError> {
+    registry_with(&Composition::default())
+}
+
+/// [`registry`] of the modules composed with `composition`.
+pub fn registry_with(composition: &Composition) -> Result<Registry, RegistryError> {
+    Registry::build_with(
+        &modules_with(composition),
+        &[(bff::OWNER, &bff::background())],
+    )
 }
 
 /// Every event the modules publish, with its payload schema: what
 /// `campbooks-server events catalogue` prints and `openapi/events.json` holds.
 pub fn events_catalogue() -> Result<EventCatalogue, RegistryError> {
-    registry(&Deps::offline()).map(|registry| EventCatalogue::new(&registry))
+    registry().map(|registry| EventCatalogue::new(&registry))
 }
 
 /// Every OAuth scope the API knows, sorted by name: what
 /// `campbooks-server scopes` prints and the identity provider mirrors.
 pub fn scope_catalogue() -> Vec<ScopeInfo> {
-    let mut scopes: Vec<ScopeInfo> = modules(&Deps::offline())
+    let mut scopes: Vec<ScopeInfo> = modules()
         .iter()
         .flat_map(|module| module.scopes.iter().copied())
         .collect();
@@ -188,6 +200,9 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
+        (name = "connectors", description = "Connections to outside accounts (Gmail first): \
+            connect with the provider's consent, see their health, sync now, disconnect. \
+            Credentials are never returned."),
         (name = "conversations", description = "Inboxes, conversations and messages on any \
             channel (email first), sorted into streams. Workspace-owned: a user sees the inboxes \
             they are a member of; a client token bound to the workspace sees them all."),
@@ -199,13 +214,17 @@ fn security_scheme() -> SecurityScheme {
 )]
 struct ApiDoc;
 
-fn api(deps: &Deps) -> OpenApiRouter<AppState> {
+fn api() -> OpenApiRouter<AppState> {
+    api_with(&Composition::default())
+}
+
+fn api_with(composition: &Composition) -> OpenApiRouter<AppState> {
     let mut doc = ApiDoc::openapi();
     env!("CARGO_PKG_VERSION").clone_into(&mut doc.info.version);
     doc.components
         .get_or_insert_with(Default::default)
         .add_security_scheme(SECURITY_SCHEME, security_scheme());
-    modules(deps)
+    modules_with(composition)
         .into_iter()
         .fold(OpenApiRouter::with_openapi(doc), |api, module| {
             api.merge(module.router)
@@ -215,7 +234,7 @@ fn api(deps: &Deps) -> OpenApiRouter<AppState> {
 
 /// The OpenAPI document: every module's routes and the web BFF's.
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    let mut doc = api(&Deps::offline()).into_openapi();
+    let mut doc = api().into_openapi();
     doc.merge(bff::openapi());
     doc
 }
@@ -232,13 +251,21 @@ pub fn openapi() -> utoipa::openapi::OpenApi {
 /// [`Operations`](operations::Operations), so automation and the assistant
 /// invoke operations by id through exactly what HTTP requests reach. The
 /// BFF's own operations are not in that catalogue: they serve browsers only.
-/// Modules are composed with `deps`.
-pub fn router(state: AppState, deps: &Deps, bff: Option<bff::Settings>) -> Router {
+pub fn router(state: AppState, bff: Option<bff::Settings>) -> Router {
+    router_with(state, bff, &Composition::default())
+}
+
+/// [`router`] over the modules composed with `composition`.
+pub fn router_with(
+    state: AppState,
+    bff: Option<bff::Settings>,
+    composition: &Composition,
+) -> Router {
     let operations::Composed {
         routes,
         mut spec,
         state,
-    } = operations::compose(api(deps), state);
+    } = operations::compose(api_with(composition), state);
     spec.merge(bff::openapi());
     let spec = Arc::new(spec);
 
@@ -317,11 +344,7 @@ mod tests {
     use super::*;
 
     fn app() -> Router {
-        router(
-            testing::state(testing::unreachable_pool()),
-            &Deps::offline(),
-            None,
-        )
+        router(testing::state(testing::unreachable_pool()), None)
     }
 
     #[test]
@@ -384,7 +407,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique, "sorted and unique");
-        for module in modules(&Deps::offline()) {
+        for module in modules() {
             for scope in module.scopes {
                 assert!(
                     scope.name.starts_with(&format!("{}:", module.name)),
@@ -511,7 +534,7 @@ mod tests {
                 pool.clone(),
                 testing::config("postgres://test@localhost/test"),
             )
-            .with_registry(registry(&Deps::offline()).unwrap()),
+            .with_registry(registry().unwrap()),
         );
         let mut tx = pool.begin().await.unwrap();
         jobs::enqueue(&mut tx, &PruneJobs, EnqueueOptions::default())
@@ -524,7 +547,7 @@ mod tests {
 
     #[test]
     fn registry_builds() {
-        let registry = registry(&Deps::offline()).unwrap();
+        let registry = registry().unwrap();
         assert!(registry.kind_names().contains(&"kernel.prune_jobs"));
         assert!(registry.kind_names().contains(&"kernel.prune_idempotency"));
     }
@@ -551,10 +574,7 @@ mod tests {
 
     #[tokio::test]
     async fn operations_are_invocable_by_id_and_gated_by_their_metadata() {
-        let composed = operations::compose(
-            api(&Deps::offline()),
-            testing::state(testing::unreachable_pool()),
-        );
+        let composed = operations::compose(api(), testing::state(testing::unreachable_pool()));
         let catalogue = composed.state.operations.catalogue().unwrap();
         assert!(
             catalogue
@@ -596,7 +616,7 @@ mod tests {
 
     #[test]
     fn module_names_are_unique() {
-        let mut names: Vec<_> = modules(&Deps::offline()).iter().map(|m| m.name).collect();
+        let mut names: Vec<_> = modules().iter().map(|m| m.name).collect();
         names.sort_unstable();
         let before = names.len();
         names.dedup();
@@ -715,11 +735,7 @@ mod tests {
     fn web_app(dir: &WebDir) -> Router {
         let mut config = testing::config("postgres://test@localhost/test");
         config.web_dir = Some(dir.0.clone());
-        router(
-            AppState::new(testing::unreachable_pool(), config),
-            &Deps::offline(),
-            None,
-        )
+        router(AppState::new(testing::unreachable_pool(), config), None)
     }
 
     struct Raw {

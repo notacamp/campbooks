@@ -44,12 +44,10 @@ impl Replica {
         config.changes.poll_interval_ms = 200;
         tweak(&mut config.changes);
         let state = crate::with_ports(
-            AppState::new(testing::app_role_pool(db).await, config).with_registry(
-                crate::registry(&crate::Deps::offline()).expect("valid registrations"),
-            ),
+            AppState::new(testing::app_role_pool(db).await, config)
+                .with_registry(crate::registry().expect("valid registrations")),
         );
-        let operations::Composed { routes, state, .. } =
-            operations::compose(crate::api(&crate::Deps::offline()), state);
+        let operations::Composed { routes, state, .. } = operations::compose(crate::api(), state);
         let app = routes
             .fallback(|| async { campbooks_kernel::Error::NotFound })
             .with_state(state.clone());

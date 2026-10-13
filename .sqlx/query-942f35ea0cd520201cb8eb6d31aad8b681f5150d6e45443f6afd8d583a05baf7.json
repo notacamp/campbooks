@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO connectors.provider_budgets (provider, tokens, refilled_at)\n           VALUES ($1, $2, clock_timestamp())\n           ON CONFLICT (provider) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Float8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "942f35ea0cd520201cb8eb6d31aad8b681f5150d6e45443f6afd8d583a05baf7"
+}

@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: ConnectionId\" FROM connectors.connections",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "21ab72dd4faabf6b273ec3465f0b5faf692b24820cd77bebabf38822f763eab7"
+}

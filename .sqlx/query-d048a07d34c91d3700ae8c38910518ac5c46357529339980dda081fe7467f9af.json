@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.gmail_messages\n                          SET label_ids = $2, listed_generation = greatest(listed_generation, $3)\n                        WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "d048a07d34c91d3700ae8c38910518ac5c46357529339980dda081fe7467f9af"
+}

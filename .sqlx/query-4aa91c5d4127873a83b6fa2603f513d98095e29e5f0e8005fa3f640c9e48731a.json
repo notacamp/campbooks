@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.streams SET paused = true WHERE connection_id = $1\n        RETURNING id AS \"id: StreamId\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "4aa91c5d4127873a83b6fa2603f513d98095e29e5f0e8005fa3f640c9e48731a"
+}

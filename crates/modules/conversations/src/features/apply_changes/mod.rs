@@ -48,7 +48,7 @@ use crate::{
         policy::Policy,
         redact,
     },
-    events::{Change, MessageFacts, MessageReceived, MessageSent, Origin},
+    events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
         ApplyChangesPayload, BATCH_VERSION, MessageChange, MessageChangeBatch, NormalizedMessage,
         ProviderLabel,
@@ -65,8 +65,6 @@ pub const MAX_BATCH_BYTES: usize = 16 * 1024 * 1024;
 /// Characters of a message's snippet.
 pub const SNIPPET_CHARS: usize = 200;
 
-/// Record type of a message, for blob references.
-pub const MESSAGE_RECORD: &str = "conversations.message";
 /// Record type of an attachment, for blob references.
 pub const ATTACHMENT_RECORD: &str = "conversations.attachment";
 /// Record type holding a pending change batch (owner id: its inbox), so the
@@ -917,18 +915,31 @@ pub async fn submit(
         .blobs
         .put(&ws, bytes, crate::ingest::BATCH_CONTENT_TYPE)
         .await?;
-    // Held until the job has applied it, so a retry still finds it.
+    enqueue(state, tx, &ws, batch.inbox, &blob).await?;
+    Ok(blob)
+}
+
+/// Enqueue the application of the stored batch `blob` to `inbox`, in `tx`:
+/// ordered per inbox, once per batch while pending, and with the batch held
+/// until the job has applied it, so a retry still finds it.
+pub async fn enqueue(
+    state: &AppState,
+    tx: &mut Transaction<'_, Postgres>,
+    workspace: &str,
+    inbox: InboxId,
+    blob: &BlobRef,
+) -> campbooks_kernel::Result<()> {
     state
         .blobs
-        .attach(tx, &ws, &blob, &BlobOwner::new(BATCH_RECORD, batch.inbox))
+        .attach(tx, workspace, blob, &BlobOwner::new(BATCH_RECORD, inbox))
         .await?;
     let payload = ApplyChangesPayload {
-        inbox: batch.inbox,
+        inbox,
         batch: blob.clone(),
     };
-    let options = EnqueueOptions::for_workspace(ws)
-        .ordered_by(format!("conversations.inbox:{}", batch.inbox))
-        .unique(format!("{}:{}", batch.inbox, blob.hash));
+    let options = EnqueueOptions::for_workspace(workspace)
+        .ordered_by(format!("conversations.inbox:{inbox}"))
+        .unique(format!("{inbox}:{}", blob.hash));
     campbooks_kernel::jobs::enqueue_to::<ApplyChanges>(tx, &payload, options).await?;
-    Ok(blob)
+    Ok(())
 }
