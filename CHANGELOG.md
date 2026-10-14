@@ -37,6 +37,17 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **Home no longer asks about mail the rules already settled.** A model
+  suggestion is put to you as a question ("Did GitHub ask you to do
+  something?") only when no answer Campbooks acts on already said no; a
+  plain notification stays off Home. Questions raised that way before this
+  fix are withdrawn the next time their conversation is refreshed.
+- **Security alerts about something of yours are a to-do.** A service's
+  notification that says a vulnerability was found, a security alert or an
+  action required (in all four languages), from a sender whose name matches
+  its own domain, with no phishing tell and no marketing, now shows on Home as
+  Do and sorts to Updates. Other notifications from the same service ask
+  nothing.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by

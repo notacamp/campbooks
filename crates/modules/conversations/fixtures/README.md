@@ -2,7 +2,9 @@
 
 Fictional mail for tests and local development, in the four languages
 Campbooks ships in. Every person, company and address is invented; domains
-are `example.com` or end in `.example`.
+are `example.com` or end in `.example`, except the public, no-person service addresses of `dependabot.json`
+and `github-comment.json`
+(a sender's real domain is what the rules read for such mail).
 
 Each file is a *recorded* `MessageChangeBatch` v1 (see
 `contracts/message-change-batch.v1.schema.json`): bodies (`text`, `html`,
@@ -21,4 +23,6 @@ that against the schema.
 | `needs.json` | What needs Sam: a question with a date, a lease to sign, a bill, a phishing message, a lunch question |
 | `needs-followup.json` | Pedro writes again about the lease, asking nothing new |
 | `needs-replied.json` | Sam's reply to the lunch question, sent from another client |
+| `dependabot.json` | A code host's security alert: list mail with Review, Dismiss and Upgrade links, asking nothing of a person (from the service's public notification address; the organisation, repository and package are invented) |
+| `github-comment.json` | The same code host's notification of a comment on an issue Sam watches: list mail that asks Sam nothing |
 | `late-parent.json` | Two replies stored before the message they answer (no thread keys) |

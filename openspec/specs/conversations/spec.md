@@ -440,14 +440,16 @@ newest inbound message sent within
 policy and the conversation's state. A `sure` need SHALL come only from
 answers the policy accepts: `pay` when `asks_action` is accepted with the
 `payment_due` reason, else `reply` when `needs_reply` is accepted, else `do`
-when `asks_action` is accepted. A `suspicious` answer of true SHALL raise a
-`review` need instead of any other. When the `decide` role is configured, a
-model answer of true for `needs_reply` or `asks_action` that the policy does
-not accept, with a confidence of at least 0.8, where no `sure` need exists
-SHALL raise a `review` need with trust `check`. The need SHALL carry the due
-date resolved from an accepted `has_deadline` answer, and `urgent` when an
-accepted `urgency` answer is "today". Messages from the conversation's own
-inbox SHALL never raise one.
+when `asks_action` is accepted. When answers of more than one source to the
+same question were accepted, the rules' answer SHALL be the one used. A
+`suspicious` answer of true SHALL raise a `review` need instead of any other.
+When the `decide` role is configured, a model answer of true for
+`needs_reply` or `asks_action` that the policy does not accept, with a
+confidence of at least 0.8, where no `sure` need exists and no accepted
+answer to the same question is false, SHALL raise a `review` need with trust
+`check`. The need SHALL carry the due date resolved from an accepted
+`has_deadline` answer, and `urgent` when an accepted `urgency` answer is
+"today". Messages from the conversation's own inbox SHALL never raise one.
 
 #### Scenario: A question from a person
 - **WHEN** Marta writes "Could you confirm Thursday's walkthrough? The builders need to know by Wednesday." and the rules accept `needs_reply` and `has_deadline`
@@ -469,14 +471,24 @@ inbox SHALL never raise one.
 - **WHEN** no `decide` role is configured
 - **THEN** no need has trust `check`
 
+#### Scenario: The rules already settled it
+- **WHEN** the rules accept `asks_action` false, `needs_reply` false and `has_deadline` false for a code host's notification, and the model answers `asks_action` true with confidence 0.875 and `has_deadline` true with 0.976
+- **THEN** no need is raised
+
+#### Scenario: Only the model says yes
+- **WHEN** the rules give no accepted answer to `asks_action` and the model answers it true with confidence 0.875
+- **THEN** the need is `review` with trust `check`
+
 ### Requirement: Clearing a need
 A need SHALL be cleared, with its cause, when: a message is sent from the
 inbox in the conversation after the message that raised it (`replied`; clears
 `reply` and `do`), the conversation is archived (`archived`; clears `reply` and
 `review`), every message is in the trash or spam or removed (`trashed`; clears
 any), or a member resolves it. A new inbound message SHALL derive the need
-again from that message (`superseded` for the old one). Changes SHALL come
-from the provider or from members alike.
+again from that message (`superseded` for the old one). When the open need's
+own message, read again, raises no need and no member confirmed it, the need
+SHALL be cleared as `superseded`. Changes SHALL come from the provider or
+from members alike.
 
 #### Scenario: Replied from the phone
 - **WHEN** Ana replies to Marta from Gmail on her phone and the sent message reaches the conversation
@@ -489,6 +501,10 @@ from the provider or from members alike.
 #### Scenario: Done in a shared inbox
 - **WHEN** Ana chooses Done on a need in an inbox she shares with Leo
 - **THEN** the need is cleared for both of them
+
+#### Scenario: A question raised against a settled answer
+- **WHEN** a conversation has an open `check` need whose message's accepted answers say it asks nothing, and the conversation's need is refreshed
+- **THEN** the need is cleared with cause `superseded`, announced once, and not shown under Done today
 
 ### Requirement: Need changes are published
 Every change to a need SHALL publish `conversations.need_changed` v1
@@ -579,6 +595,7 @@ others out.
 #### Scenario: Home asks for its rows
 - **WHEN** the client lists three conversation ids, one of them in an inbox the caller cannot see
 - **THEN** two summaries are returned, each with its `need`
+
 ### Requirement: Conversations as a search source
 The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),
@@ -612,3 +629,29 @@ SHALL list nothing for other container types.
 #### Scenario: A member's inboxes
 - **WHEN** the port lists `conversations.inbox` containers for a member of two of a workspace's three inboxes
 - **THEN** it returns those two
+
+### Requirement: Security alerts are a to-do
+The email signals SHALL answer `asks_action` true with the reason
+`signals.security_alert`, and `stream` `updates`, for a message whose subject
+says something of the recipient's needs fixing (a security alert or
+advisory, a vulnerability, an action required, in English, European
+Portuguese, Spanish and French) when the sender is a service (list mail or an
+automated address) whose display name names the sender's own domain, the
+message has no phishing tell and carries no marketing words. It SHALL take
+precedence over the list-mail "no action" answer.
+
+#### Scenario: A dependency vulnerability
+- **WHEN** "GitHub" `<notifications@github.com>` sends list mail titled "[example-org/demo-shop] High severity vulnerability in tiny-template" with Review, Dismiss and Upgrade links, and the model also answers `asks_action` true with 0.875
+- **THEN** the conversation is sorted to Updates and has a `sure` `do` need with basis `rules`
+
+#### Scenario: A comment on a watched issue
+- **WHEN** the same code host sends a notification of a comment on an issue the member watches
+- **THEN** no need is raised
+
+#### Scenario: A look-alike platform
+- **WHEN** "GitHub" `<notifications@github-alerts.example>` sends the same alert
+- **THEN** `asks_action` is not answered by `signals.security_alert`
+
+#### Scenario: Marketing that says action required
+- **WHEN** a newsletter's subject is "Action required: claim your discount"
+- **THEN** `asks_action` is false and the stream is Newsletters
