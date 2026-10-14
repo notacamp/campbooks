@@ -44,6 +44,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Tell Scout what you care about** (design, campbooks-cloud#121): five
+  optional questions at first run and in Scout's memory, and a "Teach Scout"
+  box. Precise answers and sentences become rules you check, with how many
+  emails they match, before saving; saved rules run without AI. The OpenSpec
+  change `what-you-care-about` describes it; the implementation follows in
+  the same pull request.
 - Admin → Jobs: administrators with the `jobs.read` permission see the
   background queue by kind (waiting, scheduled, running, running with a lost
   worker, failed) and the jobs that gave up with their last error (monospace,
