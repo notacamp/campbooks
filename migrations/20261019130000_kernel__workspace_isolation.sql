@@ -19,6 +19,7 @@
 -- `kernel.idempotency`, `kernel.rate_limits` and `kernel.schedules` are not
 -- keyed by workspace (keys belong to callers, counters to callers, ticks to
 -- the instance) and carry no policy.
+SET LOCAL lock_timeout = '10s';
 DO $$
 DECLARE
     t text;

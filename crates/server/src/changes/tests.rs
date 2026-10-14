@@ -314,6 +314,9 @@ impl World {
         assert_eq!(status, StatusCode::OK);
         let user = self.user_id(sub).await;
         let mut tx = self.db.begin().await.unwrap();
+        campbooks_kernel::db::set_workspace(&mut tx, workspace)
+            .await
+            .unwrap();
         sqlx::query("INSERT INTO workspaces.members (workspace_id, user_id, role) VALUES ($1::uuid, $2, $3)")
             .bind(workspace)
             .bind(user)
@@ -671,6 +674,9 @@ async fn changes_the_caller_may_not_see_are_skipped_but_advance_the_cursor(db: P
     assert!(feed.next_event().await.is("ready"));
 
     let mut tx = world.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &ws)
+        .await
+        .unwrap();
     world
         .server
         .state
@@ -903,6 +909,11 @@ impl World {
 
     async fn publish<E: campbooks_kernel::DomainEvent>(&self, event: &E) {
         let mut tx = self.db.begin().await.unwrap();
+        if let Some(workspace) = campbooks_kernel::DomainEvent::workspace(event) {
+            campbooks_kernel::db::set_workspace(&mut tx, workspace)
+                .await
+                .unwrap();
+        }
         self.server
             .state
             .events

@@ -57,7 +57,9 @@ pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
-pub use features::{inbox_visibility::visibility, search_source::search_source};
+pub use features::{
+    inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
+};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";

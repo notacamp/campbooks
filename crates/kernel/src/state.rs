@@ -21,7 +21,10 @@ use crate::{
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
-    tenancy::{MembershipPort, NoMembership},
+    tenancy::{
+        ClientDirectoryPort, KeptMailPort, MembershipPort, NoClientDirectory, NoKeptMail,
+        NoMembership,
+    },
 };
 
 /// What every handler can reach. Cheap to clone.
@@ -40,6 +43,13 @@ pub struct AppState {
     /// registers the `workspaces` module's implementation; until then nobody
     /// belongs anywhere.
     pub membership: MembershipPort,
+    /// Answers whom a registered client acts for (ADR 0017). The server
+    /// registers the issuer's when it runs in this process; until then every
+    /// client is unregistered.
+    pub clients: ClientDirectoryPort,
+    /// Answers which inboxes keeping a departing member's mail would leave
+    /// unread. The server registers the `conversations` module's.
+    pub kept_mail: KeptMailPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -111,6 +121,8 @@ impl AppState {
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
+            clients: Arc::new(NoClientDirectory),
+            kept_mail: Arc::new(NoKeptMail),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -131,6 +143,21 @@ impl AppState {
     pub fn with_admin(mut self, profiles: AdminProfilesPort, audit: AdminAuditPort) -> Self {
         self.admin_profiles = profiles;
         self.admin_audit = audit;
+        self
+    }
+
+    /// The same state, resolving whom registered clients act for through
+    /// `clients`.
+    #[must_use]
+    pub fn with_client_directory(mut self, clients: ClientDirectoryPort) -> Self {
+        self.clients = clients;
+        self
+    }
+
+    /// The same state, asking `kept_mail` before a member's mail is kept.
+    #[must_use]
+    pub fn with_kept_mail(mut self, kept_mail: KeptMailPort) -> Self {
+        self.kept_mail = kept_mail;
         self
     }
 

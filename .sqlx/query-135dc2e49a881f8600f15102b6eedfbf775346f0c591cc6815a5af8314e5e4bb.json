@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT inbox_id AS \"inbox_id: InboxId\" FROM conversations.conversations WHERE id = $1",
+  "query": "SELECT id FROM conversations.inboxes WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "inbox_id: InboxId",
+        "name": "id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "conversations.conversations",
-            "name": "inbox_id"
+            "table": "conversations.inboxes",
+            "name": "id"
           }
         }
       }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "5de47a920d836f1925ff395ec2340440335f688aad18c1c3b95e3d0634116cc1"
+  "hash": "135dc2e49a881f8600f15102b6eedfbf775346f0c591cc6815a5af8314e5e4bb"
 }

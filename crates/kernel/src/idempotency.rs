@@ -53,7 +53,7 @@ use crate::{
     jobs::{Job, JobContext, JobError},
     operations::{Catalogue, OperationInfo},
     records::RecordRef,
-    tenancy::{MembershipPort, WORKSPACE_PATH_PARAM, WorkspaceId},
+    tenancy::{ClientDirectoryPort, MembershipPort, WORKSPACE_PATH_PARAM, WorkspaceId},
 };
 
 tokio::task_local! {
@@ -105,6 +105,7 @@ pub struct Idempotency {
     auth: TokenVerifier,
     catalogue: Arc<Catalogue>,
     membership: MembershipPort,
+    clients: ClientDirectoryPort,
     visibility: VisibilityPort,
 }
 
@@ -118,6 +119,7 @@ impl Idempotency {
             auth: state.auth.clone(),
             catalogue,
             membership: Arc::clone(&state.membership),
+            clients: Arc::clone(&state.clients),
             visibility: Arc::clone(&state.visibility),
         }
     }
@@ -152,22 +154,17 @@ impl Idempotency {
         let Ok(workspace) = workspace.parse::<WorkspaceId>() else {
             return not_found();
         };
-        if principal.kind == PrincipalKind::Client
-            && principal
-                .workspace
-                .as_deref()
-                .and_then(|claim| claim.parse::<WorkspaceId>().ok())
-                != Some(workspace)
+        let access = match crate::tenancy::resolve_access(
+            self.membership.as_ref(),
+            self.clients.as_ref(),
+            &self.db,
+            principal,
+            workspace,
+        )
+        .await
         {
-            return not_found();
-        }
-        let access = match self
-            .membership
-            .resolve(&self.db, principal, workspace)
-            .await
-        {
-            Ok(Some(access)) if access.workspace == workspace => access,
-            Ok(_) => return not_found(),
+            Ok(Some(access)) => access,
+            Ok(None) => return not_found(),
             Err(error) => return Some(error.into_response()),
         };
         for container in containers {

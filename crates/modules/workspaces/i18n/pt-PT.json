@@ -18,6 +18,7 @@
     "invalid_label": "A etiqueta deve ter entre 1 e {{max}} caracteres.",
     "invalid_max_uses": "O número de utilizações deve estar entre 1 e {{max}}.",
     "invalid_expiry": "A validade tem de ser no futuro.",
-    "invalid_reason": "O motivo deve ter no máximo {{max}} caracteres."
+    "invalid_reason": "O motivo deve ter no máximo {{max}} caracteres.",
+    "keep_needs_a_reader": "Uma caixa de correio que este membro ligou ficaria sem ninguém que a possa ler. Partilhe-a primeiro com outro membro ou elimine o correio."
   }
 }

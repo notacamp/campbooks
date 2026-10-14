@@ -94,12 +94,22 @@ pub async fn delete(
     mail: MailChoice,
 ) -> Result<bool> {
     let workspace_key = workspace.to_string();
+    // Lock the connection and its streams first: a sync writing to a stream
+    // holds it (its rows reference the stream), so this waits for it and then
+    // sees every index row and batch it wrote; a later sync finds the stream
+    // gone. Reading first and deleting later could miss their files.
     let removed = sqlx::query!(
         r#"SELECT granted_by AS "granted_by: UserId", provider, account_subject
-             FROM connectors.connections WHERE id = $1"#,
+             FROM connectors.connections WHERE id = $1 FOR UPDATE"#,
         id as ConnectionId
     )
     .fetch_optional(&mut **tx)
+    .await?;
+    sqlx::query_scalar!(
+        "SELECT id FROM connectors.streams WHERE connection_id = $1 FOR UPDATE",
+        id as ConnectionId
+    )
+    .fetch_all(&mut **tx)
     .await?;
     let inbox_ids = sqlx::query_scalar!(
         r#"SELECT inbox_id AS "inbox_id!: InboxId" FROM connectors.streams

@@ -1063,6 +1063,13 @@
               }
             ]
           },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their identity subject (an opaque account id), so the issuer can\nremove the clients they registered in the workspace."
+          },
           "user": {
             "$ref": "#/components/schemas/UserId",
             "description": "The former member."

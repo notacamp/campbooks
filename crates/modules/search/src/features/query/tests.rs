@@ -512,6 +512,9 @@ async fn a_deleted_workspace_is_purged_and_stays_unindexed(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, _) = mailbox(&kit).await;
     let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace.to_string())
+        .await
+        .unwrap();
     kit.state
         .events
         .publish(

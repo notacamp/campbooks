@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE conversations.inboxes SET owner = NULL WHERE owner = $1\n                   RETURNING id AS \"id: InboxId\"",
+  "query": "UPDATE conversations.inboxes SET owner = NULL\n                    WHERE owner = $1 AND created_at <= $2\n                   RETURNING id AS \"id: InboxId\"",
   "describe": {
     "columns": [
       {
@@ -17,12 +17,13 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid"
+        "Uuid",
+        "Timestamptz"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "f65de01a6bc650044dcfa871dfafd3e649a3dc5cf74bf45ce70923988c6d1f68"
+  "hash": "d540101055544bddc3dee5cdce0243914a36752e62690ae1210177c73eeaea00"
 }

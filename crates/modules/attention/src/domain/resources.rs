@@ -1,8 +1,8 @@
 //! The module's part of the access catalogue (ADR 0017): an attention item
 //! lives in another module's container (an inbox). Whoever the visibility
 //! port lets see that container sees the item and puts it off for
-//! themselves; client tokens read it; workspace owners and admins get
-//! nothing without the container.
+//! themselves; workspace owners and admins get nothing without the
+//! container, and a client only what the member it acts for gets.
 
 use std::sync::Arc;
 
@@ -27,14 +27,14 @@ const INBOX_RECORD: &str = "conversations.inbox";
 /// The module's resource types.
 static TYPES: [ResourceType; 1] = [ResourceType {
     container: Some(INBOX_RECORD),
-    grants: &[
-        Grant::new(Grantee::ContainerViewers, &[Action::Read, Action::Write]),
-        Grant::new(Grantee::Clients, &[Action::Read]),
-    ],
+    grants: &[Grant::new(
+        Grantee::ContainerViewers,
+        &[Action::Read, Action::Write],
+    )],
     ..ResourceType::new(
         ITEM_RECORD,
         "Something that needs the members who can read its container (an inbox): they see \
-         it and put it off for themselves; client tokens read it.",
+         it and put it off for themselves. A client sees what the member it acts for sees.",
         Tenancy::Workspace,
     )
 }];

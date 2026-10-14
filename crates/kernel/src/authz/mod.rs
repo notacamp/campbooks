@@ -253,7 +253,7 @@ pub struct Facts {
     /// The caller's role in that container, if any.
     pub container_role: Option<String>,
     /// Kept read-only (a disconnected mailbox kept as history): every
-    /// action but `read` is refused.
+    /// action but `read` (and `delete`, of what one may delete) is refused.
     pub frozen: bool,
     /// Whether the caller may see the container, as the visibility port
     /// says; filled by [`authorize`] for types granting to
@@ -541,7 +541,9 @@ fn allowed(
         }
     }
     if facts.frozen {
-        actions.retain(|action| *action == Action::Read);
+        // Kept read-only: seen, and what is one's own may still be deleted
+        // (a draft), nothing else.
+        actions.retain(|action| matches!(action, Action::Read | Action::Delete));
     }
     actions
 }

@@ -193,11 +193,12 @@ impl EventBus {
     /// nothing remains if it rolls back.
     ///
     /// # Errors
-    /// [`sqlx::Error::InvalidArgument`] when `tx` works in a workspace
+    /// [`sqlx::Error::InvalidArgument`] when the event belongs to a workspace
+    /// and `tx` does not work in that one
     /// ([`begin_for`](crate::db::BeginFor::begin_for), a job's
-    /// [`tx`](crate::JobContext::tx)) and the event belongs to another one:
-    /// a change is announced in the workspace it was made in, never across
-    /// (row-level security on the event log refuses it too).
+    /// [`tx`](crate::JobContext::tx)): a change is announced in the workspace
+    /// it was made in, never across, and never from a transaction that set
+    /// none (row-level security on the event log refuses the first too).
     pub async fn publish<E: DomainEvent>(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -313,7 +314,7 @@ impl EventBus {
 }
 
 /// Refuse to publish `event` (of workspace `workspace`) in a transaction set
-/// to another workspace.
+/// to another workspace, or to none.
 async fn check_workspace(
     tx: &mut Transaction<'_, Postgres>,
     event: &str,
@@ -329,10 +330,14 @@ async fn check_workspace(
     .fetch_one(&mut **tx)
     .await?;
     match current {
-        Some(current) if current != workspace => Err(sqlx::Error::InvalidArgument(format!(
+        Some(current) if current == workspace => Ok(()),
+        Some(_) => Err(sqlx::Error::InvalidArgument(format!(
             "event `{event}` belongs to another workspace than the transaction publishing it"
         ))),
-        _ => Ok(()),
+        None => Err(sqlx::Error::InvalidArgument(format!(
+            "event `{event}` belongs to a workspace; publish it in a transaction working \
+             there (`begin_for`, a job's `tx()`)"
+        ))),
     }
 }
 

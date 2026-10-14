@@ -18,6 +18,7 @@
     "invalid_label": "Le libellé doit comporter entre 1 et {{max}} caractères.",
     "invalid_max_uses": "Le nombre d’utilisations doit être compris entre 1 et {{max}}.",
     "invalid_expiry": "L’expiration doit être dans le futur.",
-    "invalid_reason": "Le motif ne doit pas dépasser {{max}} caractères."
+    "invalid_reason": "Le motif ne doit pas dépasser {{max}} caractères.",
+    "keep_needs_a_reader": "Une boîte de réception connectée par ce membre n'aurait plus personne pour la lire. Partagez-la d'abord avec un autre membre ou supprimez le courrier."
   }
 }

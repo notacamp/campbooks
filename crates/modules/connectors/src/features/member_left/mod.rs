@@ -41,9 +41,13 @@ impl EventConsumer for RevokeDepartedGrants {
             .map_err(|_| JobError::fatal("member_left without a workspace id"))?;
         let state = ctx.state().clone();
         let mut tx = ctx.pool().begin_for(workspace).await?;
+        // Only the connections that existed when they left: a member who
+        // came back since keeps what they connected after.
         let granted = sqlx::query_scalar!(
-            r#"SELECT id AS "id: ConnectionId" FROM connectors.connections WHERE granted_by = $1"#,
-            event.payload.user as UserId
+            r#"SELECT id AS "id: ConnectionId" FROM connectors.connections
+                WHERE granted_by = $1 AND created_at <= $2"#,
+            event.payload.user as UserId,
+            event.occurred_at,
         )
         .fetch_all(&mut *tx)
         .await?;

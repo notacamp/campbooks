@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id AS \"id: InboxId\" FROM conversations.inboxes i\n                    WHERE i.owner = $1 AND i.detached_at IS NULL\n                      AND NOT EXISTS (SELECT 1 FROM conversations.inbox_members m\n                                       WHERE m.inbox_id = i.id AND m.user_id <> $1)\n                    ORDER BY i.id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e6f4f4ab69c1a29a67a852753cf4697fb779efd87fd92dbdba88b9986d5f0b37"
+}

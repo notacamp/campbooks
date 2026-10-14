@@ -138,6 +138,9 @@ mod tests {
             .await
             .unwrap();
         let mut tx = kit.state.db.begin().await.unwrap();
+        campbooks_kernel::db::set_workspace(&mut tx, &ws)
+            .await
+            .unwrap();
         kit.state
             .events
             .publish(
@@ -191,6 +194,9 @@ mod tests {
             .await
             .unwrap();
         let mut tx = kit.state.db.begin().await.unwrap();
+        campbooks_kernel::db::set_workspace(&mut tx, &ws)
+            .await
+            .unwrap();
         kit.state
             .events
             .publish(

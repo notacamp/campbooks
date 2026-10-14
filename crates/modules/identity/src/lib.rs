@@ -32,6 +32,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod client_directory;
 mod consent;
 pub mod deps;
 pub mod domain;
@@ -46,6 +47,7 @@ pub mod upstream;
 mod web;
 pub mod webauthn;
 
+pub use client_directory::client_directory;
 pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;

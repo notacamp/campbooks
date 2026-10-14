@@ -287,3 +287,77 @@ async fn a_departed_member_keeps_nothing(db: PgPool) {
     // Sam is unaffected.
     assert_eq!(kit.get(&s.sam, &path).await.status, StatusCode::OK);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_batch_being_applied_finishes_before_its_inbox_goes(db: PgPool) {
+    use campbooks_kernel::{blobs::BlobOwner, jobs::Worker};
+
+    use crate::model::MessageId;
+
+    let kit = Kit::new(db).await;
+    let s = setup(&kit).await;
+    let ws = s.workspace;
+    let key = ws.to_string();
+    // A batch in flight: it holds the inbox `FOR SHARE`, as `apply_changes`
+    // does, and attaches a new file to one of its messages.
+    let mut batch = kit.state.db.begin_for(ws).await.unwrap();
+    sqlx::query("SELECT id FROM conversations.inboxes WHERE id = $1 FOR SHARE")
+        .bind(s.inbox)
+        .fetch_one(&mut *batch)
+        .await
+        .unwrap();
+    let message: String = sqlx::query_scalar(
+        "SELECT id::text FROM conversations.messages WHERE inbox_id = $1 LIMIT 1",
+    )
+    .bind(s.inbox)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    let message: MessageId = message.parse().unwrap();
+    let blob = kit
+        .state
+        .blobs
+        .put(&key, b"a late part".to_vec(), "text/plain")
+        .await
+        .unwrap();
+    kit.state
+        .blobs
+        .attach(
+            &mut batch,
+            &key,
+            &blob,
+            &BlobOwner::new("conversations.message", *message.as_uuid()),
+        )
+        .await
+        .unwrap();
+
+    // The connection is removed meanwhile: the purge waits for the batch.
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    kit.state
+        .events
+        .publish(&mut tx, &removed(ws, s.inbox, MailChoice::Delete))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let state = kit.state.clone();
+    let purge = tokio::spawn(async move { Worker::new(state).run_until_idle().await });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    assert!(
+        !purge.is_finished(),
+        "the purge waits for the batch in flight"
+    );
+    batch.commit().await.unwrap();
+    let stats = purge.await.unwrap();
+    assert_eq!(stats.failed, 0, "{stats:?}");
+
+    // Nothing the batch attached outlives the inbox.
+    let refs: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.blob_refs
+          WHERE workspace_id = $1 AND owner_type LIKE 'conversations.%'",
+    )
+    .bind(&key)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(refs, 0);
+}

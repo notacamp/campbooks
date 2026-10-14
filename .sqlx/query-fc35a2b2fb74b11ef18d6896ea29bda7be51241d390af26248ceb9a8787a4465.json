@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS (SELECT 1 FROM conversations.inboxes\n                                           WHERE id = $1) AS \"visible!\"",
+  "query": "SELECT detached_at IS NULL AS \"open!\" FROM conversations.inboxes\n                WHERE id = $1 FOR SHARE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "visible!",
+        "name": "open!",
         "type_info": "Bool",
         "origin": "Expression"
       }
@@ -19,5 +19,5 @@
       null
     ]
   },
-  "hash": "bfcf07e2d91bd626d89ca0f0c847f411f7ede7c019bc753e8693acd14bbba192"
+  "hash": "fc35a2b2fb74b11ef18d6896ea29bda7be51241d390af26248ceb9a8787a4465"
 }

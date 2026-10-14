@@ -27,10 +27,11 @@ pub struct Resource {
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct AccessFile {
-    /// Module functions that call `authz` themselves, so a handler calling
-    /// one asks the central check (e.g. `lock_conversation(`).
+    /// Module functions that call `authz` themselves for one resource type,
+    /// so a handler calling one asks the central check about it (e.g.
+    /// `lock_conversation(` for `conversations.conversation`).
     #[serde(default)]
-    pub helpers: Vec<String>,
+    pub helpers: Vec<Helper>,
     /// Operations whose handler does not call `authz` yet, each with the
     /// issue that moves it on.
     #[serde(default)]
@@ -42,6 +43,16 @@ pub struct AccessFile {
     /// Published events nothing consumes on purpose, with the reason.
     #[serde(default)]
     pub unconsumed_events: Vec<Unconsumed>,
+}
+
+/// A function that asks the central check about `resource`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Helper {
+    /// How a call to it reads (`lock_conversation(`).
+    pub call: String,
+    /// The resource type it asks about.
+    pub resource: String,
 }
 
 /// An operation not on the central check yet.
@@ -126,6 +137,7 @@ pub fn check_authorize_calls(
         .map(|p| (p.operation.as_str(), p))
         .collect();
     let mut seen_pending = BTreeSet::new();
+    let constants = resource_constants(sources);
     for (name, operation) in operations(spec) {
         let Some(id) = operation["operationId"].as_str() else {
             continue;
@@ -166,16 +178,22 @@ pub fn check_authorize_calls(
             continue;
         };
         let code = without_tests(text);
-        let asks = AUTHORIZE_CALL.is_match(code)
-            || file
-                .helpers
+        let helper_for = |resource: &str| {
+            file.helpers
                 .iter()
-                .any(|helper| code.contains(helper.as_str()));
+                .any(|helper| helper.resource == resource && code.contains(helper.call.as_str()))
+        };
+        let names_it = code.contains(&format!("\"{resource}\""))
+            || constants
+                .iter()
+                .filter(|(_, value)| value.as_str() == resource)
+                .any(|(constant, _)| mentions(code, constant));
+        let asks = (AUTHORIZE_CALL.is_match(code) && names_it) || helper_for(resource);
         if !asks {
             violations.push(format!(
-                "{path}: the handler of `{id}` never asks the central check: call \
-                 `authz::require`/`require_type`/`require_account` (or an `authorize` \
-                 helper) for `{resource}` (ADR 0017)"
+                "{path}: the handler of `{id}` never asks the central check about \
+                 `{resource}`: call `authz::require`/`require_type`/`require_account` (or an \
+                 `authorize` helper) naming it (ADR 0017)"
             ));
         }
     }
@@ -189,6 +207,33 @@ pub fn check_authorize_calls(
         }
     }
     violations
+}
+
+/// `CONST: &str = "<module>.<record>"` declarations, by name.
+fn resource_constants(sources: &[(String, String)]) -> Vec<(String, String)> {
+    static CONSTANT: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r#"const ([A-Z][A-Z0-9_]*): &str = "([a-z_]+\.[a-z_]+)""#)
+            .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
+    });
+    sources
+        .iter()
+        .flat_map(|(_, text)| {
+            CONSTANT
+                .captures_iter(text)
+                .map(|caps| (caps[1].to_owned(), caps[2].to_owned()))
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Whether `code` names the identifier `name` (not as part of another).
+fn mentions(code: &str, name: &str) -> bool {
+    code.match_indices(name).any(|(at, _)| {
+        let before = code[..at].chars().next_back();
+        let after = code[at + name.len()..].chars().next();
+        let ident = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+        !ident(before) && !ident(after)
+    })
 }
 
 /// A call to an authorize function: `authorize(`, `authorize_type(`, …
@@ -447,7 +492,14 @@ mod tests {
         // Naming the action in `x-campbooks` is not asking.
         let named = format!("{declared}// .access(\"mail.thread\", authz::Action::Read)\n");
         assert_eq!(check_authorize_calls(&s, &c, &src(&named), &file).len(), 1);
-        let asking = format!("{declared}fn h() {{ authz::require_type(); }}\n");
+        let asking = format!("{declared}fn h() {{ authz::require_type(\"mail.thread\"); }}\n");
+        // Asking about another resource is not asking about this one.
+        let other = format!("{declared}fn h() {{ authz::require_type(\"mail.box\"); }}\n");
+        assert_eq!(check_authorize_calls(&s, &c, &src(&other), &file).len(), 1);
+        let constant = format!(
+            "{declared}const THREAD: &str = \"mail.thread\";\nfn h() {{ authz::require_type(THREAD); }}\n"
+        );
+        assert!(check_authorize_calls(&s, &c, &src(&constant), &file).is_empty());
         assert!(check_authorize_calls(&s, &c, &src(&asking), &file).is_empty());
         // A call inside the test module does not count.
         let in_tests = format!("{declared}#[cfg(test)]\nmod tests {{ authz::x(); }}\n");
@@ -457,7 +509,10 @@ mod tests {
         );
         let helper = format!("{declared}fn h() {{ lock_thread(&state); }}\n");
         let with_helper = AccessFile {
-            helpers: vec!["lock_thread(".to_owned()],
+            helpers: vec![Helper {
+                call: "lock_thread(".to_owned(),
+                resource: "mail.thread".to_owned(),
+            }],
             ..AccessFile::default()
         };
         assert!(check_authorize_calls(&s, &c, &src(&helper), &with_helper).is_empty());

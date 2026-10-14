@@ -6,15 +6,19 @@
 -- workspace, so coming back never brings back what they had.
 -- `detached_at`: set when its connection was removed and the mail kept as
 -- read-only history: nothing syncs into it, nothing is sent from it.
+SET LOCAL lock_timeout = '10s';
+
+-- Existing inboxes keep no owner (NULL): who connected them is not known
+-- here for certain, and an owner is never guessed. New ones get it from the
+-- grant.
 ALTER TABLE conversations.inboxes
     ADD COLUMN owner uuid,
     ADD COLUMN detached_at timestamptz;
 
--- Existing inboxes: the manager who created them (the granting member).
-UPDATE conversations.inboxes i
-   SET owner = (SELECT m.user_id FROM conversations.inbox_members m
-                 WHERE m.inbox_id = i.id AND m.role = 'manager'
-                 ORDER BY m.user_id LIMIT 1);
+-- When a membership began: a member's departure removes only the ones
+-- older than it, never one given after they came back.
+ALTER TABLE conversations.inbox_members
+    ADD COLUMN created_at timestamptz NOT NULL DEFAULT now();
 
 -- Inboxes deleted with their connection: a late batch or a replayed grant
 -- never brings one back. Ids only.

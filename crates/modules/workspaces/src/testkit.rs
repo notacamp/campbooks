@@ -58,7 +58,34 @@ pub struct Kit {
     admin_app: Router,
     /// What the admin API recorded.
     pub trail: Arc<Trail>,
+    /// Members whose kept mail would be left unread.
+    pub unread_if_kept: Arc<UnreadIfKept>,
     idp: TestIdp,
+}
+
+/// A `KeptMail` port answering from a list of members.
+#[derive(Debug, Default)]
+pub struct UnreadIfKept(pub Mutex<Vec<campbooks_kernel::tenancy::UserId>>);
+
+impl campbooks_kernel::tenancy::KeptMail for UnreadIfKept {
+    fn unread_if_kept<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _workspace: campbooks_kernel::tenancy::WorkspaceId,
+        user: campbooks_kernel::tenancy::UserId,
+    ) -> campbooks_kernel::tenancy::KeptMailFuture<'a> {
+        let unread = self.0.lock().unwrap().contains(&user);
+        Box::pin(async move {
+            Ok(if unread {
+                vec![campbooks_kernel::RecordRef::new(
+                    "conversations.inbox",
+                    "i-1",
+                )]
+            } else {
+                Vec::new()
+            })
+        })
+    }
 }
 
 /// The administrators of the test world: `root` holds `super`, `people`
@@ -112,9 +139,11 @@ impl Kit {
         let idp = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
         let blobs = BlobStore::memory(&BlobsConfig::default(), pool.clone());
+        let unread_if_kept = Arc::new(UnreadIfKept::default());
         let mut state = idp
             .state(pool)
             .with_blobs(blobs)
+            .with_kept_mail(unread_if_kept.clone())
             .with_membership(crate::membership())
             .with_locales(crate::locale_preference())
             .with_registry(Registry::build(&[crate::module()]).unwrap());
@@ -133,6 +162,7 @@ impl Kit {
             app,
             admin_app,
             trail,
+            unread_if_kept,
             idp,
         }
     }

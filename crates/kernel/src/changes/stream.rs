@@ -458,16 +458,20 @@ impl Feed {
 
     /// Resolve membership again; when it is gone, say so and end.
     async fn check_access(&mut self) -> Result<(), Error> {
-        let access = self
-            .state
-            .membership
-            .resolve(
-                &self.state.db,
-                &self.subscription.principal,
-                self.subscription.workspace,
-            )
-            .await?
-            .filter(|access| access.workspace == self.subscription.workspace);
+        let access = match crate::tenancy::resolve_access(
+            self.state.membership.as_ref(),
+            self.state.clients.as_ref(),
+            &self.state.db,
+            &self.subscription.principal,
+            self.subscription.workspace,
+        )
+        .await
+        {
+            Ok(access) => access,
+            // A revoked client: as gone as a former member.
+            Err(Error::Unauthorized(_)) => None,
+            Err(error) => return Err(error),
+        };
         match access {
             Some(access) => {
                 if access != self.subscription.access {

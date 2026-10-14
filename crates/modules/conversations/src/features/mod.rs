@@ -13,6 +13,7 @@ pub mod get_conversation;
 pub mod get_message_body;
 pub mod inbox_visibility;
 pub mod ingest_messages;
+pub mod kept_mail;
 pub mod labels;
 pub mod list_conversations;
 pub mod list_drafts;

@@ -70,6 +70,11 @@ impl JobHandler for ReleaseSend {
         let Some(row) = drafts::find(&mut read, &access, payload.draft, false).await? else {
             return Ok(());
         };
+        if !still_may_send(&state, &mut read, &access, &payload).await? {
+            read.commit().await?;
+            tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
+            return Ok(());
+        }
         read.commit().await?;
         if row.state()? != DraftState::Scheduled || row.send_generation != payload.generation {
             return Ok(());
@@ -133,6 +138,37 @@ impl JobHandler for ReleaseSend {
         tracing::info!(%workspace, draft = %payload.draft, %send_id, "send released");
         Ok(())
     }
+}
+
+/// Whether the author may still send the draft (they may have lost the
+/// inbox, or it was kept read-only); when not, it goes back to a draft.
+async fn still_may_send(
+    state: &campbooks_kernel::AppState,
+    read: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    access: &Access,
+    payload: &ReleaseSendPayload,
+) -> Result<bool, JobError> {
+    let allowed = campbooks_kernel::authz::authorize(
+        state,
+        read,
+        access,
+        campbooks_kernel::authz::Action::Send,
+        &campbooks_kernel::RecordRef::new(DRAFT_RECORD, &payload.draft),
+    )
+    .await?;
+    if allowed == campbooks_kernel::authz::Decision::Allow {
+        return Ok(true);
+    }
+    sqlx::query!(
+        r#"UPDATE conversations.drafts
+              SET state = 'draft', send_at = NULL, updated_at = now()
+            WHERE id = $1 AND state = 'scheduled' AND send_generation = $2"#,
+        payload.draft as DraftId,
+        payload.generation,
+    )
+    .execute(&mut **read)
+    .await?;
+    Ok(false)
 }
 
 /// The outgoing message document of `row`, sent as `send_id`.

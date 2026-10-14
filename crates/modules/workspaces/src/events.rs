@@ -96,6 +96,10 @@ pub struct MemberLeft {
     /// removing them chose so.
     #[serde(default)]
     pub mail: MailChoice,
+    /// Their identity subject (an opaque account id), so the issuer can
+    /// remove the clients they registered in the workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
 }
 
 /// What becomes of a departing member's mail (campbooks-cloud#117).

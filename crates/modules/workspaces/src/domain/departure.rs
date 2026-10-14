@@ -44,6 +44,12 @@ pub async fn depart(
         return Err(Error::Forbidden);
     }
     keep_an_owner(&mut tx, workspace, role).await?;
+    let subject = sqlx::query_scalar!(
+        "SELECT idp_subject FROM workspaces.users WHERE id = $1",
+        member as UserId,
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
     sqlx::query!(
         "DELETE FROM workspaces.members WHERE workspace_id = $1 AND user_id = $2",
         workspace as WorkspaceId,
@@ -74,6 +80,7 @@ pub async fn depart(
                 user: member,
                 removed_by,
                 mail,
+                subject,
             },
         )
         .await?;

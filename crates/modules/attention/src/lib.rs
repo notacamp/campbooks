@@ -38,6 +38,7 @@ pub fn module() -> Module {
             .on_event::<features::project_need::ProjectConversationNeed>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .on_event::<features::purge_workspace::ForgetMember>()
+            .on_event::<features::purge_workspace::ForgetInbox>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),
     }

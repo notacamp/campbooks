@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT granted_by AS \"granted_by: UserId\", provider, account_subject\n             FROM connectors.connections WHERE id = $1",
+  "query": "SELECT granted_by AS \"granted_by: UserId\", provider, account_subject\n             FROM connectors.connections WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       false
     ]
   },
-  "hash": "f97946884b5a87a8ed1220948ffe5fc66af21a39705cb4e5819347f1b2e46049"
+  "hash": "49e3a61e590d86698e65efc239558c483b13b47390c92e3faab6732853236d72"
 }

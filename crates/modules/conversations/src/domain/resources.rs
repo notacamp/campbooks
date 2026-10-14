@@ -6,10 +6,12 @@
 //! attachments, decisions, labels, corrections) follows the inbox. A
 //! **draft** is private to its author, who reads and deletes it while they
 //! read the inbox and writes and sends it while they may send from it.
-//! Client tokens bound to the workspace get an explicit grant: read and
-//! write in every inbox, their own drafts. Workspace owners and admins get
-//! nothing here: they never read an inbox they are not a member of. An
-//! inbox kept after its connection was removed is frozen read-only.
+//! Client tokens get nothing of their own here: a client a member
+//! registered acts as that member, within their inbox memberships
+//! (`tenancy::resolve_access`), and any other client sees no inbox.
+//! Workspace owners and admins get nothing here either: they never read an
+//! inbox they are not a member of. An inbox kept after its connection was
+//! removed is frozen read-only.
 
 use std::sync::Arc;
 
@@ -38,18 +40,13 @@ pub const CORRECTION_RECORD: &str = "conversations.correction";
 
 use Action::{Delete, Read, Send, Share, Write};
 
-/// Read for readers and above, and for client tokens: what lives inside an
-/// inbox and is only read.
-const READ_INSIDE: &[Grant] = &[
-    Grant::new(Grantee::ContainerRole("reader"), &[Read]),
-    Grant::new(Grantee::Clients, &[Read]),
-];
+/// Read for readers and above: what lives inside an inbox and is only read.
+const READ_INSIDE: &[Grant] = &[Grant::new(Grantee::ContainerRole("reader"), &[Read])];
 
-/// Read for readers, write for senders and above, both for client tokens.
+/// Read for readers, write for senders and above.
 const WRITE_INSIDE: &[Grant] = &[
     Grant::new(Grantee::ContainerRole("reader"), &[Read]),
     Grant::new(Grantee::ContainerRole("sender"), &[Read, Write]),
-    Grant::new(Grantee::Clients, &[Read, Write]),
 ];
 
 const fn inside(
@@ -75,7 +72,6 @@ static TYPES: [ResourceType; 8] = [
             Grant::new(Grantee::ContainerRole("reader"), &[Read]),
             Grant::new(Grantee::ContainerRole("sender"), &[Read, Send]),
             Grant::new(Grantee::ContainerRole("manager"), &[Read, Send, Share]),
-            Grant::new(Grantee::Clients, &[Read, Send]),
         ],
         ..ResourceType::new(
             INBOX_RECORD,
@@ -127,13 +123,11 @@ static TYPES: [ResourceType; 8] = [
                 Grantee::OwnerWithContainerRole("sender"),
                 &[Read, Write, Delete, Send],
             ),
-            Grant::new(Grantee::OwningClients, &[Read, Write, Delete, Send]),
         ],
         ..ResourceType::new(
             DRAFT_RECORD,
-            "A message being written, private to its author (a member, or the workspace's \
-             client tokens for one a client wrote): read and deleted while they read its inbox, \
-             written and sent while they may send from it. Nobody else sees it.",
+            "A message being written, private to its author: read and deleted while they read \
+             its inbox, written and sent while they may send from it. Nobody else sees it.",
             Tenancy::Workspace,
         )
     },
@@ -195,93 +189,63 @@ impl ResourceFacts for ConversationFacts {
                 return Ok(None);
             };
             let id = *id.as_uuid();
-            // The inbox the record lives in, and its owner when it has one
-            // of its own (an inbox, a draft).
-            let located: Option<(InboxId, OwnerFact)> = match resource.record_type.as_str() {
-                INBOX_RECORD => sqlx::query!(
-                    r#"SELECT id AS "id: InboxId", owner FROM conversations.inboxes WHERE id = $1"#,
-                    id
-                )
-                .fetch_optional(&mut *conn)
-                .await?
-                .map(|row| (row.id, row.owner.map_or(OwnerFact::Nobody, |o| OwnerFact::User(UserId::from_uuid(o))))),
-                DRAFT_RECORD => sqlx::query!(
-                    r#"SELECT inbox_id AS "inbox_id: InboxId", author FROM conversations.drafts WHERE id = $1"#,
-                    id
-                )
-                .fetch_optional(&mut *conn)
-                .await?
-                .map(|row| {
-                    let owner = row
-                        .author
-                        .map_or(OwnerFact::Clients, |a| OwnerFact::User(UserId::from_uuid(a)));
-                    (row.inbox_id, owner)
-                }),
-                other => {
-                    let inbox = match other {
-                        CONVERSATION_RECORD => sqlx::query_scalar!(
-                            r#"SELECT inbox_id AS "inbox_id: InboxId" FROM conversations.conversations WHERE id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        MESSAGE_RECORD => sqlx::query_scalar!(
-                            r#"SELECT inbox_id AS "inbox_id: InboxId" FROM conversations.messages WHERE id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        ATTACHMENT_RECORD => sqlx::query_scalar!(
-                            r#"SELECT m.inbox_id AS "inbox_id!: InboxId" FROM conversations.attachments a
-                                 JOIN conversations.messages m ON m.id = a.message_id
-                                WHERE a.id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        DECISION_RECORD => sqlx::query_scalar!(
-                            r#"SELECT m.inbox_id AS "inbox_id!: InboxId" FROM conversations.decisions d
-                                 JOIN conversations.messages m ON m.id = d.message_id
-                                WHERE d.id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        LABEL_RECORD => sqlx::query_scalar!(
-                            r#"SELECT inbox_id AS "inbox_id: InboxId" FROM conversations.labels WHERE id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        CORRECTION_RECORD => sqlx::query_scalar!(
-                            r#"SELECT c.inbox_id AS "inbox_id!: InboxId" FROM conversations.corrections r
-                                 JOIN conversations.conversations c ON c.id = r.conversation_id
-                                WHERE r.id = $1"#,
-                            id
-                        )
-                        .fetch_optional(&mut *conn)
-                        .await?,
-                        _ => None,
-                    };
-                    inbox.map(|inbox| (inbox, OwnerFact::Nobody))
-                }
-            };
-            let Some((inbox, owner)) = located else {
-                return Ok(None);
-            };
+            // One statement whatever the type, and whether the record is
+            // missing or only out of the caller's sight: the answer takes
+            // the same time either way. The inbox it lives in, its owner
+            // when it has one of its own (an inbox, a draft), whether it is
+            // kept read-only and the caller's role there.
             let found = sqlx::query!(
-                r#"SELECT i.detached_at IS NOT NULL AS "frozen!",
-                          (SELECT m.role FROM conversations.inbox_members m
-                            WHERE m.inbox_id = i.id AND m.user_id = $2) AS role
-                     FROM conversations.inboxes i WHERE i.id = $1"#,
-                inbox as InboxId,
+                r#"
+                WITH target AS (
+                    SELECT id AS inbox_id, owner, false AS is_draft
+                      FROM conversations.inboxes WHERE $1 = 'conversations.inbox' AND id = $2
+                    UNION ALL
+                    SELECT inbox_id, author, true
+                      FROM conversations.drafts WHERE $1 = 'conversations.draft' AND id = $2
+                    UNION ALL
+                    SELECT inbox_id, NULL, false FROM conversations.conversations
+                     WHERE $1 = 'conversations.conversation' AND id = $2
+                    UNION ALL
+                    SELECT inbox_id, NULL, false FROM conversations.messages
+                     WHERE $1 = 'conversations.message' AND id = $2
+                    UNION ALL
+                    SELECT m.inbox_id, NULL, false FROM conversations.attachments a
+                      JOIN conversations.messages m ON m.id = a.message_id
+                     WHERE $1 = 'conversations.attachment' AND a.id = $2
+                    UNION ALL
+                    SELECT m.inbox_id, NULL, false FROM conversations.decisions d
+                      JOIN conversations.messages m ON m.id = d.message_id
+                     WHERE $1 = 'conversations.decision' AND d.id = $2
+                    UNION ALL
+                    SELECT inbox_id, NULL, false FROM conversations.labels
+                     WHERE $1 = 'conversations.label' AND id = $2
+                    UNION ALL
+                    SELECT c.inbox_id, NULL, false FROM conversations.corrections r
+                      JOIN conversations.conversations c ON c.id = r.conversation_id
+                     WHERE $1 = 'conversations.correction' AND r.id = $2
+                )
+                SELECT t.inbox_id AS "inbox_id!: InboxId", t.owner, t.is_draft AS "is_draft!",
+                       i.detached_at IS NOT NULL AS "frozen!",
+                       (SELECT m.role FROM conversations.inbox_members m
+                         WHERE m.inbox_id = i.id AND m.user_id = $3) AS role
+                  FROM target t
+                  JOIN conversations.inboxes i ON i.id = t.inbox_id
+                "#,
+                resource.record_type,
+                id,
                 access.user.map(|user| *user.as_uuid()),
             )
             .fetch_optional(&mut *conn)
             .await?;
             Ok(found.map(|row| {
+                let owner = match (row.is_draft, row.owner) {
+                    (_, Some(user)) => OwnerFact::User(UserId::from_uuid(user)),
+                    // A draft with no author was a client's.
+                    (true, None) => OwnerFact::Clients,
+                    (false, None) => OwnerFact::Nobody,
+                };
                 Facts::owned_by(owner)
-                    .within(RecordRef::new(INBOX_RECORD, &inbox), row.role)
+                    .within(RecordRef::new(INBOX_RECORD, &row.inbox_id), row.role)
                     .frozen(row.frozen)
             }))
         })
@@ -361,12 +325,14 @@ mod tests {
             user: None,
             role: None,
         };
-        assert_eq!(check(&client, Read, None), Decision::NotFound);
-        let written = facts(OwnerFact::Clients, None);
-        assert_eq!(
-            decide(&catalogue, &client, Send, DRAFT_RECORD, Some(&written)),
-            Decision::Allow
-        );
+        // A client acting for nobody sees no draft, not even one with no author.
+        for owner in [OwnerFact::User(author), OwnerFact::Clients] {
+            let draft = facts(owner, None);
+            assert_eq!(
+                decide(&catalogue, &client, Read, DRAFT_RECORD, Some(&draft)),
+                Decision::NotFound
+            );
+        }
     }
 
     #[test]

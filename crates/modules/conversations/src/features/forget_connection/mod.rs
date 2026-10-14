@@ -11,7 +11,9 @@
 //!   `conversations.inbox_removed` tells search to forget it and the change
 //!   feed that it is gone.
 //! - **Keep**: each inbox is frozen read-only (`detached_at`): nothing syncs
-//!   into it, nothing is written or sent from it, its members keep reading.
+//!   into it, nothing is written or sent from it (scheduled sends go back to
+//!   drafts, which their authors may still delete), its members keep
+//!   reading.
 //!
 //! Idempotent: a replay finds nothing left to do.
 
@@ -86,6 +88,16 @@ pub async fn delete_inbox(
     inbox: InboxId,
 ) -> Result<(), JobError> {
     let ws = workspace.to_string();
+    // Lock the inbox first: a batch being applied holds it `FOR SHARE`, so
+    // this waits for it to commit and then sees every row it wrote (and a
+    // batch that comes later finds the inbox gone and is dropped). Reading
+    // first and deleting later could miss its files.
+    sqlx::query_scalar!(
+        "SELECT id FROM conversations.inboxes WHERE id = $1 FOR UPDATE",
+        inbox as InboxId
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
     let messages = sqlx::query_scalar!(
         "SELECT id FROM conversations.messages WHERE inbox_id = $1",
         inbox as InboxId
@@ -165,6 +177,8 @@ async fn keep_inbox(
     workspace: WorkspaceId,
     inbox: InboxId,
 ) -> Result<(), JobError> {
+    // The update waits for a batch being applied (it holds the inbox
+    // `FOR SHARE`); a later batch finds the inbox frozen and is dropped.
     let frozen = sqlx::query!(
         r#"UPDATE conversations.inboxes SET detached_at = now()
             WHERE id = $1 AND detached_at IS NULL"#,
@@ -174,6 +188,17 @@ async fn keep_inbox(
     .await?
     .rows_affected();
     if frozen > 0 {
+        // Nothing is sent from it: scheduled sends go back to drafts (their
+        // release jobs act only at the generation they were given).
+        sqlx::query!(
+            r#"UPDATE conversations.drafts
+                  SET state = 'draft', send_at = NULL, send_generation = send_generation + 1,
+                      version = version + 1, updated_at = now()
+                WHERE inbox_id = $1 AND state = 'scheduled'"#,
+            inbox as InboxId
+        )
+        .execute(&mut **tx)
+        .await?;
         state
             .events
             .publish(

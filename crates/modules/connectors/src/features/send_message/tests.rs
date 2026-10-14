@@ -83,6 +83,9 @@ async fn publish(
     message: campbooks_kernel::blobs::BlobRef,
 ) {
     let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &ws.to_string())
+        .await
+        .unwrap();
     kit.state
         .events
         .publish(

@@ -16,14 +16,23 @@
 
 # Access rules (ADR 0017, `cargo xtask arch`): the reviewed exceptions.
 [access]
-# Module functions that call `authz` themselves: a handler calling one asks
-# the central check.
-helpers = [
-    "lock_conversation(", # conversations: `write` on the conversation, then locks it
-    "drafts::load(",      # conversations: the action on the draft, then reads it
-    "flags::apply(",      # conversations: through `lock_conversation`
-    "workspace_clients::require_admin(", # identity: `require_type` on `identity.client`
-]
+# Module functions that call `authz` themselves for one resource type: a
+# handler calling one asks the central check about it.
+[[access.helpers]]
+call = "lock_conversation("
+resource = "conversations.conversation"
+
+[[access.helpers]]
+call = "drafts::load("
+resource = "conversations.draft"
+
+[[access.helpers]]
+call = "flags::apply("
+resource = "conversations.conversation"
+
+[[access.helpers]]
+call = "workspace_clients::require_admin("
+resource = "identity.client"
 
 # Operations whose handler does not call `authz` yet: the web BFF's session
 # and proxy operations act on the cookie's own session, and the proxies run

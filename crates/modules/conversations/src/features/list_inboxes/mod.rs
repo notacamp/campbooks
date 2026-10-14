@@ -118,7 +118,7 @@ mod tests {
     use crate::{model::InboxRole, testkit::Kit};
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn users_see_their_inboxes_and_clients_see_all(db: PgPool) {
+    async fn users_see_their_inboxes_and_bare_clients_none(db: PgPool) {
         let kit = Kit::new(db).await;
         let (workspace, _, sam) = kit.sams_inbox().await;
         let (ana, ana_id) = kit.member("ana", workspace);
@@ -142,10 +142,10 @@ mod tests {
             "office@example.com"
         );
 
+        // A client acting for no member gets no inbox (ADR 0017): a client
+        // a member registered arrives as that member instead.
         let client = kit.client(workspace, "conversations:read");
-        let all = kit.get(&client, &uri).await;
-        assert_eq!(all.json["inboxes"].as_array().unwrap().len(), 2);
-        assert!(all.json["inboxes"][0]["role"].is_null());
+        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::FORBIDDEN);
 
         let elsewhere = format!("/api/v1/w/{}/inboxes", WorkspaceId::new());
         assert_eq!(

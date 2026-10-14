@@ -3,6 +3,8 @@
 -- transaction do anything to the scheduling index; it now only reads it
 -- (`FOR SELECT`) and leases due streams (`FOR UPDATE`, which `SELECT … FOR
 -- UPDATE` also needs), and can no longer insert or delete rows.
+SET LOCAL lock_timeout = '10s';
+
 DROP POLICY maintenance_reads_schedule ON connectors.sync_due;
 
 CREATE POLICY maintenance_reads_schedule ON connectors.sync_due

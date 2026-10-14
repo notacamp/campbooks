@@ -78,9 +78,11 @@ enum Who {
     Connector,
     /// A client token bound to A.
     Client,
+    /// A client the admin registered: acts for the admin, nothing more.
+    Agent,
 }
 
-const MEMBERS: [Who; 7] = [
+const MEMBERS: [Who; 8] = [
     Who::Owner,
     Who::Admin,
     Who::Member,
@@ -88,6 +90,7 @@ const MEMBERS: [Who; 7] = [
     Who::Sender,
     Who::Connector,
     Who::Client,
+    Who::Agent,
 ];
 
 impl Who {
@@ -100,13 +103,23 @@ impl Who {
             Self::Sender => "sen",
             Self::Connector => "ana",
             Self::Client => "acme-sync",
+            Self::Agent => "agent:adi",
+        }
+    }
+
+    /// The person whose access this caller has.
+    fn person(self) -> Option<Self> {
+        match self {
+            Self::Client => None,
+            Self::Agent => Some(Self::Admin),
+            other => Some(other),
         }
     }
 
     fn role(self) -> Option<Role> {
         match self {
             Self::Owner => Some(Role::Owner),
-            Self::Admin => Some(Role::Admin),
+            Self::Admin | Self::Agent => Some(Role::Admin),
             Self::Client => None,
             _ => Some(Role::Member),
         }
@@ -122,8 +135,21 @@ impl Who {
     }
 }
 
+/// What became of the connector's mail.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Mail {
+    /// Connected and syncing.
+    Live,
+    /// Disconnected with `?mail=keep`: read-only history.
+    Kept,
+    /// Disconnected with `?mail=delete`: gone.
+    Removed,
+}
+
 /// Two workspaces with every kind of record, and the app.
 struct World {
+    /// What became of the inbox's mail.
+    mail: Mail,
     db: PgPool,
     app: Router,
     state: AppState,
@@ -181,6 +207,29 @@ async fn scalar(db: &PgPool, sql: &'static str, bind: Uuid) -> String {
         .unwrap_or_else(|e| panic!("{sql}: {e}"))
 }
 
+/// Registered clients of the test world: `agent:<subject>` acts for the
+/// person with that subject (as a member's workspace client does); any
+/// other client is unregistered.
+#[derive(Debug)]
+struct Agents;
+
+impl campbooks_kernel::tenancy::ClientDirectory for Agents {
+    fn acting_for<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        client_id: &'a str,
+        _workspace: WorkspaceId,
+    ) -> campbooks_kernel::tenancy::ClientsFuture<'a> {
+        use campbooks_kernel::tenancy::ClientActor;
+        let actor = client_id
+            .strip_prefix("agent:")
+            .map_or(ClientActor::Unregistered, |subject| {
+                ClientActor::ActsFor(subject.to_owned())
+            });
+        Box::pin(async move { Ok(actor) })
+    }
+}
+
 impl World {
     async fn new(db: PgPool) -> Self {
         let idp = TestIdp::start().await;
@@ -191,7 +240,8 @@ impl World {
             AppState::new(pool.clone(), config)
                 .with_blobs(BlobStore::memory(&BlobsConfig::default(), pool))
                 .with_registry(crate::registry().expect("valid registrations")),
-        );
+        )
+        .with_client_directory(std::sync::Arc::new(Agents));
         let operations::Composed { routes, state, .. } = operations::compose(crate::api(), state);
         let app = routes
             .fallback(|| async { campbooks_kernel::Error::NotFound })
@@ -204,6 +254,7 @@ impl World {
             a: WorkspaceId::new(),
             b: WorkspaceId::new(),
             users: BTreeMap::new(),
+            mail: Mail::Live,
             instances: BTreeMap::new(),
             inbox_ids: Vec::new(),
             run: String::new(),
@@ -217,6 +268,32 @@ impl World {
         self.seed_people().await;
         let (inbox, connection) = self.seed_mailbox().await;
         self.seed_records(inbox, connection).await;
+        self.mail = Mail::Live;
+    }
+
+    /// Seed, then disconnect the mailbox as its connector does, keeping or
+    /// deleting its mail.
+    async fn seed_disconnected(&mut self, mail: Mail) {
+        self.seed().await;
+        let choice = match mail {
+            Mail::Live => return,
+            Mail::Kept => "keep",
+            Mail::Removed => "delete",
+        };
+        let uri = format!(
+            "/api/v1/w/{}/connections/{}?mail={choice}",
+            self.a, self.instances["connectors.connection"]
+        );
+        let token = self.token(Who::Connector.subject());
+        let (status, bytes, _) = self.call(Some(&token), "DELETE", &uri, None).await;
+        assert_eq!(
+            status,
+            StatusCode::NO_CONTENT,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        Worker::new(self.state.clone()).run_until_idle().await;
+        self.mail = mail;
     }
 
     /// Everyone: A's members, B's owner, a person in no workspace and an
@@ -227,7 +304,7 @@ impl World {
         let run = Uuid::now_v7().simple().to_string();
         self.a = workspace(&db, "Shop").await;
         self.b = workspace(&db, "Elsewhere").await;
-        for who in MEMBERS.into_iter().filter(|w| *w != Who::Client) {
+        for who in MEMBERS.into_iter().filter(|w| w.person() == Some(*w)) {
             let id = user(&db, &format!("{}-{run}", who.subject())).await;
             join(&db, self.a, id, who.role().unwrap()).await;
             self.users.insert(who, id);
@@ -235,6 +312,14 @@ impl World {
         let bo = user(&db, &format!("bo-{run}")).await;
         join(&db, self.b, bo, Role::Owner).await;
         user(&db, &format!("eve-{run}")).await;
+        // A member who left: their row stays, their membership is gone.
+        let gone = user(&db, &format!("gone-{run}")).await;
+        join(&db, self.a, gone, Role::Member).await;
+        sqlx::query("DELETE FROM workspaces.members WHERE user_id = $1")
+            .bind(gone.as_uuid())
+            .execute(&db)
+            .await
+            .unwrap();
         user(&db, &format!("ivy-{run}")).await;
         // An instance administrator, as `campbooks-server admin grant` makes one.
         let mut conn = db.acquire().await.unwrap();
@@ -465,7 +550,7 @@ impl World {
     fn access(&self, who: Who) -> Access {
         Access {
             workspace: self.a,
-            user: self.users.get(&who).copied(),
+            user: who.person().and_then(|p| self.users.get(&p).copied()),
             role: who.role(),
         }
     }
@@ -478,7 +563,10 @@ impl World {
             "conversations.inbox",
             &self.instances["conversations.inbox"],
         );
-        let role = who.inbox_role().map(ToOwned::to_owned);
+        let role = who
+            .person()
+            .and_then(Who::inbox_role)
+            .map(ToOwned::to_owned);
         match resource_type {
             "workspaces.member" => Facts::owned_by(OwnerFact::User(u(Who::Member))),
             "connectors.connection" => Facts::owned_by(OwnerFact::User(u(Who::Connector))),
@@ -497,11 +585,23 @@ impl World {
             }
             _ => Facts::owned_by(OwnerFact::Nobody),
         }
+        .frozen(self.mail == Mail::Kept && resource_type.starts_with("conversations."))
     }
 
     fn token(&self, sub: &str) -> String {
         let mut claims = self.idp.claims(&all_scopes());
         claims["sub"] = json!(format!("{sub}-{}", self.run));
+        self.idp.token(&claims)
+    }
+
+    /// A client token bound to A, registered by the person `sub`.
+    fn agent(&self, sub: &str) -> String {
+        let mut claims = self.idp.claims(&all_scopes());
+        let object = claims.as_object_mut().unwrap();
+        object.remove("sub");
+        let id = format!("agent:{sub}-{}", self.run);
+        object.insert("azp".into(), id.into());
+        object.insert("workspace_id".into(), self.a.to_string().into());
         self.idp.token(&claims)
     }
 
@@ -520,7 +620,7 @@ impl World {
         method: &str,
         uri: &str,
         body: Option<&Value>,
-    ) -> (StatusCode, Vec<u8>) {
+    ) -> (StatusCode, Vec<u8>, String) {
         let mut request = Request::builder().method(method).uri(uri);
         if let Some(token) = token {
             request = request.header(header::AUTHORIZATION, format!("Bearer {token}"));
@@ -539,16 +639,33 @@ impl World {
             .await
             .unwrap();
         let status = response.status();
+        // The headers a client could tell two answers apart by.
+        let heads = [
+            header::CONTENT_TYPE,
+            header::CONTENT_LANGUAGE,
+            header::WWW_AUTHENTICATE,
+        ]
+        .iter()
+        .map(|name| {
+            let value = response
+                .headers()
+                .get(name)
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or_default();
+            format!("{name}: {value}")
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
         let streaming = response
             .headers()
             .get(header::CONTENT_TYPE)
             .is_some_and(|value| value.as_bytes().starts_with(b"text/event-stream"));
         if streaming {
             // The change feed never ends: its status is the answer.
-            return (status, Vec::new());
+            return (status, Vec::new(), heads);
         }
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        (status, bytes.to_vec())
+        (status, bytes.to_vec(), heads)
     }
 }
 
@@ -783,7 +900,7 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
     // The 404 of a workspace that does not exist: what every caller who may
     // not see one gets, byte for byte.
     let eve = world.token("eve");
-    let (status, canonical) = world
+    let (status, canonical, canonical_heads) = world
         .call(
             Some(&eve),
             "GET",
@@ -832,26 +949,42 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
 
         // Nobody signed in.
         let (uri, body_now) = call(&world);
-        let (status, _) = world.call(None, &method, &uri, body_now.as_ref()).await;
+        let (status, _, _) = world.call(None, &method, &uri, body_now.as_ref()).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "anonymous: {what}");
 
         // Callers who may not see workspace A at all.
         let strangers = [
             ("signed in, in no workspace", world.token("eve")),
+            ("a member who left", world.token("gone")),
             ("a member of another workspace", world.token("bo")),
             ("an instance administrator", world.token("ivy")),
             ("a client token of another workspace", world.client(world.b)),
         ];
         for (who, token) in &strangers {
-            let (status, bytes) = world
+            let (status, bytes, heads) = world
                 .call(Some(token), &method, &uri, body_now.as_ref())
                 .await;
             if in_workspace {
                 assert_eq!(status, StatusCode::NOT_FOUND, "{who}: {what}");
                 assert_eq!(bytes, canonical, "{who}: {what}: not the same 404");
+                assert_eq!(
+                    heads, canonical_heads,
+                    "{who}: {what}: not the same 404 headers"
+                );
             } else {
                 assert!(!status.is_server_error(), "{who}: {what}: {status}");
             }
+        }
+        if in_workspace {
+            // A client a member who left registered: refused outright.
+            let (status, _, _) = world
+                .call(Some(&world.agent("gone")), &method, &uri, body_now.as_ref())
+                .await;
+            assert_eq!(
+                status,
+                StatusCode::UNAUTHORIZED,
+                "a departed member's client: {what}"
+            );
         }
         // Account resources (ways in, passkeys, held grants) answer only
         // their own account: the identity module's tests own that, until
@@ -887,9 +1020,10 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
             let (uri, body_now) = call(&world);
             let token = match who {
                 Who::Client => world.client(world.a),
+                Who::Agent => world.agent(Who::Admin.subject()),
                 other => world.token(other.subject()),
             };
-            let (status, bytes) = world
+            let (status, bytes, heads) = world
                 .call(Some(&token), &method, &uri, body_now.as_ref())
                 .await;
             let text = String::from_utf8_lossy(&bytes);
@@ -898,6 +1032,10 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
                 Decision::NotFound => {
                     assert_eq!(status, StatusCode::NOT_FOUND, "{who:?}: {what}: {text}");
                     assert_eq!(bytes, canonical, "{who:?}: {what}: not the same 404");
+                    assert_eq!(
+                        heads, canonical_heads,
+                        "{who:?}: {what}: not the same 404 headers"
+                    );
                 }
                 Decision::Forbidden => {
                     assert_eq!(status, StatusCode::FORBIDDEN, "{who:?}: {what}: {text}");
@@ -919,7 +1057,7 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
                 }
             }
             // Nothing of an inbox a caller may not read leaks through a list.
-            if status.is_success() && who.inbox_role().is_none() && who != Who::Client {
+            if status.is_success() && who.inbox_role().is_none() {
                 for leaked in &world.inbox_ids {
                     assert!(
                         !text.contains(leaked.as_str()),
@@ -963,4 +1101,110 @@ fn assert_no_counts(value: &Value, what: &str) {
 fn the_matrix_names_every_member_kind_once() {
     let unique: BTreeSet<&str> = MEMBERS.iter().map(|who| who.subject()).collect();
     assert_eq!(unique.len(), MEMBERS.len());
+}
+
+/// The inbox's records once its connection is gone: kept mail answers reads
+/// and deletions only, deleted mail answers nobody, and neither leaks
+/// through a list.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
+    let mut world = World::new(db).await;
+    let spec = serde_json::to_value(crate::openapi()).unwrap();
+    let eve = world.token("eve");
+    let (_, canonical, canonical_heads) = world
+        .call(
+            Some(&eve),
+            "GET",
+            &format!("/api/v1/w/{}/inboxes", WorkspaceId::new()),
+            None,
+        )
+        .await;
+    let mut checks = 0;
+    for mail in [Mail::Kept, Mail::Removed] {
+        for (path, item) in spec["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                let method = method.to_uppercase();
+                let access = &operation["x-campbooks"]["access"];
+                let Some(resource) = access["resource"].as_str() else {
+                    continue;
+                };
+                let inside = ["conversations.", "attention.", "search."]
+                    .iter()
+                    .any(|module| resource.starts_with(module));
+                if !path.contains("{workspace_id}") || !inside {
+                    continue;
+                }
+                let id = operation["operationId"].as_str().unwrap().to_owned();
+                let action: Action = serde_json::from_value(access["action"].clone()).unwrap();
+                let what = format!("{mail:?}: {method} {path} ({id})");
+                world.seed_disconnected(mail).await;
+                let instance = instance_of(&world, &id, path, resource);
+                for who in MEMBERS {
+                    let decision = match (mail, &instance) {
+                        // Nothing of a deleted inbox is anybody's any more.
+                        (Mail::Removed, Some(_))
+                            if resource != "conversations.inbox"
+                                || id == "conversations.create_draft" =>
+                        {
+                            Decision::NotFound
+                        }
+                        _ => expected(&world, who, resource, action, instance.as_deref(), &id),
+                    };
+                    if decision == Decision::Allow && mail == Mail::Kept {
+                        world.seed_disconnected(mail).await;
+                    }
+                    let uri = fill(&world, path);
+                    let body_now = body(&world, &id);
+                    let token = match who {
+                        Who::Client => world.client(world.a),
+                        Who::Agent => world.agent(Who::Admin.subject()),
+                        other => world.token(other.subject()),
+                    };
+                    let (status, bytes, heads) = world
+                        .call(Some(&token), &method, &uri, body_now.as_ref())
+                        .await;
+                    let text = String::from_utf8_lossy(&bytes);
+                    checks += 1;
+                    match decision {
+                        Decision::NotFound => {
+                            assert_eq!(status, StatusCode::NOT_FOUND, "{who:?}: {what}: {text}");
+                            assert_eq!(bytes, canonical, "{who:?}: {what}: not the same 404");
+                            assert_eq!(heads, canonical_heads, "{who:?}: {what}: 404 headers");
+                        }
+                        Decision::Forbidden => {
+                            assert_eq!(status, StatusCode::FORBIDDEN, "{who:?}: {what}: {text}");
+                        }
+                        Decision::Allow => {
+                            assert!(
+                                !matches!(
+                                    status,
+                                    StatusCode::UNAUTHORIZED
+                                        | StatusCode::FORBIDDEN
+                                        | StatusCode::NOT_FOUND
+                                ),
+                                "{who:?}: {what}: allowed, but {status} {text}"
+                            );
+                            assert!(
+                                !status.is_server_error(),
+                                "{who:?}: {what}: {status} {text}"
+                            );
+                        }
+                    }
+                    let blind =
+                        mail == Mail::Removed || who.person().and_then(Who::inbox_role).is_none();
+                    if status.is_success() && blind {
+                        for leaked in &world.inbox_ids {
+                            assert!(
+                                !text.contains(leaked.as_str()),
+                                "{who:?}: {what}: leaked {leaked}"
+                            );
+                        }
+                        let json: Value = serde_json::from_slice(&bytes).unwrap_or(Value::Null);
+                        assert_no_counts(&json, &format!("{who:?}: {what}"));
+                    }
+                }
+            }
+        }
+    }
+    assert!(checks > 100, "only {checks} calls checked");
 }

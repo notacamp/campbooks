@@ -184,6 +184,9 @@ fn created(enqueued: Enqueued) -> JobId {
 
 async fn publish(state: &AppState, event: &Pinged) -> EventId {
     let mut tx = state.db.begin().await.unwrap();
+    if let Some(workspace) = crate::DomainEvent::workspace(event) {
+        crate::db::set_workspace(&mut tx, workspace).await.unwrap();
+    }
     let id = state.events.publish(&mut tx, event).await.unwrap();
     tx.commit().await.unwrap();
     id
@@ -240,6 +243,7 @@ async fn publish_is_transactional(db: PgPool) {
     };
 
     let mut tx = db.begin().await.unwrap();
+    crate::db::set_workspace(&mut tx, "ws-1").await.unwrap();
     state.events.publish(&mut tx, &event).await.unwrap();
     tx.rollback().await.unwrap();
     assert_eq!(count(&db, "SELECT count(*) FROM kernel.events").await, 0);
@@ -1505,6 +1509,7 @@ async fn a_workspace_transaction_sees_and_writes_only_its_kernel_rows(db: PgPool
         .await
         .unwrap();
     assert_eq!(both, 2);
+}
 
 // --- administration ----------------------------------------------------------
 

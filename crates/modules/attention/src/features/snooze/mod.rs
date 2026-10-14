@@ -125,9 +125,6 @@ async fn change(
     id: ItemId,
     until: Option<DateTime<Utc>>,
 ) -> Result<ItemView> {
-    let Some(user) = access.user else {
-        return Err(Error::Denied(crate::MESSAGES.reason("snooze_needs_member")));
-    };
     let mut tx = state.db.begin_for(access.workspace).await?;
     authz::require(
         state,
@@ -138,6 +135,9 @@ async fn change(
         || Error::Denied(crate::MESSAGES.reason("snooze_needs_member")),
     )
     .await?;
+    let Some(user) = access.user else {
+        return Err(Error::Denied(crate::MESSAGES.reason("snooze_needs_member")));
+    };
     let visible = visible_containers(state, &mut tx, access).await?;
     let item = sqlx::query!(
         r#"SELECT container_type, container_id FROM attention.items

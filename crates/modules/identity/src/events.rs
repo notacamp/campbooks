@@ -228,6 +228,9 @@ pub struct MemberLeft {
     pub workspace: String,
     /// The former member (the workspaces module's user id).
     pub user: Uuid,
+    /// Their account (the subject), when the event names it.
+    #[serde(default)]
+    pub subject: Option<String>,
 }
 
 impl DomainEvent for MemberLeft {

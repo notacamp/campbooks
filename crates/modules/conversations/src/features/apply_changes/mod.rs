@@ -156,6 +156,29 @@ impl JobHandler for ApplyChanges {
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
+        // Asked again in the transaction that writes, holding the inbox
+        // `FOR SHARE` until it commits: a disconnect deleting or freezing it
+        // waits for this batch, or this batch sees it is closed.
+        let open = sqlx::query_scalar!(
+            r#"SELECT detached_at IS NULL AS "open!" FROM conversations.inboxes
+                WHERE id = $1 FOR SHARE"#,
+            batch.inbox as InboxId
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if open != Some(true) {
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox closed meanwhile");
+            return Ok(());
+        }
         let mut apply = Apply {
             state: &state,
             events: &events,

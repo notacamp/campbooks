@@ -21,6 +21,9 @@ impl EventHandler for ForgetMember {
 
     async fn handle(ctx: &mut JobContext, event: Event<MemberLeft>) -> Result<(), JobError> {
         let left = event.payload;
+        // Only what existed when they left: a member who came back since
+        // keeps what they were given after.
+        let before = event.occurred_at;
         let workspace: WorkspaceId = left
             .workspace
             .parse()
@@ -29,8 +32,9 @@ impl EventHandler for ForgetMember {
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
         let drafts = sqlx::query_scalar!(
-            "DELETE FROM conversations.drafts WHERE author = $1 RETURNING id",
-            left.user.as_uuid()
+            "DELETE FROM conversations.drafts WHERE author = $1 AND created_at <= $2 RETURNING id",
+            left.user.as_uuid(),
+            before,
         )
         .fetch_all(&mut **tx)
         .await?;
@@ -39,17 +43,20 @@ impl EventHandler for ForgetMember {
             .detach_owners(tx, &ws, DRAFT_RECORD, &drafts)
             .await?;
         let mut inboxes = sqlx::query_scalar!(
-            r#"DELETE FROM conversations.inbox_members WHERE user_id = $1
+            r#"DELETE FROM conversations.inbox_members WHERE user_id = $1 AND created_at <= $2
                RETURNING inbox_id AS "inbox: InboxId""#,
-            left.user.as_uuid()
+            left.user.as_uuid(),
+            before,
         )
         .fetch_all(&mut **tx)
         .await?;
         inboxes.extend(
             sqlx::query_scalar!(
-                r#"UPDATE conversations.inboxes SET owner = NULL WHERE owner = $1
+                r#"UPDATE conversations.inboxes SET owner = NULL
+                    WHERE owner = $1 AND created_at <= $2
                    RETURNING id AS "id: InboxId""#,
-                left.user.as_uuid()
+                left.user.as_uuid(),
+                before,
             )
             .fetch_all(&mut **tx)
             .await?,

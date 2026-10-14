@@ -69,6 +69,11 @@ async fn complete(kit: &Kit, workspace: WorkspaceId, inbox: InboxId, send_id: &s
         .validate(&serde_json::to_value(&event).unwrap(), index)
         .unwrap();
     let mut tx = kit.state.db.begin().await.unwrap();
+    if let Some(workspace) = campbooks_kernel::DomainEvent::workspace(&event) {
+        campbooks_kernel::db::set_workspace(&mut tx, workspace)
+            .await
+            .unwrap();
+    }
     kit.state.events.publish(&mut tx, &event).await.unwrap();
     tx.commit().await.unwrap();
     kit.run_jobs().await;

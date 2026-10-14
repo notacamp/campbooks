@@ -346,7 +346,8 @@ mod tests {
             kit.get(&client, &unknown).await.status,
             StatusCode::NOT_FOUND
         );
-        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::OK);
+        // A client acting for no member sees no inbox's conversation.
+        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::NOT_FOUND);
         let junk = format!("/api/v1/w/{workspace}/conversations/not-an-id");
         assert_eq!(kit.get(&client, &junk).await.status, StatusCode::NOT_FOUND);
     }

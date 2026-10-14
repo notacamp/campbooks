@@ -224,6 +224,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_kept_mail(campbooks_conversations::kept_mail())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -243,6 +244,9 @@ pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppSta
         ));
     match &composition.identity.issuer {
         Some(issuer) => {
+            // Every client token comes from this issuer: a registered client
+            // acts for the member who registered it (ADR 0017).
+            let state = state.with_client_directory(campbooks_identity::client_directory());
             let keys = campbooks_identity::LocalKeys {
                 db: state.db.clone(),
                 keys: Arc::clone(&issuer.keys),

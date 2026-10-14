@@ -1,16 +1,16 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT inbox_id AS \"inbox_id: InboxId\" FROM conversations.messages WHERE id = $1",
+  "query": "SELECT id FROM connectors.streams WHERE connection_id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "inbox_id: InboxId",
+        "name": "id",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "conversations.messages",
-            "name": "inbox_id"
+            "table": "connectors.streams",
+            "name": "id"
           }
         }
       }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "4692d38cd172ca441ecc13de215130a3d311af621bb1700ace588462349deacd"
+  "hash": "9650225891fb69d6fe682614cae8b84cd866bbf5b958823f980843cabc8f2e98"
 }

@@ -8,7 +8,7 @@ use axum::{extract::State, http::StatusCode};
 use campbooks_kernel::authz::Action;
 use campbooks_kernel::db::BeginFor as _;
 use campbooks_kernel::{
-    AppState, Operation, Problem, Result, Risk, extract,
+    AppState, Error, Operation, Problem, Result, Risk, extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 
@@ -16,6 +16,7 @@ use serde::Deserialize;
 use utoipa::IntoParams;
 
 use crate::{
+    MESSAGES,
     domain::{
         access::{acting_user, authorize, member_resource},
         departure::{Departure, depart},
@@ -46,7 +47,9 @@ use crate::{
             removing an owner.", body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such workspace or member.", body = Problem,
             content_type = "application/problem+json"),
-        (status = CONFLICT, description = "`last_owner`: the workspace would have no owner.",
+        (status = CONFLICT, description = "`last_owner`: the workspace would have no owner; \
+            `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have \
+            nobody left to read it (share it first, or delete the mail).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -101,6 +104,16 @@ pub async fn execute(
     } else {
         Departure::RemovedBy(actor, role, mail)
     };
+    if matches!(how, Departure::RemovedBy(_, _, MailChoice::Keep))
+        && !state
+            .kept_mail
+            .unread_if_kept(&state.db, access.workspace, member)
+            .await?
+            .is_empty()
+    {
+        // Kept mail nobody could read could be neither read nor deleted.
+        return Err(Error::Conflict(MESSAGES.reason("keep_needs_a_reader")));
+    }
     depart(state, access.workspace, member, how).await
 }
 
@@ -151,6 +164,26 @@ mod tests {
         assert_eq!(response.status, StatusCode::NO_CONTENT);
         let payload = kit.last_event_payload(&ws.to_string()).await;
         assert_eq!(payload["mail"], "keep");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn keeping_mail_nobody_could_read_is_refused(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        kit.join(&ana, ws, "eli", "member").await;
+        let eli = kit.user_id("eli").await;
+        kit.unread_if_kept.0.lock().unwrap().push(eli);
+        let refused = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli}?mail=keep"))
+            .await;
+        assert_eq!(refused.status, StatusCode::CONFLICT);
+        assert_eq!(refused.json["code"], "keep_needs_a_reader");
+        // Deleting the mail needs no reader.
+        let removed = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli}"))
+            .await;
+        assert_eq!(removed.status, StatusCode::NO_CONTENT);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
