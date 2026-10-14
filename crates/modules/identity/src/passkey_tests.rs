@@ -1028,3 +1028,72 @@ async fn waiting_challenges_are_capped_per_address(db: PgPool) {
         11
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_suspended_account_is_told_so_only_after_its_passkey_verifies(db: PgPool) {
+    use crate::domain::suspension;
+
+    let kit = Kit::new(db).await;
+    let (request, verifier) = waiting_request(&kit).await;
+    let mut device = device();
+    let redirect = sign_up_with_passkey(&kit, &mut device, &request).await;
+    let tokens = redeem(&kit, &redirect, &verifier).await;
+    let (_, id) = Kit::decode(tokens["id_token"].as_str().unwrap());
+    let account: uuid::Uuid = id["sub"].as_str().unwrap().parse().unwrap();
+    let mut tx = kit.state.db.begin().await.unwrap();
+    suspension::suspend(
+        &mut tx,
+        &kit.state.events,
+        account,
+        "root",
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+
+    kit.new_browser();
+    let (request, _) = waiting_request(&kit).await;
+    let refused = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+    assert_eq!(refused.json["code"], "account_suspended");
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM identity.sessions WHERE ended_at IS NULL"
+        )
+        .await,
+        0,
+        "no session starts"
+    );
+
+    // A signature that does not verify learns nothing about the account.
+    kit.new_browser();
+    let (request, _) = waiting_request(&kit).await;
+    let options = screen(
+        &kit,
+        "/auth/passkey/sign-in/options",
+        &json!({ "request": request }),
+    )
+    .await;
+    let mut forged = device.get(&options.json, 0);
+    let signature = forged["response"]["signature"].as_str().unwrap().to_owned();
+    let tampered = if signature.starts_with('A') {
+        signature.replacen('A', "B", 1)
+    } else {
+        format!("A{}", &signature[1..])
+    };
+    forged["response"]["signature"] = json!(tampered);
+    let probe = screen(&kit, "/auth/passkey/sign-in", &forged).await;
+    assert_eq!(probe.json["code"], "passkey_not_accepted", "{probe:?}");
+
+    let mut tx = kit.state.db.begin().await.unwrap();
+    suspension::unsuspend(&mut tx, account, "root", chrono::Utc::now())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.new_browser();
+    let (request, _) = waiting_request(&kit).await;
+    let back = sign_in_with_passkey(&kit, &mut device, 0, &request).await;
+    assert_eq!(back.status, StatusCode::OK, "{back:?}");
+}

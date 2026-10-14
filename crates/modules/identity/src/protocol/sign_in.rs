@@ -16,7 +16,7 @@
 //!
 //! Errors at a sign-in callback send the browser back to the sign-in screen with
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
-//! `provider_unavailable`, `login_failed`, `account_disabled`, and
+//! `provider_unavailable`, `login_failed`, `account_suspended`, and
 //! `signup_invite_only` (an invite-only instance, and no pending invitation
 //! for the provider's verified address: nothing is kept).
 
@@ -412,7 +412,7 @@ pub async fn callback(
     let Upstreamed { identity, tokens } = signed_in;
     let request = flow.request_id.as_deref();
     let response = match accounts::find(&ctx.state.db, &identity).await? {
-        Some(Linked { disabled: true, .. }) => sign_in_error("account_disabled", request),
+        Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
         // the provider sent along is dropped, not stored.
         Some(linked) => {

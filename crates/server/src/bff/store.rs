@@ -112,16 +112,6 @@ pub async fn find_session(
     .await
 }
 
-/// Delete every session of `subject` (signed out everywhere); how many.
-pub async fn delete_for_subject(db: &PgPool, subject: &str) -> sqlx::Result<u64> {
-    Ok(
-        sqlx::query!("DELETE FROM bff.sessions WHERE subject = $1", subject)
-            .execute(db)
-            .await?
-            .rows_affected(),
-    )
-}
-
 /// Record use: push the idle deadline to `idle_expires_at`.
 pub async fn touch(
     db: &PgPool,

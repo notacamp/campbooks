@@ -78,6 +78,10 @@
       "failed": {
         "title": "Couldn’t sign in with a passkey.",
         "lead": "Something went wrong. Try again, or sign in another way."
+      },
+      "suspended": {
+        "title": "This account is suspended.",
+        "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
       }
     }
   },
@@ -98,10 +102,6 @@
       "title": "The sign-in provider couldn’t confirm who you are.",
       "lead": "Try again, or sign in another way."
     },
-    "account_disabled": {
-      "title": "This account is turned off.",
-      "lead": "Ask whoever runs this Campbooks to turn it back on."
-    },
     "way_in_belongs_to_another_account": {
       "title": "This account already signs in to another Campbooks account.",
       "lead": "Sign in with it to use that account."
@@ -113,6 +113,10 @@
     "unknown": {
       "title": "Something went wrong while signing in.",
       "lead": "Nothing changed. Start again."
+    },
+    "account_suspended": {
+      "title": "This account is suspended.",
+      "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
     }
   },
   "newAccount": {
@@ -390,6 +394,51 @@
       }
     },
     "freshSignIn": "For your security, adding a passkey needs a sign-in from the last five minutes. Sign in again; it takes you straight back here."
+  },
+  "admin": {
+    "title": "Account",
+    "loading": "Loading the account…",
+    "noAccount": "No account details here: this Campbooks signs people in with another identity provider, or the account is gone.",
+    "loadError": "Couldn’t load the account.",
+    "retry": "Try again",
+    "status": "Status",
+    "active": "Can sign in",
+    "suspended": "Suspended",
+    "suspendedSince": "Since {{date}}",
+    "primaryEmail": "Primary email address",
+    "verified": "Verified by the provider",
+    "unverified": "Not verified",
+    "none": "None",
+    "created": "Account created",
+    "lastSignIn": "Last sign-in",
+    "never": "Never",
+    "sessions": "Signed in now",
+    "sessionCount_one": "On {{count}} browser",
+    "sessionCount_other": "On {{count}} browsers",
+    "passkeys": "Passkeys",
+    "passkeyCount_one": "{{count}} passkey",
+    "passkeyCount_other": "{{count}} passkeys",
+    "waysIn": "Ways to sign in",
+    "noWaysIn": "No provider account. They sign in with a passkey only.",
+    "suspendEllipsis": "Suspend…",
+    "suspend": "Suspend",
+    "cancel": "Cancel",
+    "unsuspend": "Unsuspend",
+    "suspendHint": "Stops this person from signing in. Nothing is deleted.",
+    "unsuspendHint": "Lets this person sign in again. They start a new sign-in.",
+    "confirmSuspend": "Suspend {{name}}? They are signed out everywhere at once and can’t sign in again until you unsuspend them. Their workspaces, mail and documents stay as they are.",
+    "isAdmin": {
+      "title": "This person is an administrator.",
+      "lead": "Revoke their admin profile on the server first (campbooks-server admin revoke), then suspend them."
+    },
+    "failed": {
+      "title": "Couldn’t change it.",
+      "lead": "Nothing changed. Try again."
+    },
+    "done": {
+      "suspended": "{{name}} is suspended and signed out everywhere.",
+      "unsuspended": "{{name}} can sign in again."
+    }
   },
   "consent": {
     "loading": "Loading what the app asks for…",

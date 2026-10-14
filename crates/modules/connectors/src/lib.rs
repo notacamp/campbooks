@@ -80,7 +80,9 @@ pub fn module(deps: Deps) -> Module {
             ))
             .routes(routes!(features::sync_now::handler))
             .layer(Extension(deps.clone())),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new().routes(routes!(features::admin_list_connections::handler)),
+        ),
         background: Background::new()
             .publishes::<events::ConnectionAdded>()
             .publishes::<events::CapabilityGranted>()

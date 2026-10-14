@@ -78,6 +78,10 @@
       "failed": {
         "title": "Impossible de se connecter avec une clé d’accès.",
         "lead": "Un problème est survenu. Réessayez, ou connectez-vous autrement."
+      },
+      "suspended": {
+        "title": "Ce compte est suspendu.",
+        "lead": "La personne qui gère ce Campbooks l’a suspendu. Demandez-lui de le rétablir."
       }
     }
   },
@@ -98,10 +102,6 @@
       "title": "Le service de connexion n’a pas pu confirmer votre identité.",
       "lead": "Réessayez, ou connectez-vous d’une autre façon."
     },
-    "account_disabled": {
-      "title": "Ce compte est désactivé.",
-      "lead": "Demandez à la personne qui gère ce Campbooks de le réactiver."
-    },
     "way_in_belongs_to_another_account": {
       "title": "Ce compte permet déjà d’accéder à un autre compte Campbooks.",
       "lead": "Connectez-vous avec lui pour utiliser ce compte."
@@ -113,6 +113,10 @@
     "unknown": {
       "title": "Un problème est survenu pendant la connexion.",
       "lead": "Rien n’a changé. Recommencez."
+    },
+    "account_suspended": {
+      "title": "Ce compte est suspendu.",
+      "lead": "La personne qui gère ce Campbooks l’a suspendu. Demandez-lui de le rétablir."
     }
   },
   "newAccount": {
@@ -390,6 +394,51 @@
       }
     },
     "freshSignIn": "Par sécurité, ajouter une clé d’accès demande une connexion de moins de cinq minutes. Reconnectez-vous ; vous reviendrez directement ici."
+  },
+  "admin": {
+    "title": "Compte",
+    "loading": "Chargement du compte…",
+    "noAccount": "Aucun détail de compte ici : ce Campbooks connecte les gens avec un autre fournisseur d’identité, ou le compte n’existe plus.",
+    "loadError": "Impossible de charger le compte.",
+    "retry": "Réessayer",
+    "status": "État",
+    "active": "Peut se connecter",
+    "suspended": "Suspendu",
+    "suspendedSince": "Depuis le {{date}}",
+    "primaryEmail": "Adresse e-mail principale",
+    "verified": "Vérifiée par le fournisseur",
+    "unverified": "Non vérifiée",
+    "none": "Aucune",
+    "created": "Compte créé",
+    "lastSignIn": "Dernière connexion",
+    "never": "Jamais",
+    "sessions": "Connexions en cours",
+    "sessionCount_one": "Sur {{count}} navigateur",
+    "sessionCount_other": "Sur {{count}} navigateurs",
+    "passkeys": "Clés d’accès",
+    "passkeyCount_one": "{{count}} clé d’accès",
+    "passkeyCount_other": "{{count}} clés d’accès",
+    "waysIn": "Moyens de se connecter",
+    "noWaysIn": "Aucun compte de fournisseur. La connexion se fait uniquement avec une clé d’accès.",
+    "suspendEllipsis": "Suspendre…",
+    "suspend": "Suspendre",
+    "cancel": "Annuler",
+    "unsuspend": "Lever la suspension",
+    "suspendHint": "Empêche cette personne de se connecter. Rien n’est supprimé.",
+    "unsuspendHint": "Permet à cette personne de se connecter de nouveau. Elle devra se reconnecter.",
+    "confirmSuspend": "Suspendre {{name}} ? Toutes ses sessions sont fermées immédiatement et la connexion reste impossible jusqu’à la levée de la suspension. Ses espaces de travail, ses e-mails et ses documents restent tels quels.",
+    "isAdmin": {
+      "title": "Cette personne est administratrice.",
+      "lead": "Révoquez d’abord son profil d’administrateur sur le serveur (campbooks-server admin revoke), puis suspendez-la."
+    },
+    "failed": {
+      "title": "Impossible de modifier.",
+      "lead": "Rien n’a changé. Réessayez."
+    },
+    "done": {
+      "suspended": "Le compte de {{name}} est suspendu et toutes ses sessions sont fermées.",
+      "unsuspended": "{{name}} peut de nouveau se connecter."
+    }
   },
   "consent": {
     "loading": "Chargement de ce que demande l’application…",

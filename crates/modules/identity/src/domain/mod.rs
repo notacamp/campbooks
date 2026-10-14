@@ -11,6 +11,7 @@ pub mod notices;
 pub mod passkeys;
 pub mod sessions;
 pub mod step_up;
+pub mod suspension;
 pub mod tokens;
 pub mod ways_in;
 pub mod workspace_clients;

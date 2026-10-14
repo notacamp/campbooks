@@ -9,5 +9,34 @@
       "throttled": "Paused for a moment",
       "failing": "Not syncing"
     }
+  },
+  "admin": {
+    "title": "Connected accounts",
+    "loading": "Loading connected accounts…",
+    "loadError": "Couldn’t load the connected accounts.",
+    "retry": "Try again",
+    "none": "No account connected in this workspace.",
+    "health": {
+      "ok": "Syncing",
+      "needs_reauth": "Needs the member to reconnect",
+      "throttled": "Slowed down by the provider",
+      "failing": "Failing"
+    },
+    "since": "since {{date}}",
+    "provider": {
+      "google": "Google",
+      "zoho": "Zoho"
+    },
+    "capability": {
+      "messages": "Mail",
+      "calendar": "Calendar",
+      "files": "Files",
+      "bank": "Bank"
+    },
+    "lastSynced": "Last synced {{date}}",
+    "neverSynced": "Not synced yet",
+    "paused": "Paused",
+    "failures_one": "{{count}} failed run in a row",
+    "failures_other": "{{count}} failed runs in a row"
   }
 }

@@ -78,6 +78,10 @@
       "failed": {
         "title": "No se ha podido iniciar sesión con una llave de acceso.",
         "lead": "Algo ha fallado. Inténtalo de nuevo o inicia sesión de otra forma."
+      },
+      "suspended": {
+        "title": "Esta cuenta está suspendida.",
+        "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
       }
     }
   },
@@ -98,10 +102,6 @@
       "title": "El proveedor de inicio de sesión no ha podido confirmar quién eres.",
       "lead": "Vuelve a intentarlo o inicia sesión de otra forma."
     },
-    "account_disabled": {
-      "title": "Esta cuenta está desactivada.",
-      "lead": "Pide a quien gestiona este Campbooks que la vuelva a activar."
-    },
     "way_in_belongs_to_another_account": {
       "title": "Esta cuenta ya da acceso a otra cuenta de Campbooks.",
       "lead": "Inicia sesión con ella para usar esa cuenta."
@@ -113,6 +113,10 @@
     "unknown": {
       "title": "Algo ha fallado al iniciar sesión.",
       "lead": "No ha cambiado nada. Empieza de nuevo."
+    },
+    "account_suspended": {
+      "title": "Esta cuenta está suspendida.",
+      "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
     }
   },
   "newAccount": {
@@ -390,6 +394,51 @@
       }
     },
     "freshSignIn": "Por seguridad, añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos. Vuelve a iniciar sesión; volverás aquí enseguida."
+  },
+  "admin": {
+    "title": "Cuenta",
+    "loading": "Cargando la cuenta…",
+    "noAccount": "No hay detalles de la cuenta aquí: este Campbooks usa otro proveedor de identidad para iniciar sesión, o la cuenta ya no existe.",
+    "loadError": "No se ha podido cargar la cuenta.",
+    "retry": "Reintentar",
+    "status": "Estado",
+    "active": "Puede iniciar sesión",
+    "suspended": "Suspendida",
+    "suspendedSince": "Desde el {{date}}",
+    "primaryEmail": "Dirección de correo principal",
+    "verified": "Verificada por el proveedor",
+    "unverified": "Sin verificar",
+    "none": "Ninguna",
+    "created": "Cuenta creada",
+    "lastSignIn": "Último inicio de sesión",
+    "never": "Nunca",
+    "sessions": "Sesiones abiertas ahora",
+    "sessionCount_one": "En {{count}} navegador",
+    "sessionCount_other": "En {{count}} navegadores",
+    "passkeys": "Llaves de acceso",
+    "passkeyCount_one": "{{count}} llave de acceso",
+    "passkeyCount_other": "{{count}} llaves de acceso",
+    "waysIn": "Formas de iniciar sesión",
+    "noWaysIn": "Ninguna cuenta de proveedor. Inicia sesión solo con una llave de acceso.",
+    "suspendEllipsis": "Suspender…",
+    "suspend": "Suspender",
+    "cancel": "Cancelar",
+    "unsuspend": "Quitar la suspensión",
+    "suspendHint": "Impide que esta persona inicie sesión. No se borra nada.",
+    "unsuspendHint": "Permite que esta persona vuelva a iniciar sesión. Tendrá que iniciar sesión de nuevo.",
+    "confirmSuspend": "¿Suspender a {{name}}? Su sesión se cierra al momento en todas partes y no podrá volver a iniciar sesión hasta que quites la suspensión. Sus espacios de trabajo, su correo y sus documentos se quedan como están.",
+    "isAdmin": {
+      "title": "Esta persona es administradora.",
+      "lead": "Revoca primero su perfil de administrador en el servidor (campbooks-server admin revoke) y después suspéndela."
+    },
+    "failed": {
+      "title": "No se ha podido cambiar.",
+      "lead": "No ha cambiado nada. Vuelve a intentarlo."
+    },
+    "done": {
+      "suspended": "La cuenta de {{name}} está suspendida y todas sus sesiones se han cerrado.",
+      "unsuspended": "{{name}} puede volver a iniciar sesión."
+    }
   },
   "consent": {
     "loading": "Cargando lo que pide la aplicación…",

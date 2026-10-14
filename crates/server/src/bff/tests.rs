@@ -1249,6 +1249,49 @@ async fn backchannel_logout_ends_the_named_sessions(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
+    use campbooks_identity::events::AccountSuspended;
+    use campbooks_kernel::jobs::Worker;
+
+    let h = harness(db).await;
+    let (suspended, other) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let mut browsers = Vec::new();
+    for account in [suspended, suspended, other] {
+        h.idp.set_user(TestUser {
+            subject: account.to_string(),
+            ..TestUser::default()
+        });
+        let mut browser = Browser::new(&h.app);
+        browser.sign_in(&h.idp, "/").await;
+        browsers.push(browser);
+    }
+
+    let pool = testing::app_role_pool(&h.db).await;
+    let state = crate::with_ports(
+        AppState::new(
+            pool.clone(),
+            testing::config("postgres://test@localhost/test"),
+        )
+        .with_registry(crate::registry().unwrap()),
+    );
+    let mut tx = pool.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &AccountSuspended { account: suspended })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let stats = Worker::new(state).run_until_idle().await;
+    assert_eq!(stats.succeeded, 1, "{stats:?}");
+
+    let mut signed_in = Vec::new();
+    for browser in &mut browsers {
+        signed_in.push(browser.get("/bff/session").await.json()["authenticated"].clone());
+    }
+    assert_eq!(signed_in, [false, false, true]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn backchannel_logout_refuses_bad_tokens(db: PgPool) {
     let h = harness(db).await;
     let mut browser = Browser::new(&h.app);

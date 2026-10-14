@@ -1,6 +1,9 @@
 //! One folder per use case of the API (the operation catalogue). The issuer's
 //! protocol endpoints live in `protocol/`.
 
+pub mod admin_get_account;
+pub mod admin_suspend_account;
+pub mod admin_unsuspend_account;
 pub mod adopt_held_grant;
 pub mod discard_held_grant;
 pub mod list_clients;

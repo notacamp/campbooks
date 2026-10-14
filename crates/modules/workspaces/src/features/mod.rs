@@ -2,8 +2,12 @@
 
 pub mod accept_invitation;
 pub mod admin_approve_signup_request;
+pub mod admin_get_user;
+pub mod admin_get_workspace;
 pub mod admin_list_signup_codes;
 pub mod admin_list_signup_requests;
+pub mod admin_list_users;
+pub mod admin_list_workspaces;
 pub mod admin_mint_signup_code;
 pub mod admin_reject_signup_request;
 pub mod admin_revoke_signup_code;

@@ -38,8 +38,9 @@ use axum::{
     http::HeaderMap,
     routing::{get, post},
 };
+use campbooks_identity::events::AccountSuspended;
 use campbooks_kernel::{
-    AppState, Error, Event, EventConsumer, Job, JobContext, JobError,
+    AppState, Error, Event, EventHandler, Job, JobContext, JobError,
     auth::TokenVerifier,
     jobs::Background,
     rate_limit::{Limit, RateLimits, TrustedProxies},
@@ -200,12 +201,14 @@ impl Bff {
     }
 }
 
-/// The BFF's background work: pruning ended sessions, and ending the web
-/// sessions of a person who signed out everywhere.
+/// The BFF's background work: pruning ended sessions, and ending a
+/// suspended account's sessions, or those of a person who signed out
+/// everywhere.
 pub fn background() -> Background {
     Background::new()
         .schedule::<PruneSessions>(PRUNE_EVERY)
-        .consumer(EndSignedOutSessions)
+        .on_event::<EndSuspendedSessions>()
+        .on_event::<EndSignedOutSessions>()
 }
 
 /// `bff.end_signed_out_sessions` ← `identity.signed_out_everywhere`: every
@@ -215,22 +218,39 @@ pub fn background() -> Background {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct EndSignedOutSessions;
 
-impl EventConsumer for EndSignedOutSessions {
+impl EventHandler for EndSignedOutSessions {
     type Event = campbooks_identity::events::SignedOutEverywhere;
     const NAME: &'static str = "bff.end_signed_out_sessions";
     const QUEUE: &'static str = "events";
 
-    async fn handle(
-        &self,
-        ctx: &mut JobContext,
-        event: Event<Self::Event>,
-    ) -> Result<(), JobError> {
-        let ended =
-            store::delete_for_subject(ctx.pool(), &event.payload.account.to_string()).await?;
+    async fn handle(ctx: &mut JobContext, event: Event<Self::Event>) -> Result<(), JobError> {
+        let subject = event.payload.account.to_string();
+        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
         tracing::info!(
             sessions = ended,
             "ended the web sessions of a sign-out everywhere"
         );
+        Ok(())
+    }
+}
+
+/// An administrator suspended an account (ADR 0015): its web sessions end
+/// at once, as an identity provider's back-channel logout would end them
+/// (the in-process issuer sends none; it publishes
+/// `identity.account_suspended` instead). Its next web request is asked to
+/// sign in, and signing in tells the person the account is suspended.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EndSuspendedSessions;
+
+impl EventHandler for EndSuspendedSessions {
+    type Event = AccountSuspended;
+    const NAME: &'static str = "bff.end_suspended_sessions";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(ctx: &mut JobContext, event: Event<AccountSuspended>) -> Result<(), JobError> {
+        let subject = event.payload.account.to_string();
+        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
+        tracing::info!(sessions = ended, "ended a suspended account's web sessions");
         Ok(())
     }
 }

@@ -63,7 +63,12 @@ pub fn module(deps: Deps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router().layer(Extension(deps)),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new()
+                .routes(routes!(features::admin_get_account::handler))
+                .routes(routes!(features::admin_suspend_account::handler))
+                .routes(routes!(features::admin_unsuspend_account::handler)),
+        ),
         background: Background::new()
             .publishes::<events::AccountCreated>()
             .publishes::<events::SignedIn>()
@@ -71,6 +76,7 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
             .publishes::<events::SignedOutEverywhere>()
+            .publishes::<events::AccountSuspended>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
@@ -122,9 +128,13 @@ fn passkey_routes() -> OpenApiRouter<AppState> {
 }
 
 #[cfg(test)]
+mod admin_testkit;
+#[cfg(test)]
 mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;
+#[cfg(test)]
+mod suspension_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]
