@@ -180,6 +180,7 @@ export const LAPTOP_PASSKEY: Schema<"PasskeyView"> = {
   synced: true,
   created_at: "2026-10-02T09:00:00Z",
   last_used_at: "2026-10-13T08:30:00Z",
+  signed_up_with: false,
 };
 
 export const PHONE_PASSKEY: Schema<"PasskeyView"> = {
@@ -188,4 +189,15 @@ export const PHONE_PASSKEY: Schema<"PasskeyView"> = {
   synced: false,
   created_at: "2026-10-05T18:00:00Z",
   last_used_at: null,
+  signed_up_with: false,
+};
+
+/** The passkey a passkey-only account was made with, two days ago in the demo week. */
+export const SIGN_UP_PASSKEY: Schema<"PasskeyView"> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e3",
+  name: "Passkey",
+  synced: true,
+  created_at: "2026-10-12T10:00:00Z",
+  last_used_at: "2026-10-13T08:30:00Z",
+  signed_up_with: true,
 };

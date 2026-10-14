@@ -303,6 +303,9 @@ pub struct Gateway {
     instruments: Instruments,
     /// Recent reachability probes ([`Gateway::health`]).
     pub(crate) probes: crate::health::Probes,
+    /// The `decide` role's last answers check
+    /// ([`Gateway::answers_check`]).
+    pub(crate) checks: crate::decide::check::Checks,
 }
 
 impl Gateway {
@@ -333,6 +336,7 @@ impl Gateway {
             retry: RetryPolicy::default(),
             instruments: Instruments::new(),
             probes: crate::health::Probes::default(),
+            checks: crate::decide::check::Checks::default(),
         })
     }
 

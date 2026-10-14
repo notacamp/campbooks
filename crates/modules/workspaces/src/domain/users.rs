@@ -27,8 +27,8 @@ pub async fn ensure_user(db: &PgPool, principal: &Principal) -> Result<UserId> {
     let mut tx = begin_as_user(db, id).await?;
     let inserted = sqlx::query_scalar!(
         r#"
-        INSERT INTO workspaces.users (id, idp_subject, display_name, email)
-        VALUES ($1, $2, $3, $4)
+        INSERT INTO workspaces.users (id, idp_subject, display_name, email, email_verified)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (idp_subject) DO NOTHING
         RETURNING id AS "id: UserId"
         "#,
@@ -36,6 +36,7 @@ pub async fn ensure_user(db: &PgPool, principal: &Principal) -> Result<UserId> {
         principal.subject,
         principal.name,
         principal.email,
+        principal.email.is_some() && principal.email_verified,
     )
     .fetch_optional(&mut *tx)
     .await?;
@@ -57,10 +58,11 @@ pub async fn ensure_user(db: &PgPool, principal: &Principal) -> Result<UserId> {
     Ok(id)
 }
 
-/// The existing user of `principal`, with a changed name or email updated.
+/// The existing user of `principal`, with a changed name or email (and
+/// whether it is verified) updated.
 async fn refresh(db: &PgPool, principal: &Principal) -> Result<Option<UserId>> {
     let Some(row) = sqlx::query!(
-        r#"SELECT id AS "id: UserId", display_name, email
+        r#"SELECT id AS "id: UserId", display_name, email, email_verified
              FROM workspaces.users WHERE idp_subject = $1"#,
         principal.subject
     )
@@ -70,15 +72,18 @@ async fn refresh(db: &PgPool, principal: &Principal) -> Result<Option<UserId>> {
         return Ok(None);
     };
     let name_changed = principal.name.is_some() && principal.name != row.display_name;
-    let email_changed = principal.email.is_some() && principal.email != row.email;
+    let email_changed = principal.email.is_some()
+        && (principal.email != row.email || principal.email_verified != row.email_verified);
     if name_changed || email_changed {
         sqlx::query!(
             "UPDATE workspaces.users
-                SET display_name = coalesce($2, display_name), email = coalesce($3, email)
+                SET display_name = coalesce($2, display_name), email = coalesce($3, email),
+                    email_verified = CASE WHEN $3::text IS NULL THEN email_verified ELSE $4 END
               WHERE id = $1",
             row.id as UserId,
             principal.name,
             principal.email,
+            principal.email_verified,
         )
         .execute(db)
         .await?;

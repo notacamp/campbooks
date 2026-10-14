@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.users\n                SET display_name = coalesce($2, display_name), email = coalesce($3, email),\n                    email_verified = CASE WHEN $3::text IS NULL THEN email_verified ELSE $4 END\n              WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0ed72539b0d3e553e0ea0d1a56dd6259bfe89d723ce7a1f34add3dc9f9e77f82"
+}

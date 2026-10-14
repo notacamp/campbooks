@@ -44,7 +44,8 @@ const REGISTRATION_LIMIT: Limit =
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "The token lacks `identity:write`, or the sign-in \
-            is more than ten minutes old (`step_up_required`).", body = Problem,
+            is more than five minutes old (`fresh_sign_in_required`: sign in again at \
+            `/bff/login?max_age=0`).", body = Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "This instance offers no passkeys (not https), or \
             another identity provider serves it.", body = Problem,
@@ -62,7 +63,7 @@ pub async fn handler(
     let (issuer, account) = super::account(&deps, &principal)?;
     let rp = passkey::relying_party(&issuer).ok_or(Error::NotFound)?;
     let now = issuer.now();
-    step_up::require_recent(&principal, now)?;
+    step_up::require_fresh(&principal, now)?;
     // At most ten registrations waiting per account (a challenge lives five
     // minutes).
     state

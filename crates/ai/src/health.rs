@@ -11,7 +11,10 @@ use std::{
 use secrecy::ExposeSecret as _;
 use serde::Serialize;
 
-use crate::{Gateway, Location, Protocol, ProviderConfig, Role, gateway::endpoint};
+use crate::{
+    Gateway, Location, Protocol, ProviderConfig, Role, decide::check::AnswersCheck,
+    gateway::endpoint,
+};
 
 /// How long a probe may take before the provider counts as unreachable.
 pub const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -20,7 +23,7 @@ pub const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 pub const PROBE_CACHE: Duration = Duration::from_mins(1);
 
 /// One role, as an administrator sees it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct RoleHealth {
     /// The role.
     pub role: Role,
@@ -41,6 +44,10 @@ pub struct RoleHealth {
     /// Whether the provider answered a probe (`GET <base_url>/models`, any
     /// non-5xx status) within [`PROBE_TIMEOUT`]; `None` when not configured.
     pub reachable: Option<bool>,
+    /// The `decide` role's answers check ([`crate::decide::check`]); `None`
+    /// for other roles, and when the role is not configured or may not
+    /// receive mail (the check never runs then).
+    pub answers_check: Option<AnswersCheck>,
 }
 
 /// Every role, none configured.
@@ -56,6 +63,7 @@ pub fn unconfigured() -> Vec<RoleHealth> {
             location: None,
             content_allowed: None,
             reachable: None,
+            answers_check: None,
         })
         .collect()
 }
@@ -112,6 +120,9 @@ impl Gateway {
                     location: Some(self.config().location(provider)),
                     content_allowed: Some(self.config().content_allowed(provider)),
                     reachable: Some(reachable.get(&role).copied().unwrap_or(false)),
+                    answers_check: (role == Role::Decide
+                        && self.config().content_allowed(provider))
+                    .then(|| self.answers_check()),
                 },
                 Err(_) => RoleHealth {
                     role,
@@ -122,6 +133,7 @@ impl Gateway {
                     location: None,
                     content_allowed: None,
                     reachable: None,
+                    answers_check: None,
                 },
             })
             .collect()

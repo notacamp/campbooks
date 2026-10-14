@@ -204,6 +204,35 @@ pub async fn end(conn: &mut PgConnection, id: Uuid, now: DateTime<Utc>) -> Resul
     Ok(())
 }
 
+/// End every live session of `account` and revoke every refresh token it
+/// holds, whatever client it went to (signed out everywhere). How many
+/// sessions and refresh families ended.
+pub async fn end_all(
+    conn: &mut PgConnection,
+    account: Uuid,
+    now: DateTime<Utc>,
+) -> Result<(u64, u64)> {
+    let sessions = sqlx::query(
+        "UPDATE identity.sessions SET ended_at = $2 WHERE account_id = $1 AND ended_at IS NULL",
+    )
+    .bind(account)
+    .bind(now)
+    .execute(&mut *conn)
+    .await?
+    .rows_affected();
+    let families = sqlx::query(
+        "UPDATE identity.refresh_families
+            SET revoked_at = $2, revoke_reason = 'signed_out_everywhere'
+          WHERE account_id = $1 AND revoked_at IS NULL",
+    )
+    .bind(account)
+    .bind(now)
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok((sessions, families))
+}
+
 /// End every live session signed in with provider identity `identity_id`
 /// and revoke the refresh tokens issued in them (the way in is being
 /// removed: whoever signed in with it is signed out). How many ended.

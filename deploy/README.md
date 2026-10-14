@@ -266,6 +266,32 @@ header there unless you want callers to choose which of their requests are trace
 or email addresses, and metrics never carry ids (workspace ids appear on spans only). A
 test in the server enforces this for every release.
 
+## Outgoing mail
+
+Campbooks sends one kind of mail of its own today: when a way to sign in (a provider
+account, a passkey) is added to an account, a notice goes to the account's address and,
+for a new provider account, to that account's address too, in the person's language. It
+names what was added and when, links only to this instance, and carries no images or
+tracking. Without a mail server nothing is sent; the notice is shown in the app (Settings
+→ Ways to sign in highlights what is new) and kept in the account's history either way.
+
+Point the server at any SMTP server that accepts mail from it, over TLS:
+
+```sh
+CAMPBOOKS_MAIL__SMTP_URL=smtps://user:password@smtp.example.com                      # implicit TLS, port 465
+# CAMPBOOKS_MAIL__SMTP_URL=smtp://user:password@smtp.example.com:587?tls=required    # or STARTTLS
+CAMPBOOKS_MAIL__FROM=Campbooks <no-reply@example.com>
+```
+
+Set both or neither: one without the other stops the server at startup, naming the
+setting. TLS is required, so the password never crosses the network in clear: plain
+`smtp://`, or `tls=opportunistic` (which anyone on the path can strip), is refused at
+startup. The one exception is a relay on the same machine (`smtp://127.0.0.1:25`,
+`::1` or `localhost`) given no user or password. The URL holds the password, so it is a secret: the server never logs it or
+repeats it in an error, and `CAMPBOOKS_MAIL__SMTP_URL_FILE` reads it from a file instead
+(a Docker secret, for example). Mail is sent by the worker and retried when the server is
+unreachable; a notice is never sent twice.
+
 ## Web sign-in
 
 The server signs browsers in itself (a backend-for-frontend, ADR 0004): open the app, and
@@ -475,7 +501,7 @@ Codes in `CAMPBOOKS_SIGNUP__CODES` still work and stay reusable by anyone who ha
 minted codes, and the setting needs no value when you only use minted ones.
 
 - Every admin request and every command above is recorded (`admin log`).
-- The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks
+- The admin API asks for a recent sign-in: more than an hour after signing in, the app asks
   the administrator to sign in again.
 - Admin views show metadata only (counts, states, providers, addresses people signed in
   with), never messages or documents, and nobody can act as another person.

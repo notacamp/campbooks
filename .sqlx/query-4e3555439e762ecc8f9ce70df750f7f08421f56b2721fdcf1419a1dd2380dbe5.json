@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\", m.direction,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model') AS \"answered!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n         WHERE m.id = $1\n        ",
+  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\", m.direction,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model') AS \"answered!\",\n               i.address AS inbox_address, i.display_name AS inbox_name,\n               (SELECT count(*) FROM conversations.inbox_members im\n                 WHERE im.inbox_id = i.id) AS \"inbox_members!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n          JOIN conversations.inboxes i ON i.id = m.inbox_id\n         WHERE m.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -88,12 +88,40 @@
       },
       {
         "ordinal": 8,
+        "name": "inbox_address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "inbox_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "inbox_members!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 11,
         "name": "filenames!",
         "type_info": "TextArray",
         "origin": "Expression"
       },
       {
-        "ordinal": 9,
+        "ordinal": 12,
         "name": "content_types!",
         "type_info": "TextArray",
         "origin": "Expression"
@@ -113,9 +141,12 @@
       false,
       false,
       null,
+      false,
+      true,
+      null,
       null,
       null
     ]
   },
-  "hash": "7848d7c94616fdfc10f25fb558c27e19f935786abb436aa7f032cbe8a9cc0d6c"
+  "hash": "4e3555439e762ecc8f9ce70df750f7f08421f56b2721fdcf1419a1dd2380dbe5"
 }

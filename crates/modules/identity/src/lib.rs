@@ -76,12 +76,14 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::SignedOutEverywhere>()
             .publishes::<events::AccountSuspended>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
             .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
     }
@@ -96,6 +98,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::sign_out_everywhere::handler))
         .routes(routes!(features::list_consents::handler))
         .routes(routes!(features::revoke_consent::handler))
         .routes(routes!(

@@ -127,6 +127,9 @@ pub struct Config {
     #[serde(default)]
     pub changes: ChangesConfig,
 
+    /// The instance's own mail (`CAMPBOOKS_MAIL__*`); none by default.
+    #[serde(default)]
+    pub mail: crate::mail::MailConfig,
     /// The event log (`CAMPBOOKS_EVENTS__*`).
     #[serde(default)]
     pub events: EventsConfig,
@@ -215,6 +218,7 @@ impl Config {
             ));
         }
         self.changes.check()?;
+        self.mail.check()?;
         self.events.check()?;
         self.telemetry.check()
     }

@@ -31,6 +31,20 @@
     "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
     "client_is_public": "This app signs people in and has no secret to rotate.",
     "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name.",
-    "too_many_accounts": "Ask about at most {{max}} accounts at a time."
+    "fresh_sign_in_required": "Sign in again first: adding a passkey needs a sign-in from the last five minutes.",
+    "too_many_accounts": "Ask about at most {{max}} accounts at a time.",
+    "client_name_mixed_scripts": "Use one alphabet per word in the app’s name: letters from different alphabets can pass for others."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "A new way to sign in to your Campbooks account",
+      "passkey": "A passkey",
+      "provider": "A {{provider}} account",
+      "added": "{{what}} was added as a way to sign in to your Campbooks account on {{when}}.",
+      "if_you": "If this was you, there is nothing to do.",
+      "if_not": "If it wasn’t you, open Campbooks, go to Settings → Ways to sign in, remove it, and choose Sign out everywhere.",
+      "open": "Open Campbooks",
+      "why": "Campbooks sends this to your account’s addresses whenever a way to sign in is added. It contains no tracking."
+    }
   }
 }
