@@ -51,9 +51,9 @@ describe("the rules list", () => {
     expect(within(mine).getByText(/Remove this rule\?/u)).toBeVisible();
     fireEvent.click(within(mine).getByRole("button", { name: "Remove" }));
     await waitFor(() => {
-      expect(
-        api.calls.some((call) => call.route === `DELETE ${W}/rules/${LEDGER_RULE.id}`),
-      ).toBe(true);
+      expect(api.calls.some((call) => call.route === `DELETE ${W}/rules/${LEDGER_RULE.id}`)).toBe(
+        true,
+      );
     });
   });
 

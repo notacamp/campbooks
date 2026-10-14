@@ -139,6 +139,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Teach once in the inbox.** After you move, archive, mark read or clear one
+  email, Campbooks offers to do the same to every one like it, and to new
+  ones: it says which mail and how many, shows a few, and makes a rule with
+  one key (1). The rule's run shows its progress with Undo all; rows it
+  handled say so ("Campbooks moved this · like 23 others from …"), with Stop
+  doing this in the reader; changing back the same rule's work twice in a
+  month asks whether to keep it. The rules list for Scout's memory is ready
+  for its page. Demo: `pnpm --dir clients fake-google --lookalikes 24` and
+  `pnpm --dir clients record teach-once`.
 - **Rules you teach, applied to the mail that looks the same.** A taught rule
   says which mail it is about (the sender, its domain, a mailing list, the
   subject's template or words, a header, a label or a stream) and what to do

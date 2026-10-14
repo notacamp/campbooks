@@ -7,7 +7,7 @@
   flex-direction: column;
   gap: var(--space-3);
   width: min(var(--offer-width), calc(100% - var(--space-6)));
-  max-height: calc(100dvh - var(--toast-offset) - var(--toast-height) - var(--space-12));
+  max-height: var(--offer-max-height);
   overflow-y: auto;
   padding: var(--space-4);
   border-radius: var(--radius-xl);

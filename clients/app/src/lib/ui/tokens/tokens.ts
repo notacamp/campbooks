@@ -72,6 +72,7 @@ export const COMPONENT_TOKENS = [
   "overlay-width",
   "popover-width",
   "offer-width",
+  "offer-max-height",
   "progress-height",
   "narrow-width",
   "row-text-min",

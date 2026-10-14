@@ -211,9 +211,9 @@ describe("the inbox", () => {
     // Undo all puts them back.
     fireEvent.click(screen.getByRole("button", { name: "Undo all" }));
     await waitFor(() => {
-      expect(
-        api.calls.some((call) => call.route === `DELETE ${W}/rules/${LEDGER_RULE.id}`),
-      ).toBe(true);
+      expect(api.calls.some((call) => call.route === `DELETE ${W}/rules/${LEDGER_RULE.id}`)).toBe(
+        true,
+      );
     });
   });
 

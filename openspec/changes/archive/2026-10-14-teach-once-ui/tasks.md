@@ -15,7 +15,7 @@
 
 ## 3. Finish
 
-- [ ] 3.1 Recording at 375px and desktop on the real stack: teach one email, watch the lookalikes move, Undo all
-- [ ] 3.2 CHANGELOG
-- [ ] 3.3 Gates green (clients and the repo's)
-- [ ] 3.4 Archive the change
+- [x] 3.1 Recording at 375px and desktop on the real stack: teach one email, watch the lookalikes move, Undo all
+- [x] 3.2 CHANGELOG
+- [x] 3.3 Gates green (clients and the repo's)
+- [x] 3.4 Archive the change
