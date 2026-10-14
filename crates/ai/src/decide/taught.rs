@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use super::{
     Question, QuestionKind,
-    signals::email::{Envelope, registrable_domain, subject_words, triage},
+    signals::email::{Envelope, is_public_suffix, registrable_domain, subject_words, triage},
     strategy::{BoxFuture, Decided, Decisions, Reason, Strategy, local_answer, peaked},
 };
 use crate::Error;
@@ -287,20 +287,11 @@ const FREE_MAIL: [&str; 52] = [
     "hey.com",
 ];
 
-/// Public suffixes under which anyone registers a domain: a `sender_domain`
-/// condition naming one alone would match unrelated senders.
-const PUBLIC_SUFFIXES: [&str; 24] = [
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "com.br", "net.br", "org.br", "com.pt", "org.pt",
-    "gov.pt", "com.es", "org.es", "gob.es", "com.fr", "gouv.fr", "co.jp", "com.au", "net.au",
-    "co.nz", "co.za", "com.mx", "com.ar", "co.in", "com.cn",
-];
-
 /// Whether `domain` is a domain someone owns: two labels or more, and not a
 /// public suffix (`co.uk`).
 pub fn is_owned_domain(domain: &str) -> bool {
     let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
-    domain.split('.').filter(|l| !l.is_empty()).count() >= 2
-        && !PUBLIC_SUFFIXES.contains(&domain.as_str())
+    domain.split('.').filter(|l| !l.is_empty()).count() >= 2 && !is_public_suffix(&domain)
 }
 
 /// Whether `domain` belongs to a free mail provider.
@@ -562,7 +553,10 @@ pub fn evaluate(rules: &[TaughtRule], facts: &Facts<'_>) -> Outcome {
     out
 }
 
-fn normalise_list_id(value: &str) -> String {
+/// A `List-Id` as rules compare it: lower-cased, the id inside its angle
+/// brackets (`Design Notes <digest.design-notes.example>` →
+/// `digest.design-notes.example`).
+pub fn normalise_list_id(value: &str) -> String {
     let value = value.trim().to_ascii_lowercase();
     match (value.rfind('<'), value.rfind('>')) {
         (Some(start), Some(end)) if start < end => value[start + 1..end].trim().to_owned(),

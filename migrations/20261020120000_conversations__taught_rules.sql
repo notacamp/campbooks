@@ -7,8 +7,11 @@
 SET LOCAL lock_timeout = '5s';
 
 -- A rule may place a conversation and answer the decide pass's questions.
--- The widened checks are added NOT VALID and validated separately, so the
--- rows are checked without holding the tables' exclusive lock.
+-- The widened checks are added NOT VALID: swapping them takes the tables'
+-- exclusive lock only for a moment. They are validated by the next migration
+-- (`…120001_conversations__taught_rules_validate`), in a transaction of its
+-- own, so the rows are checked under SHARE UPDATE EXCLUSIVE alone; here, the
+-- exclusive lock would be held through the scans until this one commits.
 ALTER TABLE conversations.conversations DROP CONSTRAINT conversations_stream_source_check;
 ALTER TABLE conversations.conversations ADD CONSTRAINT conversations_stream_source_check
     CHECK (stream_source IN ('default', 'rules', 'model', 'taught', 'member')) NOT VALID;
@@ -22,17 +25,14 @@ ALTER TABLE conversations.needs DROP CONSTRAINT needs_cleared_because_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_cleared_because_check
     CHECK (cleared_because IN
         ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule')) NOT VALID;
-ALTER TABLE conversations.conversations VALIDATE CONSTRAINT conversations_stream_source_check;
-ALTER TABLE conversations.decisions VALIDATE CONSTRAINT decisions_source_check;
-ALTER TABLE conversations.needs VALIDATE CONSTRAINT needs_basis_check;
-ALTER TABLE conversations.needs VALIDATE CONSTRAINT needs_cleared_because_check;
 
 -- The subject with what changes from one message to the next taken out
 -- (`campbooks_ai::decide::signals::email::subject_template`); '' when too
 -- little is left. NULL for messages stored before this migration, until a
 -- rule preview or run in their inbox works it out.
 ALTER TABLE conversations.messages ADD COLUMN subject_template text;
--- Its indexes are built concurrently by `…120050_conversations__taught_rules_indexes`.
+-- Older mail still to get one has an index built concurrently by
+-- `…120050_conversations__taught_rules_messages_template_missing_index`.
 
 CREATE TABLE conversations.rules (
     id uuid PRIMARY KEY,

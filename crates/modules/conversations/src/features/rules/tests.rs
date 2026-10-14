@@ -937,3 +937,115 @@ async fn public_suffixes_and_long_values_are_refused(db: PgPool) {
         assert_eq!(refused.json["code"], "invalid_rule");
     }
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_same_conditions_in_any_order_or_spelling_are_one_rule(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let first = kit
+        .post(
+            &sam,
+            &rules,
+            Some(json!({
+                "conditions": [{"field": "subject_contains", "value": "  Pull   Request "},
+                               {"field": "sender_address", "value": "Notifications@GitHub.com"}],
+                "actions": [{"action": "move_to_stream", "stream": "updates"}],
+            })),
+        )
+        .await;
+    assert_eq!(first.status, StatusCode::CREATED, "{:?}", first.json);
+    assert_eq!(
+        first.json["rule"]["conditions"],
+        json!([{"field": "sender_address", "value": GITHUB},
+               {"field": "subject_contains", "value": "pull request"}])
+    );
+    // The same rule, written another way and proposed: saying yes replaces
+    // the first rather than adding a second.
+    let second = kit
+        .post(
+            &sam,
+            &rules,
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": GITHUB},
+                               {"field": "subject_contains", "value": "pull request"}],
+                "actions": [{"action": "move_to_stream", "stream": "newsletters"}],
+                "state": "proposed",
+            })),
+        )
+        .await;
+    let second = second.json["rule"]["id"].as_str().unwrap().to_owned();
+    let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
+    assert_eq!(listed.json["rules"].as_array().unwrap().len(), 2);
+    kit.post(
+        &sam,
+        &format!("/api/v1/w/{workspace}/rules/{second}/confirm"),
+        Some(json!({"apply_to_existing": false})),
+    )
+    .await;
+    let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
+    let all = listed.json["rules"].as_array().unwrap();
+    assert_eq!(all.len(), 1, "{all:?}");
+    assert_eq!(all[0]["id"], second.as_str());
+    // Changing a third rule into the same one replaces it too.
+    let third = kit
+        .post(
+            &sam,
+            &rules,
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": GITHUB}],
+                "actions": [{"action": "move_to_stream", "stream": "updates"}],
+                "apply_to_existing": false,
+            })),
+        )
+        .await;
+    let third = third.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.patch(
+        &sam,
+        &format!("/api/v1/w/{workspace}/rules/{third}"),
+        json!({"conditions": [{"field": "subject_contains", "value": "Pull request"},
+                              {"field": "sender_address", "value": GITHUB}]}),
+    )
+    .await;
+    let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
+    let all = listed.json["rules"].as_array().unwrap();
+    assert_eq!(all.len(), 1, "{all:?}");
+    assert_eq!(all[0]["id"], third.as_str());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn undo_all_still_works_after_the_rule_moves_mail_elsewhere(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.run_jobs().await;
+    // The rule now says Newsletters; what it moved is still in Updates.
+    let changed = kit
+        .patch(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}"),
+            json!({"actions": [{"action": "move_to_stream", "stream": "newsletters"}]}),
+        )
+        .await;
+    assert_eq!(changed.status, StatusCode::OK, "{:?}", changed.json);
+    kit.delete(
+        &sam,
+        &format!("/api/v1/w/{workspace}/rules/{rule}?restore=true"),
+    )
+    .await;
+    kit.run_jobs().await;
+    for (id, stream, source) in streams(&kit).await {
+        assert_eq!(
+            (stream.as_str(), source.as_str()),
+            ("primary", "default"),
+            "{id}"
+        );
+    }
+}

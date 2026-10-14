@@ -18,7 +18,10 @@ mod effects;
 mod exceptions;
 mod facts;
 
-use campbooks_ai::decide::taught::{self, Surface, TaughtRule};
+use campbooks_ai::decide::{
+    signals::email::{TEMPLATE_MAX_CHARS, subject_words},
+    taught::{self, Surface, TaughtRule},
+};
 use campbooks_kernel::{Error, Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -202,8 +205,9 @@ pub fn validate(conditions: &[RuleCondition], actions: &[RuleAction]) -> Result<
         RuleCondition::SenderAddress(v)
         | RuleCondition::SenderDomain(v)
         | RuleCondition::ListId(v)
-        | RuleCondition::SubjectTemplate(v)
         | RuleCondition::SubjectContains(v) => v.chars().count() > MAX_VALUE_CHARS,
+        // No stored template is longer: a longer one could never match.
+        RuleCondition::SubjectTemplate(v) => v.chars().count() > TEMPLATE_MAX_CHARS,
         RuleCondition::Header(h) => h
             .value
             .as_ref()
@@ -217,20 +221,22 @@ pub fn validate(conditions: &[RuleCondition], actions: &[RuleAction]) -> Result<
     TaughtRule::validate(&c, &a).map_err(|_| invalid())
 }
 
-/// `conditions` as stored and compared: trimmed, and addresses, domains,
-/// list ids and templates lower-cased, so the same rule is always written
-/// the same way.
+/// `conditions` as stored and compared, so the same rule is always written
+/// the same way: trimmed; addresses, domains and templates lower-cased; list
+/// ids as the engine compares them (no angle brackets); subject words as the
+/// engine reads them (lower-cased, accents dropped, one space apart); and
+/// sorted, without repeats.
 pub fn normalise(conditions: &[RuleCondition]) -> Vec<RuleCondition> {
     let lower = |v: &str| v.trim().to_lowercase();
-    conditions
+    let mut normal: Vec<RuleCondition> = conditions
         .iter()
         .map(|c| match c {
             RuleCondition::SenderAddress(v) => RuleCondition::SenderAddress(lower(v)),
             RuleCondition::SenderDomain(v) => RuleCondition::SenderDomain(lower(v)),
-            RuleCondition::ListId(v) => RuleCondition::ListId(lower(v)),
+            RuleCondition::ListId(v) => RuleCondition::ListId(taught::normalise_list_id(v)),
             RuleCondition::SubjectTemplate(v) => RuleCondition::SubjectTemplate(lower(v)),
             RuleCondition::SubjectContains(v) => {
-                RuleCondition::SubjectContains(v.trim().to_owned())
+                RuleCondition::SubjectContains(subject_words(v).join(" "))
             }
             RuleCondition::Header(h) => RuleCondition::Header(HeaderCondition {
                 name: h.name,
@@ -238,7 +244,11 @@ pub fn normalise(conditions: &[RuleCondition]) -> Vec<RuleCondition> {
             }),
             other => other.clone(),
         })
-        .collect()
+        .collect();
+    // Compared as JSON: one order, whatever order they came in.
+    normal.sort_by_cached_key(|c| serde_json::to_string(c).unwrap_or_default());
+    normal.dedup();
+    normal
 }
 
 /// The sum of the conditions' weights.
@@ -520,14 +530,16 @@ pub struct NewRule<'a> {
     pub from_conversation: Option<ConversationId>,
 }
 
-/// The active rules of `inbox` a new rule with `conditions` (normalised) and
-/// `actions` would replace: the same conditions and an action of the same
-/// kind (labels add up, so they replace nothing). With their authors.
+/// The active rules of `inbox`, other than `this`, that a rule with
+/// `conditions` (normalised) and `actions` would replace: the same conditions
+/// and an action of the same kind (labels add up, so they replace nothing).
+/// With their authors.
 pub async fn replaced(
     conn: &mut PgConnection,
     inbox: InboxId,
     conditions: &[RuleCondition],
     actions: &[RuleAction],
+    this: Option<RuleId>,
 ) -> Result<Vec<(RuleId, Option<UserId>)>> {
     let kinds: Vec<String> = actions
         .iter()
@@ -542,12 +554,14 @@ pub async fn replaced(
     let rows = sqlx::query!(
         r#"SELECT id AS "id: RuleId", taught_by FROM conversations.rules
             WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
+              AND id IS DISTINCT FROM $4
               AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a
                            WHERE a ->> 'action' = ANY($3))
             FOR UPDATE"#,
         inbox as InboxId,
         json!(conditions),
         &kinds,
+        this as Option<RuleId>,
     )
     .fetch_all(conn)
     .await?;

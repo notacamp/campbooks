@@ -38,6 +38,9 @@ pub const MAX_ORIGIN_TEXT_CHARS: usize = 500;
 pub const PREVIEW_SAMPLES: usize = 5;
 /// Most conversations a preview looks at; past it the counts say "at least".
 pub const PREVIEW_EXAMINE: usize = 20_000;
+/// How long a preview, or all of a suggestion's previews together, may look
+/// before answering with what it found (`complete: false`).
+pub const PREVIEW_DEADLINE: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// A read-only transaction in `workspace` whose statements give up after
 /// five seconds: previews and suggestions never write, and never run long.
@@ -299,21 +302,27 @@ pub async fn preview(
     let access = &workspace.access;
     let mut tx = begin_read(&state, access.workspace).await?;
     may_teach(&mut tx, access, path.inbox_id).await?;
-    let preview = compute_preview(&mut tx, path.inbox_id, &conditions, &actions).await?;
+    let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
+    let preview =
+        compute_preview(&mut tx, path.inbox_id, (&conditions, &actions), deadline).await?;
     tx.commit().await?;
     Ok(Json(preview))
 }
 
-/// What a rule with `conditions` and `actions` would do in `inbox`.
+/// What a rule with `parts` (its conditions and actions) would do in
+/// `inbox`. Looks at one window at least, then stops at `deadline` or
+/// [`PREVIEW_EXAMINE`] conversations, whichever comes first (`complete:
+/// false`).
 pub async fn compute_preview(
     conn: &mut PgConnection,
     inbox: InboxId,
-    conditions: &[RuleCondition],
-    actions: &[RuleAction],
+    parts: (&[RuleCondition], &[RuleAction]),
+    deadline: std::time::Instant,
 ) -> Result<RulePreview> {
     use campbooks_ai::decide::taught::{TaughtRule, evaluate};
 
     const NEW: &str = "new";
+    let (conditions, actions) = parts;
     let (c, a) = rules::engine_parts(conditions, actions);
     let new = TaughtRule {
         id: NEW.to_owned(),
@@ -379,7 +388,9 @@ pub async fn compute_preview(
                 out.complete = true;
                 break;
             }
-            Some(_) if looked >= PREVIEW_EXAMINE => break,
+            Some(_) if looked >= PREVIEW_EXAMINE || std::time::Instant::now() >= deadline => {
+                break;
+            }
             next => after = next,
         }
     }
@@ -628,7 +639,15 @@ pub async fn create_in(
         }
     }
     if rule_state == RuleState::Active {
-        replace(tx, state, access, inbox, body).await?;
+        replace(
+            tx,
+            state,
+            access,
+            inbox,
+            (&body.conditions, &body.actions),
+            None,
+        )
+        .await?;
     }
     if rules::templates_missing(tx, inbox).await? {
         crate::features::fill_templates::enqueue(tx, &ws, inbox).await?;
@@ -661,17 +680,20 @@ pub async fn create_in(
     })
 }
 
-/// Retire the active rules a new one replaces (the same conditions and an
-/// action of the same kind), without putting their mail back: 403
-/// `rule_not_yours` when the caller may not change one of them.
+/// Retire the active rules (other than `this`) that a rule with `parts`
+/// (normalised conditions, and actions) replaces as it becomes active: the
+/// same conditions and an action of the same kind. Their mail is not put
+/// back. 403 `rule_not_yours` when the caller may not change one of them.
 async fn replace(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
     access: &Access,
     inbox: InboxId,
-    body: &CreateRule,
+    parts: (&[RuleCondition], &[RuleAction]),
+    this: Option<RuleId>,
 ) -> Result<()> {
-    let replaced = rules::replaced(tx, inbox, &body.conditions, &body.actions).await?;
+    let (conditions, actions) = parts;
+    let replaced = rules::replaced(tx, inbox, conditions, actions, this).await?;
     if replaced.is_empty() {
         return Ok(());
     }
@@ -776,6 +798,15 @@ pub async fn confirm(
     if rule.state != RuleState::Proposed {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
+    replace(
+        &mut tx,
+        &state,
+        access,
+        rule.inbox,
+        (&rule.conditions, &rule.actions),
+        Some(rule.id),
+    )
+    .await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'active', confirmed_at = now(), updated_at = now(),
@@ -876,6 +907,17 @@ pub async fn update(
         Some(false) if rule.state == RuleState::Paused => RuleState::Active,
         _ => rule.state,
     };
+    if next_state == RuleState::Active {
+        replace(
+            &mut tx,
+            &state,
+            access,
+            rule.inbox,
+            (&conditions, &actions),
+            Some(rule.id),
+        )
+        .await?;
+    }
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET conditions = $2, actions = $3, specificity = $4, state = $5,

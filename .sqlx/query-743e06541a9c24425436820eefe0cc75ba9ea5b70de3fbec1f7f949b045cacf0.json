@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: RuleId\", taught_by FROM conversations.rules\n            WHERE inbox_id = $1 AND state = 'active' AND conditions = $2\n              AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a\n                           WHERE a ->> 'action' = ANY($3))\n            FOR UPDATE",
+  "query": "SELECT id AS \"id: RuleId\", taught_by FROM conversations.rules\n            WHERE inbox_id = $1 AND state = 'active' AND conditions = $2\n              AND id IS DISTINCT FROM $4\n              AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a\n                           WHERE a ->> 'action' = ANY($3))\n            FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -30,7 +30,8 @@
       "Left": [
         "Uuid",
         "Jsonb",
-        "TextArray"
+        "TextArray",
+        "Uuid"
       ]
     },
     "nullable": [
@@ -38,5 +39,5 @@
       true
     ]
   },
-  "hash": "ca564c1b4681ab42cfc00999302df0296b377ab8ff313fe453b207d8b1aceb5a"
+  "hash": "743e06541a9c24425436820eefe0cc75ba9ea5b70de3fbec1f7f949b045cacf0"
 }

@@ -87,13 +87,27 @@ async fn a_run_whose_inbox_goes_away_ends_quietly(db: PgPool) {
 #[sqlx::test(migrations = "../../../migrations")]
 async fn mail_under_review_is_never_hidden_on_arrival(db: PgPool) {
     let kit = kit(db).await;
-    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
     // gh-0's conversation has an open Review need (a question to the member).
     sqlx::query(
         "INSERT INTO conversations.needs
              (conversation_id, workspace_id, message_id, reason, trust, basis, question, state)
          SELECT conversation_id, workspace_id, id, 'review', 'check', 'model', 'needs_reply', 'open'
            FROM conversations.messages WHERE provider_message_id = 'gh-0'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    // gh-2's first message looked suspicious; the follow-up will not.
+    sqlx::query(
+        "INSERT INTO conversations.decisions
+             (id, workspace_id, message_id, conversation_id, question, source, strategy, value,
+              options, confidence, model, latency_ms, reasons, acted, state_version)
+         SELECT gen_random_uuid(), workspace_id, id, conversation_id, 'suspicious', 'rules',
+                'rules', 'true'::jsonb, '[true, false]'::jsonb, 1.0, 'rules', 0, '[]'::jsonb,
+                true, 1
+           FROM conversations.messages WHERE provider_message_id = 'gh-2'
+         ON CONFLICT (message_id, question, source) DO UPDATE SET value = 'true'::jsonb",
     )
     .execute(&kit.db)
     .await
@@ -109,15 +123,27 @@ async fn mail_under_review_is_never_hidden_on_arrival(db: PgPool) {
         Some(archive),
     )
     .await;
-    // A follow-up arrives in the same conversation.
-    let mut follow_up = notifications("gh-0-reply", 1, GITHUB, None);
-    follow_up["changes"][0]["message"]["thread_key"] = json!("thr-gh-0");
-    kit.ingest_value(workspace, inbox, &follow_up).await;
-    let in_inbox: bool = sqlx::query_scalar(
-        "SELECT in_inbox FROM conversations.messages WHERE provider_message_id = 'gh-0-reply-0'",
-    )
-    .fetch_one(&kit.db)
-    .await
-    .unwrap();
-    assert!(in_inbox);
+    // A follow-up arrives in each conversation.
+    for n in 0..3 {
+        let mut follow_up = notifications(&format!("gh-{n}-reply"), 1, GITHUB, None);
+        follow_up["changes"][0]["message"]["thread_key"] = json!(format!("thr-gh-{n}"));
+        kit.ingest_value(workspace, inbox, &follow_up).await;
+    }
+    let in_inbox = |n: usize| {
+        let db = kit.db.clone();
+        async move {
+            sqlx::query_scalar::<_, bool>(
+                "SELECT in_inbox FROM conversations.messages WHERE provider_message_id = $1",
+            )
+            .bind(format!("gh-{n}-reply-0"))
+            .fetch_one(&db)
+            .await
+            .unwrap()
+        }
+    };
+    // Under review, or suspicious earlier in the thread: left in the inbox.
+    assert!(in_inbox(0).await);
+    assert!(in_inbox(2).await);
+    // The twin with neither: the rule does archive it.
+    assert!(!in_inbox(1).await);
 }

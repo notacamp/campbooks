@@ -246,7 +246,9 @@ pub async fn store_decision(
 }
 
 /// Record that `rule` changed conversation `id` (in `run`, or as mail
-/// arrived), keeping what it was before the first time, and count it.
+/// arrived), and count it. A conversation it changed again keeps what it was
+/// before the first time, adds what the rule did since and where it last
+/// moved it.
 pub async fn record(
     conn: &mut PgConnection,
     workspace: Uuid,
@@ -264,7 +266,31 @@ pub async fn record(
            SET applied_at = now(), reverted_at = NULL,
                run_id = coalesce(EXCLUDED.run_id, conversations.rule_applications.run_id),
                before = CASE WHEN conversations.rule_applications.reverted_at IS NULL
-                             THEN conversations.rule_applications.before
+                             THEN conversations.rule_applications.before || jsonb_strip_nulls(
+                                 jsonb_build_object(
+                                     'stream', coalesce(
+                                         conversations.rule_applications.before -> 'stream',
+                                         EXCLUDED.before -> 'stream'),
+                                     'moved_to', coalesce(
+                                         EXCLUDED.before -> 'moved_to',
+                                         conversations.rule_applications.before -> 'moved_to'),
+                                     'archived',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'archived')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'archived')::boolean,
+                                                     false),
+                                     'read',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'read')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'read')::boolean, false),
+                                     'labels', (SELECT jsonb_agg(DISTINCT l) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'labels',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'labels', '[]'::jsonb)) l),
+                                     'answered', (SELECT jsonb_agg(DISTINCT q) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'answered',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q)))
                              ELSE EXCLUDED.before END
         "#,
         rule as RuleId,

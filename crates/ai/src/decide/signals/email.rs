@@ -1053,15 +1053,24 @@ static WITHIN_HOURS: LazyLock<Regex> = LazyLock::new(|| {
 
 static LINK_HOST: LazyLock<Regex> = LazyLock::new(|| regex(r#"(?i)https?://([^/\s"'<>)]+)"#));
 
-/// Two-label public suffixes the registrable-domain guess knows.
-const SUFFIXES: [&str; 6] = [
-    "example.com",
-    "example.org",
-    "example.net",
-    "co.uk",
-    "com.pt",
-    "com.es",
+/// Two-label public suffixes under which anyone registers a domain
+/// (`co.uk`): the registrable-domain guess keeps a label more under them, and
+/// a taught `sender_domain` may not name one alone.
+pub const PUBLIC_SUFFIXES: [&str; 24] = [
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "com.br", "net.br", "org.br", "com.pt", "org.pt",
+    "gov.pt", "com.es", "org.es", "gob.es", "com.fr", "gouv.fr", "co.jp", "com.au", "net.au",
+    "co.nz", "co.za", "com.mx", "com.ar", "co.in", "com.cn",
 ];
+
+/// Documentation domains (RFC 2606) the registrable-domain guess treats as
+/// suffixes, so fixtures can stand for many organisations.
+const EXAMPLE_SUFFIXES: [&str; 3] = ["example.com", "example.org", "example.net"];
+
+/// Whether `domain` is one of the [`PUBLIC_SUFFIXES`].
+pub fn is_public_suffix(domain: &str) -> bool {
+    let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
+    PUBLIC_SUFFIXES.contains(&domain.as_str())
+}
 
 /// A best-effort registrable domain (`conta.bancoatlantico.example` →
 /// `bancoatlantico.example`).
@@ -1069,8 +1078,9 @@ fn registrable(host: &str) -> String {
     let host = host.trim_end_matches('.').to_lowercase();
     let host = host.split(':').next().unwrap_or_default();
     let labels: Vec<&str> = host.split('.').collect();
-    let keep = if SUFFIXES
+    let keep = if PUBLIC_SUFFIXES
         .iter()
+        .chain(&EXAMPLE_SUFFIXES)
         .any(|s| host == *s || host.ends_with(&format!(".{s}")))
     {
         3

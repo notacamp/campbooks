@@ -427,13 +427,67 @@ async fn migrate(config: &Config) -> Result<(), String> {
     let mut conn = PgConnection::connect_with(&options)
         .await
         .map_err(|e| format!("could not connect to the database to migrate: {e}"))?;
-    sqlx::migrate!("../../migrations")
-        .run(&mut conn)
+    sqlx::query("SELECT pg_advisory_lock($1)")
+        .bind(MIGRATION_LOCK)
+        .execute(&mut conn)
         .await
-        .map_err(|e| format!("migrations failed: {e}"))?;
+        .map_err(|e| format!("could not take the migration lock: {e}"))?;
+    let migrated = migrate_locked(&mut conn).await;
+    // Closing the connection releases the lock too; unlock first anyway.
+    let _ = sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(MIGRATION_LOCK)
+        .execute(&mut conn)
+        .await;
     let _ = conn.close().await;
+    migrated?;
     tracing::info!("migrations applied");
     Ok(())
+}
+
+/// The session advisory lock every Campbooks process holds while it
+/// migrates, so no process takes another's index build in flight (not valid
+/// until it ends) for a failed one.
+const MIGRATION_LOCK: i64 = 0x6361_6d70_6d69_6772;
+
+/// Under [`MIGRATION_LOCK`]: drop what failed index builds left, then
+/// migrate.
+async fn migrate_locked(conn: &mut PgConnection) -> Result<(), String> {
+    drop_invalid_indexes(conn).await?;
+    sqlx::migrate!("../../migrations")
+        .run(conn)
+        .await
+        .map_err(|e| format!("migrations failed: {e}"))
+}
+
+/// Drop every invalid index. `CREATE INDEX CONCURRENTLY` leaves one behind
+/// when the build fails or its process dies partway; the migration that
+/// builds it (`IF NOT EXISTS`) would otherwise keep it, and Postgres never
+/// uses it. Run under [`MIGRATION_LOCK`]: a build still in flight holds it.
+/// Returns the indexes dropped.
+async fn drop_invalid_indexes(conn: &mut PgConnection) -> Result<Vec<String>, String> {
+    let invalid: Vec<String> = sqlx::query_scalar(
+        r"SELECT format('%I.%I', n.nspname, c.relname)
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indexrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE NOT i.indisvalid
+             AND n.nspname <> 'information_schema' AND n.nspname NOT LIKE 'pg\_%'
+           ORDER BY 1",
+    )
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(|e| format!("could not look for invalid indexes: {e}"))?;
+    for index in &invalid {
+        tracing::warn!(%index, "dropping an invalid index a failed concurrent build left");
+        // The name is quoted by `format('%I.%I')` above.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "DROP INDEX CONCURRENTLY IF EXISTS {index}"
+        )))
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| format!("could not drop the invalid index {index}: {e}"))?;
+    }
+    Ok(invalid)
 }
 
 /// The pool every request and job uses. A privileged login switches each
@@ -776,6 +830,39 @@ mod tests {
             ));
         }
         config
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_failed_concurrent_index_build_is_dropped_before_migrating(db: PgPool) {
+        let mut conn = db.acquire().await.unwrap();
+        sqlx::query("CREATE TABLE public.twice (n integer)")
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO public.twice VALUES (1), (1)")
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        // A unique index over duplicates fails partway and stays, invalid.
+        sqlx::query("CREATE UNIQUE INDEX CONCURRENTLY twice_n_idx ON public.twice (n)")
+            .execute(&mut *conn)
+            .await
+            .unwrap_err();
+        sqlx::query("CREATE INDEX twice_valid_idx ON public.twice (n)")
+            .execute(&mut *conn)
+            .await
+            .unwrap();
+        let dropped = drop_invalid_indexes(&mut conn).await.unwrap();
+        assert_eq!(dropped, vec!["public.twice_n_idx".to_owned()]);
+        let left: Vec<String> = sqlx::query_scalar(
+            "SELECT indexname::text FROM pg_indexes WHERE tablename = 'twice' ORDER BY 1",
+        )
+        .fetch_all(&mut *conn)
+        .await
+        .unwrap();
+        assert_eq!(left, vec!["twice_valid_idx".to_owned()]);
+        // The migrations, already applied, run again cleanly.
+        migrate_locked(&mut conn).await.unwrap();
     }
 
     #[sqlx::test(migrations = "../../migrations")]
