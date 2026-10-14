@@ -1,15 +1,15 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: InboxId\" FROM conversations.inboxes\n                    WHERE owner = $1 AND detached_at IS NULL\n                      FOR SHARE",
+  "query": "SELECT id AS \"id: StreamId\" FROM connectors.streams\n            WHERE connection_id = $1 AND NOT paused\n            ORDER BY id\n              FOR UPDATE",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: InboxId",
+        "name": "id: StreamId",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "conversations.inboxes",
+            "table": "connectors.streams",
             "name": "id"
           }
         }
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "7ebdf69fb4e9ea0f7f6e89f609af7fa676b18877c1b315caf97c65f7eb0be088"
+  "hash": "8648ef97020405c21abf6b96994a95d1fcc165fb2d71e12e8be79d1296073775"
 }

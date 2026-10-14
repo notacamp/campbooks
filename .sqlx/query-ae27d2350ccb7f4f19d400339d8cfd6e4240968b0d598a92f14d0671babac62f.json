@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id FROM connectors.streams WHERE connection_id = $1 FOR UPDATE",
+  "query": "SELECT id FROM connectors.streams WHERE connection_id = $1 ORDER BY id FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "9650225891fb69d6fe682614cae8b84cd866bbf5b958823f980843cabc8f2e98"
+  "hash": "ae27d2350ccb7f4f19d400339d8cfd6e4240968b0d598a92f14d0671babac62f"
 }

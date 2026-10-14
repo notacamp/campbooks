@@ -100,6 +100,10 @@ to be declared once, checked centrally, and enforced by CI.
   nothing. A kept inbox's facts say `frozen`, and the check then refuses
   every action but `read` and `delete`. Its scheduled sends go back to
   drafts, and a send released later re-checks `send`.
+- A member who left rejoins only once every module has handled their
+  departure (409 `still_leaving`): `workspaces.member_left` must settle
+  (`DomainEvent::SETTLES`), so a delivery of it that fails for good is never
+  pruned and keeps blocking until an operator replays or discards it.
 - A disconnect and a sync batch never interleave: removing or freezing an
   inbox locks it first, and a batch holds it `FOR SHARE` and is dropped
   when it finds the inbox closed.

@@ -95,14 +95,24 @@ pub async fn execute(
         return Err(Error::Conflict(MESSAGES.reason("needs_reauth")));
     }
     let min = i32::try_from(deps.config.poll.min_seconds).unwrap_or(i32::MAX);
+    // The connection, then its streams in id order: the order a sync and
+    // a removal lock them in.
+    crate::domain::health::lock(&mut tx, id).await?;
     let streams = sqlx::query_scalar!(
-        r#"UPDATE connectors.streams SET interval_seconds = $2
+        r#"SELECT id AS "id: StreamId" FROM connectors.streams
             WHERE connection_id = $1 AND NOT paused
-        RETURNING id AS "id: StreamId""#,
+            ORDER BY id
+              FOR UPDATE"#,
         id as ConnectionId,
-        min,
     )
     .fetch_all(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE connectors.streams SET interval_seconds = $2 WHERE id = ANY($1)",
+        &streams as &[StreamId],
+        min,
+    )
+    .execute(&mut *tx)
     .await?;
     for &stream in &streams {
         schedule::run_now(&mut tx, access.workspace, stream, now).await?;

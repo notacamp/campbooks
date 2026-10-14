@@ -454,3 +454,69 @@ async fn a_real_batch_racing_a_keep_lands_whole_then_nothing_more(db: PgPool) {
     kit.ingest(s.workspace, s.inbox, "es-ES").await;
     assert_eq!(count(&kit, french, s.inbox).await, kept);
 }
+
+/// Sam's inbox deleted with its connection while an admin removes Sam
+/// keeping his mail: the deletion holds the inbox and is about to remove
+/// its memberships; the departure asks which inboxes would be left unread.
+/// Both take the inbox before its memberships, so the departure waits and
+/// then finds nothing to keep: no deadlock.
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_departure_keeping_mail_and_a_deletion_never_deadlock(db: PgPool) {
+    use campbooks_kernel::jobs::Worker;
+
+    let kit = Kit::new(db).await;
+    let s = setup(&kit).await;
+    let ws = s.workspace;
+    let sam: UserId = sqlx::query_scalar("SELECT owner FROM conversations.inboxes WHERE id = $1")
+        .bind(s.inbox)
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    // The deletion pauses once it holds the inbox (it lets go of files next).
+    let mut gate = kit.db.begin().await.unwrap();
+    sqlx::query("LOCK TABLE kernel.blob_refs IN SHARE ROW EXCLUSIVE MODE")
+        .execute(&mut *gate)
+        .await
+        .unwrap();
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    kit.state
+        .events
+        .publish(&mut tx, &removed(ws, s.inbox, MailChoice::Delete))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let state = kit.state.clone();
+    let deletion = tokio::spawn(async move { Worker::new(state).run_until_idle().await });
+    let waiting = "SELECT count(*) FROM pg_locks
+                    WHERE relation = 'kernel.blob_refs'::regclass AND NOT granted";
+    for _ in 0..100 {
+        let n: i64 = sqlx::query_scalar(waiting)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+        if n > 0 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    // The departure, in its own transaction.
+    let state = kit.state.clone();
+    let departure = tokio::spawn(async move {
+        let mut tx = state.db.begin_for(ws).await?;
+        let unread = crate::kept_mail()
+            .unread_if_kept(&mut tx, ws, sam, &[])
+            .await?;
+        tx.commit().await?;
+        Ok::<_, campbooks_kernel::Error>(unread)
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    assert!(
+        !departure.is_finished(),
+        "the departure waits for the inbox"
+    );
+    gate.commit().await.unwrap();
+    let stats = deletion.await.unwrap();
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    let unread = departure.await.unwrap().expect("no deadlock");
+    assert!(unread.is_empty(), "the inbox is gone: {unread:?}");
+}

@@ -116,6 +116,8 @@ pub enum MailChoice {
 impl DomainEvent for MemberLeft {
     const NAME: &'static str = "workspaces.member_left";
     const VERSION: u16 = 1;
+    /// Rejoining waits for every module to have handled the departure.
+    const SETTLES: bool = true;
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)

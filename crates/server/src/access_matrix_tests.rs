@@ -1208,3 +1208,75 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
     }
     assert!(checks > 100, "only {checks} calls checked");
 }
+
+/// A scheduled send against the real membership (`workspaces`'
+/// `role_held`): released while its author is a member; back to a draft
+/// once they are not, even before their departure is handled.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
+    let mut world = World::new(db).await;
+    for still_a_member in [true, false] {
+        world.seed().await;
+        let draft = world.instances["conversations.draft"].clone();
+        let uri = format!("/api/v1/w/{}/drafts/{draft}", world.a);
+        let sender = world.token(Who::Sender.subject());
+        let body =
+            json!({"version": 1, "subject": "Matrix", "to": [{"address": "leo@example.com"}]});
+        let (status, bytes, _) = world.call(Some(&sender), "PATCH", &uri, Some(&body)).await;
+        assert_eq!(
+            status,
+            StatusCode::OK,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        let send = json!({"version": 2});
+        let (status, bytes, _) = world
+            .call(Some(&sender), "POST", &format!("{uri}/send"), Some(&send))
+            .await;
+        assert_eq!(
+            status,
+            StatusCode::ACCEPTED,
+            "{}",
+            String::from_utf8_lossy(&bytes)
+        );
+        if !still_a_member {
+            // Removed; `member_left` not handled yet (inbox membership kept).
+            sqlx::query("DELETE FROM workspaces.members WHERE user_id = $1")
+                .bind(world.users[&Who::Sender].as_uuid())
+                .execute(&world.db)
+                .await
+                .unwrap();
+        }
+        sqlx::query(
+            "UPDATE kernel.jobs SET run_at = now()
+              WHERE kind = 'conversations.release_send' AND state = 'pending'",
+        )
+        .execute(&world.db)
+        .await
+        .unwrap();
+        Worker::new(world.state.clone()).run_until_idle().await;
+        let state: String =
+            sqlx::query_scalar("SELECT state FROM conversations.drafts WHERE id = $1::uuid")
+                .bind(&draft)
+                .fetch_one(&world.db)
+                .await
+                .unwrap();
+        let requested: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM kernel.events
+              WHERE name = 'conversations.send_requested' AND workspace_id = $1",
+        )
+        .bind(world.a.to_string())
+        .fetch_one(&world.db)
+        .await
+        .unwrap();
+        if still_a_member {
+            // Released (the test mailbox can't deliver it, so it may end
+            // `failed` once the connector answers).
+            assert_ne!(state, "draft");
+            assert_eq!(requested, 1);
+        } else {
+            assert_eq!(state, "draft");
+            assert_eq!(requested, 0);
+        }
+    }
+}

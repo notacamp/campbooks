@@ -136,6 +136,36 @@ impl EventHandler for CountB {
     }
 }
 
+/// An event something waits on (`SETTLES`), whose one consumer always
+/// fails.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+struct Departed {
+    who: String,
+}
+
+impl DomainEvent for Departed {
+    const NAME: &'static str = "test.departed";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+    const SETTLES: bool = true;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+struct ForgetFails;
+
+impl EventHandler for ForgetFails {
+    type Event = Departed;
+    const NAME: &'static str = "test.forget_fails";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(_ctx: &mut JobContext, _event: Event<Departed>) -> Result<(), JobError> {
+        Err(JobError::fatal("cannot forget"))
+    }
+}
+
 fn module(background: Background) -> Module {
     Module {
         name: "test",
@@ -152,6 +182,7 @@ fn background() -> Background {
         .job::<Probe>()
         .on_event::<CountA>()
         .on_event::<CountB>()
+        .on_event::<ForgetFails>()
 }
 
 /// State over `db` with the test module registered and `tweak` applied to
@@ -1271,9 +1302,11 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.sweep_blobs",
             "test.count_a",
             "test.count_b",
+            "test.forget_fails",
             "test.probe"
         ]
     );
+    assert_eq!(registry.settling_events(), ["test.departed"]);
     assert_eq!(
         registry.schedule_names(),
         [
@@ -1908,4 +1941,49 @@ mod administration {
             1
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_delivery_of_an_event_that_must_settle_is_never_pruned(db: PgPool) {
+    let state = state(db.clone()).await;
+    let mut tx = state.db.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &Departed { who: "sam".into() })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let worker = Worker::new(state.clone());
+    worker.run_until_idle().await;
+    // Long past both retentions.
+    sqlx::query(
+        "UPDATE kernel.jobs SET finished_at = now() - interval '400 days'
+          WHERE kind = 'test.forget_fails'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE kernel.events SET occurred_at = now() - interval '400 days'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let mut tx = db.begin().await.unwrap();
+    enqueue(&mut tx, &PruneJobs, EnqueueOptions::default())
+        .await
+        .unwrap();
+    enqueue(&mut tx, &PruneEvents, EnqueueOptions::default())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    worker.run_until_idle().await;
+
+    let mut conn = db.acquire().await.unwrap();
+    let unsettled = crate::EventBus::unsettled(
+        &mut conn,
+        "test.departed",
+        &serde_json::json!({ "who": "sam" }),
+    )
+    .await
+    .unwrap();
+    assert!(unsettled, "still waiting for an operator");
 }

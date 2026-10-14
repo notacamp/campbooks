@@ -101,6 +101,9 @@ struct KindSpec {
     run: RunFn,
     /// For event handlers: the event name and version they consume.
     consumes: Option<(&'static str, u16)>,
+    /// For event handlers: whether their event must settle
+    /// ([`DomainEvent::SETTLES`]).
+    settles: bool,
 }
 
 struct ScheduleSpec {
@@ -140,6 +143,7 @@ impl Background {
             max_attempts: J::MAX_ATTEMPTS,
             run: run_fn(run_job::<J>),
             consumes: None,
+            settles: false,
         });
         self
     }
@@ -153,6 +157,7 @@ impl Background {
             max_attempts: H::MAX_ATTEMPTS,
             run: run_fn(run_handler::<H>),
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
+            settles: H::Event::SETTLES,
         });
         self
     }
@@ -177,6 +182,7 @@ impl Background {
                 })
             }),
             consumes: None,
+            settles: false,
         });
         self
     }
@@ -198,6 +204,7 @@ impl Background {
                 })
             }),
             consumes: Some((C::Event::NAME, C::Event::VERSION)),
+            settles: C::Event::SETTLES,
         });
         self
     }
@@ -299,6 +306,9 @@ pub struct ConsumerInfo {
     pub queue: &'static str,
     /// Attempts per delivery.
     pub max_attempts: u32,
+    /// Whether its event must settle ([`DomainEvent::SETTLES`]): a
+    /// delivery that failed for good is kept until an operator acts.
+    pub settles: bool,
 }
 
 /// A registered recurring schedule.
@@ -523,6 +533,7 @@ impl Registry {
                     event_version: kind.consumes.map_or(0, |(_, version)| version),
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
+                    settles: kind.settles,
                 });
             }
         }
@@ -610,6 +621,20 @@ impl Registry {
     /// The consumer named `name`.
     pub fn consumer(&self, name: &str) -> Option<ConsumerInfo> {
         self.consumers.iter().find(|c| c.name == name).copied()
+    }
+
+    /// The events that must settle ([`DomainEvent::SETTLES`]) and have a
+    /// consumer.
+    pub fn settling_events(&self) -> Vec<&'static str> {
+        let mut events: Vec<&'static str> = self
+            .consumers
+            .iter()
+            .filter(|c| c.settles)
+            .map(|c| c.event)
+            .collect();
+        events.sort_unstable();
+        events.dedup();
+        events
     }
 
     /// Every consumer, by name.

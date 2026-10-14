@@ -72,6 +72,11 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// or is instance-wide. Listed in `openapi/events.json`; keep
     /// [`workspace`](Self::workspace) consistent with it.
     const WORKSPACE_SCOPED: bool = true;
+    /// Whether something waits for every consumer to have acted on an event
+    /// of this type ([`EventBus::unsettled`]): a delivery that fails for
+    /// good is then kept, with the event, until an operator replays or
+    /// discards it, instead of being pruned after the failed-job retention.
+    const SETTLES: bool = false;
 
     /// The workspace this event belongs to, or `None` for instance-wide
     /// events. Its deliveries run with that workspace set

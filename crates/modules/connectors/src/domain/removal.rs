@@ -106,7 +106,7 @@ pub async fn delete(
     .fetch_optional(&mut **tx)
     .await?;
     sqlx::query_scalar!(
-        "SELECT id FROM connectors.streams WHERE connection_id = $1 FOR UPDATE",
+        "SELECT id FROM connectors.streams WHERE connection_id = $1 ORDER BY id FOR UPDATE",
         id as ConnectionId
     )
     .fetch_all(&mut **tx)

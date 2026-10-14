@@ -31,43 +31,40 @@ impl KeptMail for InboxReaders {
     ) -> KeptMailFuture<'a> {
         Box::pin(async move {
             // The inboxes that would be kept: the member's own, and inboxes
-            // from before owners were recorded (no owner) that they read;
-            // their memberships held until the departure commits (taking a
+            // from before owners were recorded (no owner) that they read.
+            // Locked in the order a deletion takes them (the inbox, then its
+            // memberships), each set in id order, so neither waits on the
+            // other in a cycle; held until the departure commits (taking a
             // reader out waits for it).
-            let candidates = sqlx::query_scalar!(
-                r#"SELECT m.inbox_id AS "id: InboxId"
-                     FROM conversations.inbox_members m
-                     JOIN conversations.inboxes i ON i.id = m.inbox_id
+            let inboxes = sqlx::query_scalar!(
+                r#"SELECT i.id AS "id: InboxId" FROM conversations.inboxes i
                     WHERE i.detached_at IS NULL
                       AND (i.owner = $1
                            OR (i.owner IS NULL AND EXISTS (
                                  SELECT 1 FROM conversations.inbox_members me
                                   WHERE me.inbox_id = i.id AND me.user_id = $1)))
-                      FOR SHARE OF m"#,
+                    ORDER BY i.id
+                      FOR SHARE OF i"#,
                 user.as_uuid(),
             )
             .fetch_all(&mut *conn)
             .await?;
-            let owned = sqlx::query_scalar!(
-                r#"SELECT id AS "id: InboxId" FROM conversations.inboxes
-                    WHERE owner = $1 AND detached_at IS NULL
+            let members = sqlx::query!(
+                r#"SELECT inbox_id AS "inbox: InboxId", user_id AS "user: UserId"
+                     FROM conversations.inbox_members
+                    WHERE inbox_id = ANY($1)
+                    ORDER BY inbox_id, user_id
                       FOR SHARE"#,
-                user.as_uuid(),
-            )
-            .fetch_all(&mut *conn)
-            .await?;
-            let mut inboxes: Vec<InboxId> = candidates.into_iter().chain(owned).collect();
-            inboxes.sort_unstable();
-            inboxes.dedup();
-            // Read by nobody who stays.
-            let read = sqlx::query_scalar!(
-                r#"SELECT DISTINCT inbox_id AS "id: InboxId" FROM conversations.inbox_members
-                    WHERE inbox_id = ANY($1) AND user_id = ANY($2)"#,
                 &inboxes as &[InboxId],
-                others as &[UserId],
             )
             .fetch_all(&mut *conn)
             .await?;
+            // Read by nobody who stays.
+            let read: Vec<InboxId> = members
+                .iter()
+                .filter(|m| others.contains(&m.user))
+                .map(|m| m.inbox)
+                .collect();
             Ok(inboxes
                 .iter()
                 .filter(|inbox| !read.contains(inbox))
