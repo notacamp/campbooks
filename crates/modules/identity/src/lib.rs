@@ -66,6 +66,7 @@ pub fn module(deps: Deps) -> Module {
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_get_account::handler))
+                .routes(routes!(features::admin_list_accounts::handler))
                 .routes(routes!(features::admin_suspend_account::handler))
                 .routes(routes!(features::admin_unsuspend_account::handler)),
         ),
