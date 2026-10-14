@@ -109,8 +109,9 @@ export function InboxScreen({
         ? -by
         : ids.indexOf(current);
     // Moving past the last row loaded asks for the next page.
+    // A held key repeats faster than the list re-renders: keep the request in flight.
     if (by > 0 && index + by >= ids.length && list.hasNextPage && !list.isFetchingNextPage) {
-      void list.fetchNextPage();
+      void list.fetchNextPage({ cancelRefetch: false });
     }
     const next = ids[Math.min(ids.length - 1, Math.max(0, index + by))];
     if (next === undefined) {
