@@ -5,6 +5,7 @@
   "loading": "Loading",
   "kbd": {
     "then": "then",
+    "or": "or",
     "shortcut": "Shortcut: {{keys}}"
   },
   "toast": {

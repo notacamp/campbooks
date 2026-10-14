@@ -134,6 +134,23 @@ describe("What needs you", () => {
     expect(screen.getByText("How Campbooks decided")).toBeVisible();
   });
 
+  it("moves with the arrow keys, which scroll again while an item is open", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "ArrowDown" });
+    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    fireEvent.keyDown(document, { key: "ArrowUp" });
+    expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
+    fireEvent.keyDown(document, { key: "Enter" });
+    await screen.findByText("How Campbooks decided");
+    // Open: ↓ is the browser's (no step), J still steps.
+    expect(fireEvent.keyDown(document, { key: "ArrowDown" })).toBe(true);
+    expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
+    fireEvent.keyDown(document, { key: "j" });
+    expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+  });
+
   it("replies with R in the conversation's reader", async () => {
     api();
     const { router } = renderHome();

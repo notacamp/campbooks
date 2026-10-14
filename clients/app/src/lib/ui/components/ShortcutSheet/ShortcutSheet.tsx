@@ -50,7 +50,7 @@ export function ShortcutSheet({ open, onClose }: ShortcutSheetProps) {
                   <div key={definition.id} className={styles["row"]}>
                     <dt>{translate(definition.label)}</dt>
                     <dd>
-                      <KbdHint shortcut={definition.id} announce />
+                      <KbdHint shortcut={definition.id} withAlternates announce />
                     </dd>
                   </div>
                 ))}
