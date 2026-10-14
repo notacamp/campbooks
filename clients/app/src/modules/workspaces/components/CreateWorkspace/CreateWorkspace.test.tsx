@@ -7,6 +7,11 @@ import { mockApi, problem, renderWithProviders } from "../../../../../test/rende
 import { CreateWorkspace, type CreateWorkspaceProps } from "./CreateWorkspace";
 
 const CREATE = "POST /bff/api/v1/workspaces";
+const SIGNUP = "GET /bff/api/v1/signup";
+
+const standing = (policy: string, restricted: boolean, request: string | null) => ({
+  body: { policy, restricted, request },
+});
 
 function renderFlow(props: Partial<CreateWorkspaceProps> = {}) {
   const handlers = {
@@ -40,7 +45,9 @@ describe("CreateWorkspace", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: "Household is ready" }),
     ).toBeVisible();
-    expect(api.calls).toEqual([{ route: CREATE, body: { name: "Household", kind: "personal" } }]);
+    expect(api.calls.filter((call) => call.route === CREATE)).toEqual([
+      { route: CREATE, body: { name: "Household", kind: "personal" } },
+    ]);
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Open Household" })).toHaveFocus();
     });
@@ -58,7 +65,10 @@ describe("CreateWorkspace", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
 
     await screen.findByRole("heading", { level: 1, name: "Duarte & Pessoa is ready" });
-    expect(api.calls[0]?.body).toEqual({ name: "My workspace", kind: "business" });
+    expect(api.calls.find((call) => call.route === CREATE)?.body).toEqual({
+      name: "My workspace",
+      kind: "business",
+    });
   });
 
   it("refuses a name over 100 characters and goes back from the kind", async () => {
@@ -121,17 +131,79 @@ describe("CreateWorkspace", () => {
     expect(onSignOut).toHaveBeenCalled();
   });
 
-  it("explains a pending approval and checks again", async () => {
-    const api = mockApi({ [CREATE]: problem(403, "signup_requires_approval") });
+  it("explains a pending approval and checks again without creating anything", async () => {
+    let request: string | null = null;
+    const api = mockApi({
+      [CREATE]: problem(403, "signup_requires_approval"),
+      [SIGNUP]: () => {
+        const answer = standing("approval", true, request);
+        request = "pending";
+        return answer;
+      },
+    });
     renderFlow();
     fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
     fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
 
     await screen.findByRole("heading", { level: 1, name: "Your request is waiting" });
+    const before = api.calls.filter((call) => call.route === SIGNUP).length;
     fireEvent.click(screen.getByRole("button", { name: "Check again" }));
     await waitFor(() => {
-      expect(api.calls).toHaveLength(2);
+      expect(api.calls.filter((call) => call.route === SIGNUP).length).toBeGreaterThan(before);
     });
+    expect(api.calls.filter((call) => call.route === CREATE)).toHaveLength(1);
+  });
+
+  it("opens on the waiting view for someone whose request is pending", async () => {
+    mockApi({ [SIGNUP]: standing("approval", true, "pending") });
+    renderFlow();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your request is waiting" }),
+    ).toBeVisible();
+  });
+
+  it("says a request was approved, then goes on with the name", async () => {
+    mockApi({ [SIGNUP]: standing("approval", true, "approved") });
+    renderFlow();
+
+    expect(await screen.findByRole("heading", { level: 1, name: "You’re approved" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "What should we call your workspace?" }),
+    ).toBeVisible();
+  });
+
+  it("goes on to create the workspace once approval arrives while waiting", async () => {
+    let request = "pending";
+    const api = mockApi({
+      [SIGNUP]: () => standing("approval", true, request),
+      [CREATE]: () =>
+        request === "approved"
+          ? { status: 201, body: DUARTE }
+          : problem(403, "signup_requires_approval"),
+    });
+    renderFlow();
+    await screen.findByRole("heading", { level: 1, name: "Your request is waiting" });
+    request = "approved";
+    fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Continue" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Skip" }));
+
+    await screen.findByRole("heading", { level: 1, name: "Duarte & Pessoa is ready" });
+    expect(api.calls.filter((call) => call.route === CREATE)).toHaveLength(1);
+  });
+
+  it("says a request was not approved and offers to sign out", async () => {
+    mockApi({ [SIGNUP]: standing("approval", true, "rejected") });
+    const { onSignOut } = renderFlow();
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: "Your request wasn’t approved" }),
+    ).toBeVisible();
+    fireEvent.click(within(screen.getByRole("main")).getByRole("button", { name: "Sign out" }));
+    expect(onSignOut).toHaveBeenCalled();
   });
 
   it("says when Campbooks didn't answer, and can be cancelled when not the first", async () => {

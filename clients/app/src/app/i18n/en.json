@@ -63,7 +63,8 @@
     "opening": "Opening administration…",
     "back": "Back to Campbooks",
     "sections": {
-      "system": "System"
+      "system": "System",
+      "signups": "Signups"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Sign in again to continue",

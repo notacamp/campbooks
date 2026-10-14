@@ -63,7 +63,8 @@
     "opening": "A abrir a administração…",
     "back": "Voltar ao Campbooks",
     "sections": {
-      "system": "Sistema"
+      "system": "Sistema",
+      "signups": "Registos"
     },
     "menuEntry": "Administração",
     "reauthTitle": "Inicie sessão novamente para continuar",
