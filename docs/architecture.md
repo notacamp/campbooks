@@ -17,7 +17,7 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
                             │              │             │
   External client ──OAuth──►│  Postgres    │  IdP        │  AI providers
   (client_credentials /     │  (+pgvector) │  (OIDC)     │  (OpenAI-compatible,
-   auth code + PKCE)        │  schema per  │  ADR 0004   │   open-weight models,
+   auth code + PKCE)        │  schema per  │  ADR 0014   │   open-weight models,
                             │  module      │             │   ADR 0005)
 ```
 
@@ -73,7 +73,7 @@ clients/                   pnpm workspace
     src/modules/<domain>/  1:1 with crates/modules/<domain>
     src-tauri/             Tauri 2 shell (desktop + iOS + Android); its own Cargo
                            workspace so GUI system deps never enter server CI
-deploy/                    docker compose for self-hosters (server, postgres, IdP, optional AI)
+deploy/                    docker compose for self-hosters (server, postgres, optional AI)
 openspec/                  specs (baseline) and changes (in flight)
 docs/adr/                  numbered architecture decision records
 ```
@@ -463,9 +463,10 @@ provider inside the server, on the app's origin: discovery at
 `/.well-known/openid-configuration`, keys at `/oauth2/jwks`, and
 `/oauth2/{authorize,token,revoke,end_session}`; provider round trips and the
 sign-in screens' actions under `/auth/*`. It runs while
-`CAMPBOOKS_AUTH__ISSUER` is unset (Rauthy keeps serving installs that name it
-until it is removed). Its protocol endpoints are mounted beside the BFF, not
-in the operation catalogue. The API's verifier reads its Ed25519 keys
+`CAMPBOOKS_AUTH__ISSUER` is unset or names the app's own origin (an outside
+OIDC issuer, if one is configured, serves the instance and these endpoints
+answer 404). Its protocol endpoints are mounted beside the BFF, not in the
+operation catalogue. The API's verifier reads its Ed25519 keys
 in-process (`kernel::auth::KeySource`), and the BFF reaches its token endpoint
 through its router rather than the network; both are otherwise the same code
 path any outside client and resource server would use. A new person's
