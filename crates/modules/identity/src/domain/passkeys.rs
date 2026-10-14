@@ -149,7 +149,9 @@ pub async fn descriptors(db: &PgPool, account: Uuid) -> Result<Vec<CredentialDes
 }
 
 /// The passkey with credential id `credential_id`, locked for the rest of
-/// the transaction, unless its account is disabled.
+/// the transaction. Its account may be suspended: the caller refuses it
+/// with [`accounts::is_suspended`](super::accounts::is_suspended) once the
+/// assertion verified, so only the passkey's holder learns why.
 pub async fn by_credential(
     conn: &mut PgConnection,
     credential_id: &[u8],
@@ -159,8 +161,6 @@ pub async fn by_credential(
         columns!(),
         " FROM identity.passkeys p
           WHERE credential_id = $1
-            AND EXISTS (SELECT 1 FROM identity.accounts a
-                         WHERE a.id = p.account_id AND a.disabled_at IS NULL)
           FOR UPDATE"
     ))
     .bind(credential_id)

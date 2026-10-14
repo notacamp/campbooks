@@ -79,6 +79,10 @@ pub fn module() -> Module {
             .routes(routes!(features::get_signup::handler)),
         admin_router: Some(
             OpenApiRouter::new()
+                .routes(routes!(features::admin_list_users::handler))
+                .routes(routes!(features::admin_get_user::handler))
+                .routes(routes!(features::admin_list_workspaces::handler))
+                .routes(routes!(features::admin_get_workspace::handler))
                 .routes(routes!(features::admin_list_signup_requests::handler))
                 .routes(routes!(features::admin_approve_signup_request::handler))
                 .routes(routes!(features::admin_reject_signup_request::handler))

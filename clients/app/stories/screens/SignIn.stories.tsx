@@ -346,9 +346,9 @@ export const LoginFailed: Story = {
   args: { path: signInAt("&error=login_failed"), api: ways(["google"]) },
 };
 
-/** The account is turned off. */
-export const AccountDisabled: Story = {
-  args: { path: signInAt("&error=account_disabled"), api: ways(["google"]) },
+/** An administrator suspended the account. */
+export const AccountSuspended: Story = {
+  args: { path: signInAt("&error=account_suspended"), api: ways(["google"]) },
 };
 
 /** The provider account is a way into another Campbooks account. */

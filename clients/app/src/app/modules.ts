@@ -4,18 +4,25 @@
 import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
-import { buildConnectorsRoutes } from "~/modules/connectors";
+import { buildConnectorsRoutes, WorkspaceConnectionsAdmin } from "~/modules/connectors";
 import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
   CONVERSATIONS_SHORTCUTS,
 } from "~/modules/conversations";
-import { buildIdentityRoutes, IDENTITY_SHORTCUTS, MailboxStep } from "~/modules/identity";
+import {
+  AccountAdminPanel,
+  buildIdentityRoutes,
+  IDENTITY_SHORTCUTS,
+  MailboxStep,
+} from "~/modules/identity";
 import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
 import {
   buildWorkspacesAdminRoutes,
   buildWorkspacesRoutes,
+  PEOPLE_ADMIN_SECTION,
   SIGNUPS_ADMIN_SECTION,
+  WORKSPACES_ADMIN_SECTION,
   WORKSPACES_SHORTCUTS,
 } from "~/modules/workspaces";
 
@@ -63,11 +70,23 @@ export function buildModuleRoutes<
  * module contributes its own admin operations.
  */
 export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
-  return [...buildSystemAdminRoutes(admin), ...buildWorkspacesAdminRoutes(admin)] as const;
+  return [
+    ...buildSystemAdminRoutes(admin),
+    // People and Workspaces show identity's account and connectors' health.
+    ...buildWorkspacesAdminRoutes(admin, {
+      AccountPanel: AccountAdminPanel,
+      ConnectionsPanel: WorkspaceConnectionsAdmin,
+    }),
+  ] as const;
 }
 
 /** The admin sidebar, one entry per module panel (named `admin.sections.<id>`). */
-export const ADMIN_SECTIONS = [SYSTEM_ADMIN_SECTION, SIGNUPS_ADMIN_SECTION] as const;
+export const ADMIN_SECTIONS = [
+  SYSTEM_ADMIN_SECTION,
+  PEOPLE_ADMIN_SECTION,
+  WORKSPACES_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
+] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
 export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [

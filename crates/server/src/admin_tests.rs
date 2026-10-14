@@ -221,8 +221,18 @@ fn the_admin_document_describes_its_security_and_permissions() {
 
 /// Tables whose rows an administrator may read across workspaces through
 /// `kernel::db::begin_admin` (an admin-read policy). Grows with the slices
-/// that add admin views; reviewed like an ADR (ADR 0015).
-const ADMIN_READ_TABLES: &[&str] = &["workspaces.signup_requests"];
+/// that add admin views; reviewed like an ADR (ADR 0015). Metadata only:
+/// Admin → Signups (slice S1) reads signup requests; Admin → People and
+/// Workspaces (slice S2) read workspaces, memberships, invitations (counted)
+/// and connections' health and sync state.
+const ADMIN_READ_TABLES: &[&str] = &[
+    "connectors.connections",
+    "connectors.streams",
+    "workspaces.invitations",
+    "workspaces.members",
+    "workspaces.signup_requests",
+    "workspaces.workspaces",
+];
 
 /// Tables holding people's content (or secrets). They never get an
 /// admin-read policy.
@@ -232,12 +242,14 @@ const CONTENT_TABLES: &[&str] = &[
     "conversations.conversations",
     "conversations.decisions",
     "conversations.corrections",
-    "connectors.gmail_messages",
-    "connectors.gmail_oversized",
+    "connectors.messages",
+    "connectors.oversized",
     "connectors.credentials",
     "kernel.blobs",
     "kernel.blob_refs",
     "identity.held_grants",
+    "search.entries",
+    "search.groups",
 ];
 
 #[sqlx::test(migrations = "../../migrations")]

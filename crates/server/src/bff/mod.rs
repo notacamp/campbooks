@@ -38,8 +38,10 @@ use axum::{
     http::HeaderMap,
     routing::{get, post},
 };
+use campbooks_identity::events::AccountSuspended;
 use campbooks_kernel::{
-    AppState, Error, Job, JobContext, JobError, auth::TokenVerifier, jobs::Background,
+    AppState, Error, Event, EventHandler, Job, JobContext, JobError, auth::TokenVerifier,
+    jobs::Background,
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -233,9 +235,33 @@ pub fn resources() -> campbooks_kernel::authz::Resources {
     campbooks_kernel::authz::Resources::declared(&RESOURCES)
 }
 
-/// The BFF's background work: pruning ended sessions.
+/// The BFF's background work: pruning ended sessions, and ending a
+/// suspended account's sessions.
 pub fn background() -> Background {
-    Background::new().schedule::<PruneSessions>(PRUNE_EVERY)
+    Background::new()
+        .schedule::<PruneSessions>(PRUNE_EVERY)
+        .on_event::<EndSuspendedSessions>()
+}
+
+/// An administrator suspended an account (ADR 0015): its web sessions end
+/// at once, as an identity provider's back-channel logout would end them
+/// (the in-process issuer sends none; it publishes
+/// `identity.account_suspended` instead). Its next web request is asked to
+/// sign in, and signing in tells the person the account is suspended.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EndSuspendedSessions;
+
+impl EventHandler for EndSuspendedSessions {
+    type Event = AccountSuspended;
+    const NAME: &'static str = "bff.end_suspended_sessions";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(ctx: &mut JobContext, event: Event<AccountSuspended>) -> Result<(), JobError> {
+        let subject = event.payload.account.to_string();
+        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
+        tracing::info!(sessions = ended, "ended a suspended account's web sessions");
+        Ok(())
+    }
 }
 
 /// Delete ended sessions and expired sign-ins. Scheduled every

@@ -22,6 +22,7 @@ sqlx.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }

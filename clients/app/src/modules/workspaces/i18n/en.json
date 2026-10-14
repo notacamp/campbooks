@@ -166,6 +166,73 @@
       "lead": "Campbooks didn’t answer. Nothing changed."
     }
   },
+  "admin": {
+    "open": "Open",
+    "openLabel": "Open {{name}}",
+    "retry": "Try again",
+    "more": "Show more",
+    "loadingMore": "Loading more…",
+    "loadErrorLead": "The server didn’t answer. Check your connection, then try again.",
+    "workspaceCount_one": "{{count}} workspace",
+    "workspaceCount_other": "{{count}} workspaces",
+    "memberCount_one": "{{count}} member",
+    "memberCount_other": "{{count}} members",
+    "deletedOn": "Deleted {{date}}",
+    "people": {
+      "title": "People",
+      "lead": "Everyone who has signed in to this Campbooks, newest first. You see who they are and where they belong, never their mail or documents.",
+      "search": "Search people",
+      "searchPlaceholder": "Start of a name or email address",
+      "list": "People",
+      "loading": "Loading people…",
+      "empty": "Nobody has signed in yet.",
+      "noMatch": "No name or email address starts with “{{search}}”.",
+      "loadError": "Couldn’t load people",
+      "joined": "Joined {{date}}",
+      "back": "All people"
+    },
+    "person": {
+      "loading": "Loading…",
+      "notFound": "This person isn’t here",
+      "notFoundLead": "Nobody with this link has signed in to this Campbooks.",
+      "loadError": "Couldn’t load this person",
+      "email": "Email address",
+      "noEmail": "None given",
+      "firstSignIn": "First signed in",
+      "workspaces": "Workspaces",
+      "workspacesOf": "Workspaces of {{name}}",
+      "noWorkspaces": "Not in any workspace yet.",
+      "joined": "Joined {{date}}"
+    },
+    "workspaces": {
+      "title": "Workspaces",
+      "lead": "Every workspace on this Campbooks, newest first, and who is in it. Never what is inside.",
+      "search": "Search workspaces",
+      "searchPlaceholder": "Start of a workspace name",
+      "list": "Workspaces",
+      "loading": "Loading workspaces…",
+      "empty": "No workspace yet.",
+      "noMatch": "No workspace name starts with “{{search}}”.",
+      "loadError": "Couldn’t load workspaces",
+      "created": "Created {{date}}",
+      "back": "All workspaces"
+    },
+    "workspace": {
+      "loading": "Loading…",
+      "notFound": "This workspace isn’t here",
+      "notFoundLead": "No workspace on this Campbooks has this link.",
+      "loadError": "Couldn’t load this workspace",
+      "state": "State",
+      "active": "Active",
+      "purgedLater": "Its data is removed for good after the waiting period.",
+      "kind": "Kind",
+      "created": "Created",
+      "members": "Members",
+      "pendingInvitations": "Pending invitations",
+      "invitationCount_one": "{{count}} invitation",
+      "invitationCount_other": "{{count}} invitations"
+    }
+  },
   "signups": {
     "title": "Signups",
     "parts": {

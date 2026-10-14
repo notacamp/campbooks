@@ -739,6 +739,26 @@
       }
     },
     {
+      "name": "identity.account_suspended",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions).",
+        "required": [
+          "account"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          }
+        }
+      }
+    },
+    {
       "name": "identity.client_registered",
       "module": "identity",
       "version": 1,
