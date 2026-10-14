@@ -1,3 +1,8 @@
+-- Wait at most 5 s for a lock (the seed briefly takes `inboxes` exclusively
+-- to lift and restore its forced row-level security): a busy instance fails
+-- this migration fast, and the next start retries it, rather than stalling.
+SET LOCAL lock_timeout = '5s';
+
 -- Needs for mail stored before attention existed (campbooks-cloud#123).
 --
 -- One row per inbox that exists when this migration runs. The scheduled
