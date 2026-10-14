@@ -11304,7 +11304,8 @@
           "id",
           "name",
           "synced",
-          "created_at"
+          "created_at",
+          "signed_up_with"
         ],
         "properties": {
           "created_at": {
@@ -11328,6 +11329,10 @@
           "name": {
             "type": "string",
             "description": "What its owner calls it."
+          },
+          "signed_up_with": {
+            "type": "boolean",
+            "description": "It was made with the account (a passkey-only sign-up), not added\nlater: never shown as a new way in."
           },
           "synced": {
             "type": "boolean",

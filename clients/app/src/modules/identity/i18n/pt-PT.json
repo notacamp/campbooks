@@ -291,7 +291,7 @@
       "title": "Terminar sessão em todo o lado",
       "lead": "Termina todas as sessões da sua conta: este navegador, os seus outros dispositivos e todas as aplicações que autorizou. Faça-o se perder um dispositivo ou vir uma forma de iniciar sessão que não adicionou.",
       "action": "Terminar sessão em todo o lado",
-      "confirm": "Terminar em todo o lado",
+      "confirm": "Sim, terminar em todo o lado",
       "confirmLead": "Terminar sessão no Campbooks em todos os dispositivos e aplicações, incluindo este navegador? A seguir, inicia sessão novamente aqui.",
       "failed": "Não foi possível terminar sessão em todo o lado. Nada mudou; tente novamente."
     }

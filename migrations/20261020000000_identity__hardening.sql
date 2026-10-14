@@ -18,6 +18,23 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON identity.notices TO campbooks_app;
 -- An authorization request belongs to the browser that made it: the SHA-256
 -- of that browser's `__Host-campbooks_browser` cookie. Requests waiting at
 -- upgrade time (at most 15 minutes old) have none and are dropped: those
--- sign-ins start again from the app.
+-- sign-ins start again from the app. Nullable so a build from before this
+-- change (a rollback) can still store requests; a request without a hash
+-- never matches one (`= NULL` is never true), so it is never completed by
+-- this build.
+LOCK TABLE identity.authorize_requests IN ACCESS EXCLUSIVE MODE;
 DELETE FROM identity.authorize_requests;
-ALTER TABLE identity.authorize_requests ADD COLUMN browser_hash bytea NOT NULL;
+ALTER TABLE identity.authorize_requests ADD COLUMN browser_hash bytea;
+
+-- How a passkey was added: with the account (a passkey-only sign-up) or
+-- later. Only a later one is a new way in worth pointing out. Existing
+-- sign-up passkeys are the ones their account's creation names.
+ALTER TABLE identity.passkeys
+    ADD COLUMN added_via text NOT NULL DEFAULT 'passkey'
+        CHECK (added_via IN ('sign_up', 'passkey'));
+UPDATE identity.passkeys p
+   SET added_via = 'sign_up'
+  FROM identity.audit_events a
+ WHERE a.kind = 'account_created'
+   AND a.account_id = p.account_id
+   AND a.metadata ->> 'passkey' = p.id::text;

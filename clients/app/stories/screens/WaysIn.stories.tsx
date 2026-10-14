@@ -248,7 +248,7 @@ export const SignOutEverywhereFailed: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: "Sign out everywhere" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Sign out everywhere" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Yes, sign out everywhere" }));
     await expect(await canvas.findByText(/Couldn’t sign out everywhere/u)).toBeVisible();
   },
 };

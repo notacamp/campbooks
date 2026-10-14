@@ -630,7 +630,7 @@ pub async fn sign_up(
     };
     let mut tx = ctx.state.db.begin().await?;
     passkeys::create_account(&mut tx, account, &display_name, now).await?;
-    let Some(passkey) = passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, now).await?
+    let Some(passkey) = passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, true, now).await?
     else {
         return Err(Error::Conflict(
             MESSAGES.reason("passkey_already_registered"),

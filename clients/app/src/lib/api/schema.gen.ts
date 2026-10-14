@@ -2695,6 +2695,11 @@ export interface components {
             /** @description What its owner calls it. */
             name: string;
             /**
+             * @description It was made with the account (a passkey-only sign-up), not added
+             *     later: never shown as a new way in.
+             */
+            signed_up_with: boolean;
+            /**
              * @description Whether it may sync between devices (a password manager or a
              *     platform account keeps it), as opposed to staying on one device.
              */

@@ -220,7 +220,9 @@ function RecentlyAdded({ ways }: { ways: readonly WayIn[] | undefined }) {
   const passkeys = usePasskeys();
   const recent =
     (ways ?? []).some((way) => way.linked_via !== "sign_up" && addedRecently(way.linked_at)) ||
-    (passkeys.data?.items ?? []).some((passkey) => addedRecently(passkey.created_at));
+    (passkeys.data?.items ?? []).some(
+      (passkey) => !passkey.signed_up_with && addedRecently(passkey.created_at),
+    );
   if (!recent) {
     return null;
   }
@@ -251,6 +253,19 @@ function SignOutEverywhere({ leave }: { leave: (url: string) => void }) {
         {t("waysIn.everywhere.lead")}
       </Text>
       {failed ? <Banner tone="danger" role="alert" title={t("waysIn.everywhere.failed")} /> : null}
+      <div>
+        <Button
+          variant="danger"
+          icon="sign-out"
+          aria-expanded={confirming}
+          onClick={() => {
+            setFailed(false);
+            setConfirming(true);
+          }}
+        >
+          {t("waysIn.everywhere.action")}
+        </Button>
+      </div>
       {confirming ? (
         <InlineConfirm
           confirmLabel={t("waysIn.everywhere.confirm")}
@@ -277,20 +292,7 @@ function SignOutEverywhere({ leave }: { leave: (url: string) => void }) {
         >
           {t("waysIn.everywhere.confirmLead")}
         </InlineConfirm>
-      ) : (
-        <div>
-          <Button
-            variant="danger"
-            icon="sign-out"
-            aria-expanded={confirming}
-            onClick={() => {
-              setConfirming(true);
-            }}
-          >
-            {t("waysIn.everywhere.action")}
-          </Button>
-        </div>
-      )}
+      ) : null}
     </section>
   );
 }

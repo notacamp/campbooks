@@ -291,7 +291,7 @@
       "title": "Se déconnecter partout",
       "lead": "Met fin à toutes les connexions à votre compte : ce navigateur, vos autres appareils et toutes les applications que vous avez autorisées. À faire si vous perdez un appareil ou voyez un moyen de connexion que vous n’avez pas ajouté.",
       "action": "Se déconnecter partout",
-      "confirm": "Se déconnecter partout",
+      "confirm": "Oui, me déconnecter partout",
       "confirmLead": "Vous déconnecter de Campbooks sur tous vos appareils et dans toutes les applications, ce navigateur compris ? Vous vous reconnecterez ensuite ici.",
       "failed": "Impossible de vous déconnecter partout. Rien n’a changé ; réessayez."
     }

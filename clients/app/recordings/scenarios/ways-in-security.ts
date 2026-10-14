@@ -130,7 +130,7 @@ export default async function waysInSecurity({ page }: ScenarioContext): Promise
   await caption(page, "Confirmed in place: Keep it is focused, nothing happens yet");
   // Nobody touches the sensor on the sign-in screen that follows.
   await presence(false);
-  await page.getByRole("button", { name: "Sign out everywhere" }).click();
+  await page.getByRole("button", { name: "Yes, sign out everywhere" }).click();
   await page.getByRole("link", { name: /Continue with Google/u }).waitFor();
   await caption(page, "Every sign-in ended: this browser, other devices, every app. Sign in again");
 }

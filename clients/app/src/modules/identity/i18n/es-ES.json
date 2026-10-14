@@ -291,7 +291,7 @@
       "title": "Cerrar sesión en todas partes",
       "lead": "Cierra todas las sesiones de tu cuenta: este navegador, tus otros dispositivos y todas las aplicaciones que autorizaste. Hazlo si pierdes un dispositivo o ves una forma de iniciar sesión que no añadiste.",
       "action": "Cerrar sesión en todas partes",
-      "confirm": "Cerrar en todas partes",
+      "confirm": "Sí, cerrar en todas partes",
       "confirmLead": "¿Cerrar sesión en Campbooks en todos los dispositivos y aplicaciones, incluido este navegador? Después volverás a iniciar sesión aquí.",
       "failed": "No se pudo cerrar sesión en todas partes. No cambió nada; inténtalo de nuevo."
     }

@@ -221,7 +221,13 @@ function PasskeyRow({ passkey, onStepUp }: { passkey: PasskeyView; onStepUp: () 
     <ListRow
       leading={<Icon name="key" size="lg" />}
       title={passkey.name}
-      badge={addedRecently(passkey.created_at) ? t("waysIn.new") : undefined}
+      badge={
+        passkey.signed_up_with
+          ? t("waysIn.signedUpWith")
+          : addedRecently(passkey.created_at)
+            ? t("waysIn.new")
+            : undefined
+      }
       meta={meta}
       trailing={
         mode === "idle" ? (

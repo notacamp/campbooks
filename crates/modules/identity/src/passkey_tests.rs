@@ -130,6 +130,17 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
     assert!(id.get("email").is_none(), "a passkey proves no address");
     let (_, access) = Kit::decode(tokens["access_token"].as_str().unwrap());
     assert_eq!(access["email_verified"], false);
+    // The sign-up's passkey is listed as the one the account was made with
+    // (the app never calls it a new way in), and a later one is not.
+    let token = tokens["access_token"].as_str().unwrap().to_owned();
+    let listed = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &token)
+        .await;
+    assert_eq!(listed.json["items"][0]["signed_up_with"], true, "{listed:?}");
+    let mut laptop = Authenticator::new(ORIGIN, "localhost");
+    let added = add_passkey(&kit, &token, &mut laptop, Alg::Ed25519).await;
+    assert_eq!(added.status, StatusCode::CREATED, "{added:?}");
+    assert_eq!(added.json["signed_up_with"], false);
     assert_eq!(
         count(
             &kit,
@@ -144,7 +155,8 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
             "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
         )
         .await,
-        1
+        2,
+        "the sign-up's passkey and the one added after"
     );
 
     // Another browser, the same passkey: the same account.
@@ -169,8 +181,10 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
         "the ceremony cookie is cleared"
     );
     let last_used: Option<chrono::DateTime<chrono::Utc>> =
-        sqlx::query_scalar("SELECT last_used_at FROM identity.passkeys")
-            .fetch_one(&kit.state.db)
+        sqlx::query_scalar(
+            "SELECT last_used_at FROM identity.passkeys WHERE added_via = 'sign_up'",
+        )
+        .fetch_one(&kit.state.db)
             .await
             .unwrap();
     assert!(last_used.is_some());

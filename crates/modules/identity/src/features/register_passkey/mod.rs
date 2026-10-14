@@ -91,7 +91,7 @@ pub async fn handler(
         .and_then(passkeys::clean_name)
         .unwrap_or_else(|| "Passkey".to_owned());
     let mut tx = state.db.begin().await?;
-    let id = passkeys::insert(&mut tx, account, &new, &name, now)
+    let id = passkeys::insert(&mut tx, account, &new, &name, false, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("passkey_already_registered")))?;
     accounts::audit(

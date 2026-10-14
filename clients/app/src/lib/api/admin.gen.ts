@@ -655,7 +655,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time

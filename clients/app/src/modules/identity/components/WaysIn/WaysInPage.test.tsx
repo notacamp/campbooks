@@ -5,10 +5,13 @@ import {
   ALL_PROVIDERS,
   CONNECTION,
   GOOGLE_WAY_IN,
+  SIGN_UP_PASSKEY,
   ZOHO_WAY_IN,
 } from "../../../../../test/demo/identity";
 import { DUARTE } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
+
+import { PasskeysSection } from "../Passkeys/PasskeysSection";
 
 import { WaysInPage } from "./WaysInPage";
 
@@ -174,6 +177,15 @@ describe("WaysInPage", () => {
     expect(within(notice).getByText(/remove it, then sign out everywhere/u)).toBeVisible();
   });
 
+  it("never calls the passkey an account was made with a new way in", async () => {
+    onOctober14();
+    mockApi({ ...listed([]), [PASSKEYS]: { body: { items: [SIGN_UP_PASSKEY] } } });
+    renderPage({ sections: [PasskeysSection] });
+    expect(await screen.findByText("Signed up with")).toBeVisible();
+    expect(screen.queryByText("New")).toBeNull();
+    expect(screen.queryByText("A way to sign in was added this week")).toBeNull();
+  });
+
   it("says nothing when every way in is older than a week", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-11-30T12:00:00Z"));
@@ -192,12 +204,15 @@ describe("WaysInPage", () => {
     });
     const leave = renderPage();
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
+    const open = await screen.findByRole("button", { name: "Sign out everywhere" });
+    expect(open).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(open);
+    expect(open).toHaveAttribute("aria-expanded", "true");
     expect(
       screen.getByText(/on every device and in every app, this browser included/u),
     ).toBeVisible();
     expect(api.calls.map((call) => call.route)).not.toContain(EVERYWHERE);
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, sign out everywhere" }));
     await waitFor(() => {
       expect(leave).toHaveBeenCalledWith("/");
     });
@@ -210,7 +225,7 @@ describe("WaysInPage", () => {
     const leave = renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
-    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Yes, sign out everywhere" }));
     expect(await screen.findByText(/Couldn’t sign out everywhere/u)).toBeVisible();
     expect(leave).not.toHaveBeenCalled();
   });
