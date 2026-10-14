@@ -236,7 +236,7 @@ export interface operations {
                     "application/json": components["schemas"]["AdminOverview"];
                 };
             };
-            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
+            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than an hour old). */
             401: {
                 headers: {
                     [name: string]: unknown;

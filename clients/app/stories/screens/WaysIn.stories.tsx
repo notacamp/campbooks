@@ -42,6 +42,7 @@ function signedIn({
   passkeys = [LAPTOP_PASSKEY],
   addPasskey,
   removePasskey,
+  everywhere,
 }: {
   items?: readonly unknown[];
   providers?: readonly string[];
@@ -52,6 +53,7 @@ function signedIn({
   passkeys?: readonly unknown[];
   addPasskey?: MockRoute;
   removePasskey?: MockRoute;
+  everywhere?: MockRoute;
 }): Record<string, MockRoute> {
   const routes: Record<string, MockRoute> = {
     "GET /bff/session": { body: SESSION },
@@ -75,6 +77,9 @@ function signedIn({
   }
   if (link !== undefined) {
     routes["POST /bff/api/v1/identity/links"] = link;
+  }
+  if (everywhere !== undefined) {
+    routes["POST /bff/api/v1/identity/sign-out-everywhere"] = everywhere;
   }
   if (remove !== undefined) {
     for (const way of [GOOGLE_WAY_IN, ZOHO_WAY_IN]) {
@@ -207,6 +212,53 @@ export const LoadFailed: Story = {
   args: { path: PAGE, api: signedIn({ ways: { status: 503 } }) },
 };
 
+/** Two days ago, as the story runs. */
+const twoDaysAgo = () => new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+
+/** A way in added this week (by someone else?): marked New, and what to do. */
+export const RecentlyAdded: Story = {
+  args: {
+    path: PAGE,
+    api: signedIn({
+      items: [GOOGLE_WAY_IN, { ...ZOHO_WAY_IN, linked_at: twoDaysAgo() }],
+      passkeys: [LAPTOP_PASSKEY],
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("A way to sign in was added this week")).toBeVisible();
+    await expect(canvas.getByText("New")).toBeVisible();
+  },
+};
+
+/** Sign out everywhere, confirmed in place. */
+export const SignOutEverywhere: Story = {
+  args: { path: PAGE, api: signedIn({ everywhere: { status: 204 } }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Sign out everywhere" }));
+    await expect(canvas.getByText(/this browser included/u)).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Keep it" })).toHaveFocus();
+  },
+};
+
+/** Signing out everywhere failed: still signed in, told so. */
+export const SignOutEverywhereFailed: Story = {
+  args: { path: PAGE, api: signedIn({ everywhere: problem(503, "unavailable") }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Sign out everywhere" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Sign out everywhere" }));
+    await expect(await canvas.findByText(/Couldn’t sign out everywhere/u)).toBeVisible();
+  },
+};
+
+/** Sign out everywhere, in Spanish, dark. */
+export const SignOutEverywhereSpanish: Story = {
+  args: { path: PAGE, api: signedIn({ everywhere: { status: 204 } }) },
+  globals: { locale: "es-ES", theme: "dark" },
+};
+
 /** In the personal accent. */
 export const PersonalAccent: Story = {
   args: { path: PAGE, api: signedIn({}) },
@@ -261,6 +313,16 @@ export const AddPasskeySignInAgain: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: /Add a passkey/u }));
     await expect(await canvas.findByText("Sign in again first")).toBeVisible();
+  },
+};
+
+/** Adding one needs a sign-in from the last five minutes: sign in now. */
+export const AddPasskeySignInNow: Story = {
+  args: { path: PAGE, api: signedIn({ addPasskey: problem(403, "fresh_sign_in_required") }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Add a passkey/u }));
+    await expect(await canvas.findByText(/the last five minutes/u)).toBeVisible();
   },
 };
 

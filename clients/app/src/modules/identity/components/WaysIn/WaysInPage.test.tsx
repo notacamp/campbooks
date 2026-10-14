@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ALL_PROVIDERS,
@@ -17,6 +17,9 @@ const CONNECTIONS = `GET /bff/api/v1/w/${DUARTE.id}/connections`;
 const LINK = "POST /bff/api/v1/identity/links";
 const REMOVE = (id: string) => `DELETE /bff/api/v1/identity/ways-in/${id}`;
 const HERE = `/w/${DUARTE.id}/settings/sign-in`;
+const PASSKEYS = "GET /bff/api/v1/identity/passkeys";
+const EVERYWHERE = "POST /bff/api/v1/identity/sign-out-everywhere";
+const LOGOUT = "POST /bff/logout";
 
 function renderPage(props: Partial<Parameters<typeof WaysInPage>[0]> = {}) {
   const leave = vi.fn();
@@ -29,9 +32,20 @@ function renderPage(props: Partial<Parameters<typeof WaysInPage>[0]> = {}) {
 const listed = (items: unknown[], providers: readonly string[] = ALL_PROVIDERS) => ({
   [WAYS]: { body: { items, providers } },
   [CONNECTIONS]: { body: { connections: [] } },
+  [PASSKEYS]: { body: { items: [] } },
 });
 
+/** The demo data's week: Zoho was added two days ago. */
+function onOctober14() {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));
+}
+
 describe("WaysInPage", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("lists every way in, newest last, with how and when it was added", async () => {
     mockApi(listed([GOOGLE_WAY_IN, ZOHO_WAY_IN]));
     renderPage();
@@ -141,6 +155,64 @@ describe("WaysInPage", () => {
     expect(
       await screen.findByText("That account already signs in to another Campbooks account."),
     ).toBeVisible();
+  });
+
+  it("marks a way in added this week and says what to do if it wasn't you", async () => {
+    onOctober14();
+    mockApi(listed([GOOGLE_WAY_IN, ZOHO_WAY_IN]));
+    renderPage();
+
+    const list = await screen.findByRole("list", { name: "Your ways to sign in" });
+    const [google, zoho] = within(list).getAllByRole("listitem");
+    if (google === undefined || zoho === undefined) {
+      throw new Error("two rows expected");
+    }
+    expect(within(zoho).getByText("New")).toBeVisible();
+    expect(within(google).queryByText("New")).toBeNull();
+    const notice = screen.getByRole("status", { name: "" });
+    expect(within(notice).getByText("A way to sign in was added this week")).toBeVisible();
+    expect(within(notice).getByText(/remove it, then sign out everywhere/u)).toBeVisible();
+  });
+
+  it("says nothing when every way in is older than a week", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-30T12:00:00Z"));
+    mockApi(listed([GOOGLE_WAY_IN, ZOHO_WAY_IN]));
+    renderPage();
+    await screen.findByRole("list", { name: "Your ways to sign in" });
+    expect(screen.queryByText("New")).toBeNull();
+    expect(screen.queryByText("A way to sign in was added this week")).toBeNull();
+  });
+
+  it("signs out everywhere after confirming in place, then this browser", async () => {
+    const api = mockApi({
+      ...listed([GOOGLE_WAY_IN]),
+      [EVERYWHERE]: { status: 204 },
+      [LOGOUT]: { body: { logout_url: null } },
+    });
+    const leave = renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
+    expect(
+      screen.getByText(/on every device and in every app, this browser included/u),
+    ).toBeVisible();
+    expect(api.calls.map((call) => call.route)).not.toContain(EVERYWHERE);
+    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    await waitFor(() => {
+      expect(leave).toHaveBeenCalledWith("/");
+    });
+    const routes = api.calls.map((call) => call.route);
+    expect(routes.indexOf(EVERYWHERE)).toBeLessThan(routes.indexOf(LOGOUT));
+  });
+
+  it("keeps you signed in when signing out everywhere fails", async () => {
+    mockApi({ ...listed([GOOGLE_WAY_IN]), [EVERYWHERE]: problem(503, "unavailable") });
+    const leave = renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Sign out everywhere" }));
+    fireEvent.click(screen.getByRole("button", { name: "Sign out everywhere" }));
+    expect(await screen.findByText(/Couldn’t sign out everywhere/u)).toBeVisible();
+    expect(leave).not.toHaveBeenCalled();
   });
 
   it("renders the sections other ways in bring", async () => {

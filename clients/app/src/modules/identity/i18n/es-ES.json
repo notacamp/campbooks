@@ -277,6 +277,19 @@
         "title": "Algo ha salido mal.",
         "lead": "No ha cambiado nada. Inténtalo de nuevo."
       }
+    },
+    "new": "Nueva",
+    "recent": {
+      "title": "Se añadió una forma de iniciar sesión esta semana",
+      "lead": "Está marcada como Nueva abajo. Si no la añadiste tú, elimínala y después cierra sesión en todas partes."
+    },
+    "everywhere": {
+      "title": "Cerrar sesión en todas partes",
+      "lead": "Cierra todas las sesiones de tu cuenta: este navegador, tus otros dispositivos y todas las aplicaciones que autorizaste. Hazlo si pierdes un dispositivo o ves una forma de iniciar sesión que no añadiste.",
+      "action": "Cerrar sesión en todas partes",
+      "confirm": "Cerrar en todas partes",
+      "confirmLead": "¿Cerrar sesión en Campbooks en todos los dispositivos y aplicaciones, incluido este navegador? Después volverás a iniciar sesión aquí.",
+      "failed": "No se pudo cerrar sesión en todas partes. No cambió nada; inténtalo de nuevo."
     }
   },
   "passkeySignUp": {
@@ -375,7 +388,8 @@
         "title": "No se ha podido añadir una llave de acceso.",
         "lead": "No se ha añadido nada. Inténtalo de nuevo."
       }
-    }
+    },
+    "freshSignIn": "Por seguridad, añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos. Vuelve a iniciar sesión; volverás aquí enseguida."
   },
   "consent": {
     "loading": "Cargando lo que pide la aplicación…",

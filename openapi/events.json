@@ -685,6 +685,26 @@
       }
     },
     {
+      "name": "identity.signed_out_everywhere",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A person signed out everywhere: every issuer session of the account\nended and every refresh token it held was revoked. The web BFF ends its\nown sessions of the account on it.",
+        "required": [
+          "account"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          }
+        }
+      }
+    },
+    {
       "name": "identity.way_in_added",
       "module": "identity",
       "version": 1,
@@ -717,6 +737,14 @@
           "via": {
             "type": "string",
             "description": "How it was added: `sign_up`, `link`, `connect` or `passkey`."
+          },
+          "way_in": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The provider identity or passkey added (absent from events published\nbefore it was recorded)."
           }
         }
       }

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        INSERT INTO workspaces.users (id, idp_subject, display_name, email)\n        VALUES ($1, $2, $3, $4)\n        ON CONFLICT (idp_subject) DO NOTHING\n        RETURNING id AS \"id: UserId\"\n        ",
+  "query": "\n        INSERT INTO workspaces.users (id, idp_subject, display_name, email, email_verified)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (idp_subject) DO NOTHING\n        RETURNING id AS \"id: UserId\"\n        ",
   "describe": {
     "columns": [
       {
@@ -20,12 +20,13 @@
         "Uuid",
         "Text",
         "Text",
-        "Text"
+        "Text",
+        "Bool"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "798c79db9c935a78da3f3c4f37c511d6bd0a637b0e60c15b97b4432e1bda22f4"
+  "hash": "53df659a8640678e4a4ea1625ab9ba66bf14fa0235b25486bf5f3c50438b3301"
 }

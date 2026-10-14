@@ -85,6 +85,22 @@ describe("PasskeysSection", () => {
     );
   });
 
+  it("asks for a sign-in now when adding a passkey needs a fresher one", async () => {
+    stubWebAuthn();
+    mockApi({
+      [LIST]: { body: { items: [LAPTOP_PASSKEY] } },
+      [START]: problem(403, "fresh_sign_in_required"),
+    });
+    const leave = renderSection();
+    await screen.findByRole("list", { name: "Your passkeys" });
+    fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
+    expect(await screen.findByText(/sign-in from the last five minutes/u)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(leave).toHaveBeenCalledWith(
+      `/bff/login?return_to=${encodeURIComponent(HERE)}&max_age=0`,
+    );
+  });
+
   it("explains why a passkey wasn't added", async () => {
     const browser = stubWebAuthn();
     mockApi({
