@@ -252,6 +252,11 @@
     display: none;
   }
 
+  /* The wrapped lines keep their own height: a short page must not stretch the header. */
+  .shell {
+    align-content: flex-start;
+  }
+
   .phoneHeader {
     position: sticky;
     top: 0;

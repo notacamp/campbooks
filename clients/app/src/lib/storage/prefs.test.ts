@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { readPref, writePref } from "./prefs";
+import { forgetPrefs, readPref, writePref } from "./prefs";
 
 describe("prefs", () => {
   afterEach(() => {
@@ -13,6 +13,18 @@ describe("prefs", () => {
 
     expect(readPref("locale")).toBe("pt");
     expect(globalThis.localStorage.getItem("campbooks.pref.locale")).toBe("pt");
+  });
+
+  it("forgets every key under a prefix and nothing else", () => {
+    writePref("searches.a.w1", "[]");
+    writePref("searches.b.w1", "[]");
+    writePref("locale", "fr");
+
+    forgetPrefs("searches.");
+
+    expect(readPref("searches.a.w1")).toBeNull();
+    expect(readPref("searches.b.w1")).toBeNull();
+    expect(readPref("locale")).toBe("fr");
   });
 
   it("returns null for a missing preference", () => {

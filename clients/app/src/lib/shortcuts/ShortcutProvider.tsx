@@ -11,7 +11,12 @@ import {
 import { DEFAULT_SHORTCUTS, type ShortcutId } from "./catalog";
 import { createDispatcher } from "./dispatcher";
 import { detectPlatform, type Platform } from "./keys";
-import { ShortcutRegistry, type ShortcutDefinition, type ShortcutHandler } from "./registry";
+import {
+  ShortcutRegistry,
+  type ShortcutBindOptions,
+  type ShortcutDefinition,
+  type ShortcutHandler,
+} from "./registry";
 
 interface ShortcutContextValue {
   registry: ShortcutRegistry;
@@ -82,7 +87,7 @@ export function useShortcutDefinitions(): {
   return { definitions: registry.definitions(), isBound: (id) => registry.isBound(id) };
 }
 
-export interface UseShortcutOptions {
+export interface UseShortcutOptions extends ShortcutBindOptions {
   /** Bind only while true (e.g. only for the selected row). Default true. */
   enabled?: boolean;
 }
@@ -94,7 +99,7 @@ export interface UseShortcutOptions {
 export function useShortcut(
   id: ShortcutId,
   handler: ShortcutHandler,
-  { enabled = true }: UseShortcutOptions = {},
+  { enabled = true, alternates = true }: UseShortcutOptions = {},
 ): void {
   const { registry } = useShortcuts();
   const latest = useRef(handler);
@@ -105,8 +110,12 @@ export function useShortcut(
     if (!enabled) {
       return;
     }
-    return registry.bind(id, (event) => {
-      latest.current(event);
-    });
-  }, [registry, id, enabled]);
+    return registry.bind(
+      id,
+      (event) => {
+        latest.current(event);
+      },
+      { alternates },
+    );
+  }, [registry, id, enabled, alternates]);
 }

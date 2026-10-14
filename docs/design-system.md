@@ -100,9 +100,10 @@ Funnel Sans and Funnel Display, self-hosted from `@fontsource-variable/*`
 | Visor                                                                                                                                 | the assistant's face: idle, reading, thinking, unsure, happy, alert, asleep, plus the emotions dizzy, starry and hearts; sm to xl                  |
 | Note                                                                                                                                  | "where things stand": linked records, confidence, a Why? disclosure, the low-confidence choice                                                     |
 | Banner, EmptyState, Skeleton, Toast                                                                                                   | states; `UndoProvider` + `useUndoToast()` is the undo stack (Z)                                                                                    |
-| Item, ConversationRow, NavItem, Segmented, Chip, TabBar, ActionBar                                                                    | rows and navigation                                                                                                                                |
+| Item, ConversationRow, NavItem, Segmented, Chip, TabBar, ActionBar                                                                    | rows and navigation; a ConversationRow takes nodes for subject and snippet (search hits) and an `option` mode for listboxes                        |
 | Shell, Sidebar, ListPane, ReaderPane, PaneHeader, HomeLayout, PageHero, QueueGroup, AsideSection, Line, Figure, MessageCard, Composer | layout and screen pieces                                                                                                                           |
-| CommandMenu (⌘K), ShortcutSheet (?)                                                                                                   | modal dialogs that read the shortcut registry                                                                                                      |
+| CommandMenu (⌘K), ShortcutSheet (?), Overlay                                                                                          | modal dialogs that read the shortcut registry; ⌘K's `onSearch` hands its query to search                                                           |
+| SearchField, Highlight                                                                                                                | the search box (field, removable filter chips, clear, key hint); the API's `[{text, hit}]` segments as text and `<mark>`, never HTML               |
 | TextField, Select, ChoiceCards                                                                                                        | labelled form controls with help and errors; ChoiceCards are native radios with a sentence each                                                    |
 | FocusPage, Brand                                                                                                                      | a centred page that asks one thing (signing in, each first-run step); can preview an accent with `accent`                                          |
 | Popover, PopoverSection                                                                                                               | a small non-modal panel on its trigger (the account menu); Escape and outside clicks close it                                                      |
@@ -139,7 +140,7 @@ handler, plus the screen's own commands.
 
 The defaults are in `lib/shortcuts/catalog.ts`: G then H/I/S/T/D/M/, to go
 places, J/K/↵ in lists, R/E/L/H/P/1/2 on the selected item, ⌘J/⌘↵ while
-writing, ⌘K, Z (undo), ⌘⇧W (switch workspace), ? and Esc.
+writing, ⌘K, Z (undo), ⌘⇧W (switch workspace), ? and Esc. Search adds `/` (`search.open`).
 
 **Ids (ADR 0013).** The registry is entirely client-side: the server never
 declares keys or labels. A shortcut's id is either
