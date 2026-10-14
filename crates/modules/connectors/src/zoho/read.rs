@@ -580,6 +580,7 @@ impl Reader<'_> {
                     internal_date,
                     raw,
                     flags: state::flags(tokens),
+                    receiver: mail::Receiver::Zoho,
                 },
                 generation,
             )

@@ -123,7 +123,7 @@ mod tests {
     #[test]
     fn the_message_parses_back_to_the_document() {
         let raw = rfc5322(&document(), vec![b"%PDF-1.7".to_vec()]);
-        let parsed = normalize::parse(&raw);
+        let parsed = normalize::parse(&raw, crate::mail::Receiver::Gmail);
         assert_eq!(
             parsed.rfc_message_id.as_deref(),
             Some("0192-send@example.com")
