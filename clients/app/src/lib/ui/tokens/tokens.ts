@@ -18,7 +18,15 @@ export const SEMANTIC_TOKENS = {
   ],
   border: ["border-subtle", "border-strong", "edge-highlight"],
   text: ["text-primary", "text-secondary", "text-tertiary", "text-disabled"],
-  accent: ["accent", "accent-hover", "on-accent", "accent-soft", "accent-text", "focus-ring"],
+  accent: [
+    "accent",
+    "accent-hover",
+    "on-accent",
+    "accent-soft",
+    "accent-text",
+    "highlight",
+    "focus-ring",
+  ],
   status: ["danger", "danger-soft", "success"],
   signal: [
     "signal-reply",

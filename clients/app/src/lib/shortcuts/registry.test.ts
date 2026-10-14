@@ -151,3 +151,34 @@ describe("ShortcutRegistry", () => {
     expect(registry.definitions()).toHaveLength(2);
   });
 });
+
+describe("alternate keys", () => {
+  const next: ShortcutDefinition = {
+    ...define("list.next", "j", "list"),
+    alternateKeys: ["arrowdown"],
+  };
+
+  it("are checked for conflicts like the main keys", () => {
+    expect(findConflicts([next, define("scroll", "arrowdown", "item")])).toEqual([
+      { a: "list.next", b: "scroll", reason: "same-keys" },
+    ]);
+  });
+
+  it("are live only for a handler that takes them", () => {
+    const registry = new ShortcutRegistry([next]);
+    expect(registry.liveBindings("list.next")).toEqual([]);
+
+    const unbind = registry.bind("list.next", vi.fn());
+    expect(registry.liveBindings("list.next")).toEqual(["j", "arrowdown"]);
+
+    registry.bind("list.next", vi.fn(), { alternates: false });
+    expect(registry.liveBindings("list.next")).toEqual(["j"]);
+    unbind();
+  });
+
+  it("must parse", () => {
+    expect(() => new ShortcutRegistry([{ ...next, alternateKeys: ["shift+"] }])).toThrow(
+      /Invalid key binding/,
+    );
+  });
+});

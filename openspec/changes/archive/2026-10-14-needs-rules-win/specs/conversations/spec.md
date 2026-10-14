@@ -75,6 +75,20 @@ from members alike.
 
 ## ADDED Requirements
 
+### Requirement: Spam and trash need nothing
+A message in spam or the trash SHALL never raise a need: a conversation's
+need SHALL come from its newest inbound message that is in neither, and a
+need whose own message moves to spam or the trash SHALL be cleared as
+`trashed`.
+
+#### Scenario: The lease goes to the trash
+- **WHEN** the message Pedro's `do` need comes from is moved to the trash, while his later message stays
+- **THEN** the need is cleared with cause `trashed`
+
+#### Scenario: A question in spam
+- **WHEN** a question lands in spam inside a conversation whose need comes from an earlier message
+- **THEN** the need still comes from the earlier message
+
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason
 `signals.security_alert`, and `stream` `updates`, for a message whose subject
@@ -83,13 +97,16 @@ English, European Portuguese, Spanish and French; "action required" alone is
 not one) only when all of these hold: the sender is a service (list mail or
 an automated address); its domain is plain ASCII (no internationalised
 label) and its display name names that domain; the receiving provider's own
-authentication results show `dmarc=pass` for the From domain or `dkim=pass`
-for a signing domain with the same registrable domain; the message has no
+authentication results, read as RFC 8601 says (comments and quoted strings
+are not results), hold exactly one `dmarc` result, `pass`, whose own
+`header.from` is the From domain, or a `dkim=pass` whose own signing domain
+has the From domain's registrable domain; the message has no
 phishing tell and carries no marketing words. It SHALL take precedence over
 the list-mail "no action" answer. A sure `do` need from a security alert
 SHALL require an authenticated sender on the listed code hosts and package
 registries (`github.com`, `gitlab.com`, `bitbucket.org`, `npmjs.com`,
-`pypi.org`, `rubygems.org`, `crates.io`, `snyk.io`); for any other
+`pypi.org`, `rubygems.org`, `crates.io`, `snyk.io`), signing with the
+platform's own name (`npm` for `npmjs.com`, `crates.io` for `crates.io`); for any other
 authenticated sender the answer SHALL stay below every confidence the policy
 acts from, so it raises at most a question. Anything that offers a message's
 own links as the action on its need SHALL offer them only for a message
@@ -102,6 +119,10 @@ whose sender is authenticated this way and that is not suspicious.
 #### Scenario: The same alert, not authenticated
 - **WHEN** the same alert arrives with no authentication results from the receiving provider, or with `dmarc=fail`
 - **THEN** no `do` need is raised
+
+#### Scenario: A crafted envelope sender
+- **WHEN** a message from "Crates" `<alerts@crates.io>` fails DMARC, and its envelope sender `"a; dmarc=pass header.from=crates.io x"@evil.example` is echoed in the provider's results
+- **THEN** `asks_action` is not answered by `signals.security_alert`
 
 #### Scenario: A look-alike that signs its own mail
 - **WHEN** "GitHub Security" `<alerts@githubsecurity.example>`, with `dkim=pass` and `dmarc=pass` for its own domain, sends "Security alert: new sign-in to your account"

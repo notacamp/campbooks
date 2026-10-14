@@ -17,6 +17,7 @@ import {
   MailboxStep,
   SuspendedAccounts,
 } from "~/modules/identity";
+import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
   buildSystemAdminRoutes,
   buildSystemRoutes,
@@ -64,6 +65,7 @@ export function buildModuleRoutes<
       ...workspaces.workspace,
       ...identity.workspace,
       ...buildConversationsRoutes(workspace),
+      ...buildSearchRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.
     ],
@@ -101,5 +103,6 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...WORKSPACES_SHORTCUTS,
   ...CONVERSATIONS_SHORTCUTS,
   ...COMPOSE_SHORTCUTS,
+  ...SEARCH_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
 ];
