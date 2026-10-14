@@ -1,0 +1,433 @@
+//! The needs backfill over mail stored "before attention": the fixtures are
+//! ingested, then their needs and need events are deleted, which is what a
+//! mailbox synced before the attention module looks like, and the
+//! migration's seed lists the inboxes again.
+
+use std::sync::Arc;
+
+use campbooks_ai::{
+    AiConfig, Gateway, Protocol, ProviderConfig, Role,
+    decide::{
+        Question,
+        signals::email::Envelope,
+        strategy::{BoxFuture, Decisions, Strategy},
+    },
+};
+use campbooks_kernel::{
+    jobs::{self, EnqueueOptions},
+    tenancy::WorkspaceId,
+};
+use serde_json::Value;
+use sqlx::PgPool;
+use wiremock::{Mock, MockServer, ResponseTemplate};
+
+use super::DispatchNeedsBackfills;
+use crate::{
+    ConversationsDeps, dev,
+    model::{InboxId, InboxRole},
+    testkit::{Kit, fixture, sorting_deps},
+};
+
+/// Rules that must never be asked: the backfill reads stored answers only.
+struct Unasked;
+
+impl Strategy for Unasked {
+    fn name(&self) -> &'static str {
+        "unasked"
+    }
+
+    fn decide<'a>(
+        &'a self,
+        _: &'a Envelope,
+        _: &'a [Question],
+    ) -> BoxFuture<'a, Result<Decisions, campbooks_ai::Error>> {
+        panic!("the needs backfill asked a strategy");
+    }
+}
+
+/// The module as the upgraded server composes it, except that asking the
+/// rules panics and the `decide` model is a server that must receive no
+/// request (checked when it is dropped).
+async fn upgraded(db: &PgPool, deps: ConversationsDeps) -> (Kit, MockServer) {
+    let server = MockServer::start().await;
+    Mock::given(wiremock::matchers::any())
+        .respond_with(ResponseTemplate::new(500))
+        .expect(0)
+        .mount(&server)
+        .await;
+    let provider = ProviderConfig::new(
+        format!("{}/v1", server.uri()).parse().unwrap(),
+        "convaiinnovations/laya-multilingual",
+    )
+    .with_protocol(Protocol::Laya);
+    let gateway = Gateway::new(AiConfig {
+        roles: [(Role::Decide, provider)].into(),
+        ..AiConfig::default()
+    })
+    .unwrap();
+    let deps = ConversationsDeps {
+        ai: Some(gateway),
+        ..deps
+    }
+    .with_rules(Arc::new(Unasked));
+    (Kit::with_deps(db.clone(), deps).await, server)
+}
+
+/// Sam's inbox in a new workspace, holding the recorded batches `names`.
+async fn mailbox(kit: &Kit, names: &[&str]) -> (WorkspaceId, InboxId) {
+    let workspace = WorkspaceId::new();
+    let (_, sam) = kit.member("sam", workspace);
+    let inbox = kit
+        .inbox(workspace, "sam@example.com", &[(sam, InboxRole::Manager)])
+        .await;
+    for name in names {
+        kit.ingest(workspace, inbox, name).await;
+    }
+    (workspace, inbox)
+}
+
+/// Make `workspace` look as if its mail was stored before attention: no
+/// needs and no need events.
+async fn before_attention(db: &PgPool, workspace: WorkspaceId) {
+    sqlx::query("DELETE FROM conversations.needs WHERE workspace_id = $1")
+        .bind(workspace.as_uuid())
+        .execute(db)
+        .await
+        .unwrap();
+    sqlx::query(
+        "DELETE FROM kernel.events WHERE name = 'conversations.need_changed' AND workspace_id = $1",
+    )
+    .bind(workspace.to_string())
+    .execute(db)
+    .await
+    .unwrap();
+}
+
+/// The seed of the migration that added the backfill, run again (as the
+/// migration's login).
+async fn seed(db: &PgPool) {
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../../migrations/20261019140000_conversations__needs_backfill.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let start = migration.find("-- seed begin").unwrap();
+    let end = migration.find("-- seed end").unwrap();
+    // The migration's own text, from the repository.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+        .execute(db)
+        .await
+        .unwrap();
+}
+
+/// What the scheduler does every minute, then every job it causes.
+async fn tick(kit: &Kit) {
+    let mut tx = kit.state.db.begin().await.unwrap();
+    jobs::enqueue(&mut tx, &DispatchNeedsBackfills, EnqueueOptions::default())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+}
+
+/// `(provider message id of the need, reason, state, cause)` of
+/// `workspace`'s needs.
+async fn needs_of(db: &PgPool, workspace: WorkspaceId) -> Vec<(String, String, String, String)> {
+    sqlx::query_as(
+        "SELECT m.provider_message_id, n.reason, n.state, coalesce(n.cleared_because, '')
+           FROM conversations.needs n JOIN conversations.messages m ON m.id = n.message_id
+          WHERE n.workspace_id = $1 ORDER BY 1",
+    )
+    .bind(workspace.as_uuid())
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
+async fn need_events(db: &PgPool, workspace: WorkspaceId) -> Vec<Value> {
+    sqlx::query_scalar(
+        "SELECT payload FROM kernel.events
+          WHERE name = 'conversations.need_changed' AND workspace_id = $1 ORDER BY id",
+    )
+    .bind(workspace.to_string())
+    .fetch_all(db)
+    .await
+    .unwrap()
+}
+
+fn row(message: &str, reason: &str, state: &str, cause: &str) -> (String, String, String, String) {
+    (message.into(), reason.into(), state.into(), cause.into())
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn old_answered_mail_gets_its_needs_without_asking_anyone(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (old, _) = mailbox(&kit, &["needs"]).await;
+    // Another workspace, its needs raised live: the backfill must leave it
+    // as it is.
+    let (current, _) = mailbox(&kit, &["needs"]).await;
+    let current_needs = needs_of(&db, current).await;
+    let current_events = need_events(&db, current).await.len();
+    before_attention(&db, old).await;
+    assert!(needs_of(&db, old).await.is_empty());
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+
+    assert_eq!(
+        needs_of(&db, old).await,
+        [
+            row("needs-1", "reply", "open", ""),
+            row("needs-2", "do", "open", ""),
+            row("needs-3", "pay", "open", ""),
+            row("needs-4", "review", "open", ""),
+            row("needs-5", "reply", "open", ""),
+        ]
+    );
+    // Published like live needs, so attention projects them; due dates come
+    // from the stored reasons.
+    let events = need_events(&db, old).await;
+    assert_eq!(events.len(), 5, "{events:?}");
+    assert!(events.iter().all(|e| e["workspace"] == old.to_string()));
+    let marta: String = sqlx::query_scalar(
+        "SELECT conversation_id::text FROM conversations.messages
+          WHERE provider_message_id = 'needs-1' AND workspace_id = $1",
+    )
+    .bind(old.as_uuid())
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    let due = events
+        .iter()
+        .find(|e| e["conversation"] == marta.as_str())
+        .unwrap();
+    assert_eq!(due["need"]["due_on"], "2026-10-14");
+    // The other workspace is untouched.
+    assert_eq!(needs_of(&db, current).await, current_needs);
+    assert_eq!(need_events(&db, current).await.len(), current_events);
+    let done: Vec<String> = sqlx::query_scalar("SELECT state FROM conversations.needs_backfills")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(done, ["done", "done"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn mail_older_than_the_needs_window_raises_nothing(db: PgPool) {
+    let mut deps = sorting_deps();
+    deps.config.needs_window_days = crate::DEFAULT_NEEDS_WINDOW_DAYS;
+    let kit = Kit::with_deps(db.clone(), deps.clone()).await;
+    let workspace = WorkspaceId::new();
+    let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+    // The same mail, sent six years ago.
+    let old: Value = serde_json::from_str(&fixture("needs").replace("\"2026-", "\"2020-")).unwrap();
+    let batch = dev::record(&kit.state, workspace, inbox, &old)
+        .await
+        .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+    before_attention(&db, workspace).await;
+
+    let (kit, _model) = upgraded(&db, deps).await;
+    seed(&db).await;
+    tick(&kit).await;
+    assert!(needs_of(&db, workspace).await.is_empty());
+    assert!(need_events(&db, workspace).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn replied_archived_or_trashed_mail_is_not_a_reply(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    // Sam answered Jonas from his phone before the upgrade.
+    let (workspace, _) = mailbox(&kit, &["needs", "needs-replied"]).await;
+    // Marta's question (reply) and Pedro's lease (do) archived, the bill
+    // trashed, all before the upgrade.
+    for (provider_id, column) in [
+        ("needs-1", "archived_at = now()"),
+        ("needs-2", "archived_at = now()"),
+        ("needs-3", "trashed = true"),
+    ] {
+        // `column` is one of the literals above.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "UPDATE conversations.conversations SET {column} WHERE id = $1::uuid"
+        )))
+        .bind(kit.conversation_of(provider_id).await)
+        .execute(&db)
+        .await
+        .unwrap();
+    }
+    before_attention(&db, workspace).await;
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    // Archive keeps an ask until Done; the phishing warning shows; nothing
+    // else is raised, and nothing that never opened is announced cleared.
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [
+            row("needs-2", "do", "open", ""),
+            row("needs-4", "review", "open", ""),
+        ]
+    );
+    assert_eq!(need_events(&db, workspace).await.len(), 2);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn running_it_twice_changes_nothing(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let revisions = || async {
+        sqlx::query_as::<_, (String, i64, String)>(
+            "SELECT conversation_id::text, revision, state FROM conversations.needs ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap()
+    };
+    let first = revisions().await;
+    let events = need_events(&db, workspace).await.len();
+
+    // The seed again (what a later migration runs to start over) restarts
+    // the inbox's backfill without a second row; it finds every need as it
+    // is.
+    seed(&db).await;
+    let (rows, state): (i64, String) = sqlx::query_as(
+        "SELECT count(*), min(state) FROM conversations.needs_backfills WHERE inbox_id = $1",
+    )
+    .bind(inbox)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!((rows, state.as_str()), (1, "pending"));
+    tick(&kit).await;
+    tick(&kit).await;
+    assert_eq!(revisions().await, first);
+    assert_eq!(need_events(&db, workspace).await.len(), events);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_large_inbox_is_done_a_page_at_a_time(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+    // 230 people each asking Sam a question: three pages.
+    let changes: Vec<Value> = (0..230)
+        .map(|i| {
+            serde_json::json!({"op": "upsert", "message": {
+                "provider_message_id": format!("ask-{i}"),
+                "thread_key": format!("thr-ask-{i}"),
+                "rfc_message_id": format!("ask-{i}@people.example"),
+                "from": {"name": format!("Person {i}"), "address": format!("p{i}@people.example")},
+                "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+                "subject": format!("Question {i}"),
+                "sent_at": "2026-10-12T09:00:00Z",
+                "direction": "inbound",
+                "text": "Hi Sam,\n\nCould you send me the plan?\n\nThanks",
+                "mailbox": {"in_inbox": true},
+                "read": false, "starred": false
+            }})
+        })
+        .collect();
+    let batch = dev::record(
+        &kit.state,
+        workspace,
+        inbox,
+        &serde_json::json!({ "changes": changes }),
+    )
+    .await
+    .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+    before_attention(&db, workspace).await;
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let open: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs WHERE state = 'open' AND reason = 'reply'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(open, 230);
+    let pages: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.backfill_needs'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(pages, 3);
+    let (state, refreshed): (String, i64) =
+        sqlx::query_as("SELECT state, refreshed FROM conversations.needs_backfills")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!((state.as_str(), refreshed), ("done", 230));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_inbox_that_goes_takes_its_backfill_with_it(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    seed(&db).await;
+    sqlx::query("DELETE FROM conversations.inboxes WHERE id = $1")
+        .bind(inbox)
+        .execute(&db)
+        .await
+        .unwrap();
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.needs_backfills")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0);
+    tick(&kit).await;
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_open_question_its_answers_no_longer_support_is_withdrawn(db: PgPool) {
+    // A code host's notification from long ago, outside the needs window,
+    // that an earlier version put to Sam as a question.
+    let mut deps = sorting_deps();
+    deps.config.needs_window_days = crate::DEFAULT_NEEDS_WINDOW_DAYS;
+    let kit = Kit::with_deps(db.clone(), deps.clone()).await;
+    let workspace = WorkspaceId::new();
+    let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+    let old: Value =
+        serde_json::from_str(&fixture("github-comment").replace("\"2026-", "\"2020-")).unwrap();
+    let batch = dev::record(&kit.state, workspace, inbox, &old)
+        .await
+        .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+    let message = kit.message_of("github-comment-1").await;
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question, state,
+              latest_inbound_id)
+         SELECT conversation_id, workspace_id, id, 'review', 'check', 'model', 'asks_action',
+                'open', id
+           FROM conversations.messages WHERE id = $1::uuid",
+    )
+    .bind(&message)
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let (kit, _model) = upgraded(&db, deps).await;
+    seed(&db).await;
+    tick(&kit).await;
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [row("github-comment-1", "review", "cleared", "superseded")]
+    );
+    let events = need_events(&db, workspace).await;
+    assert_eq!(events.len(), 1, "{events:?}");
+    assert_eq!(events[0]["cleared_because"], "superseded");
+}

@@ -66,6 +66,13 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **What needs you includes mail from before the upgrade.** Home's "What
+  needs you" only showed mail that arrived after attention shipped. After
+  this upgrade, each inbox's conversations from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) get their
+  needs within a few minutes, in the background, from the answers already
+  stored: no AI call, nothing to run. Replied, archived and trashed mail is
+  handled as for new mail, and mail older than the window stays off Home.
 - **Home no longer asks about mail the rules already settled.** A model
   suggestion is put to you as a question ("Did GitHub ask you to do
   something?") only when no answer Campbooks acts on already said no; a
