@@ -294,11 +294,12 @@ mod tests {
 
     #[test]
     fn job_errors_hide_addresses_links_and_tokens() {
-        let token = "eyJhbGciOiJFZERTQSJ9.eyJzdWIiOiJtYXlhIn0.c2lnbmF0dXJlLWJ5dGVz";
+        // An opaque run as long as a bearer token (built, not a literal).
+        let opaque = "Qx7-".repeat(12);
         let message = format!(
             "send to {MAIL} failed (mailto:maya@northwind-studio.example), see \
-             https://user:pw@mail.example.com/v1/messages?q=Q4+plan&token=x, \
-             token {token} for 01927a00-0000-7000-8000-00000000a001 at\tline 3"
+             https://demo@mail.example.com/v1/messages?q=Q4+plan&token=x, \
+             token {opaque} for 01927a00-0000-7000-8000-00000000a001 at\tline 3"
         );
         let stored = job_error(&message);
         assert_eq!(
