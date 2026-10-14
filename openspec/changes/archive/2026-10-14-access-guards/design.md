@@ -23,7 +23,7 @@ is built, what data each module owns, and the events.
 
 ## Data ownership and migrations
 
-- `kernel` (`20261020010000_kernel__workspace_isolation`):
+- `kernel` (`20261020040000_kernel__workspace_isolation`):
   - RLS on `changes`, `change_heads`, `blobs` and `blob_refs`: a
     transaction with no workspace set sees every row (the kernel's
     cross-workspace workers), and one with a workspace set sees only that
