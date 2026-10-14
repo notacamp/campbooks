@@ -359,7 +359,7 @@
       "keep": "La garder"
     },
     "origin": {
-      "action": "Vous l’avez apprise en traitant un e-mail",
+      "action": "Vous l’avez enseignée en traitant un e-mail",
       "onboarding": "D’après vos réponses à la configuration",
       "instruction": "D’après vos propres mots : « {{text}} »",
       "correction": "Suggérée d’après vos corrections",
@@ -376,7 +376,7 @@
       "confirmRemove": "Retirer",
       "cancel": "Garder",
       "forEveryone": "Pour tout le monde",
-      "paused": "En pause : la personne qui l’a apprise ne peut plus modifier cette boîte",
+      "paused": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
       "applied": "{{count}} jusqu’ici",
       "exceptions": "{{count}} remis en place par vous",
       "empty": "Pas encore de règles. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose de faire de même pour ceux qui lui ressemblent.",
