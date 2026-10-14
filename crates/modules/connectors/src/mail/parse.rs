@@ -343,7 +343,9 @@ mod tests {
     fn with_results(results: &[&str]) -> String {
         let mut raw = String::new();
         for value in results {
-            raw.push_str(&format!("Authentication-Results: {value}\r\n"));
+            raw.push_str("Authentication-Results: ");
+            raw.push_str(value);
+            raw.push_str("\r\n");
         }
         raw.push_str(concat!(
             "From: GitHub <noreply@github.com>\r\n",
