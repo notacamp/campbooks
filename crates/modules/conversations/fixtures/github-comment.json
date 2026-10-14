@@ -1,0 +1,26 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "github-comment-1",
+      "thread_key": "thr-issue-17",
+      "rfc_message_id": "example-org/demo-shop/issues/17/2041@github.com",
+      "in_reply_to": "example-org/demo-shop/issues/17@github.com",
+      "from": {"name": "Octavia Quill", "address": "notifications@github.com"},
+      "to": [{"name": "example-org/demo-shop", "address": "demo-shop@noreply.github.com"}],
+      "cc": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+      "reply_to": [{"name": "example-org/demo-shop", "address": "reply+EXAMPLE@reply.github.com"}],
+      "subject": "Re: [example-org/demo-shop] Checkout fails on Safari (Issue #17)",
+      "sent_at": "2026-10-13T09:30:00Z",
+      "direction": "inbound",
+      "headers": {
+        "list_id": "example-org/demo-shop <demo-shop.example-org.github.com>",
+        "list_unsubscribe": "<https://github.com/notifications/unsubscribe/EXAMPLE-TOKEN>",
+        "precedence": "list"
+      },
+      "text": "Same here on Safari 18.0. Any idea when this lands?\n\n—\nReply to this email directly, view it on GitHub: https://github.com/example-org/demo-shop/issues/17#issuecomment-2041\nYou are receiving this because you are subscribed to this thread.",
+      "mailbox": {"in_inbox": true},
+      "categories": ["updates"],
+      "read": false, "starred": false
+    }}
+  ]
+}

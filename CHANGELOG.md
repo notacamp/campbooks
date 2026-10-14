@@ -67,7 +67,23 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
-
+- **Home no longer asks about mail the rules already settled.** A model
+  suggestion is put to you as a question ("Did GitHub ask you to do
+  something?") only when no answer Campbooks acts on already said no; a
+  plain notification stays off Home. Questions raised that way before this
+  fix are withdrawn the next time their conversation is refreshed.
+- **Security alerts about your code are a to-do.** A security alert or
+  vulnerability notice (in all four languages) from a code host or package
+  registry (GitHub, GitLab, Bitbucket, npm, PyPI, RubyGems, crates.io, Snyk)
+  now shows on Home as Do and sorts to Updates, but only when your mail
+  provider authenticated the sender (DMARC, or DKIM for the sender's own
+  domain), the sender's name matches its domain, and nothing in it looks
+  like phishing or marketing. Other services' alerts are at most a question,
+  and other notifications from the same service ask nothing. Gmail mailboxes
+  now keep Gmail's own `Authentication-Results` with each message for this
+  (Zoho mailboxes keep none until Zoho's header has been checked, so no
+  alert is a to-do there yet). Mail in spam or the trash never shows on
+  Home.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by
