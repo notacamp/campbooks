@@ -631,6 +631,39 @@ async fn a_workspace_registers_rotates_and_removes_its_own_clients(db: PgPool) {
     assert_eq!(claims["workspace_id"], HOME.to_string());
     assert_eq!(claims["aud"], RESOURCE);
     assert_eq!(claims["scope"], "conversations:read");
+
+    // A stored scope above what a third party may hold (written before the
+    // ceiling existed, or by hand) is dropped when a token is issued.
+    let mut tx = crate::domain::clients::begin_as_server(&kit.state.db)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"));
+    sqlx::query(
+        "UPDATE identity.clients
+            SET allowed_scopes = ARRAY['conversations:read', 'identity:write', 'admin:access']
+          WHERE client_id = $1",
+    )
+    .bind(&client)
+    .execute(&mut *tx)
+    .await
+    .unwrap_or_else(|e| panic!("{e}"));
+    tx.commit().await.unwrap_or_else(|e| panic!("{e}"));
+    let widened = credentials(secret.clone()).await;
+    assert_eq!(widened.status, StatusCode::OK, "{widened:?}");
+    let (_, widened) = Kit::decode(widened.json["access_token"].as_str().unwrap_or_default());
+    assert_eq!(widened["scope"], "conversations:read", "the ceiling holds");
+    let asked = kit
+        .post_form(
+            "/oauth2/token",
+            &[
+                ("grant_type", "client_credentials"),
+                ("client_id", &client),
+                ("client_secret", &secret),
+                ("scope", "identity:write"),
+            ],
+        )
+        .await;
+    assert_eq!(asked.json["error"], "invalid_scope", "{asked:?}");
+
     // The API sees a client bound to Home.
     let principal = kit
         .state
