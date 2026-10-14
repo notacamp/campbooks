@@ -292,6 +292,9 @@ impl FetchError {
 async fn build_client() -> Result<reqwest::Client, FetchError> {
     Ok(reqwest::Client::builder()
         .timeout(HTTP_TIMEOUT)
+        // The keys come from the configured URL or not at all: a redirect
+        // could hand token validation to another host.
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent(concat!("campbooks-server/", env!("CARGO_PKG_VERSION")))
         .build()?)
 }
@@ -400,6 +403,37 @@ mod tests {
     use axum::http::HeaderValue;
 
     use super::*;
+
+    #[tokio::test]
+    async fn the_key_client_never_follows_a_redirect() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicU32, Ordering},
+        };
+        async fn serve(router: axum::Router) -> String {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            tokio::spawn(async move { axum::serve(listener, router).await });
+            format!("http://{addr}")
+        }
+        let hits = Arc::new(AtomicU32::new(0));
+        let counted = hits.clone();
+        let elsewhere = serve(axum::Router::new().fallback(move || {
+            counted.fetch_add(1, Ordering::SeqCst);
+            async { "{\"keys\": []}" }
+        }))
+        .await;
+        let target = format!("{elsewhere}/jwks");
+        let idp = serve(axum::Router::new().fallback(move || {
+            let target = target.clone();
+            async move { axum::response::Redirect::temporary(&target) }
+        }))
+        .await;
+        let http = build_client().await.unwrap();
+        let response = http.get(format!("{idp}/jwks")).send().await.unwrap();
+        assert_eq!(response.status(), 307);
+        assert_eq!(hits.load(Ordering::SeqCst), 0);
+    }
 
     fn ttl(values: &[&'static str]) -> Duration {
         let mut headers = HeaderMap::new();

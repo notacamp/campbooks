@@ -12,6 +12,7 @@ use std::{path::PathBuf, sync::Arc};
 
 use campbooks_kernel::{
     Config,
+    auth::ScopeInfo,
     clock::{Clock, SystemClock},
     config::Environment,
     crypto::{Cipher, SecretKey, derive_secret},
@@ -22,6 +23,7 @@ use serde::Deserialize;
 
 use crate::{
     domain::{clients::Clients, keys::Keys},
+    metadata::{Failures, FetcherPort, Guarded},
     upstream::{
         Provider,
         client::{Endpoints, Upstream, ZOHO_DEFAULT_ACCOUNTS_SERVER},
@@ -37,6 +39,9 @@ pub const SEALING_PURPOSE: &[u8] = b"campbooks identity sealing v1";
 /// The HKDF label the web client's secret is derived from. The web BFF
 /// derives the same value; never change it.
 pub const WEB_CLIENT_SECRET_PURPOSE: &[u8] = b"campbooks identity client campbooks-web v1";
+
+/// The path of the API's resource identifier under the public origin.
+pub const API_RESOURCE_PATH: &str = "/api";
 
 /// The module's dependencies. `Default` is inert: no issuer in this process
 /// (what the OpenAPI and events catalogues are built from).
@@ -70,10 +75,16 @@ pub struct Issuer {
     /// The providers configured (`CAMPBOOKS_GOOGLE__*`,
     /// `CAMPBOOKS_MICROSOFT__*`, `CAMPBOOKS_ZOHO__*`), in display order.
     pub upstreams: Vec<Upstream>,
-    /// The audience of access tokens (`CAMPBOOKS_AUTH__AUDIENCE`).
-    pub audience: String,
-    /// The API's scope catalogue: what first-party clients may ask for.
-    pub api_scopes: Vec<String>,
+    /// The API's resource identifier (RFC 8707, RFC 9728):
+    /// `<public origin>/api`, the `aud` of every access token.
+    pub resource: String,
+    /// The API's scope catalogue: what first-party clients may ask for
+    /// (third parties: all but `identity:*`).
+    pub api_scopes: Vec<ScopeInfo>,
+    /// Fetches Client ID Metadata Documents (through the SSRF guard).
+    pub fetcher: FetcherPort,
+    /// Metadata documents that recently failed, not asked for again yet.
+    pub document_failures: Failures,
     /// The time.
     pub clock: Arc<dyn Clock>,
 }
@@ -126,7 +137,7 @@ pub enum ClientSecret {
 impl Deps {
     /// Read the settings from the environment. `api_scopes` is the scope
     /// catalogue. A broken setting is an error naming it.
-    pub fn from_env(config: &Config, api_scopes: &[&str]) -> Result<Self, String> {
+    pub fn from_env(config: &Config, api_scopes: &[ScopeInfo]) -> Result<Self, String> {
         Self::from_figment(
             &campbooks_kernel::config::env_source(),
             config,
@@ -141,7 +152,7 @@ impl Deps {
         figment: &Figment,
         config: &Config,
         secret: Option<SecretKey>,
-        api_scopes: &[&str],
+        api_scopes: &[ScopeInfo],
         clock: Arc<dyn Clock>,
     ) -> Result<Self, String> {
         let (url, secure) = public_origin(&config.public_url)?;
@@ -176,9 +187,21 @@ impl Deps {
             };
             upstreams.extend(upstream_client(provider, settings, config, &url)?);
         }
+        let oauth: OAuthConfig = if figment.contains("oauth") {
+            figment
+                .extract_inner("oauth")
+                .map_err(|e| format!("CAMPBOOKS_OAUTH__*: {e}"))?
+        } else {
+            OAuthConfig::default()
+        };
         let cipher = Cipher::new(&secret, SEALING_PURPOSE);
+        let resource = format!("{url}{API_RESOURCE_PATH}");
         let issuer = Issuer {
-            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE)),
+            clients: Clients::first_party(&url, derive_secret(&secret, WEB_CLIENT_SECRET_PURPOSE))
+                .with_self_registration(
+                    oauth.dynamic_registration.0,
+                    oauth.client_metadata_documents.0,
+                ),
             url,
             cookies: Cookies::new(secure),
             keys: Arc::new(Keys::new(
@@ -187,13 +210,60 @@ impl Deps {
             )),
             cipher,
             upstreams,
-            audience: config.auth.audience.trim().to_owned(),
-            api_scopes: api_scopes.iter().map(|s| (*s).to_owned()).collect(),
+            resource,
+            api_scopes: api_scopes.to_vec(),
+            fetcher: Arc::new(Guarded),
+            document_failures: Failures::default(),
             clock,
         };
         Ok(Self {
             issuer: Some(Arc::new(issuer)),
         })
+    }
+}
+
+/// `CAMPBOOKS_OAUTH__*`: whether apps may register themselves. Both off by
+/// default; an instance that wants MCP agents to connect without a person
+/// setting them up turns them on.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct OAuthConfig {
+    /// `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`: `/oauth2/register`
+    /// (RFC 7591).
+    dynamic_registration: Switch,
+    /// `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS`: an `https` URL as a
+    /// client id, its metadata fetched from there.
+    client_metadata_documents: Switch,
+}
+
+/// `on` or `off` (also `true`/`false`, `1`/`0`, `yes`/`no`).
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct Switch(bool);
+
+impl<'de> Deserialize<'de> for Switch {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Raw {
+            Bool(bool),
+            Number(i64),
+            Text(String),
+        }
+        match Raw::deserialize(deserializer)? {
+            Raw::Bool(on) => Ok(Self(on)),
+            Raw::Number(1) => Ok(Self(true)),
+            Raw::Number(0) => Ok(Self(false)),
+            Raw::Text(text) => match text.trim().to_ascii_lowercase().as_str() {
+                "on" | "true" | "1" | "yes" => Ok(Self(true)),
+                "off" | "false" | "0" | "no" | "" => Ok(Self(false)),
+                other => Err(serde::de::Error::custom(format!(
+                    "`{other}` is not on or off"
+                ))),
+            },
+            Raw::Number(other) => Err(serde::de::Error::custom(format!(
+                "`{other}` is not on or off"
+            ))),
+        }
     }
 }
 
@@ -301,7 +371,10 @@ mod tests {
             &Figment::from(Serialized::defaults(settings.clone())),
             config,
             secret,
-            &["system:read"],
+            &[ScopeInfo {
+                name: "system:read",
+                description: "See the instance's health.",
+            }],
             Arc::new(SystemClock),
         )
     }
@@ -531,6 +604,40 @@ mod tests {
                 .issuer
                 .is_none()
         );
+    }
+
+    #[test]
+    fn self_registration_is_off_unless_turned_on() {
+        let config = config("https://app.example.com", None);
+        let off = deps(&config, KEY, &serde_json::json!({})).unwrap();
+        let issuer = off.issuer.unwrap();
+        assert!(!issuer.clients.dynamic_registration());
+        assert!(!issuer.clients.metadata_documents());
+        let on = Deps::from_figment(
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "on", "client_metadata_documents": "ON" }
+            }))),
+            &config,
+            KEY,
+            &[],
+            Arc::new(SystemClock),
+        )
+        .unwrap()
+        .issuer
+        .unwrap();
+        assert!(on.clients.dynamic_registration());
+        assert!(on.clients.metadata_documents());
+        let bad = Deps::from_figment(
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "maybe" }
+            }))),
+            &config,
+            KEY,
+            &[],
+            Arc::new(SystemClock),
+        )
+        .unwrap_err();
+        assert!(bad.contains("CAMPBOOKS_OAUTH__"), "{bad}");
     }
 
     #[test]

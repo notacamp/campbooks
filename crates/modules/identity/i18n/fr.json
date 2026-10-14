@@ -19,6 +19,17 @@
     "display_name_required": "Dites-nous comment vous appeler.",
     "passkey_name_required": "Donnez à la clé d’accès un nom de 1 à 64 caractères.",
     "account_is_admin": "Ce compte est celui d’un administrateur. Révoquez d’abord son profil d’administrateur en ligne de commande sur le serveur (campbooks-server admin revoke), puis suspendez-le.",
-    "account_suspended": "Un administrateur de ce Campbooks a suspendu ce compte. Demandez-lui de lever la suspension."
+    "account_suspended": "Un administrateur de ce Campbooks a suspendu ce compte. Demandez-lui de lever la suspension.",
+    "invalid_target": "Cette application a demandé l’accès à quelque chose que Campbooks ne fournit pas.",
+    "consent_request_not_found": "Cette demande d’autorisation d’une application a expiré ou a déjà reçu une réponse. Recommencez depuis l’application.",
+    "consent_needs_workspace": "Choisissez l’espace de travail que cette application peut utiliser.",
+    "consent_wrong_workspace": "Cette application appartient à un autre espace de travail et ne peut être autorisée que là-bas.",
+    "not_workspace_admin": "Seuls les propriétaires et les administrateurs de l’espace de travail peuvent gérer ses applications.",
+    "client_not_found": "Cette application n’existe pas dans cet espace de travail.",
+    "invalid_client_metadata": "Les informations de l’application ne sont pas acceptables : {{reason}}",
+    "client_needs_redirect": "Une application de connexion a besoin d’au moins une adresse de retour https ou de bouclage local.",
+    "client_scope_not_allowed": "Impossible de donner l’autorisation {{scope}} à des applications.",
+    "client_is_public": "Cette application connecte des personnes et n’a pas de secret à renouveler.",
+    "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom."
   }
 }

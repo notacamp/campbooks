@@ -14,6 +14,10 @@
     "no_recipients": "Añade al menos un destinatario.",
     "invalid_address": "Esta dirección no es válida: {{address}}",
     "attachments_too_large": "Los archivos adjuntos pueden sumar como máximo {{max}} MB.",
-    "too_late": "Ya es tarde para deshacer: el mensaje ya ha salido."
+    "too_late": "Ya es tarde para deshacer: el mensaje ya ha salido.",
+    "invalid_ids": "Pide entre 1 y {{max}} identificadores de conversación, separados por comas.",
+    "no_open_need": "Aquí ya no hay nada que te necesite.",
+    "nothing_to_reopen": "Aquí no hay nada que recuperar.",
+    "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo."
   }
 }

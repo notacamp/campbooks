@@ -44,6 +44,74 @@
         }
       }
     },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The same document at the root, for clients that look there.",
+        "operationId": "identity.protected_resource_metadata_root",
+        "responses": {
+          "200": {
+            "description": "The API's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource/api": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The API's protected-resource metadata (RFC 9728), at the path RFC 9728\n§3.1 derives from its resource identifier, `<origin>/api`.",
+        "operationId": "identity.protected_resource_metadata",
+        "responses": {
+          "200": {
+            "description": "The API's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/.well-known/openid-configuration": {
       "get": {
         "tags": [
@@ -74,6 +142,145 @@
           "automation": false,
           "mutates": false,
           "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/consents": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the apps you let in.",
+        "operationId": "identity.list_consents",
+        "responses": {
+          "200": {
+            "description": "The caller's connected apps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedApps"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.consent"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/consents/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Revoke an app's access.",
+        "operationId": "identity.revoke_consent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The consent.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked; the app's tokens stop working."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's consent, or already revoked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.consent"
+          ],
           "risk": "low"
         }
       }
@@ -1203,6 +1410,313 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/attention": {
+      "get": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "List what needs you.",
+        "operationId": "attention.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "`open` (default) or `cleared`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Open items, or what left the list today.",
+              "enum": [
+                "open",
+                "cleared"
+              ]
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0,\nUTC): where their day starts, for Done today and for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a state, or an offset beyond 14 hours (`invalid_offset`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Put an item off until later, for yourself.",
+        "operationId": "attention.snooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Snooze"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A time in the past or more than a year away (`invalid_until`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low",
+          "undo": "attention.unsnooze"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Bring an item you put off back now.",
+        "operationId": "attention.unsnooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/changes": {
       "get": {
         "tags": [
@@ -1821,6 +2335,15 @@
               "type": "integer",
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "These conversations only (1 to 100 ids, comma-separated), whatever\ntheir stream or whether archived; those you cannot see are left\nout. Other filters and the cursor are ignored.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2486,6 +3009,342 @@
             "conversations.message"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Answer yes to a question Campbooks put (a Review need it was unsure of).",
+        "operationId": "conversations.confirm_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Confirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No message id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No question to answer (`no_open_need`), or not the one you saw (`need_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take back Done, Not needed or a confirmation: the need is as it was.",
+        "operationId": "conversations.reopen_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to bring back (`nothing_to_reopen`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Mark what a conversation needs as done, or as not needed.",
+        "operationId": "conversations.resolve_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an outcome.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
         }
       }
     },
@@ -3723,6 +4582,357 @@
           ],
           "risk": "high",
           "undo": "conversations.cancel_send"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/identity/clients": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the workspace's own apps.",
+        "operationId": "identity.list_clients",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace's apps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceClients"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a member of the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Register an app of the workspace's own.",
+        "operationId": "identity.register_client",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterClient"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registered; a confidential app's secret is shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredClient"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, the caller is not an owner or admin (`not_workspace_admin`), or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a member of the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Remove one of the workspace's apps.",
+        "operationId": "identity.remove_client",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "description": "The app.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed; its tokens stop working."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such app in the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}/secret": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Rotate an app's secret.",
+        "operationId": "identity.rotate_client_secret",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "description": "The app.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret, shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredClient"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, the caller is not an owner or admin, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such app in the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A sign-in app has no secret (`client_is_public`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
         }
       }
     },
@@ -5131,6 +6341,148 @@
             "identity.upstream_flow",
             "identity.session",
             "identity.pending_sign_up"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/consent/{id}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "What the consent screen shows for the waiting request `id`.",
+        "operationId": "identity.get_consent_request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The `request` the consent screen was given.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentRequest"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request waiting for this browser's person, or another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.authorize_request"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Answer the waiting request `id`.",
+        "operationId": "identity.answer_consent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The `request` the consent screen was given.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answered"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`consent_needs_workspace`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, `step_up_required` (sign in again: the sign-in is older than ten minutes), or `consent_wrong_workspace`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request waiting for this browser's person, or a workspace the person does not belong to."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.consent",
+            "identity.authorization_code"
           ],
           "risk": "low"
         }
@@ -6839,7 +8191,7 @@
           {
             "name": "client_id",
             "in": "query",
-            "description": "The client.",
+            "description": "The client: a registered id, or the `https` URL of its metadata\ndocument.",
             "required": false,
             "schema": {
               "type": "string"
@@ -6917,11 +8269,20 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "description": "The resource the token is for (RFC 8707): the API's resource URI.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen.",
+            "description": "To the client's redirect URI with `code` (signed in, and no consent to ask) or `error`; to the sign-in screen; or to the consent screen.",
             "headers": {
               "location": {
                 "schema": {
@@ -6942,6 +8303,16 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`: too many metadata-document clients looked up from this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7139,6 +8510,65 @@
         }
       }
     },
+    "/oauth2/register": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Register a public client.",
+        "operationId": "identity.register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registered"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_redirect_uri` or `invalid_client_metadata`."
+          },
+          "404": {
+            "description": "Dynamic registration is off on this instance (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/oauth2/revoke": {
       "post": {
         "tags": [
@@ -7186,7 +8616,7 @@
         "tags": [
           "identity"
         ],
-        "summary": "Exchange an authorization code or a refresh token for tokens.",
+        "summary": "Exchange an authorization code, a refresh token or a workspace client's\ncredentials for tokens.",
         "operationId": "identity.token",
         "requestBody": {
           "content": {
@@ -7210,13 +8640,23 @@
             }
           },
           "400": {
-            "description": "`invalid_request`, `invalid_grant` or `unsupported_grant_type`."
+            "description": "`invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_target`, `unauthorized_client` or `unsupported_grant_type`."
           },
           "401": {
             "description": "`invalid_client`."
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -7310,6 +8750,30 @@
           }
         }
       },
+      "Answer": {
+        "type": "object",
+        "description": "The person's answer.",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/Decision",
+            "description": "Allow or deny."
+          },
+          "workspace_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId",
+                "description": "The workspace the app may use (required to allow an app that binds\none)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "AnswerView": {
         "oneOf": [
           {
@@ -7327,6 +8791,19 @@
           }
         ],
         "description": "An answer's value: a label (choice), a level (score) or yes/no."
+      },
+      "Answered": {
+        "type": "object",
+        "description": "Where to go next.",
+        "required": [
+          "redirect"
+        ],
+        "properties": {
+          "redirect": {
+            "type": "string",
+            "description": "Navigate here: the app's redirect URI, with a code or\n`error=access_denied`."
+          }
+        }
       },
       "AppliedFilter": {
         "type": "object",
@@ -7423,6 +8900,30 @@
             "format": "int64",
             "description": "Its size in bytes.",
             "minimum": 0
+          }
+        }
+      },
+      "AttentionList": {
+        "type": "object",
+        "description": "The caller's items.",
+        "required": [
+          "items",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonCount"
+            },
+            "description": "Open items per reason, every reason listed (open lists only; empty\nfor cleared)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemView"
+            },
+            "description": "Open: by reason (review, reply, decide, do, pay), then overdue, by\ndue date, urgent first, oldest first. Cleared: newest first."
           }
         }
       },
@@ -7545,6 +9046,112 @@
           "email"
         ]
       },
+      "ClientType": {
+        "type": "string",
+        "description": "How a workspace client signs in.",
+        "enum": [
+          "confidential",
+          "public"
+        ]
+      },
+      "Confirm": {
+        "type": "object",
+        "description": "Yes to a question.",
+        "required": [
+          "message_id"
+        ],
+        "properties": {
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message the question the member saw comes from."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConnectedApp": {
+        "type": "object",
+        "description": "An app the caller let in.",
+        "required": [
+          "id",
+          "client_id",
+          "verified",
+          "scopes",
+          "granted_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The app's client id."
+          },
+          "client_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+          },
+          "client_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its name; `null` when the app is gone (its tokens no longer work)."
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was allowed."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The consent (what `identity.revoke_consent` takes)."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last got a token."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What it may do."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether it is Campbooks' own app (a workspace's app says so by its\nkind; every other name is its registrant's word)."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The workspace it may use; `null` for Campbooks' own apps (all)."
+          }
+        }
+      },
+      "ConnectedApps": {
+        "type": "object",
+        "description": "The apps the caller let in.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectedApp"
+            },
+            "description": "Newest first."
+          }
+        }
+      },
       "ConnectionId": {
         "type": "string",
         "format": "uuid",
@@ -7643,6 +9250,161 @@
               "$ref": "#/components/schemas/StreamView"
             },
             "description": "Its change streams."
+          }
+        }
+      },
+      "ConsentClient": {
+        "type": "object",
+        "description": "The app asking.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "verified",
+          "device"
+        ],
+        "properties": {
+          "device": {
+            "type": "boolean",
+            "description": "The redirect goes to an app on this device (loopback or a\nprivate-use scheme): it is asked every time, and warned about."
+          },
+          "document_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a metadata-document client, the host serving its document."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its client id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+          },
+          "logo_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its logo (a workspace's own app only)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name, as it registered it (only trustworthy when `verified`)."
+          },
+          "redirect_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the browser goes next: the redirect URI's host (`None` for a\nprivate-use scheme)."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether it is Campbooks' own app. Every other app's name is its\nregistrant's word."
+          },
+          "workspace_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a workspace's own app, the workspace that registered it (its\nname, when the person belongs to it): what the screen says instead of\n\"verified\"."
+          }
+        }
+      },
+      "ConsentRequest": {
+        "type": "object",
+        "description": "What the consent screen shows.",
+        "required": [
+          "client",
+          "scopes",
+          "binds_workspace",
+          "workspaces",
+          "remembered"
+        ],
+        "properties": {
+          "account_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their address."
+          },
+          "account_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The signed-in person's name."
+          },
+          "binds_workspace": {
+            "type": "boolean",
+            "description": "Whether the person picks one workspace for it; `false` for\nCampbooks' own apps, which work in all of them."
+          },
+          "client": {
+            "$ref": "#/components/schemas/ConsentClient",
+            "description": "The app."
+          },
+          "remembered": {
+            "type": "boolean",
+            "description": "Whether \"Allow\" will be remembered (an exact `https` redirect)."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentScope"
+            },
+            "description": "What it asks to do."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentWorkspace"
+            },
+            "description": "The workspaces it may be allowed in (a workspace's own app: its\nworkspace only)."
+          }
+        }
+      },
+      "ConsentScope": {
+        "type": "object",
+        "description": "One thing the app may do.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What it allows, in English (the screen translates by name)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The scope's name (`conversations:read`, `openid`…)."
+          }
+        }
+      },
+      "ConsentWorkspace": {
+        "type": "object",
+        "description": "A workspace the person may let the app use.",
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The person's role there."
           }
         }
       },
@@ -7761,6 +9523,17 @@
             "format": "int32",
             "description": "Messages in it.",
             "minimum": 0
+          },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NeedView",
+                "description": "What it needs from its inbox's members, while it needs something."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "snippet": {
             "type": "string",
@@ -7974,6 +9747,14 @@
           }
         }
       },
+      "Decision": {
+        "type": "string",
+        "description": "Allow or deny.",
+        "enum": [
+          "allow",
+          "deny"
+        ]
+      },
       "DecisionSource": {
         "type": "string",
         "description": "What kind of strategy gave an answer.",
@@ -8023,6 +9804,15 @@
           "source": {
             "$ref": "#/components/schemas/DecisionSource",
             "description": "Who answered."
+          },
+          "threshold": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The confidence, 0 to 100, from which an answer of this source to\nthis question may act; `None` when it never acts (a suggestion).",
+            "minimum": 0
           },
           "value": {
             "$ref": "#/components/schemas/AnswerView",
@@ -8716,6 +10506,120 @@
         },
         "additionalProperties": false
       },
+      "ItemId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ItemId (UUIDv7)"
+      },
+      "ItemState": {
+        "type": "string",
+        "description": "Whether an item still needs someone.",
+        "enum": [
+          "open",
+          "cleared"
+        ]
+      },
+      "ItemView": {
+        "type": "object",
+        "description": "An attention item, as the caller sees it. References and facts only: the\nowning module renders who and what.",
+        "required": [
+          "id",
+          "record",
+          "container",
+          "cause",
+          "reason",
+          "trust",
+          "overdue",
+          "urgent",
+          "since",
+          "state"
+        ],
+        "properties": {
+          "cause": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record that raised it."
+          },
+          "cleared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was cleared."
+          },
+          "cleared_because": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was cleared (`replied`, `archived`, `trashed`, `done`,\n`not_needed`), as the producing module said."
+          },
+          "cleared_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who cleared it, when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Who may see it: its container."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ItemId",
+            "description": "The item."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "Why."
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record it is about."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its cause arrived."
+          },
+          "snoozed_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when the caller put it off (\"Later\"), when they did."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ItemState",
+            "description": "Open or cleared."
+          },
+          "trust": {
+            "$ref": "#/components/schemas/Trust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
       "Kind": {
         "type": "string",
         "description": "What a workspace is for.",
@@ -8991,6 +10895,112 @@
         },
         "additionalProperties": false
       },
+      "NeedBasis": {
+        "type": "string",
+        "description": "Whose answer raised a need.",
+        "enum": [
+          "rules",
+          "model",
+          "member"
+        ]
+      },
+      "NeedQuestion": {
+        "type": "string",
+        "description": "The question whose answer raised a need.",
+        "enum": [
+          "needs_reply",
+          "asks_action",
+          "suspicious"
+        ]
+      },
+      "NeedReason": {
+        "type": "string",
+        "description": "Why a conversation needs its inbox's members (attention).",
+        "enum": [
+          "reply",
+          "do",
+          "pay",
+          "review"
+        ]
+      },
+      "NeedTrust": {
+        "type": "string",
+        "description": "How much Campbooks stands behind a need.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
+      "NeedView": {
+        "type": "object",
+        "description": "A conversation's open need, as lists and the reader show it.",
+        "required": [
+          "reason",
+          "trust",
+          "basis",
+          "question",
+          "overdue",
+          "urgent",
+          "message_id"
+        ],
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/NeedBasis",
+            "description": "Whose answer raised it."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message it comes from."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "question": {
+            "$ref": "#/components/schemas/NeedQuestion",
+            "description": "The question that raised it."
+          },
+          "quote": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Quote",
+                "description": "What the sender wrote, when the rules quoted it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why."
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule that decided it (`signals.reply_asked`, …), for the sentence\nthe client words it with.",
+            "example": "signals.reply_asked"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/NeedTrust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
       "NewAccount": {
         "type": "object",
         "description": "The pending new account, as the new-account screen shows it.",
@@ -9103,6 +11113,14 @@
             "description": "Recipients, instead of the filled ones."
           }
         }
+      },
+      "Outcome": {
+        "type": "string",
+        "description": "How a member resolves a need.",
+        "enum": [
+          "done",
+          "not_needed"
+        ]
       },
       "ParsedQuery": {
         "type": "object",
@@ -9264,6 +11282,61 @@
           }
         }
       },
+      "Quote": {
+        "type": "object",
+        "description": "The sender's sentence a need quotes, with who wrote it and when.\nUntrusted mail content: clients show it as quoted plain text only.",
+        "required": [
+          "text",
+          "from",
+          "sent_at"
+        ],
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Address",
+            "description": "Who wrote it."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence, at most 240 characters."
+          }
+        }
+      },
+      "Reason": {
+        "type": "string",
+        "description": "Why an item needs someone, in the order Home shows the groups.",
+        "enum": [
+          "review",
+          "reply",
+          "decide",
+          "do",
+          "pay"
+        ]
+      },
+      "ReasonCount": {
+        "type": "object",
+        "description": "How many open items there are for one reason.",
+        "required": [
+          "reason",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Open items with it.",
+            "minimum": 0
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "The reason."
+          }
+        }
+      },
       "ReasonView": {
         "type": "object",
         "description": "One reason behind an answer: a stable rule id the client translates,\nand what it matched.",
@@ -9280,6 +11353,13 @@
             "type": "string",
             "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
             "example": "signals.list_header"
+          },
+          "sentence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's sentence holding the evidence, when it came from the\ntext. Untrusted: show it as quoted plain text only."
           }
         }
       },
@@ -9303,6 +11383,39 @@
           }
         }
       },
+      "RegisterClient": {
+        "type": "object",
+        "description": "What to register.",
+        "required": [
+          "name",
+          "type",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name, 1 to 100 characters."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A public app's redirect URIs: 1 to 10, `https` or loopback `http`."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The API scopes it may ask for (never `identity:*`)."
+          },
+          "type": {
+            "$ref": "#/components/schemas/ClientType",
+            "description": "Confidential (server to server, with a secret) or public (a sign-in\napp)."
+          }
+        }
+      },
       "RegisterPasskey": {
         "type": "object",
         "description": "The new passkey.",
@@ -9320,6 +11433,138 @@
               "null"
             ],
             "description": "What to call it (default `Passkey`)."
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "description": "What a client sends (RFC 7591 §2; the fields read).",
+        "properties": {
+          "client_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A name to show on the consent screen (with \"unverified\")."
+          },
+          "grant_types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "`authorization_code` and optionally `refresh_token`."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where codes may go: `https`, or loopback `http` (any port)."
+          },
+          "response_types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "`code`."
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Space-separated scopes it may ask for; missing means every scope a\nthird party may hold."
+          },
+          "token_endpoint_auth_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Must be `none` (or missing)."
+          }
+        }
+      },
+      "Registered": {
+        "type": "object",
+        "description": "The registered client (RFC 7591 §3.2.1).",
+        "required": [
+          "client_id",
+          "client_id_issued_at",
+          "client_name",
+          "redirect_uris",
+          "grant_types",
+          "response_types",
+          "token_endpoint_auth_method",
+          "scope"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The new client id."
+          },
+          "client_id_issued_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it was issued (seconds since the epoch)."
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The name it will be shown with."
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its grant types."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its redirect URIs."
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`[\"code\"]`."
+          },
+          "scope": {
+            "type": "string",
+            "description": "The scopes it may ask for."
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "description": "`none`."
+          }
+        }
+      },
+      "RegisteredClient": {
+        "type": "object",
+        "description": "The new app, with its secret for the only time.",
+        "required": [
+          "client"
+        ],
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/WorkspaceClient",
+            "description": "The app."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A confidential app's secret: shown now, never again."
           }
         }
       },
@@ -9445,6 +11690,25 @@
             "description": "`required`."
           }
         }
+      },
+      "Resolve": {
+        "type": "object",
+        "description": "A member's verdict on a need.",
+        "required": [
+          "outcome",
+          "message_id"
+        ],
+        "properties": {
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message the need the member saw comes from (`NeedView.message_id`):\nwhen the open need comes from another one, nothing is recorded (409\n`need_changed`)."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "Done or Not needed."
+          }
+        },
+        "additionalProperties": false
       },
       "RevokeForm": {
         "type": "object",
@@ -9734,6 +11998,21 @@
             "description": "Navigate here: the client's redirect URI with a code, or `return_to`."
           }
         }
+      },
+      "Snooze": {
+        "type": "object",
+        "description": "Until when.",
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Later than now and less than a year away."
+          }
+        },
+        "additionalProperties": false
       },
       "StartConnection": {
         "type": "object",
@@ -10067,7 +12346,7 @@
               "string",
               "null"
             ],
-            "description": "`authorization_code` or `refresh_token`."
+            "description": "`authorization_code`, `refresh_token` or `client_credentials`."
           },
           "redirect_uri": {
             "type": [
@@ -10082,6 +12361,20 @@
               "null"
             ],
             "description": "The refresh token."
+          },
+          "resource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The resource the token is for (RFC 8707): the API's resource URI."
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Space-separated scopes (`client_credentials`: at most what the\nclient was given; missing means all of them)."
           }
         }
       },
@@ -10127,6 +12420,14 @@
             "description": "Always `Bearer`."
           }
         }
+      },
+      "Trust": {
+        "type": "string",
+        "description": "How much the producing module stands behind an item.",
+        "enum": [
+          "sure",
+          "check"
+        ]
       },
       "UpdateWorkspace": {
         "type": "object",
@@ -10277,6 +12578,83 @@
           }
         }
       },
+      "WorkspaceClient": {
+        "type": "object",
+        "description": "A workspace client, as settings show it. Never its secret.",
+        "required": [
+          "client_id",
+          "name",
+          "type",
+          "scopes",
+          "redirect_uris",
+          "created_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Its client id."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was registered."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last got a token."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A public client's redirect URIs."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The scopes it may ask for."
+          },
+          "secret_rotated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When its secret last changed."
+          },
+          "type": {
+            "$ref": "#/components/schemas/ClientType",
+            "description": "Confidential or public."
+          }
+        }
+      },
+      "WorkspaceClients": {
+        "type": "object",
+        "description": "The workspace's apps.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceClient"
+            },
+            "description": "Oldest first."
+          }
+        }
+      },
       "WorkspaceDeletion": {
         "type": "object",
         "description": "A deleted workspace.",
@@ -10369,7 +12747,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -10399,6 +12777,10 @@
     {
       "name": "identity",
       "description": "Accounts and their ways in, and this instance's OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, sign-in with a provider, and the mailboxes a sign-up granted, waiting for a workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve browsers and OAuth clients; they answer 404 while another identity provider serves the instance."
+    },
+    {
+      "name": "attention",
+      "description": "What needs you: one queue per member of what the records you may open ask of you (conversations today), with Later per member."
     },
     {
       "name": "search",

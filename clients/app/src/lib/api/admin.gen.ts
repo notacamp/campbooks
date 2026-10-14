@@ -420,6 +420,11 @@ export interface components {
             workspaces: components["schemas"]["AdminWorkspace"][];
         };
         /**
+         * @description Where an AI role's endpoint is, as far as mail content is concerned.
+         * @enum {string}
+         */
+        AiLocation: "instance" | "external";
+        /**
          * @description The protocol a provider speaks.
          * @enum {string}
          */
@@ -437,10 +442,18 @@ export interface components {
             /** @description Whether a provider is configured for it. */
             configured: boolean;
             /**
+             * @description Whether it may receive mail content: on the instance's network, or
+             *     opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When
+             *     `false`, nothing calls it with content (the decide pass leaves
+             *     sorting to rules); only the reachability probe runs.
+             */
+            content_allowed?: boolean | null;
+            /**
              * @description The provider's scheme, host and port.
              * @example http://ollama:11434
              */
             endpoint?: string | null;
+            location?: components["schemas"]["AiLocation"] | null;
             /** @description The model it calls. */
             model?: string | null;
             protocol?: components["schemas"]["AiProtocol"] | null;

@@ -8,6 +8,7 @@ use campbooks_kernel::auth::{ScopeInfo, ScopeName};
 pub const ALL: &[ScopeInfo] = &[
     ScopeInfo::of::<IdentityRead>(),
     ScopeInfo::of::<IdentityWrite>(),
+    ScopeInfo::of::<IdentityClients>(),
 ];
 
 /// `identity:read` — see your account and what waits on it.
@@ -28,4 +29,14 @@ impl ScopeName for IdentityWrite {
     const NAME: &'static str = "identity:write";
     const DESCRIPTION: &'static str =
         "Change your account and connect or discard the mailboxes waiting on it.";
+}
+
+/// `identity:clients` — manage a workspace's own apps and their secrets.
+#[derive(Debug, Clone, Copy)]
+pub struct IdentityClients;
+
+impl ScopeName for IdentityClients {
+    const NAME: &'static str = "identity:clients";
+    const DESCRIPTION: &'static str =
+        "Register, rotate and remove a workspace's own apps and their secrets.";
 }

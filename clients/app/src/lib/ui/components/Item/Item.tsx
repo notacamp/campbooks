@@ -15,6 +15,8 @@ export interface ItemProps {
   who: string;
   /** What it needs, in one line. */
   what: string;
+  /** The sender's own words, on one line under it while closed (quoted, plain text). */
+  excerpt?: string | undefined;
   avatar: Pick<AvatarProps, "name" | "kind" | "initials">;
   /** When: "Thu", "Today", "Fri · €148.00". */
   due?: string | undefined;
@@ -45,6 +47,7 @@ export interface ItemProps {
 export function Item({
   who,
   what,
+  excerpt,
   avatar,
   due,
   soon = false,
@@ -73,6 +76,7 @@ export function Item({
         ) : null}
       </span>{" "}
       <span className={styles["what"]}>{what}</span>
+      {excerpt === undefined || expanded ? null : <q className={styles["excerpt"]}>{excerpt}</q>}
       {tags.length > 0 ? (
         <span className={styles["meta"]}>
           {tags.map((tag) => (
@@ -119,23 +123,45 @@ export function Item({
 
 export interface ItemDetailProps {
   /** "Sofia, Friday 17:42". */
-  quoteFrom: string;
-  /** The sender's own words. */
-  quote: string;
+  quoteFrom?: string | undefined;
+  /** The sender's own words: untrusted mail text, shown quoted and as plain text. */
+  quote?: string | undefined;
+  /** Why to be careful, before the quote (a warning's tells). */
+  reasons?: string[] | undefined;
   /** The assistant's context, next to the visor. */
   context?: string | undefined;
   /** Buttons: the item's own actions, then Later and Done. */
   actions: ReactNode;
+  /** "How Campbooks decided" ({@link HowDecided}). */
+  how?: ReactNode | undefined;
 }
 
 /** The expanded part of an {@link Item}. */
-export function ItemDetail({ quoteFrom, quote, context, actions }: ItemDetailProps) {
+export function ItemDetail({
+  quoteFrom,
+  quote,
+  reasons = [],
+  context,
+  actions,
+  how,
+}: ItemDetailProps) {
   return (
     <div className={styles["detail"]}>
-      <p className={styles["quote"]}>
-        <span className={styles["quoteFrom"]}>{quoteFrom}</span>
-        {quote}
-      </p>
+      {reasons.length === 0 ? null : (
+        <ul className={styles["reasons"]}>
+          {reasons.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
+      {quote === undefined ? null : (
+        <p className={styles["quote"]}>
+          {quoteFrom === undefined ? null : (
+            <span className={styles["quoteFrom"]}>{quoteFrom}</span>
+          )}
+          <q className={styles["quoteText"]}>{quote}</q>
+        </p>
+      )}
       {context === undefined ? null : (
         <p className={styles["context"]}>
           <Visor />
@@ -143,6 +169,7 @@ export function ItemDetail({ quoteFrom, quote, context, actions }: ItemDetailPro
         </p>
       )}
       <div className={styles["actions"]}>{actions}</div>
+      {how}
     </div>
   );
 }

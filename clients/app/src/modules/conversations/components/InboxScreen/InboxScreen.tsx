@@ -53,6 +53,8 @@ export interface InboxScreenProps {
   renderReplySlot?: RenderReplySlot | undefined;
   /** A list-header action from the send slice ("New message", C). */
   composeAction?: ReactNode | undefined;
+  /** Open the reply composer once the conversation is loaded (Home's R). */
+  startReply?: boolean | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -69,6 +71,7 @@ export function InboxScreen({
   conversationId,
   renderReplySlot,
   composeAction,
+  startReply = false,
   now,
 }: InboxScreenProps) {
   const { t: typed } = useTranslation("conversations");
@@ -291,6 +294,7 @@ export function InboxScreen({
             }}
             onDone={done}
             renderReplySlot={renderReplySlot}
+            startReply={startReply}
             now={now}
           />
         )}

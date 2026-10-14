@@ -14,6 +14,7 @@ use wiremock::{
 fn gateway(roles: impl IntoIterator<Item = (Role, ProviderConfig)>) -> Gateway {
     Gateway::new(AiConfig {
         roles: roles.into_iter().collect::<HashMap<_, _>>(),
+        ..AiConfig::default()
     })
     .unwrap()
 }

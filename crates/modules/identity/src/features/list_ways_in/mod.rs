@@ -3,7 +3,7 @@
 //! listed by `identity.list_passkeys`.
 
 use axum::{Extension, Json, extract::State};
-use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Scoped};
+use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Unbound};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -61,7 +61,7 @@ pub struct WaysIn {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityRead>,
+    Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<WaysIn>> {
     let (issuer, account) = super::account(&deps, &principal)?;
     let items = accounts::ways_in(&state.db, account)

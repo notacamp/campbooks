@@ -11,6 +11,12 @@
   font: var(--weight-medium) var(--text-xs) / var(--leading-none) var(--font-sans);
 }
 
+.tag[data-tone="danger"] {
+  background: var(--danger-soft);
+  box-shadow: none;
+  color: var(--danger);
+}
+
 .text {
   min-width: 0;
   overflow: hidden;

@@ -6,6 +6,36 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- **Mail no longer goes to an AI provider outside your network unless you say
+  so.** Each AI role's address is checked: a loopback or private address,
+  `localhost`, a single-label name such as a compose service (`laya`,
+  `ollama`) or a host you list in `CAMPBOOKS_AI__INTERNAL_HOSTS` counts as
+  your network; anything else gets no mail content until you set
+  `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow` for that role. Without it the
+  gateway refuses (`ai_external_content_refused`) and the decide pass leaves
+  sorting to the rules. Admin → System shows where each role is and whether it
+  receives mail. **Self-hosters using a hosted provider:** add the opt-in for
+  each such role, or it stops being used after this upgrade.
+- Campbooks no longer follows HTTP redirects from AI providers, Gmail, Zoho
+  or the identity provider's key endpoint: a redirect could have carried mail
+  or tokens to another host. A 3xx is reported as an error.
+- Errors no longer carry mail: an AI provider's error body is not kept, and
+  logs and failed jobs describe database and JSON errors by kind and position
+  (SQLSTATE, constraint, table), never the values they quote.
+- API responses (`/api/`, `/bff/`, `/admin/`) carry `Cache-Control: no-store`
+  and `Pragma: no-cache`, so browsers and proxies don't keep them.
+- `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
+  `[::1]` unless `--allow-remote` is passed.
+
+### Changed
+- The event log is no longer kept forever: events older than
+  `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
+  events still being delivered, and failed jobs older than
+  `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS` (default 30) go too. Deleting a
+  workspace now also deletes its events and finished jobs when it is purged.
+  The first prune after upgrading may take a while on a large instance.
+
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
@@ -30,6 +60,49 @@ All notable changes to Campbooks Next are documented here. The format follows
   profile is revoked with `campbooks-server admin revoke`. Access tokens a
   native app already holds stay valid until they expire (at most ten
   minutes).
+- What needs you. Home now lists what your mail asks of you, grouped Review,
+  Reply, Decide, Do and Pay, due soonest first: a question you owe an answer
+  to, a request, a bill, a phishing warning. Each says why in a sentence and
+  quotes the sender's own words; the numbers stay behind "How Campbooks
+  decided". J/K, Enter, R reply, E done, L later, X not needed (or "It's
+  safe"), Z undo, and "Done today" lists what left your list. The inbox shows
+  the same as chips on rows and in the reader's note, which no longer shows a
+  percentage. It runs on the rules alone (no AI role needed); replying from
+  any client, archiving a reply or a warning, and the trash clear an item;
+  bills and requests stay until Done. Only mail from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) counts. A new
+  module, `attention`, with the scopes `attention:read` and `attention:write`
+  (the web app gets them at the next sign-in). "Done today" and what is
+  overdue follow your device's time zone; deadline words ("Thursday") are
+  read against the message's date in UTC until accounts carry a time zone. Migrations add
+  `conversations.needs` and the `attention` schema; nothing to do.
+- Apps other than Campbooks on the web can use your account, with your say
+  each time. A consent screen names the app, says whether anyone vouches for
+  it, lists what it will be able to do in plain words, and asks which
+  workspace it may use; an app on your device (the desktop app, a local
+  agent) is asked for every time and comes with a warning. Allow starts
+  unfocused, has no shortcut and waits a second after the page shows, so no
+  stray key press answers it; a remembered answer lasts 90 days for the same
+  return address. Settings → Apps and integrations lists what you allowed,
+  with Revoke, which ends the app's tokens at once. Allowing needs a sign-in
+  from the last ten minutes.
+- The desktop and mobile apps' sign-in is on (`campbooks-native`), always
+  through the consent screen.
+- A workspace's own apps: owners and admins register server-to-server apps
+  (`client_credentials`, a secret shown once, rotate, remove) and sign-in
+  apps under Settings → Apps and integrations. Their tokens work in that
+  workspace only.
+- MCP agents can connect: dynamic client registration (`/oauth2/register`,
+  off unless `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on`,
+  rate-limited, public clients only, deleted after 30 days unused), client
+  metadata documents (off unless `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on`;
+  an `https` client id, fetched with SSRF protection and cached up to a day), protected-resource metadata
+  (`/.well-known/oauth-protected-resource/api`), `resource_metadata` in the
+  API's `WWW-Authenticate`, and resource indicators. Apps that aren't
+  Campbooks' own can never hold an `identity:*`, `workspaces:write` or
+  `workspaces:admin` scope, get read scopes only unless they ask for more,
+  see only the workspace they were allowed in, and can't be called
+  Campbooks or Not A Camp.
 - Search over your mail (`GET /api/v1/w/{workspace_id}/search`, operation
   `search.query`, new scope `search:read`; screens follow). Words match in
   English, Portuguese, Spanish and French whatever language you type in, with
@@ -453,6 +526,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
+  audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
+  applies to an outside identity provider. Nothing to do: tokens last ten minutes, and
+  the next refresh gets the new one.
+- The token endpoint, client registration and the consent answer are rate-limited per
+  client address (`CAMPBOOKS_TRUSTED_PROXIES` behind a reverse proxy).
 - The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
   new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes

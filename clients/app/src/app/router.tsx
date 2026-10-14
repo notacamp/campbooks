@@ -3,7 +3,7 @@ import { createRoute, createRouter, Navigate, type RouterHistory } from "@tansta
 
 import { AdminLayout } from "./admin/AdminLayout";
 import { buildModuleAdminRoutes, buildModuleRoutes } from "./modules";
-import { EmptyHome } from "./routes/home";
+import { Home } from "./routes/home";
 import { gatedRoute, rootRoute } from "./routes/root";
 import { Start } from "./routes/start";
 import { WorkspaceLayout } from "./routes/workspace";
@@ -23,7 +23,7 @@ const workspaceRoute = createRoute({
 const homeRoute = createRoute({
   getParentRoute: () => workspaceRoute,
   path: "/",
-  component: EmptyHome,
+  component: Home,
 });
 
 /** Settings opens on its only section for now: Members. */

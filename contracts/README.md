@@ -15,6 +15,7 @@ produce or accept against the file.
 | `connection-account.v1.schema.json` | `connectors` | `conversations` | The account behind a connection (address, name), as the blob that event points at |
 | `outgoing-message.v1.schema.json` | `conversations` | `connectors` | A message a member asked to send (addresses, subject, bodies, attachment blobs), as a blob (`application/vnd.campbooks.outgoing-message+json; version=1`) |
 | `conversations.send_requested.v1.schema.json` | `conversations` | `connectors` | The event announcing a send once its undo window ends (ids and the outgoing message blob) |
+| `conversations.need_changed.v1.schema.json` | `conversations` | `attention` | What a conversation needs from its inbox's members, opened, changed or cleared (ids, enums and a date only) |
 | `connectors.send_completed.v1.schema.json` | `connectors` | `conversations` | The event telling how a send ended: sent (with the provider's id) or failed (with a reason) |
 
 Rules:

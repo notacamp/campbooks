@@ -47,6 +47,7 @@ pub async fn handler(
 /// The workspaces `principal` belongs to (creating their user on first
 /// sign-in).
 pub async fn execute(state: &AppState, principal: &Principal) -> Result<WorkspaceList> {
+    let bound = principal.bound_workspace();
     let user = ensure_user(&state.db, principal).await?;
     let mut tx = begin_as_user(&state.db, user).await?;
     let rows = sqlx::query!(
@@ -64,6 +65,8 @@ pub async fn execute(state: &AppState, principal: &Principal) -> Result<Workspac
     tx.commit().await?;
     let workspaces = rows
         .into_iter()
+        // An app allowed in one workspace sees that one only.
+        .filter(|row| bound.is_none_or(|w| w == row.id.to_string()))
         .map(|row| {
             WorkspaceView::from_row(
                 row.id,
@@ -114,6 +117,43 @@ mod tests {
         assert_eq!(list.len(), 1, "{list:?}");
         assert_eq!(list[0]["id"], mine.to_string());
         assert_eq!(list[0]["role"], "owner");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_app_bound_to_one_workspace_sees_it_and_can_make_or_join_no_other(db: PgPool) {
+        use crate::features::{accept_invitation, create_workspace};
+
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let mine = kit.create_workspace(&ana, "Mine").await;
+        kit.create_workspace(&ana, "Other").await;
+        let bound = Kit::bound(&ana, mine);
+
+        let listed = super::execute(&kit.state, &bound).await.unwrap();
+        assert_eq!(listed.workspaces.len(), 1);
+        assert_eq!(listed.workspaces[0].id, mine);
+
+        let created = create_workspace::execute(
+            &kit.state,
+            &bound,
+            serde_json::from_value(serde_json::json!({ "name": "Sneaky", "kind": "business" }))
+                .unwrap(),
+        )
+        .await;
+        assert!(
+            matches!(created, Err(campbooks_kernel::Error::NotFound)),
+            "{created:?}"
+        );
+        let accepted = accept_invitation::execute(
+            &kit.state,
+            &bound,
+            serde_json::from_value(serde_json::json!({ "token": "anything" })).unwrap(),
+        )
+        .await;
+        assert!(
+            matches!(accepted, Err(campbooks_kernel::Error::NotFound)),
+            "{accepted:?}"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

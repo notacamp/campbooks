@@ -2,7 +2,7 @@
 //! granted, waiting for a workspace (never their tokens).
 
 use axum::{Extension, Json, extract::State};
-use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Scoped};
+use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Unbound};
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -53,7 +53,7 @@ pub struct HeldGrants {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityRead>,
+    Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<HeldGrants>> {
     let (issuer, account) = super::account(&deps, &principal)?;
     let items = held_grants::list(&state.db, account, issuer.now())

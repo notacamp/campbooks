@@ -7,7 +7,11 @@ use utoipa::ToSchema;
 
 use campbooks_kernel::{Error, Result};
 
-use super::conversation::ConversationSummary;
+use super::{
+    conversation::ConversationSummary,
+    decide::Source,
+    policy::{Policy, Switch},
+};
 use crate::model::{ConversationId, MessageId, Stream, StreamSource};
 
 /// What kind of strategy gave an answer.
@@ -47,6 +51,10 @@ pub struct ReasonView {
     pub rule: String,
     /// What it matched (a header name, a word), possibly empty.
     pub evidence: String,
+    /// The sender's sentence holding the evidence, when it came from the
+    /// text. Untrusted: show it as quoted plain text only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sentence: Option<String>,
 }
 
 /// Where the decide pass would put a conversation, when that is not where it
@@ -91,8 +99,25 @@ pub struct DecisionView {
     /// Whether it changed anything. In this version only a confident rules
     /// stream answer may; every other answer is a suggestion.
     pub acted: bool,
+    /// The confidence, 0 to 100, from which an answer of this source to
+    /// this question may act; `None` when it never acts (a suggestion).
+    pub threshold: Option<u8>,
     /// Why.
     pub reasons: Vec<ReasonView>,
+}
+
+/// The confidence from which `view`'s source may act on its question.
+pub fn threshold(policy: &Policy, view: &DecisionView) -> Option<u8> {
+    let source = match view.source {
+        DecisionSource::Rules => Source::Rules,
+        DecisionSource::Model => Source::Model,
+        DecisionSource::Knn | DecisionSource::Cascade => return None,
+    };
+    match policy.switch(&view.question, source) {
+        Switch::Record => None,
+        // The smallest whole percent at or above the switch's point.
+        Switch::ActAbove(at) => (0..=100_u8).find(|p| f64::from(*p) >= at * 100.0 - 1e-9),
+    }
 }
 
 struct DecisionRow {
@@ -193,6 +218,7 @@ pub async fn for_message(conn: &mut PgConnection, message: MessageId) -> Result<
                 question: row.question,
                 value,
                 acted: row.acted,
+                threshold: None,
             })
         })
         .collect::<Result<Vec<_>>>()?;

@@ -105,7 +105,6 @@ function StatesBoard() {
                 { label: "Updates", keys: "2", onSelect: noop },
               ],
             }}
-            confidence="61% sure. Below 80% Campbooks asks instead of acting."
           >
             An invitation to a workshop. Campbooks has not seen this sender before.
           </Note>

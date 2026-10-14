@@ -23,6 +23,7 @@
 //!
 //! Tokens are never logged.
 
+mod challenge;
 mod jwks;
 mod oidc;
 mod scoped;
@@ -32,10 +33,11 @@ use std::{borrow::Borrow, collections::BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+pub use challenge::challenge_with_resource_metadata;
 pub use jwks::{KeySource, KeySourceFuture};
 pub use oidc::{BACKCHANNEL_LOGOUT_EVENT, IdToken, LogoutToken};
-pub use scoped::Scoped;
 pub(crate) use scoped::bearer_token;
+pub use scoped::{Scoped, Unbound};
 pub use verifier::TokenVerifier;
 
 /// An OAuth scope a token carries, e.g. `mail:read`.
@@ -173,6 +175,20 @@ impl Principal {
     /// Whether the token grants the scope named `scope`.
     pub fn has_scope(&self, scope: &str) -> bool {
         self.scopes.contains(scope)
+    }
+
+    /// The workspace a person's token is bound to: a third-party app the
+    /// person allowed in one workspace (`workspace_id`, set by the
+    /// in-process issuer). Such a token reaches that workspace only:
+    /// `Workspace<S>` refuses any other, and a route outside a workspace
+    /// either shows only what belongs to this one or refuses (404; see
+    /// [`Unbound`]). `None` for an unbound person and for clients (whose
+    /// workspace is their own claim, checked by `Workspace<S>`).
+    pub fn bound_workspace(&self) -> Option<&str> {
+        match self.kind {
+            PrincipalKind::User => self.workspace.as_deref(),
+            PrincipalKind::Client => None,
+        }
     }
 }
 
