@@ -99,7 +99,7 @@
     "whyHasDeadline": "Refere uma data",
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, como lhe ensinou"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
   },
   "reasons": {
     "signals": {
@@ -142,7 +142,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "O Campbooks segue uma regra que ensinou para mensagens como esta."
+      "rule": "O Campbooks segue uma regra ensinada para mensagens como esta."
     }
   },
   "shortcuts": {
@@ -215,7 +215,9 @@
       "pay": "{{name}} enviou uma fatura para pagar",
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
-      "checkDo": "{{name}} pediu-lhe para fazer algo?"
+      "checkDo": "{{name}} pediu-lhe para fazer algo?",
+      "taughtReply": "{{name}}: responder, por uma regra",
+      "taughtDo": "{{name}}: a fazer, por uma regra"
     },
     "chip": {
       "reply": "Precisa de resposta",
@@ -242,7 +244,7 @@
         "model": "Modelo",
         "knn": "Correio semelhante",
         "cascade": "Regras e depois modelo",
-        "taught": "A sua regra"
+        "taught": "Uma regra"
       },
       "suggestion": "uma sugestão",
       "actsFrom": "age a partir de {{threshold}}",

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT rule_id AS \"rule: RuleId\", kind, state, cursor AS \"cursor: ConversationId\"\n                 FROM conversations.rule_runs WHERE id = $1 FOR UPDATE",
+  "query": "SELECT rule_id AS \"rule: RuleId\", kind, state, counted,\n                      cursor AS \"cursor: ConversationId\"\n                 FROM conversations.rule_runs WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -38,6 +38,17 @@
       },
       {
         "ordinal": 3,
+        "name": "counted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "counted"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "cursor: ConversationId",
         "type_info": "Uuid",
         "origin": {
@@ -57,8 +68,9 @@
       false,
       false,
       false,
+      false,
       true
     ]
   },
-  "hash": "d523fee2f423ce68ef015a64d02b437922ad8352bea31a8b0eca7165275e456d"
+  "hash": "abc7be66906b3d5d8a618f2b96bd1dc607d7565218c2deb60cebcce07f0a2f03"
 }

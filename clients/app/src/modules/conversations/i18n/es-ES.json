@@ -99,7 +99,7 @@
     "whyHasDeadline": "Menciona una fecha",
     "whyUrgent": "Urgente",
     "whySuspicious": "Sospechosa",
-    "sortedTaught": "Campbooks la puso en {{stream}}, como le enseñaste"
+    "sortedTaught": "Campbooks la puso en {{stream}}, por una regla"
   },
   "reasons": {
     "signals": {
@@ -142,7 +142,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "Campbooks sigue una regla que le enseñaste para correos como este."
+      "rule": "Campbooks sigue una regla enseñada para correos como este."
     }
   },
   "shortcuts": {
@@ -215,7 +215,9 @@
       "pay": "{{name}} ha enviado una factura para pagar",
       "warning": "Esto puede ser phishing. No uses sus enlaces.",
       "checkReply": "¿{{name}} necesita respuesta?",
-      "checkDo": "¿{{name}} te ha pedido que hagas algo?"
+      "checkDo": "¿{{name}} te ha pedido que hagas algo?",
+      "taughtReply": "{{name}}: responder, por una regla",
+      "taughtDo": "{{name}}: por hacer, por una regla"
     },
     "chip": {
       "reply": "Necesita respuesta",
@@ -242,7 +244,7 @@
         "model": "Modelo",
         "knn": "Correo parecido",
         "cascade": "Reglas y luego modelo",
-        "taught": "Tu regla"
+        "taught": "Una regla"
       },
       "suggestion": "una sugerencia",
       "actsFrom": "actúa desde {{threshold}}",

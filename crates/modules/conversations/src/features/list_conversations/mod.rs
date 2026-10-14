@@ -107,7 +107,6 @@ pub async fn handler(
         suggestions::attach(&mut tx, &mut conversations).await?;
         needs::attach(&mut tx, &mut conversations).await?;
         rules::attach(&mut tx, &mut conversations).await?;
-        rules::attach(&mut tx, &mut conversations).await?;
         tx.commit().await?;
         return Ok(Json(ConversationList {
             conversations,

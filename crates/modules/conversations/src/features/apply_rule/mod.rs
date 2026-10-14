@@ -16,7 +16,7 @@ use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::WorkspaceId};
 use crate::{
     domain::{
         needs::NeedSettings,
-        rule_runs::{self, BATCH, RunBatch, SCAN},
+        rule_runs::{self, BATCH, COUNT_WINDOW, RunBatch, SCAN},
         rules::{self, Applied, Context},
     },
     model::{ConversationId, RuleId, RuleRunId, RuleState, RunKind, RunState},
@@ -48,15 +48,20 @@ impl JobHandler for ApplyRules {
         let events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
         let run = sqlx::query!(
-            r#"SELECT rule_id AS "rule: RuleId", kind, state, cursor AS "cursor: ConversationId"
+            r#"SELECT rule_id AS "rule: RuleId", kind, state, counted,
+                      cursor AS "cursor: ConversationId"
                  FROM conversations.rule_runs WHERE id = $1 FOR UPDATE"#,
             batch.run as RuleRunId,
         )
         .fetch_optional(&mut **tx)
         .await?;
-        // A newer run replaced this one, or this batch was done already.
+        // A newer run replaced this one, its inbox is gone, or this batch was
+        // done already.
         let Some(run) = run else { return Ok(()) };
-        if run.state != RunState::Running.as_str() || run.cursor != batch.after {
+        if run.state != RunState::Running.as_str()
+            || run.cursor != batch.after
+            || run.counted == batch.counting
+        {
             return Ok(());
         }
         let kind: RunKind = run.kind.parse()?;
@@ -75,20 +80,26 @@ impl JobHandler for ApplyRules {
             inbox: rule.inbox,
             needs: &self.needs,
         };
-        let mut tally = Tally::default();
-        let last = match kind {
-            RunKind::Apply => apply_batch(tx, &context, &rule, &batch, &mut tally).await?,
-            RunKind::Revert => revert_batch(tx, &context, &rule, &batch, &mut tally).await?,
-        };
-        progress(tx, batch.run, &tally, last).await?;
-        if let Some(after) = last {
-            let next = RunBatch {
+        let next = if batch.counting {
+            count_batch(tx, &rule, &batch).await?
+        } else {
+            let mut tally = Tally::default();
+            let last = match kind {
+                RunKind::Apply => apply_batch(tx, &context, &rule, &batch, &mut tally).await?,
+                RunKind::Revert => revert_batch(tx, &context, &rule, &batch, &mut tally).await?,
+            };
+            progress(tx, batch.run, &tally, last).await?;
+            last.map(|after| RunBatch {
                 run: batch.run,
                 after: Some(after),
-            };
-            campbooks_kernel::jobs::enqueue_to::<Self>(tx, &next, next.options(&ws)).await?;
-        } else {
-            end(tx, batch.run, RunState::Done).await?;
+                counting: false,
+            })
+        };
+        match next {
+            Some(next) => {
+                campbooks_kernel::jobs::enqueue_to::<Self>(tx, &next, next.options(&ws)).await?;
+            }
+            None => end(tx, batch.run, RunState::Done).await?,
         }
         let view = rule_runs::latest(tx, rule.id).await?;
         let state = if kind == RunKind::Revert {
@@ -99,6 +110,39 @@ impl JobHandler for ApplyRules {
         rule_runs::announce(tx, &events, &ws, rule.inbox, rule.id, state, view.as_ref()).await?;
         Ok(())
     }
+}
+
+/// Count the conversations `rule` matches in the next window. Returns the
+/// next batch: more counting, or the first applying batch once counted.
+async fn count_batch(
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    rule: &rules::Stored,
+    batch: &RunBatch,
+) -> Result<Option<RunBatch>, JobError> {
+    let engine = rule.engine();
+    let window = rules::scan(tx, rule.inbox, &rule.conditions, batch.after, COUNT_WINDOW).await?;
+    let matched = window
+        .candidates
+        .iter()
+        .filter(|c| engine.matches(&c.facts()))
+        .count();
+    let counted = window.next.is_none();
+    sqlx::query!(
+        r#"UPDATE conversations.rule_runs
+              SET total = total + $2, counted = $3, cursor = CASE WHEN $3 THEN NULL ELSE $4::uuid END
+            WHERE id = $1"#,
+        batch.run as RuleRunId,
+        i32::try_from(matched).unwrap_or(i32::MAX),
+        counted,
+        window.next.map(|c| *c.as_uuid()),
+    )
+    .execute(&mut **tx)
+    .await?;
+    Ok(Some(RunBatch {
+        run: batch.run,
+        after: window.next,
+        counting: !counted,
+    }))
 }
 
 /// Apply `rule` to the next [`BATCH`] conversations it matches after the
@@ -112,27 +156,21 @@ async fn apply_batch(
 ) -> Result<Option<ConversationId>, JobError> {
     let acting = rules::acting(tx, rule.inbox).await?;
     let engine = rule.engine();
-    let mut after = batch.after;
-    loop {
-        let page = rules::scan(tx, rule.inbox, &rule.conditions, after, SCAN).await?;
-        let full = page.len() == usize::try_from(SCAN).unwrap_or(usize::MAX);
-        for candidate in &page {
-            if !engine.matches(&candidate.facts()) {
-                continue;
-            }
-            tally.done += 1;
-            let applied =
-                rules::apply(tx, context, rule.id, &acting, candidate, Some(batch.run)).await?;
-            tally.count(applied);
-            if tally.done >= BATCH {
-                return Ok(Some(candidate.id));
-            }
+    // One window of the inbox at most, and at most [`BATCH`] changes.
+    let window = rules::scan(tx, rule.inbox, &rule.conditions, batch.after, SCAN).await?;
+    for candidate in &window.candidates {
+        if !engine.matches(&candidate.facts()) {
+            continue;
         }
-        if !full {
-            return Ok(None);
+        tally.done += 1;
+        let applied =
+            rules::apply(tx, context, rule.id, &acting, candidate, Some(batch.run)).await?;
+        tally.count(applied);
+        if tally.done >= BATCH {
+            return Ok(Some(candidate.id));
         }
-        after = page.last().map(|c| c.id);
     }
+    Ok(window.next)
 }
 
 /// Put back the next [`BATCH`] conversations `rule` changed.

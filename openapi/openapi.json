@@ -13409,9 +13409,14 @@
           "samples",
           "skipped_suspicious",
           "skipped_member",
-          "overrides"
+          "overrides",
+          "complete"
         ],
         "properties": {
+          "complete": {
+            "type": "boolean",
+            "description": "Whether every conversation of the inbox was looked at; when false the\ncounts are \"at least\" (a very large inbox)."
+          },
           "matching": {
             "type": "integer",
             "format": "int32",
@@ -13707,6 +13712,7 @@
           "kind",
           "state",
           "total",
+          "counted",
           "done",
           "changed",
           "skipped_suspicious",
@@ -13719,6 +13725,10 @@
             "format": "int32",
             "description": "Changed so far.",
             "minimum": 0
+          },
+          "counted": {
+            "type": "boolean",
+            "description": "Whether `total` is final; while false the run is still counting."
           },
           "done": {
             "type": "integer",
@@ -13766,7 +13776,7 @@
           "total": {
             "type": "integer",
             "format": "int32",
-            "description": "Conversations it looks at.",
+            "description": "Conversations it matches (or will put back).",
             "minimum": 0
           }
         }

@@ -76,6 +76,28 @@ pub async fn except(
     }))
 }
 
+/// How many exceptions each of `rules` had in the last [`EXCEPTION_DAYS`]
+/// (those with none are left out).
+pub async fn recent_exceptions_of(
+    conn: &mut PgConnection,
+    rules: &[RuleId],
+) -> Result<std::collections::HashMap<RuleId, u32>> {
+    let rows = sqlx::query!(
+        r#"SELECT rule_id AS "rule: RuleId", count(*)::int AS "n!"
+             FROM conversations.rule_applications
+            WHERE rule_id = ANY($1) AND excepted_at > now() - make_interval(days => $2)
+            GROUP BY rule_id"#,
+        rules as &[RuleId],
+        i32::try_from(EXCEPTION_DAYS).unwrap_or(30),
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.rule, u32::try_from(r.n).unwrap_or_default()))
+        .collect())
+}
+
 /// How many exceptions `rule` had in the last [`EXCEPTION_DAYS`].
 pub async fn recent_exceptions(conn: &mut PgConnection, rule: RuleId) -> Result<u32> {
     let n = sqlx::query_scalar!(

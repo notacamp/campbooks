@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT reason, question FROM conversations.needs WHERE conversation_id = $1",
+  "query": "SELECT reason, question FROM conversations.needs\n                  WHERE conversation_id = $1 AND verdict = 'not_needed'",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       false
     ]
   },
-  "hash": "cf430e8d9a6ac32ffeb99951e5c67305029e4c33155638c9e28296b69efb11c1"
+  "hash": "2bb541fd30464a0a4991d4eca472fce92fd5969376bdd7cfcea9b56b9414f5ba"
 }

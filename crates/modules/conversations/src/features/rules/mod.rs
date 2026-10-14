@@ -6,7 +6,7 @@
 //! is checked, stored and applied one way whatever taught it.
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
@@ -36,8 +36,24 @@ use crate::{
 pub const MAX_ORIGIN_TEXT_CHARS: usize = 500;
 /// Most sample conversations a preview shows.
 pub const PREVIEW_SAMPLES: usize = 5;
-/// Most conversations a preview looks at.
-pub const PREVIEW_SCAN_LIMIT: usize = 50_000;
+/// Most conversations a preview looks at; past it the counts say "at least".
+pub const PREVIEW_EXAMINE: usize = 20_000;
+
+/// A read-only transaction in `workspace` whose statements give up after
+/// five seconds: previews and suggestions never write, and never run long.
+pub async fn begin_read(
+    state: &AppState,
+    workspace: WorkspaceId,
+) -> Result<Transaction<'static, Postgres>> {
+    let mut tx = state.db.begin_for(workspace).await?;
+    sqlx::query("SET TRANSACTION READ ONLY")
+        .execute(&mut *tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '5s'")
+        .execute(&mut *tx)
+        .await?;
+    Ok(tx)
+}
 
 /// `…/inboxes/{inbox_id}/rules…`
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -95,27 +111,51 @@ pub struct RuleView {
 }
 
 async fn view(conn: &mut PgConnection, access: &Access, rule: &Stored) -> Result<RuleView> {
-    let inbox_role = rules::role_in(conn, rule.inbox, access.user).await?;
-    Ok(RuleView {
-        id: rule.id,
-        inbox_id: rule.inbox,
-        teaching_id: rule.teaching,
-        conditions: rule.conditions.clone(),
-        actions: rule.actions.clone(),
-        origin: rule.origin,
-        origin_text: rule.origin_text.clone(),
-        state: rule.effective_state(),
-        taught_by: rule.taught_by,
-        from_conversation_id: rule.from_conversation,
-        created_at: rule.created_at,
-        confirmed_at: rule.confirmed_at,
-        applied_count: u32::try_from(rule.applied_count).unwrap_or_default(),
-        last_applied_at: rule.last_applied_at,
-        recent_exceptions: rules::recent_exceptions(conn, rule.id).await?,
-        run: rule_runs::latest(conn, rule.id).await?,
-        shared: rules::is_shared(conn, rule.inbox).await?,
-        may_change: rules::may_change(inbox_role, access.user, rule.taught_by),
-    })
+    let mut views = views(conn, access, std::slice::from_ref(rule)).await?;
+    views.pop().ok_or(Error::NotFound)
+}
+
+/// `stored` rules as the caller sees them, with a few queries for all of them.
+async fn views(
+    conn: &mut PgConnection,
+    access: &Access,
+    stored: &[Stored],
+) -> Result<Vec<RuleView>> {
+    let ids: Vec<RuleId> = stored.iter().map(|r| r.id).collect();
+    let mut inboxes: Vec<InboxId> = stored.iter().map(|r| r.inbox).collect();
+    inboxes.sort_unstable();
+    inboxes.dedup();
+    let inbox_roles = rules::roles_of(conn, &inboxes, access.user).await?;
+    let shared = rules::shared_of(conn, &inboxes).await?;
+    let exceptions = rules::recent_exceptions_of(conn, &ids).await?;
+    let mut runs = rule_runs::latest_of(conn, &ids).await?;
+    Ok(stored
+        .iter()
+        .map(|rule| RuleView {
+            id: rule.id,
+            inbox_id: rule.inbox,
+            teaching_id: rule.teaching,
+            conditions: rule.conditions.clone(),
+            actions: rule.actions.clone(),
+            origin: rule.origin,
+            origin_text: rule.origin_text.clone(),
+            state: rule.effective_state(),
+            taught_by: rule.taught_by,
+            from_conversation_id: rule.from_conversation,
+            created_at: rule.created_at,
+            confirmed_at: rule.confirmed_at,
+            applied_count: u32::try_from(rule.applied_count).unwrap_or_default(),
+            last_applied_at: rule.last_applied_at,
+            recent_exceptions: exceptions.get(&rule.id).copied().unwrap_or_default(),
+            run: runs.remove(&rule.id),
+            shared: shared.contains(&rule.inbox),
+            may_change: rules::may_change(
+                inbox_roles.get(&rule.inbox).copied(),
+                access.user,
+                rule.taught_by,
+            ),
+        })
+        .collect())
 }
 
 /// 404 unless the caller sees `inbox`; 403 `inbox_read_only` unless they may
@@ -217,6 +257,9 @@ pub struct RulePreview {
     pub skipped_member: u32,
     /// Active rules it would take over from.
     pub overrides: Vec<RuleOverride>,
+    /// Whether every conversation of the inbox was looked at; when false the
+    /// counts are "at least" (a very large inbox).
+    pub complete: bool,
 }
 
 /// Preview what a rule would do in an inbox. A read served by POST: the
@@ -251,12 +294,11 @@ pub async fn preview(
     extract::Path(path): extract::Path<InboxPath>,
     extract::Json(body): extract::Json<PreviewRule>,
 ) -> Result<Json<RulePreview>> {
-    let (conditions, actions) = (body.conditions, body.actions);
+    let (conditions, actions) = (rules::normalise(&body.conditions), body.actions);
     rules::validate(&conditions, &actions)?;
     let access = &workspace.access;
-    let mut tx = state.db.begin_for(access.workspace).await?;
+    let mut tx = begin_read(&state, access.workspace).await?;
     may_teach(&mut tx, access, path.inbox_id).await?;
-    rules::fill_templates(&mut tx, path.inbox_id).await?;
     let preview = compute_preview(&mut tx, path.inbox_id, &conditions, &actions).await?;
     tx.commit().await?;
     Ok(Json(preview))
@@ -295,15 +337,16 @@ pub async fn compute_preview(
         skipped_suspicious: 0,
         skipped_member: 0,
         overrides: Vec::new(),
+        complete: false,
     };
     let mut overridden: Vec<(String, u32)> = Vec::new();
     let mut found = Vec::new();
     let mut after = None;
     let mut looked = 0_usize;
     loop {
-        let page = rules::scan(conn, inbox, conditions, after, SCAN).await?;
-        looked += page.len();
-        for candidate in &page {
+        let window = rules::scan(conn, inbox, conditions, after, SCAN).await?;
+        looked += window.examined;
+        for candidate in &window.candidates {
             let facts = candidate.facts();
             if !new.matches(&facts) {
                 continue;
@@ -324,15 +367,21 @@ pub async fn compute_preview(
             let after_outcome = evaluate(&with_new, &facts);
             if would_change(candidate, &after_outcome, NEW) {
                 out.would_change += 1;
-                found.push(candidate.clone());
+                // Suspicious mail is counted, never shown as an example.
+                if !candidate.suspicious {
+                    found.push(candidate.clone());
+                }
             }
             count_overrides(&before, &after_outcome, NEW, &mut overridden);
         }
-        if page.len() < usize::try_from(SCAN).unwrap_or(usize::MAX) || looked >= PREVIEW_SCAN_LIMIT
-        {
-            break;
+        match window.next {
+            None => {
+                out.complete = true;
+                break;
+            }
+            Some(_) if looked >= PREVIEW_EXAMINE => break,
+            next => after = next,
         }
-        after = page.last().map(|c| c.id);
     }
     found.sort_by_key(|c| std::cmp::Reverse(c.sent_at));
     out.samples = found.iter().take(PREVIEW_SAMPLES).map(sample).collect();
@@ -510,8 +559,9 @@ pub async fn create(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<InboxPath>,
-    extract::Json(body): extract::Json<CreateRule>,
+    extract::Json(mut body): extract::Json<CreateRule>,
 ) -> Result<(StatusCode, Json<CreatedRule>)> {
+    body.conditions = rules::normalise(&body.conditions);
     rules::validate(&body.conditions, &body.actions)?;
     if body
         .origin_text
@@ -564,6 +614,25 @@ pub async fn create_in(
         }
     };
     let ws = access.workspace.to_string();
+    if let Some(from) = body.from_conversation_id {
+        let in_inbox = sqlx::query_scalar!(
+            r#"SELECT EXISTS (SELECT 1 FROM conversations.conversations
+                               WHERE id = $1 AND inbox_id = $2) AS "e!""#,
+            from as ConversationId,
+            inbox as InboxId,
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+        if !in_inbox {
+            return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
+        }
+    }
+    if rule_state == RuleState::Active {
+        replace(tx, state, access, inbox, body).await?;
+    }
+    if rules::templates_missing(tx, inbox).await? {
+        crate::features::fill_templates::enqueue(tx, &ws, inbox).await?;
+    }
     let id = rules::insert(
         tx,
         *access.workspace.as_uuid(),
@@ -590,6 +659,68 @@ pub async fn create_in(
         rule: view(tx, access, &rule).await?,
         acted_without_asking,
     })
+}
+
+/// Retire the active rules a new one replaces (the same conditions and an
+/// action of the same kind), without putting their mail back: 403
+/// `rule_not_yours` when the caller may not change one of them.
+async fn replace(
+    tx: &mut Transaction<'_, Postgres>,
+    state: &AppState,
+    access: &Access,
+    inbox: InboxId,
+    body: &CreateRule,
+) -> Result<()> {
+    let replaced = rules::replaced(tx, inbox, &body.conditions, &body.actions).await?;
+    if replaced.is_empty() {
+        return Ok(());
+    }
+    let inbox_role = rules::role_in(tx, inbox, access.user).await?;
+    if replaced
+        .iter()
+        .any(|(_, author)| !rules::may_change(inbox_role, access.user, *author))
+    {
+        return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
+    }
+    for (old, _) in replaced {
+        retire(tx, state, access, inbox, old).await?;
+    }
+    Ok(())
+}
+
+/// Mark `rule` removed, stop its running runs and announce it.
+async fn retire(
+    tx: &mut Transaction<'_, Postgres>,
+    state: &AppState,
+    access: &Access,
+    inbox: InboxId,
+    rule: RuleId,
+) -> Result<()> {
+    sqlx::query!(
+        r#"UPDATE conversations.rules
+              SET state = 'removed', removed_at = now(), updated_at = now()
+            WHERE id = $1"#,
+        rule as RuleId,
+    )
+    .execute(&mut **tx)
+    .await?;
+    sqlx::query!(
+        r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
+            WHERE rule_id = $1 AND state = 'running'"#,
+        rule as RuleId,
+    )
+    .execute(&mut **tx)
+    .await?;
+    rule_runs::announce(
+        tx,
+        &state.events,
+        &access.workspace.to_string(),
+        inbox,
+        rule,
+        RuleState::Removed,
+        None,
+    )
+    .await
 }
 
 // --- Confirm, update, remove -------------------------------------------------
@@ -733,7 +864,11 @@ pub async fn update(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let rule = changeable_rule(&mut tx, access, path.rule_id).await?;
-    let conditions = body.conditions.unwrap_or_else(|| rule.conditions.clone());
+    if body.paused.is_some() && rule.state == RuleState::Proposed {
+        // A proposed rule acts only once someone says yes (`confirm_rule`).
+        return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_active")));
+    }
+    let conditions = rules::normalise(&body.conditions.unwrap_or_else(|| rule.conditions.clone()));
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());
     rules::validate(&conditions, &actions)?;
     let next_state = match body.paused {
@@ -915,10 +1050,7 @@ pub async fn list(
         inboxes = vec![inbox];
     }
     let stored = rules::of_inboxes(&mut tx, &inboxes).await?;
-    let mut views = Vec::with_capacity(stored.len());
-    for rule in &stored {
-        views.push(view(&mut tx, access, rule).await?);
-    }
+    let mut views = views(&mut tx, access, &stored).await?;
     views.sort_by_key(|v| v.state != RuleState::Proposed);
     tx.commit().await?;
     Ok(Json(RuleList { rules: views }))

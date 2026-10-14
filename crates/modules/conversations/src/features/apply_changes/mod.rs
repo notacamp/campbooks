@@ -165,6 +165,11 @@ impl JobHandler for ApplyChanges {
             }
         }
         apply.finish(tx).await?;
+        // Mail stored before subject templates existed gets them in the
+        // background, a page at a time.
+        if rules::templates_missing(tx, batch.inbox).await? {
+            crate::features::fill_templates::enqueue(tx, &ws, batch.inbox).await?;
+        }
         // Applied: the batch is no longer needed (the sweep removes it once
         // nothing else holds it).
         state
@@ -566,33 +571,40 @@ impl Apply<'_> {
         if all.is_empty() {
             return Ok(Outcome::default());
         }
-        let (acting, stream, labels) = match found {
+        let (acting, stream, labels, under_review) = match found {
             Some(conversation) => {
                 let acting = rules::acting_on(tx, all, conversation).await?;
                 let row = sqlx::query!(
                     r#"SELECT c.stream,
                               coalesce((SELECT array_agg(cl.label_id::text)
                                           FROM conversations.conversation_labels cl
-                                         WHERE cl.conversation_id = c.id), '{}') AS "labels!"
+                                         WHERE cl.conversation_id = c.id), '{}') AS "labels!",
+                              EXISTS (SELECT 1 FROM conversations.needs n
+                                       WHERE n.conversation_id = c.id AND n.state = 'open'
+                                         AND n.reason = 'review') AS "under_review!"
                          FROM conversations.conversations c WHERE c.id = $1"#,
                     conversation as ConversationId,
                 )
                 .fetch_one(&mut **tx)
                 .await?;
-                (acting, row.stream, row.labels)
+                (acting, row.stream, row.labels, row.under_review)
             }
             None => (
                 all.to_vec(),
                 Stream::Primary.as_str().to_owned(),
                 Vec::new(),
+                false,
             ),
         };
         let questions = triage_questions();
-        let suspicious = questions.iter().zip(&prepared.answers).any(|(q, a)| {
-            q.id == triage::SUSPICIOUS
-                && a.as_ref()
-                    .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
-        });
+        // Suspicious mail, or a conversation with an open Review need, is
+        // never hidden by a rule (archiving would clear the Review).
+        let suspicious = under_review
+            || questions.iter().zip(&prepared.answers).any(|(q, a)| {
+                q.id == triage::SUSPICIOUS
+                    && a.as_ref()
+                        .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
+            });
         let sender = message.from.address.to_lowercase();
         let facts = Facts {
             sender_address: &sender,

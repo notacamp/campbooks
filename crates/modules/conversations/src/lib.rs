@@ -162,6 +162,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
+            .handler(features::fill_templates::FillTemplates)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -274,6 +275,7 @@ mod tests {
             "conversations.record_send",
             "conversations.check_send",
             "conversations.apply_rule",
+            "conversations.fill_templates",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }

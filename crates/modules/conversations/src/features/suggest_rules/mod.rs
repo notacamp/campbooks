@@ -171,7 +171,7 @@ pub async fn suggest(
     extract::Query(query): extract::Query<SuggestQuery>,
 ) -> Result<Json<RuleSuggestions>> {
     let access = &workspace.access;
-    let mut tx = state.db.begin_for(access.workspace).await?;
+    let mut tx = crate::features::rules::begin_read(&state, access.workspace).await?;
     let inbox = teachable_inbox(&mut tx, access, path.conversation_id).await?;
     let out = suggestions(&mut tx, access, inbox, path.conversation_id, query).await?;
     tx.commit().await?;
@@ -214,7 +214,6 @@ async fn suggestions(
     query: SuggestQuery,
 ) -> Result<RuleSuggestions> {
     let shared = rules::is_shared(conn, inbox).await?;
-    rules::fill_templates(conn, inbox).await?;
     let Some(candidate) = rules::candidate(conn, id).await? else {
         return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
     };
@@ -319,7 +318,8 @@ async fn actions_for(
             .map(|label| vec![RuleAction::AddLabel { label }]),
         TaughtAction::NotNeeded => {
             let need = sqlx::query!(
-                "SELECT reason, question FROM conversations.needs WHERE conversation_id = $1",
+                "SELECT reason, question FROM conversations.needs
+                  WHERE conversation_id = $1 AND verdict = 'not_needed'",
                 id as ConversationId,
             )
             .fetch_optional(conn)

@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: RuleId\", taught_by FROM conversations.rules\n            WHERE inbox_id = $1 AND state = 'active' AND conditions = $2\n              AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a\n                           WHERE a ->> 'action' = ANY($3))\n            FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: RuleId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rules",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "taught_by",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rules",
+            "name": "taught_by"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "TextArray"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "ca564c1b4681ab42cfc00999302df0296b377ab8ff313fe453b207d8b1aceb5a"
+}

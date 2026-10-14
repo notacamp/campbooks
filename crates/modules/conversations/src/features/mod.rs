@@ -7,6 +7,7 @@ pub mod check_send;
 pub mod create_draft;
 pub mod create_inbox;
 pub mod decide_message;
+pub mod fill_templates;
 pub mod get_attachment;
 pub mod get_conversation;
 pub mod get_message_body;

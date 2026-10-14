@@ -3,32 +3,36 @@
 -- existing mail, the conversations they changed, and the suggestions a member
 -- turned down.
 
+-- Never wait long for a lock on a busy table: fail and retry the deploy.
+SET LOCAL lock_timeout = '5s';
+
 -- A rule may place a conversation and answer the decide pass's questions.
+-- The widened checks are added NOT VALID and validated separately, so the
+-- rows are checked without holding the tables' exclusive lock.
 ALTER TABLE conversations.conversations DROP CONSTRAINT conversations_stream_source_check;
 ALTER TABLE conversations.conversations ADD CONSTRAINT conversations_stream_source_check
-    CHECK (stream_source IN ('default', 'rules', 'model', 'taught', 'member'));
+    CHECK (stream_source IN ('default', 'rules', 'model', 'taught', 'member')) NOT VALID;
 ALTER TABLE conversations.decisions DROP CONSTRAINT decisions_source_check;
 ALTER TABLE conversations.decisions ADD CONSTRAINT decisions_source_check
-    CHECK (source IN ('rules', 'model', 'knn', 'cascade', 'taught'));
+    CHECK (source IN ('rules', 'model', 'knn', 'cascade', 'taught')) NOT VALID;
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_basis_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_basis_check
-    CHECK (basis IN ('rules', 'model', 'taught', 'member'));
+    CHECK (basis IN ('rules', 'model', 'taught', 'member')) NOT VALID;
 ALTER TABLE conversations.needs DROP CONSTRAINT needs_cleared_because_check;
 ALTER TABLE conversations.needs ADD CONSTRAINT needs_cleared_because_check
     CHECK (cleared_because IN
-        ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule'));
+        ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule')) NOT VALID;
+ALTER TABLE conversations.conversations VALIDATE CONSTRAINT conversations_stream_source_check;
+ALTER TABLE conversations.decisions VALIDATE CONSTRAINT decisions_source_check;
+ALTER TABLE conversations.needs VALIDATE CONSTRAINT needs_basis_check;
+ALTER TABLE conversations.needs VALIDATE CONSTRAINT needs_cleared_because_check;
 
 -- The subject with what changes from one message to the next taken out
 -- (`campbooks_ai::decide::signals::email::subject_template`); '' when too
 -- little is left. NULL for messages stored before this migration, until a
 -- rule preview or run in their inbox works it out.
 ALTER TABLE conversations.messages ADD COLUMN subject_template text;
-CREATE INDEX messages_sender_idx ON conversations.messages (inbox_id, sender_address)
-    WHERE direction = 'inbound';
-CREATE INDEX messages_list_id_idx ON conversations.messages (inbox_id, (headers ->> 'list_id'))
-    WHERE direction = 'inbound' AND headers ? 'list_id';
-CREATE INDEX messages_subject_template_idx ON conversations.messages (inbox_id, subject_template)
-    WHERE direction = 'inbound' AND subject_template <> '';
+-- Its indexes are built concurrently by `…120050_conversations__taught_rules_indexes`.
 
 CREATE TABLE conversations.rules (
     id uuid PRIMARY KEY,
@@ -69,7 +73,10 @@ CREATE TABLE conversations.rule_runs (
     kind text NOT NULL CHECK (kind IN ('apply', 'revert')),
     state text NOT NULL CHECK (state IN ('running', 'done', 'cancelled')),
     cursor uuid,
+    -- Conversations it looks at; `counted` once the run has counted them all
+    -- (an apply run counts in its first batches, never in the request).
     total integer NOT NULL DEFAULT 0,
+    counted boolean NOT NULL DEFAULT false,
     done integer NOT NULL DEFAULT 0,
     -- Changed by the run (the rest were already so, or another rule wins).
     changed integer NOT NULL DEFAULT 0,

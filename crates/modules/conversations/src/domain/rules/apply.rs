@@ -331,7 +331,11 @@ pub async fn revert(
     .await?;
     let Some(row) = row else { return Ok(false) };
     let before: Before = serde_json::from_value(row.before).unwrap_or_default();
-    let effects = undo(tx, id, &before).await?;
+    let moved_to = rule.actions.iter().find_map(|a| match a {
+        super::RuleAction::MoveToStream { stream } => Some(*stream),
+        _ => None,
+    });
+    let effects = undo(tx, id, &before, moved_to).await?;
     if !before.answered.is_empty() {
         sqlx::query!(
             r#"DELETE FROM conversations.decisions
@@ -360,10 +364,15 @@ pub async fn revert(
 }
 
 /// Put conversation `id` back as `before` says, where a rule still holds it.
-async fn undo(conn: &mut PgConnection, id: ConversationId, before: &Before) -> Result<Effects> {
+async fn undo(
+    conn: &mut PgConnection,
+    id: ConversationId,
+    before: &Before,
+    moved_to: Option<Stream>,
+) -> Result<Effects> {
     let mut effects = Effects::default();
-    if let Some((stream, source)) = &before.stream
-        && effects::unplace(conn, id, *stream, source).await?
+    if let (Some((stream, source)), Some(moved_to)) = (&before.stream, moved_to)
+        && effects::unplace(conn, id, (*stream, source), moved_to).await?
     {
         let messages = crate::domain::conversation::provider_message_ids(conn, id).await?;
         effects.add(

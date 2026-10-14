@@ -685,7 +685,8 @@ does. The same message and the same rules SHALL always give the same outcome.
 
 ### Requirement: Suspicious mail is never hidden by a rule
 When a message has a true `suspicious` answer from any source, or its
-conversation has an open Review need, rules SHALL NOT archive it, mark it
+conversation has an open Review need of any kind (a warning or a question to
+the member), rules SHALL NOT archive it, mark it
 read, move it out of `primary`, answer a need question false, or apply
 `surface: never`; the Review need SHALL stay. Such a conversation SHALL
 never start a rule suggestion.
@@ -730,12 +731,37 @@ with `restore=true` put back what it changed. `GET …/rules`
 `GET …/rules/{rule_id}` (`conversations.get_rule`, a removed one too, so the
 run putting its mail back can be followed) SHALL answer the rules of the
 inboxes the caller can see with their counts, latest run and recent
-exceptions. A rule with the same conditions and an action of the same kind
-as an active one SHALL replace it.
+exceptions. Conditions SHALL be stored normalised (trimmed; addresses, domains, list ids
+and templates lower-cased) and a value SHALL be at most 320 characters. A
+rule with the same conditions and an action of the same kind as an active
+one SHALL replace it, cancelling its runs and announcing it removed, only
+when the caller may change that rule; otherwise the response SHALL be 403
+`rule_not_yours` and nothing changes. A proposed rule SHALL not be paused or
+resumed (409 `rule_not_active`): only `confirm_rule` makes it act.
+`from_conversation_id` SHALL name a conversation of the rule's inbox.
+
+#### Scenario: Someone else's rule
+- **WHEN** Ines, a sender of info@, creates a rule with the same conditions as Leo's, written " Notifications@GitHub.com "
+- **THEN** the response is 403 `rule_not_yours` and Leo's rule stays active; a manager doing the same replaces it
 
 #### Scenario: Preview
 - **WHEN** a member previews moving mail from notifications@github.com to `updates` in an inbox with 1,000 such conversations in Primary, 2 of them suspicious
 - **THEN** the preview would change 998, lists five of them and says 2 are skipped as suspicious
+
+### Requirement: Previews and suggestions only read
+A preview and a suggestion SHALL run in a read-only transaction whose
+statements give up after five seconds, and SHALL look at no more than 20,000
+conversations, saying `complete: false` when they stopped before the end of
+the inbox. Their samples SHALL never show a suspicious conversation (it is
+still counted). Messages stored before subject templates existed SHALL match
+template conditions all the same (their template is worked out as they are
+read), and `conversations.fill_templates` SHALL store those templates in the
+background, a thousand messages per job, enqueued by the inbox's next change
+batch or a new rule.
+
+#### Scenario: A huge inbox
+- **WHEN** a member previews a rule in an inbox of 300,000 conversations
+- **THEN** the answer comes from the first 20,000 with `complete: false`, and nothing is written
 
 #### Scenario: A proposed rule does nothing
 - **WHEN** a rule is created as `proposed`
@@ -792,8 +818,11 @@ port.
 
 ### Requirement: Applying a rule to existing mail
 Creating or confirming an active rule with `apply_to_existing` SHALL start
-an apply run, `conversations.apply_rule`, that changes the matching
-conversations of the inbox in batches of 100, each batch in one transaction,
+an apply run, `conversations.apply_rule`, that first counts the conversations
+it matches in the background (5,000 looked at per job; the request counts
+nothing, and the run says `counted: false` until done), then changes them,
+each job looking at 500 conversations at most and changing 100 at most, in
+one transaction,
 skipping suspicious conversations, conversations a member placed or changed
 back, and those already so, recording each change with what it was before.
 The run SHALL be resumable from its stored position and SHALL never change a
@@ -805,7 +834,7 @@ publish `conversations.rule_changed` with the run's total and done.
 
 #### Scenario: Moving 1,000
 - **WHEN** a rule moving notifications@github.com to `updates` is created with `apply_to_existing` and 1,000 lookalikes sit in Primary
-- **THEN** ten batches move them, `rule_changed` reports 100, 200, … 1,000 done, and the connector receives a move for each
+- **THEN** the run counts 1,000, ten batches move them, `rule_changed` reports 100, 200, … 1,000 done, and the connector receives a move for each
 
 #### Scenario: A crash halfway
 - **WHEN** the worker stops after 340 conversations and the job is retried
@@ -867,8 +896,9 @@ rule and how many exceptions it had in the last 30 days.
 ### Requirement: Undoing a rule
 `conversations.remove_rule` with `restore=true` SHALL cancel any apply run
 of the rule and start a revert run that puts every changed conversation back
-as it was before, except those excepted or changed by a member since, with
-the same batching, progress and events as an apply run.
+as it was before, except those excepted or changed since (by a member, or
+moved on by another rule), with the same batching, progress and events as an
+apply run.
 
 #### Scenario: Undo all
 - **WHEN** Ana presses Z right after 998 conversations were moved

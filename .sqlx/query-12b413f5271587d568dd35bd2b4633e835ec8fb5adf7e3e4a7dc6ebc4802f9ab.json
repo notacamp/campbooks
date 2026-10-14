@@ -1,0 +1,148 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: RuleRunId\", kind, state, total, counted, done, changed, skipped_suspicious,\n                  skipped_member, started_at, finished_at\n             FROM conversations.rule_runs WHERE rule_id = $1\n            ORDER BY started_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: RuleRunId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "total",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "total"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "counted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "counted"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "done",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "done"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "changed",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "changed"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "skipped_suspicious",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "skipped_suspicious"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "skipped_member",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "skipped_member"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 10,
+        "name": "finished_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "finished_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "12b413f5271587d568dd35bd2b4633e835ec8fb5adf7e3e4a7dc6ebc4802f9ab"
+}

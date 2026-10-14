@@ -1065,7 +1065,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read one taught rule. */
+        /**
+         * Read one taught rule (a removed one too, with the run putting its mail
+         *     back).
+         */
         get: operations["conversations.get_rule"];
         put?: never;
         post?: never;
@@ -3324,6 +3327,11 @@ export interface components {
         /** @description What a rule would do to the inbox's mail now. */
         RulePreview: {
             /**
+             * @description Whether every conversation of the inbox was looked at; when false the
+             *     counts are "at least" (a very large inbox).
+             */
+            complete: boolean;
+            /**
              * Format: int32
              * @description Conversations it matches.
              */
@@ -3452,6 +3460,8 @@ export interface components {
              * @description Changed so far.
              */
             changed: number;
+            /** @description Whether `total` is final; while false the run is still counting. */
+            counted: boolean;
             /**
              * Format: int32
              * @description Looked at so far.
@@ -3485,7 +3495,7 @@ export interface components {
             state: components["schemas"]["RunState"];
             /**
              * Format: int32
-             * @description Conversations it looks at.
+             * @description Conversations it matches (or will put back).
              */
             total: number;
         };
@@ -7932,7 +7942,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The rule. */
+            /** @description The rule, removed or not. */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -16,11 +16,14 @@ use crate::{
     testkit::{Kit, notifications},
 };
 
-const GITHUB: &str = "notifications@github.com";
+pub(crate) const GITHUB: &str = "notifications@github.com";
 
 /// A workspace with Sam's inbox holding `n` GitHub notifications and one
 /// message from a person; nothing sorted (the shipped policy).
-async fn sams_notifications(kit: &Kit, n: usize) -> (WorkspaceId, InboxId, String, UserId) {
+pub(crate) async fn sams_notifications(
+    kit: &Kit,
+    n: usize,
+) -> (WorkspaceId, InboxId, String, UserId) {
     let workspace = WorkspaceId::new();
     let (token, sam) = kit.member("sam", workspace);
     let inbox = kit
@@ -44,18 +47,18 @@ async fn sams_notifications(kit: &Kit, n: usize) -> (WorkspaceId, InboxId, Strin
     (workspace, inbox, token, sam)
 }
 
-async fn kit(db: PgPool) -> Kit {
+pub(crate) async fn kit(db: PgPool) -> Kit {
     Kit::with_deps(db, ConversationsDeps::offline()).await
 }
 
-fn move_github() -> Value {
+pub(crate) fn move_github() -> Value {
     json!({
         "conditions": [{"field": "sender_address", "value": GITHUB}],
         "actions": [{"action": "move_to_stream", "stream": "updates"}],
     })
 }
 
-async fn streams(kit: &Kit) -> Vec<(String, String, String)> {
+pub(crate) async fn streams(kit: &Kit) -> Vec<(String, String, String)> {
     sqlx::query_as(
         "SELECT m.provider_message_id, c.stream, c.stream_source
            FROM conversations.conversations c
@@ -89,7 +92,7 @@ async fn teaching_once_moves_every_lookalike_in_batches(db: PgPool) {
     assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
     assert_eq!(created.json["rule"]["state"], "active");
     assert_eq!(created.json["rule"]["origin"], "action");
-    assert_eq!(created.json["rule"]["run"]["total"], 250);
+    assert_eq!(created.json["rule"]["run"]["counted"], false);
     assert_eq!(created.json["acted_without_asking"], false);
     let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
     kit.run_jobs().await;
@@ -122,7 +125,8 @@ async fn teaching_once_moves_every_lookalike_in_batches(db: PgPool) {
         .iter()
         .filter_map(|e| e["run"]["done"].as_i64())
         .collect();
-    assert_eq!(progress, vec![0, 100, 200, 250]);
+    // Announced when it starts, once counted, then after each batch.
+    assert_eq!(progress, vec![0, 0, 100, 200, 250]);
     // The provider is asked to move each one.
     let requested = kit.events("conversations.changes_requested").await;
     assert_eq!(requested.len(), 250);
@@ -688,4 +692,245 @@ async fn a_thousand_lookalikes_taught_once(db: PgPool) {
         in_stream(&kit, "updates").await
     );
     assert_eq!(in_stream(&kit, "updates").await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn nobody_outside_the_inbox_or_the_workspace_reaches_a_rule(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+
+    // A member (an owner or admin, say) who is not in the inbox.
+    let (admin, _) = kit.member("ola", workspace);
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    assert_eq!(kit.get(&admin, &one).await.status, StatusCode::NOT_FOUND);
+    let listed = kit
+        .get(&admin, &format!("/api/v1/w/{workspace}/rules"))
+        .await;
+    assert_eq!(listed.json["rules"].as_array().unwrap().len(), 0);
+    let preview = kit
+        .post(
+            &admin,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules/preview"),
+            Some(move_github()),
+        )
+        .await;
+    assert_eq!(preview.status, StatusCode::NOT_FOUND);
+
+    // Another workspace naming this rule's id.
+    let other = WorkspaceId::new();
+    let (eve, eve_id) = kit.member("eve", other);
+    kit.inbox(other, "eve@example.com", &[(eve_id, InboxRole::Manager)])
+        .await;
+    let theirs = format!("/api/v1/w/{other}/rules/{rule}");
+    assert_eq!(kit.get(&eve, &theirs).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(
+        kit.patch(&eve, &theirs, json!({"paused": true}))
+            .await
+            .status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        kit.delete(&eve, &theirs).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_reader_previews_confirms_and_changes_nothing(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, ana_id, InboxRole::Reader).await;
+    let mut proposed = move_github();
+    proposed["state"] = json!("proposed");
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(proposed),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    let preview = kit
+        .post(
+            &ana,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules/preview"),
+            Some(move_github()),
+        )
+        .await;
+    assert_eq!(preview.status, StatusCode::FORBIDDEN);
+    assert_eq!(preview.json["code"], "inbox_read_only");
+    let confirm = kit
+        .post(
+            &ana,
+            &format!("/api/v1/w/{workspace}/rules/{rule}/confirm"),
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(confirm.status, StatusCode::FORBIDDEN);
+    let update = kit
+        .patch(
+            &ana,
+            &format!("/api/v1/w/{workspace}/rules/{rule}"),
+            json!({"paused": true}),
+        )
+        .await;
+    assert_eq!(update.status, StatusCode::FORBIDDEN);
+    assert_eq!(update.json["code"], "rule_not_yours");
+    // Pausing a proposed rule never makes it act without a yes.
+    let paused = kit
+        .patch(
+            &sam,
+            &format!("/api/v1/w/{workspace}/rules/{rule}"),
+            json!({"paused": true}),
+        )
+        .await;
+    assert_eq!(paused.status, StatusCode::CONFLICT);
+    assert_eq!(paused.json["code"], "rule_not_active");
+    assert_eq!(
+        kit.get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+            .await
+            .json["state"],
+        "proposed"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_cannot_replace_someone_elses_rule(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    let (ines, ines_id) = kit.member("ines", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    kit.add_to_inbox(inbox, ines_id, InboxRole::Sender).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let leos = kit.post(&leo, &rules, Some(move_github())).await;
+    let leos = leos.json["rule"]["id"].as_str().unwrap().to_owned();
+
+    // The same rule, written differently, with another stream.
+    let same = json!({
+        "conditions": [{"field": "sender_address", "value": " Notifications@GitHub.com "}],
+        "actions": [{"action": "move_to_stream", "stream": "newsletters"}],
+    });
+    let refused = kit.post(&ines, &rules, Some(same.clone())).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "rule_not_yours");
+    assert_eq!(
+        kit.get(&sam, &format!("/api/v1/w/{workspace}/rules/{leos}"))
+            .await
+            .json["state"],
+        "active"
+    );
+
+    // A manager may, and Leo's rule is retired and announced.
+    let replaced = kit.post(&sam, &rules, Some(same)).await;
+    assert_eq!(replaced.status, StatusCode::CREATED);
+    assert_eq!(replaced.json["rule"]["conditions"][0]["value"], GITHUB);
+    let old = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{leos}"))
+        .await;
+    assert_eq!(old.json["state"], "removed");
+    assert_ne!(old.json["run"]["state"], "running");
+    let removed: Vec<Value> = kit
+        .events("conversations.rule_changed")
+        .await
+        .into_iter()
+        .filter(|e| e["rule"] == leos.as_str() && e["state"] == "removed")
+        .collect();
+    assert_eq!(removed.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn previews_never_show_suspicious_mail_and_say_when_complete(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
+    // gh-2, the newest, looks suspicious.
+    sqlx::query(
+        "UPDATE conversations.decisions d SET value = 'true'::jsonb
+           FROM conversations.messages m
+          WHERE d.message_id = m.id AND m.provider_message_id = 'gh-2'
+            AND d.question = 'suspicious'",
+    )
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let label = json!({
+        "conditions": [{"field": "sender_address", "value": GITHUB}],
+        "actions": [{"action": "needs_reply", "value": true}],
+    });
+    let preview = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules/preview"),
+            Some(label),
+        )
+        .await;
+    assert_eq!(preview.json["would_change"], 3, "{:?}", preview.json);
+    assert_eq!(preview.json["complete"], true);
+    let subjects: Vec<&str> = preview.json["samples"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s["subject"].as_str().unwrap())
+        .collect();
+    assert_eq!(subjects.len(), 2);
+    assert!(!subjects.contains(&"[acme/web] Pull request #4002 merged"));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn putting_back_leaves_another_rules_placement_alone(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let first = kit.post(&sam, &rules, Some(move_github())).await;
+    let first = first.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.run_jobs().await;
+    // A more specific rule moves gh-0 on to Newsletters.
+    let narrower = json!({
+        "conditions": [
+            {"field": "sender_address", "value": GITHUB},
+            {"field": "subject_contains", "value": "#4000"}
+        ],
+        "actions": [{"action": "move_to_stream", "stream": "newsletters"}],
+    });
+    let created = kit.post(&sam, &rules, Some(narrower)).await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    kit.run_jobs().await;
+    kit.delete(
+        &sam,
+        &format!("/api/v1/w/{workspace}/rules/{first}?restore=true"),
+    )
+    .await;
+    kit.run_jobs().await;
+    let placed = streams(&kit).await;
+    let at = |id: &str| placed.iter().find(|(m, ..)| m == id).unwrap().1.clone();
+    assert_eq!(at("gh-0"), "newsletters");
+    assert_eq!(at("gh-1"), "primary");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn public_suffixes_and_long_values_are_refused(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 1).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    for body in [
+        json!({"conditions": [{"field": "sender_domain", "value": "co.uk"},
+                              {"field": "subject_template", "value": "your order # has shipped"}],
+               "actions": [{"action": "archive"}]}),
+        json!({"conditions": [{"field": "subject_contains", "value": "x ".repeat(200)}],
+               "actions": [{"action": "archive"}]}),
+    ] {
+        let refused = kit.post(&sam, &rules, Some(body)).await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+        assert_eq!(refused.json["code"], "invalid_rule");
+    }
 }

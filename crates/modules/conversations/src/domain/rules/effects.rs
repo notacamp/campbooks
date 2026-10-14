@@ -86,20 +86,23 @@ pub async fn place(conn: &mut PgConnection, id: ConversationId, stream: Stream) 
 }
 
 /// Put conversation `id` back in `stream` placed by `source`, if a rule
-/// still holds it there. Returns whether it moved.
+/// still holds it in `moved_to` (the stream the rule put it in; another
+/// rule's later placement is left alone). Returns whether it moved.
 pub async fn unplace(
     conn: &mut PgConnection,
     id: ConversationId,
-    stream: Stream,
-    source: &str,
+    back: (Stream, &str),
+    moved_to: Stream,
 ) -> Result<bool> {
+    let (stream, source) = back;
     let moved = sqlx::query!(
         r#"UPDATE conversations.conversations
               SET stream = $2, stream_source = $3, updated_at = now()
-            WHERE id = $1 AND stream_source = 'taught'"#,
+            WHERE id = $1 AND stream_source = 'taught' AND stream = $4"#,
         id as ConversationId,
         stream.as_str(),
         source,
+        moved_to.as_str(),
     )
     .execute(conn)
     .await?

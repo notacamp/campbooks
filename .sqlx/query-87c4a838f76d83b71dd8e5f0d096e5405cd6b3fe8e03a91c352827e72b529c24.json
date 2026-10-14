@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT c.id AS \"id!: ConversationId\", m.id AS \"message!: MessageId\", c.stream AS \"stream!\",\n               c.stream_source AS \"stream_source!\", c.archived_at IS NOT NULL AS \"archived!\",\n               c.unread_count > 0 AS \"unread!\",\n               coalesce((SELECT array_agg(cl.label_id::text ORDER BY cl.label_id)\n                           FROM conversations.conversation_labels cl\n                          WHERE cl.conversation_id = c.id), '{}') AS \"labels!\",\n               m.sender_address AS \"sender_address!\", m.subject AS \"subject!\",\n               m.subject_template, m.headers AS \"headers!\",\n               (EXISTS (SELECT 1 FROM conversations.decisions d\n                         WHERE d.message_id = m.id AND d.question = 'suspicious'\n                           AND d.value = 'true'::jsonb)\n                OR EXISTS (SELECT 1 FROM conversations.needs n\n                            WHERE n.conversation_id = c.id AND n.state = 'open'\n                              AND n.question = 'suspicious')) AS \"suspicious!\",\n               m.sent_at AS \"sent_at!\"\n          FROM conversations.conversations c\n          CROSS JOIN LATERAL (\n              SELECT id, sender_address, subject, subject_template, headers, sent_at\n                FROM conversations.messages\n               WHERE conversation_id = c.id AND direction = 'inbound'\n               ORDER BY sent_at DESC, id DESC LIMIT 1\n          ) m\n         WHERE c.inbox_id = $1 AND NOT c.trashed\n           AND ($2::uuid IS NULL OR c.id > $2)\n           AND ($3::text IS NULL OR m.sender_address = $3)\n           AND ($4::text IS NULL OR split_part(m.sender_address, '@', 2) = $4\n                OR split_part(m.sender_address, '@', 2) LIKE '%.' || $4)\n           AND ($5::text IS NULL OR lower(m.headers ->> 'list_id') LIKE '%' || $5 || '%')\n           AND ($6::text IS NULL OR m.subject_template = $6)\n         ORDER BY c.id\n         LIMIT $7\n        ",
+  "query": "\n        SELECT c.id AS \"id!: ConversationId\", m.id AS \"message!: MessageId\", c.stream AS \"stream!\",\n               c.stream_source AS \"stream_source!\", c.archived_at IS NOT NULL AS \"archived!\",\n               c.unread_count > 0 AS \"unread!\",\n               coalesce((SELECT array_agg(cl.label_id::text ORDER BY cl.label_id)\n                           FROM conversations.conversation_labels cl\n                          WHERE cl.conversation_id = c.id), '{}') AS \"labels!\",\n               m.sender_address AS \"sender_address!\", m.subject AS \"subject!\",\n               m.subject_template, m.headers AS \"headers!\",\n               (EXISTS (SELECT 1 FROM conversations.decisions d\n                         WHERE d.message_id = m.id AND d.question = 'suspicious'\n                           AND d.value = 'true'::jsonb)\n                OR EXISTS (SELECT 1 FROM conversations.needs n\n                            WHERE n.conversation_id = c.id AND n.state = 'open'\n                              AND n.reason = 'review')) AS \"suspicious!\",\n               m.sent_at AS \"sent_at!\"\n          FROM conversations.conversations c\n          CROSS JOIN LATERAL (\n              SELECT id, sender_address, subject, subject_template, headers, sent_at\n                FROM conversations.messages\n               WHERE conversation_id = c.id AND direction = 'inbound'\n               ORDER BY sent_at DESC, id DESC LIMIT 1\n          ) m\n         WHERE c.id = ANY($1) AND NOT c.trashed\n           AND ($2::text IS NULL OR m.sender_address = $2)\n           AND ($3::text IS NULL OR split_part(m.sender_address, '@', 2) = $3\n                OR split_part(m.sender_address, '@', 2) LIKE '%.' || $4 ESCAPE '\\')\n           AND ($5::text IS NULL OR lower(m.headers ->> 'list_id') LIKE '%' || $5 || '%' ESCAPE '\\')\n           AND ($6::text IS NULL OR m.subject_template = $6 OR m.subject_template IS NULL)\n         ORDER BY c.id\n        ",
   "describe": {
     "columns": [
       {
@@ -129,13 +129,12 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "Uuid",
+        "UuidArray",
         "Text",
         "Text",
         "Text",
         "Text",
-        "Int8"
+        "Text"
       ]
     },
     "nullable": [
@@ -154,5 +153,5 @@
       false
     ]
   },
-  "hash": "a61e50d9f43f1a87120fbf5df133a72598c499b5c12ae56ac76ac0b73f3eb6f8"
+  "hash": "87c4a838f76d83b71dd8e5f0d096e5405cd6b3fe8e03a91c352827e72b529c24"
 }

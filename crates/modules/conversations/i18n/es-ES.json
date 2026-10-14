@@ -22,6 +22,7 @@
     "invalid_rule": "No se puede guardar esta regla. Necesita de una a cuatro condiciones que digan a qué correos se aplica, y de una a cuatro acciones de tipos distintos.",
     "rule_not_yours": "Solo quien enseñó esta regla, o un gestor de la bandeja de entrada, puede cambiarla.",
     "rule_not_proposed": "Esta regla ya no está esperando un sí.",
-    "rule_needs_member": "Las reglas las enseña un miembro de la bandeja de entrada, no una aplicación."
+    "rule_needs_member": "Las reglas las enseña un miembro de la bandeja de entrada, no una aplicación.",
+    "rule_not_active": "Esta regla está esperando un sí. Mantenla primero y luego podrás pausarla."
   }
 }

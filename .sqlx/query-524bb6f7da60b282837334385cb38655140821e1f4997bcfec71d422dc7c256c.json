@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT id AS \"id: MessageId\", subject FROM conversations.messages\n                WHERE inbox_id = $1 AND direction = 'inbound' AND subject_template IS NULL\n                LIMIT $2",
+  "query": "SELECT id AS \"id: MessageId\", subject FROM conversations.messages\n            WHERE inbox_id = $1 AND direction = 'inbound' AND subject_template IS NULL\n            LIMIT $2",
   "describe": {
     "columns": [
       {
@@ -37,5 +37,5 @@
       false
     ]
   },
-  "hash": "f7c1f49cbf1325a106511748e47fd7521cbad2c35aa2963181991b8cf0ff6149"
+  "hash": "524bb6f7da60b282837334385cb38655140821e1f4997bcfec71d422dc7c256c"
 }

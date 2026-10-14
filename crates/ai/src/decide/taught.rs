@@ -132,7 +132,8 @@ impl Condition {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Surface {
-    /// Keep it visible and on Home.
+    /// Keep it visible: no rule archives it, marks it read or moves it out
+    /// of Primary.
     Always,
     /// Raise no need for it.
     Never,
@@ -231,30 +232,76 @@ pub enum Invalid {
 }
 
 /// Free mail providers: a domain of theirs on its own would match people.
-const FREE_MAIL: [&str; 22] = [
+const FREE_MAIL: [&str; 52] = [
     "gmail.com",
     "googlemail.com",
     "outlook.com",
+    "outlook.pt",
+    "outlook.es",
+    "outlook.fr",
     "hotmail.com",
+    "hotmail.co.uk",
+    "hotmail.fr",
+    "hotmail.es",
+    "hotmail.it",
+    "hotmail.de",
     "live.com",
+    "live.co.uk",
+    "live.fr",
     "msn.com",
     "yahoo.com",
+    "yahoo.co.uk",
+    "yahoo.fr",
+    "yahoo.es",
+    "yahoo.de",
     "ymail.com",
+    "rocketmail.com",
     "icloud.com",
     "me.com",
     "mac.com",
     "aol.com",
+    "aol.co.uk",
     "proton.me",
     "protonmail.com",
+    "pm.me",
     "gmx.com",
     "gmx.net",
+    "gmx.de",
+    "gmx.fr",
+    "web.de",
+    "t-online.de",
+    "yandex.com",
+    "yandex.ru",
+    "mail.ru",
+    "fastmail.com",
+    "fastmail.fm",
     "zoho.com",
+    "zohomail.com",
+    "tutanota.com",
+    "tuta.io",
     "sapo.pt",
-    "hotmail.fr",
     "orange.fr",
-    "yahoo.es",
+    "free.fr",
+    "laposte.net",
     "mail.com",
+    "hey.com",
 ];
+
+/// Public suffixes under which anyone registers a domain: a `sender_domain`
+/// condition naming one alone would match unrelated senders.
+const PUBLIC_SUFFIXES: [&str; 24] = [
+    "co.uk", "org.uk", "ac.uk", "gov.uk", "com.br", "net.br", "org.br", "com.pt", "org.pt",
+    "gov.pt", "com.es", "org.es", "gob.es", "com.fr", "gouv.fr", "co.jp", "com.au", "net.au",
+    "co.nz", "co.za", "com.mx", "com.ar", "co.in", "com.cn",
+];
+
+/// Whether `domain` is a domain someone owns: two labels or more, and not a
+/// public suffix (`co.uk`).
+pub fn is_owned_domain(domain: &str) -> bool {
+    let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
+    domain.split('.').filter(|l| !l.is_empty()).count() >= 2
+        && !PUBLIC_SUFFIXES.contains(&domain.as_str())
+}
 
 /// Whether `domain` belongs to a free mail provider.
 pub fn is_free_mail(domain: &str) -> bool {
@@ -309,7 +356,7 @@ impl TaughtRule {
         for condition in conditions {
             let ok = match condition {
                 Condition::SenderAddress(v) => v.contains('@') && !v.trim().is_empty(),
-                Condition::SenderDomain(v) => v.contains('.') && !v.contains('@'),
+                Condition::SenderDomain(v) => !v.contains('@') && is_owned_domain(v),
                 Condition::ListId(v) | Condition::SubjectTemplate(v) | Condition::Label(v) => {
                     !v.trim().is_empty()
                 }
