@@ -584,7 +584,7 @@ Permissions are `super` (everything), `system.read`, `signups.review`, `users.re
 `super` for now. Changes apply on the person's next request.
 
 - Every admin request and every command above is recorded (`admin log`).
-- The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks
+- The admin API asks for a recent sign-in: more than an hour after signing in, the app asks
   the administrator to sign in again.
 - Admin views show metadata only (counts, states, providers, addresses people signed in
   with), never messages or documents, and nobody can act as another person.

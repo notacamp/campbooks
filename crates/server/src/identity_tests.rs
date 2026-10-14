@@ -276,13 +276,13 @@ async fn world(db: PgPool) -> (Browser, TestIdp, Arc<campbooks_identity::deps::I
 }
 
 /// An access token like `access` (its account, session, client and
-/// sign-in time) bound to `workspace`, with identity, search and
-/// conversation scopes.
-async fn bound_token(
+/// sign-in time) with `scope`, bound to `workspace` when given.
+async fn minted_token(
     db: &PgPool,
     issuer: &campbooks_identity::deps::Issuer,
     access: &str,
-    workspace: &str,
+    workspace: Option<&str>,
+    scope: &str,
 ) -> String {
     use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
     use campbooks_identity::domain::{accounts, tokens};
@@ -298,12 +298,10 @@ async fn bound_token(
         client_id: claims["client_id"].as_str().unwrap().to_owned(),
         account_id: account,
         session_id: claims["sid"].as_str().and_then(|s| s.parse().ok()),
-        scope: "identity:read identity:write identity:clients connectors:write search:read \
-                conversations:read"
-            .to_owned(),
+        scope: scope.to_owned(),
         auth_time: chrono::Utc::now(),
         resource: format!("{ORIGIN}/api"),
-        workspace: Some(workspace.parse().unwrap()),
+        workspace: workspace.map(|w| w.parse().unwrap()),
     };
     let profile = accounts::profile(db, account).await.unwrap().unwrap();
     let signer = issuer.keys.signer(db).await.unwrap();
@@ -749,7 +747,15 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     // The same, for a bound token that does hold the scopes (no app may be
     // granted `identity:*`, so it is minted here): account-wide and
     // workspace-management routes answer 404, and Work stays out of reach.
-    let bound = bound_token(&db, &issuer, &access, &home).await;
+    let bound = minted_token(
+        &db,
+        &issuer,
+        &access,
+        Some(&home),
+        "identity:read identity:write identity:clients connectors:write search:read \
+         conversations:read",
+    )
+    .await;
     let bound = format!("Bearer {bound}");
     let none = uuid::Uuid::now_v7();
     for (method, path, body) in [
@@ -839,6 +845,41 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     step(
         "a bound token holding identity scopes: account and app routes 404, Work 404, Home searchable",
     );
+
+    // Even an administrator's token, once bound to a workspace, reaches no
+    // admin route; the same token unbound does.
+    let account = {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        let payload = access.split('.').nth(1).unwrap();
+        let claims: Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).unwrap()).unwrap();
+        claims["sub"].as_str().unwrap().to_owned()
+    };
+    campbooks_admin::cli::grant(
+        &mut db.acquire().await.unwrap(),
+        &account,
+        &[campbooks_kernel::admin::Permission::Super],
+        None,
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
+    for (workspace, expected) in [
+        (Some(home.as_str()), StatusCode::NOT_FOUND),
+        (None, StatusCode::OK),
+    ] {
+        let token = minted_token(&db, &issuer, &access, workspace, "admin:access").await;
+        let reply = browser
+            .raw(
+                Method::GET,
+                "/admin/v1/system/overview",
+                &[("authorization", &format!("Bearer {token}"))],
+                None,
+            )
+            .await;
+        assert_eq!(reply.status, expected, "{workspace:?}: {}", reply.body);
+    }
+    step("an administrator's token bound to Home: admin API 404; unbound: 200");
 
     // A workspace's own server-to-server client.
     let created = browser

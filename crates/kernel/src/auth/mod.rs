@@ -242,8 +242,10 @@ impl AuthFailure {
         match self {
             Self::NotConfigured | Self::MissingToken => "Bearer",
             Self::InvalidToken | Self::ExpiredToken => r#"Bearer error="invalid_token""#,
+            // RFC 9470: `max_age` is `admin::REAUTH_AFTER` in seconds (the
+            // `admin` module's tests hold the two together).
             Self::AdminReauthRequired => {
-                r#"Bearer error="insufficient_user_authentication", max_age=43200"#
+                r#"Bearer error="insufficient_user_authentication", max_age=3600"#
             }
         }
     }

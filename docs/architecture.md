@@ -492,7 +492,7 @@ document, `openapi/admin.json`, never merged into `openapi/openapi.json`, so
 them. Each handler takes `kernel::admin::Admin<P>`: a user's bearer token
 with the `admin:access` scope (which the built-in issuer grants to
 first-party clients only) and a profile allowing `P`, else **404** like an
-unknown route; then a sign-in at most 12 hours old (`auth_time`), else 401
+unknown route; then a sign-in at most an hour old (`auth_time`), else 401
 `admin_reauth_required`. The `kernel::admin::audit` middleware records every
 request that passed the profile check. The web app reaches the admin API
 through `/bff/admin/*`, like `/bff/api/*`; its Admin section lives in

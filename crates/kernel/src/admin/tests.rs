@@ -159,6 +159,10 @@ fn admin_operations_carry_their_permission() {
 fn recent_means_within_an_hour() {
     let now = Utc::now();
     assert!(recently_authenticated(
+        Some(now - TimeDelta::minutes(59)),
+        now
+    ));
+    assert!(!recently_authenticated(
         Some(now - TimeDelta::hours(11)),
         now
     ));
@@ -243,7 +247,10 @@ async fn a_stale_sign_in_must_authenticate_again() {
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
         assert_eq!(
             response.headers()[header::WWW_AUTHENTICATE],
-            r#"Bearer error="insufficient_user_authentication", max_age=43200"#
+            format!(
+                r#"Bearer error="insufficient_user_authentication", max_age={}"#,
+                REAUTH_AFTER.num_seconds()
+            )
         );
     }
     let rows = f.recorded();
