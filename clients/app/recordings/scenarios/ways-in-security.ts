@@ -45,11 +45,15 @@ async function caption(page: Page, text: string): Promise<void> {
   await pause(1800);
 }
 
-/** A platform authenticator that verifies the user at once (as after Touch ID). */
-async function virtualAuthenticator(page: Page): Promise<void> {
+/**
+ * A platform authenticator that verifies the user at once (as after Touch
+ * ID). The returned switch turns that off, as when nobody touches the
+ * sensor (or picks the sign-in screen's autofill suggestion).
+ */
+async function virtualAuthenticator(page: Page): Promise<(on: boolean) => Promise<void>> {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
       transport: "internal",
@@ -59,6 +63,9 @@ async function virtualAuthenticator(page: Page): Promise<void> {
       automaticPresenceSimulation: true,
     },
   });
+  return async (on) => {
+    await cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: on });
+  };
 }
 
 /** Open the account menu (the avatar on a phone, the footer on desktop). */
@@ -71,7 +78,7 @@ async function accountMenu(page: Page): Promise<void> {
 }
 
 export default async function waysInSecurity({ page }: ScenarioContext): Promise<void> {
-  await virtualAuthenticator(page);
+  const presence = await virtualAuthenticator(page);
 
   // Sign up with Google: the account and a workspace.
   await page.goto("/");
@@ -113,8 +120,13 @@ export default async function waysInSecurity({ page }: ScenarioContext): Promise
   await everywhere.scrollIntoViewIfNeeded();
   await caption(page, "If a device was lost, or a way in isn't hers: Sign out everywhere");
   await everywhere.click();
-  await page.getByText(/this browser included/u).waitFor();
+  const confirm = page.getByText(/this browser included/u);
+  await confirm.waitFor();
+  // Above the caption.
+  await confirm.evaluate("(el) => el.scrollIntoView({ block: 'center' })");
   await caption(page, "Confirmed in place: Keep it is focused, nothing happens yet");
+  // Nobody touches the sensor on the sign-in screen that follows.
+  await presence(false);
   await page.getByRole("button", { name: "Sign out everywhere" }).click();
   await page.getByRole("link", { name: /Continue with Google/u }).waitFor();
   await caption(page, "Every sign-in ended: this browser, other devices, every app. Sign in again");
