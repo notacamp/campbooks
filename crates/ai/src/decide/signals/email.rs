@@ -1624,6 +1624,116 @@ impl Strategy for EmailSignals {
     }
 }
 
+// --- Likeness helpers (taught rules, campbooks-cloud#125) -----------------------
+
+/// A best-effort registrable domain of an address or a host
+/// (`notifications@mail.github.com` → `github.com`).
+pub fn registrable_domain(address_or_host: &str) -> String {
+    let host = address_or_host
+        .rsplit_once('@')
+        .map_or(address_or_host, |(_, d)| d);
+    registrable(host)
+}
+
+/// Whether a machine sent it: a list or bulk header, `Auto-Submitted`, or an
+/// automated local part (`no-reply@`, `notifications@`, `billing@`, …).
+pub fn is_machine_sender(env: &Envelope) -> bool {
+    let subject = env.subject.to_lowercase();
+    let (auto_reply, automated_sender) = automation(env, &subject);
+    bulk_header(env).is_some() || auto_reply.is_some() || automated_sender.is_some()
+}
+
+/// The words of a subject or phrase, lower-cased with accents dropped, in
+/// order (letters and digits only).
+pub fn subject_words(text: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    for c in text.chars().flat_map(char::to_lowercase) {
+        if let Some(plain) = fold_accent(c) {
+            word.push_str(plain);
+        } else if c.is_alphanumeric() {
+            word.push(c);
+        } else if !word.is_empty() {
+            words.push(std::mem::take(&mut word));
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
+/// The plain letters of an accented Latin letter (pt, es, fr).
+fn fold_accent(c: char) -> Option<&'static str> {
+    Some(match c {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => "a",
+        'ç' => "c",
+        'è' | 'é' | 'ê' | 'ë' => "e",
+        'ì' | 'í' | 'î' | 'ï' => "i",
+        'ñ' => "n",
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' => "o",
+        'ù' | 'ú' | 'û' | 'ü' => "u",
+        'ý' | 'ÿ' => "y",
+        'œ' => "oe",
+        'æ' => "ae",
+        'ß' => "ss",
+        _ => return None,
+    })
+}
+
+static REPLY_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+    regex(r"(?i)^\s*(?:re|fwd?|fw|enc|res|rv|tr|réf|ref|aw|wg)\s*(?:\[\d+\])?\s*:\s*")
+});
+static DATE_TOKEN: LazyLock<Regex> =
+    LazyLock::new(|| regex(r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b"));
+static ID_TOKEN: LazyLock<Regex> = LazyLock::new(|| regex(r"[\p{L}\d_-]{6,}"));
+static DIGITS: LazyLock<Regex> = LazyLock::new(|| regex(r"\d+"));
+static HASHES: LazyLock<Regex> = LazyLock::new(|| regex(r"#(?:[\s#.,:/-]*#)*"));
+static SPACES: LazyLock<Regex> = LazyLock::new(|| regex(r"\s+"));
+static LITERAL_WORD: LazyLock<Regex> = LazyLock::new(|| regex(r"\p{L}{2,}"));
+
+/// Longest subject template, in characters.
+pub const TEMPLATE_MAX_CHARS: usize = 120;
+
+/// A subject with what changes from one message to the next taken out:
+/// reply and forward prefixes (in the four locales) dropped, dates and digit
+/// runs as `#`, ids (six or more characters mixing letters and digits) as
+/// `*`, lower-cased, spaces collapsed, at most [`TEMPLATE_MAX_CHARS`]. `None`
+/// when fewer than two literal words are left: such a template would match
+/// unrelated mail.
+pub fn subject_template(subject: &str) -> Option<String> {
+    let mut rest = subject.trim();
+    while let Some(m) = REPLY_PREFIX.find(rest) {
+        rest = &rest[m.end()..];
+    }
+    let lower = rest.to_lowercase();
+    let no_dates = DATE_TOKEN.replace_all(&lower, "#");
+    let no_ids = ID_TOKEN.replace_all(&no_dates, |c: &regex::Captures<'_>| {
+        let token = &c[0];
+        let letters = token.chars().any(char::is_alphabetic);
+        let digits = token.chars().any(|ch| ch.is_ascii_digit());
+        if letters && digits {
+            "*".to_owned()
+        } else {
+            token.to_owned()
+        }
+    });
+    let no_digits = DIGITS.replace_all(&no_ids, "#");
+    let hashes = HASHES.replace_all(&no_digits, "#");
+    let template = SPACES.replace_all(hashes.trim(), " ");
+    if LITERAL_WORD.find_iter(&template).count() < 2 {
+        return None;
+    }
+    Some(
+        template
+            .chars()
+            .take(TEMPLATE_MAX_CHARS)
+            .collect::<String>()
+            .trim_end()
+            .to_owned(),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
