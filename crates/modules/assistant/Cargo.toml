@@ -1,6 +1,6 @@
 [package]
 name = "campbooks-assistant"
-description = "Campbooks assistant module."
+description = "Campbooks assistant module: what each member told Scout about how to act, and turning their sentences into taught rules to check."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -10,15 +10,20 @@ publish.workspace = true
 
 [dependencies]
 axum.workspace = true
+campbooks-ai.workspace = true
 campbooks-kernel.workspace = true
+chrono.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
-sqlx.workspace = true
 tokio.workspace = true
+wiremock.workspace = true
 
 [lints]
 workspace = true

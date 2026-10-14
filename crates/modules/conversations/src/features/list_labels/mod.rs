@@ -87,8 +87,12 @@ mod tests {
         let kit = Kit::new(db).await;
         let (workspace, inbox, sam) = kit.sams_inbox().await;
         let (ana, ana_id) = kit.member("ana", workspace);
-        kit.inbox(workspace, "board@example.com", &[(ana_id, InboxRole::Manager)])
-            .await;
+        kit.inbox(
+            workspace,
+            "board@example.com",
+            &[(ana_id, InboxRole::Manager)],
+        )
+        .await;
         sqlx::query(
             "INSERT INTO conversations.labels (id, workspace_id, inbox_id, name)
              SELECT gen_random_uuid(), workspace_id, id, 'Board'

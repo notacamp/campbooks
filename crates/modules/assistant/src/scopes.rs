@@ -27,5 +27,6 @@ pub struct AssistantWrite;
 
 impl ScopeName for AssistantWrite {
     const NAME: &'static str = "assistant:write";
-    const DESCRIPTION: &'static str = "Tell Scout how it should act, and turn your sentences into rules to check.";
+    const DESCRIPTION: &'static str =
+        "Tell Scout how it should act, and turn your sentences into rules to check.";
 }

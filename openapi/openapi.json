@@ -1465,6 +1465,298 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/assistant/compile": {
+      "post": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Turn your sentence into rules to check.",
+        "operationId": "assistant.compile_instruction",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompileRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "What Scout understood; nothing is saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompileResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Empty, too long, a link or pasted mail (`instruction_empty`, `instruction_too_long`, `instruction_has_link`, `instruction_pasted_mail`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many sentences this hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No language model may read sentences here (`ai_role_not_configured`, `ai_external_content_refused`), or it failed (`compile_failed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/assistant/profile": {
+      "get": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Your profile, or the defaults when you never answered.",
+        "operationId": "assistant.get_profile",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your profile.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      },
+      "put": {
+        "tags": [
+          "assistant"
+        ],
+        "summary": "Keep your profile.",
+        "operationId": "assistant.update_profile",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProfileUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Your profile afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A value outside the allowed set.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`profile_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "assistant:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "assistant.profile"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/attention": {
       "get": {
         "tags": [
@@ -5168,6 +5460,230 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Create a taught rule in an inbox.",
+        "operationId": "conversations.create_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "path",
+            "description": "The inbox.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "The rule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedRule"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "conversations.rule",
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.remove_rule"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Preview what a rule would do in an inbox.",
+        "operationId": "conversations.preview_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox_id",
+            "in": "path",
+            "description": "The inbox.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          },
+          {
+            "name": "conditions",
+            "in": "query",
+            "description": "The conditions, a JSON array of `RuleCondition`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "actions",
+            "in": "query",
+            "description": "The actions, a JSON array of `RuleAction`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What it would do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RulePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/invitations": {
       "get": {
         "tags": [
@@ -5349,6 +5865,84 @@
             "workspaces.invitation"
           ],
           "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/labels": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the labels of the inboxes you can read.",
+        "operationId": "conversations.list_labels",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The labels.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
+          ],
+          "risk": "low"
         }
       }
     },
@@ -5716,6 +6310,489 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/rules": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List the taught rules of the inboxes you can read.",
+        "operationId": "conversations.list_rules",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "inbox",
+            "in": "query",
+            "description": "Only this inbox; every inbox you can read when absent.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/InboxId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rules.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such inbox, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rules/{rule_id}": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Read one taught rule.",
+        "operationId": "conversations.get_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rule.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      },
+      "delete": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Remove a rule, optionally putting back what it changed.",
+        "operationId": "conversations.remove_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          },
+          {
+            "name": "restore",
+            "in": "query",
+            "description": "`true` to put back every conversation it changed that no member has\nchanged since.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rule, removed; with the run putting mail back when asked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not your rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule",
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      },
+      "patch": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Change a rule's conditions or actions, pause it or let it act again.",
+        "operationId": "conversations.update_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The rule afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a valid rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not your rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/confirm": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Say yes to a proposed rule.",
+        "operationId": "conversations.confirm_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The rule, now active.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is not waiting for a yes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule",
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.remove_rule"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/search": {
       "get": {
         "tags": [
@@ -5969,6 +7046,114 @@
           "mutates": false,
           "records": [
             "workspaces.security_event"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/senders": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "List who writes to the inboxes you can read.",
+        "operationId": "conversations.list_senders",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "Words (2 to 100 characters) every listed sender's address, display\nname or domain contains, ignoring case and accents. Without it, the\nsenders replied to most.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "How many, 1 to 10 (default 10).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The senders.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SenderList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A `q` or `limit` out of range (`invalid_senders_query`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not a member.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.inbox"
           ],
           "risk": "low"
         }
@@ -9070,6 +10255,40 @@
           }
         }
       },
+      "Candidate": {
+        "type": "object",
+        "description": "Someone the sentence names without an address.",
+        "required": [
+          "address",
+          "received",
+          "replied"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their display name."
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Messages from them.",
+            "minimum": 0
+          },
+          "replied": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their conversations you replied to.",
+            "minimum": 0
+          }
+        }
+      },
       "Capability": {
         "type": "string",
         "description": "What a connection lets Campbooks do with the account.",
@@ -9109,6 +10328,67 @@
           "public"
         ]
       },
+      "CompileOutcome": {
+        "type": "string",
+        "description": "What came of the sentence.",
+        "enum": [
+          "rules",
+          "unsupported",
+          "unclear"
+        ]
+      },
+      "CompileRequest": {
+        "type": "object",
+        "description": "The sentence to compile.",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "What you want, in your own words (at most 300 characters).",
+            "example": "anything from my accountant always matters"
+          }
+        },
+        "additionalProperties": false
+      },
+      "CompileResult": {
+        "type": "object",
+        "description": "What Scout understood. Nothing is saved.",
+        "required": [
+          "outcome",
+          "text",
+          "proposals"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/CompileOutcome",
+            "description": "Rules to check, something rules can't do, or unclear."
+          },
+          "proposals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "description": "The rules, at most three."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence as used, to keep as the rule's `origin_text`."
+          },
+          "unsupported": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UnsupportedReason",
+                "description": "Why not, when `unsupported`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "Confirm": {
         "type": "object",
         "description": "Yes to a question.",
@@ -9119,6 +10399,17 @@
           "message_id": {
             "$ref": "#/components/schemas/MessageId",
             "description": "The message the question the member saw comes from."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConfirmRule": {
+        "type": "object",
+        "description": "How to confirm a proposed rule.",
+        "properties": {
+          "apply_to_existing": {
+            "type": "boolean",
+            "description": "Apply it to the mail already in the inbox too (default true)."
           }
         },
         "additionalProperties": false
@@ -9590,6 +10881,28 @@
               }
             ]
           },
+          "rule": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RuleMark",
+                "description": "The taught rule that placed or changed it, while no member changed\nthat back."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rule_exception": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RuleException",
+                "description": "In the response of an operation that changed back what a rule did:\nthat rule, now leaving this conversation alone."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "snippet": {
             "type": "string",
             "description": "The start of the newest message's text."
@@ -9628,6 +10941,72 @@
             "minimum": 0
           }
         }
+      },
+      "CreateRule": {
+        "type": "object",
+        "description": "A rule to create.",
+        "required": [
+          "conditions",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it does."
+          },
+          "apply_to_existing": {
+            "type": "boolean",
+            "description": "Apply it to the mail already in the inbox too (default true)."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "All must hold."
+          },
+          "from_conversation_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConversationId",
+                "description": "The conversation it was taught from."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "origin": {
+            "$ref": "#/components/schemas/RuleOrigin",
+            "description": "Where it came from (default `action`)."
+          },
+          "origin_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The member's own words, for an instruction (at most 500 characters)."
+          },
+          "state": {
+            "$ref": "#/components/schemas/NewRuleState",
+            "description": "Act now or wait for a yes (default active). Rules from corrections\nor suggestions act now only when the member lets Campbooks act\nwithout asking and the inbox is theirs alone."
+          },
+          "teaching_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TeachingId",
+                "description": "The teaching it belongs to, when one teaching makes rules in several\ninboxes."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false
       },
       "CreateWorkspace": {
         "type": "object",
@@ -9701,6 +11080,24 @@
           }
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
+      },
+      "CreatedRule": {
+        "type": "object",
+        "description": "A rule just created.",
+        "required": [
+          "rule",
+          "acted_without_asking"
+        ],
+        "properties": {
+          "acted_without_asking": {
+            "type": "boolean",
+            "description": "Campbooks made it active on its own, from evidence: tell the member,\nwith Undo."
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleView",
+            "description": "The rule (with its run when it is applying to existing mail)."
+          }
+        }
       },
       "CreationOptions": {
         "type": "object",
@@ -9817,7 +11214,8 @@
           "rules",
           "model",
           "knn",
-          "cascade"
+          "cascade",
+          "taught"
         ]
       },
       "DecisionView": {
@@ -10200,6 +11598,46 @@
           }
         }
       },
+      "HeaderCondition": {
+        "type": "object",
+        "description": "A header test: present, or equal to a value.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/HeaderField",
+            "description": "Which header."
+          },
+          "value": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The value it must have (case-insensitive); absent means \"present\"."
+          }
+        }
+      },
+      "HeaderField": {
+        "type": "string",
+        "description": "A stored header a condition may test.",
+        "enum": [
+          "list_id",
+          "list_unsubscribe",
+          "precedence",
+          "auto_submitted"
+        ]
+      },
+      "HeaderKey": {
+        "type": "string",
+        "description": "A header a condition may test.",
+        "enum": [
+          "list_id",
+          "list_unsubscribe",
+          "auto_submitted",
+          "precedence"
+        ]
+      },
       "Health": {
         "type": "string",
         "description": "How a connection is doing.",
@@ -10406,6 +11844,30 @@
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
       },
+      "InboxLabel": {
+        "type": "object",
+        "description": "A label of an inbox.",
+        "required": [
+          "id",
+          "inbox",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/LabelId",
+            "description": "The label."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name.",
+            "example": "Clients"
+          }
+        }
+      },
       "InboxList": {
         "type": "object",
         "description": "The inboxes, by address.",
@@ -10438,7 +11900,8 @@
           "id",
           "channel",
           "address",
-          "unread_count"
+          "unread_count",
+          "shared"
         ],
         "properties": {
           "address": {
@@ -10471,6 +11934,10 @@
                 "type": "null"
               }
             ]
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether someone other than the caller holds a role on it (for a\nclient token: more than one member). Never says who."
           },
           "unread_count": {
             "type": "integer",
@@ -10687,6 +12154,22 @@
         "type": "string",
         "format": "uuid",
         "description": "LabelId (UUIDv7)"
+      },
+      "LabelList": {
+        "type": "object",
+        "description": "Labels, by inbox then name.",
+        "required": [
+          "labels"
+        ],
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/InboxLabel"
+            },
+            "description": "The labels."
+          }
+        }
       },
       "LabelView": {
         "type": "object",
@@ -10956,6 +12439,7 @@
         "enum": [
           "rules",
           "model",
+          "taught",
           "member"
         ]
       },
@@ -11169,6 +12653,14 @@
           }
         }
       },
+      "NewRuleState": {
+        "type": "string",
+        "description": "Whether a new rule should act now or wait for a yes.",
+        "enum": [
+          "active",
+          "proposed"
+        ]
+      },
       "Outcome": {
         "type": "string",
         "description": "How a member resolves a need.",
@@ -11269,6 +12761,43 @@
           "resync"
         ]
       },
+      "PreviewSample": {
+        "type": "object",
+        "description": "One conversation a rule would change.",
+        "required": [
+          "conversation_id",
+          "subject",
+          "sender",
+          "sent_at"
+        ],
+        "properties": {
+          "conversation_id": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "sender": {
+            "type": "string",
+            "description": "Its sender's address."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was sent."
+          },
+          "subject": {
+            "type": "string",
+            "description": "Its newest inbound message's subject."
+          }
+        }
+      },
+      "Proactivity": {
+        "type": "string",
+        "description": "Whether rules Scout proposes from a member's own corrections may start\non their own (in an inbox only they use) or wait for a yes.",
+        "enum": [
+          "ask_first",
+          "act_then_tell"
+        ]
+      },
       "Problem": {
         "type": "object",
         "description": "RFC 9457 problem details.",
@@ -11309,6 +12838,392 @@
           "status": 404,
           "title": "Not found",
           "type": "about:blank"
+        }
+      },
+      "ProfileUpdate": {
+        "type": "object",
+        "description": "The profile to keep.",
+        "required": [
+          "proactivity",
+          "asked"
+        ],
+        "properties": {
+          "asked": {
+            "type": "boolean",
+            "description": "Whether you answered or put off the questions (keeps the first time)."
+          },
+          "proactivity": {
+            "$ref": "#/components/schemas/Proactivity",
+            "description": "How rules Scout proposes from your corrections start."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ProfileView": {
+        "type": "object",
+        "description": "What the member told Scout.",
+        "required": [
+          "proactivity",
+          "revision"
+        ],
+        "properties": {
+          "asked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When you answered or put off the questions; `None` until then."
+          },
+          "proactivity": {
+            "$ref": "#/components/schemas/Proactivity",
+            "description": "How rules Scout proposes from your corrections start."
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Grows by one on every change; 0 before the first.",
+            "minimum": 0
+          }
+        }
+      },
+      "Proposal": {
+        "type": "object",
+        "description": "One rule to check.",
+        "required": [
+          "conditions",
+          "actions",
+          "inboxes"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedAction"
+            },
+            "description": "What it does."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposedCondition"
+            },
+            "description": "All must hold; without the sender while `who` is unanswered."
+          },
+          "inboxes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProposalInbox"
+            },
+            "description": "The inboxes it can be taught in (where you may send)."
+          },
+          "who": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WhoQuestion",
+                "description": "A sender to pick before saving: add it as `sender_address` (or\n`sender_domain`)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProposalInbox": {
+        "type": "object",
+        "description": "An inbox a rule can be taught in.",
+        "required": [
+          "id",
+          "address",
+          "shared"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Its address."
+          },
+          "id": {
+            "type": "string",
+            "description": "The inbox."
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Someone else uses it too: the rule would act for everyone there."
+          }
+        }
+      },
+      "ProposedAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Put the conversation in this stream.",
+            "required": [
+              "stream",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "move_to_stream"
+                ]
+              },
+              "stream": {
+                "$ref": "#/components/schemas/StreamKey",
+                "description": "The stream."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take it out of the inbox.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "archive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Put this label on it (its id).",
+            "required": [
+              "label",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "add_label"
+                ]
+              },
+              "label": {
+                "type": "string",
+                "description": "The label."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Mark it read.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mark_read"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it needs a reply.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "needs_reply"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it asks for an action.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "asks_action"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Always or never show it.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "surface"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/SurfaceKey",
+                "description": "Which."
+              }
+            }
+          }
+        ],
+        "description": "What a rule does."
+      },
+      "ProposedCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The sender's address is this one.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_address"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's address is this one."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The sender's domain is this one, or a subdomain of it.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_domain"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's domain is this one, or a subdomain of it."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The subject holds these words, in this order.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "subject_contains"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The subject holds these words, in this order."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A header is present.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "header"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/ProposedHeader",
+                "description": "A header is present."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation has this label (its id).",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "label"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The conversation has this label (its id)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation is in this stream.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "stream"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/StreamKey",
+                "description": "The conversation is in this stream."
+              }
+            }
+          }
+        ],
+        "description": "One test on a message; all of a rule's conditions must hold."
+      },
+      "ProposedHeader": {
+        "type": "object",
+        "description": "A header test: the header is present.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/HeaderKey",
+            "description": "Which header."
+          }
         }
       },
       "Provider": {
@@ -11817,6 +13732,721 @@
           "member"
         ]
       },
+      "RuleAction": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "Put the conversation in this stream.",
+            "required": [
+              "stream",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "move_to_stream"
+                ]
+              },
+              "stream": {
+                "$ref": "#/components/schemas/Stream",
+                "description": "The stream."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Take it out of the inbox.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "archive"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Put this label on it.",
+            "required": [
+              "label",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "add_label"
+                ]
+              },
+              "label": {
+                "$ref": "#/components/schemas/LabelId",
+                "description": "The label."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Mark it read.",
+            "required": [
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "mark_read"
+                ]
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it needs a reply.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "needs_reply"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Whether it asks for an action.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "asks_action"
+                ]
+              },
+              "value": {
+                "type": "boolean",
+                "description": "Yes or no."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "Always or never show it.",
+            "required": [
+              "value",
+              "action"
+            ],
+            "properties": {
+              "action": {
+                "type": "string",
+                "enum": [
+                  "surface"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/SurfaceWhen",
+                "description": "Which."
+              }
+            }
+          }
+        ],
+        "description": "What a rule does; at most one of each kind, labels excepted."
+      },
+      "RuleCondition": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "The sender's address is this one.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_address"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's address is this one."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The sender's domain is this one, or a subdomain of it (never a free\nmail domain on its own).",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "sender_domain"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The sender's domain is this one, or a subdomain of it (never a free\nmail domain on its own)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The `List-Id` is this one.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "list_id"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The `List-Id` is this one."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The subject's template is this one (\"your order # has shipped\").",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "subject_template"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The subject's template is this one (\"your order # has shipped\")."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The subject holds these words, in this order (case and accents ignored).",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "subject_contains"
+                ]
+              },
+              "value": {
+                "type": "string",
+                "description": "The subject holds these words, in this order (case and accents ignored)."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "A stored header is present, or has a value.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "header"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/HeaderCondition",
+                "description": "A stored header is present, or has a value."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation has this label.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "label"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/LabelId",
+                "description": "The conversation has this label."
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "The conversation is in this stream.",
+            "required": [
+              "value",
+              "field"
+            ],
+            "properties": {
+              "field": {
+                "type": "string",
+                "enum": [
+                  "stream"
+                ]
+              },
+              "value": {
+                "$ref": "#/components/schemas/Stream",
+                "description": "The conversation is in this stream."
+              }
+            }
+          }
+        ],
+        "description": "One test on a message; all of a rule's conditions must hold."
+      },
+      "RuleException": {
+        "type": "object",
+        "description": "A rule a member just changed back on one conversation.",
+        "required": [
+          "rule_id",
+          "recent_exceptions"
+        ],
+        "properties": {
+          "recent_exceptions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Its exceptions in the last 30 days, this one included.",
+            "minimum": 0
+          },
+          "rule_id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          }
+        }
+      },
+      "RuleId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RuleId (UUIDv7)"
+      },
+      "RuleList": {
+        "type": "object",
+        "description": "Rules, proposed ones first, then newest first.",
+        "required": [
+          "rules"
+        ],
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleView"
+            },
+            "description": "The rules."
+          }
+        }
+      },
+      "RuleMark": {
+        "type": "object",
+        "description": "The rule that placed or changed a conversation, as rows show it.",
+        "required": [
+          "id",
+          "actions",
+          "conditions",
+          "applied_count"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it does."
+          },
+          "applied_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many conversations it has changed.",
+            "minimum": 0
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "Its conditions, for \"like … others from …\"."
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          }
+        }
+      },
+      "RuleOrigin": {
+        "type": "string",
+        "description": "Where a taught rule came from.",
+        "enum": [
+          "action",
+          "onboarding",
+          "instruction",
+          "correction",
+          "suggestion"
+        ]
+      },
+      "RuleOverride": {
+        "type": "object",
+        "description": "An active rule a new one would take over from on some conversations.",
+        "required": [
+          "rule_id",
+          "conditions",
+          "actions",
+          "conversations"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "Its actions."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "Its conditions, to say which."
+          },
+          "conversations": {
+            "type": "integer",
+            "format": "int32",
+            "description": "On how many conversations.",
+            "minimum": 0
+          },
+          "rule_id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          }
+        }
+      },
+      "RulePreview": {
+        "type": "object",
+        "description": "What a rule would do to the inbox's mail now.",
+        "required": [
+          "matching",
+          "would_change",
+          "samples",
+          "skipped_suspicious",
+          "skipped_member",
+          "overrides"
+        ],
+        "properties": {
+          "matching": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations it matches.",
+            "minimum": 0
+          },
+          "overrides": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleOverride"
+            },
+            "description": "Active rules it would take over from."
+          },
+          "samples": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PreviewSample"
+            },
+            "description": "The newest of them."
+          },
+          "skipped_member": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Left alone because a member placed them.",
+            "minimum": 0
+          },
+          "skipped_suspicious": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Left alone because they look suspicious.",
+            "minimum": 0
+          },
+          "would_change": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Of those, the ones it would change.",
+            "minimum": 0
+          }
+        }
+      },
+      "RuleRunId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RuleRunId (UUIDv7)"
+      },
+      "RuleState": {
+        "type": "string",
+        "description": "Whether a taught rule acts.",
+        "enum": [
+          "proposed",
+          "active",
+          "paused",
+          "removed"
+        ]
+      },
+      "RuleView": {
+        "type": "object",
+        "description": "A taught rule.",
+        "required": [
+          "id",
+          "inbox_id",
+          "teaching_id",
+          "conditions",
+          "actions",
+          "origin",
+          "state",
+          "created_at",
+          "applied_count",
+          "recent_exceptions",
+          "shared",
+          "may_change"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it does."
+          },
+          "applied_count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations it has changed.",
+            "minimum": 0
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "All must hold."
+          },
+          "confirmed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When a member said yes to it."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was made."
+          },
+          "from_conversation_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConversationId",
+                "description": "The conversation it was taught from."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          },
+          "inbox_id": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "Its inbox."
+          },
+          "last_applied_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last changed one."
+          },
+          "may_change": {
+            "type": "boolean",
+            "description": "Whether the caller may change or remove it."
+          },
+          "origin": {
+            "$ref": "#/components/schemas/RuleOrigin",
+            "description": "Where it came from."
+          },
+          "origin_text": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The member's own words, for an instruction."
+          },
+          "recent_exceptions": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations members changed back in the last 30 days.",
+            "minimum": 0
+          },
+          "run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunView",
+                "description": "Its newest run over existing mail."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Whether other members use its inbox: it acts for them too."
+          },
+          "state": {
+            "$ref": "#/components/schemas/RuleState",
+            "description": "Whether it acts. `paused` when its author can no longer change the inbox."
+          },
+          "taught_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "Who taught it; `None` when a client did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "teaching_id": {
+            "$ref": "#/components/schemas/TeachingId",
+            "description": "The teaching it came with (shared by its rules in other inboxes)."
+          }
+        }
+      },
+      "RunKind": {
+        "type": "string",
+        "description": "What a run over existing mail does.",
+        "enum": [
+          "apply",
+          "revert"
+        ]
+      },
+      "RunState": {
+        "type": "string",
+        "description": "Where a run is.",
+        "enum": [
+          "running",
+          "done",
+          "cancelled"
+        ]
+      },
+      "RunView": {
+        "type": "object",
+        "description": "A run, as clients show its progress.",
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "total",
+          "done",
+          "changed",
+          "skipped_suspicious",
+          "skipped_member",
+          "started_at"
+        ],
+        "properties": {
+          "changed": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Changed so far.",
+            "minimum": 0
+          },
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Looked at so far.",
+            "minimum": 0
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it ended."
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleRunId",
+            "description": "The run."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RunKind",
+            "description": "Applying, or putting back."
+          },
+          "skipped_member": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Left alone because a member placed them or changed them back.",
+            "minimum": 0
+          },
+          "skipped_suspicious": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Left alone because they look suspicious.",
+            "minimum": 0
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it started."
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState",
+            "description": "Where it is."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations it looks at.",
+            "minimum": 0
+          }
+        }
+      },
       "SearchResults": {
         "type": "object",
         "description": "A page of results.",
@@ -11940,6 +14570,58 @@
             "type": "integer",
             "format": "int32",
             "description": "The draft's version as last saved by the caller; any other answers\n409 `draft_changed`, so what is sent is what the member saw.",
+            "minimum": 0
+          }
+        }
+      },
+      "SenderList": {
+        "type": "object",
+        "description": "Senders, replied to most first.",
+        "required": [
+          "senders"
+        ],
+        "properties": {
+          "senders": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SenderView"
+            },
+            "description": "Replied to most first, then written most, then by address."
+          }
+        }
+      },
+      "SenderView": {
+        "type": "object",
+        "description": "Someone who writes to the caller's inboxes.",
+        "required": [
+          "address",
+          "received",
+          "replied"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address, lower-cased.",
+            "example": "rita@silva-contas.example"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The display name on their newest message, when it had one.",
+            "example": "Rita Gomes"
+          },
+          "received": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Inbound messages from them in the caller's inboxes.",
+            "minimum": 0
+          },
+          "replied": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Their conversations the caller's inboxes replied to.",
             "minimum": 0
           }
         }
@@ -12287,6 +14969,16 @@
           }
         }
       },
+      "StreamKey": {
+        "type": "string",
+        "description": "A stream.",
+        "enum": [
+          "primary",
+          "updates",
+          "receipts",
+          "newsletters"
+        ]
+      },
       "StreamSource": {
         "type": "string",
         "description": "Who put a conversation in its stream.",
@@ -12294,6 +14986,7 @@
           "default",
           "rules",
           "model",
+          "taught",
           "member"
         ]
       },
@@ -12397,6 +15090,22 @@
           }
         }
       },
+      "SurfaceKey": {
+        "type": "string",
+        "description": "Always or never show.",
+        "enum": [
+          "always",
+          "never"
+        ]
+      },
+      "SurfaceWhen": {
+        "type": "string",
+        "description": "Always or never show.",
+        "enum": [
+          "always",
+          "never"
+        ]
+      },
       "SyncScheduled": {
         "type": "object",
         "description": "What was scheduled.",
@@ -12411,6 +15120,11 @@
             "minimum": 0
           }
         }
+      },
+      "TeachingId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "TeachingId (UUIDv7)"
       },
       "TokenForm": {
         "type": "object",
@@ -12531,6 +15245,54 @@
           "sure",
           "check"
         ]
+      },
+      "UnsupportedReason": {
+        "type": "string",
+        "description": "Why a sentence can't be a rule.",
+        "enum": [
+          "sends_mail",
+          "deletes_mail",
+          "not_about_mail",
+          "too_vague"
+        ]
+      },
+      "UpdateRule": {
+        "type": "object",
+        "description": "What to change about a rule.",
+        "properties": {
+          "actions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "New actions."
+          },
+          "adopt": {
+            "type": "boolean",
+            "description": "A manager takes over a rule whose author can no longer change the\ninbox, so it acts again with their rights."
+          },
+          "conditions": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "New conditions."
+          },
+          "paused": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "`true` to pause it, `false` to let it act again."
+          }
+        },
+        "additionalProperties": false
       },
       "UpdateWorkspace": {
         "type": "object",
@@ -12678,6 +15440,33 @@
               "type": "string"
             },
             "description": "The providers this instance offers, in display order."
+          }
+        }
+      },
+      "WhoQuestion": {
+        "type": "object",
+        "description": "\"Who do you mean by …?\": the person must pick or type the sender.",
+        "required": [
+          "phrase",
+          "candidates",
+          "matched"
+        ],
+        "properties": {
+          "candidates": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "description": "Senders whose name, address or domain matches the phrase, replied\nto most first; when none match, the people replied to most."
+          },
+          "matched": {
+            "type": "boolean",
+            "description": "Whether the candidates matched the phrase."
+          },
+          "phrase": {
+            "type": "string",
+            "description": "The words from the sentence.",
+            "example": "my accountant"
           }
         }
       },
@@ -12850,7 +15639,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `assistant:read`: See what you told Scout about how it should act.\n- `assistant:write`: Tell Scout how it should act, and turn your sentences into rules to check.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -12888,6 +15677,10 @@
     {
       "name": "search",
       "description": "One search over the records you may open: conversations today. Words in English, Portuguese, Spanish and French with accents ignored, Gmail-style operators, highlights as plain-text segments. Results come only from the containers (inboxes) you may see, checked at query time."
+    },
+    {
+      "name": "assistant",
+      "description": "What you told Scout about how to act, and turning a sentence you type into rules to check. Compiling uses the `complete` AI role only when you ask, and sends it your sentence and your own addresses and label names, never your mail; nothing is saved until you save a rule through the conversations module."
     },
     {
       "name": "changes",

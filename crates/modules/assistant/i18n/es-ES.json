@@ -1,0 +1,10 @@
+{
+  "errors": {
+    "profile_needs_member": "Solo un miembro de este espacio de trabajo puede decirle a Scout cómo actuar.",
+    "compile_failed": "Scout no ha podido leer tu frase ahora. Inténtalo de nuevo en un momento o crea la regla tú mismo.",
+    "instruction_empty": "Escribe lo que quieres que Scout haga con tu correo.",
+    "instruction_too_long": "Usa como máximo {{max}} caracteres: una o dos frases.",
+    "instruction_has_link": "No incluyas enlaces. Di qué correo y qué hacer con él.",
+    "instruction_pasted_mail": "Esto parece pegado de un correo. Di con tus palabras qué correo y qué hacer con él."
+  }
+}

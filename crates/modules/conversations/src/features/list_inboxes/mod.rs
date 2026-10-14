@@ -160,8 +160,12 @@ mod tests {
         let workspace = WorkspaceId::new();
         let (ana, ana_id) = kit.member("ana", workspace);
         let (_, leo_id) = kit.member("leo", workspace);
-        kit.inbox(workspace, "ana@example.com", &[(ana_id, InboxRole::Manager)])
-            .await;
+        kit.inbox(
+            workspace,
+            "ana@example.com",
+            &[(ana_id, InboxRole::Manager)],
+        )
+        .await;
         kit.inbox(
             workspace,
             "office@example.com",
@@ -169,7 +173,9 @@ mod tests {
         )
         .await;
 
-        let anas = kit.get(&ana, &format!("/api/v1/w/{workspace}/inboxes")).await;
+        let anas = kit
+            .get(&ana, &format!("/api/v1/w/{workspace}/inboxes"))
+            .await;
         let inboxes = anas.json["inboxes"].as_array().unwrap();
         assert_eq!(inboxes[0]["address"], "ana@example.com");
         assert_eq!(inboxes[0]["shared"], false);

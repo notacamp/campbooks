@@ -188,7 +188,9 @@ mod tests {
         let kit = Kit::new(db).await;
         let (workspace, _, sam) = kit.sams_inbox().await;
 
-        let response = kit.get(&sam, &format!("/api/v1/w/{workspace}/senders")).await;
+        let response = kit
+            .get(&sam, &format!("/api/v1/w/{workspace}/senders"))
+            .await;
         assert_eq!(response.status, StatusCode::OK);
         let senders = response.json["senders"].as_array().unwrap();
         assert_eq!(senders[0]["address"], "maya@northwind-studio.example");
@@ -248,7 +250,9 @@ mod tests {
         let reader = kit.get(&ana, &uri).await;
         assert!(!reader.json["senders"].as_array().unwrap().is_empty());
 
-        let stranger = kit.get(&ana, &format!("/api/v1/w/{}/senders", WorkspaceId::new())).await;
+        let stranger = kit
+            .get(&ana, &format!("/api/v1/w/{}/senders", WorkspaceId::new()))
+            .await;
         assert_eq!(stranger.status, StatusCode::NOT_FOUND);
         assert_eq!(kit.get("", &uri).await.status, StatusCode::UNAUTHORIZED);
     }
