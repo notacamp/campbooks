@@ -1,5 +1,6 @@
 {
   "errors": {
+    "ai_external_content_refused": "Le fournisseur d’IA du rôle {{role}} est hors du réseau de cette instance, et cette instance ne lui envoie pas de courrier. Un administrateur peut l’autoriser.",
     "ai_role_not_configured": "Cette instance n’a aucun modèle d’IA configuré pour le rôle {{role}}. Un administrateur peut en configurer un."
   }
 }
