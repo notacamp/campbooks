@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.signup_requests\n                SET status = $2, decided_at = now(), decided_by = $3, reason = $4\n              WHERE user_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "137ab6e8d506bc28fa09ecbeef6edb1d89c43ba294025cf97ee32fcf48142ac7"
+}

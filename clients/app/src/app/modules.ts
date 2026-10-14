@@ -17,7 +17,12 @@ import {
   JOBS_ADMIN_SECTION,
   SYSTEM_ADMIN_SECTION,
 } from "~/modules/system";
-import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
+import {
+  buildWorkspacesAdminRoutes,
+  buildWorkspacesRoutes,
+  SIGNUPS_ADMIN_SECTION,
+  WORKSPACES_SHORTCUTS,
+} from "~/modules/workspaces";
 
 export interface ModuleRouteParents<
   TPublic extends AnyRoute,
@@ -63,11 +68,15 @@ export function buildModuleRoutes<
  * module contributes its own admin operations.
  */
 export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
-  return [...buildSystemAdminRoutes(admin)] as const;
+  return [...buildSystemAdminRoutes(admin), ...buildWorkspacesAdminRoutes(admin)] as const;
 }
 
 /** The admin sidebar, one entry per module panel (named `admin.sections.<id>`). */
-export const ADMIN_SECTIONS = [SYSTEM_ADMIN_SECTION, JOBS_ADMIN_SECTION] as const;
+export const ADMIN_SECTIONS = [
+  SYSTEM_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
+  JOBS_ADMIN_SECTION,
+] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
 export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [

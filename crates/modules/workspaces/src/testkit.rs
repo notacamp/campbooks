@@ -103,6 +103,19 @@ impl Kit {
         }
     }
 
+    /// A user `sub` with the admin API's scope, signed in `age_seconds` ago.
+    pub fn admin_caller(&self, sub: &str, age_seconds: i64) -> Caller {
+        let mut claims = self.idp.claims(campbooks_kernel::admin::ACCESS_SCOPE);
+        claims["sub"] = sub.into();
+        claims["auth_time"] = (chrono::Utc::now().timestamp() - age_seconds).into();
+        Caller {
+            token: self.idp.token(&claims),
+            subject: sub.to_owned(),
+            email: None,
+            kind: PrincipalKind::User,
+        }
+    }
+
     /// A user `sub` granted only `scopes`.
     pub fn user_scopes(&self, sub: &str, scopes: &str) -> Caller {
         let mut claims = self.idp.claims(scopes);

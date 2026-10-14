@@ -222,7 +222,7 @@ fn the_admin_document_describes_its_security_and_permissions() {
 /// Tables whose rows an administrator may read across workspaces through
 /// `kernel::db::begin_admin` (an admin-read policy). Grows with the slices
 /// that add admin views; reviewed like an ADR (ADR 0015).
-const ADMIN_READ_TABLES: &[&str] = &[];
+const ADMIN_READ_TABLES: &[&str] = &["workspaces.signup_requests"];
 
 /// Tables holding people's content (or secrets). They never get an
 /// admin-read policy.

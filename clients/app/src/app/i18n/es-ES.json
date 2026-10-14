@@ -64,7 +64,8 @@
     "back": "Volver a Campbooks",
     "sections": {
       "system": "Sistema",
-      "jobs": "Trabajos"
+      "jobs": "Trabajos",
+      "signups": "Registros"
     },
     "menuEntry": "Administración",
     "reauthTitle": "Vuelve a iniciar sesión para continuar",

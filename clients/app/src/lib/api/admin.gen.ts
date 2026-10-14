@@ -109,6 +109,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/workspaces/signup-codes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List signup codes. */
+        get: operations["workspaces.admin_list_signup_codes"];
+        put?: never;
+        /** Mint a signup code. */
+        post: operations["workspaces.admin_mint_signup_code"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/workspaces/signup-codes/{code_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke a signup code. */
+        post: operations["workspaces.admin_revoke_signup_code"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/workspaces/signup-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List signup requests. */
+        get: operations["workspaces.admin_list_signup_requests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/workspaces/signup-requests/{user_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve a signup request. */
+        post: operations["workspaces.admin_approve_signup_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/workspaces/signup-requests/{user_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject a signup request. */
+        post: operations["workspaces.admin_reject_signup_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -195,6 +281,11 @@ export interface components {
          * @enum {string}
          */
         BlobBackend: "fs" | "s3";
+        /**
+         * @description What a signup code can still do.
+         * @enum {string}
+         */
+        CodeState: "active" | "used_up" | "expired" | "revoked";
         /**
          * @description The non-secret facts of a [`Config`] an administrator sees
          *     ([`Config::summary`]).
@@ -358,6 +449,35 @@ export interface components {
          * @enum {string}
          */
         Migrations: "on_start" | "separately";
+        /** @description A new signup code. */
+        MintSignupCode: {
+            /**
+             * Format: date-time
+             * @description After this it cannot be redeemed; must be in the future. Never
+             *     expires when absent.
+             */
+            expires_at?: string | null;
+            /**
+             * @description What it is for (who it goes to), 1 to 100 characters.
+             * @example Beta tester, Ana
+             */
+            label: string;
+            /**
+             * Format: int32
+             * @description How many times it can be redeemed: 1 to 100000, default 1.
+             */
+            max_uses?: number | null;
+        };
+        /** @description A freshly minted code. */
+        MintedSignupCode: {
+            /**
+             * @description The code to hand over, like `K7QM-2XWP-9DHE-RT4A`. Shown here once.
+             * @example K7QM-2XWP-9DHE-RT4A
+             */
+            code: string;
+            /** @description The stored code (without the code itself). */
+            entry: components["schemas"]["SignupCodeView"];
+        };
         /**
          * @description What a retry or discard did.
          * @enum {string}
@@ -416,6 +536,19 @@ export interface components {
              */
             oldest_ready_seconds?: number | null;
         };
+        /** @description Why a request is turned down. */
+        RejectSignupRequest: {
+            /**
+             * @description An optional note for the administrators' records, at most 500
+             *     characters. The requester is told only that they were not approved.
+             */
+            reason?: string | null;
+        };
+        /**
+         * @description Where a user's signup request stands.
+         * @enum {string}
+         */
+        RequestStatus: "pending" | "approved" | "rejected";
         /** @description Which dead jobs to retry. */
         RetryKind: {
             /** @description The kind (`<module>.<job>`). */
@@ -437,10 +570,101 @@ export interface components {
             requeued: number;
         };
         /**
+         * Format: uuid
+         * @description SignupCodeId (UUIDv7)
+         */
+        SignupCodeId: string;
+        /** @description A page of signup codes. */
+        SignupCodeList: {
+            /** @description The codes, newest first. */
+            codes: components["schemas"]["SignupCodeView"][];
+            /** @description Pass as `after` for the next page; `null` on the last one. */
+            next?: string | null;
+        };
+        /**
+         * @description One minted signup code. The code itself is never here: only its
+         *     administrators saw it, once, when it was minted.
+         */
+        SignupCodeView: {
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            created_at: string;
+            /** @description The administrator who minted it (their account id). */
+            created_by: string;
+            /**
+             * Format: date-time
+             * @description After this it cannot be redeemed.
+             */
+            expires_at?: string | null;
+            /** @description Its id. */
+            id: components["schemas"]["SignupCodeId"];
+            /** @description What the administrator called it. */
+            label: string;
+            /**
+             * Format: int32
+             * @description How many times it can be redeemed.
+             */
+            max_uses: number;
+            /**
+             * Format: date-time
+             * @description When it was revoked.
+             */
+            revoked_at?: string | null;
+            /** @description What it can still do. */
+            state: components["schemas"]["CodeState"];
+            /**
+             * Format: int32
+             * @description How many times it was.
+             */
+            uses: number;
+        };
+        /**
          * @description Who may create a workspace when they are not a member of any yet.
          * @enum {string}
          */
         SignupPolicy: "open" | "invite_only" | "approval" | "code";
+        /** @description A page of signup requests. */
+        SignupRequestList: {
+            /** @description Pass as `after` for the next page; `null` on the last one. */
+            next?: string | null;
+            /** @description The requests: pending first, then newest first. */
+            requests: components["schemas"]["SignupRequestView"][];
+        };
+        /**
+         * @description One signup request, as an administrator sees it: who asked and where it
+         *     stands. No content, only the account's own name and address.
+         */
+        SignupRequestView: {
+            /**
+             * Format: date-time
+             * @description When an administrator decided.
+             */
+            decided_at?: string | null;
+            /** @description The deciding administrator's account id. */
+            decided_by?: string | null;
+            /** @description Their display name, when their sign-in carried one. */
+            display_name?: string | null;
+            /** @description Their email address, when their sign-in carried one. */
+            email?: string | null;
+            /** @description Why it was turned down, when the administrator said. */
+            reason?: string | null;
+            /**
+             * Format: date-time
+             * @description When they first asked.
+             */
+            requested_at: string;
+            /** @description Where the request stands. */
+            status: components["schemas"]["RequestStatus"];
+            /** @description The requesting user (also the request's id). */
+            user_id: components["schemas"]["UserId"];
+        };
+        /**
+         * Format: uuid
+         * @description UserId (UUIDv7)
+         */
+        UserId: string;
     };
     responses: never;
     parameters: never;
@@ -705,6 +929,299 @@ export interface operations {
                 };
             };
             /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_list_signup_codes": {
+        parameters: {
+            query?: {
+                /** @description Where the previous page ended (its `next`). */
+                after?: string;
+                /** @description How many: 1 to 200, default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of codes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupCodeList"];
+                };
+            };
+            /** @description Invalid limit or cursor. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_mint_signup_code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MintSignupCode"];
+            };
+        };
+        responses: {
+            /** @description Minted. The response is the only place the code appears. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MintedSignupCode"];
+                };
+            };
+            /** @description Invalid label, number of uses or expiry. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_revoke_signup_code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The code. */
+                code_id: components["schemas"]["SignupCodeId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The code, revoked (also when it already was). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupCodeView"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such code, or not an administrator with `signups.review`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_list_signup_requests": {
+        parameters: {
+            query?: {
+                /** @description Only requests in this state. */
+                status?: components["schemas"]["RequestStatus"];
+                /** @description Where the previous page ended (its `next`). */
+                after?: string;
+                /** @description How many: 1 to 200, default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupRequestList"];
+                };
+            };
+            /** @description Invalid limit or cursor. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_approve_signup_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The requesting user. */
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request, approved (also when it already was). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupRequestView"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such request, or not an administrator with `signups.review`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.admin_reject_signup_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The requesting user. */
+                user_id: components["schemas"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectSignupRequest"];
+            };
+        };
+        responses: {
+            /** @description The request, rejected (also when it already was). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupRequestView"];
+                };
+            };
+            /** @description The reason is too long. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such request, or not an administrator with `signups.review`. */
             404: {
                 headers: {
                     [name: string]: unknown;
