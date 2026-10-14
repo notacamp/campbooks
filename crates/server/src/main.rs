@@ -300,6 +300,8 @@ async fn run(
     let stop = Arc::new(watch::channel(false).0);
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
 
+    check_answers(&composition, &stop);
+
     if role.api() {
         if let Some(issuer) = &composition.identity.issuer {
             // Fail closed: never serve with signing keys this secret cannot open.
@@ -391,6 +393,17 @@ async fn blob_store(config: &Config, db: &PgPool) -> Result<BlobStore, String> {
         ),
     }
     Ok(blobs)
+}
+
+/// The decide role's answers check: now, then periodically, never per
+/// request (`campbooks_ai::decide::check`). Every process keeps its own: the
+/// API shows it in the admin System panel, the worker gates the model pass
+/// on it.
+fn check_answers(composition: &campbooks_server::Composition, stop: &watch::Sender<bool>) {
+    if let Some(gateway) = composition.system.ai.clone() {
+        let stopped = stopped(stop);
+        tokio::spawn(async move { gateway.keep_answers_checked(stopped).await });
+    }
 }
 
 /// Resolves once `stop` is flipped.

@@ -124,6 +124,15 @@
         "instance": "sur le réseau de cette instance",
         "externalAllowed": "hors du réseau de cette instance, autorisé à recevoir du courrier",
         "externalRefused": "hors du réseau de cette instance, donc aucun courrier ne lui est envoyé"
+      },
+      "check": {
+        "pending": "Vérification de ses réponses",
+        "pendingDetail": "ses réponses seront utilisées quand il répondra juste à des e-mails de test évidents",
+        "passed": "a donné {{right}} bonnes réponses de test sur {{total}}",
+        "failed": "Ses réponses échouent à la vérification",
+        "failedDetail": "seulement {{right}} bonnes réponses de test évidentes sur {{total}}, donc ses réponses ne sont pas utilisées et les règles trient le courrier seules",
+        "unavailable": "N’a pas répondu à la vérification",
+        "unavailableDetail": "ses réponses ne sont pas utilisées tant qu’il ne répond pas"
       }
     },
     "duration": {

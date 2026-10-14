@@ -21,5 +21,8 @@ pub fn ai(error: &AiError) -> JobError {
             "the decide role is off this instance's network and may not receive mail content",
         ),
         AiError::InvalidQuestion(_) => JobError::fatal("a decide question is invalid"),
+        AiError::AnswersNotTrusted => {
+            JobError::fatal("the decide model has not passed its answers check")
+        }
     }
 }
