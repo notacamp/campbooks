@@ -24,6 +24,7 @@ use campbooks_kernel::text::displayable;
 use regex::Regex;
 use serde::Deserialize;
 
+use super::auth_results;
 use crate::{
     Error,
     decide::{
@@ -508,19 +509,20 @@ static SECURITY_ALERT: LazyLock<Regex> = LazyLock::new(|| {
 });
 
 /// Code hosts and package registries whose authenticated security alerts
-/// are a sure to-do: the alert is about the recipient's code, and the next
-/// step is in the mail. Kept short on purpose; an authenticated sender not
-/// listed here is answered below the confidence answers act from, so at
-/// most a question, never a to-do.
-const SECURITY_PLATFORMS: [&str; 8] = [
-    "github.com",
-    "gitlab.com",
-    "bitbucket.org",
-    "npmjs.com",
-    "pypi.org",
-    "rubygems.org",
-    "crates.io",
-    "snyk.io",
+/// are a sure to-do (the alert is about the recipient's code, and the next
+/// step is in the mail), each with the display-name words it signs with.
+/// Kept short on purpose; an authenticated sender not listed here is
+/// answered below the confidence answers act from, so at most a question,
+/// never a to-do.
+const SECURITY_PLATFORMS: [(&str, &[&str]); 8] = [
+    ("github.com", &["github"]),
+    ("gitlab.com", &["gitlab"]),
+    ("bitbucket.org", &["bitbucket"]),
+    ("npmjs.com", &["npm", "npmjs"]),
+    ("pypi.org", &["pypi"]),
+    ("rubygems.org", &["rubygems"]),
+    ("crates.io", &["crates", "cratesio"]),
+    ("snyk.io", &["snyk"]),
 ];
 
 static NOTIFICATION: LazyLock<Regex> = LazyLock::new(|| {
@@ -1195,6 +1197,21 @@ fn plain_domain(host: &str) -> bool {
             .all(|label| !label.to_ascii_lowercase().starts_with("xn--"))
 }
 
+/// Whether the sender's display name, or one of its words, is one of
+/// `accepted` (letters and digits only, lower-case).
+fn named(from: &Party, accepted: &[&str]) -> bool {
+    let squash = |s: &str| -> String {
+        s.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .map(|c| c.to_ascii_lowercase())
+            .collect()
+    };
+    let name = squash(&from.name);
+    accepted
+        .iter()
+        .any(|token| name == *token || from.name.split_whitespace().any(|w| squash(w) == *token))
+}
+
 /// Whether the sender's display name names its own domain: "GitHub" at
 /// `github.com`, not "GitHub" at `github-alerts.example`. Names and domain
 /// labels compare letters and digits only; the domain must be plain ASCII.
@@ -1202,52 +1219,57 @@ fn names_own_domain(from: &Party) -> bool {
     if !plain_domain(domain(&from.address)) {
         return false;
     }
-    let squash = |s: &str| -> String {
-        s.chars()
-            .filter(|c| c.is_alphanumeric())
-            .flat_map(char::to_lowercase)
-            .collect()
-    };
     let host = registrable(domain(&from.address));
-    let label = squash(host.split('.').next().unwrap_or_default());
-    if label.len() < 3 {
-        return false;
-    }
-    squash(&from.name) == label || from.name.split_whitespace().any(|w| squash(w) == label)
+    let label: String = host
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    label.len() >= 3 && named(from, &[label.as_str()])
 }
 
 /// Whether the receiving provider authenticated the sender's domain: its
-/// own `Authentication-Results` (the connector keeps no other) says
-/// `dmarc=pass` for the From domain, or `dkim=pass` for a signing domain
-/// aligned with it (the same registrable domain). Absent or failing results
-/// authenticate nothing.
+/// own `Authentication-Results` (the connector keeps no other), read as RFC
+/// 8601 says ([`auth_results`]), holds exactly one `dmarc` result, `pass`,
+/// whose `header.from` is the From domain; or a `dkim=pass` whose signing
+/// domain (`header.d`, `header.i`) has the From domain's registrable
+/// domain. Absent, malformed or failing results authenticate nothing.
 fn authenticated(env: &Envelope) -> bool {
-    let Some(results) = env.header("authentication-results") else {
+    let Some(results) = env
+        .header("authentication-results")
+        .and_then(auth_results::parse)
+    else {
         return false;
     };
-    let from = registrable(domain(&env.from.address));
-    if !plain_domain(&from) {
+    let host = domain(&env.from.address).to_ascii_lowercase();
+    let from = registrable(&host);
+    if !plain_domain(&host) || from.is_empty() {
         return false;
     }
-    let aligned = |words: &[&str], key: &str| {
-        words
-            .iter()
-            .filter_map(|w| w.strip_prefix(key))
-            .any(|d| registrable(d.rsplit('@').next().unwrap_or_default()) == from)
-    };
-    // The first part is the authserv-id; then one result per method.
-    results.split(';').skip(1).any(|part| {
-        let part = part.to_ascii_lowercase();
-        let words: Vec<&str> = part.split_whitespace().collect();
-        let Some(method) = words.first().and_then(|w| w.split('(').next()) else {
-            return false;
-        };
-        match method {
-            "dmarc=pass" => aligned(&words, "header.from="),
-            "dkim=pass" => aligned(&words, "header.d=") || aligned(&words, "header.i="),
-            _ => false,
+    let dmarc: Vec<_> = results.iter().filter(|r| r.method == "dmarc").collect();
+    let dmarc_pass = match dmarc.as_slice() {
+        [only] => {
+            let headers_from: Vec<_> = only.values("header.from").collect();
+            only.result == "pass"
+                && matches!(headers_from.as_slice(), [d] if d.eq_ignore_ascii_case(&host))
         }
-    })
+        _ => false,
+    };
+    let aligned = |signer: &str| {
+        let signer = signer.rsplit('@').next().unwrap_or_default();
+        plain_domain(signer) && registrable(signer) == from
+    };
+    let dkim_pass = results.iter().any(|r| {
+        let signers: Vec<_> = r.values("header.d").chain(r.values("header.i")).collect();
+        r.method == "dkim"
+            && r.result == "pass"
+            && !signers.is_empty()
+            && signers.into_iter().all(aligned)
+    });
+    dmarc_pass || dkim_pass
 }
 
 /// A security alert about something of the recipient's (a vulnerability in
@@ -1271,19 +1293,25 @@ fn security_alert(
     marketing: Option<&str>,
     phishing: &[Reason],
 ) -> Option<SecurityAlert> {
-    if !service
-        || marketing.is_some()
-        || !phishing.is_empty()
-        || !names_own_domain(&env.from)
-        || !authenticated(env)
-    {
+    if !service || marketing.is_some() || !phishing.is_empty() || !authenticated(env) {
+        return None;
+    }
+    let host = registrable(domain(&env.from.address));
+    let platform = SECURITY_PLATFORMS
+        .iter()
+        .find(|(domain, _)| *domain == host)
+        .map(|(_, names)| *names);
+    let names_itself = match platform {
+        Some(names) => named(&env.from, names),
+        None => names_own_domain(&env.from),
+    };
+    if !names_itself {
         return None;
     }
     let words = first_match(&SECURITY_ALERT, subject)?;
-    let host = registrable(domain(&env.from.address));
     Some(SecurityAlert {
         words,
-        platform: SECURITY_PLATFORMS.contains(&host.as_str()),
+        platform: platform.is_some(),
     })
 }
 
@@ -2018,6 +2046,50 @@ mod tests {
             Some("mx.zohomail.com; dkim=pass header.d=github.com; spf=pass"),
         );
         assert!(alert_answer(&dkim).is_some());
+    }
+
+    #[test]
+    fn every_listed_platform_s_alert_is_a_to_do() {
+        for (name, from) in [
+            ("GitHub", "noreply@github.com"),
+            ("GitLab", "noreply@gitlab.com"),
+            ("Bitbucket", "noreply@bitbucket.org"),
+            ("npm", "support@npmjs.com"),
+            ("PyPI", "noreply@pypi.org"),
+            ("RubyGems", "no-reply@rubygems.org"),
+            ("crates.io", "noreply@crates.io"),
+            ("Snyk", "alerts@snyk.io"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(name, from, SUBJECT, Some(&passed(host)));
+            let asks = alert_answer(&env).unwrap_or_else(|| panic!("{name} <{from}>"));
+            assert!(asks.answer.confidence.unwrap() >= 0.9, "{name} <{from}>");
+        }
+    }
+
+    #[test]
+    fn a_crafted_envelope_sender_cannot_fake_a_pass() {
+        // MAIL FROM:<"a; dmarc=pass header.from=crates.io x"@evil.example>,
+        // echoed by the provider; the real DMARC result is a fail (crates.io
+        // publishes p=none, so the mail is delivered).
+        let results = "mx.google.com; dkim=none; spf=softfail (google.com: domain of \
+             transitioning \"a; dmarc=pass header.from=crates.io x\"@evil.example does not \
+             designate 192.0.2.1 as permitted sender) \
+             smtp.mailfrom=\"a; dmarc=pass header.from=crates.io x\"@evil.example; \
+             dmarc=fail (p=NONE sp=NONE dis=NONE) header.from=crates.io";
+        let env = alert("Crates", "alerts@crates.io", SUBJECT, Some(results));
+        assert!(alert_answer(&env).is_none());
+        // The same with a parenthesis to close the comment early, or a
+        // second, injected dmarc result.
+        for results in [
+            "mx.google.com; spf=softfail (domain of \"a) ; dmarc=pass header.from=crates.io (x\"\
+             @evil.example) smtp.mailfrom=x@evil.example; dmarc=fail header.from=crates.io",
+            "mx.google.com; dmarc=pass header.from=crates.io; dmarc=fail header.from=crates.io",
+            "mx.google.com; dmarc=pass header.from=crates.io header.from=evil.example",
+        ] {
+            let env = alert("Crates", "alerts@crates.io", SUBJECT, Some(results));
+            assert!(alert_answer(&env).is_none(), "{results}");
+        }
     }
 
     #[test]

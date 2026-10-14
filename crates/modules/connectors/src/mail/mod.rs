@@ -113,24 +113,20 @@ pub enum Receiver {
 }
 
 impl Receiver {
-    /// The authserv-ids the provider stamps its own results with. Gmail's
-    /// is documented by its headers; Zoho's are its regional mail
-    /// exchangers' names. An id not listed here is not trusted, so an
-    /// unknown one reads as no result at all.
+    /// The authserv-ids the provider stamps its own results with. An id not
+    /// listed here is not trusted, so an unknown one reads as no result at
+    /// all.
+    ///
+    /// Zoho trusts none yet: nobody has seen which `Authentication-Results`
+    /// (if any, rather than only `ARC-Authentication-Results`) Zoho adds on
+    /// top of a received message, and if it adds none, a header naming its
+    /// servers would be one the sender wrote. TODO(campbooks-cloud#132):
+    /// list Zoho's ids once a recorded Zoho message shows them, with a test
+    /// over that recording.
     pub const fn authserv_ids(self) -> &'static [&'static str] {
         match self {
             Self::Gmail => &["mx.google.com"],
-            Self::Zoho => &[
-                "mx.zohomail.com",
-                "mx.zoho.com",
-                "mx.zoho.eu",
-                "mx.zohomail.eu",
-                "mx.zoho.in",
-                "mx.zoho.com.au",
-                "mx.zohocloud.ca",
-                "mx.zoho.jp",
-                "mx.zoho.sa",
-            ],
+            Self::Zoho => &[],
         }
     }
 }

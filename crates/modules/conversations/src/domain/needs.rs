@@ -4,12 +4,13 @@
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
 //! - **Raised** ([`raise`], pure) from the decide pass's answers about the
-//!   newest inbound message: `pay`, `reply` or `do` from answers the policy
+//!   newest inbound message that is not in spam or the trash: `pay`, `reply` or `do` from answers the policy
 //!   let act; `review` for a suspicious message (a warning) or, when a model
 //!   answers, for a suggestion put to the member as a question.
 //! - **Settled** ([`settle`], pure) against what happened since: a reply
-//!   clears Reply and Do, an archive clears Reply and Review, the trash
-//!   clears everything, and a member's verdict (Done, Not needed, a confirmed
+//!   clears Reply and Do, an archive clears Reply and Review, the trash or
+//!   spam (the conversation's, or the need's own message's) clears
+//!   everything, and a member's verdict (Done, Not needed, a confirmed
 //!   question) wins.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did.
@@ -254,7 +255,8 @@ pub struct Since {
     pub replied: bool,
     /// The conversation is archived.
     pub archived: bool,
-    /// Every message is in the trash or spam, or the message is gone.
+    /// Every message is in the trash or spam, or the message is gone or in
+    /// spam or the trash itself.
     pub trashed: bool,
     /// A member's verdict on this message's need.
     pub verdict: Option<NeedVerdict>,
@@ -415,6 +417,7 @@ async fn candidate(
     let newest = sqlx::query!(
         r#"SELECT id AS "id: MessageId", sent_at FROM conversations.messages
             WHERE conversation_id = $1 AND direction = 'inbound'
+              AND NOT in_spam AND NOT in_trash
             ORDER BY sent_at DESC, id DESC LIMIT 1"#,
         id as ConversationId,
     )
@@ -468,8 +471,10 @@ async fn since(
     row: Option<&Row>,
     need: &Need,
 ) -> Result<(Since, Option<DateTime<Utc>>)> {
+    // A message in spam or the trash needs nothing, as one that is gone.
     let sent = sqlx::query_scalar!(
-        "SELECT sent_at FROM conversations.messages WHERE id = $1",
+        "SELECT sent_at FROM conversations.messages
+          WHERE id = $1 AND NOT in_spam AND NOT in_trash",
         need.message as MessageId,
     )
     .fetch_optional(&mut **tx)

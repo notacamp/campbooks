@@ -189,11 +189,19 @@ fn authentication_results(
     message: &mail_parser::Message<'_>,
     receiver: Receiver,
 ) -> Option<String> {
-    let topmost = message
-        .headers_raw()
-        .find(|(name, _)| name.eq_ignore_ascii_case("Authentication-Results"))
-        .map(|(_, value)| value)?;
-    let value = unfold(topmost)?;
+    // Every header, in order, raw: one that is not UTF-8 is still the
+    // topmost, and makes the results absent rather than letting the next one
+    // down take its place.
+    let topmost = message.headers().iter().find(|header| {
+        header
+            .name
+            .as_str()
+            .eq_ignore_ascii_case("Authentication-Results")
+    })?;
+    let bytes = message
+        .raw_message()
+        .get(topmost.offset_start as usize..topmost.offset_end as usize)?;
+    let value = unfold(std::str::from_utf8(bytes).ok()?)?;
     let authserv_id = value
         .split(';')
         .next()?
@@ -402,15 +410,27 @@ mod tests {
     }
 
     #[test]
-    fn zoho_results_are_kept_for_a_zoho_mailbox() {
+    fn a_zoho_mailbox_trusts_no_results_yet() {
+        // Until a real Zoho message shows which header Zoho adds, a header
+        // naming Zoho's servers may be one the sender wrote.
         let raw = with_results(&[
             "mx.zohomail.com; dkim=pass; spf=pass; dmarc=pass header.from=github.com",
         ]);
-        assert!(
+        assert_eq!(
             parse(raw.as_bytes(), Receiver::Zoho)
                 .headers
-                .authentication_results
-                .is_some()
+                .authentication_results,
+            None
+        );
+    }
+
+    #[test]
+    fn a_topmost_header_that_is_not_utf8_means_no_results() {
+        let mut raw = b"Authentication-Results: mx.google.com; dmarc=pass \xff\r\n".to_vec();
+        raw.extend_from_slice(with_results(&[GMAIL_PASS]).as_bytes());
+        assert_eq!(
+            parse(&raw, Receiver::Gmail).headers.authentication_results,
+            None
         );
     }
 }

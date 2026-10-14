@@ -1,5 +1,7 @@
 import { queryOptions, useQuery } from "@tanstack/react-query";
 
+import { forgetPrefs } from "~/lib/storage/prefs";
+
 import { unwrap } from "./errors";
 import type { components } from "./schema.gen";
 import { webRoutes } from "./web";
@@ -15,10 +17,20 @@ type Session = components["schemas"]["SessionInfo"];
 const sessionQuery = (origin: string = globalThis.location.origin) =>
   queryOptions({
     queryKey: ["bff", "session"],
-    queryFn: async ({ signal }): Promise<Session> =>
-      unwrap(await webRoutes(origin).GET("/bff/session", { signal })),
+    queryFn: async ({ signal }): Promise<Session> => {
+      const session = unwrap(await webRoutes(origin).GET("/bff/session", { signal }));
+      if (!session.authenticated) {
+        // A session that ended (or never was): the next person on this
+        // browser must not find the last one's recent searches.
+        forgetPrefs(SEARCH_PREFS);
+      }
+      return session;
+    },
     staleTime: 60_000,
   });
+
+/** Prefix of the device-only recent searches, cleared whenever no one is signed in. */
+const SEARCH_PREFS = "searches.";
 
 /** The current web session (TanStack Query over `GET /bff/session`). */
 export function useSession() {
@@ -35,7 +47,9 @@ export async function signOut(origin: string = globalThis.location.origin): Prom
     // The BFF refuses unsafe requests without its CSRF header.
     params: { header: { "x-campbooks-csrf": "1" } },
   });
-  return unwrap(result).logout_url ?? null;
+  const logoutUrl = unwrap(result).logout_url ?? null;
+  forgetPrefs(SEARCH_PREFS);
+  return logoutUrl;
 }
 
 /**

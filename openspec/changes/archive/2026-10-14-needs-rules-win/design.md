@@ -2,6 +2,11 @@
 
 ## Data ownership and events
 
+Spam and trash: a need comes only from the newest inbound message in neither
+(`messages.in_spam`, `messages.in_trash`, which Gmail's SPAM/TRASH labels
+and Zoho's spam and trash folders already set), and a need whose own message
+moves there is cleared as `trashed`.
+
 `connectors` adds one optional field to the message change it publishes
 (`headers.authentication_results`, `MessageChangeBatch` v1, backward
 compatible); `conversations` stores it with the message's other headers
@@ -107,10 +112,43 @@ sender is authenticated like this and it is not suspicious.
 | B. Verify DKIM ourselves | Independent of the provider, but DNS lookups at sync time, key rotation and a new crate, for what the provider already did |
 | C. An allow-list of sender addresses | Simple, but a spoofed From passes it unchanged; nothing proves the mail came from there |
 
-Zoho's authserv-ids are its regional mail exchangers' names
-(`mx.zohomail.com`, `mx.zoho.eu`, …); they have not been checked against a
-live Zoho mailbox yet, and an id not listed simply means no security alert
-is recognised there.
+**Reading the header.** The header is the provider's, but it echoes what
+the sender chose: the envelope sender in the SPF comment and in
+`smtp.mailfrom`, which may be a quoted string holding `;`, `(` or `)`. A
+second review showed that splitting on `;` lets
+`MAIL FROM:<"a; dmarc=pass header.from=crates.io x"@evil.example>` fake a
+pass for a domain that publishes `p=none`. So the header is tokenised as RFC
+8601 says (`signals::auth_results`): nested comments dropped, a quoted
+string one atom wherever it appears (inside a comment too, so a `)` in it
+closes nothing), results split only at a top-level `;`, each result's own
+`ptype.property=value` pairs read up to the next one. A malformed header
+(unclosed comment or quote, a result that is not `method=value`) reads as no
+results. `dmarc` counts only when there is exactly one `dmarc` result, it is
+`pass`, and its own single `header.from` is the From domain; `dkim` only
+when it is `pass` and every signing domain it names is aligned.
+
+**Topmost, in the message's own order.** The connector walks the raw
+headers in order; a topmost `Authentication-Results` that is not UTF-8 makes
+the results absent, never the next one down.
+
+**Zoho trusts none yet.** Nobody has seen which header Zoho adds on top of a
+received message; if it adds only `ARC-Authentication-Results`, a
+sender-written `Authentication-Results: mx.zohomail.com; dmarc=pass …` would
+be the topmost one. So Zoho's list is empty (no security alert is a to-do in
+a Zoho mailbox) until a recorded Zoho message shows its ids
+(campbooks-cloud#132).
+
+**Platform names.** Each listed platform has the display-name words it
+signs with (`npm` for `npmjs.com`, `crates.io` for `crates.io`), so its real
+alerts are recognised; any other domain must be named by its first label.
+
+**Residual risk: insiders.** Mail between two people of the same Google
+Workspace domain may be delivered without a Google-added
+`Authentication-Results`. A colleague could then put a forged header on top,
+with a spoofed `From: GitHub <noreply@github.com>`, and the alert would read
+as authenticated. The risk is limited to people who can already send mail
+inside the organisation; reading Gmail's `ARC-Authentication-Results` or the
+`Received` chain as well would close it, and is noted as a follow-up.
 
 ## What the model sees for such mail
 

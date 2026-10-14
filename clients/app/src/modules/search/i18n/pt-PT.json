@@ -1,0 +1,126 @@
+{
+  "field": {
+    "label": "Pesquisar conversas",
+    "placeholder": "Pesquisar conversas"
+  },
+  "overlay": {
+    "label": "Pesquisa",
+    "results": "Resultados",
+    "hintMove": "Mover",
+    "hintOpen": "Abrir",
+    "hintAll": "Todos os resultados",
+    "hintClose": "Fechar"
+  },
+  "shortcuts": {
+    "open": "Pesquisar conversas"
+  },
+  "row": {
+    "noSubject": "(sem assunto)"
+  },
+  "chip": {
+    "attachment": "Com anexo",
+    "is": {
+      "unread": "Não lidas",
+      "read": "Lidas",
+      "starred": "Com estrela"
+    },
+    "from": "De {{value}}",
+    "to": "Para {{value}}",
+    "cc": "Cc {{value}}",
+    "subject": "Assunto: {{value}}",
+    "in": "Em {{value}}",
+    "label": "Etiqueta: {{value}}",
+    "date": {
+      "before": "Antes de {{value}}",
+      "after": "Depois de {{value}}",
+      "older_than": "Com mais de {{value}}",
+      "newer_than": "Com menos de {{value}}"
+    },
+    "other": "{{operator}}: {{value}}"
+  },
+  "warning": {
+    "label": "O que não foi compreendido",
+    "unknown_operator": "“{{operator}}:” não é um operador de pesquisa, por isso foi pesquisado como texto.",
+    "empty_value": "“{{operator}}:” precisa de um valor a seguir.",
+    "invalid_value": "O valor a seguir a “{{operator}}:” não foi compreendido.",
+    "other": "Parte desta pesquisa não foi compreendida."
+  },
+  "recent": {
+    "title": "Pesquisas recentes",
+    "clear": "Limpar"
+  },
+  "tips": {
+    "title": "Afinar a pesquisa",
+    "from": {
+      "text": "De uma pessoa",
+      "example": "from:ana"
+    },
+    "attachment": {
+      "text": "Com um ficheiro anexado",
+      "example": "has:attachment"
+    },
+    "unread": {
+      "text": "Só o que ainda não leu",
+      "example": "is:unread"
+    },
+    "phrase": {
+      "text": "Uma expressão exata",
+      "example": "\"fatura de outubro\""
+    },
+    "exclude": {
+      "text": "Excluir uma palavra",
+      "example": "-newsletter"
+    },
+    "date": {
+      "text": "Enviadas depois de uma data",
+      "example": "after:2026-09-01"
+    }
+  },
+  "count_one": "{{count}} resultado",
+  "count_other": "{{count}} resultados",
+  "empty": {
+    "title": "Nenhuma conversa corresponde a “{{query}}”",
+    "body": "Experimente menos palavras, ou outras palavras.",
+    "bodyFilters": "Experimente remover um filtro acima, ou usar menos palavras."
+  },
+  "indexing": {
+    "title": "Ainda a indexar o correio mais antigo",
+    "body": "As conversas mais antigas podem faltar nestes resultados por agora."
+  },
+  "error": {
+    "retry": "Tentar novamente",
+    "again": "Pesquisar novamente",
+    "too_long": {
+      "title": "Esta pesquisa é demasiado longa",
+      "body": "Reduza-a para 512 carateres ou menos."
+    },
+    "cursor": {
+      "title": "Estes resultados estão desatualizados",
+      "body": "A pesquisa mudou enquanto se carregavam mais resultados. Pesquise novamente para recomeçar do topo."
+    },
+    "busy": {
+      "title": "Demasiadas pesquisas seguidas",
+      "body": "Aguarde um momento e tente novamente."
+    },
+    "other": {
+      "title": "Não foi possível pesquisar",
+      "body": "O Campbooks não conseguiu contactar o servidor. Nada se perdeu."
+    }
+  },
+  "page": {
+    "title": "Pesquisa",
+    "list": "Resultados da pesquisa",
+    "order": "Ordem",
+    "newest": "Mais recentes",
+    "relevance": "Mais relevantes",
+    "quick": "Filtros rápidos",
+    "attachmentToggle": "Com anexo",
+    "unreadToggle": "Não lidas",
+    "more": "Mais resultados",
+    "loadingMore": "A carregar mais resultados",
+    "reader": "Conversa",
+    "readerTitle": "Escolha um resultado",
+    "readerBody": "Escolha um da lista ou use o teclado:",
+    "back": "Voltar aos resultados"
+  }
+}

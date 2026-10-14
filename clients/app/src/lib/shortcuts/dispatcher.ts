@@ -33,6 +33,50 @@ export function isTypingTarget(target: EventTarget | null): boolean {
   return target.closest('[contenteditable]:not([contenteditable="false"])') !== null;
 }
 
+const ARROW_KEYS = new Set(["arrowup", "arrowdown", "arrowleft", "arrowright"]);
+
+/** Controls whose arrow keys already mean something (a radio group, a menu, a slider). */
+const ARROW_WIDGETS = [
+  "input",
+  "select",
+  "textarea",
+  "[contenteditable]:not([contenteditable='false'])",
+  "dialog",
+  ...[
+    "dialog",
+    "alertdialog",
+    "radiogroup",
+    "radio",
+    "tablist",
+    "tab",
+    "toolbar",
+    "menu",
+    "menubar",
+    "menuitem",
+    "menuitemradio",
+    "menuitemcheckbox",
+    "listbox",
+    "option",
+    "combobox",
+    "slider",
+    "spinbutton",
+    "scrollbar",
+    "tree",
+    "treeitem",
+    "grid",
+    "treegrid",
+  ].map((role) => `[role='${role}']`),
+].join(",");
+
+/**
+ * True when arrow keys at `target` belong to the browser or a widget: any
+ * field, a radio group, menu, toolbar, listbox, slider or grid, or an open
+ * dialog.
+ */
+export function handlesArrowKeys(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(ARROW_WIDGETS) !== null;
+}
+
 export interface DispatcherOptions {
   timeoutMs?: number;
   now?: () => number;
@@ -63,31 +107,28 @@ export function createDispatcher(
   const attempt = (candidate: Chord[], event: KeyboardEvent, typing: boolean): boolean => {
     const live = registry
       .definitions()
-      .filter((definition) => registry.isBound(definition.id))
-      .filter((definition) => !typing || definition.allowInInputs === true);
+      .filter((definition) => !typing || definition.allowInInputs === true)
+      .flatMap((definition) =>
+        registry
+          .liveBindings(definition.id)
+          .map((keys) => ({ id: definition.id, chords: chordsOf(keys) })),
+      );
     const startsWith = (chords: Chord[]) =>
       candidate.every((chord, index) => {
         const other = chords[index];
         return other !== undefined && chordsEqual(chord, other);
       });
 
-    const match = live.find((definition) => {
-      const chords = chordsOf(definition.keys);
-      return chords.length === candidate.length && startsWith(chords);
-    });
+    const match = live.find(
+      ({ chords }) => chords.length === candidate.length && startsWith(chords),
+    );
     if (match !== undefined) {
       buffer = [];
       event.preventDefault();
       registry.run(match.id, event);
       return true;
     }
-    if (
-      live.some(
-        (definition) =>
-          chordsOf(definition.keys).length > candidate.length &&
-          startsWith(chordsOf(definition.keys)),
-      )
-    ) {
+    if (live.some(({ chords }) => chords.length > candidate.length && startsWith(chords))) {
       buffer = candidate;
       lastAt = now();
       return true;
@@ -101,6 +142,10 @@ export function createDispatcher(
     }
     const chord = chordFromEvent(event, platform);
     if (chord === null) {
+      return;
+    }
+    // Arrows in a field, a menu or a dialog do their own job.
+    if (ARROW_KEYS.has(chord.key) && handlesArrowKeys(event.target)) {
       return;
     }
     const typing = isTypingTarget(event.target);

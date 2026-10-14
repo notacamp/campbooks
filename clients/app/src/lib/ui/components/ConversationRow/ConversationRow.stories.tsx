@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 
+import { Highlight } from "../Highlight/Highlight";
 import { Pill } from "../Pill/Pill";
 import { Tag } from "../Tag/Tag";
 
@@ -119,4 +120,43 @@ export const Suspicious: Story = {
     snippet: "Your mailbox will be closed today unless…",
     chips: <Pill signal="review">Looks suspicious</Pill>,
   },
+};
+
+/** A search hit: the words that matched are marked in the subject and the snippet. */
+export const SearchHit: Story = {
+  args: {
+    unread: true,
+    attachment: true,
+    count: 3,
+    subject: (
+      <Highlight
+        segments={[
+          { text: "Invoice ", hit: false },
+          { text: "October", hit: true },
+          { text: " for the studio", hit: false },
+        ]}
+      />
+    ),
+    snippet: (
+      <Highlight
+        segments={[
+          { text: "…the ", hit: false },
+          { text: "October", hit: true },
+          { text: " invoice is attached, due on the 31st.", hit: false },
+        ]}
+      />
+    ),
+  },
+};
+
+/** An option of the search overlay's listbox: not in the tab order, selected by the cursor. */
+export const Option: Story = {
+  args: { option: true, selected: true },
+  decorators: [
+    (Story) => (
+      <div role="listbox" aria-label="Results">
+        <Story />
+      </div>
+    ),
+  ],
 };

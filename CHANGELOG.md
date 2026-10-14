@@ -7,6 +7,7 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+
 - **Mail no longer goes to an AI provider outside your network unless you say
   so.** Each AI role's address is checked: a loopback or private address,
   `localhost`, a single-label name such as a compose service (`laya`,
@@ -78,9 +79,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   provider authenticated the sender (DMARC, or DKIM for the sender's own
   domain), the sender's name matches its domain, and nothing in it looks
   like phishing or marketing. Other services' alerts are at most a question,
-  and other notifications from the same service ask nothing. Gmail and Zoho
-  mailboxes now keep the provider's own `Authentication-Results` with each
-  message for this.
+  and other notifications from the same service ask nothing. Gmail mailboxes
+  now keep Gmail's own `Authentication-Results` with each message for this
+  (Zoho mailboxes keep none until Zoho's header has been checked, so no
+  alert is a to-do there yet). Mail in spam or the trash never shows on
+  Home.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by
@@ -88,6 +91,26 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
+  stream's conversations like J and K, Enter opens one, and going past the
+  last row loads more. In an open conversation the arrows scroll it (J and K
+  still go to the next or previous one), and they're never taken from a
+  field, a menu or a dialog. The `?` sheet and the empty reader show "J or ↓".
+  Home's "what needs you" list moves with the arrows too (an open item scrolls).
+- Search in the app. Press `/` anywhere in a workspace for a search panel:
+  instant rows by relevance with the words that matched marked, the filters
+  Campbooks understood (`from:`, `has:attachment`, `is:unread`, dates...)
+  as chips you can remove, ↑ ↓ to move, ↵ to open the conversation in the
+  inbox reader, Ctrl/⌘↵ for all results and Esc to close. ⌘K now ends with
+  "Search conversations for ..." when you have typed something. The results
+  page (`/w/<workspace>/search?q=`) lists the hits newest first, with a
+  "Most relevant" toggle, quick filters for attachments and unread mail, and
+  the reader beside the list on wide screens; J, K, ↵, E, S, U, M and Z work
+  as in the inbox. On phones the top bar has a search button, the page is
+  full screen and the reader is its own screen. Recent searches are kept on
+  this device only, for the signed-in account and workspace (cleared with one button and on sign-out); older mail still being
+  indexed and every error are said plainly. In English, European Portuguese,
+  Spanish and French.
 - Admin → Jobs: administrators with the `jobs.read` permission see the
   background queue by kind (waiting, scheduled, running, running with a lost
   worker, failed) and the jobs that gave up with their last error (monospace,
@@ -548,7 +571,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   (crate, scopes, events, a scoped read slice with tests, schema migration,
   OpenSpec change, client module with its four locale files) and registers it
   in the workspace, the server and the client shell; `cargo xtask new-feature
-  <module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
+<module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
   (also run in CI) proves their output passes the gates. Optional local git
   hooks (`lefthook install`), Claude Code skills for starting a task,
   developing a feature and adding a module, and a guide to working in
@@ -591,6 +614,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+
 - Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
   audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
   applies to an outside identity provider. Nothing to do: tokens last ten minutes, and

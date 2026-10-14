@@ -221,6 +221,10 @@
     oklch(var(--accent-l-light) var(--accent-c) var(--accent-h)),
     oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h))
   );
+  --highlight: light-dark(
+    oklch(var(--accent-l-light) var(--accent-c) var(--accent-h) / 0.2),
+    oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h) / 0.32)
+  );
   --focus-ring: var(--accent);
 
   --danger: light-dark(oklch(0.52 0.19 25), oklch(0.72 0.16 25));

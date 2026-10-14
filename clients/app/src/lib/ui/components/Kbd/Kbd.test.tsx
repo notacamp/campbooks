@@ -40,4 +40,18 @@ describe("KbdHint", () => {
 
     expect(container).toHaveTextContent("Ctrl↵");
   });
+
+  it("draws a shortcut's other keys when asked", () => {
+    const { container } = renderUi(<KbdHint shortcut="list.next" withAlternates announce />);
+    expect([...container.querySelectorAll("kbd")].map((kbd) => kbd.textContent)).toEqual([
+      "J",
+      "↓",
+    ]);
+    expect(screen.getByText("Shortcut: J or ↓")).toBeInTheDocument();
+  });
+
+  it("draws only the main keys by default", () => {
+    const { container } = renderUi(<KbdHint shortcut="list.next" />);
+    expect(container).toHaveTextContent(/^J$/);
+  });
 });

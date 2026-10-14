@@ -49,9 +49,14 @@ question and not hidden. The rules had no signal for it.
   any other authenticated sender gets an answer below every operating
   point, at most a question.
 - **Connectors carry the receiving provider's authentication results.** The
-  Gmail and Zoho adapters keep the topmost `Authentication-Results` when its
-  authserv-id is their provider's, and no other, in the message change
-  (`headers.authentication_results`, optional, `MessageChangeBatch` v1).
+  Gmail adapter keeps the topmost `Authentication-Results` when its
+  authserv-id is Gmail's, and no other, in the message change
+  (`headers.authentication_results`, optional, `MessageChangeBatch` v1). The
+  Zoho adapter keeps none until Zoho's header has been checked on a real
+  message (campbooks-cloud#132). The header is read as RFC 8601 says, so a
+  sender's quoted envelope address cannot fake a result.
+- **Spam and trash need nothing.** A need comes only from mail outside spam
+  and the trash, and goes when its own message moves there.
 - Two fixtures: a Dependabot-style security alert and a comment
   notification from the same code host. The reason's sentence is shown in
   the reader in all four languages.
