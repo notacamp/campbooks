@@ -1,9 +1,10 @@
+SET LOCAL lock_timeout = '5s';
+
 -- The one-minute dispatcher works across workspaces in a transaction that
 -- sets none. Until now one policy (`maintenance_reads_schedule`) let such a
 -- transaction do anything to the scheduling index; it now only reads it
 -- (`FOR SELECT`) and leases due streams (`FOR UPDATE`, which `SELECT … FOR
 -- UPDATE` also needs), and can no longer insert or delete rows.
-SET LOCAL lock_timeout = '10s';
 
 DROP POLICY maintenance_reads_schedule ON connectors.sync_due;
 

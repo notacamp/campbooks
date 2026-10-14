@@ -1,3 +1,5 @@
+SET LOCAL lock_timeout = '5s';
+
 -- Row-level security on the kernel's workspace-keyed tables (ADR 0011,
 -- `openspec/changes/access-guards`): the change feed, the blob catalogue,
 -- the event log and the job queue.
@@ -19,7 +21,6 @@
 -- `kernel.idempotency`, `kernel.rate_limits` and `kernel.schedules` are not
 -- keyed by workspace (keys belong to callers, counters to callers, ticks to
 -- the instance) and carry no policy.
-SET LOCAL lock_timeout = '10s';
 DO $$
 DECLARE
     t text;

@@ -1,3 +1,5 @@
+SET LOCAL lock_timeout = '5s';
+
 -- An inbox's owner, its read-only state, and the inboxes that were deleted
 -- (`openspec/changes/access-guards`, ADR 0017).
 --
@@ -6,7 +8,6 @@
 -- workspace, so coming back never brings back what they had.
 -- `detached_at`: set when its connection was removed and the mail kept as
 -- read-only history: nothing syncs into it, nothing is sent from it.
-SET LOCAL lock_timeout = '10s';
 
 -- Existing inboxes keep no owner (NULL): who connected them is not known
 -- here for certain, and an owner is never guessed. New ones get it from the
