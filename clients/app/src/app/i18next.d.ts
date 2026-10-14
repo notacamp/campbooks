@@ -10,6 +10,7 @@ import type connectors from "~/modules/connectors/i18n/en.json";
 import type workspaces from "~/modules/workspaces/i18n/en.json";
 import type identity from "~/modules/identity/i18n/en.json";
 import type attention from "~/modules/attention/i18n/en.json";
+import type search from "~/modules/search/i18n/en.json";
 
 declare module "i18next" {
   interface CustomTypeOptions {
@@ -24,6 +25,7 @@ declare module "i18next" {
       workspaces: typeof workspaces;
       identity: typeof identity;
       attention: typeof attention;
+      search: typeof search;
       // `cargo xtask new-module` inserts above this line.
     };
   }

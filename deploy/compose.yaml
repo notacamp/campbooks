@@ -1,7 +1,7 @@
 # Campbooks for self-hosters.
 #
 #   cp .env.example .env        # then edit it
-#   docker compose up -d        # server, postgres, identity provider
+#   docker compose up -d        # server (with its built-in sign-in), postgres
 #   docker compose --profile ai up -d     # + local open-weight models (Laya, Ollama, TEI)
 #
 # See README.md in this directory.
@@ -25,23 +25,21 @@ services:
       CAMPBOOKS_DATABASE_URL: postgres://campbooks_runtime@postgres:5432/campbooks
       CAMPBOOKS_DATABASE_PASSWORD_FILE: /run/db/runtime-password
       CAMPBOOKS_DATABASE_MIGRATION_URL: postgres://campbooks:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/campbooks
-      # Trust the bundled IdP's access tokens (ADR 0004). To use another IdP,
-      # change these lines (and drop the idp services).
-      CAMPBOOKS_AUTH__ISSUER: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}/auth/v1/
-      CAMPBOOKS_AUTH__JWKS_URL: http://idp:8080/auth/v1/oidc/certs
-      # Web sign-in (the BFF): the server reaches the IdP inside the compose
-      # network; browsers use CAMPBOOKS_IDP_URL. Both secrets are files in the
-      # `server-secrets` volume, never environment variables.
-      CAMPBOOKS_BFF__IDP_INTERNAL_URL: http://idp:8080/auth/v1/
-      CAMPBOOKS_BFF__CLIENT_SECRET_FILE: /run/campbooks/campbooks-web.client-secret
+      # Campbooks is its own identity provider (ADR 0014): leave
+      # CAMPBOOKS_AUTH__ISSUER unset. The instance secret key is a file in the
+      # `server-secrets` volume, never an environment variable.
       CAMPBOOKS_SECRET_KEY_FILE: /run/campbooks/secret-key
     volumes:
       # Message bodies, attachments and files (CAMPBOOKS_BLOBS__PATH). Back it
       # up with Postgres; unused when CAMPBOOKS_BLOBS__BACKEND=s3.
       - blobs-data:/data/blobs
-      # The instance secret key and the web client's OIDC secret, read through
-      # the supplementary group 10001 (the files are 0440, see server/init.sh).
+      # The instance secret key, read through the supplementary group 10001
+      # (the file is 0440, see server/init.sh).
       - server-secrets:/run/campbooks:ro
+      # Sign-in providers' client secrets (google-client-secret, ...), one file
+      # each; point CAMPBOOKS_<PROVIDER>__CLIENT_SECRET_FILE at
+      # /run/secrets/campbooks/<file>. See README.md -> Built-in sign-in.
+      - ./secrets:/run/secrets/campbooks:ro
       # The runtime database login's password (see db-init).
       - db-secrets:/run/db:ro
     group_add: ["10001"]
@@ -99,87 +97,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # --- Identity provider (OIDC / OAuth 2.1) -------------------------------------
-  # Rauthy (ADR 0004). Three services, no manual steps:
-  #   idp-init       one-shot: generates secrets on first boot, writes config
-  #   idp            the IdP itself; issuer = ${CAMPBOOKS_IDP_URL}/auth/v1/
-  #   idp-provision  one-shot: registers Campbooks' scopes and clients, and the
-  #                  sign-in providers (Google, Microsoft, Zoho) you configure
-  # Admin UI: ${CAMPBOOKS_IDP_URL}/auth/v1/admin — see README.md for first login.
-  idp-init:
-    image: busybox:1.37.0-musl
-    restart: "no"
-    command: ["sh", "/idp/init.sh"]
-    environment:
-      CAMPBOOKS_IDP_URL: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}
-      CAMPBOOKS_IDP_ADMIN_EMAIL: ${CAMPBOOKS_IDP_ADMIN_EMAIL:-admin@localhost}
-      CAMPBOOKS_IDP_TRUSTED_PROXIES: ${CAMPBOOKS_IDP_TRUSTED_PROXIES:-}
-    volumes:
-      - ./idp:/idp:ro
-      - idp-data:/app/data
-
-  idp:
-    image: ghcr.io/sebadob/rauthy:0.36.2
-    restart: unless-stopped
-    # Rauthy needs a few seconds for a clean shutdown; a force-kill costs a WAL
-    # integrity check on the next start.
-    stop_grace_period: 30s
-    command: ["serve", "--config-file", "/app/data/config.toml", "--secrets-file", "/app/data/secrets.toml"]
-    # Rauthy reads its config from the volume (written by idp-init). Optional
-    # outgoing mail (password resets, invitations): add SMTP_URL, SMTP_USERNAME,
-    # SMTP_PASSWORD and SMTP_FROM under `environment:` here.
-    volumes:
-      - idp-data:/app/data
-    ports:
-      - "${CAMPBOOKS_IDP_PORT:-8081}:8080"
-    depends_on:
-      idp-init:
-        condition: service_completed_successfully
-    healthcheck:
-      # The image is distroless; idp-init drops a static busybox into the volume.
-      test: ["CMD", "/app/data/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/auth/v1/ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 30
-      start_period: 10s
-
-  idp-provision:
-    image: curlimages/curl:8.22.0
-    restart: "no"
-    user: "10001:10001"
-    entrypoint: ["sh", "/idp/provision.sh"]
-    environment:
-      CAMPBOOKS_PUBLIC_URL: ${CAMPBOOKS_PUBLIC_URL:-http://localhost:8080}
-      # Where Rauthy delivers back-channel logouts; empty means the public URL
-      # (https only: Rauthy refuses plain http). See README.md.
-      CAMPBOOKS_BACKCHANNEL_LOGOUT_URL: ${CAMPBOOKS_BACKCHANNEL_LOGOUT_URL:-}
-      # Sign in with Google, Microsoft or Zoho: a provider is registered when
-      # its client ID is set; its secret is the file secrets/<provider>-client-secret.
-      # See README.md -> "Sign in with Google, Microsoft or Zoho".
-      CAMPBOOKS_IDP_URL: ${CAMPBOOKS_IDP_URL:-http://localhost:8081}
-      CAMPBOOKS_SIGNUP__POLICY: ${CAMPBOOKS_SIGNUP__POLICY:-open}
-      CAMPBOOKS_IDP_PROVIDER_SIGNUP: ${CAMPBOOKS_IDP_PROVIDER_SIGNUP:-auto}
-      CAMPBOOKS_IDP_GOOGLE_CLIENT_ID: ${CAMPBOOKS_IDP_GOOGLE_CLIENT_ID:-}
-      CAMPBOOKS_IDP_GOOGLE_CLIENT_SECRET_FILE: /run/secrets/campbooks/google-client-secret
-      CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID: ${CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID:-}
-      CAMPBOOKS_IDP_MICROSOFT_CLIENT_SECRET_FILE: /run/secrets/campbooks/microsoft-client-secret
-      CAMPBOOKS_IDP_MICROSOFT_TENANT: ${CAMPBOOKS_IDP_MICROSOFT_TENANT:-common}
-      CAMPBOOKS_IDP_ZOHO_CLIENT_ID: ${CAMPBOOKS_IDP_ZOHO_CLIENT_ID:-}
-      CAMPBOOKS_IDP_ZOHO_CLIENT_SECRET_FILE: /run/secrets/campbooks/zoho-client-secret
-      CAMPBOOKS_IDP_ZOHO_ISSUER: ${CAMPBOOKS_IDP_ZOHO_ISSUER:-https://accounts.zoho.eu}
-    volumes:
-      - ./idp:/idp:ro
-      - idp-data:/app/data
-      # Writes the web client's secret here for the server.
-      - server-secrets:/secrets
-      # The sign-in providers' client secrets (files readable by uid 10001).
-      - ./secrets:/run/secrets/campbooks:ro
-    depends_on:
-      idp:
-        condition: service_healthy
-      server-init:
-        condition: service_completed_successfully
-
   # --- Local AI (open-weight models) --------------------------------------------
   # Optional: `docker compose --profile ai up -d`. See README.md → Local AI.
   #
@@ -234,8 +151,7 @@ volumes:
   postgres-data:
   db-secrets:
   blobs-data:
-  idp-data:
-  # The instance secret key and the web client's OIDC secret (read-only for the server).
+  # The instance secret key (read-only for the server).
   server-secrets:
   laya-models:
   ollama-data:

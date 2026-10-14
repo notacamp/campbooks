@@ -1,6 +1,6 @@
 import { createRoute, useParams, type AnyRoute } from "@tanstack/react-router";
 
-import { AdminPeoplePanel } from "./components/AdminPeople/AdminPeoplePanel";
+import { AdminPeoplePanel, type AccountStandings } from "./components/AdminPeople/AdminPeoplePanel";
 import { AdminPersonPage, type AccountPanel } from "./components/AdminPeople/AdminPersonPage";
 import {
   AdminWorkspacePage,
@@ -27,6 +27,8 @@ export const SIGNUPS_ADMIN_SECTION = {
 export interface WorkspacesAdminParts {
   /** A person's account: how they sign in, and suspending it (identity). */
   AccountPanel: AccountPanel;
+  /** Which people on the People list are suspended (identity). */
+  AccountStandings: AccountStandings;
   /** A workspace's connected accounts and their health (connectors). */
   ConnectionsPanel: ConnectionsPanel;
 }
@@ -43,7 +45,9 @@ export function buildWorkspacesAdminRoutes<TParent extends AnyRoute>(
   const people = createRoute({
     getParentRoute: () => parent,
     path: "/people",
-    component: AdminPeoplePanel,
+    component: function PeopleRoute() {
+      return <AdminPeoplePanel AccountStandings={parts.AccountStandings} />;
+    },
   });
   const person = createRoute({
     getParentRoute: () => parent,

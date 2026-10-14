@@ -45,7 +45,7 @@ export function endOfDay(day: string): string | null {
   return Number.isNaN(end.getTime()) ? null : end.toISOString();
 }
 
-/** Admin → Signups → Codes: mint single-use codes, see their use, revoke them. */
+/** Admin → Signups → Codes: mint codes with a number of uses, see their use, revoke them. */
 export function SignupCodes() {
   const { t } = useTranslation("workspaces");
   const codes = useSignupCodes();

@@ -60,10 +60,18 @@ export const DEFAULT_SHORTCUTS = [
   },
 
   // Lists and the selected item
-  { id: "list.next", keys: "j", scope: "list", group: "list", label: "shortcuts:list.next" },
+  {
+    id: "list.next",
+    keys: "j",
+    alternateKeys: ["arrowdown"],
+    scope: "list",
+    group: "list",
+    label: "shortcuts:list.next",
+  },
   {
     id: "list.previous",
     keys: "k",
+    alternateKeys: ["arrowup"],
     scope: "list",
     group: "list",
     label: "shortcuts:list.previous",

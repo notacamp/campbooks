@@ -189,6 +189,7 @@
       "noMatch": "Ningún nombre ni dirección de correo empieza por «{{search}}».",
       "loadError": "No se han podido cargar las personas",
       "joined": "Se unió el {{date}}",
+      "suspended": "Suspendida",
       "back": "Todas las personas"
     },
     "person": {
@@ -242,7 +243,7 @@
     },
     "lead": {
       "requests": "Personas que han pedido crear una cuenta en este Campbooks, cuando aprueba las cuentas nuevas. Al aprobar, la persona puede crear su espacio de trabajo; lo sabrá la próxima vez que abra la aplicación.",
-      "codes": "Códigos de un solo uso que entregas cuando este Campbooks pide un código de registro. Cada código se puede usar tantas veces como indiques y después deja de funcionar."
+      "codes": "Códigos que entregas cuando este Campbooks pide un código de registro. Cada código sirve para tantos registros como indiques al crearlo; pon 1 para una sola persona. Deja de funcionar cuando se agota, caduca o se revoca."
     },
     "more": "Mostrar más",
     "cancel": "Cancelar",

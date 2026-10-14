@@ -3,6 +3,8 @@ import { renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
+import { readPref, writePref } from "~/lib/storage/prefs";
+
 import { ApiError, signOut, signOutAndLeave, useSession } from "./index";
 
 function wrapper({ children }: { children: ReactNode }) {
@@ -86,5 +88,34 @@ describe("signOutAndLeave", () => {
     await signOutAndLeave(leave);
 
     expect(leave.mock.calls).toEqual([["https://id.example.com/logout"], ["/"]]);
+  });
+});
+
+describe("recent searches on a shared browser", () => {
+  it("are forgotten on sign-out, for every account and workspace", async () => {
+    writePref("searches.user-1.w1", '["from:client invoice"]');
+    writePref("searches.user-2.w2", '["lease"]');
+    writePref("locale", "fr");
+    vi.stubGlobal("fetch", () => Promise.resolve(Response.json({ logout_url: null })));
+
+    await signOut();
+
+    expect(readPref("searches.user-1.w1")).toBeNull();
+    expect(readPref("searches.user-2.w2")).toBeNull();
+    // Only the queries go: preferences stay.
+    expect(readPref("locale")).toBe("fr");
+    writePref("locale", "en");
+  });
+
+  it("are forgotten when the session is found to be over", async () => {
+    writePref("searches.user-1.w1", '["lease"]');
+    vi.stubGlobal("fetch", () => Promise.resolve(Response.json({ authenticated: false })));
+
+    const { result } = renderHook(() => useSession(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.data).toStrictEqual({ authenticated: false });
+    });
+    expect(readPref("searches.user-1.w1")).toBeNull();
   });
 });

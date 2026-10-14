@@ -27,6 +27,8 @@ export interface CommandMenuProps {
   commands?: Command[] | undefined;
   /** Offered as the last row while there is a query: hand it to the assistant. */
   onAsk?: ((query: string) => void) | undefined;
+  /** Offered next to Ask while there is a query: search conversations for it. */
+  onSearch?: ((query: string) => void) | undefined;
 }
 
 /** Hidden from the menu: they open or close menus themselves. */
@@ -43,12 +45,12 @@ const fold = (text: string) =>
  * bound handler, from the registry) plus this screen's own commands, run one
  * with ↑ ↓ ↵, or ask the assistant.
  */
-export function CommandMenu({ open, onClose, commands = [], onAsk }: CommandMenuProps) {
+export function CommandMenu({ open, onClose, commands = [], onAsk, onSearch }: CommandMenuProps) {
   const { t } = useTranslation("ui");
   return (
     <Overlay open={open} onClose={onClose} label={t("commandMenu.label")}>
       {/* Mounted only while open, so every opening starts with an empty query. */}
-      <MenuContent onClose={onClose} commands={commands} onAsk={onAsk} />
+      <MenuContent onClose={onClose} commands={commands} onAsk={onAsk} onSearch={onSearch} />
     </Overlay>
   );
 }
@@ -57,10 +59,12 @@ function MenuContent({
   onClose,
   commands,
   onAsk,
+  onSearch,
 }: {
   onClose: () => void;
   commands: Command[];
   onAsk: ((query: string) => void) | undefined;
+  onSearch: ((query: string) => void) | undefined;
 }) {
   const { t } = useTranslation("ui");
   const translate = useTranslateKey();
@@ -83,25 +87,39 @@ function MenuContent({
           registry.run(definition.id);
         },
       }));
-    const ask: Command[] =
-      onAsk !== undefined && query.trim() !== ""
+    const typed = query.trim();
+    const ask: Command[] = [
+      ...(onSearch !== undefined && typed !== ""
         ? [
             {
-              id: "ask",
-              label: t("commandMenu.ask", { query: query.trim() }),
+              id: "search",
+              label: t("commandMenu.search", { query: typed }),
               group: t("commandMenu.askGroup"),
               onSelect: () => {
-                onAsk(query.trim());
+                onSearch(typed);
               },
             },
           ]
-        : [];
+        : []),
+      ...(onAsk !== undefined && typed !== ""
+        ? [
+            {
+              id: "ask",
+              label: t("commandMenu.ask", { query: typed }),
+              group: t("commandMenu.askGroup"),
+              onSelect: () => {
+                onAsk(typed);
+              },
+            },
+          ]
+        : []),
+    ];
     const needle = fold(query.trim());
     const matches = [...commands, ...fromRegistry].filter((command) =>
       fold(command.label).includes(needle),
     );
     return [...matches, ...ask];
-  }, [definitions, isBound, translate, registry, commands, onAsk, query, t]);
+  }, [definitions, isBound, translate, registry, commands, onAsk, onSearch, query, t]);
 
   const groups = useMemo(() => {
     const byGroup = new Map<string, { command: Command; index: number }[]>();
