@@ -77,6 +77,10 @@ its own transaction (tested as a non-superuser owner). Row-level security on
   alone ("Friday", "16/10"). No model or rules call is made: the tests run
   the backfill with rules that panic and a model server that must receive
   nothing.
+- **Kept read-only inboxes** (`inboxes.detached_at`, set when a removed
+  connection's mail is kept) are history: the backfill marks such an inbox
+  done without looking at it, and `refresh` changes nothing in one, as no
+  batch or member action reaches it either.
 - **Settled like live needs.** Replied conversations get no Reply or Do;
   archived ones keep Do and Pay but not Reply or Review; trashed ones get
   nothing; a member's Done stays done. A need that is cleared before it was

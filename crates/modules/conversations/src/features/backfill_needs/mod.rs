@@ -24,13 +24,13 @@
 use std::time::Duration;
 
 use campbooks_kernel::{
-    EventBus, Job, JobContext, JobError, JobHandler,
+    EventBus, Job, JobContext, JobError, JobHandler, db,
     jobs::{self, EnqueueOptions, Enqueued},
     tenancy::WorkspaceId,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use sqlx::{Connection as _, Postgres, Transaction};
+use sqlx::{Postgres, Transaction};
 
 use crate::{
     domain::needs::{self, NeedSettings},
@@ -169,7 +169,7 @@ impl JobHandler for BackfillNeeds {
         // The page in a savepoint: on the last attempt a failure is undone
         // and the inbox recorded as failed at this cursor, rather than left
         // running for ever.
-        let mut work = (**tx).begin().await?;
+        let mut work = db::savepoint(tx).await?;
         match self.page(&mut work, &events, workspace, page).await {
             Ok(()) => {
                 work.commit().await?;
@@ -207,6 +207,28 @@ impl BackfillNeeds {
         workspace: WorkspaceId,
         page: Page,
     ) -> Result<(), JobError> {
+        // A kept, read-only inbox (its connection removed) is history: it is
+        // done with nothing to look at.
+        let detached = sqlx::query_scalar!(
+            r#"SELECT detached_at IS NOT NULL AS "detached!" FROM conversations.inboxes
+                WHERE id = $1"#,
+            page.inbox as InboxId,
+        )
+        .fetch_optional(&mut **tx)
+        .await?
+        .unwrap_or(true);
+        if detached {
+            sqlx::query!(
+                "UPDATE conversations.needs_backfills
+                    SET state = 'done', finished_at = now()
+                  WHERE inbox_id = $1",
+                page.inbox as InboxId,
+            )
+            .execute(&mut **tx)
+            .await?;
+            return Ok(());
+        }
+
         // Recent conversations, and any whose need is open (an old one may
         // no longer be supported by its answers).
         let since = Utc::now() - self.needs.window;
@@ -230,7 +252,7 @@ impl BackfillNeeds {
         for id in &ids {
             // One conversation that cannot be worked out is skipped, not the
             // page: its own savepoint is undone, and the rest go on.
-            let mut one = (**tx).begin().await?;
+            let mut one = db::savepoint(tx).await?;
             match needs::refresh(&mut one, events, &ws, *id, &self.needs).await {
                 Ok(()) => one.commit().await?,
                 Err(error) => {

@@ -11,7 +11,8 @@ No AI role and no rules strategy SHALL be asked. Each change SHALL publish
 `conversations.need_changed` as for live mail, and running it again SHALL
 change nothing. A conversation whose need cannot be worked out SHALL be
 skipped without undoing the others, and an inbox whose page keeps failing
-SHALL be recorded as failed at its cursor, never left running.
+SHALL be recorded as failed at its cursor, never left running. An inbox kept
+read-only after its connection was removed SHALL be left as it is.
 
 #### Scenario: Mail stored before the upgrade
 - **WHEN** an inbox holds a question from Marta answered by the rules before the upgrade, and the upgraded server starts
@@ -32,6 +33,10 @@ SHALL be recorded as failed at its cursor, never left running.
 #### Scenario: Another workspace
 - **WHEN** one workspace's inboxes are backfilled
 - **THEN** no other workspace's needs or events change
+
+#### Scenario: A kept read-only inbox
+- **WHEN** an inbox's connection was removed and its mail kept read-only before the backfill runs
+- **THEN** none of its needs changes and no event is published for it
 
 #### Scenario: One conversation that cannot be worked out
 - **WHEN** one conversation's stored answers no longer decode

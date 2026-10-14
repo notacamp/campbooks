@@ -14,6 +14,7 @@ use campbooks_ai::{
     },
 };
 use campbooks_kernel::{
+    db::BeginFor as _,
     jobs::{self, EnqueueOptions},
     tenancy::WorkspaceId,
 };
@@ -518,4 +519,61 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
             .execute(&mut *tx)
             .await;
     assert!(moved.is_err(), "moved to another inbox");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_kept_read_only_inbox_is_left_as_it_is(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, inbox) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    // Its connection was removed and the mail kept, read-only; one need
+    // from before stays as it was.
+    sqlx::query("UPDATE conversations.inboxes SET detached_at = now() WHERE id = $1")
+        .bind(inbox)
+        .execute(&db)
+        .await
+        .unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question, state,
+              latest_inbound_id)
+         SELECT conversation_id, workspace_id, id, 'review', 'check', 'model', 'asks_action',
+                'open', id
+           FROM conversations.messages WHERE provider_message_id = 'needs-5'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [row("needs-5", "review", "open", "")]
+    );
+    assert!(need_events(&db, workspace).await.is_empty());
+    let state: String = sqlx::query_scalar("SELECT state FROM conversations.needs_backfills")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(state, "done");
+
+    // Nor does a refresh of one of its conversations change anything.
+    let conversation = kit.conversation_of("needs-5").await;
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    crate::domain::needs::refresh(
+        &mut tx,
+        &kit.state.events,
+        &workspace.to_string(),
+        conversation.parse().unwrap(),
+        &crate::domain::needs::NeedSettings::new(
+            36_500,
+            &crate::domain::policy::Policy::baseline(),
+        ),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    assert!(need_events(&db, workspace).await.is_empty());
 }
