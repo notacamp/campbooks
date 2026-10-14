@@ -44,6 +44,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Rules you teach, applied to the mail that looks the same.** A taught rule
+  says which mail it is about (the sender, its domain, a mailing list, the
+  subject's template or words, a header, a label or a stream) and what to do
+  (move it to a stream, archive it, label it, mark it read, say whether it
+  needs a reply or an action, or always or never show it). Rules run before
+  the built-in signals and any model, always give the same result for the
+  same mail, and never hide mail that looks suspicious. Creating one applies
+  it to the mail already in the inbox in the background, a hundred
+  conversations at a time, with progress; removing it can put that mail back.
+  Moving one back by hand makes it an exception the rule leaves alone. New
+  operations: `conversations.preview_rule`, `create_rule`, `confirm_rule`,
+  `update_rule`, `remove_rule`, `list_rules`, `get_rule`, `suggest_rules`
+  and `dismiss_rule_suggestion`; new event `conversations.rule_changed`. The
+  screens that use them follow in the next release.
+- `conversations.need_changed` may clear a need with cause `rule`.
 - Admin → Jobs: administrators with the `jobs.read` permission see the
   background queue by kind (waiting, scheduled, running, running with a lost
   worker, failed) and the jobs that gave up with their last error (monospace,

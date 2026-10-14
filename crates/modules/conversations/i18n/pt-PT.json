@@ -22,6 +22,6 @@
     "invalid_rule": "Não é possível guardar esta regra. Precisa de uma a quatro condições que digam a que mensagens se aplica, e de uma a quatro ações de tipos diferentes.",
     "rule_not_yours": "Só quem ensinou esta regra, ou um gestor da caixa de entrada, a pode alterar.",
     "rule_not_proposed": "Esta regra já não está à espera de um sim.",
-    "invalid_rule_query": "Não foi possível ler a regra a pré-visualizar. Envie as condições e as ações em JSON."
+    "rule_needs_member": "As regras são ensinadas por um membro da caixa de entrada, não por uma aplicação."
   }
 }

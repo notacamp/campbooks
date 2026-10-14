@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT conversation_id AS \"id: ConversationId\" FROM conversations.rule_applications\n            WHERE rule_id = $1 AND reverted_at IS NULL AND excepted_at IS NULL\n              AND ($2::uuid IS NULL OR conversation_id > $2)\n            ORDER BY conversation_id LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_applications",
+            "name": "conversation_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "9c1c1263e8efd8619e6c225a39a99951e367478a252ef4f6577b69fd83f60d9c"
+}

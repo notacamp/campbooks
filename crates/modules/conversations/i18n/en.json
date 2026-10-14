@@ -22,6 +22,6 @@
     "invalid_rule": "This rule can't be saved. It needs one to four conditions that say which mail it is about, and one to four actions of different kinds.",
     "rule_not_yours": "Only the person who taught this rule, or a manager of the inbox, can change it.",
     "rule_not_proposed": "This rule is not waiting for a yes any more.",
-    "invalid_rule_query": "The rule to preview could not be read. Send its conditions and actions as JSON."
+    "rule_needs_member": "Rules are taught by a member of the inbox, not by an app."
   }
 }

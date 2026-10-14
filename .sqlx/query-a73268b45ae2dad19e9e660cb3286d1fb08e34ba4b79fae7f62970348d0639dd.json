@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT excepted_at IS NOT NULL AS \"excepted!\", reverted_at IS NOT NULL AS \"reverted!\"\n             FROM conversations.rule_applications WHERE rule_id = $1 AND conversation_id = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "excepted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "reverted!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "a73268b45ae2dad19e9e660cb3286d1fb08e34ba4b79fae7f62970348d0639dd"
+}

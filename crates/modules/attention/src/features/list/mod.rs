@@ -152,7 +152,7 @@ pub async fn handler(
                    AND i.container_type || ':' || i.container_id = ANY($2)
                    AND i.reason IS NOT NULL
                    AND ((i.state = 'cleared' AND i.cleared_at >= $5
-                         AND i.cleared_because IS DISTINCT FROM 'superseded')
+                         AND coalesce(i.cleared_because, '') NOT IN ('superseded', 'rule'))
                         OR (i.state = 'open' AND s.created_at >= $5))
                  ORDER BY greatest(i.cleared_at, s.created_at) DESC, i.id
                 "#,

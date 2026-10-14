@@ -27,4 +27,5 @@ pub mod rules;
 pub mod search_source;
 pub mod send_draft;
 pub mod star;
+pub mod suggest_rules;
 pub mod update_draft;

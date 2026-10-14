@@ -23,6 +23,7 @@ use crate::{
     domain::{
         access::lock_conversation,
         conversation::{Changed, ConversationSummary, provider_message_ids, request, summary},
+        rules,
     },
     events::{Change, Origin, RequestedChange},
     model::{ConversationId, CorrectionId, DecisionId, MessageId, Stream},
@@ -81,7 +82,11 @@ pub async fn handler(
     )
     .fetch_one(&mut *tx)
     .await?;
+    let mut exception = None;
     if current.stream != body.stream.as_str() {
+        if current.stream_source == "taught" {
+            exception = rules::except(&mut tx, id, rules::Undone::Stream, access.user).await?;
+        }
         sqlx::query!(
             r#"UPDATE conversations.conversations
                   SET stream = $2, stream_source = 'member', updated_at = now()
@@ -142,7 +147,8 @@ pub async fn handler(
         request(&state.events, &mut tx, &changed, &move_to).await?;
         changed.publish(&state.events, &mut tx).await?;
     }
-    let summary = summary(&mut tx, id).await?;
+    let mut summary = summary(&mut tx, id).await?;
+    summary.rule_exception = exception;
     tx.commit().await?;
     Ok(Json(summary))
 }

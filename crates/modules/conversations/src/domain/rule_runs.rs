@@ -110,7 +110,10 @@ pub async fn start(
     .execute(&mut **tx)
     .await?;
     let total = match kind {
-        RunKind::Apply => matching(tx, rule).await?,
+        RunKind::Apply => {
+            rules::fill_templates(tx, rule.inbox).await?;
+            matching(tx, rule).await?
+        }
         RunKind::Revert => u32::try_from(
             sqlx::query_scalar!(
                 r#"SELECT count(*)::int AS "n!" FROM conversations.rule_applications

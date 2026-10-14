@@ -25,8 +25,9 @@ use std::{
 
 use campbooks_ai::decide::{
     AnswerValue, Question,
-    signals::email::{triage, triage_questions},
+    signals::email::{subject_template, triage, triage_questions},
     strategy::{Decided, Strategy},
+    taught::{Facts, Outcome, TaughtRule, evaluate},
 };
 use campbooks_kernel::{
     AppState, EventBus, JobContext, JobError, JobHandler,
@@ -47,7 +48,7 @@ use crate::{
         decisions::Recorded,
         needs::{self, NeedSettings},
         policy::Policy,
-        redact,
+        redact, rules,
     },
     events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -149,6 +150,7 @@ impl JobHandler for ApplyChanges {
             inbox: batch.inbox,
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
+            taught: None,
         };
         for change in &batch.changes {
             match change {
@@ -323,6 +325,8 @@ struct Apply<'a> {
     touched: BTreeMap<ConversationId, (BTreeSet<Change>, BTreeSet<String>)>,
     /// Conversations that only gained new messages: recounted at the end.
     new_in: BTreeSet<ConversationId>,
+    /// The inbox's taught rules, read once per batch.
+    taught: Option<Vec<TaughtRule>>,
 }
 
 /// A stored message's mutable state.
@@ -458,16 +462,38 @@ impl Apply<'_> {
     ) -> Result<(), JobError> {
         let questions = triage_questions();
         let inbound = message.direction == Direction::Inbound;
-        let sort_to = if inbound {
+        let placement = threading::place(tx, self.inbox, message).await?;
+        let template = subject_template(&message.subject);
+        let outcome = if inbound {
+            self.taught_outcome(
+                tx,
+                message,
+                prepared,
+                placement.conversation,
+                template.as_deref(),
+            )
+            .await?
+        } else {
+            Outcome::default()
+        };
+        let sort_to = if let Some(applied) = &outcome.stream {
+            applied
+                .value
+                .parse::<Stream>()
+                .ok()
+                .map(|s| (s, StreamSource::Taught))
+        } else if inbound {
             accepted_stream(&questions, &prepared.answers, self.policy)
+                .map(|s| (s, StreamSource::Rules))
         } else {
             None
         };
-        let placement = threading::place(tx, self.inbox, message).await?;
         let (conversation, sorted) = self
             .conversation_for(tx, message, placement.conversation, sort_to)
             .await?;
-        let id = self.store(tx, message, prepared, conversation).await?;
+        let id = self
+            .store(tx, message, prepared, conversation, template.as_deref())
+            .await?;
 
         if inbound {
             let recorded = Recorded {
@@ -479,7 +505,30 @@ impl Apply<'_> {
                 answers: &prepared.answers,
                 policy: self.policy,
             };
-            recorded.store(tx, self.workspace, sorted).await?;
+            let by_signals = sorted && sort_to.is_some_and(|(_, s)| s == StreamSource::Rules);
+            recorded.store(tx, self.workspace, by_signals).await?;
+            if !outcome.is_empty() {
+                let by_rule = sorted && sort_to.is_some_and(|(_, s)| s == StreamSource::Taught);
+                let arrival = rules::Arrival {
+                    workspace: *self.workspace.as_uuid(),
+                    ws: self.ws,
+                    inbox: self.inbox,
+                    conversation,
+                    message: id,
+                    provider_message_id: &message.provider_message_id,
+                    placed_from: by_rule.then(|| (Stream::Primary, "default".to_owned())),
+                };
+                let mut outcome = outcome;
+                if !by_rule {
+                    outcome.stream = None;
+                }
+                let changes = rules::on_arrival(tx, self.events, &arrival, &outcome).await?;
+                if !changes.is_empty() {
+                    let entry = self.touched.entry(conversation).or_default();
+                    entry.0.extend(changes);
+                    entry.1.insert(message.provider_message_id.clone());
+                }
+            }
         }
         for merged in &placement.merge {
             threading::merge(tx, *merged, conversation).await?;
@@ -500,6 +549,66 @@ impl Apply<'_> {
         Ok(())
     }
 
+    /// What the inbox's taught rules say about a new inbound message, in
+    /// `found` (its conversation, when threading found one) or a new one.
+    async fn taught_outcome(
+        &mut self,
+        tx: &mut Transaction<'static, Postgres>,
+        message: &NormalizedMessage,
+        prepared: &Prepared,
+        found: Option<ConversationId>,
+        template: Option<&str>,
+    ) -> Result<Outcome, JobError> {
+        if self.taught.is_none() {
+            self.taught = Some(rules::acting(tx, self.inbox).await?);
+        }
+        let all = self.taught.as_deref().unwrap_or_default();
+        if all.is_empty() {
+            return Ok(Outcome::default());
+        }
+        let (acting, stream, labels) = match found {
+            Some(conversation) => {
+                let acting = rules::acting_on(tx, all, conversation).await?;
+                let row = sqlx::query!(
+                    r#"SELECT c.stream,
+                              coalesce((SELECT array_agg(cl.label_id::text)
+                                          FROM conversations.conversation_labels cl
+                                         WHERE cl.conversation_id = c.id), '{}') AS "labels!"
+                         FROM conversations.conversations c WHERE c.id = $1"#,
+                    conversation as ConversationId,
+                )
+                .fetch_one(&mut **tx)
+                .await?;
+                (acting, row.stream, row.labels)
+            }
+            None => (
+                all.to_vec(),
+                Stream::Primary.as_str().to_owned(),
+                Vec::new(),
+            ),
+        };
+        let questions = triage_questions();
+        let suspicious = questions.iter().zip(&prepared.answers).any(|(q, a)| {
+            q.id == triage::SUSPICIOUS
+                && a.as_ref()
+                    .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
+        });
+        let sender = message.from.address.to_lowercase();
+        let facts = Facts {
+            sender_address: &sender,
+            subject: &message.subject,
+            subject_template: template,
+            list_id: message.headers.list_id.as_deref(),
+            list_unsubscribe: message.headers.list_unsubscribe.as_deref(),
+            precedence: message.headers.precedence.as_deref(),
+            auto_submitted: message.headers.auto_submitted.as_deref(),
+            labels: &labels,
+            stream: &stream,
+            suspicious,
+        };
+        Ok(evaluate(&acting, &facts))
+    }
+
     /// The conversation a new message goes in: the one threading found
     /// (sorted by this message if it is its first inbound one), or a new
     /// one. Returns it and whether `sort_to` placed it.
@@ -508,19 +617,18 @@ impl Apply<'_> {
         tx: &mut Transaction<'static, Postgres>,
         message: &NormalizedMessage,
         found: Option<ConversationId>,
-        sort_to: Option<Stream>,
+        sort_to: Option<(Stream, StreamSource)>,
     ) -> Result<(ConversationId, bool), JobError> {
         if let Some(conversation) = found {
             let sorted = match sort_to {
-                Some(stream) => sort_first_inbound(tx, conversation, stream).await?,
+                Some((stream, source)) => {
+                    sort_first_inbound(tx, conversation, stream, source).await?
+                }
                 None => false,
             };
             return Ok((conversation, sorted));
         }
-        let (stream, source) = match sort_to {
-            Some(stream) => (stream, StreamSource::Rules),
-            None => (Stream::Primary, StreamSource::Default),
-        };
+        let (stream, source) = sort_to.unwrap_or((Stream::Primary, StreamSource::Default));
         let id = ConversationId::new();
         sqlx::query!(
             r#"
@@ -551,6 +659,7 @@ impl Apply<'_> {
         message: &NormalizedMessage,
         prepared: &Prepared,
         conversation: ConversationId,
+        template: Option<&str>,
     ) -> Result<MessageId, JobError> {
         let id = MessageId::new();
         let bodies = json!({
@@ -571,9 +680,9 @@ impl Apply<'_> {
                 (id, workspace_id, inbox_id, conversation_id, provider_message_id, direction,
                  rfc_message_id, in_reply_to, reference_ids, sender, sender_address, recipients,
                  subject, snippet, sent_at, headers, categories, provider_labels, in_inbox,
-                 in_spam, in_trash, read, starred, bodies, participants)
+                 in_spam, in_trash, read, starred, bodies, participants, subject_template)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-                    $18, $19, $20, $21, $22, $23, $24, $25)
+                    $18, $19, $20, $21, $22, $23, $24, $25, $26)
             "#,
             id as MessageId,
             self.workspace.as_uuid(),
@@ -600,6 +709,7 @@ impl Apply<'_> {
             message.starred,
             bodies,
             json!(prepared.participants),
+            template.unwrap_or_default(),
         )
         .execute(&mut **tx)
         .await?;
@@ -820,17 +930,19 @@ async fn sort_first_inbound(
     conn: &mut PgConnection,
     conversation: ConversationId,
     stream: Stream,
+    source: StreamSource,
 ) -> Result<bool, JobError> {
     let sorted = sqlx::query!(
         r#"
         UPDATE conversations.conversations c
-           SET stream = $2, stream_source = 'rules', updated_at = now()
+           SET stream = $2, stream_source = $3, updated_at = now()
          WHERE c.id = $1 AND c.stream_source = 'default'
            AND NOT EXISTS (SELECT 1 FROM conversations.messages m
                             WHERE m.conversation_id = c.id AND m.direction = 'inbound')
         "#,
         conversation as ConversationId,
         stream.as_str(),
+        source.as_str(),
     )
     .execute(conn)
     .await?

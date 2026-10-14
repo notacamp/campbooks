@@ -7,6 +7,7 @@ use super::{
     access::lock_conversation,
     conversation::{Changed, ConversationSummary, request, summary},
     needs::{self, NeedSettings},
+    rules,
 };
 use crate::{
     events::{Change, Origin, RequestedChange},
@@ -65,6 +66,17 @@ pub async fn apply(
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inbox = lock_conversation(&mut tx, access, id).await?;
     let changed = change(&mut tx, id, flag).await?;
+    let undone = match flag {
+        Flag::Unarchive => Some(rules::Undone::Archive),
+        Flag::Unread => Some(rules::Undone::Read),
+        _ => None,
+    };
+    let exception = match undone {
+        Some(undone) if !changed.is_empty() => {
+            rules::except(&mut tx, id, undone, access.user).await?
+        }
+        _ => None,
+    };
     if !changed.is_empty() {
         let changed = Changed {
             workspace: access.workspace.to_string(),
@@ -87,7 +99,8 @@ pub async fn apply(
             .await?;
         }
     }
-    let summary = summary(&mut tx, id).await?;
+    let mut summary = summary(&mut tx, id).await?;
+    summary.rule_exception = exception;
     tx.commit().await?;
     Ok(summary)
 }

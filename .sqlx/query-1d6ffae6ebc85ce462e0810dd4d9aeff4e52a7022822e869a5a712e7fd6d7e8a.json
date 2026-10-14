@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rule_id AS \"rule: RuleId\" FROM conversations.rule_applications\n            WHERE conversation_id = $1 AND excepted_at IS NOT NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule: RuleId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_applications",
+            "name": "rule_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "1d6ffae6ebc85ce462e0810dd4d9aeff4e52a7022822e869a5a712e7fd6d7e8a"
+}

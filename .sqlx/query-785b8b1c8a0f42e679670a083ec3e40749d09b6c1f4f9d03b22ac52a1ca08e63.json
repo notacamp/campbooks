@@ -1,0 +1,39 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO conversations.messages\n                (id, workspace_id, inbox_id, conversation_id, provider_message_id, direction,\n                 rfc_message_id, in_reply_to, reference_ids, sender, sender_address, recipients,\n                 subject, snippet, sent_at, headers, categories, provider_labels, in_inbox,\n                 in_spam, in_trash, read, starred, bodies, participants, subject_template)\n            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,\n                    $18, $19, $20, $21, $22, $23, $24, $25, $26)\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "TextArray",
+        "Jsonb",
+        "Text",
+        "Jsonb",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Jsonb",
+        "TextArray",
+        "TextArray",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Bool",
+        "Jsonb",
+        "Jsonb",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "785b8b1c8a0f42e679670a083ec3e40749d09b6c1f4f9d03b22ac52a1ca08e63"
+}

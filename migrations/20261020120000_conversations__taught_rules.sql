@@ -19,16 +19,16 @@ ALTER TABLE conversations.needs ADD CONSTRAINT needs_cleared_because_check
         ('replied', 'archived', 'trashed', 'done', 'not_needed', 'superseded', 'rule'));
 
 -- The subject with what changes from one message to the next taken out
--- (`campbooks_ai::decide::signals::email::subject_template`); NULL when too
--- little is left, and for messages stored before this migration until the
--- backfill reaches them.
+-- (`campbooks_ai::decide::signals::email::subject_template`); '' when too
+-- little is left. NULL for messages stored before this migration, until a
+-- rule preview or run in their inbox works it out.
 ALTER TABLE conversations.messages ADD COLUMN subject_template text;
 CREATE INDEX messages_sender_idx ON conversations.messages (inbox_id, sender_address)
     WHERE direction = 'inbound';
 CREATE INDEX messages_list_id_idx ON conversations.messages (inbox_id, (headers ->> 'list_id'))
     WHERE direction = 'inbound' AND headers ? 'list_id';
 CREATE INDEX messages_subject_template_idx ON conversations.messages (inbox_id, subject_template)
-    WHERE direction = 'inbound' AND subject_template IS NOT NULL;
+    WHERE direction = 'inbound' AND subject_template <> '';
 
 CREATE TABLE conversations.rules (
     id uuid PRIMARY KEY,

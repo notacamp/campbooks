@@ -147,6 +147,9 @@ export function placementLine(t: Translate, conversation: ConversationSummary): 
     case "rules": {
       return t("scout.sortedRule", { stream });
     }
+    case "taught": {
+      return t("scout.sortedTaught", { stream });
+    }
     case "default": {
       return t("scout.sortedDefault", { stream });
     }

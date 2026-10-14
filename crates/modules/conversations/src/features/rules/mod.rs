@@ -95,7 +95,7 @@ pub struct RuleView {
 }
 
 async fn view(conn: &mut PgConnection, access: &Access, rule: &Stored) -> Result<RuleView> {
-    let role = rules::role_in(conn, rule.inbox, access.user).await?;
+    let inbox_role = rules::role_in(conn, rule.inbox, access.user).await?;
     Ok(RuleView {
         id: rule.id,
         inbox_id: rule.inbox,
@@ -114,7 +114,7 @@ async fn view(conn: &mut PgConnection, access: &Access, rule: &Stored) -> Result
         recent_exceptions: rules::recent_exceptions(conn, rule.id).await?,
         run: rule_runs::latest(conn, rule.id).await?,
         shared: rules::is_shared(conn, rule.inbox).await?,
-        may_change: rules::may_change(role, access.user, rule.taught_by),
+        may_change: rules::may_change(inbox_role, access.user, rule.taught_by),
     })
 }
 
@@ -135,6 +135,14 @@ async fn may_teach(conn: &mut PgConnection, access: &Access, inbox: InboxId) -> 
     Ok(())
 }
 
+/// 403 `rule_needs_member` for a client token: rules are taught by members.
+fn member_only(access: &Access) -> Result<()> {
+    if access.user.is_none() {
+        return Err(Error::Denied(crate::MESSAGES.reason("rule_needs_member")));
+    }
+    Ok(())
+}
+
 /// Rule `id` if the caller sees its inbox, else 404.
 async fn visible_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -> Result<Stored> {
     let rule = rules::find(conn, id).await?.ok_or(Error::NotFound)?;
@@ -148,11 +156,9 @@ async fn visible_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -> R
 /// `rule_not_yours` when they are not its author (a sender) or a manager.
 async fn changeable_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -> Result<Stored> {
     let rule = visible_rule(conn, access, id).await?;
-    if access.user.is_none() {
-        return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
-    }
-    let role = rules::role_in(conn, rule.inbox, access.user).await?;
-    if !rules::may_change(role, access.user, rule.taught_by) {
+    member_only(access)?;
+    let inbox_role = rules::role_in(conn, rule.inbox, access.user).await?;
+    if !rules::may_change(inbox_role, access.user, rule.taught_by) {
         return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
     }
     Ok(rule)
@@ -160,14 +166,14 @@ async fn changeable_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -
 
 // --- Preview -----------------------------------------------------------------
 
-/// A rule to preview: its conditions and actions as JSON.
-#[derive(Debug, Clone, Deserialize, IntoParams)]
-#[into_params(parameter_in = Query)]
-pub struct PreviewQuery {
-    /// The conditions, a JSON array of `RuleCondition`.
-    pub conditions: String,
-    /// The actions, a JSON array of `RuleAction`.
-    pub actions: String,
+/// A rule to preview.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PreviewRule {
+    /// All must hold.
+    pub conditions: Vec<RuleCondition>,
+    /// What it would do.
+    pub actions: Vec<RuleAction>,
 }
 
 /// One conversation a rule would change.
@@ -213,19 +219,20 @@ pub struct RulePreview {
     pub overrides: Vec<RuleOverride>,
 }
 
-/// Preview what a rule would do in an inbox.
+/// Preview what a rule would do in an inbox. A read served by POST: the
+/// rule's addresses and words stay out of the URL (and so out of access logs).
 #[utoipa::path(
-    get,
+    post,
     path = "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview",
     operation_id = "conversations.preview_rule",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"])))),
+    extensions(("x-campbooks" = json!(Operation::body_query().assistant().records(["conversations.rule"])))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("inbox_id" = InboxId, Path, description = "The inbox."),
-        PreviewQuery,
     ),
+    request_body = PreviewRule,
     responses(
         (status = OK, description = "What it would do.", body = RulePreview),
         (status = BAD_REQUEST, description = "Not a valid rule.", body = Problem,
@@ -242,16 +249,14 @@ pub async fn preview(
     State(state): State<AppState>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<InboxPath>,
-    extract::Query(query): extract::Query<PreviewQuery>,
+    extract::Json(body): extract::Json<PreviewRule>,
 ) -> Result<Json<RulePreview>> {
-    let bad = || Error::BadRequest(crate::MESSAGES.reason("invalid_rule_query"));
-    let conditions: Vec<RuleCondition> =
-        serde_json::from_str(&query.conditions).map_err(|_| bad())?;
-    let actions: Vec<RuleAction> = serde_json::from_str(&query.actions).map_err(|_| bad())?;
+    let (conditions, actions) = (body.conditions, body.actions);
     rules::validate(&conditions, &actions)?;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     may_teach(&mut tx, access, path.inbox_id).await?;
+    rules::fill_templates(&mut tx, path.inbox_id).await?;
     let preview = compute_preview(&mut tx, path.inbox_id, &conditions, &actions).await?;
     tx.commit().await?;
     Ok(Json(preview))
@@ -321,36 +326,7 @@ pub async fn compute_preview(
                 out.would_change += 1;
                 found.push(candidate.clone());
             }
-            for (old, new_winner) in [
-                (
-                    before.stream.as_ref().map(|a| &a.rule),
-                    after_outcome.stream.as_ref().map(|a| &a.rule),
-                ),
-                (before.archive.as_ref(), after_outcome.archive.as_ref()),
-                (before.read.as_ref(), after_outcome.read.as_ref()),
-                (
-                    before.needs_reply.as_ref().map(|a| &a.rule),
-                    after_outcome.needs_reply.as_ref().map(|a| &a.rule),
-                ),
-                (
-                    before.asks_action.as_ref().map(|a| &a.rule),
-                    after_outcome.asks_action.as_ref().map(|a| &a.rule),
-                ),
-                (
-                    before.surface.as_ref().map(|a| &a.rule),
-                    after_outcome.surface.as_ref().map(|a| &a.rule),
-                ),
-            ] {
-                if let (Some(old), Some(winner)) = (old, new_winner)
-                    && winner == NEW
-                    && old != NEW
-                {
-                    match overridden.iter_mut().find(|(id, _)| id == old) {
-                        Some((_, n)) => *n += 1,
-                        None => overridden.push((old.clone(), 1)),
-                    }
-                }
-            }
+            count_overrides(&before, &after_outcome, NEW, &mut overridden);
         }
         if page.len() < usize::try_from(SCAN).unwrap_or(usize::MAX) || looked >= PREVIEW_SCAN_LIMIT
         {
@@ -358,17 +334,8 @@ pub async fn compute_preview(
         }
         after = page.last().map(|c| c.id);
     }
-    found.sort_by(|a, b| b.sent_at.cmp(&a.sent_at));
-    out.samples = found
-        .iter()
-        .take(PREVIEW_SAMPLES)
-        .map(|c| PreviewSample {
-            conversation_id: c.id,
-            subject: c.subject.clone(),
-            sender: c.sender_address.clone(),
-            sent_at: c.sent_at,
-        })
-        .collect();
+    found.sort_by_key(|c| std::cmp::Reverse(c.sent_at));
+    out.samples = found.iter().take(PREVIEW_SAMPLES).map(sample).collect();
     out.overrides = overridden
         .into_iter()
         .filter_map(|(id, n)| {
@@ -382,6 +349,48 @@ pub async fn compute_preview(
         })
         .collect();
     Ok(out)
+}
+
+fn sample(c: &rules::Candidate) -> PreviewSample {
+    PreviewSample {
+        conversation_id: c.id,
+        subject: c.subject.clone(),
+        sender: c.sender_address.clone(),
+        sent_at: c.sent_at,
+    }
+}
+
+/// The rule winning each slot of `outcome` (labels aside).
+fn winners(outcome: &campbooks_ai::decide::taught::Outcome) -> [Option<&str>; 6] {
+    [
+        outcome.stream.as_ref().map(|a| a.rule.as_str()),
+        outcome.archive.as_deref(),
+        outcome.read.as_deref(),
+        outcome.needs_reply.as_ref().map(|a| a.rule.as_str()),
+        outcome.asks_action.as_ref().map(|a| a.rule.as_str()),
+        outcome.surface.as_ref().map(|a| a.rule.as_str()),
+    ]
+}
+
+/// Count, per rule, the slots `new` takes over from it between `before`
+/// and `after`.
+fn count_overrides(
+    before: &campbooks_ai::decide::taught::Outcome,
+    after: &campbooks_ai::decide::taught::Outcome,
+    new: &str,
+    overridden: &mut Vec<(String, u32)>,
+) {
+    for (old, winner) in winners(before).into_iter().zip(winners(after)) {
+        if let (Some(old), Some(winner)) = (old, winner)
+            && winner == new
+            && old != new
+        {
+            match overridden.iter_mut().find(|(id, _)| id == old) {
+                Some((_, n)) => *n += 1,
+                None => overridden.push((old.to_owned(), 1)),
+            }
+        }
+    }
 }
 
 /// Whether `outcome`'s slots won by `rule` would change `candidate`.
@@ -512,6 +521,7 @@ pub async fn create(
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
     }
     let access = &workspace.access;
+    member_only(access)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     may_teach(&mut tx, access, path.inbox_id).await?;
     let created = create_in(&mut tx, &state, access, path.inbox_id, &body).await?;
@@ -630,6 +640,7 @@ pub async fn confirm(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let rule = visible_rule(&mut tx, access, path.rule_id).await?;
+    member_only(access)?;
     may_teach(&mut tx, access, rule.inbox).await?;
     if rule.state != RuleState::Proposed {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
@@ -810,6 +821,7 @@ pub async fn remove(
     // A proposed rule can be turned down by anyone who may teach there.
     let rule = match visible_rule(&mut tx, access, path.rule_id).await? {
         r if r.state == RuleState::Proposed => {
+            member_only(access)?;
             may_teach(&mut tx, access, r.inbox).await?;
             r
         }

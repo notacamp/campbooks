@@ -633,7 +633,7 @@ fn check_meta(
         }
     }
     for key in meta.keys() {
-        if !REQUIRED_META.contains(&key.as_str()) && key != "undo" {
+        if !REQUIRED_META.contains(&key.as_str()) && key != "undo" && key != "query_in" {
             violations.push(format!(
                 "OpenAPI operation `{name}`: unknown key `x-campbooks.{key}`"
             ));
@@ -693,6 +693,20 @@ fn check_meta(
             None
         }
     };
+    check_method(name, method, meta, violations);
+    meta.get("mutates")
+        .and_then(serde_json::Value::as_bool)
+        .map(|mutates| Meta { mutates, undo })
+}
+
+/// `mutates` must match the method: writes are POST/PUT/PATCH/DELETE, reads
+/// GET/HEAD, or a POST marked `query_in: body` (inputs kept out of URLs).
+fn check_method(
+    name: &str,
+    method: &str,
+    meta: &serde_json::Map<String, serde_json::Value>,
+    violations: &mut Vec<String>,
+) {
     if let Some(mutates) = meta.get("mutates").and_then(serde_json::Value::as_bool) {
         let writes = matches!(method, "POST" | "PUT" | "PATCH" | "DELETE");
         let reads = matches!(method, "GET" | "HEAD");
@@ -701,15 +715,20 @@ fn check_meta(
                 "OpenAPI operation `{name}` mutates, so it must be POST, PUT, PATCH or DELETE"
             ));
         }
-        if !mutates && !reads {
+        let body_query = meta.get("query_in").and_then(serde_json::Value::as_str) == Some("body");
+        if body_query && (mutates || method != "POST") {
             violations.push(format!(
-                "OpenAPI operation `{name}` does not mutate, so it must be GET or HEAD"
+                "OpenAPI operation `{name}`: `x-campbooks.query_in` is for reads served by POST \
+                 (inputs that must stay out of URLs)"
+            ));
+        }
+        if !mutates && !reads && !body_query {
+            violations.push(format!(
+                "OpenAPI operation `{name}` does not mutate, so it must be GET or HEAD (or a POST \
+                 marked `Operation::body_query()` when its inputs must stay out of URLs)"
             ));
         }
     }
-    meta.get("mutates")
-        .and_then(serde_json::Value::as_bool)
-        .map(|mutates| Meta { mutates, undo })
 }
 
 /// An event type a module publishes, or one a consumer reads.
@@ -1659,6 +1678,31 @@ mod tests {
             v.iter()
                 .any(|m| m.contains("`DELETE /a` does not mutate, so it must be GET"))
         );
+    }
+
+    #[test]
+    fn a_body_query_is_a_post_that_does_not_mutate() {
+        let mut body_query = meta(false);
+        body_query["query_in"] = serde_json::json!("body");
+        let mut wrong = meta(true);
+        wrong["query_in"] = serde_json::json!("body");
+        let spec = serde_json::json!({ "paths": {
+            "/q": { "post": { "operationId": "mail.q", "x-campbooks": body_query } },
+            "/w": { "post": { "operationId": "mail.w", "x-campbooks": wrong } },
+            "/p": { "post": { "operationId": "mail.p", "x-campbooks": meta(false) } },
+        }});
+        let owners = owners(&[
+            ("POST", "/q", "mail"),
+            ("POST", "/w", "mail"),
+            ("POST", "/p", "mail"),
+        ]);
+        let v = check_operations(&spec, &owners);
+        assert_eq!(v.len(), 2, "{v:#?}");
+        assert!(
+            v.iter()
+                .any(|m| m.contains("`POST /w`: `x-campbooks.query_in` is for reads"))
+        );
+        assert!(v.iter().any(|m| m.contains("`POST /p` does not mutate")));
     }
 
     #[test]

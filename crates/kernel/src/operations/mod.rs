@@ -96,6 +96,20 @@ pub struct Operation {
     pub risk: Risk,
     /// The record types (`<module>.<record>`) it reads or changes.
     pub records: Vec<String>,
+    /// Where a read takes its inputs, when not from the URL: `body` for a
+    /// read served by POST because its inputs hold personal data
+    /// (addresses, subjects) that URLs would leak to access logs, proxies
+    /// and browser history. Only with `mutates: false`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_in: Option<QueryIn>,
+}
+
+/// Where a read that is not a GET takes its inputs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum QueryIn {
+    /// The request body of a POST.
+    Body,
 }
 
 impl Operation {
@@ -109,6 +123,16 @@ impl Operation {
             assistant: false,
             risk: Risk::Low,
             records: Vec::new(),
+            query_in: None,
+        }
+    }
+
+    /// A read served by POST, because its inputs hold personal data that
+    /// must stay out of URLs (see [`query_in`](Self::query_in)).
+    pub fn body_query() -> Self {
+        Self {
+            query_in: Some(QueryIn::Body),
+            ..Self::query()
         }
     }
 

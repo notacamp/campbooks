@@ -22,6 +22,6 @@
     "invalid_rule": "No se puede guardar esta regla. Necesita de una a cuatro condiciones que digan a qué correos se aplica, y de una a cuatro acciones de tipos distintos.",
     "rule_not_yours": "Solo quien enseñó esta regla, o un gestor de la bandeja de entrada, puede cambiarla.",
     "rule_not_proposed": "Esta regla ya no está esperando un sí.",
-    "invalid_rule_query": "No se ha podido leer la regla que quieres previsualizar. Envía sus condiciones y acciones en JSON."
+    "rule_needs_member": "Las reglas las enseña un miembro de la bandeja de entrada, no una aplicación."
   }
 }

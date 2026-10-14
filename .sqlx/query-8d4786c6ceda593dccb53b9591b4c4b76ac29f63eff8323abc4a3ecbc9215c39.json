@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.rules\n            (id, workspace_id, inbox_id, teaching_id, conditions, actions, specificity, origin,\n             origin_text, state, taught_by, from_conversation_id, confirmed_at)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,\n                CASE WHEN $10 = 'active' THEN now() END)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Int4",
+        "Text",
+        "Text",
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "8d4786c6ceda593dccb53b9591b4c4b76ac29f63eff8323abc4a3ecbc9215c39"
+}

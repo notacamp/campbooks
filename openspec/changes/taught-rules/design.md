@@ -194,8 +194,9 @@ Action    move_to_stream{stream} · archive · add_label{label} · mark_read
   `default < rules | model < taught < member`.
 - **Surface.** `never`: the derived need is not raised (an open one clears
   with cause `rule`). `always`: no rule may archive, mark read or move the
-  conversation out of Primary, and a need is raised as Review ("You asked to
-  see mail from …") when nothing else applies.
+  conversation out of Primary. Raising a Review need of its own is left out
+  of this change (it would add a need question type); the UI says only what
+  it does.
 - **Suspicious mail.** When the message has a true `suspicious` answer (any
   source) or an open Review need, rules never archive, mark read, move out of
   Primary, answer a need false, or say `surface: never`. The warning always
@@ -410,19 +411,31 @@ Schema `conversations` (all with `workspace_id`, forced RLS):
 | operationId | Method, path (under `/api/v1/w/{workspace_id}`) | Scope | Role | `x-campbooks` |
 | --- | --- | --- | --- | --- |
 | `conversations.suggest_rules` | GET `/conversations/{id}/rule-suggestions?action=…` | `conversations:read` | sender | read |
-| `conversations.preview_rule` | POST `/inboxes/{inbox_id}/rules/preview` | `conversations:read` | sender | `mutates: false` |
+| `conversations.preview_rule` | POST `/inboxes/{inbox_id}/rules/preview` | `conversations:read` | sender | `mutates: false`, `query_in: body` (a read served by POST: addresses and words stay out of URLs and logs; the arch check accepts it only with this marker) |
 | `conversations.create_rule` | POST `/inboxes/{inbox_id}/rules` | `conversations:write` | sender | undo `remove_rule`, automation, assistant |
 | `conversations.confirm_rule` | POST `/rules/{rule_id}/confirm` | `conversations:write` | sender | undo `remove_rule` |
 | `conversations.update_rule` | PATCH `/rules/{rule_id}` | `conversations:write` | author or manager | |
 | `conversations.remove_rule` | DELETE `/rules/{rule_id}?restore=` | `conversations:write` | author or manager | `risk: low` (the client confirms in place) |
 | `conversations.list_rules` | GET `/rules?inbox=&state=` | `conversations:read` | reader | |
 | `conversations.get_rule` | GET `/rules/{rule_id}` | `conversations:read` | reader | |
-| `conversations.dismiss_rule_suggestion` | POST `/conversations/{id}/rule-suggestions/dismiss` | `conversations:write` | sender | |
+| `conversations.dismiss_rule_suggestion` | POST `/conversations/{id}/rule-suggestions/dismiss` (body: the suggestion's `key`) | `conversations:write` | sender | |
+
+Client tokens read and preview rules only; creating, confirming, changing
+and removing take a member (403 `rule_needs_member`).
 
 Errors (problem+json, catalogue codes in four locales):
-`invalid_rule` (no conditions, a free-mail domain alone, two actions in one
-slot, an unknown label or stream), `rule_not_active`, `inbox_read_only`, and
-404 for a rule or conversation the caller cannot see.
+`invalid_rule` (no conditions, a free-mail domain alone, label or stream
+conditions only, two actions of one kind), `rule_not_proposed` (409),
+`rule_not_yours`, `rule_needs_member`, `inbox_read_only`, and 404 for a rule
+or conversation the caller cannot see.
+
+**Rules from evidence** (origin `correction` or `suggestion`, e.g. #83's
+confirmed k-NN patterns or #121's) ask the kernel's new `MemberPreferences`
+port (`kernel::preferences`, default `AskFirst`; the `assistant` module of
+#121 installs the real one): active, with `acted_without_asking` so the client
+shows a notice with Undo, only when the member lets Campbooks act without
+asking and the inbox is theirs alone; otherwise proposed. A shared inbox
+always gets a proposal, because the rule would act for everyone.
 
 ## AI use
 
@@ -479,6 +492,10 @@ both; the UI change's spec deltas are `inbox-ui` and `memory-ui`.
   up in the background".
 - **Shared inbox surprise.** "For everyone" in the offer and the memory
   page, and the row line names the rule.
+- **Older mail's templates.** Messages stored before this change get their
+  subject template the first time a rule is previewed, suggested or run in
+  their inbox (`rules::fill_templates`, a thousand at a time, only rows not
+  yet worked out), since a scheduled job cannot read workspace tables.
 - **Template quality** across four languages: the normaliser is tested on
   real-shaped demo subjects in en, pt-PT, es-ES and fr; a template with fewer
   than two literal words is never offered.

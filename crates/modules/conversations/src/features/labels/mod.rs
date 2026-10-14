@@ -19,6 +19,7 @@ use crate::{
     domain::{
         access::lock_conversation,
         conversation::{Changed, LabelView, provider_message_ids, request},
+        rules,
     },
     events::{Change, Origin, RequestedChange},
     model::{ConversationId, InboxId, LabelId},
@@ -177,6 +178,7 @@ pub async fn remove(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or(Error::NotFound)?;
+    rules::except(&mut tx, id, rules::Undone::Label(label), access.user).await?;
     let change = RequestedChange::RemoveLabel {
         label,
         provider_key: removed,
