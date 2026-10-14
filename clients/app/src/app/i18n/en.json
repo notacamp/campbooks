@@ -65,7 +65,9 @@
     "sections": {
       "system": "System",
       "jobs": "Jobs",
-      "signups": "Signups"
+      "signups": "Signups",
+      "people": "People",
+      "workspaces": "Workspaces"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Sign in again to continue",

@@ -197,7 +197,7 @@ pub struct WayIn {
 }
 
 /// The provider ways into `account`, oldest first.
-pub async fn ways_in(db: &PgPool, account: Uuid) -> Result<Vec<WayIn>> {
+pub async fn ways_in<'e>(db: impl sqlx::PgExecutor<'e>, account: Uuid) -> Result<Vec<WayIn>> {
     Ok(sqlx::query_as(
         "SELECT id, provider, email_at_link AS email, linked_via, linked_at, last_used_at
            FROM identity.provider_identities
@@ -231,6 +231,17 @@ pub async fn profile(db: &PgPool, id: Uuid) -> Result<Option<Profile>> {
     .bind(id)
     .fetch_optional(db)
     .await?)
+}
+
+/// Whether account `id` is suspended (an administrator set `disabled_at`).
+/// A missing account counts as suspended: nothing may sign it in.
+pub async fn is_suspended(conn: &mut PgConnection, id: Uuid) -> Result<bool> {
+    let active: Option<bool> =
+        sqlx::query_scalar("SELECT disabled_at IS NULL FROM identity.accounts WHERE id = $1")
+            .bind(id)
+            .fetch_optional(conn)
+            .await?;
+    Ok(active != Some(true))
 }
 
 /// Record `kind` in the account's audit trail. `metadata` holds ids,

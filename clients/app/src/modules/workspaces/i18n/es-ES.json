@@ -166,6 +166,73 @@
       "lead": "Campbooks no ha respondido. No ha cambiado nada."
     }
   },
+  "admin": {
+    "open": "Abrir",
+    "openLabel": "Abrir {{name}}",
+    "retry": "Reintentar",
+    "more": "Mostrar más",
+    "loadingMore": "Cargando más…",
+    "loadErrorLead": "El servidor no ha respondido. Comprueba la conexión y vuelve a intentarlo.",
+    "workspaceCount_one": "{{count}} espacio de trabajo",
+    "workspaceCount_other": "{{count}} espacios de trabajo",
+    "memberCount_one": "{{count}} miembro",
+    "memberCount_other": "{{count}} miembros",
+    "deletedOn": "Eliminado el {{date}}",
+    "people": {
+      "title": "Personas",
+      "lead": "Todas las personas que han iniciado sesión en este Campbooks, de la más reciente a la más antigua. Ves quiénes son y dónde están, nunca su correo ni sus documentos.",
+      "search": "Buscar personas",
+      "searchPlaceholder": "Comienzo de un nombre o una dirección de correo",
+      "list": "Personas",
+      "loading": "Cargando personas…",
+      "empty": "Todavía no ha iniciado sesión nadie.",
+      "noMatch": "Ningún nombre ni dirección de correo empieza por «{{search}}».",
+      "loadError": "No se han podido cargar las personas",
+      "joined": "Se unió el {{date}}",
+      "back": "Todas las personas"
+    },
+    "person": {
+      "loading": "Cargando…",
+      "notFound": "Esta persona no está aquí",
+      "notFoundLead": "Nadie con este enlace ha iniciado sesión en este Campbooks.",
+      "loadError": "No se ha podido cargar esta persona",
+      "email": "Dirección de correo",
+      "noEmail": "Ninguna",
+      "firstSignIn": "Primer inicio de sesión",
+      "workspaces": "Espacios de trabajo",
+      "workspacesOf": "Espacios de trabajo de {{name}}",
+      "noWorkspaces": "Todavía no está en ningún espacio de trabajo.",
+      "joined": "Se unió el {{date}}"
+    },
+    "workspaces": {
+      "title": "Espacios de trabajo",
+      "lead": "Todos los espacios de trabajo de este Campbooks, del más reciente al más antiguo, y quién está en cada uno. Nunca lo que contienen.",
+      "search": "Buscar espacios de trabajo",
+      "searchPlaceholder": "Comienzo del nombre de un espacio de trabajo",
+      "list": "Espacios de trabajo",
+      "loading": "Cargando espacios de trabajo…",
+      "empty": "Todavía no hay espacios de trabajo.",
+      "noMatch": "Ningún espacio de trabajo tiene un nombre que empiece por «{{search}}».",
+      "loadError": "No se han podido cargar los espacios de trabajo",
+      "created": "Creado el {{date}}",
+      "back": "Todos los espacios de trabajo"
+    },
+    "workspace": {
+      "loading": "Cargando…",
+      "notFound": "Este espacio de trabajo no está aquí",
+      "notFoundLead": "Ningún espacio de trabajo de este Campbooks tiene este enlace.",
+      "loadError": "No se ha podido cargar este espacio de trabajo",
+      "state": "Estado",
+      "active": "Activo",
+      "purgedLater": "Sus datos se borran definitivamente tras el periodo de espera.",
+      "kind": "Tipo",
+      "created": "Creado",
+      "members": "Miembros",
+      "pendingInvitations": "Invitaciones pendientes",
+      "invitationCount_one": "{{count}} invitación",
+      "invitationCount_other": "{{count}} invitaciones"
+    }
+  },
   "signups": {
     "title": "Registros",
     "parts": {

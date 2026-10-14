@@ -65,7 +65,9 @@
     "sections": {
       "system": "Système",
       "jobs": "Tâches",
-      "signups": "Inscriptions"
+      "signups": "Inscriptions",
+      "people": "Personnes",
+      "workspaces": "Espaces de travail"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Reconnectez-vous pour continuer",

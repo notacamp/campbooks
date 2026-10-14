@@ -18,6 +18,8 @@
     "passkey_already_registered": "Cette clé d’accès permet déjà d’accéder à Campbooks.",
     "display_name_required": "Dites-nous comment vous appeler.",
     "passkey_name_required": "Donnez à la clé d’accès un nom de 1 à 64 caractères.",
+    "account_is_admin": "Ce compte est celui d’un administrateur. Révoquez d’abord son profil d’administrateur en ligne de commande sur le serveur (campbooks-server admin revoke), puis suspendez-le.",
+    "account_suspended": "Un administrateur de ce Campbooks a suspendu ce compte. Demandez-lui de lever la suspension.",
     "invalid_target": "Cette application a demandé l’accès à quelque chose que Campbooks ne fournit pas.",
     "consent_request_not_found": "Cette demande d’autorisation d’une application a expiré ou a déjà reçu une réponse. Recommencez depuis l’application.",
     "consent_needs_workspace": "Choisissez l’espace de travail que cette application peut utiliser.",
