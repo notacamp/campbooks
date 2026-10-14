@@ -2003,6 +2003,55 @@
           }
         }
       },
+      "AiAnswersCheck": {
+        "type": "object",
+        "description": "How the `decide` model did on its answers check (eight fictional emails\nwhose answers are not in doubt). While it does not pass, the model's\nanswers are not used: the inbox is sorted by the rules alone.",
+        "required": [
+          "state"
+        ],
+        "properties": {
+          "checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the last check finished."
+          },
+          "right": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Expected answers the model got right, once a check finished.",
+            "minimum": 0
+          },
+          "state": {
+            "$ref": "#/components/schemas/AiAnswersCheckState",
+            "description": "Where the check stands."
+          },
+          "total": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Expected answers asked, once a check finished.",
+            "minimum": 0
+          }
+        }
+      },
+      "AiAnswersCheckState": {
+        "type": "string",
+        "description": "Where the answers check stands.",
+        "enum": [
+          "pending",
+          "passed",
+          "failed",
+          "unavailable"
+        ]
+      },
       "AiLocation": {
         "type": "string",
         "description": "Where an AI role's endpoint is, as far as mail content is concerned.",
@@ -2037,6 +2086,17 @@
           "configured"
         ],
         "properties": {
+          "answers_check": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AiAnswersCheck",
+                "description": "The `decide` role's answers check: whether the model gets obvious\nfictional emails right. `null` for the other roles, and when the\nrole is not configured or may not receive mail."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "configured": {
             "type": "boolean",
             "description": "Whether a provider is configured for it."

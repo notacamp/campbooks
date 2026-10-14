@@ -19,7 +19,14 @@
 //! answer may act, is measured by `cargo xtask eval decide` on the eval set
 //! in `crates/ai/evals/decide/`.
 
-use std::{collections::HashMap, fmt, future::Future, pin::Pin, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    fmt,
+    future::Future,
+    pin::Pin,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use super::{Answer, AnswerValue, DecisionContext, Question, signals::email::Envelope};
 use crate::{Error, Gateway};
@@ -119,7 +126,12 @@ pub struct Model {
     name: String,
     gateway: Gateway,
     purpose: &'static str,
+    checked: bool,
 }
+
+/// How long a checked [`Model`] waits for the first answers check after
+/// startup before it counts as not passed.
+pub const FIRST_CHECK_WAIT: Duration = Duration::from_secs(30);
 
 impl Model {
     /// A strategy named `name` asking `gateway`'s `decide` role, filed under
@@ -129,7 +141,20 @@ impl Model {
             name: name.into(),
             gateway,
             purpose,
+            checked: false,
         }
+    }
+
+    /// The same strategy, answering only while the role's answers check
+    /// ([`super::check`]) passes: otherwise it fails with
+    /// [`Error::AnswersNotTrusted`] before calling the model, and the
+    /// answers it gives carry the check's [`stamp`](super::check::stamp) as
+    /// their `model_version`. The check itself runs elsewhere
+    /// ([`Gateway::keep_answers_checked`]).
+    #[must_use]
+    pub fn checked(mut self) -> Self {
+        self.checked = true;
+        self
     }
 }
 
@@ -147,6 +172,9 @@ impl Strategy for Model {
             if questions.is_empty() {
                 return Ok(Decisions::default());
             }
+            if self.checked && !self.gateway.answers_trusted(FIRST_CHECK_WAIT).await {
+                return Err(Error::AnswersNotTrusted);
+            }
             let answers = self
                 .gateway
                 .decide(
@@ -159,9 +187,14 @@ impl Strategy for Model {
                 answers: answers
                     .iter()
                     .map(|answer| {
+                        let mut answer = answer.clone();
+                        if self.checked {
+                            answer.model_version =
+                                Some(super::check::stamp(answer.model_version.as_deref()));
+                        }
                         Some(Decided {
                             reasons: vec![Reason::new("model.decide", answer.model.clone())],
-                            answer: answer.clone(),
+                            answer,
                         })
                     })
                     .collect(),

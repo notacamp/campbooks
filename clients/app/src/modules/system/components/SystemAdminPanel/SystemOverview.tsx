@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
 import { Fact, FactList, Heading, Text } from "~/lib/ui";
@@ -180,18 +181,57 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
         ? ""
         : t(`admin.ai.protocol.${role.protocol}`),
   });
-  const status = refused ? "off" : reachable ? "ok" : "problem";
+  const check = refused ? undefined : answersCheck(role, t);
+  const status = refused ? "off" : reachable && check?.trusted !== false ? "ok" : "problem";
+  const facts = [detail, where, check?.detail].filter((part) => part !== undefined);
   return (
-    <Fact
-      label={label}
-      status={status}
-      detail={where === undefined ? detail : `${detail} · ${where}`}
-    >
+    <Fact label={label} status={status} detail={facts.join(" · ")}>
       {refused
         ? t("admin.ai.notSentMail")
         : reachable
-          ? t("admin.ai.answering")
+          ? (check?.headline ?? t("admin.ai.answering"))
           : t("admin.ai.notAnswering")}
     </Fact>
   );
+}
+
+/**
+ * The decide role's answers check in words: whether the model got obvious
+ * fictional emails right, and so whether its answers are used.
+ */
+function answersCheck(
+  role: AiRoleStatus,
+  t: TFunction<"system">,
+): { headline: string; detail: string; trusted: boolean | undefined } | undefined {
+  const check = role.answers_check;
+  if (check === undefined || check === null) {
+    return undefined;
+  }
+  const counts = { right: check.right ?? 0, total: check.total ?? 0 };
+  switch (check.state) {
+    case "pending":
+      return {
+        headline: t("admin.ai.check.pending"),
+        detail: t("admin.ai.check.pendingDetail"),
+        trusted: undefined,
+      };
+    case "passed":
+      return {
+        headline: t("admin.ai.answering"),
+        detail: t("admin.ai.check.passed", counts),
+        trusted: true,
+      };
+    case "failed":
+      return {
+        headline: t("admin.ai.check.failed"),
+        detail: t("admin.ai.check.failedDetail", counts),
+        trusted: false,
+      };
+    case "unavailable":
+      return {
+        headline: t("admin.ai.check.unavailable"),
+        detail: t("admin.ai.check.unavailableDetail"),
+        trusted: false,
+      };
+  }
 }

@@ -39,10 +39,64 @@ describe("SystemOverview", () => {
 
     expect(await screen.findByText("Decisions")).toBeVisible();
     expect(valueOf("Decisions")).toHaveTextContent(
-      "Answeringqwen3:8b at http://ollama:11434 · OpenAI-compatible · on this instance’s network",
+      "Answeringqwen3:8b at http://ollama:11434 · OpenAI-compatible · on this instance’s network · " +
+        "got 33 of 33 test answers right",
     );
     expect(valueOf("Embeddings")).toHaveTextContent("Not answering");
     expect(valueOf("Images and scans")).toHaveTextContent("Not set up");
+  });
+
+  it("says when the decisions model fails its answers check, and that its answers are not used", async () => {
+    const failing = {
+      ...OVERVIEW,
+      ai: OVERVIEW.ai.map((role) =>
+        role.role === "decide"
+          ? {
+              ...role,
+              model: "convaiinnovations/laya-multilingual",
+              protocol: "laya" as const,
+              answers_check: {
+                state: "failed" as const,
+                right: 8,
+                total: 33,
+                checked_at: "2026-10-14T06:00:00Z",
+              },
+            }
+          : role,
+      ),
+    };
+    renderWithProviders(<SystemOverview overview={failing} />);
+
+    expect(await screen.findByText("Decisions")).toBeVisible();
+    expect(valueOf("Decisions")).toHaveTextContent(
+      "Answers fail the checkconvaiinnovations/laya-multilingual at http://ollama:11434 · Laya · " +
+        "on this instance’s network · got only 8 of 33 obvious test answers right, so its " +
+        "answers are not used and the rules sort mail alone",
+    );
+    expect(valueOf("Decisions").querySelector("[data-status='problem']")).not.toBeNull();
+  });
+
+  it("says while the first answers check runs", async () => {
+    const pending = {
+      ...OVERVIEW,
+      ai: OVERVIEW.ai.map((role) =>
+        role.role === "decide"
+          ? {
+              ...role,
+              answers_check: {
+                state: "pending" as const,
+                right: null,
+                total: null,
+                checked_at: null,
+              },
+            }
+          : role,
+      ),
+    };
+    renderWithProviders(<SystemOverview overview={pending} />);
+
+    expect(await screen.findByText("Decisions")).toBeVisible();
+    expect(valueOf("Decisions")).toHaveTextContent(/^Checking its answers/u);
   });
 
   it("says when a role is outside the instance's network and gets no mail", async () => {

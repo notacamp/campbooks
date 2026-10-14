@@ -117,16 +117,20 @@ never re-sort a conversation, and a member's move SHALL stick.
 
 ### Requirement: The decide pass records suggestions
 Every answer of every strategy SHALL be stored in `decisions` with its
-question, source, value, options, probabilities, confidence, model, latency,
-reasons, whether it acted, and the envelope version. The rules SHALL be the
+question, source, value, options, probabilities, confidence, model, model
+version, latency, reasons, whether it acted, and the envelope version
+(`1 + CONTEXT_VERSION` of the triage context). The rules SHALL be the
 shared email signals and the questions the shared triage questions of
 `campbooks_ai::decide`; this module SHALL hold no rules of its own. The model pass
 (`conversations.decide_message`, role `decide`) SHALL ask the six questions
 (`stream`, `needs_reply`, `asks_action`, `has_deadline`, `urgency`,
-`suspicious`) in one call per inbound message, only when the `decide` role is
-configured, only for messages sent within
+`suspicious`) in one call per inbound message, telling the model whose inbox
+the message is in, only when the `decide` role is configured and has passed
+its answers check, only for messages sent within
 `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14), and once per
-message. Answers the policy accepts SHALL be marked `acted`; no model answer
+message. When the role has not passed its answers check, the pass SHALL do
+exactly what it does with no `decide` role: store nothing, fail no job.
+Answers the policy accepts SHALL be marked `acted`; no model answer
 SHALL be accepted by the shipped policy. Provider
 failures SHALL be retried, recording only the kind of failure.
 
@@ -141,6 +145,14 @@ failures SHALL be retried, recording only the kind of failure.
 #### Scenario: A replayed delivery
 - **WHEN** `message_received` is delivered again to `conversations.decide_message`
 - **THEN** the model is not asked again
+
+#### Scenario: A model that failed its answers check
+- **WHEN** the decide role's last answers check failed and a batch of mail arrives
+- **THEN** the model is not called, and the decisions, streams and needs are the same as with no `decide` role
+
+#### Scenario: The recipient
+- **WHEN** a message arrives in Sam's inbox, which only Sam reads
+- **THEN** the model reads "The recipient is sam@example.com, who reads this personal inbox."
 
 ### Requirement: Reading conversations
 `GET /api/v1/w/{workspace_id}/inboxes` (`conversations.list_inboxes`) SHALL
@@ -280,13 +292,15 @@ them SHALL be listed with zero.
 
 ### Requirement: Suggestions with their reasons
 A conversation summary SHALL carry `suggestion` when the newest stream answer
-on record for it (the model's before the rules' for the same message) did
+on record for it (the model's before the rules' for the same message; a
+model's answer only when its `model_version` starts with `checked:`) did
 not act, names another stream than the conversation's, and no member placed
 the conversation; the suggestion SHALL carry the stream, its source, its
 confidence (0 to 100, when known) and its stored reasons. A conversation's
 detail SHALL carry `decisions`: for each question, the answer about its newest
-inbound message, with its source, confidence, reasons and whether it acted.
-Neither SHALL change where a conversation is.
+inbound message, with its source, confidence, reasons and whether it acted,
+read the same way. Model answers without that stamp SHALL be kept and never
+read. Neither SHALL change where a conversation is.
 
 #### Scenario: The shipped policy
 - **WHEN** the rules answer `newsletters` for a message under `Policy::baseline`
@@ -295,6 +309,10 @@ Neither SHALL change where a conversation is.
 #### Scenario: A member moved it
 - **WHEN** a member moves that conversation to `newsletters`
 - **THEN** the summary the move returns has no suggestion
+
+#### Scenario: Model answers from before the answers check
+- **WHEN** a message's model answers carry `model_version` `laya-0.3.21-unchecked`
+- **THEN** its detail lists the rules' answers, and the model's answers stay stored
 
 ### Requirement: Sending scope and roles
 The `conversations` module SHALL declare the scope `conversations:send`, and
@@ -444,7 +462,8 @@ when `asks_action` is accepted. A `suspicious` answer of true SHALL raise a
 `review` need instead of any other. When the `decide` role is configured, a
 model answer of true for `needs_reply` or `asks_action` that the policy does
 not accept, with a confidence of at least 0.8, where no `sure` need exists
-SHALL raise a `review` need with trust `check`. The need SHALL carry the due
+SHALL raise a `review` need with trust `check`. Only model answers whose
+`model_version` starts with `checked:` SHALL count. The need SHALL carry the due
 date resolved from an accepted `has_deadline` answer, and `urgent` when an
 accepted `urgency` answer is "today". Messages from the conversation's own
 inbox SHALL never raise one.
@@ -468,6 +487,10 @@ inbox SHALL never raise one.
 #### Scenario: Rules only
 - **WHEN** no `decide` role is configured
 - **THEN** no need has trust `check`
+
+#### Scenario: Unchecked model answers
+- **WHEN** a message's only `needs_reply` true is a model answer marked `laya-0.3.21-unchecked`
+- **THEN** reading it raises no `check` need
 
 ### Requirement: Clearing a need
 A need SHALL be cleared, with its cause, when: a message is sent from the
@@ -579,6 +602,7 @@ others out.
 #### Scenario: Home asks for its rows
 - **WHEN** the client lists three conversation ids, one of them in an inbox the caller cannot see
 - **THEN** two summaries are returned, each with its `need`
+
 ### Requirement: Conversations as a search source
 The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),

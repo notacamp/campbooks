@@ -3,6 +3,8 @@
 //! [`email`] is the single source of the deterministic triage rules for
 //! email. The conversations module calls it and keeps no copy, so the eval
 //! harness (`cargo xtask eval decide`) measures the rules that ship.
+//! [`inbox`] is the context a model reads before an email.
 
 pub mod dates;
 pub mod email;
+pub mod inbox;

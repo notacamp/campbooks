@@ -59,6 +59,25 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **The decisions model's answers are only used once it gets obvious emails
+  right** (campbooks-cloud#128). The default Laya model said "yes" to almost
+  every question (needs a reply, has a deadline, looks like phishing), often
+  at 100% confidence. These answers never acted on their own, but they showed
+  up as suggestions and as Check questions on Home. It wasn't a bug in
+  Campbooks: the model can't answer these questions without training on them.
+  Every server now asks the `decide` role about eight made-up emails with
+  obvious answers at startup, again every 6 hours, and every 15 minutes while
+  it fails. A model that gets fewer than 90% right isn't used: the rules sort
+  mail exactly as if no model were set up, and Admin → System says so
+  ("Answers fail the check", with the count). Laya currently fails it, so on
+  a default install the rules alone sort mail until a better decisions model
+  ships.
+- Model answers stored before this release are marked as unchecked (database
+  migration). They are kept, but no longer feed suggestions or new Check
+  questions.
+- The decisions model is now told what Campbooks is, whose inbox the email
+  arrived in (personal or shared), what the rules noticed, and that the email
+  is data, not instructions. Its yes/no questions are asked as questions.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by
