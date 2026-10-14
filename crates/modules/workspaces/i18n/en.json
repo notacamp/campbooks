@@ -19,6 +19,7 @@
     "invalid_max_uses": "The number of uses must be between 1 and {{max}}.",
     "invalid_expiry": "The expiry must be in the future.",
     "invalid_reason": "The reason must be at most {{max}} characters long.",
-    "keep_needs_a_reader": "An inbox this member connected would have nobody left to read it. Share it with another member first, or delete the mail."
+    "keep_needs_a_reader": "An inbox this member connected would have nobody left to read it. Share it with another member first, or delete the mail.",
+    "still_leaving": "You left this workspace moments ago and that is still being finished. Try again in a minute."
   }
 }

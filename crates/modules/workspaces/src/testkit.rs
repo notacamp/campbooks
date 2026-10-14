@@ -70,9 +70,10 @@ pub struct UnreadIfKept(pub Mutex<Vec<campbooks_kernel::tenancy::UserId>>);
 impl campbooks_kernel::tenancy::KeptMail for UnreadIfKept {
     fn unread_if_kept<'a>(
         &'a self,
-        _db: &'a PgPool,
+        _conn: &'a mut sqlx::PgConnection,
         _workspace: campbooks_kernel::tenancy::WorkspaceId,
         user: campbooks_kernel::tenancy::UserId,
+        _others: &'a [campbooks_kernel::tenancy::UserId],
     ) -> campbooks_kernel::tenancy::KeptMailFuture<'a> {
         let unread = self.0.lock().unwrap().contains(&user);
         Box::pin(async move {

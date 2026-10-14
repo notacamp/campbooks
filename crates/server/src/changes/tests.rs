@@ -16,7 +16,7 @@ use campbooks_kernel::{
     config::ChangesConfig,
     jobs::Worker,
     operations,
-    tenancy::UserId,
+    tenancy::{ClientActor, UserId},
     testing::{self, TestIdp},
 };
 use campbooks_workspaces::events::MemberJoined;
@@ -31,10 +31,39 @@ const ALL_SCOPES: &str = "workspaces:read workspaces:write workspaces:admin";
 /// How long a test waits for a frame it expects.
 const WAIT: Duration = Duration::from_secs(10);
 
+/// Registered clients: each acts for a person, until removed.
+#[derive(Debug, Default)]
+struct Agents(std::sync::Mutex<std::collections::HashMap<String, ClientActor>>);
+
+impl Agents {
+    fn set(&self, client: &str, actor: ClientActor) {
+        self.0.lock().unwrap().insert(client.to_owned(), actor);
+    }
+}
+
+impl campbooks_kernel::tenancy::ClientDirectory for Agents {
+    fn acting_for<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        client_id: &'a str,
+        _workspace: campbooks_kernel::tenancy::WorkspaceId,
+    ) -> campbooks_kernel::tenancy::ClientsFuture<'a> {
+        let actor = self
+            .0
+            .lock()
+            .unwrap()
+            .get(client_id)
+            .cloned()
+            .unwrap_or(ClientActor::Unregistered);
+        Box::pin(async move { Ok(actor) })
+    }
+}
+
 /// One server process over the test database.
 struct Replica {
     app: Router,
     state: AppState,
+    agents: std::sync::Arc<Agents>,
 }
 
 impl Replica {
@@ -48,16 +77,18 @@ impl Replica {
             &campbooks_kernel::config::BlobsConfig::default(),
             pool.clone(),
         );
+        let agents = std::sync::Arc::new(Agents::default());
         let state = crate::with_ports(
             AppState::new(pool, config)
                 .with_blobs(blobs)
                 .with_registry(crate::registry().expect("valid registrations")),
-        );
+        )
+        .with_client_directory(agents.clone());
         let operations::Composed { routes, state, .. } = operations::compose(crate::api(), state);
         let app = routes
             .fallback(|| async { campbooks_kernel::Error::NotFound })
             .with_state(state.clone());
-        Self { app, state }
+        Self { app, state, agents }
     }
 
     async fn call(
@@ -274,6 +305,16 @@ impl World {
         claims["email"] = format!("{sub}@example.com").into();
         claims["email_verified"] = true.into();
         claims["name"] = format!("Person {sub}").into();
+        self.idp.token(&claims)
+    }
+
+    /// A token of client `id`, bound to `workspace`.
+    fn client(&self, id: &str, workspace: &str) -> String {
+        let mut claims = self.idp.claims(ALL_SCOPES);
+        let object = claims.as_object_mut().unwrap();
+        object.remove("sub");
+        object.insert("azp".into(), id.into());
+        object.insert("workspace_id".into(), workspace.into());
         self.idp.token(&claims)
     }
 
@@ -753,6 +794,122 @@ async fn a_removed_member_is_revoked_and_then_refused(db: PgPool) {
         .err()
         .unwrap();
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+/// A change every member with `workspaces:admin` sees, and that changes
+/// nobody's membership: keeps a stream busy.
+#[derive(Debug, Serialize, Deserialize)]
+struct Busy {
+    workspace: String,
+    n: u32,
+}
+
+impl DomainEvent for Busy {
+    const NAME: &'static str = "test.busy";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        vec![Change::upsert(RecordRef::new(
+            "workspaces.invitation",
+            &format!("inv-{}", self.n),
+        ))]
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_removed_client_loses_its_feed_even_while_busy(db: PgPool) {
+    let world = World::with(db, |c| c.heartbeat_seconds = 1).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.add_member(&ws, "bea", "admin").await;
+    world
+        .server
+        .agents
+        .set("bea-agent", ClientActor::ActsFor("bea".into()));
+    world.server.sequence().await;
+
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.client("bea-agent", &ws)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // Removed (identity revoked its tokens); the stream is busy with
+    // changes Bea's client may see, so it never idles into a heartbeat.
+    world.server.agents.set("bea-agent", ClientActor::Revoked);
+    let mut ended = false;
+    for n in 0..15 {
+        let mut tx = world.db.begin().await.unwrap();
+        campbooks_kernel::db::set_workspace(&mut tx, &ws)
+            .await
+            .unwrap();
+        world
+            .server
+            .state
+            .events
+            .publish(
+                &mut tx,
+                &Busy {
+                    workspace: ws.clone(),
+                    n,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+        world.server.sequence().await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        feed.drain(Duration::from_millis(50)).await;
+        if feed.raw.contains("event: revoked") {
+            ended = true;
+            break;
+        }
+    }
+    assert!(ended, "still streaming: {}", feed.raw);
+    let (status, _) = world
+        .server
+        .subscribe(Some(&world.client("bea-agent", &ws)), &ws, None)
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_client_whose_member_left_loses_its_feed(db: PgPool) {
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (_, bea) = world.add_member(&ws, "bea", "member").await;
+    world
+        .server
+        .agents
+        .set("bea-agent", ClientActor::ActsFor("bea".into()));
+    world.server.sequence().await;
+
+    let mut feed = world
+        .server
+        .subscribe(Some(&world.client("bea-agent", &ws)), &ws, None)
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    let (status, _) = world
+        .server
+        .call(
+            Some(&ana),
+            "DELETE",
+            &format!("/api/v1/w/{ws}/members/{bea}"),
+            None,
+        )
+        .await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+    world.server.sequence().await;
+    assert!(feed.next_event().await.is("revoked"));
+    assert!(feed.next().await.is_none(), "the stream ends");
 }
 
 // --- scale, limits, liveness ---------------------------------------------------

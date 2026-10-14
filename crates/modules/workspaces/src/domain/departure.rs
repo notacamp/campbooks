@@ -44,6 +44,28 @@ pub async fn depart(
         return Err(Error::Forbidden);
     }
     keep_an_owner(&mut tx, workspace, role).await?;
+    if let Departure::RemovedBy(_, _, MailChoice::Keep) = how {
+        // Asked in this transaction, with the workspace locked: the members
+        // who stay cannot change before the departure commits.
+        let others = sqlx::query_scalar!(
+            r#"SELECT user_id AS "user_id: UserId" FROM workspaces.members
+                WHERE workspace_id = $1 AND user_id <> $2"#,
+            workspace as WorkspaceId,
+            member as UserId,
+        )
+        .fetch_all(&mut *tx)
+        .await?;
+        let unread = state
+            .kept_mail
+            .unread_if_kept(&mut tx, workspace, member, &others)
+            .await?;
+        if !unread.is_empty() {
+            // Kept mail nobody could read could be neither read nor deleted.
+            return Err(Error::Conflict(
+                crate::MESSAGES.reason("keep_needs_a_reader"),
+            ));
+        }
+    }
     let subject = sqlx::query_scalar!(
         "SELECT idp_subject FROM workspaces.users WHERE id = $1",
         member as UserId,

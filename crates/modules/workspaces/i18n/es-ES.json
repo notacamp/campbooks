@@ -19,6 +19,7 @@
     "invalid_max_uses": "El número de usos debe estar entre 1 y {{max}}.",
     "invalid_expiry": "La caducidad debe ser futura.",
     "invalid_reason": "El motivo debe tener como máximo {{max}} caracteres.",
-    "keep_needs_a_reader": "Un buzón que conectó este miembro se quedaría sin nadie que pueda leerlo. Compártelo antes con otro miembro o elimina el correo."
+    "keep_needs_a_reader": "Un buzón que conectó este miembro se quedaría sin nadie que pueda leerlo. Compártelo antes con otro miembro o elimina el correo.",
+    "still_leaving": "Saliste de este espacio de trabajo hace unos instantes y tu salida aún se está completando. Vuelve a intentarlo dentro de un minuto."
   }
 }

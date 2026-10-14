@@ -1045,6 +1045,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6636,7 +6640,7 @@
             }
           },
           "409": {
-            "description": "`invitation_used`, `invitation_expired` or `already_a_member`.",
+            "description": "`invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute.",
             "content": {
               "application/problem+json": {
                 "schema": {

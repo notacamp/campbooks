@@ -263,6 +263,31 @@ impl EventBus {
         Ok(id)
     }
 
+    /// Whether an event `name` of the transaction's workspace whose payload
+    /// contains `matching` (`@>`) has a delivery that has not succeeded yet
+    /// (pending, running, or failed for good): its consumers have not all
+    /// acted on it. Row-level security limits it to `conn`'s workspace.
+    ///
+    /// # Errors
+    /// The database's.
+    pub async fn unsettled(
+        conn: &mut sqlx::PgConnection,
+        name: &str,
+        matching: &serde_json::Value,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM kernel.events e
+                     JOIN kernel.jobs j ON j.event_id = e.id
+                    WHERE e.name = $1 AND e.payload @> $2 AND j.state <> 'succeeded'
+               ) AS "unsettled!""#,
+            name,
+            matching,
+        )
+        .fetch_one(conn)
+        .await
+    }
+
     /// Re-enqueue deliveries of the logged events of `consumer`'s event type
     /// to that consumer, from `from` on. Events that already have an
     /// unfinished delivery to it are skipped. Returns how many were enqueued.

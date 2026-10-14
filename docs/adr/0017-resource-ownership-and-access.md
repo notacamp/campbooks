@@ -41,7 +41,11 @@ to be declared once, checked centrally, and enforced by CI.
    (`ClientDirectory` port, answered by the issuer): it gets their access,
    no more, and stops working (401) once they leave or the client is
    removed. Inbox and inbox-contained types grant nothing to clients as
-   such. The kernel builds one catalogue
+   such. With an outside identity provider (no issuer in this process)
+   nothing answers the port, so every client token is "unregistered": it
+   reads no inbox, but the explicit `Clients` grants on the workspace, its
+   members and its connections still apply. With the issuer in process,
+   a client token it does not know as a workspace's own is refused (401). The kernel builds one catalogue
    from all modules (`Registry::resources`, installed in `AppState`) and
    rejects duplicate or misnamed types and unknown container roles.
 2. **One central check**, `authz::authorize(state, tx, access, action,

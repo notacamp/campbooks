@@ -171,6 +171,7 @@ pub async fn open(
         deadline_reason,
         heartbeat,
         next_heartbeat: now + heartbeat,
+        access_checked: now,
         poll: Duration::from_millis(config.poll_interval_ms),
         out: VecDeque::from([first]),
         shown: HashSet::new(),
@@ -201,6 +202,9 @@ struct Feed {
     deadline_reason: &'static str,
     heartbeat: Duration,
     next_heartbeat: Instant,
+    /// When membership was last resolved: at least once a heartbeat, busy
+    /// or not, so a client removed (or whose member left) stops soon.
+    access_checked: Instant,
     poll: Duration,
     out: VecDeque<Frame>,
     /// Containers this stream has shown changes from. Visibility is asked
@@ -334,7 +338,10 @@ impl Feed {
             rows.iter()
                 .any(|row| records.contains(&row.record.record_type.as_str()))
         };
-        let access_changed = touches(self.access_records);
+        // A busy stream never idles into a heartbeat: resolve again when one
+        // is due anyway (a removed client changes nothing in the feed).
+        let access_changed =
+            touches(self.access_records) || self.access_checked.elapsed() >= self.heartbeat;
         let containers_changed = touches(self.container_records);
 
         // Who may see what changed before this page is read: the membership
@@ -458,6 +465,7 @@ impl Feed {
 
     /// Resolve membership again; when it is gone, say so and end.
     async fn check_access(&mut self) -> Result<(), Error> {
+        self.access_checked = Instant::now();
         let access = match crate::tenancy::resolve_access(
             self.state.membership.as_ref(),
             self.state.clients.as_ref(),

@@ -32,6 +32,11 @@ pub struct AccessFile {
     /// `lock_conversation(` for `conversations.conversation`).
     #[serde(default)]
     pub helpers: Vec<Helper>,
+    /// Module functions that build a reference to one resource type for an
+    /// `authorize` call (e.g. `member_resource(` for `workspaces.member`):
+    /// a handler passing one to the check names that type.
+    #[serde(default)]
+    pub references: Vec<Helper>,
     /// Operations whose handler does not call `authz` yet, each with the
     /// issue that moves it on.
     #[serde(default)]
@@ -177,13 +182,20 @@ pub fn check_authorize_calls(
             ));
             continue;
         };
-        let code = without_tests(text);
+        // The operation's own declaration names its resource: only the code
+        // around it counts.
+        let stripped = without_declarations(without_tests(text));
+        let code = stripped.as_str();
         let helper_for = |resource: &str| {
             file.helpers
                 .iter()
                 .any(|helper| helper.resource == resource && code.contains(helper.call.as_str()))
         };
         let names_it = code.contains(&format!("\"{resource}\""))
+            || file
+                .references
+                .iter()
+                .any(|r| r.resource == resource && code.contains(r.call.as_str()))
             || constants
                 .iter()
                 .filter(|(_, value)| value.as_str() == resource)
@@ -243,6 +255,49 @@ static AUTHORIZE_CALL: LazyLock<Regex> = LazyLock::new(|| {
     )
     .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
 });
+
+/// `code` without its `#[utoipa::path(…)]` attributes and comments, which
+/// name the declared resource whether or not the handler asks about it.
+fn without_declarations(code: &str) -> String {
+    const ATTRIBUTE: &str = "#[utoipa::path(";
+    let mut out = String::with_capacity(code.len());
+    let mut rest = code;
+    while let Some(at) = rest.find(ATTRIBUTE) {
+        out.push_str(&rest[..at]);
+        let mut depth = 0usize;
+        let mut end = rest.len();
+        let (mut quoted, mut escaped) = (false, false);
+        for (i, c) in rest[at + 1..].char_indices() {
+            if quoted {
+                match c {
+                    _ if escaped => escaped = false,
+                    '\\' => escaped = true,
+                    '"' => quoted = false,
+                    _ => {}
+                }
+                continue;
+            }
+            match c {
+                '"' => quoted = true,
+                '(' | '[' => depth += 1,
+                ')' | ']' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        end = at + 1 + i + 1;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        rest = &rest[end..];
+    }
+    out.push_str(rest);
+    out.lines()
+        .filter(|line| !line.trim_start().starts_with("//"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
 
 /// The BFF documents its proxies with a macro taking the id as a literal.
 fn declares_by_macro(text: &str, id: &str) -> bool {
@@ -501,6 +556,20 @@ mod tests {
         );
         assert!(check_authorize_calls(&s, &c, &src(&constant), &file).is_empty());
         assert!(check_authorize_calls(&s, &c, &src(&asking), &file).is_empty());
+        // The declaration's own mention of the resource (in its
+        // `#[utoipa::path]`, strings with parentheses included) does not make
+        // a call about another resource count.
+        let attribute = "#[utoipa::path(\n    operation_id = \"mail.list\",\n    \
+            extensions((\"x-campbooks\" = json!(Operation::query().access(\"mail.thread\", \
+            Action::Read)))),\n    responses((status = OK, description = \"Fine (or not\"))\n)]\n";
+        let elsewhere = format!("{attribute}fn h() {{ authz::require_type(\"mail.box\"); }}\n");
+        assert_eq!(
+            check_authorize_calls(&s, &c, &src(&elsewhere), &file).len(),
+            1
+        );
+        let right = format!("{attribute}fn h() {{ authz::require_type(\"mail.thread\"); }}\n");
+        let elsewhere_head = attribute;
+        assert!(check_authorize_calls(&s, &c, &src(&right), &file).is_empty());
         // A call inside the test module does not count.
         let in_tests = format!("{declared}#[cfg(test)]\nmod tests {{ authz::x(); }}\n");
         assert_eq!(
@@ -516,6 +585,22 @@ mod tests {
             ..AccessFile::default()
         };
         assert!(check_authorize_calls(&s, &c, &src(&helper), &with_helper).is_empty());
+        // A function building the reference counts as naming it, only when
+        // the handler also asks the check.
+        let with_reference = AccessFile {
+            references: vec![Helper {
+                call: "thread_ref(".to_owned(),
+                resource: "mail.thread".to_owned(),
+            }],
+            ..AccessFile::default()
+        };
+        let referenced = format!("{elsewhere_head}fn h() {{ authorize(&s, thread_ref(id)); }}\n");
+        assert!(check_authorize_calls(&s, &c, &src(&referenced), &with_reference).is_empty());
+        let unasked = format!("{elsewhere_head}fn h() {{ let r = thread_ref(id); }}\n");
+        assert_eq!(
+            check_authorize_calls(&s, &c, &src(&unasked), &with_reference).len(),
+            1
+        );
         let pending = AccessFile {
             pending: vec![Pending {
                 operation: "mail.list".to_owned(),

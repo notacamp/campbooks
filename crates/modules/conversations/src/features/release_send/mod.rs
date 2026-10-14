@@ -70,9 +70,16 @@ impl JobHandler for ReleaseSend {
         let Some(row) = drafts::find(&mut read, &access, payload.draft, false).await? else {
             return Ok(());
         };
-        if !still_may_send(&state, &mut read, &access, &payload).await? {
+        if !still_may_send(
+            &state,
+            &mut read,
+            workspace,
+            author.map(Into::into),
+            &payload,
+        )
+        .await?
+        {
             read.commit().await?;
-            tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
             return Ok(());
         }
         read.commit().await?;
@@ -88,6 +95,12 @@ impl JobHandler for ReleaseSend {
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
+        // Again where the send is marked: the author's membership is held
+        // until this commits, so a removal either comes after the send or
+        // stops it.
+        if !still_may_send(&state, tx, workspace, author.map(Into::into), &payload).await? {
+            return Ok(());
+        }
         let released = sqlx::query_scalar!(
             r#"
             UPDATE conversations.drafts
@@ -140,23 +153,41 @@ impl JobHandler for ReleaseSend {
     }
 }
 
-/// Whether the author may still send the draft (they may have lost the
-/// inbox, or it was kept read-only); when not, it goes back to a draft.
+/// Whether the author may still send the draft: still a member of the
+/// workspace (held until `tx` ends) and allowed to send it (they may have
+/// lost the inbox, or it was kept read-only). When not, it goes back to a
+/// draft.
 async fn still_may_send(
     state: &campbooks_kernel::AppState,
-    read: &mut sqlx::Transaction<'static, sqlx::Postgres>,
-    access: &Access,
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    workspace: WorkspaceId,
+    author: Option<campbooks_kernel::tenancy::UserId>,
     payload: &ReleaseSendPayload,
 ) -> Result<bool, JobError> {
-    let allowed = campbooks_kernel::authz::authorize(
-        state,
-        read,
-        access,
-        campbooks_kernel::authz::Action::Send,
-        &campbooks_kernel::RecordRef::new(DRAFT_RECORD, &payload.draft),
-    )
-    .await?;
-    if allowed == campbooks_kernel::authz::Decision::Allow {
+    let role = match author {
+        Some(author) => state.membership.role_held(tx, workspace, author).await?,
+        None => None,
+    };
+    let allowed = match role {
+        Some(role) => {
+            let access = Access {
+                workspace,
+                user: author,
+                role: Some(role),
+            };
+            campbooks_kernel::authz::authorize(
+                state,
+                tx,
+                &access,
+                campbooks_kernel::authz::Action::Send,
+                &campbooks_kernel::RecordRef::new(DRAFT_RECORD, &payload.draft),
+            )
+            .await?
+                == campbooks_kernel::authz::Decision::Allow
+        }
+        None => false,
+    };
+    if allowed {
         return Ok(true);
     }
     sqlx::query!(
@@ -166,8 +197,9 @@ async fn still_may_send(
         payload.draft as DraftId,
         payload.generation,
     )
-    .execute(&mut **read)
+    .execute(&mut **tx)
     .await?;
+    tracing::info!(draft = %payload.draft, "scheduled send not released: the author may no longer send it");
     Ok(false)
 }
 

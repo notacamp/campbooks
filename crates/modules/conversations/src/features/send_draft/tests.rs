@@ -203,6 +203,25 @@ async fn undo_then_send_again_releases_only_the_second(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn a_scheduled_send_stays_put_once_its_author_left(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = kit.sams_inbox().await;
+    let draft = reply(&kit, workspace, &sam).await;
+    let sent = send(&kit, &sam, &draft).await;
+    assert_eq!(sent.status, StatusCode::ACCEPTED, "{:?}", sent.json);
+    // Removed from the workspace before the window ends, and before the
+    // departure is handled (the inbox membership is still there).
+    kit.leave("sam", workspace);
+    window_ends(&kit).await;
+    assert!(kit.events("conversations.send_requested").await.is_empty());
+    let state: String = sqlx::query_scalar("SELECT state FROM conversations.drafts")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(state, "draft");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_failed_send_can_be_fixed_and_sent_again(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, inbox, sam) = kit.sams_inbox().await;

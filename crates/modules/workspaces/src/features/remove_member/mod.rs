@@ -8,7 +8,7 @@ use axum::{extract::State, http::StatusCode};
 use campbooks_kernel::authz::Action;
 use campbooks_kernel::db::BeginFor as _;
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk, extract,
+    AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 
@@ -16,7 +16,6 @@ use serde::Deserialize;
 use utoipa::IntoParams;
 
 use crate::{
-    MESSAGES,
     domain::{
         access::{acting_user, authorize, member_resource},
         departure::{Departure, depart},
@@ -104,16 +103,8 @@ pub async fn execute(
     } else {
         Departure::RemovedBy(actor, role, mail)
     };
-    if matches!(how, Departure::RemovedBy(_, _, MailChoice::Keep))
-        && !state
-            .kept_mail
-            .unread_if_kept(&state.db, access.workspace, member)
-            .await?
-            .is_empty()
-    {
-        // Kept mail nobody could read could be neither read nor deleted.
-        return Err(Error::Conflict(MESSAGES.reason("keep_needs_a_reader")));
-    }
+    // With `mail=keep`, `depart` refuses (409 `keep_needs_a_reader`) when
+    // an inbox would be left with nobody to read it.
     depart(state, access.workspace, member, how).await
 }
 
@@ -184,6 +175,55 @@ mod tests {
             .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli}"))
             .await;
         assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_member_removed_rejoins_only_once_their_departure_is_handled(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let eli = kit.join(&ana, ws, "eli", "member").await;
+        let eli_id = kit.user_id("eli").await;
+        let removed = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli_id}"))
+            .await;
+        assert_eq!(removed.status, StatusCode::NO_CONTENT);
+        // Another module has not handled `member_left` yet (a delivery
+        // still pending, as when its worker is behind).
+        let pending = sqlx::query_scalar::<_, uuid::Uuid>(
+            "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+             SELECT 'default', 'other.forget_member', '{}'::jsonb, e.workspace_id, e.id, e.id::text, 5
+               FROM kernel.events e WHERE e.name = 'workspaces.member_left'
+             RETURNING id",
+        )
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        let token = kit.invite(&ana, ws, "eli@example.com", "member").await;
+        let accept = |token: String| {
+            let kit = &kit;
+            let eli = &eli;
+            async move {
+                kit.post(
+                    eli,
+                    "/api/v1/workspaces/invitations/accept",
+                    serde_json::json!({ "token": token }),
+                )
+                .await
+            }
+        };
+        let early = accept(token.clone()).await;
+        assert_eq!(early.status, StatusCode::CONFLICT, "{:?}", early.json);
+        assert_eq!(early.json["code"], "still_leaving");
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'succeeded', finished_at = now() WHERE id = $1",
+        )
+        .bind(pending)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+        let back = accept(token).await;
+        assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

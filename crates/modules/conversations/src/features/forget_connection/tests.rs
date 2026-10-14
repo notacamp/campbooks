@@ -361,3 +361,96 @@ async fn a_batch_being_applied_finishes_before_its_inbox_goes(db: PgPool) {
     .unwrap();
     assert_eq!(refs, 0);
 }
+
+/// The real `apply_changes` of batch `fr` caught mid-way (it holds the
+/// inbox and waits on a table the test locks) while the connection is
+/// removed with `mail`: the removal waits for the batch, then sees all of
+/// it.
+async fn a_batch_racing_its_removal(kit: &Kit, mail: MailChoice) -> Setup {
+    use campbooks_kernel::jobs::Worker;
+
+    let s = setup(kit).await;
+    let ws = s.workspace;
+    let batch = kit.batch(ws, s.inbox, "fr").await;
+    // A new conversation can't be written until the test lets go.
+    let mut gate = kit.db.begin().await.unwrap();
+    sqlx::query("LOCK TABLE conversations.conversations IN SHARE ROW EXCLUSIVE MODE")
+        .execute(&mut *gate)
+        .await
+        .unwrap();
+    crate::dev::submit(&kit.state, ws, &batch).await.unwrap();
+    let state = kit.state.clone();
+    let apply = tokio::spawn(async move { Worker::new(state).run_until_idle().await });
+    // The batch is under way: it holds the inbox `FOR SHARE`.
+    let holding = "SELECT count(*) FROM pg_locks l JOIN pg_stat_activity a ON a.pid = l.pid
+                    WHERE l.relation = 'conversations.conversations'::regclass
+                      AND NOT l.granted";
+    for _ in 0..100 {
+        let waiting: i64 = sqlx::query_scalar(holding)
+            .fetch_one(&kit.db)
+            .await
+            .unwrap();
+        if waiting > 0 {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+    let mut tx = kit.state.db.begin_for(ws).await.unwrap();
+    kit.state
+        .events
+        .publish(&mut tx, &removed(ws, s.inbox, mail))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let state = kit.state.clone();
+    let remove = tokio::spawn(async move { Worker::new(state).run_until_idle().await });
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+    assert!(!apply.is_finished() && !remove.is_finished(), "both wait");
+    gate.commit().await.unwrap();
+    let (applied, removed) = (apply.await.unwrap(), remove.await.unwrap());
+    assert_eq!(
+        applied.failed + removed.failed,
+        0,
+        "{applied:?} {removed:?}"
+    );
+    s
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_real_batch_racing_a_delete_leaves_nothing_behind(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let s = a_batch_racing_its_removal(&kit, MailChoice::Delete).await;
+    let key = s.workspace.to_string();
+    assert_eq!(
+        count(
+            &kit,
+            "SELECT count(*) FROM conversations.messages WHERE inbox_id = $1",
+            s.inbox
+        )
+        .await,
+        0
+    );
+    let refs: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.blob_refs
+          WHERE workspace_id = $1 AND owner_type LIKE 'conversations.%'",
+    )
+    .bind(&key)
+    .fetch_one(&kit.db)
+    .await
+    .unwrap();
+    assert_eq!(refs, 0, "no file of the batch outlives its inbox");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_real_batch_racing_a_keep_lands_whole_then_nothing_more(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let s = a_batch_racing_its_removal(&kit, MailChoice::Keep).await;
+    let french = "SELECT count(*) FROM conversations.messages m
+                    JOIN conversations.inboxes i ON i.id = m.inbox_id
+                   WHERE m.inbox_id = $1 AND i.detached_at IS NOT NULL";
+    let kept = count(&kit, french, s.inbox).await;
+    assert!(kept > 0, "the batch landed before the inbox froze");
+    // A batch after the freeze is dropped.
+    kit.ingest(s.workspace, s.inbox, "es-ES").await;
+    assert_eq!(count(&kit, french, s.inbox).await, kept);
+}

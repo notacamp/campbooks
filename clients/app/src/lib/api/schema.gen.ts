@@ -7519,7 +7519,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            /** @description `invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute. */
             409: {
                 headers: {
                     [name: string]: unknown;

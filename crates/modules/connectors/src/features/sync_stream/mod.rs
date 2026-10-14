@@ -424,6 +424,8 @@ impl SyncStream {
         let retention = TimeDelta::days(i64::from(self.deps.config.batch_retention_days));
 
         let tx = ctx.tx().await?;
+        // The connection before the stream (removal's order).
+        health::lock(tx, target.connection).await?;
         if let Some(labels) = &page.labels {
             replace_labels(tx, workspace, target.stream, labels).await?;
         }
@@ -532,6 +534,7 @@ impl SyncStream {
             .saturating_mul(1_i64 << failures.clamp(0, 16))
             .min(i64::from(poll.max_seconds));
         let tx = ctx.tx().await?;
+        health::lock(tx, target.connection).await?;
         credentials::forget_access_token(tx, target.connection).await?;
         sqlx::query!(
             "UPDATE connectors.streams SET consecutive_failures = $2 WHERE id = $1",
@@ -583,6 +586,7 @@ impl SyncStream {
                     .unwrap_or(TimeDelta::seconds(i64::from(poll.min_seconds)));
                 let until = now + wait;
                 let tx = ctx.tx().await?;
+                health::lock(tx, target.connection).await?;
                 sqlx::query!(
                     "UPDATE connectors.streams SET throttled_until = $2 WHERE id = $1",
                     target.stream as StreamId,
@@ -613,6 +617,7 @@ impl SyncStream {
                     .saturating_mul(1_i64 << failures.clamp(0, 16))
                     .min(max);
                 let tx = ctx.tx().await?;
+                health::lock(tx, target.connection).await?;
                 sqlx::query!(
                     "UPDATE connectors.streams SET consecutive_failures = $2 WHERE id = $1",
                     target.stream as StreamId,

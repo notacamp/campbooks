@@ -25,7 +25,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **A client a member registered acts for that member and no one else.** It reads
   only the inboxes they read, and stops working (401) when they leave the workspace,
   which also removes the clients they registered there. Client tokens no longer get
-  any inbox or attention item by themselves.
+  any inbox or attention item by themselves. A removed client's open change feed ends within a
+  heartbeat. A member removed and invited back can rejoin only once their departure
+  has been handled everywhere (409 `still_leaving` until then), and a scheduled send
+  of someone no longer in the workspace goes back to a draft instead of out.
 - **Workspace owners and admins never read an inbox they are not a member of**, and
   the change feed, search and every operation now enforce this through one access
   check. Each resource type declares its owner and who else may do what (ADR 0017).

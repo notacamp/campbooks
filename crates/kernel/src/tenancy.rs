@@ -24,7 +24,7 @@ use axum::{
     http::request::Parts,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use utoipa::ToSchema;
 
 use crate::{
@@ -128,6 +128,9 @@ pub struct WorkspaceSummary {
 pub type WorkspacesFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Vec<WorkspaceSummary>, Error>> + Send + 'a>>;
 
+/// A future returned by [`Membership::role_held`].
+pub type RoleFuture<'a> = Pin<Box<dyn Future<Output = Result<Option<Role>, Error>> + Send + 'a>>;
+
 /// The port that answers "may this principal work in this workspace?".
 /// Implemented by the `workspaces` module; the server registers it with
 /// [`AppState::with_membership`].
@@ -148,6 +151,20 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
     /// asks which workspace an app may use).
     fn workspaces_of<'a>(&'a self, _db: &'a PgPool, _subject: &'a str) -> WorkspacesFuture<'a> {
         Box::pin(async { Ok(Vec::new()) })
+    }
+
+    /// The role of `user` in `workspace`, read in `conn` (a transaction
+    /// working in that workspace) and held there until it ends: removing
+    /// them waits for it. `None` when they are not a member. For work done
+    /// later on a member's behalf (a scheduled send), which must stop once
+    /// they are gone.
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _user: UserId,
+    ) -> RoleFuture<'a> {
+        Box::pin(async { Ok(None) })
     }
 
     /// Record types (`<module>.<record>`) whose changes may change who
@@ -180,17 +197,20 @@ pub type MembershipPort = Arc<dyn Membership>;
 pub type KeptMailFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Vec<crate::RecordRef>, Error>> + Send + 'a>>;
 
-/// The port that answers, before a member is removed with their mail kept:
+/// The port that answers, as a member is removed with their mail kept:
 /// which containers (inboxes) would be left with nobody to read them.
 /// Implemented by the module that owns them; until then, none.
 pub trait KeptMail: std::fmt::Debug + Send + Sync + 'static {
     /// The containers `user`'s departure would leave unread if their mail
-    /// were kept.
+    /// were kept, when `others` are the members who stay. Asked in `conn`,
+    /// the departure's own transaction, which holds what the answer rests
+    /// on until it ends.
     fn unread_if_kept<'a>(
         &'a self,
-        db: &'a PgPool,
+        conn: &'a mut PgConnection,
         workspace: WorkspaceId,
         user: UserId,
+        others: &'a [UserId],
     ) -> KeptMailFuture<'a>;
 }
 
@@ -201,9 +221,10 @@ pub struct NoKeptMail;
 impl KeptMail for NoKeptMail {
     fn unread_if_kept<'a>(
         &'a self,
-        _db: &'a PgPool,
+        _conn: &'a mut PgConnection,
         _workspace: WorkspaceId,
         _user: UserId,
+        _others: &'a [UserId],
     ) -> KeptMailFuture<'a> {
         Box::pin(async { Ok(Vec::new()) })
     }

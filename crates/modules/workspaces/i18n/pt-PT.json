@@ -19,6 +19,7 @@
     "invalid_max_uses": "O número de utilizações deve estar entre 1 e {{max}}.",
     "invalid_expiry": "A validade tem de ser no futuro.",
     "invalid_reason": "O motivo deve ter no máximo {{max}} caracteres.",
-    "keep_needs_a_reader": "Uma caixa de correio que este membro ligou ficaria sem ninguém que a possa ler. Partilhe-a primeiro com outro membro ou elimine o correio."
+    "keep_needs_a_reader": "Uma caixa de correio que este membro ligou ficaria sem ninguém que a possa ler. Partilhe-a primeiro com outro membro ou elimine o correio.",
+    "still_leaving": "Saiu deste espaço de trabalho há instantes e a saída ainda está a ser concluída. Tente novamente dentro de um minuto."
   }
 }
