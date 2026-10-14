@@ -32,7 +32,7 @@
 - [x] 4.1 `conversations.apply_rule` job: batches of 100, cursor, idempotent applications, re-checks, events, progress; resume test; 1,000-conversation test
 - [x] 4.2 Revert run for `remove_rule?restore=true` (skips excepted and member-changed); cancel a running apply; tests
 - [x] 4.3 `suggest_rules` (likenesses broad → narrow, default by machine sender / List-Id / template, correspondents, thresholds) and `dismiss_rule_suggestion` (30 days, then for good); tests
-- [ ] 4.4 Terminal recording (vhs): create a rule over 1,000 demo conversations, watch progress, a new message handled on arrival, undo all
+- [x] 4.4 Terminal recording (vhs): create a rule over 1,000 demo conversations, watch progress, a new message handled on arrival, undo all
 
 ## 5. Finish
 
@@ -40,4 +40,4 @@
 - [x] 5.2 OpenAPI regenerated, client types regenerated, `openapi/events.json` regenerated
 - [x] 5.3 CHANGELOG updated
 - [x] 5.4 Gates green; migration duplicate check against `next`
-- [ ] 5.5 Archive the change into `openspec/specs/`
+- [x] 5.5 Archive the change into `openspec/specs/`

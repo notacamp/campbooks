@@ -636,16 +636,19 @@ async fn a_thousand_lookalikes_taught_once(db: PgPool) {
         .post(&sam, &format!("{rules}/preview"), Some(move_github()))
         .await;
     println!(
-        "Preview \"mail from {GITHUB} -> Updates\": matches {}, would move {}, e.g. {:?}",
+        "Preview \"mail from {GITHUB} -> Updates\": matches {}, would move {}, e.g. \"{}\"",
         preview.json["matching"],
         preview.json["would_change"],
         preview.json["samples"][0]["subject"]
+            .as_str()
+            .unwrap_or_default()
     );
     let created = kit.post(&sam, &rules, Some(move_github())).await;
     let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
     println!(
         "Rule created ({}), run of {} started",
-        created.json["rule"]["state"], created.json["rule"]["run"]["total"]
+        created.json["rule"]["state"].as_str().unwrap_or_default(),
+        created.json["rule"]["run"]["total"]
     );
     kit.run_jobs().await;
     for event in kit.events("conversations.rule_changed").await {
