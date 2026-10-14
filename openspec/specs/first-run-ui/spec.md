@@ -89,20 +89,25 @@ last workspace on this device.
 - **THEN** the client opens the workspace's Primary stream
 
 ### Requirement: Empty Home
-A workspace's Home SHALL say that nothing needs the user yet and show the
-keyboard shortcuts available on the page. Its mail section SHALL offer the
-person's held mailbox grant when there is one, else name the mailboxes
-connected to the workspace that the person can see, else offer "Connect your
-mail" as unavailable with copy saying that connecting more mailboxes is
-coming.
+While the user can see no inbox in the workspace, its Home SHALL say that
+nothing needs the user yet and show the keyboard shortcuts available on the
+page; once they can see one, Home SHALL show what needs them instead
+(home-ui). The empty Home's mail section SHALL offer the person's held
+mailbox grant when there is one, else name the mailboxes connected to the
+workspace that the person can see, else offer "Connect your mail" as
+unavailable with copy saying that connecting more mailboxes is coming.
 
 #### Scenario: New workspace
 - **WHEN** a user with no held mailbox and no connection opens a workspace's Home
 - **THEN** "Nothing needs you yet" is shown and the "Connect your mail" button is disabled with a note that it is coming
 
 #### Scenario: Mailbox connected
-- **WHEN** `connectors.list_connections` returns a connection for `ana@example.com`
+- **WHEN** `connectors.list_connections` returns a connection for `ana@example.com` and its inbox is not listed yet
 - **THEN** Home says that `ana@example.com` is connected
+
+#### Scenario: The inbox is there
+- **WHEN** `conversations.list_inboxes` lists an inbox for the user
+- **THEN** Home shows what needs them instead of "Nothing needs you yet"
 
 ### Requirement: Members and invitations
 Settings → Members SHALL list the workspace's members with their role. For
@@ -172,7 +177,19 @@ brand, one line about Campbooks and one action per way in the response lists
 that the client knows (`google`, `microsoft`, `zoho`, `passkey`), in the
 listed order, ignoring unknown ones. Provider actions SHALL navigate to
 `/auth/start/<provider>?request=<id>` and SHALL have the keys `1`, `2` and
-`3` by position; the passkey action SHALL have `P`. With no way in listed,
+`3` by position. The passkey action SHALL have `P`, SHALL be shown only in a
+browser with passkeys, and SHALL run the passkey ceremony in place
+(`/auth/passkey/sign-in/options`, the browser's dialog,
+`/auth/passkey/sign-in`), then follow the answer's redirect. Where the
+browser offers passkeys in a field's autofill, the screen SHALL also show a
+"Saved passkeys" field (`autocomplete="username webauthn"`) whose autofill
+ceremony starts when the screen opens. A passkey that is not accepted, a
+ceremony that expired or was cancelled, and too many tries SHALL be explained
+in place. When the request says passkey sign-up is open, the screen SHALL
+link to `/sign-in/passkey?request=<id>`, a one-question screen (what to call
+you; Create with Enter, Sign in another way with Escape) that creates the
+account with a new passkey and explains a refusal (`signup_invite_only`, a
+browser without passkeys) on its own page. With no way in listed,
 the screen SHALL say that sign-in is not set up and to ask the instance's
 administrator. A request the server no longer knows (404) SHALL be
 explained, with an action that starts again. Without `request`, the screen
@@ -189,6 +206,14 @@ invitation copy.
 #### Scenario: Every way in
 - **WHEN** the request lists `["google", "microsoft", "zoho", "passkey"]`
 - **THEN** Google, Microsoft and Zoho have keys `1`, `2` and `3`, and "Use a passkey" has `P`
+
+#### Scenario: Sign in with a passkey from the screen
+- **WHEN** a browser with passkeys presses `P` on `/sign-in?request=r1` and approves a passkey
+- **THEN** the screen posts the assertion and follows the returned redirect to the web client
+
+#### Scenario: Passkey cancelled
+- **WHEN** the person closes the browser's passkey dialog
+- **THEN** the screen says no passkey was used and "Use a passkey" can be pressed again
 
 #### Scenario: Start from a deep link
 - **WHEN** a signed-out browser opens `/sign-in?return_to=%2Fw%2F1234`

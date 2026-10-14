@@ -75,6 +75,10 @@ pub async fn execute(
     principal: &Principal,
     input: AcceptInvitation,
 ) -> Result<WorkspaceView> {
+    // An app allowed in one workspace can't join the person to others.
+    if principal.bound_workspace().is_some() {
+        return Err(Error::NotFound);
+    }
     let token = input.token.trim();
     let workspace = invitation::workspace_of(token).ok_or(Error::NotFound)?;
     let user = ensure_user(&state.db, principal).await?;

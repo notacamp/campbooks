@@ -14,6 +14,9 @@
 //!   `decisions`; a per-question switch says which may act. In this version
 //!   only confident rules answers place a conversation in a stream; model
 //!   answers are suggestions (ADR 0009 note, campbooks-cloud#59).
+//! - **Search**: the module is the search source of its conversations
+//!   ([`search_source`], ADR 0016) and lists the inboxes a caller may search
+//!   through its visibility port ([`visibility`]).
 //! - **Operations** under `/api/v1/w/{workspace_id}/…`: list inboxes and
 //!   conversations, read a conversation, mark read, star, archive, label,
 //!   move to a stream (recorded as a correction).
@@ -49,12 +52,12 @@ pub mod scopes;
 #[cfg(test)]
 mod testkit;
 
-pub use config::{ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS};
+pub use config::{ConversationsConfig, DEFAULT_DECIDE_BACKFILL_DAYS, DEFAULT_NEEDS_WINDOW_DAYS};
 pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
-pub use features::inbox_visibility::visibility;
+pub use features::{inbox_visibility::visibility, search_source::search_source};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
@@ -137,12 +140,16 @@ pub fn module(deps: ConversationsDeps) -> Module {
         .map(|gateway| {
             Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
         });
+    let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: router().layer(Extension(features::send_draft::SendSettings {
-            undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
-        })),
+        router: router()
+            .layer(Extension(features::send_draft::SendSettings {
+                undo: chrono::TimeDelta::seconds(i64::from(deps.config.undo_send_seconds)),
+            }))
+            .layer(Extension(needs.clone()))
+            .layer(Extension(deps.policy.clone())),
         admin_router: None,
         background: Background::new()
             .publishes::<events::MessageReceived>()
@@ -152,17 +159,20 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::SendRequested>()
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
+            .publishes::<events::NeedChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
+                needs.clone(),
             ))
             .consumer(features::decide_message::DecideMessage::new(
                 model,
                 deps.config.decide_backfill_days,
                 deps.policy,
+                needs,
             ))
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()
@@ -176,7 +186,7 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
-        send_draft, star, update_draft,
+        needs, send_draft, star, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -202,6 +212,9 @@ fn router() -> OpenApiRouter<AppState> {
         ))
         .routes(routes!(send_draft::send))
         .routes(routes!(send_draft::cancel))
+        .routes(routes!(needs::resolve))
+        .routes(routes!(needs::reopen))
+        .routes(routes!(needs::confirm))
 }
 
 #[cfg(test)]

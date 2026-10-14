@@ -116,7 +116,7 @@ async fn end(ctx: &Ctx, request: EndSession) -> Result<Response> {
         sessions::end_for(&mut tx, session, hint.account, now).await?;
         tx.commit().await?;
     }
-    let client = issuer.clients.get(&hint.client);
+    let client = issuer.clients.first_party_client(&hint.client);
     let target = request
         .post_logout_redirect_uri
         .as_deref()
@@ -184,7 +184,7 @@ async fn verify_hint(ctx: &Ctx, issuer: &Issuer, token: &str) -> Result<Option<H
     let Ok(account) = claims.sub.parse() else {
         return Ok(None);
     };
-    if issuer.clients.get(&claims.aud).is_none() {
+    if issuer.clients.first_party_client(&claims.aud).is_none() {
         return Ok(None);
     }
     Ok(Some(Hint {

@@ -143,20 +143,58 @@ impl Browser {
     async fn get(&mut self, url: &str) -> Reply {
         self.send(Method::GET, url, None).await
     }
+
+    /// A request with `headers` and a raw `body`, no cookies (an outside
+    /// client, not a browser).
+    async fn raw(
+        &self,
+        method: Method,
+        url: &str,
+        headers: &[(&str, &str)],
+        body: Option<String>,
+    ) -> Reply {
+        let mut request = Request::builder().method(method).uri(url);
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let response = self
+            .app
+            .clone()
+            .oneshot(
+                request
+                    .body(body.map_or_else(Body::empty, Body::from))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let bytes = response.into_body().collect().await.unwrap().to_bytes();
+        Reply {
+            status,
+            headers,
+            body: String::from_utf8_lossy(&bytes).into_owned(),
+        }
+    }
+
+    /// A form POST from an outside client.
+    async fn form(&self, url: &str, pairs: &[(&str, &str)]) -> Reply {
+        let body = url::form_urlencoded::Serializer::new(String::new())
+            .extend_pairs(pairs.iter().copied())
+            .finish();
+        self.raw(
+            Method::POST,
+            url,
+            &[("content-type", "application/x-www-form-urlencoded")],
+            Some(body),
+        )
+        .await
+    }
 }
 
-#[sqlx::test(migrations = "../../migrations")]
-async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_workspace(
-    db: PgPool,
-) {
-    let logs = Logs::default();
-    let writer = logs.clone();
-    let _logging = tracing::subscriber::set_default(
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::TRACE)
-            .with_writer(move || writer.clone())
-            .finish(),
-    );
+/// The server with the in-process issuer, a (fake) Google and the web BFF,
+/// and a browser with no cookies.
+async fn world(db: PgPool) -> (Browser, TestIdp) {
     let google = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
     assert!(config.auth.issuer.is_none(), "no other identity provider");
@@ -175,10 +213,13 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
         )
         .unwrap(),
         identity: campbooks_identity::Deps::from_figment(
-            &Figment::from(Serialized::defaults(serde_json::json!({}))),
+            // MCP agents may register themselves here (off by default).
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": { "dynamic_registration": "on" },
+            }))),
             &config,
             Some(secret.clone()),
-            &scopes,
+            &crate::scope_catalogue(),
             Arc::new(SystemClock),
         )
         .unwrap(),
@@ -224,10 +265,27 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
             .with_registry(registry),
         &composition,
     );
-    let mut browser = Browser {
+    let browser = Browser {
         app: crate::router_with(state, Some(*settings), &composition),
         cookies: BTreeMap::new(),
     };
+
+    (browser, google)
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_workspace(
+    db: PgPool,
+) {
+    let logs = Logs::default();
+    let writer = logs.clone();
+    let _logging = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(move || writer.clone())
+            .finish(),
+    );
+    let (mut browser, google) = world(db).await;
 
     println!("\nSign up with Google through the web app, Campbooks as its own issuer:");
     // The web app sends the browser to sign in; the issuer shows its screen.
@@ -355,4 +413,341 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
         assert!(!text.contains(cookie.as_str()), "a log line holds a cookie");
     }
     step("every log line checked: no code, cookie, secret or address");
+}
+
+/// Sign up through the web app as the fake Google's user and land with a
+/// web session.
+async fn sign_up_through_bff(browser: &mut Browser, google: &TestIdp) {
+    let to_issuer = browser.get("/bff/login?return_to=/welcome").await;
+    let screen = browser.get(&to_issuer.location()).await.location();
+    let request = screen.trim_start_matches("/sign-in?request=").to_owned();
+    let to_google = browser
+        .get(&format!("/auth/start/google?request={request}"))
+        .await;
+    let to_new = browser.get(&google.authorize(&to_google.location())).await;
+    assert!(to_new.location().starts_with("/sign-in/new"));
+    let created = browser.send(Method::POST, "/auth/new-account", None).await;
+    let to_bff = created.json()["redirect"].as_str().unwrap().to_owned();
+    assert_eq!(browser.get(&to_bff).await.status, StatusCode::OK);
+}
+
+/// Create a workspace through the web app; its id.
+async fn create_workspace(browser: &mut Browser, name: &str) -> String {
+    let created = browser
+        .send(
+            Method::POST,
+            "/bff/api/v1/workspaces",
+            Some(serde_json::json!({ "name": name, "kind": "business" })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    created.json()["id"].as_str().unwrap().to_owned()
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(db: PgPool) {
+    let logs = Logs::default();
+    let writer = logs.clone();
+    let _logging = tracing::subscriber::set_default(
+        tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::TRACE)
+            .with_writer(move || writer.clone())
+            .finish(),
+    );
+    let (mut browser, google) = world(db).await;
+    println!("\nAn MCP agent connects to Campbooks (RFC 9728, 7591, 8707), a person allows it:");
+    sign_up_through_bff(&mut browser, &google).await;
+    let home = create_workspace(&mut browser, "Home").await;
+    let work = create_workspace(&mut browser, "Work").await;
+    step("Ana signed up through the web app; workspaces Home and Work");
+
+    // The agent knows only the API's URL.
+    let challenge = browser
+        .raw(Method::GET, &format!("/api/v1/w/{home}/inboxes"), &[], None)
+        .await;
+    assert_eq!(challenge.status, StatusCode::UNAUTHORIZED);
+    let www = challenge.headers[header::WWW_AUTHENTICATE]
+        .to_str()
+        .unwrap();
+    let metadata_url = format!("{ORIGIN}/.well-known/oauth-protected-resource/api");
+    assert_eq!(www, format!(r#"Bearer resource_metadata="{metadata_url}""#));
+    step(&format!("401 WWW-Authenticate: {www}"));
+    let resource = browser
+        .raw(Method::GET, &metadata_url, &[], None)
+        .await
+        .json();
+    assert_eq!(resource["resource"], format!("{ORIGIN}/api"));
+    assert_eq!(resource["authorization_servers"][0], ORIGIN);
+    let server = browser
+        .raw(
+            Method::GET,
+            "/.well-known/oauth-authorization-server",
+            &[],
+            None,
+        )
+        .await
+        .json();
+    step(&format!(
+        "protected resource {} -> issuer {} -> registration {}",
+        resource["resource"], server["issuer"], server["registration_endpoint"]
+    ));
+
+    // It registers itself: a public client, unverified.
+    let callback = "http://127.0.0.1:33418/callback";
+    let registered = browser
+        .raw(
+            Method::POST,
+            "/oauth2/register",
+            &[("content-type", "application/json")],
+            Some(
+                serde_json::json!({
+                    "client_name": "Desk Agent",
+                    "redirect_uris": [callback],
+                    "grant_types": ["authorization_code", "refresh_token"],
+                    "scope": "conversations:read workspaces:read offline_access identity:write workspaces:write",
+                })
+                .to_string(),
+            ),
+        )
+        .await;
+    assert_eq!(
+        registered.status,
+        StatusCode::CREATED,
+        "{}",
+        registered.body
+    );
+    let client = registered.json()["client_id"].as_str().unwrap().to_owned();
+    assert_eq!(
+        registered.json()["scope"],
+        "conversations:read workspaces:read"
+    );
+    step(&format!(
+        "POST /oauth2/register -> {client} (public, PKCE; identity:* and workspaces:write dropped)"
+    ));
+
+    // The person's browser: signed in already, so straight to the consent
+    // screen, which names the app as unverified and asks for a workspace.
+    let verifier = campbooks_kernel::crypto::random_token();
+    let mut authorize = url::Url::parse(&format!("{ORIGIN}/oauth2/authorize")).unwrap();
+    authorize
+        .query_pairs_mut()
+        .append_pair("response_type", "code")
+        .append_pair("client_id", &client)
+        .append_pair("redirect_uri", callback)
+        .append_pair("scope", "conversations:read workspaces:read offline_access")
+        .append_pair("state", "agent-state")
+        .append_pair(
+            "code_challenge",
+            &campbooks_kernel::crypto::pkce_challenge(&verifier),
+        )
+        .append_pair("code_challenge_method", "S256")
+        .append_pair("resource", &format!("{ORIGIN}/api"));
+    let to_consent = browser.get(authorize.as_str()).await.location();
+    assert!(to_consent.starts_with("/consent?request="), "{to_consent}");
+    let request = to_consent
+        .trim_start_matches("/consent?request=")
+        .to_owned();
+    let shown = browser
+        .get(&format!("/auth/consent/{request}"))
+        .await
+        .json();
+    assert_eq!(shown["client"]["verified"], false);
+    assert_eq!(shown["client"]["device"], true);
+    let names: Vec<&str> = shown["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["Home", "Work"]);
+    step("consent screen: \"Desk Agent\" (unverified, an app on this device), pick a workspace");
+    let allowed = browser
+        .send(
+            Method::POST,
+            &format!("/auth/consent/{request}"),
+            Some(serde_json::json!({ "decision": "allow", "workspace_id": home })),
+        )
+        .await;
+    assert_eq!(allowed.status, StatusCode::OK, "{}", allowed.body);
+    let back = url::Url::parse(allowed.json()["redirect"].as_str().unwrap()).unwrap();
+    let code = back
+        .query_pairs()
+        .find(|(k, _)| k == "code")
+        .unwrap()
+        .1
+        .into_owned();
+    step("Allow in Home -> code to the agent's loopback callback");
+
+    let tokens = browser
+        .form(
+            "/oauth2/token",
+            &[
+                ("grant_type", "authorization_code"),
+                ("code", &code),
+                ("redirect_uri", callback),
+                ("code_verifier", &verifier),
+                ("client_id", &client),
+                ("resource", &format!("{ORIGIN}/api")),
+            ],
+        )
+        .await;
+    assert_eq!(tokens.status, StatusCode::OK, "{}", tokens.body);
+    let access = tokens.json()["access_token"].as_str().unwrap().to_owned();
+    let bearer = format!("Bearer {access}");
+    step("token: aud = <origin>/api, workspace_id = Home");
+    let in_home = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{home}/inboxes"),
+            &[("authorization", &bearer)],
+            None,
+        )
+        .await;
+    assert_eq!(in_home.status, StatusCode::OK, "{}", in_home.body);
+    let in_work = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{work}/inboxes"),
+            &[("authorization", &bearer)],
+            None,
+        )
+        .await;
+    assert_eq!(in_work.status, StatusCode::NOT_FOUND);
+    step("GET Home's inboxes -> 200; Work's -> 404 (bound to Home)");
+
+    // Every route outside a workspace: the bound token sees Home only, and
+    // reaches nothing account-wide.
+    let call = |method: Method, path: String, body: Option<&'static str>| {
+        let browser = &browser;
+        let bearer = bearer.clone();
+        async move {
+            let mut headers = vec![("authorization", bearer.as_str())];
+            if body.is_some() {
+                headers.push(("content-type", "application/json"));
+            }
+            browser
+                .raw(method, &path, &headers, body.map(ToOwned::to_owned))
+                .await
+        }
+    };
+    let listed = call(Method::GET, "/api/v1/workspaces".to_owned(), None).await;
+    assert_eq!(listed.status, StatusCode::OK, "{}", listed.body);
+    let names: Vec<String> = listed.json()["workspaces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|w| w["name"].as_str().unwrap().to_owned())
+        .collect();
+    assert_eq!(names, ["Home"]);
+    for (method, path, body, expected) in [
+        (
+            Method::POST,
+            "/api/v1/workspaces".to_owned(),
+            Some(r#"{"name":"Sneaky","kind":"business"}"#),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::POST,
+            "/api/v1/workspaces/invitations/accept".to_owned(),
+            Some(r#"{"token":"x"}"#),
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/consents".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/ways-in".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/held-grants".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            "/api/v1/identity/passkeys".to_owned(),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{home}/identity/clients"),
+            None,
+            StatusCode::FORBIDDEN,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{work}/changes"),
+            None,
+            StatusCode::NOT_FOUND,
+        ),
+        (
+            Method::GET,
+            "/admin/v1/system/overview".to_owned(),
+            None,
+            StatusCode::NOT_FOUND,
+        ),
+    ] {
+        let reply = call(method.clone(), path.clone(), body).await;
+        assert_eq!(reply.status, expected, "{method} {path}: {}", reply.body);
+    }
+    step("outside a workspace: lists Home only; creating, joining, accounts, apps, admin refused");
+
+    // A workspace's own server-to-server client.
+    let created = browser
+        .send(
+            Method::POST,
+            &format!("/bff/api/v1/w/{work}/identity/clients"),
+            Some(
+                serde_json::json!({ "name": "Nightly export", "type": "confidential",
+                "scopes": ["conversations:read"] }),
+            ),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    let sync = created.json()["client"]["client_id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let secret = created.json()["client_secret"].as_str().unwrap().to_owned();
+    step(&format!(
+        "Work's admin registers {sync}; its secret is shown once"
+    ));
+    let token = browser
+        .form(
+            "/oauth2/token",
+            &[
+                ("grant_type", "client_credentials"),
+                ("client_id", &sync),
+                ("client_secret", &secret),
+            ],
+        )
+        .await;
+    assert_eq!(token.status, StatusCode::OK, "{}", token.body);
+    let bearer = format!("Bearer {}", token.json()["access_token"].as_str().unwrap());
+    for (workspace, expected) in [(&work, StatusCode::OK), (&home, StatusCode::NOT_FOUND)] {
+        let reply = browser
+            .raw(
+                Method::GET,
+                &format!("/api/v1/w/{workspace}/inboxes"),
+                &[("authorization", &bearer)],
+                None,
+            )
+            .await;
+        assert_eq!(reply.status, expected, "{}", reply.body);
+    }
+    step("client_credentials -> Work's inboxes 200, Home's 404");
+
+    let text = logs.text();
+    for secret in [secret.as_str(), access.as_str(), code.as_str()] {
+        assert!(!text.contains(secret), "a log line holds a secret");
+    }
+    step("every log line checked: no secret, token or code");
 }

@@ -8,7 +8,10 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
+import { AppsPage } from "./components/Apps/AppsPage";
+import { ConsentScreen } from "./components/Consent/ConsentScreen";
 import { NewAccountScreen } from "./components/NewAccount/NewAccount";
+import { PasskeySignUpScreen } from "./components/PasskeySignUp/PasskeySignUp";
 import { SignInScreen } from "./components/SignIn/SignInScreen";
 import { WaysInPage } from "./components/WaysIn/WaysInPage";
 import { WAY_IN_SECTIONS } from "./components/WaysIn/sections";
@@ -78,6 +81,21 @@ function WaysInRoute() {
   );
 }
 
+/** Settings → Apps and integrations. */
+function AppsRoute() {
+  const { workspaceId } = useParams({ strict: false });
+  const { pathname } = useLocation();
+  return workspaceId === undefined ? null : (
+    <AppsPage workspaceId={workspaceId} returnTo={pathname} />
+  );
+}
+
+/** The consent screen's query: the waiting request. */
+function validateConsentSearch(search: Record<string, unknown>): { request?: string } {
+  const request = text(search["request"]);
+  return request === undefined ? {} : { request };
+}
+
 export interface IdentityRouteParents<TPublic extends AnyRoute, TWorkspace extends AnyRoute> {
   /** Pages anyone can open (the sign-in screens). */
   public: TPublic;
@@ -86,8 +104,10 @@ export interface IdentityRouteParents<TPublic extends AnyRoute, TWorkspace exten
 }
 
 /**
- * `/sign-in` and `/sign-in/new`, public: they are how a browser gets a
- * session; and Settings → Ways to sign in, inside a workspace.
+ * `/sign-in`, `/sign-in/new`, `/sign-in/passkey` (a new account with a
+ * passkey alone) and `/consent`, public: they are how a browser gets a
+ * session or lets an app in; and Settings → Ways to sign in and Apps and
+ * integrations, inside a workspace.
  */
 export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends AnyRoute>(
   parents: IdentityRouteParents<TPublic, TWorkspace>,
@@ -113,11 +133,37 @@ export function buildIdentityRoutes<TPublic extends AnyRoute, TWorkspace extends
       return <NewAccountScreen request={search.request} />;
     },
   });
+  const passkeySignUp = createRoute({
+    getParentRoute: () => parent,
+    path: "/sign-in/passkey",
+    validateSearch: validateSignInSearch,
+    component: function PasskeySignUpRoute() {
+      const search: SignInSearch = useSearch({ strict: false });
+      return <PasskeySignUpScreen request={search.request} />;
+    },
+  });
+  const consent = createRoute({
+    getParentRoute: () => parent,
+    path: "/consent",
+    validateSearch: validateConsentSearch,
+    component: function ConsentRoute() {
+      const search: { request?: string } = useSearch({ strict: false });
+      return <ConsentScreen request={search.request ?? ""} />;
+    },
+  });
+  const apps = createRoute({
+    getParentRoute: () => parents.workspace,
+    path: "/settings/apps",
+    component: AppsRoute,
+  });
   const waysIn = createRoute({
     getParentRoute: () => parents.workspace,
     path: "/settings/sign-in",
     validateSearch: validateWaysInSearch,
     component: WaysInRoute,
   });
-  return { public: [signIn, newAccount] as const, workspace: [waysIn] as const };
+  return {
+    public: [signIn, newAccount, passkeySignUp, consent] as const,
+    workspace: [waysIn, apps] as const,
+  };
 }

@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.messages SET label_ids = $3\n                WHERE stream_id = $1 AND provider_message_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "5212287a84cf4fa71b676422e32634f2e05a4f1effde2acafccdcd68215e0df7"
+}

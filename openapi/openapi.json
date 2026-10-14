@@ -44,6 +44,74 @@
         }
       }
     },
+    "/.well-known/oauth-protected-resource": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The same document at the root, for clients that look there.",
+        "operationId": "identity.protected_resource_metadata_root",
+        "responses": {
+          "200": {
+            "description": "The API's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/.well-known/oauth-protected-resource/api": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "The API's protected-resource metadata (RFC 9728), at the path RFC 9728\n§3.1 derives from its resource identifier, `<origin>/api`.",
+        "operationId": "identity.protected_resource_metadata",
+        "responses": {
+          "200": {
+            "description": "The API's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [],
+          "risk": "low"
+        }
+      }
+    },
     "/.well-known/openid-configuration": {
       "get": {
         "tags": [
@@ -74,6 +142,145 @@
           "automation": false,
           "mutates": false,
           "records": [],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/consents": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the apps you let in.",
+        "operationId": "identity.list_consents",
+        "responses": {
+          "200": {
+            "description": "The caller's connected apps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectedApps"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.consent"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/consents/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Revoke an app's access.",
+        "operationId": "identity.revoke_consent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The consent.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Revoked; the app's tokens stop working."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's consent, or already revoked.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.consent"
+          ],
           "risk": "low"
         }
       }
@@ -319,6 +526,414 @@
           "mutates": true,
           "records": [
             "identity.link_ticket"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/passkeys": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the caller's passkeys.",
+        "operationId": "identity.list_passkeys",
+        "responses": {
+          "200": {
+            "description": "The caller's passkeys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Passkeys"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.passkey"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Add a passkey.",
+        "operationId": "identity.register_passkey",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterPasskey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Added: a way in from now on.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, the sign-in is more than ten minutes old (`step_up_required`), or the passkey did not verify (`passkey_not_accepted`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance offers no passkeys, or another identity provider serves it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "`passkey_expired` (no registration waits: it took more than five minutes, or was used), or `passkey_already_registered`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.passkey"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/identity/passkeys/registrations": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start adding a passkey.",
+        "operationId": "identity.start_passkey_registration",
+        "responses": {
+          "201": {
+            "description": "Options for `navigator.credentials.create`: a discoverable passkey, user verification required, attestation `none`, excluding the caller's passkeys.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreationOptions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance offers no passkeys (not https), or another identity provider serves it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`: ten registrations are already waiting for this account.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.webauthn_challenge"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/passkeys/{id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Remove a passkey.",
+        "operationId": "identity.remove_passkey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The passkey.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed; the sessions signed in with it ended. The authenticator still holds the credential: the person can delete it there."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's passkey, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is the account's last way in (`last_way_in`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.passkey"
+          ],
+          "risk": "high"
+        }
+      },
+      "patch": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Rename a passkey.",
+        "operationId": "identity.rename_passkey",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The passkey.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RenamePasskey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Renamed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PasskeyView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`passkey_name_required`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not the caller's passkey, or gone.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.passkey"
           ],
           "risk": "low"
         }
@@ -845,6 +1460,313 @@
           "mutates": true,
           "records": [
             "workspaces.workspace"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention": {
+      "get": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "List what needs you.",
+        "operationId": "attention.list",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "description": "`open` (default) or `cleared`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Open items, or what left the list today.",
+              "enum": [
+                "open",
+                "cleared"
+              ]
+            }
+          },
+          {
+            "name": "utc_offset",
+            "in": "query",
+            "description": "The caller's offset from UTC, in minutes (-840 to 840; default 0,\nUTC): where their day starts, for Done today and for what is overdue.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The caller's items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AttentionList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a state, or an offset beyond 14 hours (`invalid_offset`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Put an item off until later, for yourself.",
+        "operationId": "attention.snooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Snooze"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A time in the past or more than a year away (`invalid_until`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
+          ],
+          "risk": "low",
+          "undo": "attention.unsnooze"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+      "post": {
+        "tags": [
+          "attention"
+        ],
+        "summary": "Bring an item you put off back now.",
+        "operationId": "attention.unsnooze",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "item_id",
+            "in": "path",
+            "description": "The item.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not a member (`snooze_needs_member`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such item, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "attention:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": true,
+          "mutates": true,
+          "records": [
+            "attention.item"
           ],
           "risk": "low"
         }
@@ -1468,6 +2390,15 @@
               "type": "integer",
               "format": "int32",
               "minimum": 0
+            }
+          },
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "These conversations only (1 to 100 ids, comma-separated), whatever\ntheir stream or whether archived; those you cannot see are left\nout. Other filters and the cursor are ignored.",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -2133,6 +3064,342 @@
             "conversations.message"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Answer yes to a question Campbooks put (a Review need it was unsure of).",
+        "operationId": "conversations.confirm_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Confirm"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No message id.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No question to answer (`no_open_need`), or not the one you saw (`need_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Take back Done, Not needed or a confirmation: the need is as it was.",
+        "operationId": "conversations.reopen_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing to bring back (`nothing_to_reopen`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Mark what a conversation needs as done, or as not needed.",
+        "operationId": "conversations.resolve_need",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Resolve"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The conversation afterwards.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not an outcome.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox (`inbox_read_only`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.conversation",
+            "conversations.correction"
+          ],
+          "risk": "low",
+          "undo": "conversations.reopen_need"
         }
       }
     },
@@ -3373,6 +4640,357 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/identity/clients": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "List the workspace's own apps.",
+        "operationId": "identity.list_clients",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The workspace's apps.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceClients"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a member of the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Register an app of the workspace's own.",
+        "operationId": "identity.register_client",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterClient"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registered; a confidential app's secret is shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredClient"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, the caller is not an owner or admin (`not_workspace_admin`), or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not a member of the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}": {
+      "delete": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Remove one of the workspace's apps.",
+        "operationId": "identity.remove_client",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "description": "The app.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed; its tokens stop working."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such app in the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}/secret": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Rotate an app's secret.",
+        "operationId": "identity.rotate_client_secret",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "client_id",
+            "in": "path",
+            "description": "The app.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret, shown this once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisteredClient"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:clients`, the caller is not an owner or admin, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such app in the workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A sign-in app has no secret (`client_is_public`).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:clients"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "high"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
       "post": {
         "tags": [
@@ -4098,6 +5716,165 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/search": {
+      "get": {
+        "tags": [
+          "search"
+        ],
+        "summary": "Search the records the caller may open.",
+        "operationId": "search.query",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "description": "The query: words, `\"phrases\"`, `-word`, `a OR b` and operators\n(`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`, `is:`,\n`label:`, `before:`, `after:`, `older_than:`, `newer_than:`). At most\n512 characters.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "`relevance` (default) or `newest`.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "How results are ordered.",
+              "enum": [
+                "relevance",
+                "newest"
+              ]
+            }
+          },
+          {
+            "name": "prefix",
+            "in": "query",
+            "description": "`true` while the member is typing: the last word matches as a prefix.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1 to 50 (default 20).",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "`next_cursor` of the previous page, with the same query and order.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tz",
+            "in": "query",
+            "description": "The caller's time zone for `before:` and `after:` (IANA, default UTC).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of results.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResults"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "A query too long, a bad limit, or a cursor from another query.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such workspace, or you are not in it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many queries; try again shortly.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "search:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "search.result"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/security-events": {
       "get": {
         "tags": [
@@ -4624,6 +6401,148 @@
         }
       }
     },
+    "/auth/consent/{id}": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "What the consent screen shows for the waiting request `id`.",
+        "operationId": "identity.get_consent_request",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The `request` the consent screen was given.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsentRequest"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request waiting for this browser's person, or another identity provider serves this instance."
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "identity.authorize_request"
+          ],
+          "risk": "low"
+        }
+      },
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Answer the waiting request `id`.",
+        "operationId": "identity.answer_consent",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The `request` the consent screen was given.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Answered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Answered"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`consent_needs_workspace`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, `step_up_required` (sign in again: the sign-in is older than ten minutes), or `consent_wrong_workspace`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such request waiting for this browser's person, or a workspace the person does not belong to."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.consent",
+            "identity.authorization_code"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/auth/new-account": {
       "get": {
         "tags": [
@@ -4729,6 +6648,406 @@
             "identity.account",
             "identity.session",
             "identity.held_grant"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/passkey/sign-in": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Finish signing in with a passkey.",
+        "operationId": "identity.finish_passkey_sign_in",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "`PublicKeyCredential.toJSON()` of the assertion.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuthenticationCredential"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Signed in.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedInWith"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance offers no passkeys, or another identity provider serves it."
+          },
+          "409": {
+            "description": "`passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/passkey/sign-in/options": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start signing in with a passkey.",
+        "operationId": "identity.start_passkey_sign_in",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignInStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Options for `navigator.credentials.get` (any of this site's passkeys, user verification required), with a ceremony cookie.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it."
+          },
+          "429": {
+            "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.webauthn_challenge"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/passkey/sign-up": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Finish creating an account with a passkey.",
+        "operationId": "identity.finish_passkey_sign_up",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "description": "`PublicKeyCredential.toJSON()` of the new passkey.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegistrationCredential"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Created and signed in.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedInWith"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_body` (not a credential, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "This instance offers no passkeys, or another identity provider serves it."
+          },
+          "409": {
+            "description": "`passkey_expired`, or `passkey_already_registered`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "`rate_limited`: too many ceremonies from this address, or too many passkey-only accounts made on this instance in the last hour.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.account",
+            "identity.passkey",
+            "identity.session"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/auth/passkey/sign-up/options": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Start creating an account with a passkey.",
+        "operationId": "identity.start_passkey_sign_up",
+        "parameters": [
+          {
+            "name": "x-campbooks-csrf",
+            "in": "header",
+            "description": "Must be `1`.",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignUpStart"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Options for `navigator.credentials.create` (a discoverable passkey, user verification required, attestation `none`), with a ceremony cookie.",
+            "headers": {
+              "set-cookie": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreationOptions"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "`csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it."
+          },
+          "429": {
+            "description": "`rate_limited`: too many ceremonies, or ten challenges waiting, for this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.webauthn_challenge"
           ],
           "risk": "low"
         }
@@ -5927,7 +8246,7 @@
           {
             "name": "client_id",
             "in": "query",
-            "description": "The client.",
+            "description": "The client: a registered id, or the `https` URL of its metadata\ndocument.",
             "required": false,
             "schema": {
               "type": "string"
@@ -6005,11 +8324,20 @@
               "type": "integer",
               "format": "int64"
             }
+          },
+          {
+            "name": "resource",
+            "in": "query",
+            "description": "The resource the token is for (RFC 8707): the API's resource URI.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "303": {
-            "description": "To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen.",
+            "description": "To the client's redirect URI with `code` (signed in, and no consent to ask) or `error`; to the sign-in screen; or to the consent screen.",
             "headers": {
               "location": {
                 "schema": {
@@ -6030,6 +8358,16 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`: too many metadata-document clients looked up from this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6227,6 +8565,65 @@
         }
       }
     },
+    "/oauth2/register": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Register a public client.",
+        "operationId": "identity.register",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Registered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Registered"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`invalid_redirect_uri` or `invalid_client_metadata`."
+          },
+          "404": {
+            "description": "Dynamic registration is off on this instance (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {}
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.client"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/oauth2/revoke": {
       "post": {
         "tags": [
@@ -6274,7 +8671,7 @@
         "tags": [
           "identity"
         ],
-        "summary": "Exchange an authorization code or a refresh token for tokens.",
+        "summary": "Exchange an authorization code, a refresh token or a workspace client's\ncredentials for tokens.",
         "operationId": "identity.token",
         "requestBody": {
           "content": {
@@ -6298,13 +8695,23 @@
             }
           },
           "400": {
-            "description": "`invalid_request`, `invalid_grant` or `unsupported_grant_type`."
+            "description": "`invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_target`, `unauthorized_client` or `unsupported_grant_type`."
           },
           "401": {
             "description": "`invalid_client`."
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -6398,6 +8805,30 @@
           }
         }
       },
+      "Answer": {
+        "type": "object",
+        "description": "The person's answer.",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "$ref": "#/components/schemas/Decision",
+            "description": "Allow or deny."
+          },
+          "workspace_id": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId",
+                "description": "The workspace the app may use (required to allow an app that binds\none)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
       "AnswerView": {
         "oneOf": [
           {
@@ -6415,6 +8846,67 @@
           }
         ],
         "description": "An answer's value: a label (choice), a level (score) or yes/no."
+      },
+      "Answered": {
+        "type": "object",
+        "description": "Where to go next.",
+        "required": [
+          "redirect"
+        ],
+        "properties": {
+          "redirect": {
+            "type": "string",
+            "description": "Navigate here: the app's redirect URI, with a code or\n`error=access_denied`."
+          }
+        }
+      },
+      "AppliedFilter": {
+        "type": "object",
+        "description": "A filter the query applied, for chips.",
+        "required": [
+          "operator",
+          "value"
+        ],
+        "properties": {
+          "operator": {
+            "type": "string",
+            "description": "The operator (`from`, `has`, `in`, `is`, `label`, …)."
+          },
+          "value": {
+            "type": "string",
+            "description": "Its value."
+          }
+        }
+      },
+      "AssertionResponse": {
+        "type": "object",
+        "description": "`AuthenticatorAssertionResponseJSON`: the authenticator's signature.",
+        "required": [
+          "clientDataJSON",
+          "authenticatorData",
+          "signature"
+        ],
+        "properties": {
+          "authenticatorData": {
+            "type": "string",
+            "description": "The authenticator data, base64url."
+          },
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "signature": {
+            "type": "string",
+            "description": "The signature, base64url."
+          },
+          "userHandle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The user handle the passkey was created with, base64url."
+          }
+        }
       },
       "AttachmentBytes": {
         "type": "string",
@@ -6466,6 +8958,106 @@
           }
         }
       },
+      "AttentionList": {
+        "type": "object",
+        "description": "The caller's items.",
+        "required": [
+          "items",
+          "counts"
+        ],
+        "properties": {
+          "counts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReasonCount"
+            },
+            "description": "Open items per reason, every reason listed (open lists only; empty\nfor cleared)."
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ItemView"
+            },
+            "description": "Open: by reason (review, reply, decide, do, pay), then overdue, by\ndue date, urgent first, oldest first. Cleared: newest first."
+          }
+        }
+      },
+      "AttestationResponse": {
+        "type": "object",
+        "description": "`AuthenticatorAttestationResponseJSON`: what the authenticator made.",
+        "required": [
+          "clientDataJSON",
+          "attestationObject"
+        ],
+        "properties": {
+          "attestationObject": {
+            "type": "string",
+            "description": "The attestation object (CBOR), base64url."
+          },
+          "clientDataJSON": {
+            "type": "string",
+            "description": "The client data, base64url."
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "How the browser reached the authenticator."
+          }
+        }
+      },
+      "AuthenticationCredential": {
+        "type": "object",
+        "description": "`AuthenticationResponseJSON`: a sign-in with a passkey, as the browser\nreturns it.",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential id, base64url."
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The same, as the raw id."
+          },
+          "response": {
+            "$ref": "#/components/schemas/AssertionResponse",
+            "description": "The authenticator's response."
+          },
+          "type": {
+            "type": "string",
+            "description": "`public-key`."
+          }
+        }
+      },
+      "AuthenticatorSelection": {
+        "type": "object",
+        "description": "What the authenticator must do.",
+        "required": [
+          "residentKey",
+          "requireResidentKey",
+          "userVerification"
+        ],
+        "properties": {
+          "requireResidentKey": {
+            "type": "boolean",
+            "description": "`true`, for browsers that predate `residentKey`."
+          },
+          "residentKey": {
+            "type": "string",
+            "description": "`required`: a discoverable credential (a passkey)."
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "`required`."
+          }
+        }
+      },
       "BackchannelLogout": {
         "type": "object",
         "required": [
@@ -6508,6 +9100,112 @@
         "enum": [
           "email"
         ]
+      },
+      "ClientType": {
+        "type": "string",
+        "description": "How a workspace client signs in.",
+        "enum": [
+          "confidential",
+          "public"
+        ]
+      },
+      "Confirm": {
+        "type": "object",
+        "description": "Yes to a question.",
+        "required": [
+          "message_id"
+        ],
+        "properties": {
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message the question the member saw comes from."
+          }
+        },
+        "additionalProperties": false
+      },
+      "ConnectedApp": {
+        "type": "object",
+        "description": "An app the caller let in.",
+        "required": [
+          "id",
+          "client_id",
+          "verified",
+          "scopes",
+          "granted_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The app's client id."
+          },
+          "client_kind": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+          },
+          "client_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its name; `null` when the app is gone (its tokens no longer work)."
+          },
+          "granted_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was allowed."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The consent (what `identity.revoke_consent` takes)."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last got a token."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "What it may do."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether it is Campbooks' own app (a workspace's app says so by its\nkind; every other name is its registrant's word)."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The workspace it may use; `null` for Campbooks' own apps (all)."
+          }
+        }
+      },
+      "ConnectedApps": {
+        "type": "object",
+        "description": "The apps the caller let in.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConnectedApp"
+            },
+            "description": "Newest first."
+          }
+        }
       },
       "ConnectionId": {
         "type": "string",
@@ -6607,6 +9305,161 @@
               "$ref": "#/components/schemas/StreamView"
             },
             "description": "Its change streams."
+          }
+        }
+      },
+      "ConsentClient": {
+        "type": "object",
+        "description": "The app asking.",
+        "required": [
+          "id",
+          "name",
+          "kind",
+          "verified",
+          "device"
+        ],
+        "properties": {
+          "device": {
+            "type": "boolean",
+            "description": "The redirect goes to an app on this device (loopback or a\nprivate-use scheme): it is asked every time, and warned about."
+          },
+          "document_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a metadata-document client, the host serving its document."
+          },
+          "id": {
+            "type": "string",
+            "description": "Its client id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "`first_party`, `workspace`, `dynamic` or `metadata_document`."
+          },
+          "logo_uri": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its logo (a workspace's own app only)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name, as it registered it (only trustworthy when `verified`)."
+          },
+          "redirect_host": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Where the browser goes next: the redirect URI's host (`None` for a\nprivate-use scheme)."
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Whether it is Campbooks' own app. Every other app's name is its\nregistrant's word."
+          },
+          "workspace_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "For a workspace's own app, the workspace that registered it (its\nname, when the person belongs to it): what the screen says instead of\n\"verified\"."
+          }
+        }
+      },
+      "ConsentRequest": {
+        "type": "object",
+        "description": "What the consent screen shows.",
+        "required": [
+          "client",
+          "scopes",
+          "binds_workspace",
+          "workspaces",
+          "remembered"
+        ],
+        "properties": {
+          "account_email": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their address."
+          },
+          "account_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The signed-in person's name."
+          },
+          "binds_workspace": {
+            "type": "boolean",
+            "description": "Whether the person picks one workspace for it; `false` for\nCampbooks' own apps, which work in all of them."
+          },
+          "client": {
+            "$ref": "#/components/schemas/ConsentClient",
+            "description": "The app."
+          },
+          "remembered": {
+            "type": "boolean",
+            "description": "Whether \"Allow\" will be remembered (an exact `https` redirect)."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentScope"
+            },
+            "description": "What it asks to do."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsentWorkspace"
+            },
+            "description": "The workspaces it may be allowed in (a workspace's own app: its\nworkspace only)."
+          }
+        }
+      },
+      "ConsentScope": {
+        "type": "object",
+        "description": "One thing the app may do.",
+        "required": [
+          "name",
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "What it allows, in English (the screen translates by name)."
+          },
+          "name": {
+            "type": "string",
+            "description": "The scope's name (`conversations:read`, `openid`…)."
+          }
+        }
+      },
+      "ConsentWorkspace": {
+        "type": "object",
+        "description": "A workspace the person may let the app use.",
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "properties": {
+          "id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "role": {
+            "$ref": "#/components/schemas/Role",
+            "description": "The person's role there."
           }
         }
       },
@@ -6726,6 +9579,17 @@
             "description": "Messages in it.",
             "minimum": 0
           },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NeedView",
+                "description": "What it needs from its inbox's members, while it needs something."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "snippet": {
             "type": "string",
             "description": "The start of the newest message's text."
@@ -6838,6 +9702,114 @@
         ],
         "description": "A new invitation, as the inviter sees it once: with the link to pass on."
       },
+      "CreationOptions": {
+        "type": "object",
+        "description": "`PublicKeyCredentialCreationOptionsJSON`: create a passkey.",
+        "required": [
+          "rp",
+          "user",
+          "challenge",
+          "pubKeyCredParams",
+          "timeout",
+          "excludeCredentials",
+          "authenticatorSelection",
+          "attestation"
+        ],
+        "properties": {
+          "attestation": {
+            "type": "string",
+            "description": "`none`."
+          },
+          "authenticatorSelection": {
+            "$ref": "#/components/schemas/AuthenticatorSelection",
+            "description": "Discoverable, with user verification."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "The challenge, base64url (single use, five minutes)."
+          },
+          "excludeCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CredentialDescriptor"
+            },
+            "description": "The account's passkeys, so an authenticator holding one says so\ninstead of making a second."
+          },
+          "pubKeyCredParams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CredentialParameter"
+            },
+            "description": "EdDSA, ES256, RS256."
+          },
+          "rp": {
+            "$ref": "#/components/schemas/RelyingPartyEntity",
+            "description": "The relying party."
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Milliseconds.",
+            "minimum": 0
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserEntity",
+            "description": "The account."
+          }
+        }
+      },
+      "CredentialDescriptor": {
+        "type": "object",
+        "description": "A credential, by id.",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential id, base64url."
+          },
+          "transports": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Transports the authenticator reported, when it did."
+          },
+          "type": {
+            "type": "string",
+            "description": "`public-key`."
+          }
+        }
+      },
+      "CredentialParameter": {
+        "type": "object",
+        "description": "An algorithm the relying party accepts.",
+        "required": [
+          "type",
+          "alg"
+        ],
+        "properties": {
+          "alg": {
+            "type": "integer",
+            "format": "int64",
+            "description": "The COSE algorithm."
+          },
+          "type": {
+            "type": "string",
+            "description": "`public-key`."
+          }
+        }
+      },
+      "Decision": {
+        "type": "string",
+        "description": "Allow or deny.",
+        "enum": [
+          "allow",
+          "deny"
+        ]
+      },
       "DecisionSource": {
         "type": "string",
         "description": "What kind of strategy gave an answer.",
@@ -6887,6 +9859,15 @@
           "source": {
             "$ref": "#/components/schemas/DecisionSource",
             "description": "Who answered."
+          },
+          "threshold": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The confidence, 0 to 100, from which an answer of this source to\nthis question may act; `None` when it never acts (a suggestion).",
+            "minimum": 0
           },
           "value": {
             "$ref": "#/components/schemas/AnswerView",
@@ -7302,6 +10283,124 @@
           }
         }
       },
+      "Hit": {
+        "type": "object",
+        "description": "One result: a record the caller may open, with what a list row shows.",
+        "required": [
+          "record",
+          "container",
+          "title",
+          "snippet",
+          "occurred_at",
+          "facets"
+        ],
+        "properties": {
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Its container (an inbox)."
+          },
+          "facets": {
+            "$ref": "#/components/schemas/HitFacets",
+            "description": "The record's state, for the row."
+          },
+          "from": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/HitPerson",
+                "description": "Who wrote the best entry."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "matched": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecordRef",
+                "description": "The entry that matched best (a message), when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "occurred_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "The record's time (a conversation's last message)."
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record (a conversation)."
+          },
+          "snippet": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "description": "A snippet of the best entry, hits marked."
+          },
+          "title": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Segment"
+            },
+            "description": "The title, hits marked."
+          }
+        }
+      },
+      "HitFacets": {
+        "type": "object",
+        "description": "A hit's state.",
+        "properties": {
+          "attachment": {
+            "type": "boolean",
+            "description": "Some entry carries files."
+          },
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "How many entries (messages) it has.",
+            "minimum": 0
+          },
+          "starred": {
+            "type": "boolean",
+            "description": "Starred."
+          },
+          "stream": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Its stream."
+          },
+          "unread": {
+            "type": "boolean",
+            "description": "Something in it is unread."
+          }
+        }
+      },
+      "HitPerson": {
+        "type": "object",
+        "description": "A person on a hit.",
+        "required": [
+          "address"
+        ],
+        "properties": {
+          "address": {
+            "type": "string",
+            "description": "Their address."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their display name."
+          }
+        }
+      },
       "InboxId": {
         "type": "string",
         "format": "uuid",
@@ -7461,6 +10560,120 @@
           }
         },
         "additionalProperties": false
+      },
+      "ItemId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ItemId (UUIDv7)"
+      },
+      "ItemState": {
+        "type": "string",
+        "description": "Whether an item still needs someone.",
+        "enum": [
+          "open",
+          "cleared"
+        ]
+      },
+      "ItemView": {
+        "type": "object",
+        "description": "An attention item, as the caller sees it. References and facts only: the\nowning module renders who and what.",
+        "required": [
+          "id",
+          "record",
+          "container",
+          "cause",
+          "reason",
+          "trust",
+          "overdue",
+          "urgent",
+          "since",
+          "state"
+        ],
+        "properties": {
+          "cause": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record that raised it."
+          },
+          "cleared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it was cleared."
+          },
+          "cleared_because": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it was cleared (`replied`, `archived`, `trashed`, `done`,\n`not_needed`), as the producing module said."
+          },
+          "cleared_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who cleared it, when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Who may see it: its container."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ItemId",
+            "description": "The item."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "Why."
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "The record it is about."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When its cause arrived."
+          },
+          "snoozed_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "Until when the caller put it off (\"Later\"), when they did."
+          },
+          "state": {
+            "$ref": "#/components/schemas/ItemState",
+            "description": "Open or cleared."
+          },
+          "trust": {
+            "$ref": "#/components/schemas/Trust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
       },
       "Kind": {
         "type": "string",
@@ -7737,6 +10950,112 @@
         },
         "additionalProperties": false
       },
+      "NeedBasis": {
+        "type": "string",
+        "description": "Whose answer raised a need.",
+        "enum": [
+          "rules",
+          "model",
+          "member"
+        ]
+      },
+      "NeedQuestion": {
+        "type": "string",
+        "description": "The question whose answer raised a need.",
+        "enum": [
+          "needs_reply",
+          "asks_action",
+          "suspicious"
+        ]
+      },
+      "NeedReason": {
+        "type": "string",
+        "description": "Why a conversation needs its inbox's members (attention).",
+        "enum": [
+          "reply",
+          "do",
+          "pay",
+          "review"
+        ]
+      },
+      "NeedTrust": {
+        "type": "string",
+        "description": "How much Campbooks stands behind a need.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
+      "NeedView": {
+        "type": "object",
+        "description": "A conversation's open need, as lists and the reader show it.",
+        "required": [
+          "reason",
+          "trust",
+          "basis",
+          "question",
+          "overdue",
+          "urgent",
+          "message_id"
+        ],
+        "properties": {
+          "basis": {
+            "$ref": "#/components/schemas/NeedBasis",
+            "description": "Whose answer raised it."
+          },
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due."
+          },
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message it comes from."
+          },
+          "overdue": {
+            "type": "boolean",
+            "description": "Whether the due date has passed."
+          },
+          "question": {
+            "$ref": "#/components/schemas/NeedQuestion",
+            "description": "The question that raised it."
+          },
+          "quote": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Quote",
+                "description": "What the sender wrote, when the rules quoted it."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why."
+          },
+          "rule": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The rule that decided it (`signals.reply_asked`, …), for the sentence\nthe client words it with.",
+            "example": "signals.reply_asked"
+          },
+          "trust": {
+            "$ref": "#/components/schemas/NeedTrust",
+            "description": "`sure`, or `check` for a question to the member."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
       "NewAccount": {
         "type": "object",
         "description": "The pending new account, as the new-account screen shows it.",
@@ -7850,6 +11169,97 @@
           }
         }
       },
+      "Outcome": {
+        "type": "string",
+        "description": "How a member resolves a need.",
+        "enum": [
+          "done",
+          "not_needed"
+        ]
+      },
+      "ParsedQuery": {
+        "type": "object",
+        "description": "The query as understood.",
+        "required": [
+          "text",
+          "filters",
+          "warnings"
+        ],
+        "properties": {
+          "filters": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AppliedFilter"
+            },
+            "description": "The filters applied."
+          },
+          "text": {
+            "type": "string",
+            "description": "The free text, as searched."
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/QueryWarning"
+            },
+            "description": "What was not understood (and was searched as text, or ignored)."
+          }
+        }
+      },
+      "PasskeyView": {
+        "type": "object",
+        "description": "A passkey, as its owner sees it.",
+        "required": [
+          "id",
+          "name",
+          "synced",
+          "created_at"
+        ],
+        "properties": {
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was added."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Its id."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last signed in."
+          },
+          "name": {
+            "type": "string",
+            "description": "What its owner calls it."
+          },
+          "synced": {
+            "type": "boolean",
+            "description": "Whether it may sync between devices (a password manager or a\nplatform account keeps it), as opposed to staying on one device."
+          }
+        }
+      },
+      "Passkeys": {
+        "type": "object",
+        "description": "The caller's passkeys.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PasskeyView"
+            },
+            "description": "Oldest first."
+          }
+        }
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -7905,8 +11315,82 @@
         "type": "string",
         "description": "An outside provider.",
         "enum": [
-          "google"
+          "google",
+          "zoho"
         ]
+      },
+      "QueryWarning": {
+        "type": "object",
+        "description": "Something in the query that was not understood.",
+        "required": [
+          "code",
+          "operator"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "`unknown_operator`, `empty_value` or `invalid_value`."
+          },
+          "operator": {
+            "type": "string",
+            "description": "The operator (or `tz`)."
+          }
+        }
+      },
+      "Quote": {
+        "type": "object",
+        "description": "The sender's sentence a need quotes, with who wrote it and when.\nUntrusted mail content: clients show it as quoted plain text only.",
+        "required": [
+          "text",
+          "from",
+          "sent_at"
+        ],
+        "properties": {
+          "from": {
+            "$ref": "#/components/schemas/Address",
+            "description": "Who wrote it."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When."
+          },
+          "text": {
+            "type": "string",
+            "description": "The sentence, at most 240 characters."
+          }
+        }
+      },
+      "Reason": {
+        "type": "string",
+        "description": "Why an item needs someone, in the order Home shows the groups.",
+        "enum": [
+          "review",
+          "reply",
+          "decide",
+          "do",
+          "pay"
+        ]
+      },
+      "ReasonCount": {
+        "type": "object",
+        "description": "How many open items there are for one reason.",
+        "required": [
+          "reason",
+          "count"
+        ],
+        "properties": {
+          "count": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Open items with it.",
+            "minimum": 0
+          },
+          "reason": {
+            "$ref": "#/components/schemas/Reason",
+            "description": "The reason."
+          }
+        }
       },
       "ReasonView": {
         "type": "object",
@@ -7924,6 +11408,277 @@
             "type": "string",
             "description": "`<strategy>.<rule>`, e.g. `signals.list_header`.",
             "example": "signals.list_header"
+          },
+          "sentence": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The sender's sentence holding the evidence, when it came from the\ntext. Untrusted: show it as quoted plain text only."
+          }
+        }
+      },
+      "RecordRef": {
+        "type": "object",
+        "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id within its module.",
+            "example": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"
+          },
+          "type": {
+            "type": "string",
+            "description": "The record type, `<module>.<record>`.",
+            "example": "conversations.thread"
+          }
+        }
+      },
+      "RegisterClient": {
+        "type": "object",
+        "description": "What to register.",
+        "required": [
+          "name",
+          "type",
+          "scopes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Its name, 1 to 100 characters."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A public app's redirect URIs: 1 to 10, `https` or loopback `http`."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The API scopes it may ask for (never `identity:*`)."
+          },
+          "type": {
+            "$ref": "#/components/schemas/ClientType",
+            "description": "Confidential (server to server, with a secret) or public (a sign-in\napp)."
+          }
+        }
+      },
+      "RegisterPasskey": {
+        "type": "object",
+        "description": "The new passkey.",
+        "required": [
+          "credential"
+        ],
+        "properties": {
+          "credential": {
+            "$ref": "#/components/schemas/RegistrationCredential",
+            "description": "`PublicKeyCredential.toJSON()` of `navigator.credentials.create`."
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "What to call it (default `Passkey`)."
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "description": "What a client sends (RFC 7591 §2; the fields read).",
+        "properties": {
+          "client_name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A name to show on the consent screen (with \"unverified\")."
+          },
+          "grant_types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "`authorization_code` and optionally `refresh_token`."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Where codes may go: `https`, or loopback `http` (any port)."
+          },
+          "response_types": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            },
+            "description": "`code`."
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Space-separated scopes it may ask for; missing means every scope a\nthird party may hold."
+          },
+          "token_endpoint_auth_method": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Must be `none` (or missing)."
+          }
+        }
+      },
+      "Registered": {
+        "type": "object",
+        "description": "The registered client (RFC 7591 §3.2.1).",
+        "required": [
+          "client_id",
+          "client_id_issued_at",
+          "client_name",
+          "redirect_uris",
+          "grant_types",
+          "response_types",
+          "token_endpoint_auth_method",
+          "scope"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "The new client id."
+          },
+          "client_id_issued_at": {
+            "type": "integer",
+            "format": "int64",
+            "description": "When it was issued (seconds since the epoch)."
+          },
+          "client_name": {
+            "type": "string",
+            "description": "The name it will be shown with."
+          },
+          "grant_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its grant types."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its redirect URIs."
+          },
+          "response_types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "`[\"code\"]`."
+          },
+          "scope": {
+            "type": "string",
+            "description": "The scopes it may ask for."
+          },
+          "token_endpoint_auth_method": {
+            "type": "string",
+            "description": "`none`."
+          }
+        }
+      },
+      "RegisteredClient": {
+        "type": "object",
+        "description": "The new app, with its secret for the only time.",
+        "required": [
+          "client"
+        ],
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/WorkspaceClient",
+            "description": "The app."
+          },
+          "client_secret": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A confidential app's secret: shown now, never again."
+          }
+        }
+      },
+      "RegistrationCredential": {
+        "type": "object",
+        "description": "`RegistrationResponseJSON`: a new passkey, as the browser returns it.",
+        "required": [
+          "id",
+          "rawId",
+          "type",
+          "response"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The credential id, base64url."
+          },
+          "rawId": {
+            "type": "string",
+            "description": "The same, as the raw id."
+          },
+          "response": {
+            "$ref": "#/components/schemas/AttestationResponse",
+            "description": "The authenticator's response."
+          },
+          "type": {
+            "type": "string",
+            "description": "`public-key`."
+          }
+        }
+      },
+      "RelyingPartyEntity": {
+        "type": "object",
+        "description": "The relying party, as the browser shows it.",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The relying-party id (the public URL's host)."
+          },
+          "name": {
+            "type": "string",
+            "description": "Shown by the browser: `Campbooks`."
+          }
+        }
+      },
+      "RenamePasskey": {
+        "type": "object",
+        "description": "The new name.",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "1 to 64 characters."
           }
         }
       },
@@ -7932,19 +11687,62 @@
         "description": "What the sign-in screen shows for a waiting authorization request.",
         "required": [
           "client_id",
-          "providers"
+          "providers",
+          "passkey_sign_up"
         ],
         "properties": {
           "client_id": {
             "type": "string",
             "description": "The client asking."
           },
+          "passkey_sign_up": {
+            "type": "boolean",
+            "description": "Whether a passkey alone may create a new account here (not on an\ninvite-only instance)."
+          },
           "providers": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "description": "The providers configured on this instance, in display order."
+            "description": "The ways in this instance offers, in display order: the providers\nconfigured, then `passkey` when it can offer passkeys (https, or\n`localhost` in development)."
+          }
+        }
+      },
+      "RequestOptions": {
+        "type": "object",
+        "description": "`PublicKeyCredentialRequestOptionsJSON`: sign in with a passkey.",
+        "required": [
+          "challenge",
+          "timeout",
+          "rpId",
+          "allowCredentials",
+          "userVerification"
+        ],
+        "properties": {
+          "allowCredentials": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CredentialDescriptor"
+            },
+            "description": "Empty: any of this site's passkeys (discoverable credentials)."
+          },
+          "challenge": {
+            "type": "string",
+            "description": "The challenge, base64url (single use, five minutes)."
+          },
+          "rpId": {
+            "type": "string",
+            "description": "The relying-party id."
+          },
+          "timeout": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Milliseconds.",
+            "minimum": 0
+          },
+          "userVerification": {
+            "type": "string",
+            "description": "`required`."
           }
         }
       },
@@ -7956,6 +11754,25 @@
           "approved",
           "rejected"
         ]
+      },
+      "Resolve": {
+        "type": "object",
+        "description": "A member's verdict on a need.",
+        "required": [
+          "outcome",
+          "message_id"
+        ],
+        "properties": {
+          "message_id": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The message the need the member saw comes from (`NeedView.message_id`):\nwhen the open need comes from another one, nothing is recorded (409\n`need_changed`)."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "Done or Not needed."
+          }
+        },
+        "additionalProperties": false
       },
       "RevokeForm": {
         "type": "object",
@@ -7999,6 +11816,39 @@
           "admin",
           "member"
         ]
+      },
+      "SearchResults": {
+        "type": "object",
+        "description": "A page of results.",
+        "required": [
+          "hits",
+          "indexing",
+          "query"
+        ],
+        "properties": {
+          "hits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hit"
+            },
+            "description": "The results, in the order asked for."
+          },
+          "indexing": {
+            "type": "boolean",
+            "description": "The index of some source is still being built: older records may be\nmissing for now."
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass it as `cursor` for the next page; `None` on the last one."
+          },
+          "query": {
+            "$ref": "#/components/schemas/ParsedQuery",
+            "description": "The query as understood."
+          }
+        }
       },
       "SecurityEventId": {
         "type": "string",
@@ -8058,6 +11908,24 @@
                 "type": "null"
               }
             ]
+          }
+        }
+      },
+      "Segment": {
+        "type": "object",
+        "description": "A run of plain text, part of a hit or not. Clients render it as text\n(a `<mark>` around hits); it never carries markup.",
+        "required": [
+          "text",
+          "hit"
+        ],
+        "properties": {
+          "hit": {
+            "type": "boolean",
+            "description": "Whether it matched the query."
+          },
+          "text": {
+            "type": "string",
+            "description": "The text, verbatim."
           }
         }
       },
@@ -8135,6 +12003,66 @@
           }
         }
       },
+      "SignInStart": {
+        "type": "object",
+        "description": "What a sign-in ceremony continues.",
+        "properties": {
+          "request": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The waiting authorization request (`/sign-in?request=`), completed\nafterwards."
+          },
+          "return_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Otherwise, a same-origin path to land on."
+          }
+        }
+      },
+      "SignUpStart": {
+        "type": "object",
+        "description": "A new account with a passkey alone.",
+        "required": [
+          "display_name"
+        ],
+        "properties": {
+          "display_name": {
+            "type": "string",
+            "description": "What to call the person (shown in the app; the passkey is saved\nunder it)."
+          },
+          "request": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The waiting authorization request, completed afterwards."
+          },
+          "return_to": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Otherwise, a same-origin path to land on."
+          }
+        }
+      },
+      "SignedInWith": {
+        "type": "object",
+        "description": "Where to go once signed in.",
+        "required": [
+          "redirect"
+        ],
+        "properties": {
+          "redirect": {
+            "type": "string",
+            "description": "Navigate here: the client's redirect URI with a code, or `return_to`."
+          }
+        }
+      },
       "SignupPolicy": {
         "type": "string",
         "description": "Who may create a workspace when they are not a member of any yet.",
@@ -8173,6 +12101,21 @@
             "description": "Whether the policy holds the caller back from creating a workspace:\n`false` for members of a workspace, the instance's first user and\nevery user of an `open` instance."
           }
         }
+      },
+      "Snooze": {
+        "type": "object",
+        "description": "Until when.",
+        "required": [
+          "until"
+        ],
+        "properties": {
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Later than now and less than a year away."
+          }
+        },
+        "additionalProperties": false
       },
       "StartConnection": {
         "type": "object",
@@ -8398,6 +12341,13 @@
           "paused"
         ],
         "properties": {
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The mailbox it reads (`messages`): one connection can reach several\n(a Zoho login's mail accounts)."
+          },
           "capability": {
             "$ref": "#/components/schemas/Capability",
             "description": "The capability it reads."
@@ -8499,7 +12449,7 @@
               "string",
               "null"
             ],
-            "description": "`authorization_code` or `refresh_token`."
+            "description": "`authorization_code`, `refresh_token` or `client_credentials`."
           },
           "redirect_uri": {
             "type": [
@@ -8514,6 +12464,20 @@
               "null"
             ],
             "description": "The refresh token."
+          },
+          "resource": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The resource the token is for (RFC 8707): the API's resource URI."
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Space-separated scopes (`client_credentials`: at most what the\nclient was given; missing means all of them)."
           }
         }
       },
@@ -8560,6 +12524,14 @@
           }
         }
       },
+      "Trust": {
+        "type": "string",
+        "description": "How much the producing module stands behind an item.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
       "UpdateWorkspace": {
         "type": "object",
         "description": "The settings to change; absent fields stay as they are.",
@@ -8584,6 +12556,29 @@
           }
         },
         "additionalProperties": false
+      },
+      "UserEntity": {
+        "type": "object",
+        "description": "The account the credential is for.",
+        "required": [
+          "id",
+          "name",
+          "displayName"
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "The person's name."
+          },
+          "id": {
+            "type": "string",
+            "description": "The user handle: the account id's 16 bytes, base64url. It holds no\npersonal information."
+          },
+          "name": {
+            "type": "string",
+            "description": "What the passkey is saved under (an address or a name)."
+          }
+        }
       },
       "UserId": {
         "type": "string",
@@ -8686,6 +12681,83 @@
           }
         }
       },
+      "WorkspaceClient": {
+        "type": "object",
+        "description": "A workspace client, as settings show it. Never its secret.",
+        "required": [
+          "client_id",
+          "name",
+          "type",
+          "scopes",
+          "redirect_uris",
+          "created_at"
+        ],
+        "properties": {
+          "client_id": {
+            "type": "string",
+            "description": "Its client id."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was registered."
+          },
+          "last_used_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it last got a token."
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name."
+          },
+          "redirect_uris": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "A public client's redirect URIs."
+          },
+          "scopes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The scopes it may ask for."
+          },
+          "secret_rotated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When its secret last changed."
+          },
+          "type": {
+            "$ref": "#/components/schemas/ClientType",
+            "description": "Confidential or public."
+          }
+        }
+      },
+      "WorkspaceClients": {
+        "type": "object",
+        "description": "The workspace's apps.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceClient"
+            },
+            "description": "Oldest first."
+          }
+        }
+      },
       "WorkspaceDeletion": {
         "type": "object",
         "description": "A deleted workspace.",
@@ -8778,7 +12850,7 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT",
-        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
+        "description": "An OAuth 2.1 access token (a JWT) issued by this instance's identity provider, the issuer configured as `CAMPBOOKS_AUTH__ISSUER`. Each operation lists the scope it requires; operations with an empty requirement are public. Scopes:\n\n- `admin:access`: Reach the instance administration API, if your account has an admin profile. Granted to Campbooks' own apps only.\n- `attention:read`: See what needs you: the items on your Home.\n- `attention:write`: Put items on your Home off until later, and bring them back.\n- `connectors:read`: See the outside accounts connected to your workspaces and how their sync is doing.\n- `connectors:write`: Connect outside accounts (such as Gmail), sync them now and disconnect them.\n- `conversations:read`: Read your inboxes, conversations and messages.\n- `conversations:send`: Write drafts and send messages, replies and forwards from your inboxes.\n- `conversations:write`: Mark conversations read or unread, star, archive, label and move them between streams.\n- `identity:clients`: Register, rotate and remove a workspace's own apps and their secrets.\n- `identity:read`: See your account, its ways in and the mailboxes waiting to be connected.\n- `identity:write`: Change your account and connect or discard the mailboxes waiting on it.\n- `search:read`: Search the records you may read (conversations need conversations:read too).\n- `system:read`: Read operational status.\n- `workspaces:admin`: Manage workspaces you own or administer: settings, members, invitations, deletion and the security log.\n- `workspaces:read`: See your workspaces and who belongs to them.\n- `workspaces:write`: Create workspaces, accept invitations and leave workspaces."
       },
       "session": {
         "type": "apiKey",
@@ -8799,7 +12871,7 @@
     },
     {
       "name": "connectors",
-      "description": "Connections to outside accounts (Gmail first): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
+      "description": "Connections to outside accounts (Gmail, Zoho Mail): connect with the provider's consent, see their health, sync now, disconnect. Credentials are never returned."
     },
     {
       "name": "conversations",
@@ -8808,6 +12880,14 @@
     {
       "name": "identity",
       "description": "Accounts and their ways in, and this instance's OAuth 2.1 authorization server: discovery, keys, authorization, tokens, revocation, sign-in with a provider, and the mailboxes a sign-up granted, waiting for a workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve browsers and OAuth clients; they answer 404 while another identity provider serves the instance."
+    },
+    {
+      "name": "attention",
+      "description": "What needs you: one queue per member of what the records you may open ask of you (conversations today), with Later per member."
+    },
+    {
+      "name": "search",
+      "description": "One search over the records you may open: conversations today. Words in English, Portuguese, Spanish and French with accents ignored, Gmail-style operators, highlights as plain-text segments. Results come only from the containers (inboxes) you may see, checked at query time."
     },
     {
       "name": "changes",

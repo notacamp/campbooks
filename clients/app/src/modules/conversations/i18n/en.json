@@ -78,13 +78,11 @@
   "scout": {
     "label": "Where things stand",
     "suggestion": "Suggests {{stream}}",
-    "suggestionSure": "Suggests {{stream}}, {{confidence}}% sure",
     "suggestionNote": "Campbooks thinks this belongs in {{stream}}. It is a suggestion: nothing moves until you say so.",
     "prompt": "Move it?",
     "accept": "Move to {{stream}}",
     "keep": "Keep in {{stream}}",
     "sortedRule": "Sorted into {{stream}} by a rule",
-    "sortedRuleSure": "Sorted into {{stream}} by a rule, {{confidence}}% sure",
     "sortedModel": "Sorted into {{stream}} by Campbooks",
     "sortedMember": "You put this in {{stream}}",
     "sortedDefault": "In {{stream}}: nothing moved it",
@@ -154,7 +152,8 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "showImages": "Show images",
-    "nextAttachment": "Next attachment"
+    "nextAttachment": "Next attachment",
+    "notNeeded": "Not needed (or it’s safe)"
   },
   "compose": {
     "title": {
@@ -191,9 +190,9 @@
       "draft_not_editable": "This message is already on its way.",
       "not_connected": "This mailbox is no longer connected. Reconnect it, then send again.",
       "needs_reauth": "Campbooks needs your permission again to send from this mailbox. Reconnect it, then send again.",
-      "rejected": "Gmail refused this message. Check the addresses and try again.",
-      "too_large": "This message is too large for Gmail to send.",
-      "unavailable": "Gmail could not be reached, so nothing was sent. Try again.",
+      "rejected": "Your mail provider refused this message. Check the addresses and try again.",
+      "too_large": "This message is too large for your mail provider to send.",
+      "unavailable": "Your mail provider could not be reached, so nothing was sent. Try again.",
       "unknown_outcome": "Campbooks could not confirm that this message was sent. Check your Sent folder before sending it again.",
       "unknown": "Something went wrong. Try again.",
       "not_saved": "Your last changes could not be saved, so nothing was sent. Try again.",
@@ -203,5 +202,62 @@
       "newMessage": "New message"
     },
     "tooLate": "Too late to undo: it was sent."
+  },
+  "needs": {
+    "line": {
+      "reply": "{{name}} is waiting for your reply",
+      "question": "{{name}} asked you a question",
+      "do": "{{name}} asked you to do something",
+      "pay": "{{name}} sent a bill to pay",
+      "warning": "This may be phishing. Don’t use its links.",
+      "checkReply": "Does {{name}} need a reply?",
+      "checkDo": "Did {{name}} ask you to do something?"
+    },
+    "chip": {
+      "reply": "Needs a reply",
+      "do": "To do",
+      "pay": "Pay",
+      "review": "Review",
+      "suspicious": "Looks suspicious",
+      "check": "Check"
+    },
+    "due": {
+      "today": "Due today",
+      "tomorrow": "Due tomorrow",
+      "on": "Due {{date}}",
+      "overdue": "Overdue · was due {{date}}"
+    },
+    "how": {
+      "yes": "Yes.",
+      "no": "No.",
+      "urgency0": "No hurry.",
+      "urgency1": "Within the next days.",
+      "urgency2": "Today.",
+      "source": {
+        "rules": "Rules",
+        "model": "Model",
+        "knn": "Similar mail",
+        "cascade": "Rules, then model"
+      },
+      "suggestion": "a suggestion",
+      "actsFrom": "acts from {{threshold}}",
+      "footnote": "Rules answer from what the email shows on its face. An answer acts only from the confidence its eval holds at; below that it is a suggestion."
+    },
+    "actions": {
+      "done": "Done",
+      "notNeeded": "Not needed",
+      "safe": "It’s safe",
+      "yes": "Yes",
+      "no": "No",
+      "questionPrompt": "Campbooks is not sure."
+    },
+    "toast": {
+      "done": "Done · {{name}}",
+      "notNeeded": "Not needed · {{name}}. Campbooks will learn from it",
+      "safe": "Marked safe · {{name}}. Campbooks will learn from it",
+      "confirmed": "Thanks · {{name}} stays on your list",
+      "failed": "Could not change {{name}}: nothing changed. Try again.",
+      "changed": "{{name}} changed while you looked: have another look."
+    }
   }
 }

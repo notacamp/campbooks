@@ -7,7 +7,7 @@ use campbooks_kernel::{config::SignupPolicy, testing::TestUser};
 use sqlx::PgPool;
 
 use crate::{
-    domain::clients::{NATIVE_CLIENT_ID, WEB_CLIENT_ID},
+    domain::clients::WEB_CLIENT_ID,
     testkit::{Kit, MAIL_SCOPE, ORIGIN, query},
 };
 
@@ -28,7 +28,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     assert_eq!(shown.json["client_id"], WEB_CLIENT_ID);
     assert_eq!(
         shown.json["providers"],
-        serde_json::json!(["google", "microsoft", "zoho"])
+        serde_json::json!(["google", "microsoft", "zoho", "passkey"])
     );
 
     // One consent: identity, the mailbox the instance can sync, offline.
@@ -101,6 +101,7 @@ async fn a_new_person_signs_up_with_google_and_their_mailbox_waits_for_a_workspa
     assert_eq!(handed[0].1, claims["sub"].as_str().unwrap());
     assert!(handed[0].3.is_some(), "the refresh token went along");
     assert!(handed[0].4.contains(&MAIL_SCOPE.to_owned()));
+    assert_eq!(kit.intake.issuers(), [kit.google.issuer()]);
     let after = kit
         .api(Method::GET, "/api/v1/identity/held-grants", &access)
         .await;
@@ -298,36 +299,6 @@ async fn the_token_endpoint_authenticates_clients(db: PgPool) {
         )
         .await;
     assert_eq!(ok.status, StatusCode::OK, "{ok:?}");
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
-async fn the_native_client_is_refused_until_native_sign_in_ships(db: PgPool) {
-    let kit = Kit::new(db).await;
-    kit.sign_up().await;
-    // A signed-in browser must not hand a code to whatever listens on a
-    // loopback port (RFC 8252 §8.6).
-    let (url, verifier) = Kit::authorize_url(
-        NATIVE_CLIENT_ID,
-        "http://127.0.0.1:53124/callback",
-        "openid offline_access",
-    );
-    let refused = kit.get(&url).await;
-    assert_eq!(refused.status, StatusCode::BAD_REQUEST);
-    assert_eq!(refused.json["code"], "invalid_client");
-    assert!(refused.headers.get("location").is_none());
-    let token = kit
-        .post_form(
-            "/oauth2/token",
-            &[
-                ("grant_type", "authorization_code"),
-                ("code", "anything"),
-                ("redirect_uri", "http://127.0.0.1:53124/callback"),
-                ("code_verifier", &verifier),
-                ("client_id", NATIVE_CLIENT_ID),
-            ],
-        )
-        .await;
-    assert_eq!(token.status, StatusCode::UNAUTHORIZED);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

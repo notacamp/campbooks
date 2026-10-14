@@ -12,6 +12,22 @@
     "step_up_required": "Inicie sessão novamente primeiro: para alterar a forma como inicia sessão, é preciso ter iniciado sessão nos últimos dez minutos.",
     "last_way_in": "Esta é a única forma de iniciar sessão, por isso não pode ser removida. Adicione outra primeiro.",
     "link_incomplete": "Indique o fornecedor, o espaço de trabalho ou a caixa de correio a que isto se refere.",
-    "mailbox_unsupported": "O Campbooks ainda não consegue ligar a caixa de correio deste fornecedor nesta instância."
+    "mailbox_unsupported": "O Campbooks ainda não consegue ligar a caixa de correio deste fornecedor nesta instância.",
+    "passkey_not_accepted": "Esta chave de acesso não foi aceite. Tente novamente ou inicie sessão de outra forma.",
+    "passkey_expired": "Este pedido de chave de acesso demorou demasiado tempo ou já foi usado. Tente novamente.",
+    "passkey_already_registered": "Esta chave de acesso já dá acesso ao Campbooks.",
+    "display_name_required": "Diga-nos como lhe devemos chamar.",
+    "passkey_name_required": "Dê à chave de acesso um nome com 1 a 64 caracteres.",
+    "invalid_target": "Esta aplicação pediu acesso a algo que o Campbooks não disponibiliza.",
+    "consent_request_not_found": "Este pedido para autorizar uma aplicação expirou ou já foi respondido. Recomece a partir da aplicação.",
+    "consent_needs_workspace": "Escolha o espaço de trabalho que esta aplicação pode usar.",
+    "consent_wrong_workspace": "Esta aplicação pertence a outro espaço de trabalho e só pode ser autorizada aí.",
+    "not_workspace_admin": "Só os proprietários e administradores do espaço de trabalho podem gerir as suas aplicações.",
+    "client_not_found": "Não existe essa aplicação neste espaço de trabalho.",
+    "invalid_client_metadata": "Os dados da aplicação não são aceitáveis: {{reason}}",
+    "client_needs_redirect": "Uma aplicação de início de sessão precisa de pelo menos um endereço de retorno https ou de loopback.",
+    "client_scope_not_allowed": "Não é possível dar a permissão {{scope}} a aplicações.",
+    "client_is_public": "Esta aplicação inicia sessão de pessoas e não tem segredo para renovar.",
+    "client_name_reserved": "Só as aplicações do próprio Campbooks se podem chamar Campbooks ou Not A Camp. Escolha outro nome."
   }
 }

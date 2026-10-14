@@ -5,6 +5,9 @@
 name: campbooks-next
 paths-ignore:
   - "**/tests.rs"
+  - "**/*_tests.rs"
+  - "**/testkit.rs"
+  - "**/testkit_*.rs"
   - "**/tests/**"
   - "**/testing.rs"
   - "**/testing/**"

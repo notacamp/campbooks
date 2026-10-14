@@ -1,0 +1,8 @@
+{
+  "errors": {
+    "invalid_limit": "O limite tem de estar entre 1 e {{max}}.",
+    "query_too_long": "Esta pesquisa é demasiado longa ou tem demasiadas palavras ou filtros. Encurte-a e tente novamente.",
+    "cursor_mismatch": "Esta ligação de página pertence a outra pesquisa. Recomece pela primeira página.",
+    "query_only_excludes": "Indique algo a procurar: uma pesquisa não pode apenas excluir palavras."
+  }
+}

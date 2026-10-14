@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO search.backfills (workspace_id, group_type, state, index_version)\n               SELECT $1, group_type, 'deleting', $3 FROM unnest($2::text[]) AS group_type\n               ON CONFLICT (workspace_id, group_type) DO UPDATE SET state = 'deleting'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "501c2c837aadef6306086d3acfa90f9d7edda165a65857ba30d48481cc264937"
+}

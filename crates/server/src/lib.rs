@@ -18,6 +18,8 @@ pub mod web;
 mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
+#[cfg(test)]
+mod search_tests;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
 
@@ -35,6 +37,7 @@ use campbooks_kernel::{
     i18n,
     jobs::{Registry, RegistryError},
     operations,
+    search::SearchSources,
 };
 use tower::ServiceBuilder;
 use tower_http::{
@@ -104,9 +107,8 @@ impl Composition {
         } else {
             Some(campbooks_ai::Gateway::new(ai).map_err(|e| e.to_string())?)
         };
-        let scopes: Vec<&str> = scope_catalogue().iter().map(|scope| scope.name).collect();
         let connectors = campbooks_connectors::Deps::from_env(config)?;
-        let identity = campbooks_identity::Deps::from_env(config, &scopes)?;
+        let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
@@ -171,6 +173,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
+        campbooks_attention::module(),
+        campbooks_search::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -178,7 +182,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// `state` with the ports modules implement for the kernel registered: the
 /// `workspaces` module answers who belongs to which workspace and which
 /// language each user chose; the `conversations` module, who may see the
-/// change feed's records inside an inbox; the `admin` module, who is an
+/// change feed's records inside an inbox and search's results, and how
+/// search reads its conversations (ADR 0016); the `admin` module, who is an
 /// administrator, and keeps the trail of what they do.
 pub fn with_ports(state: AppState) -> AppState {
     state
@@ -187,6 +192,9 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_search_sources(SearchSources::new(vec![
+            campbooks_conversations::search_source(),
+        ]))
 }
 
 /// [`with_ports`], plus the ports of the modules composed with
@@ -207,8 +215,12 @@ pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppSta
                 db: state.db.clone(),
                 keys: Arc::clone(&issuer.keys),
             };
+            // Its access tokens are for the API's resource URI (RFC 8707);
+            // `CAMPBOOKS_AUTH__AUDIENCE` is what an outside IdP sends.
+            let mut auth = state.config.auth.clone();
+            auth.audience.clone_from(&issuer.resource);
             let verifier = campbooks_kernel::auth::TokenVerifier::in_process(
-                &state.config.auth,
+                &auth,
                 &issuer.url,
                 Arc::new(keys),
             );
@@ -290,7 +302,7 @@ fn security_scheme() -> SecurityScheme {
         (name = "workspaces", description = "Workspaces, members and roles, invitations and the \
             security log. Workspace-owned resources live under `/api/v1/w/{workspace_id}/`; a \
             caller who is not a member (or a client token bound to another workspace) gets 404."),
-        (name = "connectors", description = "Connections to outside accounts (Gmail first): \
+        (name = "connectors", description = "Connections to outside accounts (Gmail, Zoho Mail): \
             connect with the provider's consent, see their health, sync now, disconnect. \
             Credentials are never returned."),
         (name = "conversations", description = "Inboxes, conversations and messages on any \
@@ -302,6 +314,12 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
+        (name = "attention", description = "What needs you: one queue per member of what the \
+            records you may open ask of you (conversations today), with Later per member."),
+        (name = "search", description = "One search over the records you may open: \
+            conversations today. Words in English, Portuguese, Spanish and French with accents \
+            ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
+            from the containers (inboxes) you may see, checked at query time."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \
@@ -473,7 +491,19 @@ pub fn router_with(
         .with_state(state.clone());
     let bff = bff::Bff::new(bff, &state, api_only, admin_only, identity.clone());
 
-    compose(state, routes.merge(admin_routes), spec, &bff, identity)
+    // RFC 9728: every Bearer challenge of the API names its metadata, so an
+    // agent that knows only the API's URL finds the issuer.
+    let routes = routes.merge(admin_routes);
+    let routes = match &composition.identity.issuer {
+        Some(issuer) => routes.layer(axum::middleware::from_fn_with_state(
+            Arc::<str>::from(
+                campbooks_identity::protocol::discovery::resource_metadata_url(issuer),
+            ),
+            campbooks_kernel::auth::challenge_with_resource_metadata,
+        )),
+        None => routes,
+    };
+    compose(state, routes, spec, &bff, identity)
 }
 
 /// Assemble the application from the API routes, the OpenAPI document and
@@ -542,6 +572,16 @@ mod tests {
 
     fn app() -> Router {
         router(testing::state(testing::unreachable_pool()), None)
+    }
+
+    #[test]
+    fn identity_and_connectors_know_the_same_zoho_data_centres() {
+        // Identity validates the accounts server a Zoho grant comes from;
+        // connectors maps that server to the data centre's mail host.
+        assert_eq!(
+            campbooks_identity::upstream::client::ZOHO_ACCOUNTS_SERVERS,
+            campbooks_connectors::ZOHO_ACCOUNTS_SERVERS
+        );
     }
 
     #[test]

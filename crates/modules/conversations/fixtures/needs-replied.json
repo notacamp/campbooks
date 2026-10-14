@@ -1,0 +1,35 @@
+{
+  "changes": [
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-6",
+        "thread_key": "thr-lunch",
+        "rfc_message_id": "needs-6@needs.example",
+        "from": {
+          "name": "Sam Rivers",
+          "address": "sam@example.com"
+        },
+        "to": [
+          {
+            "name": "Jonas Weber",
+            "address": "jonas@weber-studio.example"
+          }
+        ],
+        "subject": "Re: Lunch on Friday?",
+        "sent_at": "2026-10-13T09:12:00Z",
+        "direction": "outbound",
+        "text": "Friday works, see you at one.",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": true,
+        "starred": false,
+        "in_reply_to": "needs-5@needs.example",
+        "references": [
+          "needs-5@needs.example"
+        ]
+      }
+    }
+  ]
+}

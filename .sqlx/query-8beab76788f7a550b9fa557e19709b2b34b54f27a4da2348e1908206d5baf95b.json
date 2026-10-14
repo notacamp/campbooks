@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT state, after_id, index_version FROM search.backfills\n              WHERE workspace_id = $1 AND group_type = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.backfills",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "after_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.backfills",
+            "name": "after_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "index_version",
+        "type_info": "Int2",
+        "origin": {
+          "Table": {
+            "table": "search.backfills",
+            "name": "index_version"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "8beab76788f7a550b9fa557e19709b2b34b54f27a4da2348e1908206d5baf95b"
+}

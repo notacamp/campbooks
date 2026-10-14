@@ -36,6 +36,10 @@ pub struct Reason {
     pub rule: &'static str,
     /// What matched: a header name, a phrase, an attachment, a count.
     pub evidence: String,
+    /// The sentence of the message's new text that holds the evidence, when
+    /// the evidence came from the text: what the sender actually wrote, for
+    /// quoting. Untrusted content, shown as quoted text only.
+    pub sentence: Option<String>,
 }
 
 impl Reason {
@@ -44,6 +48,7 @@ impl Reason {
         Self {
             rule,
             evidence: evidence.into(),
+            sentence: None,
         }
     }
 }

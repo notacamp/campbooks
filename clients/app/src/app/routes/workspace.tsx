@@ -23,6 +23,7 @@ import {
   WorkspaceMenu,
   WorkspaceSwitcher,
 } from "~/lib/ui";
+import { useAttentionCount } from "~/modules/attention";
 import { StreamNav, streamPath } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
@@ -132,9 +133,11 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const base = `/w/${workspace.id}`;
   const membersPath = `${base}/settings/members`;
   const waysInPath = `${base}/settings/sign-in`;
+  const appsPath = `${base}/settings/apps`;
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const atHome = !inSettings && !inInbox;
+  const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
   const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
     "primary" | "updates" | "receipts" | "newsletters" | undefined;
@@ -173,7 +176,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             onClick={openSwitcher}
           />
           <Spacer />
-          <AccountMenu compact waysIn={link(waysInPath)} />
+          <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
         </PhoneHeader>
         <Sidebar>
           <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
@@ -187,6 +190,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             icon="home"
             shortcut="nav.home"
             current={atHome}
+            count={needsYou}
             {...link(base)}
           />
           <NavItem
@@ -215,7 +219,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             >
               {tNav("sheet.open")}
             </Button>
-            <AccountMenu waysIn={link(waysInPath)} />
+            <AccountMenu waysIn={link(waysInPath)} apps={link(appsPath)} />
           </SidebarFooter>
         </Sidebar>
         <Outlet />
@@ -223,7 +227,14 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
       <TabBar
         phoneOnly
         items={[
-          { id: "home", label: tNav("nav.home"), icon: "home", current: atHome, ...link(base) },
+          {
+            id: "home",
+            label: tNav("nav.home"),
+            icon: "home",
+            current: atHome,
+            ...(needsYou === undefined ? {} : { badge: needsYou }),
+            ...link(base),
+          },
           {
             id: "inbox",
             label: tNav("nav.inbox"),

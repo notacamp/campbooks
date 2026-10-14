@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversations.needs n\n           SET verdict = NULL, verdict_message_id = NULL, verdict_by = NULL,\n               verdict_correction_id = NULL, updated_at = now()\n          FROM (SELECT conversation_id, verdict_correction_id FROM conversations.needs\n                 WHERE conversation_id = $1 AND verdict IS NOT NULL\n                   AND verdict_message_id = message_id FOR UPDATE) old\n         WHERE n.conversation_id = old.conversation_id\n        RETURNING old.verdict_correction_id AS \"correction: CorrectionId\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "correction: CorrectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs",
+            "name": "verdict_correction_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "9402ff27e4642cdd55fdfdc267cf79168d076c63b901fe8970e85abe703b9b53"
+}

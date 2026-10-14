@@ -13,9 +13,7 @@
     "redone": "Rehecho: {{label}}"
   },
   "note": {
-    "label": "Cómo están las cosas",
-    "why": "¿Por qué?",
-    "hideWhy": "Ocultar el porqué"
+    "label": "Cómo están las cosas"
   },
   "search": {
     "label": "Buscar o preguntar"
@@ -43,7 +41,10 @@
     "unsure": "Campbooks no está seguro",
     "happy": "Campbooks está contento",
     "alert": "Campbooks necesita tu atención",
-    "asleep": "Campbooks está en pausa"
+    "asleep": "Campbooks está en pausa",
+    "dizzy": "Campbooks ha tenido un tropiezo",
+    "starry": "Campbooks está encantado",
+    "hearts": "A Campbooks le encanta"
   },
   "signal": {
     "review": "Revisar",
@@ -97,5 +98,8 @@
     "previewOf": "Vista previa de {{name}}",
     "downloadOf": "Descargar {{name}}",
     "previewTitle": "Vista previa de {{name}}"
+  },
+  "howDecided": {
+    "title": "Cómo decidió Campbooks"
   }
 }

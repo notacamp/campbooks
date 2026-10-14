@@ -1,5 +1,6 @@
-//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine) and
-//! `CAMPBOOKS_GOOGLE__*` (the Google OAuth client).
+//! The module's settings: `CAMPBOOKS_CONNECTORS__*` (the sync engine),
+//! `CAMPBOOKS_GOOGLE__*` and `CAMPBOOKS_ZOHO__*` (the OAuth clients, shared
+//! with sign-in).
 
 use std::path::PathBuf;
 
@@ -17,6 +18,8 @@ pub struct ConnectorsConfig {
     pub poll: PollConfig,
     /// Google's request budget (`CAMPBOOKS_CONNECTORS__GOOGLE__*`).
     pub google: BudgetConfig,
+    /// The Zoho Mail adapter (`CAMPBOOKS_CONNECTORS__ZOHO__*`).
+    pub zoho: ZohoMailConfig,
     /// Consecutive failed runs before a connection's health is `failing`
     /// (`CAMPBOOKS_CONNECTORS__FAILING_AFTER`, default 5).
     pub failing_after: u32,
@@ -38,6 +41,26 @@ pub struct GmailConfig {
     /// bytes and continues in the next run (default 64 MiB), so a run's
     /// memory stays bounded.
     pub run_budget_bytes: u64,
+}
+
+/// `CAMPBOOKS_CONNECTORS__ZOHO__*`.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ZohoMailConfig {
+    /// How far back a new mailbox reads, in days (default 90).
+    pub backfill_days: u32,
+    /// Messages larger than this (bytes) are skipped and recorded as
+    /// oversized (default 50 MiB).
+    pub max_message_bytes: u64,
+    /// One run starts no download once it has fetched this many bytes
+    /// (default 64 MiB).
+    pub run_budget_bytes: u64,
+    /// Requests per minute each Zoho login may make, shared by every
+    /// process (default 60).
+    pub requests_per_minute: u32,
+    /// Minutes between sweeps that re-read a mailbox's whole window
+    /// (default 360).
+    pub sweep_minutes: u32,
 }
 
 /// `CAMPBOOKS_CONNECTORS__POLL__*`.
@@ -65,6 +88,7 @@ impl Default for ConnectorsConfig {
             gmail: GmailConfig::default(),
             poll: PollConfig::default(),
             google: BudgetConfig::default(),
+            zoho: ZohoMailConfig::default(),
             failing_after: 5,
             batch_retention_days: 7,
         }
@@ -77,6 +101,18 @@ impl Default for GmailConfig {
             backfill_days: 90,
             max_message_bytes: 50 * 1024 * 1024,
             run_budget_bytes: 64 * 1024 * 1024,
+        }
+    }
+}
+
+impl Default for ZohoMailConfig {
+    fn default() -> Self {
+        Self {
+            backfill_days: 90,
+            max_message_bytes: 50 * 1024 * 1024,
+            run_budget_bytes: 64 * 1024 * 1024,
+            requests_per_minute: 60,
+            sweep_minutes: 360,
         }
     }
 }
@@ -133,6 +169,21 @@ impl ConnectorsConfig {
                 "CAMPBOOKS_CONNECTORS__GOOGLE__UNITS_PER_SECOND must be positive".to_owned(),
             );
         }
+        let zoho = &self.zoho;
+        if zoho.backfill_days == 0 || zoho.backfill_days > 3650 {
+            return Err("CAMPBOOKS_CONNECTORS__ZOHO__BACKFILL_DAYS must be 1 to 3650".to_owned());
+        }
+        if zoho.max_message_bytes == 0
+            || zoho.run_budget_bytes == 0
+            || zoho.requests_per_minute == 0
+            || zoho.sweep_minutes == 0
+        {
+            return Err(
+                "CAMPBOOKS_CONNECTORS__ZOHO__MAX_MESSAGE_BYTES, …__RUN_BUDGET_BYTES, \
+                 …__REQUESTS_PER_MINUTE and …__SWEEP_MINUTES must be positive"
+                    .to_owned(),
+            );
+        }
         if self.failing_after == 0 {
             return Err("CAMPBOOKS_CONNECTORS__FAILING_AFTER must be positive".to_owned());
         }
@@ -143,33 +194,35 @@ impl ConnectorsConfig {
     }
 }
 
-/// The Google OAuth client, `CAMPBOOKS_GOOGLE__*`. Google is offered only
-/// when the client id and a secret are set.
+/// A provider's OAuth client, `CAMPBOOKS_GOOGLE__*` or `CAMPBOOKS_ZOHO__*`.
+/// The provider is offered only when the client id and a secret are set.
+/// The identity module reads the same settings (one OAuth app serves
+/// sign-in and mail); keys it alone uses are ignored here.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
-pub struct GoogleConfig {
-    /// `CAMPBOOKS_GOOGLE__CLIENT_ID`.
+pub struct OAuthClientConfig {
+    /// `…__CLIENT_ID`.
     pub client_id: Option<String>,
-    /// `CAMPBOOKS_GOOGLE__CLIENT_SECRET`, inline; for development.
+    /// `…__CLIENT_SECRET`, inline; for development.
     pub client_secret: Option<SecretString>,
-    /// `CAMPBOOKS_GOOGLE__CLIENT_SECRET_FILE`: read when a token is
-    /// requested, so a rotated secret is picked up without a restart.
+    /// `…__CLIENT_SECRET_FILE`: read when a token is requested, so a
+    /// rotated secret is picked up without a restart.
     pub client_secret_file: Option<PathBuf>,
-    /// `CAMPBOOKS_GOOGLE__BASE_URL`: serve every Google endpoint from this
-    /// base instead (a local fake Google). Development only
-    /// (`CAMPBOOKS_ENV=development`); refused otherwise.
+    /// `…__BASE_URL`: serve every endpoint of the provider from this base
+    /// instead (a local fake). Development only (`CAMPBOOKS_ENV=development`);
+    /// refused otherwise.
     pub base_url: Option<String>,
 }
 
-impl GoogleConfig {
-    /// Load the `google` section of `figment`.
-    pub fn from_figment(figment: &Figment) -> Result<Self, String> {
-        if !figment.contains("google") {
+impl OAuthClientConfig {
+    /// Load the `section` (`google`, `zoho`) of `figment`.
+    pub fn from_figment(figment: &Figment, section: &str) -> Result<Self, String> {
+        if !figment.contains(section) {
             return Ok(Self::default());
         }
         figment
-            .extract_inner("google")
-            .map_err(|e| format!("CAMPBOOKS_GOOGLE__*: {e}"))
+            .extract_inner(section)
+            .map_err(|e| format!("CAMPBOOKS_{}__*: {e}", section.to_ascii_uppercase()))
     }
 }
 
@@ -213,8 +266,32 @@ mod tests {
     }
 
     #[test]
-    fn google_is_unset_by_default() {
-        let google = GoogleConfig::from_figment(&Figment::new()).unwrap();
-        assert!(google.client_id.is_none() && google.client_secret_file.is_none());
+    fn providers_are_unset_by_default() {
+        for section in ["google", "zoho"] {
+            let client = OAuthClientConfig::from_figment(&Figment::new(), section).unwrap();
+            assert!(client.client_id.is_none() && client.client_secret_file.is_none());
+        }
+    }
+
+    #[test]
+    fn zoho_settings_are_read_and_checked() {
+        let config = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"zoho": {"requests_per_minute": 30, "sweep_minutes": 60}}
+        })))
+        .unwrap();
+        assert_eq!(config.zoho.requests_per_minute, 30);
+        assert_eq!(config.zoho.sweep_minutes, 60);
+        let bad = ConnectorsConfig::from_figment(&figment(serde_json::json!({
+            "connectors": {"zoho": {"requests_per_minute": 0}}
+        })));
+        assert!(bad.unwrap_err().contains("REQUESTS_PER_MINUTE"));
+        // Sign-in's own keys sit in the same section and are ignored here.
+        let client = OAuthClientConfig::from_figment(
+            &figment(serde_json::json!({"zoho": {"client_id": "z", "redirect_path": "/oauth/zoho/callback",
+                                                 "accounts_server": "https://accounts.zoho.eu"}})),
+            "zoho",
+        )
+        .unwrap();
+        assert_eq!(client.client_id.as_deref(), Some("z"));
     }
 }

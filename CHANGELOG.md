@@ -25,6 +25,96 @@ All notable changes to Campbooks Next are documented here. The format follows
   `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and
   `CAMPBOOKS_SIGNUP__POLICY=code` no longer needs it to start. A refused request
   now says `signup_rejected`, and asking again no longer repeats the request.
+- What needs you. Home now lists what your mail asks of you, grouped Review,
+  Reply, Decide, Do and Pay, due soonest first: a question you owe an answer
+  to, a request, a bill, a phishing warning. Each says why in a sentence and
+  quotes the sender's own words; the numbers stay behind "How Campbooks
+  decided". J/K, Enter, R reply, E done, L later, X not needed (or "It's
+  safe"), Z undo, and "Done today" lists what left your list. The inbox shows
+  the same as chips on rows and in the reader's note, which no longer shows a
+  percentage. It runs on the rules alone (no AI role needed); replying from
+  any client, archiving a reply or a warning, and the trash clear an item;
+  bills and requests stay until Done. Only mail from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) counts. A new
+  module, `attention`, with the scopes `attention:read` and `attention:write`
+  (the web app gets them at the next sign-in). "Done today" and what is
+  overdue follow your device's time zone; deadline words ("Thursday") are
+  read against the message's date in UTC until accounts carry a time zone. Migrations add
+  `conversations.needs` and the `attention` schema; nothing to do.
+- Apps other than Campbooks on the web can use your account, with your say
+  each time. A consent screen names the app, says whether anyone vouches for
+  it, lists what it will be able to do in plain words, and asks which
+  workspace it may use; an app on your device (the desktop app, a local
+  agent) is asked for every time and comes with a warning. Allow starts
+  unfocused, has no shortcut and waits a second after the page shows, so no
+  stray key press answers it; a remembered answer lasts 90 days for the same
+  return address. Settings → Apps and integrations lists what you allowed,
+  with Revoke, which ends the app's tokens at once. Allowing needs a sign-in
+  from the last ten minutes.
+- The desktop and mobile apps' sign-in is on (`campbooks-native`), always
+  through the consent screen.
+- A workspace's own apps: owners and admins register server-to-server apps
+  (`client_credentials`, a secret shown once, rotate, remove) and sign-in
+  apps under Settings → Apps and integrations. Their tokens work in that
+  workspace only.
+- MCP agents can connect: dynamic client registration (`/oauth2/register`,
+  off unless `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on`,
+  rate-limited, public clients only, deleted after 30 days unused), client
+  metadata documents (off unless `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on`;
+  an `https` client id, fetched with SSRF protection and cached up to a day), protected-resource metadata
+  (`/.well-known/oauth-protected-resource/api`), `resource_metadata` in the
+  API's `WWW-Authenticate`, and resource indicators. Apps that aren't
+  Campbooks' own can never hold an `identity:*`, `workspaces:write` or
+  `workspaces:admin` scope, get read scopes only unless they ask for more,
+  see only the workspace they were allowed in, and can't be called
+  Campbooks or Not A Camp.
+- Search over your mail (`GET /api/v1/w/{workspace_id}/search`, operation
+  `search.query`, new scope `search:read`; screens follow). Words match in
+  English, Portuguese, Spanish and French whatever language you type in, with
+  accents ignored ("fatura joao" finds "As faturas de João"); Gmail-style
+  operators (`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`,
+  `is:unread`, `is:starred`, `label:`, `before:`, `after:`, `older_than:`,
+  `newer_than:`, `"phrases"`, `-word`, `OR`) narrow it, and highlights come
+  back as plain text. You only ever find conversations in inboxes you can
+  read, checked at the moment you search. The index lives in Postgres and
+  stays current within seconds; mail that arrived before this version is
+  indexed in the background the first time someone searches a workspace (or
+  run `campbooks-server search reindex --workspace <id>`). Queries are never
+  stored or logged. **Self-hosters on managed Postgres:** the server now
+  creates the `unaccent` and `pg_trgm` extensions (both ship with Postgres and
+  are in the default image); allow them if your provider asks.
+- The Visor (the assistant's face) has three new emotions: dizzy (something failed on
+  our side), starry (a big win) and heart eyes (a warm moment), with an optional
+  gold/rose tint. Its thinking motion is now a typing-indicator hop that reads at
+  small sizes.
+- Passkeys. Add one under Settings → Ways to sign in (Add a passkey, `N` `P`), then sign
+  in with it on the sign-in screen: the passkey button (`P`) or your browser's
+  autofill. You can also create an account with a passkey alone, no Google, Microsoft or
+  Zoho needed (not on an invite-only instance, where an invitation is matched by email
+  address). Passkeys are ways in like provider accounts: rename or remove them (never your
+  last way in; removing one signs out whoever used it), and adding or removing one needs
+  a sign-in in the last ten minutes. They need `https://` (or `http://localhost`), and are
+  bound to the host of `CAMPBOOKS_PUBLIC_URL`: changing that host retires them.
+- A ready-made image for the local `decide` model: `ghcr.io/notacamp/campbooks-laya`,
+  published for linux/amd64 and linux/arm64 with the same tags as the Campbooks image
+  and scanned the same way. `docker compose --profile ai` now pulls it instead of
+  building `deploy/laya` on your machine (the `build:` line is still there, commented,
+  if you prefer to build it). The model checkpoint still downloads into the
+  `laya-models` volume on first start. Pin it to the same tag as the server image.
+- Zoho Mail. Signing up with Zoho also connects your Zoho mailbox (Zoho
+  asks a second time, for the mail, only when the account is new; signing
+  in again never asks), and members can connect more Zoho logins; every
+  mail account of a login becomes its own inbox, beside Gmail in the same
+  streams. Mail is read from the account's own data centre and polled (Zoho
+  has no push); read, star (flag), archive and unarchive go back to Zoho;
+  unarchiving never moves your own sent mail into the Inbox; replies and new
+  messages are sent through Zoho, never twice. Uses the Zoho
+  app of Sign in with Zoho, which must allow `ZohoMail.accounts.READ`,
+  `ZohoMail.folders.READ` and `ZohoMail.messages.ALL`. New settings
+  `CAMPBOOKS_CONNECTORS__ZOHO__*` (window, size limits,
+  `REQUESTS_PER_MINUTE` per Zoho login, default 60, and `SWEEP_MINUTES`).
+  Zoho labels are not synced yet. A migration renames the connectors' message
+  index (`connectors.messages`); nothing to do.
 - Attachments open from the reader. Each message lists its files with their
   size, Download and, for pictures and PDFs, Preview: a picture opens in a
   dialog, a PDF in your browser's own viewer in a new tab. V moves through
@@ -401,6 +491,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+- Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
+  audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
+  applies to an outside identity provider. Nothing to do: tokens last ten minutes, and
+  the next refresh gets the new one.
+- The token endpoint, client registration and the consent answer are rate-limited per
+  client address (`CAMPBOOKS_TRUSTED_PROXIES` behind a reverse proxy).
 - The members page's "copy invitation link" shortcut is now `Y` (`C` writes a
   new message everywhere).
 - The web app's Content-Security-Policy now allows inline `style` attributes

@@ -26,8 +26,8 @@ export function waysIn(listed: readonly string[]): WaysIn {
   };
 }
 
-/** Where a provider (or a passkey) button goes: S1a's start route for this request. */
-export function startUrl(method: Provider | "passkey", request: string): string {
+/** Where a provider button goes: the start route for this request. */
+export function startUrl(method: Provider, request: string): string {
   return `/auth/start/${method}?request=${encodeURIComponent(request)}`;
 }
 
@@ -139,4 +139,40 @@ export function stepUpUrl(returnTo: string): string {
 /** Whether `provider` is one this client can show. */
 export function knownProvider(name: string): name is Provider {
   return isProvider(name);
+}
+
+/** What a workspace's own app may do, as Settings offers it: read, or read and change. */
+export const APP_ACCESS = {
+  read: ["system:read", "workspaces:read", "connectors:read", "conversations:read"],
+  write: [
+    "system:read",
+    "workspaces:read",
+    "connectors:read",
+    "connectors:write",
+    "conversations:read",
+    "conversations:write",
+    "conversations:send",
+  ],
+} as const satisfies Record<string, readonly string[]>;
+export type AppAccess = keyof typeof APP_ACCESS;
+
+/**
+ * Whether `uri` may be a sign-in app's return address: `https` with a host,
+ * or loopback `http` (`127.0.0.1`, `[::1]`, `localhost`); never a fragment
+ * or credentials. The server checks again.
+ */
+export function isReturnAddress(uri: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(uri);
+  } catch {
+    return false;
+  }
+  if (url.hash !== "" || url.username !== "" || url.password !== "") {
+    return false;
+  }
+  if (url.protocol === "https:") {
+    return url.hostname !== "";
+  }
+  return url.protocol === "http:" && ["127.0.0.1", "[::1]", "localhost"].includes(url.hostname);
 }

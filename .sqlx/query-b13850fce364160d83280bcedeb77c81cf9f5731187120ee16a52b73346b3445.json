@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id::text AS \"inbox!\", subject, stream, last_message_at, message_count,\n                  unread_count, starred, archived_at IS NOT NULL AS \"archived!\"\n             FROM conversations.conversations WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox!",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 1,
+        "name": "subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "subject"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "last_message_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "last_message_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "message_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "message_count"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "unread_count",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "unread_count"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "starred",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "starred"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "archived!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "b13850fce364160d83280bcedeb77c81cf9f5731187120ee16a52b73346b3445"
+}

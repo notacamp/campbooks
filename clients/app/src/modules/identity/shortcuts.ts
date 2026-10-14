@@ -38,10 +38,24 @@ export const IDENTITY_SHORTCUTS = [
     label: "identity:shortcuts.passkey",
   },
   {
+    id: "identity.register_client",
+    keys: "shift+n",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.newApp",
+  },
+  {
     id: "identity.start_link",
     keys: "a",
     scope: "list",
     group: "general",
     label: "identity:shortcuts.addWayIn",
+  },
+  {
+    id: "identity.add_passkey",
+    keys: "n p",
+    scope: "list",
+    group: "general",
+    label: "identity:shortcuts.addPasskey",
   },
 ] as const satisfies readonly ShortcutDefinition[];

@@ -7,10 +7,18 @@ import { expect, userEvent, within } from "storybook/test";
 import { UndoProvider } from "~/lib/ui";
 
 import { createAppRouter } from "../../src/app/router";
-import { ALL_PROVIDERS, CONNECTION, GOOGLE_WAY_IN, ZOHO_WAY_IN } from "../../test/demo/identity";
+import {
+  ALL_PROVIDERS,
+  CONNECTION,
+  GOOGLE_WAY_IN,
+  LAPTOP_PASSKEY,
+  PHONE_PASSKEY,
+  ZOHO_WAY_IN,
+} from "../../test/demo/identity";
 import { DUARTE, SESSION } from "../../test/demo/workspaces";
 
 import { mockFetch, saveThemeFromGlobals, type MockRoute } from "./mock-fetch";
+import { CREATION_OPTIONS, mockWebAuthn, type MockWebAuthn } from "./mock-webauthn";
 
 // Settings → Ways to sign in, in the real app (router, session gate,
 // workspace frame) against in-memory demo data: every state, tested with axe
@@ -31,6 +39,9 @@ function signedIn({
   link,
   remove,
   ways,
+  passkeys = [LAPTOP_PASSKEY],
+  addPasskey,
+  removePasskey,
 }: {
   items?: readonly unknown[];
   providers?: readonly string[];
@@ -38,13 +49,30 @@ function signedIn({
   link?: MockRoute;
   remove?: MockRoute;
   ways?: MockRoute;
+  passkeys?: readonly unknown[];
+  addPasskey?: MockRoute;
+  removePasskey?: MockRoute;
 }): Record<string, MockRoute> {
   const routes: Record<string, MockRoute> = {
     "GET /bff/session": { body: SESSION },
     "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
     "GET /bff/api/v1/identity/ways-in": ways ?? { body: { items, providers } },
     [`GET /bff/api/v1/w/${DUARTE.id}/connections`]: { body: { connections } },
+    "GET /bff/api/v1/identity/passkeys": { body: { items: passkeys } },
+    "POST /bff/api/v1/identity/passkeys/registrations": addPasskey ?? {
+      status: 201,
+      body: CREATION_OPTIONS,
+    },
+    "POST /bff/api/v1/identity/passkeys": {
+      status: 201,
+      body: { ...PHONE_PASSKEY, id: "p-new", name: "Passkey on Mac", synced: true },
+    },
   };
+  if (removePasskey !== undefined) {
+    for (const passkey of [LAPTOP_PASSKEY, PHONE_PASSKEY]) {
+      routes[`DELETE /bff/api/v1/identity/passkeys/${passkey.id}`] = removePasskey;
+    }
+  }
   if (link !== undefined) {
     routes["POST /bff/api/v1/identity/links"] = link;
   }
@@ -74,6 +102,8 @@ function AppAt({ path }: { path: string }) {
 interface ScreenArgs {
   path: string;
   api: Record<string, MockRoute>;
+  /** A pretend browser with passkeys. */
+  webauthn?: MockWebAuthn;
 }
 
 const meta = {
@@ -81,7 +111,12 @@ const meta = {
   parameters: { layout: "fullscreen" },
   beforeEach: ({ args, globals }) => {
     saveThemeFromGlobals(globals);
-    return mockFetch(args.api);
+    const restoreFetch = mockFetch(args.api);
+    const restoreWebAuthn = mockWebAuthn(args.webauthn ?? {});
+    return () => {
+      restoreFetch();
+      restoreWebAuthn();
+    };
   },
   render: ({ path }) => <AppAt path={path} />,
 } satisfies Meta<ScreenArgs>;
@@ -188,4 +223,83 @@ export const ForestAccent: Story = {
 export const Portuguese: Story = {
   args: { path: PAGE, api: signedIn({}) },
   globals: { locale: "pt-PT" },
+};
+
+// --- Passkeys ----------------------------------------------------------------
+
+/** Passkeys below the provider accounts: a synced one and one on a phone. */
+export const Passkeys: Story = {
+  args: { path: PAGE, api: signedIn({ passkeys: [LAPTOP_PASSKEY, PHONE_PASSKEY] }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const list = await canvas.findByRole("list", { name: "Your passkeys" });
+    await expect(within(list).getByText("Passkey on Mac")).toBeVisible();
+    await expect(within(list).getByText(/Synced across your devices/u)).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /Add a passkey/u })).toBeVisible();
+  },
+};
+
+/** No passkey yet. */
+export const NoPasskeys: Story = {
+  args: { path: PAGE, api: signedIn({ passkeys: [] }) },
+};
+
+/** Add a passkey: the browser makes one, and it is listed. */
+export const AddPasskey: Story = {
+  args: { path: PAGE, api: signedIn({ passkeys: [] }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Add a passkey/u }));
+    await expect(await canvas.findByText(/Passkey on Mac is added/u)).toBeVisible();
+  },
+};
+
+/** Adding one needs a recent sign-in. */
+export const AddPasskeySignInAgain: Story = {
+  args: { path: PAGE, api: signedIn({ addPasskey: problem(403, "step_up_required") }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Add a passkey/u }));
+    await expect(await canvas.findByText("Sign in again first")).toBeVisible();
+  },
+};
+
+/** The passkey dialog was closed. */
+export const AddPasskeyCancelled: Story = {
+  args: { path: PAGE, api: signedIn({}), webauthn: { ceremony: "cancel" } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: /Add a passkey/u }));
+    await expect(await canvas.findByText("No passkey was added.")).toBeVisible();
+  },
+};
+
+/** The passkey is the only way in: removing it is refused and explained. */
+export const PasskeyLastWayIn: Story = {
+  args: {
+    path: PAGE,
+    api: signedIn({ items: [], removePasskey: problem(409, "last_way_in") }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Remove Passkey on Mac" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Remove" }));
+    await expect(await canvas.findByText("This is your only way to sign in.")).toBeVisible();
+  },
+};
+
+/** Rename, in place. */
+export const RenamePasskey: Story = {
+  args: { path: PAGE, api: signedIn({}) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(await canvas.findByRole("button", { name: "Rename Passkey on Mac" }));
+    await expect(canvas.getByRole("textbox", { name: "Name" })).toHaveFocus();
+  },
+};
+
+/** Passkeys in French, dark. */
+export const PasskeysFrench: Story = {
+  args: { path: PAGE, api: signedIn({ passkeys: [LAPTOP_PASSKEY, PHONE_PASSKEY] }) },
+  globals: { locale: "fr", theme: "dark" },
 };

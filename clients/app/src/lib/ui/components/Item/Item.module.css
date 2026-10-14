@@ -39,6 +39,7 @@
 
 .who {
   min-width: 0;
+  unicode-bidi: isolate;
   overflow: hidden;
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
@@ -54,6 +55,18 @@
   color: var(--text-secondary);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.excerpt {
+  grid-column: 2 / 3;
+  unicode-bidi: isolate;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  quotes: auto;
 }
 
 .due {
@@ -106,6 +119,24 @@
   margin-bottom: var(--space-1);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+}
+
+.quoteText {
+  quotes: auto;
+  unicode-bidi: isolate;
+}
+
+.reasons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+}
+
+.reasons li {
+  margin-left: var(--space-4);
+  list-style: disc;
 }
 
 .context {

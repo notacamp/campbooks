@@ -21,7 +21,7 @@ use axum::{
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use campbooks_kernel::{
     AppState, Error,
-    auth::{Principal, TokenVerifier},
+    auth::{Principal, ScopeInfo, TokenVerifier},
     clock::SystemClock,
     config::SignupPolicy,
     connections::{AdoptFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture},
@@ -53,6 +53,34 @@ use crate::{
     },
 };
 
+/// The API's scope catalogue in these tests.
+const CATALOGUE: [ScopeInfo; 6] = [
+    ScopeInfo {
+        name: "system:read",
+        description: "See the instance's health.",
+    },
+    ScopeInfo {
+        name: "identity:read",
+        description: "See your account.",
+    },
+    ScopeInfo {
+        name: "identity:write",
+        description: "Change your account.",
+    },
+    ScopeInfo {
+        name: "identity:clients",
+        description: "Manage a workspace's apps.",
+    },
+    ScopeInfo {
+        name: "connectors:write",
+        description: "Connect mailboxes.",
+    },
+    ScopeInfo {
+        name: "conversations:read",
+        description: "Read your conversations.",
+    },
+];
+
 /// The instance under test.
 pub const ORIGIN: &str = "http://localhost:8080";
 /// The scope the fake intake asks for.
@@ -82,9 +110,34 @@ pub type Handed = (
 #[derive(Debug, Default)]
 pub struct FakeIntake {
     adopted: Mutex<Vec<Handed>>,
+    /// The issuer of each grant handed over, in order.
+    issuers: Mutex<Vec<String>>,
+    /// Whether the instance syncs Zoho mailboxes too.
+    zoho_mail: std::sync::atomic::AtomicBool,
 }
 
+/// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
+pub const ZOHO_MAIL_SCOPES: [&str; 3] = [
+    "ZohoMail.accounts.READ",
+    "ZohoMail.folders.READ",
+    "ZohoMail.messages.ALL",
+];
+
 impl FakeIntake {
+    /// The issuer of each grant handed over, in order.
+    pub fn issuers(&self) -> Vec<String> {
+        self.issuers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
+    pub fn sync_zoho(&self) {
+        self.zoho_mail
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
     /// `(workspace, subject, address, refresh token, scopes)` of each grant.
     pub fn adopted(&self) -> Vec<Handed> {
         self.adopted
@@ -96,14 +149,20 @@ impl FakeIntake {
 
 impl GrantIntake for FakeIntake {
     fn mailbox_scopes(&self, provider: &str) -> Vec<String> {
-        if provider == "google" {
-            vec![MAIL_SCOPE.to_owned()]
-        } else {
-            Vec::new()
+        match provider {
+            "google" => vec![MAIL_SCOPE.to_owned()],
+            "zoho" if self.zoho_mail.load(std::sync::atomic::Ordering::SeqCst) => {
+                ZOHO_MAIL_SCOPES.map(str::to_owned).to_vec()
+            }
+            _ => Vec::new(),
         }
     }
 
     fn adopt<'a>(&'a self, _state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a> {
+        self.issuers
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(grant.issuer.clone());
         self.adopted
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -157,7 +216,22 @@ impl Invitations for Invited {
     }
 }
 
-/// Everyone belongs everywhere, as an owner.
+/// Two workspaces every user belongs to as an owner, and lists.
+pub const HOME: uuid::Uuid = uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_00a1);
+/// The second.
+pub const WORK: uuid::Uuid = uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_00a2);
+/// A workspace every user belongs to as a plain member.
+pub const MEMBER_ONLY: uuid::Uuid =
+    uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_00a3);
+/// A workspace nobody here belongs to.
+pub const FOREIGN: uuid::Uuid = uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_00f0);
+/// The workspaces module's id of every user in [`HOME`].
+pub const MEMBER_IN_HOME: uuid::Uuid =
+    uuid::Uuid::from_u128(0x0199_0000_0000_7000_8000_0000_0000_0b01);
+
+/// Everyone belongs everywhere (as an owner) except [`FOREIGN`], and is a
+/// plain member of [`MEMBER_ONLY`]; client tokens reach their own
+/// workspace.
 #[derive(Debug)]
 struct Everyone;
 
@@ -165,15 +239,108 @@ impl Membership for Everyone {
     fn resolve<'a>(
         &'a self,
         _db: &'a PgPool,
-        _principal: &'a Principal,
+        principal: &'a Principal,
         workspace: WorkspaceId,
     ) -> MembershipFuture<'a> {
         Box::pin(async move {
+            if *workspace.as_uuid() == FOREIGN {
+                return Ok(None);
+            }
+            if principal.kind == campbooks_kernel::auth::PrincipalKind::Client {
+                return Ok(Some(Access {
+                    workspace,
+                    user: None,
+                    role: None,
+                }));
+            }
+            let user = if *workspace.as_uuid() == HOME {
+                UserId::from_uuid(MEMBER_IN_HOME)
+            } else {
+                UserId::new()
+            };
+            let role = if *workspace.as_uuid() == MEMBER_ONLY {
+                Role::Member
+            } else {
+                Role::Owner
+            };
             Ok(Some(Access {
                 workspace,
-                user: Some(UserId::new()),
-                role: Some(Role::Owner),
+                user: Some(user),
+                role: Some(role),
             }))
+        })
+    }
+
+    fn workspaces_of<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _subject: &'a str,
+    ) -> campbooks_kernel::tenancy::WorkspacesFuture<'a> {
+        Box::pin(async {
+            Ok([(HOME, "Home", Role::Owner), (WORK, "Work", Role::Owner)]
+                .into_iter()
+                .map(
+                    |(id, name, role)| campbooks_kernel::tenancy::WorkspaceSummary {
+                        id: WorkspaceId::from_uuid(id),
+                        name: name.to_owned(),
+                        role,
+                    },
+                )
+                .collect())
+        })
+    }
+}
+
+/// A served document and its `max-age`.
+type Served = (Vec<u8>, Option<std::time::Duration>);
+
+/// Client metadata documents served at their URLs (no network).
+#[derive(Debug, Default)]
+pub struct FakeDocuments {
+    documents: Mutex<HashMap<String, Served>>,
+    fetched: Mutex<Vec<String>>,
+}
+
+impl FakeDocuments {
+    /// Serve `document` at `url`, cacheable for `max_age`.
+    pub fn serve(&self, url: &str, document: &serde_json::Value, max_age: Option<u64>) {
+        self.documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .insert(
+                url.to_owned(),
+                (
+                    document.to_string().into_bytes(),
+                    max_age.map(std::time::Duration::from_secs),
+                ),
+            );
+    }
+
+    /// Every URL fetched, in order.
+    pub fn fetched(&self) -> Vec<String> {
+        self.fetched
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+}
+
+impl crate::metadata::Fetcher for FakeDocuments {
+    fn fetch<'a>(&'a self, url: &'a Url) -> crate::metadata::FetchFuture<'a> {
+        self.fetched
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(url.to_string());
+        let found = self
+            .documents
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .get(url.as_str())
+            .cloned();
+        Box::pin(async move {
+            found
+                .map(|(body, max_age)| crate::metadata::Fetched { body, max_age })
+                .ok_or(crate::metadata::Refused::Unavailable)
         })
     }
 }
@@ -287,8 +454,12 @@ pub struct Kit {
     pub intake: Arc<FakeIntake>,
     /// The module's dependencies.
     pub deps: Deps,
+    /// The metadata documents on the (fake) internet.
+    pub documents: Arc<FakeDocuments>,
     /// The browser's cookies.
     cookies: Mutex<HashMap<String, String>>,
+    /// The address requests come from (none: from inside the process).
+    peer: Mutex<Option<std::net::SocketAddr>>,
 }
 
 impl Kit {
@@ -301,13 +472,19 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
-        Self::build(db, policy, invited, None).await
+        Self::build(db, policy, invited, None, true).await
+    }
+
+    /// A fresh world whose instance left self-registration off (the
+    /// default: no dynamic registration, no metadata documents).
+    pub async fn without_self_registration(db: PgPool) -> Self {
+        Self::build(db, SignupPolicy::Open, &[], None, false).await
     }
 
     /// A fresh world whose Google client was registered with the callback
     /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
     pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
-        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path)).await
+        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path), true).await
     }
 
     async fn build(
@@ -315,6 +492,7 @@ impl Kit {
         policy: SignupPolicy,
         invited: &[&str],
         redirect_path: Option<&str>,
+        self_registration: bool,
     ) -> Self {
         let google = TestIdp::start().await;
         let microsoft = TestIdp::start().await;
@@ -326,15 +504,15 @@ impl Kit {
         config.env = campbooks_kernel::config::Environment::Development;
         config.signup.policy = policy;
         let mut deps = Deps::from_figment(
-            &Figment::from(Serialized::defaults(serde_json::json!({}))),
+            &Figment::from(Serialized::defaults(serde_json::json!({
+                "oauth": {
+                    "dynamic_registration": self_registration,
+                    "client_metadata_documents": self_registration,
+                }
+            }))),
             &config,
             Some(SecretKey::from_bytes([9; 32])),
-            &[
-                "system:read",
-                "identity:read",
-                "identity:write",
-                "connectors:write",
-            ],
+            &CATALOGUE,
             Arc::new(SystemClock),
         )
         .unwrap_or_else(|e| panic!("deps: {e}"));
@@ -375,16 +553,24 @@ impl Kit {
                 None,
             ),
         ];
+        let documents = Arc::new(FakeDocuments::default());
+        issuer.fetcher = documents.clone();
         let intake = Arc::new(FakeIntake::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
+        let mut auth = config.auth.clone();
+        auth.audience.clone_from(&issuer.resource);
         let state = AppState::new(pool.clone(), config.clone())
+            .with_registry(
+                campbooks_kernel::jobs::Registry::build(&[crate::module(deps.clone())])
+                    .unwrap_or_else(|e| panic!("registry: {e}")),
+            )
             .with_membership(Arc::new(Everyone))
             .with_grant_intake(intake.clone())
             .with_invitations(Arc::new(Invited(
                 invited.iter().map(|e| (*e).to_owned()).collect(),
             )))
             .with_auth(TokenVerifier::in_process(
-                &config.auth,
+                &auth,
                 &issuer.url,
                 Arc::new(LocalKeys {
                     db: pool,
@@ -402,7 +588,9 @@ impl Kit {
             state,
             intake,
             deps,
+            documents,
             cookies: Mutex::default(),
+            peer: Mutex::default(),
         }
     }
 
@@ -425,6 +613,20 @@ impl Kit {
             .unwrap_or_else(PoisonError::into_inner)
             .clone();
         *self.cookies.lock().unwrap_or_else(PoisonError::into_inner) = theirs;
+    }
+
+    /// Send the next requests from `peer` (as the server sees a socket
+    /// address), or from inside the process (`None`).
+    pub fn send_from(&self, peer: Option<&str>) {
+        *self.peer.lock().unwrap_or_else(PoisonError::into_inner) =
+            peer.map(|p| p.parse().unwrap_or_else(|e| panic!("{p}: {e}")));
+    }
+
+    /// Run every job that is ready (event deliveries included).
+    pub async fn run_jobs(&self) {
+        campbooks_kernel::jobs::Worker::new(self.state.clone())
+            .run_until_idle()
+            .await;
     }
 
     /// Forget every cookie (another browser).
@@ -460,9 +662,14 @@ impl Kit {
         for (name, value) in headers {
             request = request.header(*name, *value);
         }
-        let request = request
+        let mut request = request
             .body(body.map_or_else(Body::empty, Body::from))
             .unwrap_or_else(|e| panic!("request: {e}"));
+        if let Some(peer) = *self.peer.lock().unwrap_or_else(PoisonError::into_inner) {
+            request
+                .extensions_mut()
+                .insert(axum::extract::ConnectInfo(peer));
+        }
         let response = match self.app.clone().oneshot(request).await {
             Ok(response) => response,
             Err(never) => match never {},
@@ -536,7 +743,8 @@ impl Kit {
         Self::authorize_url(
             WEB_CLIENT_ID,
             &format!("{ORIGIN}/bff/callback"),
-            "openid profile email offline_access identity:read identity:write connectors:write",
+            "openid profile email offline_access identity:read identity:write identity:clients \
+             connectors:write",
         )
     }
 

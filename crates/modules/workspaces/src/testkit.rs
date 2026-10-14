@@ -200,6 +200,23 @@ impl Kit {
 
     /// Invite `email` as `role` on behalf of `inviter`; returns the token
     /// (which the API never shows).
+    /// `caller` as a person's token bound to `workspace` (a third-party app
+    /// they allowed there; only the in-process issuer mints these).
+    pub fn bound(caller: &Caller, workspace: WorkspaceId) -> Principal {
+        Principal {
+            subject: caller.subject.clone(),
+            kind: PrincipalKind::User,
+            client_id: Some("dcr_agent".to_owned()),
+            scopes: std::collections::BTreeSet::new(),
+            workspace: Some(workspace.to_string()),
+            email: caller.email.clone(),
+            email_verified: true,
+            name: None,
+            expires_at: None,
+            auth_time: None,
+        }
+    }
+
     pub async fn invite(
         &self,
         inviter: &Caller,
