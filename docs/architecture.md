@@ -166,7 +166,9 @@ Workspace-owned resources live under `/api/v1/w/{workspace_id}/<module>/…`
 (the workspace itself is `/api/v1/w/{workspace_id}`). Their handlers take
 `kernel::tenancy::Workspace<S>` instead of `Scoped<S>`: after the token and
 scope checks it reads the workspace from the path, requires a client
-token's `workspace_id` claim to name it, and asks the `Membership` port —
+token's `workspace_id` claim to name it (and a user token that carries one,
+from an app the person allowed in one workspace, to name it too), and asks
+the `Membership` port —
 a kernel trait the `workspaces` module implements and the server registers
 in `AppState` — whether a user is a member, and with which role. Anything
 else is 404. Handlers then open `state.db.begin_for(workspace.id)`. The path,
@@ -489,6 +491,22 @@ provider sign-in asks for their mailbox in the same consent; `identity` holds
 that grant until they put it in a workspace, then hands it to `connectors`
 through the kernel's `GrantIntake` port (`kernel::connections`), which
 `connectors` implements.
+
+Clients other than the web app (slice S4) are stored in `identity.clients`,
+under forced row-level security with a second policy for the protocol path:
+a workspace's own clients (`client_credentials`, or sign-in apps), clients
+that registered themselves (RFC 7591, `/oauth2/register`) and clients known
+by their metadata document (an `https` `client_id`, fetched through an SSRF
+guard). Every one of them, the native app included, gets a code only after
+the person allows it on the consent screen (`/consent`); the answer is
+remembered only for an exact `https` redirect, never for a loopback or
+custom-scheme one (RFC 8252 §8.6). A third party's token is bound to the
+workspace the person picked (`workspace_id`) and may hold no `identity:*`
+scope nor `admin:access`. Access tokens name the API's resource URI, `<origin>/api`, as `aud`
+(RFC 8707); `/.well-known/oauth-protected-resource/api` describes it
+(RFC 9728), and the API's Bearer challenges point there, so an MCP agent that
+knows only the API's URL finds the issuer. Endpoints anyone can call are
+rate-limited per client address through `kernel::rate_limit`.
 
 ### Instance administration (ADR 0015)
 

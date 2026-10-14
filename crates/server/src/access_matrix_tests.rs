@@ -44,6 +44,13 @@ use uuid::Uuid;
 
 const EN: &str = include_str!("../../modules/conversations/fixtures/en.json");
 
+/// Workspace resource types not answered per instance yet: search results
+/// and the change feed are lists filtered at query time (tested in their
+/// own suites); workspace clients move onto per-instance facts with the
+/// identity module (campbooks-cloud#117, PR B) and are owner/admin-only by
+/// type meanwhile. A new type must be seeded below, or listed here.
+const NOT_PER_INSTANCE: [&str; 3] = ["changes.feed", "identity.client", "search.result"];
+
 /// Every scope of the catalogue, so only access decides.
 fn all_scopes() -> String {
     crate::scope_catalogue()
@@ -515,7 +522,7 @@ async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgP
     let workspace_types: Vec<_> = catalogue
         .iter()
         .filter(|declared| declared.tenancy == Tenancy::Workspace)
-        .filter(|declared| !matches!(declared.name, "search.result" | "changes.feed"))
+        .filter(|declared| !NOT_PER_INSTANCE.contains(&declared.name))
         .collect();
     let unseeded: Vec<&str> = workspace_types
         .iter()
@@ -642,6 +649,7 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "identity.start_link" => json!({"purpose": "link", "provider": "google"}),
         "identity.register_passkey" => json!({"credential": {}}),
         "identity.rename_passkey" => json!({"name": "Laptop"}),
+        "identity.register_client" => json!({"name": "Matrix agent", "scopes": []}),
         _ => return None,
     })
 }
@@ -804,7 +812,8 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
             .resources
             .get(resource)
             .is_some_and(|declared| declared.tenancy == Tenancy::Account);
-        if !in_workspace || account {
+        // Workspace clients answer only when the in-process issuer runs.
+        if !in_workspace || account || resource == "identity.client" {
             continue;
         }
 

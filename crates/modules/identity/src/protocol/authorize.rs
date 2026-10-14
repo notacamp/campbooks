@@ -1,10 +1,22 @@
-//! `/oauth2/authorize` (authorization code with PKCE S256 only) and
-//! `/oauth2/end_session` (RP-initiated logout).
+//! `/oauth2/authorize` (authorization code with PKCE S256 only).
 //!
 //! Validation order follows RFC 6749 §4.1.2.1: an unknown client or a
 //! redirect URI it did not register is shown as an error and never
 //! redirected to; every other problem goes back to the client's redirect
 //! URI with `error`, `state` and `iss` (RFC 9207).
+//!
+//! Once the person is signed in, [`decide`] says what happens:
+//!
+//! - the web app gets a code at once;
+//! - another client whose redirect is an exact `https` URI gets one at once
+//!   when a remembered consent (for that same redirect, less than 90 days
+//!   old) already covers the request;
+//! - otherwise the person answers the consent screen (`/consent`), after a
+//!   sign-in in the last ten minutes. A loopback or private-use-scheme
+//!   redirect (native apps, many agents) is asked every time: any app on the
+//!   device can claim one (RFC 8252 §8.6).
+
+use std::time::Duration;
 
 use axum::{
     extract::{Query, State},
@@ -15,26 +27,34 @@ use campbooks_kernel::{
     Operation, Result,
     crypto::{hash, random_token},
     error::LocalizableProblem,
+    rate_limit::{ClientIp, Limit, RateKey},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
 use utoipa::IntoParams;
+use uuid::Uuid;
 
-use super::{Ctx, SIGN_IN_PATH, discovery::OIDC_SCOPES};
+use super::{Ctx, SIGN_IN_PATH};
 use crate::{
     MESSAGES,
     deps::Issuer,
     domain::{
-        clients::Client,
+        clients::{Client, is_https_redirect},
+        consents,
         sessions::{self, Session},
+        step_up::STEP_UP_WINDOW,
         tokens::{self, Grant},
     },
+    metadata,
     web::{self, see_other},
 };
 
 /// How long an authorization request waits for the person to sign in.
 pub const REQUEST_LIFETIME: TimeDelta = TimeDelta::minutes(15);
+
+/// The web client's consent screen.
+pub const CONSENT_PATH: &str = "/consent";
 
 /// `/oauth2/authorize` parameters.
 #[derive(Debug, Deserialize, IntoParams)]
@@ -42,7 +62,8 @@ pub const REQUEST_LIFETIME: TimeDelta = TimeDelta::minutes(15);
 pub struct AuthorizeQuery {
     /// Must be `code`.
     pub response_type: Option<String>,
-    /// The client.
+    /// The client: a registered id, or the `https` URL of its metadata
+    /// document.
     pub client_id: Option<String>,
     /// One of the client's registered redirect URIs.
     pub redirect_uri: Option<String>,
@@ -60,6 +81,8 @@ pub struct AuthorizeQuery {
     pub prompt: Option<String>,
     /// Seconds since the person last authenticated, at most.
     pub max_age: Option<i64>,
+    /// The resource the token is for (RFC 8707): the API's resource URI.
+    pub resource: Option<String>,
 }
 
 /// A parsed, valid authorization request.
@@ -77,6 +100,12 @@ pub struct Request {
     pub nonce: Option<String>,
     /// The PKCE challenge.
     pub code_challenge: String,
+    /// The resource (`aud`).
+    pub resource: Option<String>,
+    /// The consent screen must be shown.
+    pub consent_due: bool,
+    /// The person a request waiting on the consent screen was put to.
+    pub consent_account_id: Option<Uuid>,
 }
 
 impl Request {
@@ -105,6 +134,39 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     web::no_store(LocalizableProblem::new(status, MESSAGES.reason(code)).into_response())
 }
 
+/// Metadata documents one address may make the server look up (each may
+/// be a fetch from the internet).
+const DOCUMENT_LIMIT: Limit = Limit::new("identity.metadata_document", 30, Duration::from_mins(1));
+
+/// The client `id` names: Campbooks' own, a stored one, or the client a
+/// metadata document at that URL describes (fetched now if not cached; the
+/// asker's address is limited, so the server can't be made to fetch
+/// without end).
+pub async fn find_client(
+    ctx: &Ctx,
+    issuer: &Issuer,
+    id: &str,
+    ip: ClientIp,
+) -> Result<Option<Client>> {
+    if let Some(url) = metadata::document_url(id).filter(|_| issuer.clients.metadata_documents()) {
+        ctx.state
+            .rate_limits
+            .check(&ctx.state.db, &DOCUMENT_LIMIT, &RateKey::ip(ip))
+            .await?;
+        return metadata::client(
+            &ctx.state.db,
+            &ctx.state.rate_limits,
+            issuer.fetcher.as_ref(),
+            &issuer.document_failures,
+            &url,
+            &issuer.api_scopes,
+            issuer.now(),
+        )
+        .await;
+    }
+    issuer.clients.find(&ctx.state.db, id).await
+}
+
 /// Start (or, for a signed-in browser, complete at once) an authorization.
 #[utoipa::path(
     get,
@@ -115,24 +177,29 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     params(AuthorizeQuery),
     security(()),
     responses(
-        (status = 303, description = "To the client's redirect URI with `code` (signed in) or \
-            `error`, or to the sign-in screen.", headers(("location" = String))),
+        (status = 303, description = "To the client's redirect URI with `code` (signed in, and \
+            no consent to ask) or `error`; to the sign-in screen; or to the consent screen.",
+            headers(("location" = String))),
         (status = 400, description = "`invalid_client` or `invalid_redirect_uri`: nothing is \
             redirected.", body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "Another identity provider serves this instance."),
+        (status = 429, description = "`rate_limited`: too many metadata-document clients \
+            looked up from this address.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn authorize(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     headers: HeaderMap,
     Query(query): Query<AuthorizeQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
-    let Some(client) = query
-        .client_id
-        .as_deref()
-        .and_then(|id| issuer.clients.get(id))
-    else {
+    let client = match query.client_id.as_deref() {
+        Some(id) => find_client(&ctx, issuer, id, ip).await?,
+        None => None,
+    };
+    let Some(client) = client else {
         return Ok(problem(StatusCode::BAD_REQUEST, "invalid_client"));
     };
     let Some(redirect_uri) = query
@@ -142,18 +209,22 @@ pub async fn authorize(
     else {
         return Ok(problem(StatusCode::BAD_REQUEST, "invalid_redirect_uri"));
     };
+    let prompt = query.prompt.as_deref().unwrap_or_default();
     let mut request = Request {
-        client_id: client.id.to_owned(),
+        client_id: client.id.clone(),
         redirect_uri: redirect_uri.to_owned(),
         scope: String::new(),
         state: query.state.clone(),
         nonce: query.nonce.clone(),
         code_challenge: String::new(),
+        resource: None,
+        consent_due: prompt.split_whitespace().any(|p| p == "consent"),
+        consent_account_id: None,
     };
     let refuse = |request: &Request, error: &str| {
         see_other(&request.redirect(&issuer.url, &[("error", error)]))
     };
-    if query.response_type.as_deref() != Some("code") {
+    if query.response_type.as_deref() != Some("code") || !client.may_use("authorization_code") {
         return Ok(refuse(&request, "unsupported_response_type"));
     }
     match (
@@ -165,11 +236,17 @@ pub async fn authorize(
         }
         _ => return Ok(refuse(&request, "invalid_request")),
     }
-    let Some(scope) = allowed_scope(&issuer.api_scopes, client, query.scope.as_deref()) else {
+    let Some(scope) = allowed_scope(issuer, &client, query.scope.as_deref()) else {
         return Ok(refuse(&request, "invalid_scope"));
     };
     request.scope = scope;
-    let prompt = query.prompt.as_deref().unwrap_or_default();
+    match query.resource.as_deref() {
+        None => {}
+        Some(resource) if resource == issuer.resource => {
+            request.resource = Some(resource.to_owned());
+        }
+        Some(_) => return Ok(refuse(&request, "invalid_target")),
+    }
     if !prompt
         .split_whitespace()
         .all(|p| matches!(p, "none" | "login" | "consent" | "select_account"))
@@ -177,6 +254,7 @@ pub async fn authorize(
         return Ok(refuse(&request, "invalid_request"));
     }
     let force_login = prompt.split_whitespace().any(|p| p == "login");
+    let silent = prompt.split_whitespace().any(|p| p == "none");
     let now = issuer.now();
     let session = match issuer.session_cookie(&headers) {
         Some(token) => sessions::current(&ctx.state.db, &token, now).await?,
@@ -188,33 +266,46 @@ pub async fn authorize(
             .is_none_or(|max_age| now - session.auth_time <= TimeDelta::seconds(max_age.max(0)))
     };
     if let Some(session) = session.filter(|s| !force_login && fresh_enough(s)) {
-        let location = complete(&ctx.state.db, issuer, &request, &session, now).await?;
+        if silent {
+            // `prompt=none`: a code, or an error; never a screen.
+            return Ok(
+                match decision(&ctx.state.db, &client, &request, &session, now).await? {
+                    Decision::Code(workspace) => see_other(
+                        &issue(&ctx.state.db, issuer, &request, &session, workspace, now).await?,
+                    ),
+                    Decision::SignInAgain => refuse(&request, "login_required"),
+                    Decision::Consent => refuse(&request, "consent_required"),
+                },
+            );
+        }
+        let location = decide(&ctx.state.db, issuer, &client, request, &session, now).await?;
         return Ok(see_other(&location));
     }
-    if prompt.split_whitespace().any(|p| p == "none") {
+    if silent {
         return Ok(refuse(&request, "login_required"));
     }
     let id = store(&ctx.state.db, &request, now).await?;
     Ok(see_other(&format!("{SIGN_IN_PATH}?request={id}")))
 }
 
-/// The requested scopes when every one is known (the OIDC scopes and the
-/// API's catalogue), deduplicated, without those `client` may not get
-/// (`admin:access` unless it is first-party, ADR 0015); `None` when one is
-/// unknown. Missing means `openid`.
-fn allowed_scope(
-    api_scopes: &[String],
-    client: &Client,
-    requested: Option<&str>,
-) -> Option<String> {
+/// The requested scopes when `client` may ask for every one (the OIDC
+/// scopes and, for Campbooks' own clients, the API's catalogue; for anyone
+/// else what they registered, never `identity:*`), deduplicated, without
+/// `admin:access` unless `client` is first-party (ADR 0015); `None`
+/// otherwise. Missing means `openid`.
+fn allowed_scope(issuer: &Issuer, client: &Client, requested: Option<&str>) -> Option<String> {
     let requested = requested.unwrap_or("openid");
     let mut scopes: Vec<&str> = Vec::new();
     for scope in requested.split_whitespace() {
-        let known = OIDC_SCOPES.contains(&scope) || api_scopes.iter().any(|s| s == scope);
-        if !known {
+        // `admin:access` is dropped, not refused, for anyone but Campbooks'
+        // own apps (ADR 0015): the app gets what it may have.
+        if scope == campbooks_kernel::admin::ACCESS_SCOPE && !client.is_first_party() {
+            continue;
+        }
+        if !client.may_ask_for(scope, &issuer.api_scopes) {
             return None;
         }
-        if client.may_request(scope) && !scopes.contains(&scope) {
+        if !scopes.contains(&scope) {
             scopes.push(scope);
         }
     }
@@ -234,8 +325,8 @@ async fn store(db: &PgPool, request: &Request, now: DateTime<Utc>) -> Result<Str
     sqlx::query(
         "INSERT INTO identity.authorize_requests
              (id_hash, client_id, redirect_uri, scope, state, nonce, code_challenge, created_at,
-              expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+              expires_at, resource, consent_due, consent_account_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
     )
     .bind(hash(&id))
     .bind(&request.client_id)
@@ -246,25 +337,48 @@ async fn store(db: &PgPool, request: &Request, now: DateTime<Utc>) -> Result<Str
     .bind(&request.code_challenge)
     .bind(now)
     .bind(now + REQUEST_LIFETIME)
+    .bind(&request.resource)
+    .bind(request.consent_due)
+    .bind(request.consent_account_id)
     .execute(db)
     .await?;
     Ok(id)
 }
 
+const REQUEST_COLUMNS: &str = "client_id, redirect_uri, scope, state, nonce, code_challenge, \
+     resource, consent_due, consent_account_id";
+
 /// The stored authorization request `id`, while it waits.
 pub async fn load(db: &PgPool, id: &str, now: DateTime<Utc>) -> Result<Option<Request>> {
-    Ok(sqlx::query_as(
-        "SELECT client_id, redirect_uri, scope, state, nonce, code_challenge
-           FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2",
-    )
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "SELECT {REQUEST_COLUMNS}
+           FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2"
+    )))
     .bind(hash(id))
     .bind(now)
     .fetch_optional(db)
     .await?)
 }
 
+/// Take the stored request `id` (single use), while it waits.
+pub async fn take(
+    conn: &mut sqlx::PgConnection,
+    id: &str,
+    now: DateTime<Utc>,
+) -> Result<Option<Request>> {
+    Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
+        "DELETE FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2
+         RETURNING {REQUEST_COLUMNS}"
+    )))
+    .bind(hash(id))
+    .bind(now)
+    .fetch_optional(conn)
+    .await?)
+}
+
 /// Complete the stored request `id` for `session`; where to send the
-/// browser, or `None` when the request is gone or expired.
+/// browser (the client with a code, or the consent screen), or `None` when
+/// the request is gone or expired.
 pub async fn complete_stored(
     db: &PgPool,
     issuer: &Issuer,
@@ -272,27 +386,104 @@ pub async fn complete_stored(
     session: &Session,
     now: DateTime<Utc>,
 ) -> Result<Option<String>> {
-    let request: Option<Request> = sqlx::query_as(
-        "DELETE FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2
-         RETURNING client_id, redirect_uri, scope, state, nonce, code_challenge",
-    )
-    .bind(hash(id))
-    .bind(now)
-    .fetch_optional(db)
-    .await?;
-    match request {
-        Some(request) => complete(db, issuer, &request, session, now).await.map(Some),
-        None => Ok(None),
+    let mut conn = db.acquire().await?;
+    let Some(request) = take(&mut conn, id, now).await? else {
+        return Ok(None);
+    };
+    drop(conn);
+    let Some(client) = issuer.clients.find(db, &request.client_id).await? else {
+        // Removed while the person signed in.
+        return Ok(Some(
+            request.redirect(&issuer.url, &[("error", "unauthorized_client")]),
+        ));
+    };
+    decide(db, issuer, &client, request, session, now)
+        .await
+        .map(Some)
+}
+
+/// What becomes of a signed-in authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Decision {
+    /// A code, bound to this workspace (if any).
+    Code(Option<Uuid>),
+    /// The consent screen, after a fresh sign-in.
+    SignInAgain,
+    /// The consent screen.
+    Consent,
+}
+
+/// See the module docs.
+async fn decision(
+    db: &PgPool,
+    client: &Client,
+    request: &Request,
+    session: &Session,
+    now: DateTime<Utc>,
+) -> Result<Decision> {
+    if !client.needs_consent() {
+        return Ok(Decision::Code(None));
+    }
+    if !request.consent_due && is_https_redirect(&request.redirect_uri) {
+        let remembered = consents::live(db, session.account_id, &client.id)
+            .await?
+            .filter(|consent| {
+                consent.remembered
+                    && consent.remember_until.is_some_and(|until| until > now)
+                    && consent.redirect_uri == request.redirect_uri
+                    && (consent.bound_workspace_id.is_some() || !client.binds_workspace())
+                    && request
+                        .scope
+                        .split_whitespace()
+                        .all(|s| consent.scopes.iter().any(|c| c == s))
+            });
+        if let Some(consent) = remembered {
+            consents::touch(db, consent.id, now).await?;
+            return Ok(Decision::Code(consent.bound_workspace_id));
+        }
+    }
+    if now - session.auth_time > STEP_UP_WINDOW {
+        return Ok(Decision::SignInAgain);
+    }
+    Ok(Decision::Consent)
+}
+
+/// Where the browser goes for `request`, signed in with `session`: the
+/// client with a code, the sign-in screen (to sign in again before the
+/// consent screen), or the consent screen.
+async fn decide(
+    db: &PgPool,
+    issuer: &Issuer,
+    client: &Client,
+    mut request: Request,
+    session: &Session,
+    now: DateTime<Utc>,
+) -> Result<String> {
+    match decision(db, client, &request, session, now).await? {
+        Decision::Code(workspace) => issue(db, issuer, &request, session, workspace, now).await,
+        Decision::SignInAgain => {
+            // The screen will follow the new sign-in.
+            request.consent_due = true;
+            let id = store(db, &request, now).await?;
+            Ok(format!("{SIGN_IN_PATH}?request={id}&reauth=1"))
+        }
+        Decision::Consent => {
+            request.consent_due = true;
+            request.consent_account_id = Some(session.account_id);
+            let id = store(db, &request, now).await?;
+            Ok(format!("{CONSENT_PATH}?request={id}"))
+        }
     }
 }
 
-/// Issue a code for `request` to the person signed in with `session` and
-/// return the client's redirect URI carrying it.
-async fn complete(
+/// Issue a code for `request` to the person signed in with `session`,
+/// bound to `workspace`, and return the client's redirect URI carrying it.
+pub async fn issue(
     db: &PgPool,
     issuer: &Issuer,
     request: &Request,
     session: &Session,
+    workspace: Option<Uuid>,
     now: DateTime<Utc>,
 ) -> Result<String> {
     let grant = Grant {
@@ -301,6 +492,11 @@ async fn complete(
         session_id: Some(session.id),
         scope: request.scope.clone(),
         auth_time: session.auth_time,
+        resource: request
+            .resource
+            .clone()
+            .unwrap_or_else(|| issuer.resource.clone()),
+        workspace,
     };
     let mut conn = db.acquire().await?;
     let code = tokens::create_code(
@@ -331,47 +527,6 @@ mod tests {
     }
 
     #[test]
-    fn only_first_party_clients_are_granted_admin_access() {
-        use secrecy::SecretString;
-
-        use crate::domain::clients::{Authentication, Clients, WEB_CLIENT_ID};
-
-        let api = ["admin:access".to_owned(), "conversations:read".to_owned()];
-        let clients = Clients::first_party("https://app.example.com", SecretString::from("s"));
-        let web = clients.get(WEB_CLIENT_ID).unwrap();
-        let requested = Some("openid admin:access conversations:read admin:access");
-        assert_eq!(
-            allowed_scope(&api, web, requested).as_deref(),
-            Some("openid admin:access conversations:read")
-        );
-        let third_party = Client {
-            id: "acme-app",
-            first_party: false,
-            active: true,
-            authentication: Authentication::None,
-            redirect_uris: Vec::new(),
-            loopback_any_port: false,
-            post_logout_redirect_uris: Vec::new(),
-            refresh_idle: TimeDelta::days(1),
-            refresh_absolute: TimeDelta::days(1),
-        };
-        assert_eq!(
-            allowed_scope(&api, &third_party, requested).as_deref(),
-            Some("openid conversations:read"),
-            "dropped, not refused: the client still signs the person in"
-        );
-        assert_eq!(
-            allowed_scope(&api, &third_party, Some("admin:access")),
-            None,
-            "nothing left"
-        );
-        assert_eq!(
-            allowed_scope(&api, web, Some("openid mail:everything")),
-            None
-        );
-    }
-
-    #[test]
     fn redirects_carry_state_and_issuer() {
         let request = Request {
             client_id: "c".into(),
@@ -380,6 +535,9 @@ mod tests {
             state: Some("s t".into()),
             nonce: None,
             code_challenge: String::new(),
+            resource: None,
+            consent_due: false,
+            consent_account_id: None,
         };
         assert_eq!(
             request.redirect("https://app.example.com", &[("code", "abc")]),

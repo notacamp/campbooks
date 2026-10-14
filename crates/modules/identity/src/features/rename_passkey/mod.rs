@@ -6,7 +6,7 @@ use axum::{
     extract::{Path, State},
 };
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk, auth::Scoped, extract::Json as JsonBody,
+    AppState, Error, Operation, Problem, Result, Risk, auth::Unbound, extract::Json as JsonBody,
 };
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -46,7 +46,7 @@ pub struct RenamePasskey {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityWrite>,
+    Unbound { principal, .. }: Unbound<IdentityWrite>,
     Path(path): Path<PasskeyPath>,
     JsonBody(input): JsonBody<RenamePasskey>,
 ) -> Result<Json<PasskeyView>> {

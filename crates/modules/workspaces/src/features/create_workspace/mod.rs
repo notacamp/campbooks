@@ -89,6 +89,10 @@ pub async fn execute(
     principal: &Principal,
     input: CreateWorkspace,
 ) -> Result<WorkspaceView> {
+    // An app allowed in one workspace can't make others.
+    if principal.bound_workspace().is_some() {
+        return Err(Error::NotFound);
+    }
     let name = workspace_name(&input.name)?;
     let accent = input.accent.unwrap_or(input.kind.default_accent());
     let user = ensure_user(&state.db, principal).await?;

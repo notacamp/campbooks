@@ -4,7 +4,7 @@
 
 use axum::{Extension, Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk, auth::Scoped, extract::Json as JsonBody,
+    AppState, Error, Operation, Problem, Result, Risk, auth::Unbound, extract::Json as JsonBody,
 };
 use serde::Deserialize;
 use utoipa::ToSchema;
@@ -61,7 +61,7 @@ pub struct RegisterPasskey {
 pub async fn handler(
     State(state): State<AppState>,
     Extension(deps): Extension<Deps>,
-    Scoped { principal, .. }: Scoped<IdentityWrite>,
+    Unbound { principal, .. }: Unbound<IdentityWrite>,
     JsonBody(input): JsonBody<RegisterPasskey>,
 ) -> Result<(StatusCode, Json<PasskeyView>)> {
     campbooks_kernel::authz::require_account(

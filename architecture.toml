@@ -22,6 +22,7 @@ helpers = [
     "lock_conversation(", # conversations: `write` on the conversation, then locks it
     "drafts::load(",      # conversations: the action on the draft, then reads it
     "flags::apply(",      # conversations: through `lock_conversation`
+    "workspace_clients::require_admin(", # identity: `require_type` on `identity.client`
 ]
 
 # Operations whose handler does not call `authz` yet: the web BFF's session
@@ -155,3 +156,19 @@ reason = "The change feed and automation to come."
 [[access.unconsumed_events]]
 name = "workspaces.workspace_updated"
 reason = "The change feed (the workspace's name and accent)."
+
+[[access.unconsumed_events]]
+name = "identity.client_registered"
+reason = "The security log and notices to workspace admins to come."
+
+[[access.unconsumed_events]]
+name = "identity.client_removed"
+reason = "The security log and notices to workspace admins to come."
+
+[[access.unconsumed_events]]
+name = "identity.consent_granted"
+reason = "Way-in and connected-app notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "identity.consent_revoked"
+reason = "Connected-app notices to come (campbooks-cloud#117 batch 3)."

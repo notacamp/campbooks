@@ -8,13 +8,16 @@
 //! endpoints are public by nature: they authenticate what they act on
 //! themselves (a client secret, a PKCE verifier, a signed-in session).
 
-use campbooks_kernel::authz::{
-    Action::{Delete, Read, Write},
-    Grant, Grantee, Owner, ResourceType, Resources, Tenancy,
+use campbooks_kernel::{
+    authz::{
+        Action::{Create, Delete, Read, Write},
+        Grant, Grantee, Owner, ResourceType, Resources, Tenancy,
+    },
+    tenancy::Role,
 };
 
 /// The module's resource types.
-static TYPES: [ResourceType; 9] = [
+static TYPES: [ResourceType; 11] = [
     ResourceType {
         owner: Owner::Account,
         owner_actions: &[Read, Write, Delete],
@@ -55,12 +58,37 @@ static TYPES: [ResourceType; 9] = [
             Tenancy::Account,
         )
     },
-    ResourceType::new(
-        "identity.client",
-        "An OAuth client registered with the issuer: configuration of the instance, \
-         reached by no operation.",
-        Tenancy::Instance,
-    ),
+    ResourceType {
+        grants: &[Grant::new(
+            Grantee::WorkspaceRole(Role::Admin),
+            &[Create, Read, Write, Delete],
+        )],
+        ..ResourceType::new(
+            "identity.client",
+            "An OAuth client a workspace registered (an integration or agent bound to it): \
+             its owners and admins create, list, rotate and remove them.",
+            Tenancy::Workspace,
+        )
+    },
+    ResourceType {
+        owner: Owner::Account,
+        owner_actions: &[Read, Delete],
+        ..ResourceType::new(
+            "identity.consent",
+            "An app an account allowed to act for it (a connected app): only that account \
+             lists or revokes it.",
+            Tenancy::Account,
+        )
+    },
+    ResourceType {
+        grants: &[Grant::new(Grantee::Anyone, &[Create])],
+        ..ResourceType::new(
+            "identity.registration",
+            "Dynamic client registration (RFC 7591) for agents: public, rate-limited, and the \
+             registered client holds no access until a person consents.",
+            Tenancy::Public,
+        )
+    },
     ResourceType {
         grants: &[Grant::new(Grantee::Anyone, &[Read])],
         ..ResourceType::new(
