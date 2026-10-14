@@ -107,7 +107,7 @@ async fn before_attention(db: &PgPool, workspace: WorkspaceId) {
 /// migration's login).
 async fn seed(db: &PgPool) {
     let migration = std::fs::read_to_string(format!(
-        "{}/../../../migrations/20261020030000_conversations__needs_backfill.sql",
+        "{}/../../../migrations/20261020050000_conversations__needs_backfill.sql",
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap();
