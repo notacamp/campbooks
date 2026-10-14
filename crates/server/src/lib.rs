@@ -204,6 +204,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_admin::module(),
         campbooks_attention::module(),
         campbooks_search::module(),
+        campbooks_assistant::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -349,6 +350,7 @@ fn security_scheme() -> SecurityScheme {
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
             from the containers (inboxes) you may see, checked at query time."),
+        (name = "assistant", description = "The assistant module."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

@@ -1,0 +1,10 @@
+//! The domain events the `assistant` module publishes (ADR 0012). None yet.
+//!
+//! Declare each one here as a `campbooks_kernel::DomainEvent` named
+//! `assistant.<event>` with an explicit `VERSION`, publish it in the
+//! transaction that makes the change (`state.events.publish(&mut tx, &event)`),
+//! and describe it in the module's spec. Derive `utoipa::ToSchema` too and
+//! declare it in the module's background (`Background::new().publishes::<E>()`)
+//! so it is listed in `openapi/events.json` (`cargo xtask events`; ADR 0013).
+//! Other modules subscribe to these types; they never call this module
+//! directly.

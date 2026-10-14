@@ -5,6 +5,7 @@ import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
 import { buildConnectorsRoutes, WorkspaceConnectionsAdmin } from "~/modules/connectors";
+import { buildAssistantRoutes } from "~/modules/assistant";
 import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
@@ -64,6 +65,7 @@ export function buildModuleRoutes<
       ...identity.workspace,
       ...buildConversationsRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
+      ...buildAssistantRoutes(workspace),
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;

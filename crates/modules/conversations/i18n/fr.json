@@ -18,6 +18,7 @@
     "invalid_ids": "Demandez entre 1 et {{max}} identifiants de conversation, séparés par des virgules.",
     "no_open_need": "Plus rien ici n’a besoin de vous.",
     "nothing_to_reopen": "Il n’y a rien à rétablir ici.",
-    "need_changed": "Ceci a changé pendant que vous le regardiez. Jetez-y un nouveau coup d’œil."
+    "need_changed": "Ceci a changé pendant que vous le regardiez. Jetez-y un nouveau coup d’œil.",
+    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs."
   }
 }

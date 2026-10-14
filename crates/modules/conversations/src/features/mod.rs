@@ -15,6 +15,8 @@ pub mod labels;
 pub mod list_conversations;
 pub mod list_drafts;
 pub mod list_inboxes;
+pub mod list_labels;
+pub mod list_senders;
 pub mod list_streams;
 pub mod mark_read;
 pub mod move_to_stream;

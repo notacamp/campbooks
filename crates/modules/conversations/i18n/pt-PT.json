@@ -18,6 +18,7 @@
     "invalid_ids": "Peça entre 1 e {{max}} identificadores de conversa, separados por vírgulas.",
     "no_open_need": "Já nada aqui precisa de si.",
     "nothing_to_reopen": "Não há nada para recuperar aqui.",
-    "need_changed": "Isto mudou enquanto estava a ver. Volte a ver."
+    "need_changed": "Isto mudou enquanto estava a ver. Volte a ver.",
+    "invalid_senders_query": "Pesquise com 2 a 100 caracteres e peça entre 1 e {{max}} remetentes."
   }
 }

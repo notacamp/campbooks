@@ -202,11 +202,14 @@ fn model_may_read_mail(gateway: &Gateway) -> bool {
 fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
-        list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
+        list_conversations, list_drafts, list_inboxes, list_labels, list_senders, list_streams,
+        mark_read, move_to_stream,
         needs, send_draft, star, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
+        .routes(routes!(list_senders::handler))
+        .routes(routes!(list_labels::handler))
         .routes(routes!(list_streams::handler))
         .routes(routes!(list_conversations::handler))
         .routes(routes!(get_conversation::handler))
