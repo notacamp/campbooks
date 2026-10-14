@@ -213,6 +213,23 @@ export interface paths {
         patch: operations["identity.rename_passkey"];
         trace?: never;
     };
+    "/api/v1/identity/sign-out-everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out everywhere. */
+        post: operations["identity.sign_out_everywhere"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/ways-in": {
         parameters: {
             query?: never;
@@ -1224,7 +1241,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1236,7 +1253,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1248,7 +1265,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1260,7 +1277,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1274,7 +1291,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -2488,7 +2505,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time
@@ -2678,6 +2699,11 @@ export interface components {
             last_used_at?: string | null;
             /** @description What its owner calls it. */
             name: string;
+            /**
+             * @description It was made with the account (a passkey-only sign-up), not added
+             *     later: never shown as a new way in.
+             */
+            signed_up_with: boolean;
             /**
              * @description Whether it may sync between devices (a password manager or a
              *     platform account keeps it), as opposed to staying on one device.
@@ -3958,7 +3984,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            /** @description The token lacks `identity:write`, or the sign-in is more than five minutes old (`fresh_sign_in_required`: sign in again at `/bff/login?max_age=0`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4097,6 +4123,51 @@ export interface operations {
                 };
             };
             /** @description Not the caller's passkey, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.sign_out_everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every session and refresh token of the account ended, this one's included: sign in again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance, or the token is bound to a workspace. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -6471,7 +6542,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegisteredClient"];
                 };
             };
-            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -7968,7 +8039,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestInfo"];
                 };
             };
-            /** @description No such request (or it expired), or another identity provider serves this instance. */
+            /** @description No such request (or it expired, or another browser made it), or another identity provider serves this instance. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -8636,6 +8707,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description `rate_limited`: too many sign-ins started from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `bff_not_configured`, or the identity provider is unreachable. */
             503: {
                 headers: {
@@ -8768,7 +8848,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            /** @description `rate_limited`: too many authorization requests, or metadata-document clients looked up, from this address. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -8828,6 +8908,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "identity.end_session_post": {
@@ -8873,6 +8962,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

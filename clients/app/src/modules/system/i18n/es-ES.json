@@ -124,6 +124,15 @@
         "instance": "en la red de esta instancia",
         "externalAllowed": "fuera de la red de esta instancia, autorizado a recibir correo",
         "externalRefused": "fuera de la red de esta instancia, así que no se le envía correo"
+      },
+      "check": {
+        "pending": "Comprobando sus respuestas",
+        "pendingDetail": "sus respuestas se usarán cuando acierte con correos de prueba evidentes",
+        "passed": "acertó {{right}} de {{total}} respuestas de prueba",
+        "failed": "Sus respuestas no superan la comprobación",
+        "failedDetail": "solo acertó {{right}} de {{total}} respuestas de prueba evidentes, así que sus respuestas no se usan y las reglas ordenan el correo por sí solas",
+        "unavailable": "No respondió a la comprobación",
+        "unavailableDetail": "sus respuestas no se usan hasta que responda"
       }
     },
     "duration": {

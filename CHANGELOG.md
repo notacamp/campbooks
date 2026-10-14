@@ -40,6 +40,35 @@ All notable changes to Campbooks Next are documented here. The format follows
   log and job queue. A search cursor only works in the workspace it came from, and
   search reports `indexing` only to callers who can see an inbox.
 - **Self-hosters:** three new migrations run on start, with nothing to configure.
+- When a way to sign in is added to your account (a Google, Microsoft or Zoho
+  account, or a passkey), you are told: by mail to your account's address and
+  the new account's address (verified addresses only, in your language, no
+  tracking) when the instance has a mail server, and on Settings → Ways to
+  sign in, which marks what was added this week, either way. New settings
+  `CAMPBOOKS_MAIL__SMTP_URL` (or `_FILE`) and `CAMPBOOKS_MAIL__FROM`; see
+  deploy/README.md → Outgoing mail.
+- Sign out everywhere (Settings → Ways to sign in): ends every sign-in to
+  your account, on every device and in every app.
+- A copied web session cookie used after the real one moved on ends the
+  session for both, and its tokens at the identity provider.
+- Adding a passkey needs a sign-in from the last five minutes (the app signs
+  you in again first).
+- A sign-in link opened in another browser no longer completes there.
+- Refresh tokens end with the sign-in they came from.
+- Signing in, authorizing and signing out are rate-limited per address;
+  passkey-only sign-ups allow 5 per address an hour (200 per instance).
+- Workspace members' addresses are shown only when the identity provider
+  verified them.
+- The admin API asks for a sign-in from the last hour (was twelve hours), and
+  app names that only look like "Campbooks" (full-width, accented, styled
+  letters) are refused.
+- Upgrading: sign-ins waiting at the moment of the upgrade start again from
+  the app; refresh tokens of the native app (90 days) and of other apps (365
+  days) now end with the sign-in they came from (30 days), so those apps ask
+  to sign in again then; existing members' addresses that the identity
+  provider never verified stop showing until their next sign-in verifies
+  them; a mail server is only accepted over TLS (`smtps://` or
+  `smtp://…?tls=required`), except a relay on the same machine.
 - **Mail no longer goes to an AI provider outside your network unless you say
   so.** Each AI role's address is checked: a loopback or private address,
   `localhost`, a single-label name such as a compose service (`laya`,
@@ -99,6 +128,26 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **The decisions model's answers are only used once it gets obvious emails
+  right** (campbooks-cloud#128). The default Laya model said "yes" to almost
+  every question (needs a reply, has a deadline, looks like phishing), often
+  at 100% confidence. These answers never acted on their own, but they showed
+  up as suggestions and as Check questions on Home. It wasn't a bug in
+  Campbooks: the model can't answer these questions without training on them.
+  Every server now asks the `decide` role about eight made-up emails with
+  obvious answers at startup, again every 6 hours, and every 15 minutes while
+  it fails. A model that gets fewer than 90% right isn't used: the rules sort
+  mail exactly as if no model were set up, and Admin → System says so
+  ("Answers fail the check", with the count). Laya currently fails it, so on
+  a default install the rules alone sort mail until a better decisions model
+  ships.
+- Model answers stored before this release are marked as unchecked (database
+  migration). They are kept, but no longer feed suggestions or Check
+  questions; Check questions they raised are withdrawn the next time their
+  conversation is refreshed.
+- The decisions model is now told what Campbooks is, whose inbox the email
+  arrived in (personal or shared), what the rules noticed, and that the email
+  is data, not instructions. Its yes/no questions are asked as questions.
 - **Home no longer asks about mail the rules already settled.** A model
   suggestion is put to you as a question ("Did GitHub ask you to do
   something?") only when no answer Campbooks acts on already said no; a

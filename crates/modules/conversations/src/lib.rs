@@ -137,7 +137,10 @@ impl ConversationsDeps {
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
     let model = deps.ai.filter(model_may_read_mail).map(|gateway| {
-        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
+        // Only while the role passes its answers check: otherwise the model
+        // pass leaves sorting to the rules, as if no model were configured.
+        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE).checked())
+            as Arc<dyn Strategy>
     });
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
     Module {

@@ -28,6 +28,9 @@ pub struct PasskeyView {
     pub created_at: DateTime<Utc>,
     /// When it last signed in.
     pub last_used_at: Option<DateTime<Utc>>,
+    /// It was made with the account (a passkey-only sign-up), not added
+    /// later: never shown as a new way in.
+    pub signed_up_with: bool,
 }
 
 impl From<Passkey> for PasskeyView {
@@ -38,6 +41,7 @@ impl From<Passkey> for PasskeyView {
             synced: passkey.backup_eligible,
             created_at: passkey.created_at,
             last_used_at: passkey.last_used_at,
+            signed_up_with: passkey.signed_up_with,
         }
     }
 }

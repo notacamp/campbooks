@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { LAPTOP_PASSKEY, PHONE_PASSKEY } from "../../../../../test/demo/identity";
+import { LAPTOP_PASSKEY, PHONE_PASSKEY, SIGN_UP_PASSKEY } from "../../../../../test/demo/identity";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
 import {
   ATTESTATION_JSON,
@@ -68,6 +68,29 @@ describe("PasskeysSection", () => {
     expect(browser.create).toHaveBeenCalledTimes(1);
   });
 
+  it("marks a passkey added this week New, but not the one the account was made with", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));
+    stubWebAuthn();
+    mockApi({
+      [LIST]: {
+        body: {
+          items: [SIGN_UP_PASSKEY, { ...PHONE_PASSKEY, created_at: "2026-10-13T09:00:00Z" }],
+        },
+      },
+    });
+    renderSection();
+    const list = await screen.findByRole("list", { name: "Your passkeys" });
+    vi.useRealTimers();
+    const [signUp, phone] = within(list).getAllByRole("listitem");
+    if (signUp === undefined || phone === undefined) {
+      throw new Error("two rows expected");
+    }
+    expect(within(signUp).getByText("Signed up with")).toBeVisible();
+    expect(within(signUp).queryByText("New")).toBeNull();
+    expect(within(phone).getByText("New")).toBeVisible();
+  });
+
   it("asks for a fresh sign-in when the last one is too old", async () => {
     stubWebAuthn();
     mockApi({
@@ -82,6 +105,22 @@ describe("PasskeysSection", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
     expect(leave).toHaveBeenCalledWith(
       `/bff/login?return_to=${encodeURIComponent(HERE)}&max_age=600`,
+    );
+  });
+
+  it("asks for a sign-in now when adding a passkey needs a fresher one", async () => {
+    stubWebAuthn();
+    mockApi({
+      [LIST]: { body: { items: [LAPTOP_PASSKEY] } },
+      [START]: problem(403, "fresh_sign_in_required"),
+    });
+    const leave = renderSection();
+    await screen.findByRole("list", { name: "Your passkeys" });
+    fireEvent.click(screen.getByRole("button", { name: "Add a passkey" }));
+    expect(await screen.findByText(/sign-in from the last five minutes/u)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in again" }));
+    expect(leave).toHaveBeenCalledWith(
+      `/bff/login?return_to=${encodeURIComponent(HERE)}&max_age=0`,
     );
   });
 

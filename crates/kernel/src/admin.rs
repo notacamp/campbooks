@@ -74,7 +74,7 @@ pub const SECURITY_SCHEME: &str = "admin";
 pub const EXTENSION: &str = "x-campbooks-admin";
 
 /// How long after signing in a person may still use the admin API.
-pub const REAUTH_AFTER: TimeDelta = TimeDelta::hours(12);
+pub const REAUTH_AFTER: TimeDelta = TimeDelta::hours(1);
 
 /// What an administrator may do. A closed set with stable wire names; a
 /// permission is never an OAuth scope and never appears in a token.
@@ -404,7 +404,12 @@ impl<P: AdminPermission> FromRequestParts<AppState> for Admin<P> {
             .verify(token)
             .await
             .map_err(|_| Error::NotFound)?;
-        if principal.kind != PrincipalKind::User || !principal.has_scope(ACCESS_SCOPE) {
+        // A person's own token only: never a client's, nor one an app holds
+        // for one workspace.
+        if principal.kind != PrincipalKind::User
+            || principal.bound_workspace().is_some()
+            || !principal.has_scope(ACCESS_SCOPE)
+        {
             return Err(Error::NotFound);
         }
         let permissions = state

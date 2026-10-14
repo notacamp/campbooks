@@ -13,6 +13,7 @@ use campbooks_kernel::{
     error::LocalizableProblem,
     i18n,
     operations::{Operation, Risk},
+    rate_limit::{ClientIp, RateKey},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -124,14 +125,33 @@ pub struct LoginQuery {
             headers(("location" = String), ("set-cookie" = String))),
         (status = 400, description = "`invalid_return_to`", body = Problem,
             content_type = "application/problem+json"),
+        (status = 429, description = "`rate_limited`: too many sign-ins started from this \
+            address.", body = Problem, content_type = "application/problem+json"),
         (status = 503, description = "`bff_not_configured`, or the identity provider is unreachable.",
             body = Problem, content_type = "application/problem+json"),
     ),
 )]
-pub async fn login(State(bff): State<Bff>, Query(query): Query<LoginQuery>) -> Response {
+pub async fn login(
+    State(bff): State<Bff>,
+    peer: Option<axum::Extension<axum::extract::ConnectInfo<std::net::SocketAddr>>>,
+    headers: HeaderMap,
+    Query(query): Query<LoginQuery>,
+) -> Response {
     let Some(inner) = &bff.inner else {
         return not_configured();
     };
+    let ip = ClientIp::resolve(
+        peer.map(|axum::Extension(axum::extract::ConnectInfo(addr))| addr.ip()),
+        &headers,
+        &inner.trusted_proxies,
+    );
+    if let Err(limited) = inner
+        .rate_limits
+        .check(&inner.db, &super::LOGIN_LIMIT, &RateKey::ip(ip))
+        .await
+    {
+        return limited.into_response();
+    }
     let Some(return_to) = return_to(query.return_to.as_deref()) else {
         return problem(StatusCode::BAD_REQUEST, code::INVALID_RETURN_TO);
     };
@@ -515,36 +535,7 @@ pub async fn logout(State(bff): State<Bff>, headers: HeaderMap) -> Result<Respon
     };
     let mut ended_here = false;
     if let Some(current) = inner.current(&headers).await? {
-        let id = current.session.id;
-        let deleted = store::delete_session(&mut *inner.db.acquire().await?, id).await?;
-        if let Some((refresh_token, id_token)) = deleted {
-            if let Some(sealed) = refresh_token {
-                match inner.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
-                    Ok(refresh_token) => {
-                        if let Err(err) = inner.oidc.revoke(&refresh_token).await {
-                            tracing::warn!(error = %err, "could not revoke a signed-out session's refresh token");
-                        }
-                    }
-                    Err(_) => {
-                        tracing::warn!(
-                            "a signed-out session's refresh token could not be decrypted"
-                        );
-                    }
-                }
-            }
-            // The in-process issuer's session ends here, with the ID token as
-            // proof (ADR 0014): nothing for the browser to visit or forge.
-            if inner.oidc.in_process()
-                && let Ok(id_token) = inner.cipher.open(&id_token, &sealed_for(id, "id_token"))
-            {
-                match inner.oidc.end_issuer_session(&id_token).await {
-                    Ok(()) => ended_here = true,
-                    Err(err) => {
-                        tracing::warn!(error = %err, "could not end the issuer session of a sign-out");
-                    }
-                }
-            }
-        }
+        ended_here = inner.terminate(current.session.id).await?;
         tracing::info!("web sign-out");
     }
     let logout_url = if ended_here || inner.oidc.in_process() {
@@ -709,7 +700,7 @@ macro_rules! admin_operation {
         /// the session's access token attached, exactly like `/bff/api/*`. Its
         /// answers are the admin API's own: 404 for anyone who is not an
         /// administrator with the operation's permission, 401
-        /// `admin_reauth_required` when the last sign-in is more than 12 hours
+        /// `admin_reauth_required` when the last sign-in is more than 1 hour
         /// old (sign in again at `/bff/login?max_age=0`). Without a live session
         /// the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
         /// need the `X-Campbooks-CSRF: 1` header from the app's origin.

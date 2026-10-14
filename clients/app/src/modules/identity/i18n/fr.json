@@ -281,6 +281,19 @@
         "title": "Un problème est survenu.",
         "lead": "Rien n’a changé. Réessayez."
       }
+    },
+    "new": "Ajout récent",
+    "recent": {
+      "title": "Un moyen de connexion a été ajouté cette semaine",
+      "lead": "Il est marqué « Ajout récent » ci-dessous. Si ce n’est pas vous qui l’avez ajouté, supprimez-le, puis déconnectez-vous partout."
+    },
+    "everywhere": {
+      "title": "Se déconnecter partout",
+      "lead": "Met fin à toutes les connexions à votre compte : ce navigateur, vos autres appareils et toutes les applications que vous avez autorisées. À faire si vous perdez un appareil ou voyez un moyen de connexion que vous n’avez pas ajouté.",
+      "action": "Se déconnecter partout",
+      "confirm": "Oui, me déconnecter partout",
+      "confirmLead": "Vous déconnecter de Campbooks sur tous vos appareils et dans toutes les applications, ce navigateur compris ? Vous vous reconnecterez ensuite ici.",
+      "failed": "Impossible de vous déconnecter partout. Rien n’a changé ; réessayez."
     }
   },
   "passkeySignUp": {
@@ -379,7 +392,8 @@
         "title": "Impossible d’ajouter une clé d’accès.",
         "lead": "Rien n’a été ajouté. Réessayez."
       }
-    }
+    },
+    "freshSignIn": "Par sécurité, ajouter une clé d’accès demande une connexion de moins de cinq minutes. Reconnectez-vous ; vous reviendrez directement ici."
   },
   "admin": {
     "title": "Compte",

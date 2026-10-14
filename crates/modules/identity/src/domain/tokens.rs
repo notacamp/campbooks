@@ -200,6 +200,9 @@ pub async fn attach_family(conn: &mut PgConnection, code: &str, family: Uuid) ->
 }
 
 /// Start a refresh family for `grant` and return its id and first token.
+/// The family ends with the client's absolute lifetime, or with the issuer
+/// session it came from, whichever is first: refreshing never outlives the
+/// sign-in behind it.
 pub async fn create_family(
     conn: &mut PgConnection,
     grant: &Grant,
@@ -211,7 +214,8 @@ pub async fn create_family(
         "INSERT INTO identity.refresh_families
              (id, client_id, account_id, session_id, scope, auth_time, created_at, expires_at,
               resource, bound_workspace_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+         VALUES ($1, $2, $3, $4, $5, $6, $7,
+                 least($8, (SELECT expires_at FROM identity.sessions WHERE id = $4)), $9, $10)",
     )
     .bind(family)
     .bind(&grant.client_id)

@@ -70,7 +70,7 @@ export function AdminLayout() {
   }
 }
 
-/** Administration asks for a recent sign-in (12 hours): explain, then sign in again. */
+/** Administration asks for a recent sign-in (1 hour): explain, then sign in again. */
 function ReauthNotice({ returnTo }: { returnTo: string }) {
   const { t } = useTranslation();
   return (

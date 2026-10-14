@@ -52,10 +52,11 @@ request.
 Admin operations SHALL be served under `/admin/v1/<module>/` and SHALL
 require a user (not client-credentials) bearer token carrying the scope
 `admin:access` and an admin profile holding the operation's permission;
-otherwise they SHALL answer 404, indistinguishable from an unknown route.
-Once those pass, a token whose `auth_time` is more than 12 hours old SHALL be
-refused with 401 and the problem code `admin_reauth_required`. The issuer
-SHALL grant `admin:access` only to first-party clients.
+otherwise they SHALL answer 404, indistinguishable from an unknown route. A
+token bound to a workspace SHALL also answer 404. Once those pass, a token
+whose `auth_time` is more than one hour old SHALL be refused with 401 and the
+problem code `admin_reauth_required`. The issuer SHALL grant `admin:access`
+only to first-party clients.
 
 #### Scenario: Not an administrator
 - **WHEN** a signed-in user without a profile calls `GET /admin/v1/system/overview`
@@ -65,8 +66,12 @@ SHALL grant `admin:access` only to first-party clients.
 - **WHEN** an OAuth client that is not first-party requests the scope `admin:access`
 - **THEN** the issuer does not grant it, and an admin request with that client's token answers 404
 
+#### Scenario: Bound token
+- **WHEN** a super admin's token bound to a workspace calls an admin operation
+- **THEN** the response is 404
+
 #### Scenario: Stale authentication
-- **WHEN** a super admin's token has `auth_time` 13 hours ago
+- **WHEN** a super admin's token has `auth_time` two hours ago
 - **THEN** admin requests answer 401 with code `admin_reauth_required`, and after signing in again they succeed
 
 ### Requirement: Admin API is outside the operation catalogue
@@ -126,11 +131,19 @@ summary of the effective configuration that contains no secrets (signup
 policy, configured sign-in providers, blob store kind, configured mail
 providers), and per AI role whether it is configured, its model, its base URL
 reduced to scheme and host, and whether it answered a probe within 3 seconds
-(probe results cached for 60 seconds).
+(probe results cached for 60 seconds). For the `decide` role, when it may
+receive mail, it SHALL also return its answers check: `pending`, `passed`,
+`failed` or `unavailable`, with the right and total counts and when it ran.
+The System panel SHALL show a failed or unavailable check as a problem and
+say that the model's answers are not used.
 
 #### Scenario: No secrets
 - **WHEN** an AI role's base URL contains credentials or the configuration holds API keys
 - **THEN** the overview shows only the scheme and host and never any key or password
+
+#### Scenario: A decide model failing its answers check
+- **WHEN** the decide model got 8 of 33 answers of its check right
+- **THEN** the System panel shows the decide role as a problem: "Answers fail the check", got only 8 of 33 obvious test answers right, its answers are not used and the rules sort mail alone
 
 ### Requirement: Administrators can inspect and recover the job queue
 The admin API SHALL let an administrator with `jobs.read` see the background

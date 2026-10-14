@@ -42,6 +42,12 @@ export const OVERVIEW: AdminOverview = {
       location: "instance",
       content_allowed: true,
       reachable: true,
+      answers_check: {
+        state: "passed",
+        right: 33,
+        total: 33,
+        checked_at: "2026-10-14T06:00:00Z",
+      },
     },
     {
       role: "embed",

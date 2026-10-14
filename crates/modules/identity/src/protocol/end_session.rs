@@ -13,7 +13,13 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse as _, Response},
 };
-use campbooks_kernel::{Error, Operation, Result, Risk, error::LocalizableProblem};
+use std::time::Duration;
+
+use campbooks_kernel::{
+    Error, Operation, Result, Risk,
+    error::LocalizableProblem,
+    rate_limit::{ClientIp, Limit, RateKey},
+};
 use jsonwebtoken::{Algorithm, DecodingKey, Validation, jwk::Jwk};
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
@@ -26,6 +32,10 @@ use crate::{
     domain::sessions,
     web::{self, SESSION_COOKIE, SameSite, see_other, with_cookie},
 };
+
+/// Sign-outs one address may ask for (each verifies a signature). The web
+/// BFF's, in-process, have no address and are not counted.
+const END_SESSION_LIMIT: Limit = Limit::new("identity.end_session", 30, Duration::from_mins(1));
 
 /// `/oauth2/end_session` parameters (query for GET, form for POST).
 #[derive(Debug, Deserialize, IntoParams, ToSchema)]
@@ -57,13 +67,16 @@ pub struct EndSession {
         (status = 400, description = "`invalid_id_token_hint`: nothing was ended.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "Another identity provider serves this instance."),
+        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn end_session(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     Query(query): Query<EndSession>,
 ) -> Result<Response> {
-    end(&ctx, query).await
+    end(&ctx, ip, query).await
 }
 
 /// The same, as a form POST (what the web BFF sends, in-process).
@@ -81,17 +94,24 @@ pub async fn end_session(
         (status = 400, description = "`invalid_id_token_hint`: nothing was ended.",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "Another identity provider serves this instance."),
+        (status = 429, description = "`rate_limited`.", body = campbooks_kernel::Problem,
+            content_type = "application/problem+json"),
     ),
 )]
 pub async fn end_session_post(
     State(ctx): State<Ctx>,
+    ip: ClientIp,
     Form(form): Form<EndSession>,
 ) -> Result<Response> {
-    end(&ctx, form).await
+    end(&ctx, ip, form).await
 }
 
-async fn end(ctx: &Ctx, request: EndSession) -> Result<Response> {
+async fn end(ctx: &Ctx, ip: ClientIp, request: EndSession) -> Result<Response> {
     let issuer = ctx.issuer()?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &END_SESSION_LIMIT, &RateKey::ip(ip))
+        .await?;
     let hint = match &request.id_token_hint {
         Some(token) => verify_hint(ctx, issuer, token).await?,
         None => None,

@@ -13,8 +13,11 @@ use campbooks_ai::decide::signals::email::{Attachment, Envelope, Party};
 use crate::{ingest::Headers, model::Address};
 
 /// The version of the envelope this module builds, recorded with every
-/// answer so a labelled example can be rebuilt as it was seen.
-pub const STATE_VERSION: i16 = 1;
+/// answer so a labelled example can be rebuilt as it was seen. Version 1
+/// had no triage context; version `1 + n` is the email after context
+/// version `n` ([`campbooks_ai::decide::signals::inbox::CONTEXT_VERSION`]),
+/// so a change in what the model is told shows on every stored answer.
+pub const STATE_VERSION: i16 = 1 + campbooks_ai::decide::signals::inbox::CONTEXT_VERSION;
 
 /// Bytes of the text body read into an envelope (rules look for cue phrases
 /// in it; the model reads its first 1,500 characters).
@@ -99,6 +102,8 @@ pub fn envelope(parts: MessageParts<'_>) -> Envelope {
             })
             .collect(),
         body: parts.body.to_owned(),
+        // The decide pass adds whose inbox it is; the rules do not read it.
+        recipient: None,
     }
 }
 

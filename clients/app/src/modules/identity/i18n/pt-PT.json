@@ -281,6 +281,19 @@
         "title": "Algo correu mal.",
         "lead": "Nada mudou. Tente novamente."
       }
+    },
+    "new": "Nova",
+    "recent": {
+      "title": "Foi adicionada uma forma de iniciar sessão esta semana",
+      "lead": "Está marcada como Nova abaixo. Se não foi você que a adicionou, remova-a e termine sessão em todo o lado."
+    },
+    "everywhere": {
+      "title": "Terminar sessão em todo o lado",
+      "lead": "Termina todas as sessões da sua conta: este navegador, os seus outros dispositivos e todas as aplicações que autorizou. Faça-o se perder um dispositivo ou vir uma forma de iniciar sessão que não adicionou.",
+      "action": "Terminar sessão em todo o lado",
+      "confirm": "Sim, terminar em todo o lado",
+      "confirmLead": "Terminar sessão no Campbooks em todos os dispositivos e aplicações, incluindo este navegador? A seguir, inicia sessão novamente aqui.",
+      "failed": "Não foi possível terminar sessão em todo o lado. Nada mudou; tente novamente."
     }
   },
   "passkeySignUp": {
@@ -379,7 +392,8 @@
         "title": "Não foi possível adicionar uma chave de acesso.",
         "lead": "Nada foi adicionado. Tente novamente."
       }
-    }
+    },
+    "freshSignIn": "Por segurança, adicionar uma chave de acesso exige um início de sessão nos últimos cinco minutos. Inicie sessão novamente; volta logo para aqui."
   },
   "admin": {
     "title": "Conta",

@@ -65,7 +65,8 @@ pub struct RegisteredClient {
         (status = CREATED, description = "Registered; a confidential app's secret is shown this \
             once.", body = RegisteredClient),
         (status = BAD_REQUEST, description = "A bad name, `client_name_reserved` (it reads as \
-            Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
+            Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), \
+            `client_scope_not_allowed` or `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "The token lacks `identity:clients`, the caller is not \
@@ -99,6 +100,11 @@ pub async fn handler(
     }
     if client_names::impersonates_campbooks(&name) {
         return Err(Error::BadRequest(MESSAGES.reason("client_name_reserved")));
+    }
+    if client_names::mixes_scripts(&name) {
+        return Err(Error::BadRequest(
+            MESSAGES.reason("client_name_mixed_scripts"),
+        ));
     }
     let name = name.as_str();
     let mut scopes: Vec<String> = Vec::new();

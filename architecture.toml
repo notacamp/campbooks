@@ -143,10 +143,6 @@ name = "identity.signed_in"
 reason = "The security log and way-in notices to come (campbooks-cloud#117 batch 3)."
 
 [[access.unconsumed_events]]
-name = "identity.way_in_added"
-reason = "Way-in notices to come (campbooks-cloud#117 batch 3)."
-
-[[access.unconsumed_events]]
 name = "identity.way_in_removed"
 reason = "Way-in notices to come (campbooks-cloud#117 batch 3)."
 

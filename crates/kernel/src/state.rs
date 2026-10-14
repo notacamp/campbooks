@@ -103,6 +103,9 @@ pub struct AppState {
     /// Appends to the admin audit trail. The server registers the `admin`
     /// module's implementation; until then no admin request is answered.
     pub admin_audit: AdminAuditPort,
+    /// Sends the instance's own mail ([`mail`](crate::mail)). The server
+    /// installs the configured one; until then nothing is sent.
+    pub mailer: crate::mail::MailerPort,
 }
 
 impl AppState {
@@ -134,7 +137,15 @@ impl AppState {
             rate_limits: RateLimits::default(),
             signer: Signer::default(),
             resources: authz::Catalogue::default(),
+            mailer: Arc::new(crate::mail::NoMailer),
         }
+    }
+
+    /// The same state, sending the instance's mail through `mailer`.
+    #[must_use]
+    pub fn with_mailer(mut self, mailer: crate::mail::MailerPort) -> Self {
+        self.mailer = mailer;
+        self
     }
 
     /// The same state, reading admin profiles through `profiles` and

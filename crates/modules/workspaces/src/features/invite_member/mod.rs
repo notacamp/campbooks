@@ -138,7 +138,7 @@ pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> 
         r#"SELECT EXISTS (
                SELECT 1 FROM workspaces.members m
                  JOIN workspaces.users u ON u.id = m.user_id
-                WHERE m.workspace_id = $1 AND lower(u.email) = $2
+                WHERE m.workspace_id = $1 AND lower(u.email) = $2 AND u.email_verified
            ) AS "exists!""#,
         id as WorkspaceId,
         email,

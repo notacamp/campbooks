@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM workspaces.members m\n                 JOIN workspaces.users u ON u.id = m.user_id\n                WHERE m.workspace_id = $1 AND lower(u.email) = $2 AND u.email_verified\n           ) AS \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f45a081c3b42072ba8c2bc31ca84f4144362a12b3572779e55dcc1f5888608e7"
+}
