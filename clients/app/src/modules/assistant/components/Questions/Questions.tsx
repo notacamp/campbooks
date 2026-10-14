@@ -171,6 +171,24 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
     });
   };
 
+  // Enter on a ticked checkbox moves on too; a focused button or link
+  // handles its own Enter.
+  useShortcut("scout.next", (event) => {
+    const target = event?.target;
+    if (target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement) {
+      return;
+    }
+    if (asking) {
+      next();
+    } else if (step === "review") {
+      if (!create.isPending && !update.isPending) {
+        save();
+      }
+    } else {
+      onHome();
+    }
+  });
+
   const top = (
     <>
       <Brand name={tShell("appName")} />
@@ -183,7 +201,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   );
   const questionActions = (
     <>
-      <Button type="submit" variant="primary" size="lg" keys="enter">
+      <Button type="submit" variant="primary" size="lg" shortcut="scout.next">
         {step === "act" ? t("flow.review") : t("flow.next")}
       </Button>
       <Button variant="ghost" size="lg" shortcut="scout.skip" onClick={skip}>
@@ -370,7 +388,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           }}
           actions={
             <>
-              <Button type="submit" variant="primary" size="lg" keys="enter" disabled={busy}>
+              <Button type="submit" variant="primary" size="lg" shortcut="scout.next" disabled={busy}>
                 {busy ? t("flow.reviewStep.saving") : t("flow.reviewStep.save")}
               </Button>
               <Button variant="ghost" size="lg" disabled={busy} onClick={back}>
@@ -454,7 +472,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           onSubmit={onHome}
           actions={
             <>
-              <Button type="submit" variant="primary" size="lg" keys="enter">
+              <Button type="submit" variant="primary" size="lg" shortcut="scout.next">
                 {t("flow.done.home")}
               </Button>
               <Button variant="ghost" size="lg" onClick={onMemory}>

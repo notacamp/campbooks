@@ -22,14 +22,14 @@ while it runs, the visor thinking and "Only your sentence is sent, never
 your mail". For a proposal with a `who`, it SHALL ask "Who do you mean by
 …?" with the candidates and a field for an address or domain; for each
 proposal it SHALL show the rule sentence, "You wrote: …", the inbox, and
-Save (`Enter`) and Cancel (`Esc`), with the match preview once #125's
-`preview_rule` is on `next`. For `unsupported` it SHALL say what Scout
+the match preview (`conversations.preview_rule`), "Also apply to the mail
+you already have", Save (`Enter`) and Cancel (`Esc`). For `unsupported` it SHALL say what Scout
 can't do, in plain words for the reason, and for `unclear` how to say it
 as a rule; any proposal left SHALL be offered as the closest rule.
 
 #### Scenario: Anything from my accountant
 - **WHEN** a member types "anything from my accountant always matters", presses Enter and picks Rita Gomes
-- **THEN** the proposal reads "Always show mail from rita@silva-contas.example", quoting what they wrote, with Save
+- **THEN** the proposal reads "Mail from Rita Gomes (rita@silva-contas.example) always stays in your inbox and never gets filed away.", quotes what they wrote, shows how many emails it matches, and Save creates it with origin `instruction` and their words
 
 #### Scenario: Forwarding
 - **WHEN** the answer is `unsupported` with `sends_mail`

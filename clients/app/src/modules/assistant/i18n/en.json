@@ -200,6 +200,7 @@
     "rules": "Your rules"
   },
   "shortcuts": {
-    "skip": "Skip this question"
+    "skip": "Skip this question",
+    "next": "Next, or save"
   }
 }

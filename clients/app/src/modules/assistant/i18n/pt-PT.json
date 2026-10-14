@@ -200,6 +200,7 @@
     "rules": "As suas regras"
   },
   "shortcuts": {
-    "skip": "Saltar esta pergunta"
+    "skip": "Saltar esta pergunta",
+    "next": "Seguinte, ou guardar"
   }
 }

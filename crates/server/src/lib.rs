@@ -19,6 +19,8 @@ mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
 #[cfg(test)]
+mod assistant_tests;
+#[cfg(test)]
 mod search_tests;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};

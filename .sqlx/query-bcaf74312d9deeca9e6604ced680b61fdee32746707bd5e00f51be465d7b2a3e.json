@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT before FROM conversations.rule_applications\n            WHERE rule_id = $1 AND conversation_id = $2\n              AND reverted_at IS NULL AND excepted_at IS NULL\n            FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "before",
+        "type_info": "Jsonb",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_applications",
+            "name": "before"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "bcaf74312d9deeca9e6604ced680b61fdee32746707bd5e00f51be465d7b2a3e"
+}

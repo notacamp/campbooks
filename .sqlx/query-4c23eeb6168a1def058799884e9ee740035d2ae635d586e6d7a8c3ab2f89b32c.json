@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.decisions\n                WHERE conversation_id = $1 AND source = 'taught' AND question = ANY($2)\n                  AND reasons @> jsonb_build_array(jsonb_build_object('evidence', $3::text))",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "TextArray",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "4c23eeb6168a1def058799884e9ee740035d2ae635d586e6d7a8c3ab2f89b32c"
+}

@@ -189,4 +189,15 @@ describe("Questions", () => {
       screen.getByRole("heading", { name: "Whose mail should always reach you?" }),
     ).toBeVisible();
   });
+
+  it("moves on with Enter after ticking a box", async () => {
+    mockEverything();
+    renderWithProviders(<Questions workspaceId={WS} onHome={vi.fn()} onMemory={vi.fn()} />);
+
+    const rita = await screen.findByRole("checkbox", { name: "Rita Gomes" });
+    fireEvent.click(rita);
+    fireEvent.keyDown(rita, { key: "Enter" });
+
+    expect(await screen.findByRole("heading", { name: "What never needs you?" })).toBeVisible();
+  });
 });

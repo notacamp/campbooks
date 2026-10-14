@@ -1,0 +1,19 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_runs\n              SET done = done + $2, changed = changed + $3,\n                  skipped_suspicious = skipped_suspicious + $4,\n                  skipped_member = skipped_member + $5, cursor = $6\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Int4",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f9251195a540ab5faa7e2e4c96e1274304b5febf5fe9fdf643e9c27a748653d6"
+}

@@ -1,0 +1,136 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: RuleRunId\", kind, state, total, done, changed, skipped_suspicious,\n                  skipped_member, started_at, finished_at\n             FROM conversations.rule_runs WHERE rule_id = $1\n            ORDER BY started_at DESC, id DESC LIMIT 1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: RuleRunId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "total",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "total"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "done",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "done"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "changed",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "changed"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "skipped_suspicious",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "skipped_suspicious"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "skipped_member",
+        "type_info": "Int4",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "skipped_member"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "started_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "started_at"
+          }
+        }
+      },
+      {
+        "ordinal": 9,
+        "name": "finished_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "finished_at"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "dc93823cc89390d9d7b3e517d5a6dd305ae9af66a29071501016cea93d0e4d5f"
+}

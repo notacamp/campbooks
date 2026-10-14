@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_applications SET reverted_at = now()\n            WHERE rule_id = $1 AND conversation_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "0807c735afb15cc90d7a731ae8ccfb4582193c80089a29cf7518b55793ab0e83"
+}

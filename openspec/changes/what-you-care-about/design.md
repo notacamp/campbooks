@@ -37,11 +37,13 @@ exist.
 | # | Question (en) | What it changes |
 | - | --- | --- |
 | 1 | Whose mail should always reach you? Suggestions (who you reply to most) plus "Add an address or domain" | One taught rule per sender: `sender_address is X` (or `sender_domain is D`, never a free-mail domain) → `surface: always`. Their mail always raises at least a Review need and no rule hides it. |
-| 2 | What never needs you? Newsletters and mailing lists / Automatic notifications / senders you rarely open | Taught rules → `surface: never`: `header list_id present`; `header auto_submitted present`; `sender_address is X` per sender. No need is raised for them. Suspicious mail is exempt (#125). |
+| 2 | What never needs you? Newsletters and mailing lists / Automatic notifications / an address or domain the member adds | Taught rules → `surface: never`: `header list_id present`; `header auto_submitted present`; `sender_address is X` per sender. No need is raised for them. Suspicious mail is exempt (#125). |
 | 3 | When Scout is sure, should it act? Ask me first / Do it and tell me | `proactivity` on the member's profile, read by #125 through the kernel port `MemberPreferences::acts_without_asking`: a rule Scout proposes from that member's evidence starts `active` with a notice and Undo in a personal inbox, and is always `proposed` in a shared inbox. Default `ask_first`, #125's behaviour without the port. |
 
-Question 3 is shown only once #125's port is on `next` (a client flag
-until then), so the flow never asks a question with no effect.
+Question 3 has an effect because #125 reads the port when it creates a
+rule from evidence (origins `correction` and `suggestion`); this change
+implements the port and an end-to-end test shows "Do it and tell me"
+making the next such rule active in a personal inbox.
 
 Dropped, with the reason:
 
@@ -64,9 +66,8 @@ Inboxes the member only reads get no rule, and the view says so. Save
 creates every rule (`create_rule`, `state = active`, origin `onboarding`)
 and writes the profile; one Undo removes them all.
 
-Until #125's operations are on `next`, the views show the rule sentence
-without counts, and Save stores the profile only; wiring the rules is a
-task of this change.
+The match preview is `conversations.preview_rule` in each inbox the rule
+would go to, summed; the samples are the newest three.
 
 ### 3. Where answers live
 
@@ -103,10 +104,11 @@ Input: `{ text }`, at most 300 characters. Steps:
 1. **Sanitise** the text: displayable characters only
    (`kernel::text::displayable`: no control, bidi or zero-width
    characters), whitespace collapsed, trimmed. Refuse with 400
-   `instruction_invalid` and a `reason` (`empty`, `too_long`, `url`,
-   `pasted_mail`) when it is empty, longer than 300 characters, holds a URL,
-   or looks pasted from mail (header lines such as `From:` or `Subject:`,
-   quote markers, more than two addresses).
+   `instruction_empty`, `instruction_too_long`, `instruction_has_link` or
+   `instruction_pasted_mail` when it is empty, longer than 300 characters,
+   holds a URL, or looks pasted from mail (header lines such as `From:` or
+   `Subject:` in any of the four languages, quote markers, several lines,
+   more than two addresses).
 2. **Gather the person's own context** through `kernel::operations::invoke`
    as the person (`Caller::Assistant`), so every access check applies:
    their inboxes' addresses (`conversations.list_inboxes`) and their label

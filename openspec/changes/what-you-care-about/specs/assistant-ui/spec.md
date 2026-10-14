@@ -16,9 +16,9 @@ flow; Not now SHALL record `asked_at` and the offer SHALL not come back.
 
 ### Requirement: The question flow
 The client SHALL ask, one per view: whose mail should always reach you,
-what never needs you, and (once #125's port is on `next`) whether Scout
-should ask first or act and tell you. Each view SHALL show its position
-("1 of 3"), Next (`Enter`), Skip (`S`) and Not now (`Esc`), and Back from
+what never needs you, and whether Scout should ask first or act and tell
+you. Each view SHALL show its position ("1 of 3"), Next (`Enter`, also
+from a ticked box), Skip (`S`) and Not now (`Esc`), and Back from
 the second view on, each with its shortcut hint from the registry, and the
 line "You can change this anytime in Scout's memory." No view SHALL
 require an answer. The sender view SHALL offer the senders from
@@ -39,9 +39,9 @@ rule it becomes as the sentence Scout's memory uses. Before saving, a
 review view SHALL list every rule grouped by inbox: the member's own
 inboxes on; an inbox shared with others marked "For everyone" and off
 until the member switches it on; inboxes the member only reads saying they
-get no rule. Save (`Enter`) SHALL store the profile and, once #125's
-operations are on `next`, create every rule that is on (origin
-`onboarding`) with one Undo for all of them.
+get no rule. Save (`Enter`) SHALL create every rule that is on (`state = active`,
+origin `onboarding`, one teaching per answer), store the profile, and
+offer one Undo that removes them all and puts the profile back.
 
 #### Scenario: Newsletters never need me
 - **WHEN** a member picks "Newsletters and mailing lists"

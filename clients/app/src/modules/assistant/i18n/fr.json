@@ -200,6 +200,7 @@
     "rules": "Vos règles"
   },
   "shortcuts": {
-    "skip": "Passer cette question"
+    "skip": "Passer cette question",
+    "next": "Suivant, ou enregistrer"
   }
 }

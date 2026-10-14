@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_runs SET state = $2, finished_at = now() WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "546785db8d9758c1c84ade7ebe72cfc12a12abbb5f8cca2c649c2b7610fc7d1a"
+}

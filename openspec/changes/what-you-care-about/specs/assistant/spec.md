@@ -62,14 +62,19 @@ The module SHALL implement the kernel's `MemberPreferences` port, answering
 - **WHEN** a member chose "Do it and tell me"
 - **THEN** the port answers true for them and false for every other member
 
+#### Scenario: Scout's next proposal in a personal inbox
+- **WHEN** a member who chose "Do it and tell me" gets a rule Scout proposes from their evidence (origin `suggestion`) in an inbox only they use
+- **THEN** it is created active, with `acted_without_asking`, where with "Ask me first" it waited as proposed
+
 ### Requirement: Own words are sanitised
 The instruction a member writes SHALL lose control, bidirectional and
 zero-width characters, have runs of whitespace collapsed to one space and
 be trimmed before it is checked or used. Text that is empty, longer than
 300 characters, holds a URL, or looks pasted from mail (header lines,
-quote markers, more than two addresses) SHALL be refused with 400
-`instruction_invalid` and a `reason` of `empty`, `too_long`, `url` or
-`pasted_mail`.
+quote markers, several lines, more than two addresses) SHALL be refused
+with 400 and the code `instruction_empty`, `instruction_too_long`,
+`instruction_has_link` or `instruction_pasted_mail`, without calling any
+model.
 
 #### Scenario: A hidden direction override
 - **WHEN** an instruction contains a right-to-left override and a zero-width space
@@ -77,7 +82,7 @@ quote markers, more than two addresses) SHALL be refused with 400
 
 #### Scenario: Pasted mail
 - **WHEN** a member pastes "From: Ana <ana@example.com>\nSubject: Invoice" as an instruction
-- **THEN** the response is 400 `instruction_invalid` with reason `pasted_mail` and no model is called
+- **THEN** the response is 400 `instruction_pasted_mail` and no model is called
 
 ### Requirement: Compiling an instruction into taught rules
 `POST …/assistant/compile` (`assistant.compile_instruction`,

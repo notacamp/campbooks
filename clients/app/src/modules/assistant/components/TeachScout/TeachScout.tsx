@@ -73,7 +73,6 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
         <div className="min-w-0 flex-1">
           <TextField
             label={t("memory.teach.label")}
-            hint={t("memory.teach.privacy")}
             placeholder={t("memory.teach.placeholder")}
             maxLength={MAX_CHARS}
             value={text}
@@ -86,6 +85,9 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
           {t("memory.teach.submit")}
         </Button>
       </form>
+      <Text tone="tertiary" size="sm">
+        {t("memory.teach.privacy")}
+      </Text>
       {compile.isPending ? (
         <Note visor="thinking" label={t("memory.teach.reading")}>
           <strong>{t("memory.teach.reading")}</strong> {t("memory.teach.readingLead")}

@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.rule_applications\n            (rule_id, conversation_id, workspace_id, run_id, before)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (rule_id, conversation_id) DO UPDATE\n           SET run_id = EXCLUDED.run_id, before = EXCLUDED.before, applied_at = now(),\n               reverted_at = NULL\n         WHERE conversations.rule_applications.reverted_at IS NOT NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cf7dc31e824923a3afd0b27bc8ea28fe631aeeab2f4fc5fee867ab3c1dab5191"
+}
