@@ -85,8 +85,9 @@ On the demo mailbox the recordings use (the fake Gmail: 13 messages in 11
 conversations, all within the window, synced by a server that raised no
 needs), the backfill refreshed 11 conversations and raised 6 needs: one
 phishing warning, three replies (two with due dates), one request and one
-bill. The other five (a newsletter, receipts, notifications, a calendar
-invitation) ask nothing under the rules. So a mailbox gets roughly one need
+bill. The other five raise none: two newsletters and a sign-in notice ask
+nothing, a friend's photos are an FYI, and in a colleague's thread Sam had
+already answered and the newest message asks nothing new. So a mailbox gets roughly one need
 per person-to-person question, request or bill in the last 14 days; list
 and service mail, most of a typical inbox, raises none. For the production
 instance this means its recent person-to-person mail fills Home, not its

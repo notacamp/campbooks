@@ -61,7 +61,10 @@ export default async function needsBackfill({ page }: ScenarioContext): Promise<
   await page.goto(home);
   await heading(page);
   await caption(page, "Mail synced before the upgrade: Home has nothing yet", 2400);
-  await caption(page, "The upgraded server lists each inbox and works through it in the background");
+  await caption(
+    page,
+    "The upgraded server lists each inbox and works through it in the background",
+  );
 
   // The dispatcher ticks every minute; the page reloads until Home fills.
   for (let attempt = 0; attempt < 90; attempt += 1) {
