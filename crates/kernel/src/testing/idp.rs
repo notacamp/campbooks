@@ -166,7 +166,8 @@ impl TestKey {
 
 impl TestIdp {
     /// Start an IdP on a free loopback port with one published signing key.
-    /// Its issuer is `http://127.0.0.1:<port>/auth/v1/` (a layout with a path, to exercise issuer paths).
+    /// Its issuer is `http://127.0.0.1:<port>/auth/v1/` (it has a path, to
+    /// exercise issuer paths).
     ///
     /// # Panics
     /// If the test environment is broken (see the module docs).

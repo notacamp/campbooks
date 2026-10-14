@@ -1,7 +1,7 @@
 //! The BFF's side of OIDC: discovery, the authorization request,
 //! and the token, refresh, revocation and end-session endpoints, as a
-//! confidential client authenticating with `client_secret_post` (the method
-//! every OIDC server accepts for every grant).
+//! confidential client authenticating with `client_secret_post` (the most widely
+//! supported method).
 //!
 //! The browser and the server may reach the IdP at different addresses (in
 //! a container network the server uses an internal URL): the authorization and
