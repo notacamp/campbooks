@@ -117,12 +117,20 @@ and the operator tips (`from:`, `has:attachment`, `is:unread`, `"exact phrase"`,
 there is one. When the response says `indexing` it SHALL say "Still indexing
 older mail". Errors SHALL be plain: `query_too_long` asks for a shorter
 search, `cursor_mismatch` offers to search again from the start, and any other
-failure offers Try again. Storage failures SHALL be ignored.
+failure offers Try again. Recent searches SHALL be stored only on the device,
+under a key scoped to the signed-in account and workspace, SHALL NOT be read or
+written while the account is unknown, and SHALL be removed on sign-out and
+whenever the session is found to be over. Storage failures SHALL be ignored.
 
 #### Scenario: Recents
 
 - **WHEN** the user opens all results for `lease` and later presses `/`
 - **THEN** `lease` is listed under Recent searches, and "Clear" empties the list
+
+#### Scenario: A shared browser
+
+- **WHEN** Ana's recent searches are stored and Ben signs in on the same browser, or Ana signs out
+- **THEN** Ben sees none of them, and after sign-out none remain on the device
 
 #### Scenario: Still indexing
 

@@ -141,3 +141,69 @@ describe("isTypingTarget", () => {
     expect(isTypingTarget(null)).toBe(false);
   });
 });
+
+describe("alternate keys", () => {
+  const list: ShortcutDefinition[] = [
+    {
+      id: "next",
+      keys: "j",
+      alternateKeys: ["arrowdown"],
+      scope: "list",
+      group: "list",
+      label: "shortcuts:list.next",
+    },
+  ];
+
+  function arrows(alternates: boolean) {
+    const registry = new ShortcutRegistry(list);
+    const handler = vi.fn();
+    registry.bind("next", handler, { alternates });
+    const dispatch = createDispatcher(registry, "other");
+    const press = (key: string, target: EventTarget = document.body) => {
+      const event = new KeyboardEvent("keydown", { key, cancelable: true });
+      Object.defineProperty(event, "target", { value: target });
+      dispatch(event);
+      return event;
+    };
+    return { handler, press };
+  }
+
+  it("run the shortcut like its main keys", () => {
+    const { handler, press } = arrows(true);
+
+    press("j");
+    const event = press("ArrowDown");
+
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("stay with the browser when the screen takes only the main keys", () => {
+    const { handler, press } = arrows(false);
+
+    const event = press("ArrowDown");
+    press("j");
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it("leave arrows to fields, radio groups, menus and dialogs", () => {
+    const { handler, press } = arrows(true);
+    document.body.innerHTML = `
+      <input type="radio" id="radio" />
+      <div role="menu"><button id="item">Item</button></div>
+      <div role="dialog"><button id="close">Close</button></div>
+      <button id="row">Row</button>`;
+    const at = (id: string) => document.getElementById(id) ?? document.body;
+
+    for (const id of ["radio", "item", "close"]) {
+      expect(press("ArrowDown", at(id)).defaultPrevented).toBe(false);
+    }
+    expect(handler).not.toHaveBeenCalled();
+
+    press("ArrowDown", at("row"));
+    expect(handler).toHaveBeenCalledOnce();
+    document.body.innerHTML = "";
+  });
+});

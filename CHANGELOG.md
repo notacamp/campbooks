@@ -28,6 +28,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   and `Pragma: no-cache`, so browsers and proxies don't keep them.
 - `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
   `[::1]` unless `--allow-remote` is passed.
+- A failed job's error is cleaned before it is stored and logged: only its
+  first line, at most 500 characters, with quoted text, email addresses,
+  link paths and queries, and long tokens removed. Admin → Jobs shows the
+  cleaned message. Errors already stored are left as they are.
 
 ### Removed
 - **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
@@ -52,7 +56,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
-
+- Admin → People marks people whose account is suspended, and Admin →
+  Signups → Codes says what a code is: good for the number of signups set
+  when it is minted, until it is used up, expires or is revoked.
 - The event log is no longer kept forever: events older than
   `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
   events still being delivered, and failed jobs older than
@@ -69,7 +75,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
-
+- **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
+  stream's conversations like J and K, Enter opens one, and going past the
+  last row loads more. In an open conversation the arrows scroll it (J and K
+  still go to the next or previous one), and they're never taken from a
+  field, a menu or a dialog. The `?` sheet and the empty reader show "J or ↓".
+  Home's "what needs you" list moves with the arrows too (an open item scrolls).
 - Search in the app. Press `/` anywhere in a workspace for a search panel:
   instant rows by relevance with the words that matched marked, the filters
   Campbooks understood (`from:`, `has:attachment`, `is:unread`, dates...)
@@ -81,7 +92,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   the reader beside the list on wide screens; J, K, ↵, E, S, U, M and Z work
   as in the inbox. On phones the top bar has a search button, the page is
   full screen and the reader is its own screen. Recent searches are kept on
-  the device only (and cleared with one button); older mail still being
+  this device only, for the signed-in account and workspace (cleared with one button and on sign-out); older mail still being
   indexed and every error are said plainly. In English, European Portuguese,
   Spanish and French.
 - Admin → Jobs: administrators with the `jobs.read` permission see the
@@ -112,9 +123,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 - Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
   join an instance that approves new accounts and approve or reject each request
   (a rejection can carry a note only administrators see), and mint, copy once and
-  revoke **single-use signup codes** for instances that ask for a code. A person
-  waiting for approval, approved, or not approved sees that on the create-workspace
-  screen the next time they open the app (they are not emailed yet). Codes are
+  revoke **signup codes** (each good for the number of signups you set) for
+  instances that ask for a code. A person waiting for approval, approved, or not
+  approved sees that on the create-workspace screen the next time they open the
+  app (they are not emailed yet). Codes are
   stored as digests, work for the number of uses and until the day you set, and are
   spent when the workspace is created, so two people cannot share the last use.
   `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and

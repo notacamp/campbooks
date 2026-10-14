@@ -24,11 +24,15 @@ import {
   W,
 } from "../../../test/demo/conversations";
 import { INVOICE_HIT, LEDGER_HIT, Q4_HIT, results } from "../../../test/demo/search";
-import { DUARTE } from "../../../test/demo/workspaces";
+import { DUARTE, SESSION } from "../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../test/render";
 
-import { forgetSearches, rememberSearch } from "./model";
+import { forgetPrefs } from "~/lib/storage/prefs";
+
+import { recentKey, rememberSearch } from "./model";
 import { buildSearchRoutes } from "./routes";
+
+const SIGNED_IN = { "GET /bff/session": { body: SESSION } };
 
 function renderAt(path: string) {
   const root = createRootRoute({ component: Outlet });
@@ -59,6 +63,7 @@ function backend(
 ) {
   const asked: URLSearchParams[] = [];
   const api = mockApi({
+    ...SIGNED_IN,
     [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
     [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
     [`GET ${W}/search`]: (request) => {
@@ -86,7 +91,7 @@ function backend(
 
 describe("the results page", () => {
   afterEach(() => {
-    forgetSearches();
+    forgetPrefs("searches.");
   });
 
   it("lists the hits newest first with the matched words marked, then by relevance on request", async () => {
@@ -188,7 +193,7 @@ describe("the results page", () => {
   });
 
   it("shows the recent searches and the tips for an empty query", async () => {
-    rememberSearch("lease");
+    rememberSearch(recentKey(SESSION.user.sub, DUARTE.id), "lease");
     const { asked } = backend();
     renderAt(SEARCH);
 
@@ -247,6 +252,7 @@ describe("a stale cursor", () => {
   it("offers to search again from the top", async () => {
     const asked: URLSearchParams[] = [];
     mockApi({
+      ...SIGNED_IN,
       [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
       [`GET ${W}/streams`]: { body: { streams: STREAM_COUNTS } },
       [`GET ${W}/conversations`]: { body: { conversations: PRIMARY, next_cursor: null } },

@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { writePref } from "~/lib/storage/prefs";
+import { forgetPrefs, writePref } from "~/lib/storage/prefs";
 
 import {
   addToken,
   chipLabel,
   forgetSearches,
   hasFilter,
+  recentKey,
   recentSearches,
   rememberSearch,
   removeFilter,
@@ -71,34 +72,53 @@ describe("chip labels", () => {
 });
 
 describe("recent searches", () => {
+  const key = recentKey("account-a", "w1");
+
   afterEach(() => {
-    forgetSearches();
+    forgetPrefs("searches.");
   });
 
   it("keeps the newest first, once each, at most eight", () => {
     for (const query of ["a", "b", "c", "d", "e", "f", "g", "h", "i", "B "]) {
-      rememberSearch(query);
+      rememberSearch(key, query);
     }
 
-    const recent = recentSearches();
+    const recent = recentSearches(key);
     expect(recent).toHaveLength(8);
     expect(recent[0]).toBe("B");
     expect(recent.filter((query) => query.toLowerCase() === "b")).toHaveLength(1);
   });
 
   it("ignores empty and over-long queries, and clears", () => {
-    rememberSearch(" ".repeat(3));
-    rememberSearch("x".repeat(513));
-    expect(recentSearches()).toEqual([]);
-    rememberSearch("lease");
-    forgetSearches();
-    expect(recentSearches()).toEqual([]);
+    rememberSearch(key, " ".repeat(3));
+    rememberSearch(key, "x".repeat(513));
+    expect(recentSearches(key)).toEqual([]);
+    rememberSearch(key, "lease");
+    forgetSearches(key);
+    expect(recentSearches(key)).toEqual([]);
   });
 
   it("treats damaged storage as empty", () => {
-    writePref("searches", "{not json");
-    expect(recentSearches()).toEqual([]);
-    writePref("searches", '[1, "ok"]');
-    expect(recentSearches()).toEqual(["ok"]);
+    writePref(key ?? "searches.x", "{not json");
+    expect(recentSearches(key)).toEqual([]);
+    writePref(key ?? "searches.x", '[1, "ok"]');
+    expect(recentSearches(key)).toEqual(["ok"]);
+  });
+
+  it("keeps each account's and workspace's searches apart", () => {
+    rememberSearch(recentKey("account-a", "w1"), "from:client invoice");
+
+    expect(recentSearches(recentKey("account-b", "w1"))).toEqual([]);
+    expect(recentSearches(recentKey("account-a", "w2"))).toEqual([]);
+    expect(recentSearches(recentKey("account-a", "w1"))).toEqual(["from:client invoice"]);
+  });
+
+  it("stores nothing until the account is known", () => {
+    const unknown = recentKey(undefined, "w1");
+
+    rememberSearch(unknown, "lease");
+
+    expect(unknown).toBeUndefined();
+    expect(recentSearches(unknown)).toEqual([]);
   });
 });

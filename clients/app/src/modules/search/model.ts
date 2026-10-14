@@ -1,6 +1,6 @@
 // Pure helpers of the search screens: the query text and its filters, the
 // device's recent searches, and what a hit says. No React, no fetching.
-import { readPref, writePref } from "~/lib/storage/prefs";
+import { readPref, writePref, type PrefKey } from "~/lib/storage/prefs";
 
 import type { SearchFilter, SearchWarning } from "./api/queries";
 
@@ -127,10 +127,24 @@ export function warningText(t: Translate, warning: SearchWarning): string {
 
 const RECENT_MAX = 8;
 
-/** The device's recent searches, newest first (empty when storage is unavailable). */
-export function recentSearches(): string[] {
+/**
+ * Where a member's recent searches live on this device: one key per account
+ * and workspace, so the next person on a shared browser finds none of them.
+ * Without a known account nothing is stored.
+ */
+export function recentKey(accountId: string | undefined, workspaceId: string): PrefKey | undefined {
+  return accountId === undefined || accountId === ""
+    ? undefined
+    : (`searches.${accountId}.${workspaceId}` as const);
+}
+
+/** The recent searches under `key`, newest first (empty when storage is unavailable). */
+export function recentSearches(key: PrefKey | undefined): string[] {
+  if (key === undefined) {
+    return [];
+  }
   try {
-    const parsed: unknown = JSON.parse(readPref("searches") ?? "[]");
+    const parsed: unknown = JSON.parse(readPref(key) ?? "[]");
     return Array.isArray(parsed)
       ? parsed.filter((item): item is string => typeof item === "string").slice(0, RECENT_MAX)
       : [];
@@ -140,17 +154,19 @@ export function recentSearches(): string[] {
 }
 
 /** Remembers a query that was run (typed text only, never a result). */
-export function rememberSearch(text: string): void {
+export function rememberSearch(key: PrefKey | undefined, text: string): void {
   const query = text.trim();
-  if (query === "" || query.length > MAX_QUERY) {
+  if (key === undefined || query === "" || query.length > MAX_QUERY) {
     return;
   }
-  const others = recentSearches().filter((other) => other.toLowerCase() !== query.toLowerCase());
-  writePref("searches", JSON.stringify([query, ...others].slice(0, RECENT_MAX)));
+  const others = recentSearches(key).filter((other) => other.toLowerCase() !== query.toLowerCase());
+  writePref(key, JSON.stringify([query, ...others].slice(0, RECENT_MAX)));
 }
 
-export function forgetSearches(): void {
-  writePref("searches", "[]");
+export function forgetSearches(key: PrefKey | undefined): void {
+  if (key !== undefined) {
+    writePref(key, "[]");
+  }
 }
 
 // ── the list ─────────────────────────────────────────────────────────────

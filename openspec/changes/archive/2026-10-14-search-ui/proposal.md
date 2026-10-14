@@ -50,5 +50,6 @@ No server change: the design is Decision 4 of the archived `search` change.
 ## Impact
 
 Client only. New shortcut `search.open` (`/`) in the `?` sheet and the ⌘K menu.
-New device preference key `searches` (recent searches; the only Web Storage
-write, through `lib/storage/prefs`).
+New device preference keys `searches.<account>.<workspace>` (recent searches,
+typed text only; the only Web Storage write, through `lib/storage/prefs`),
+cleared on sign-out.

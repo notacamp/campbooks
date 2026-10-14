@@ -49,8 +49,9 @@ pub const DEFAULT_MAX_ATTEMPTS: u32 = 10;
 /// The `LISTEN/NOTIFY` channel enqueues signal on; the payload is the queue.
 pub const NOTIFY_CHANNEL: &str = "kernel_jobs";
 
-/// Longest `last_error` kept, in characters.
-pub const MAX_ERROR_LEN: usize = 2_000;
+/// Longest `last_error` kept, in characters, after
+/// [`redact::job_error`](crate::redact::job_error) kept its first line.
+pub const MAX_ERROR_LEN: usize = 500;
 
 /// A unit of background work.
 ///
@@ -105,8 +106,11 @@ pub trait JobHandler: Send + Sync + 'static {
     ) -> impl Future<Output = Result<(), JobError>> + Send;
 }
 
-/// Why a job did not succeed. The message is stored in `last_error`
-/// (truncated) and logged: never put secrets or user content in it.
+/// Why a job did not succeed. The message is stored in `last_error` and
+/// logged, after [`redact::job_error`](crate::redact::job_error) kept its
+/// first line, hid anything quoted, addresses, links and tokens, and
+/// [`MAX_ERROR_LEN`] bounded it. That is a backstop: never put secrets or
+/// user content in it; say what failed, with ids and status codes.
 #[derive(Debug, thiserror::Error)]
 pub enum JobError {
     /// Try again later: after `after` if given, else with exponential

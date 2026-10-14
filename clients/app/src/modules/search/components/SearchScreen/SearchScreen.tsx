@@ -36,11 +36,8 @@ import {
 import { HitRow, hitStream } from "../../hit-row";
 import {
   chipLabel,
-  forgetSearches,
   hasFilter,
   MAX_QUERY,
-  recentSearches,
-  rememberSearch,
   removeFilter,
   scrollIntoView,
   toggleFilter,
@@ -54,6 +51,7 @@ import {
   SearchTips,
   Warnings,
 } from "../../states";
+import { useRecentSearches } from "../../use-recent";
 import { useDebounced } from "../../use-debounced";
 import { useSearchT } from "../../use-search-t";
 
@@ -96,7 +94,7 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
   const field = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState(query);
   const [cursor, setCursor] = useState<string | undefined>();
-  const [recents, setRecents] = useState(recentSearches);
+  const recent = useRecentSearches(workspaceId);
   const pushed = useRef(query);
   // An empty search page opens ready to type; the reader's page does not.
   const startsEmpty = useRef(query === "" && conversationId === undefined);
@@ -163,7 +161,7 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
     );
   };
   const open = (id: string) => {
-    rememberSearch(draft);
+    recent.remember(draft);
     setCursor(id);
     go(id);
   };
@@ -366,15 +364,7 @@ export function SearchScreen({ workspaceId, query, sort, conversationId, now }: 
         )}
         {debounced === "" && typed === "" ? (
           <>
-            <RecentSearches
-              t={t}
-              items={recents}
-              onPick={setDraft}
-              onClear={() => {
-                forgetSearches();
-                setRecents([]);
-              }}
-            />
+            <RecentSearches t={t} items={recent.items} onPick={setDraft} onClear={recent.clear} />
             <SearchTips t={t} />
           </>
         ) : null}

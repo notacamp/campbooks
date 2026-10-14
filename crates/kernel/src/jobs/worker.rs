@@ -579,8 +579,11 @@ impl Shared {
                 Some(JobOutcome::Lost)
             }
             Err(e) => {
-                self.fail(info, &JobError::retry(format!("could not commit: {e}")))
-                    .await
+                self.fail(
+                    info,
+                    &JobError::retry(format!("could not commit: {}", crate::redact::sqlx(&e))),
+                )
+                .await
             }
         }
     }
@@ -592,7 +595,9 @@ impl Shared {
             JobError::Fatal(_) => (true, None),
             JobError::Retry { after, .. } => (false, after.map(|d| d.as_secs_f64())),
         };
-        let message = truncate_error(&error.to_string());
+        // Sanitized and bounded where it is written: an administrator reads it
+        // (Admin → Jobs), and it is logged.
+        let message = truncate_error(&crate::redact::job_error(&error.to_string()));
         #[expect(
             clippy::cast_precision_loss,
             reason = "retry delays are far below 2^52 ms; f64 seconds are exact enough"

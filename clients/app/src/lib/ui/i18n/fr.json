@@ -5,6 +5,7 @@
   "loading": "Chargement",
   "kbd": {
     "then": "puis",
+    "or": "ou",
     "shortcut": "Raccourci : {{keys}}"
   },
   "toast": {

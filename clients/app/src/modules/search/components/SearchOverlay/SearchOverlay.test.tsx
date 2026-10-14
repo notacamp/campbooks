@@ -11,11 +11,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { LEDGER, W } from "../../../../../test/demo/conversations";
 import { INVOICE_HIT, LEDGER_HIT, results } from "../../../../../test/demo/search";
-import { DUARTE } from "../../../../../test/demo/workspaces";
+import { DUARTE, SESSION } from "../../../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
-import { forgetSearches, rememberSearch } from "../../model";
+import { forgetPrefs } from "~/lib/storage/prefs";
+
+import { recentKey, rememberSearch } from "../../model";
 
 import { SearchOverlay } from "./SearchOverlay";
+
+const SIGNED_IN = { "GET /bff/session": { body: SESSION } };
 
 function renderOverlay(initialQuery = "") {
   const onClose = vi.fn();
@@ -52,12 +56,13 @@ const type = (input: HTMLElement, value: string) => {
 
 describe("the search overlay", () => {
   afterEach(() => {
-    forgetSearches();
+    forgetPrefs("searches.");
   });
 
   it("asks by relevance with the last word as a prefix, and marks what matched", async () => {
     const asked: URLSearchParams[] = [];
     mockApi({
+      ...SIGNED_IN,
       [`GET ${W}/search`]: (request) => {
         asked.push(new URL(request.url).searchParams);
         return { body: results([INVOICE_HIT, LEDGER_HIT]) };
@@ -80,7 +85,7 @@ describe("the search overlay", () => {
   });
 
   it("moves with the arrows and opens the selected conversation in the inbox reader", async () => {
-    mockApi({ [`GET ${W}/search`]: { body: results([INVOICE_HIT, LEDGER_HIT]) } });
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT, LEDGER_HIT]) } });
     const { router, onClose } = renderOverlay();
     const input = await field();
     type(input, "invoice");
@@ -102,7 +107,7 @@ describe("the search overlay", () => {
   });
 
   it("opens all results with Ctrl+Enter, and remembers the query", async () => {
-    mockApi({ [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
     const { router } = renderOverlay();
     const input = await field();
     type(input, " invoice ");
@@ -118,6 +123,7 @@ describe("the search overlay", () => {
 
   it("shows the filters it understood as chips and removes one from the text", async () => {
     mockApi({
+      ...SIGNED_IN,
       [`GET ${W}/search`]: {
         body: results([INVOICE_HIT], {
           query: {
@@ -140,7 +146,7 @@ describe("the search overlay", () => {
   });
 
   it("starts from the query ⌘K handed over", async () => {
-    mockApi({ [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
     renderOverlay("lease");
 
     expect(await field()).toHaveValue("lease");
@@ -148,12 +154,13 @@ describe("the search overlay", () => {
   });
 
   it("offers the device's recent searches and the tips while the field is empty", async () => {
-    rememberSearch("lease");
-    mockApi({ [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
+    rememberSearch(recentKey(SESSION.user.sub, DUARTE.id), "lease");
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
     renderOverlay();
     const input = await field();
 
-    expect(screen.getByRole("heading", { name: "Recent searches" })).toBeVisible();
+    // They appear once the session says whose they are.
+    expect(await screen.findByRole("heading", { name: "Recent searches" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Narrow it down" })).toBeVisible();
     expect(screen.getByText("has:attachment")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "lease" }));
@@ -165,6 +172,7 @@ describe("the search overlay", () => {
 
   it("says when older mail is still being indexed, and when nothing matches", async () => {
     mockApi({
+      ...SIGNED_IN,
       [`GET ${W}/search`]: (request) =>
         new URL(request.url).searchParams.get("q") === "zzz"
           ? { body: results([], { indexing: true }, "zzz") }
@@ -182,7 +190,7 @@ describe("the search overlay", () => {
   });
 
   it("says plainly when the search is too long", async () => {
-    mockApi({ [`GET ${W}/search`]: problem(400, "query_too_long") });
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: problem(400, "query_too_long") });
     renderOverlay();
 
     type(await field(), "invoice");
@@ -192,7 +200,7 @@ describe("the search overlay", () => {
   });
 
   it("closes with Escape", async () => {
-    mockApi({});
+    mockApi({ ...SIGNED_IN });
     const { onClose } = renderOverlay();
 
     fireEvent.keyDown(await field(), { key: "Escape" });
@@ -201,7 +209,7 @@ describe("the search overlay", () => {
   });
 
   it("hints its keys", async () => {
-    mockApi({});
+    mockApi({ ...SIGNED_IN });
     renderOverlay();
     await field();
 

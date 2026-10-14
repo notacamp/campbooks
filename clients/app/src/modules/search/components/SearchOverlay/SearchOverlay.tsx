@@ -5,15 +5,7 @@ import { Button, KbdHint, Overlay, SearchField, SkeletonList, Text } from "~/lib
 
 import { useInstantSearch, useSearchRestart, type SearchHit } from "../../api/queries";
 import { HitRow, hitStream } from "../../hit-row";
-import {
-  chipLabel,
-  forgetSearches,
-  MAX_QUERY,
-  recentSearches,
-  rememberSearch,
-  removeFilter,
-  scrollIntoView,
-} from "../../model";
+import { chipLabel, MAX_QUERY, removeFilter, scrollIntoView } from "../../model";
 import {
   IndexingNote,
   NoResults,
@@ -23,6 +15,7 @@ import {
   SearchTips,
   Warnings,
 } from "../../states";
+import { useRecentSearches } from "../../use-recent";
 import { useDebounced } from "../../use-debounced";
 import { useSearchT } from "../../use-search-t";
 
@@ -72,7 +65,7 @@ function OverlayContent({
   const input = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(initialQuery);
   const [active, setActive] = useState(0);
-  const [recents, setRecents] = useState(recentSearches);
+  const recent = useRecentSearches(workspaceId);
   const typed = text.trim();
   const debounced = useDebounced(text, DEBOUNCE_MS);
   const settled = debounced.trim() === typed;
@@ -91,7 +84,7 @@ function OverlayContent({
   }, [activeId, hits.length]);
 
   const showAll = () => {
-    rememberSearch(text);
+    recent.remember(text);
     onClose();
     void navigate({
       to: "/w/$workspaceId/search",
@@ -100,7 +93,7 @@ function OverlayContent({
     });
   };
   const openHit = (hit: SearchHit) => {
-    rememberSearch(text);
+    recent.remember(text);
     onClose();
     void navigate({
       to: `/w/${workspaceId}/inbox/${hitStream(hit)}/${hit.record.id}`,
@@ -178,15 +171,7 @@ function OverlayContent({
       />
       {typed === "" ? (
         <>
-          <RecentSearches
-            t={t}
-            items={recents}
-            onPick={setText}
-            onClear={() => {
-              forgetSearches();
-              setRecents([]);
-            }}
-          />
+          <RecentSearches t={t} items={recent.items} onPick={setText} onClear={recent.clear} />
           <SearchTips t={t} />
         </>
       ) : null}

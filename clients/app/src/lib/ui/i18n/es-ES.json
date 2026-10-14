@@ -5,6 +5,7 @@
   "loading": "Cargando",
   "kbd": {
     "then": "después",
+    "or": "o",
     "shortcut": "Atajo: {{keys}}"
   },
   "toast": {

@@ -57,10 +57,19 @@ first page.
 ### D6. The device remembers queries, not mail
 
 Recent searches (the last 8 query strings) are stored through
-`lib/storage/prefs` (try/catch inside), under a new closed-union key, and
-cleared by a button. A query is saved when it is opened as all results or when
-a result is opened from it. Only text the member typed is stored, never a
-result.
+`lib/storage/prefs` (try/catch inside), cleared by a button. A query is saved
+when it is opened as all results or when a result is opened from it. Only text
+the member typed is stored, never a result.
+
+Queries are private, so the key is scoped: `searches.<account id>.<workspace
+id>` (a template-literal pref key, the account id is the session's `sub`).
+Until the session says who is signed in nothing is read or written, so the
+next person on a shared browser never sees the previous one's queries. Every
+`searches.*` entry is removed (`forgetPrefs("searches.")`, the only code that
+touches Web Storage stays in `prefs.ts`) on sign-out (`signOut`,
+`signOutAndLeave`) and whenever the session query finds no one signed in
+(an ended session, a 401 leading to sign-in). `prefs.ts`'s rule against user
+data now has this one documented exception.
 
 ### D7. Instant results never flicker
 
