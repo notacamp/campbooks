@@ -143,7 +143,7 @@ export function stepUpUrl(returnTo: string, { fresh = false }: { fresh?: boolean
 }
 
 /** How long a new way to sign in stands out on Ways to sign in. */
-export const RECENT_DAYS = 7;
+const RECENT_DAYS = 7;
 
 /** Whether a way in added at `iso` is recent enough to stand out (as of `now`). */
 export function addedRecently(iso: string, now: Date = new Date()): boolean {
