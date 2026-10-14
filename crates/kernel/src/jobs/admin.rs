@@ -1,0 +1,367 @@
+//! What an administrator may see and do with the queue (ADR 0015).
+//!
+//! `kernel.jobs` is written only through the kernel, so the admin
+//! operations of the `system` module call these functions rather than
+//! touching the table. Each takes the [`AdminGrant`] that only the
+//! [`Admin`](crate::admin::Admin) extractor builds.
+//!
+//! - **Metadata only.** Nothing here selects `payload`: a payload holds ids
+//!   today and may hold more tomorrow, and an operator needs to know what
+//!   failed and why (kind, queue, attempts, error), not what was in it.
+//! - **Failed jobs only.** [`retry`], [`retry_kind`] and [`discard`] match
+//!   `state = 'failed'` in the statement itself, so a job a worker has
+//!   claimed, or that already succeeded, can never be touched, however the
+//!   calls race with the worker. Retrying is idempotent: the second call
+//!   finds the job pending (or running, or done) and changes nothing.
+
+use chrono::{DateTime, Utc};
+use serde::Serialize;
+use sqlx::PgPool;
+use utoipa::ToSchema;
+use uuid::Uuid;
+
+use super::{JobId, NOTIFY_CHANNEL};
+use crate::{Error, admin::AdminGrant, i18n};
+
+/// Most failed jobs [`retry_kind`] requeues per call; call again for more.
+pub const RETRY_BATCH: i64 = 1_000;
+
+/// Largest page of [`failed`].
+pub const MAX_PAGE: i64 = 200;
+
+/// Page size of [`failed`] when none is asked for.
+pub const DEFAULT_PAGE: i64 = 50;
+
+/// The queue at a glance: one row per queue and kind with unfinished or
+/// failed work. Succeeded jobs are pruned and not counted.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct QueueSummary {
+    /// When the counts were taken.
+    pub at: DateTime<Utc>,
+    /// Age of the oldest job that is ready to run and waiting, in seconds.
+    pub oldest_ready_seconds: Option<i64>,
+    /// Counts per queue and kind, sorted by queue then kind.
+    pub kinds: Vec<KindSummary>,
+}
+
+/// The jobs of one kind on one queue.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct KindSummary {
+    /// The queue they run on.
+    pub queue: String,
+    /// The job's wire name (`<module>.<job>`).
+    pub kind: String,
+    /// Pending and due now: waiting for a worker.
+    pub ready: i64,
+    /// Pending for later: new delayed work, or waiting out a retry backoff.
+    pub scheduled: i64,
+    /// Claimed by a worker.
+    pub running: i64,
+    /// Running, but past its lease: the worker stopped renewing it and the
+    /// next upkeep hands it back.
+    pub expired_leases: i64,
+    /// Dead: out of attempts, or failed for good. Kept for inspection.
+    pub failed: i64,
+    /// Age of the oldest ready job of this kind, in seconds.
+    pub oldest_ready_seconds: Option<i64>,
+}
+
+/// A dead job: what ran and why it stopped, never its payload.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FailedJob {
+    /// The job's id.
+    pub id: JobId,
+    /// The queue it ran on.
+    pub queue: String,
+    /// The job's wire name.
+    pub kind: String,
+    /// The workspace it belongs to; `null` for instance-wide work.
+    pub workspace_id: Option<String>,
+    /// Attempts made.
+    pub attempts: i32,
+    /// Attempts it was allowed.
+    pub max_attempts: i32,
+    /// The last failure, truncated; never carries secrets.
+    pub last_error: Option<String>,
+    /// When it was enqueued.
+    pub created_at: DateTime<Utc>,
+    /// When it died.
+    pub finished_at: Option<DateTime<Utc>>,
+}
+
+/// A page of dead jobs, newest first.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct FailedPage {
+    /// The jobs.
+    pub items: Vec<FailedJob>,
+    /// Pass as `after` for the next page; `null` on the last one.
+    pub next: Option<String>,
+}
+
+/// Which dead jobs [`failed`] lists.
+#[derive(Debug, Clone, Default)]
+pub struct FailedFilter {
+    /// Only this kind.
+    pub kind: Option<String>,
+    /// Only this queue.
+    pub queue: Option<String>,
+}
+
+/// What [`retry`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Retry {
+    /// It was dead and is pending again, with its attempts reset.
+    Requeued,
+    /// It is not dead (already requeued, running, or done): nothing changed.
+    Unchanged,
+    /// Another unfinished job of the same kind holds its unique key, so
+    /// running it again would duplicate that work: nothing changed.
+    Superseded,
+    /// There is no such job.
+    Missing,
+}
+
+/// What [`discard`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Discard {
+    /// It was dead and is gone.
+    Discarded,
+    /// It is not dead (retried meanwhile, running, or done): kept.
+    Unchanged,
+    /// There is no such job (already discarded).
+    Missing,
+}
+
+/// Counts of the queue by queue and kind.
+pub async fn summary(db: &PgPool, _grant: &AdminGrant) -> Result<QueueSummary, Error> {
+    let rows = sqlx::query!(
+        r#"
+        SELECT queue, kind,
+               count(*) FILTER (WHERE state = 'pending' AND run_at <= now()) AS "ready!",
+               count(*) FILTER (WHERE state = 'pending' AND run_at > now()) AS "scheduled!",
+               count(*) FILTER (WHERE state = 'running') AS "running!",
+               count(*) FILTER (WHERE state = 'running' AND locked_until < now())
+                   AS "expired_leases!",
+               count(*) FILTER (WHERE state = 'failed') AS "failed!",
+               extract(epoch FROM now() - min(run_at)
+                   FILTER (WHERE state = 'pending' AND run_at <= now()))::bigint
+                   AS oldest_ready_seconds
+          FROM kernel.jobs
+         WHERE state <> 'succeeded'
+         GROUP BY queue, kind
+         ORDER BY queue, kind
+        "#
+    )
+    .fetch_all(db)
+    .await?;
+    let kinds: Vec<KindSummary> = rows
+        .into_iter()
+        .map(|row| KindSummary {
+            queue: row.queue,
+            kind: row.kind,
+            ready: row.ready,
+            scheduled: row.scheduled,
+            running: row.running,
+            expired_leases: row.expired_leases,
+            failed: row.failed,
+            oldest_ready_seconds: row.oldest_ready_seconds,
+        })
+        .collect();
+    Ok(QueueSummary {
+        at: Utc::now(),
+        oldest_ready_seconds: kinds.iter().filter_map(|k| k.oldest_ready_seconds).max(),
+        kinds,
+    })
+}
+
+/// A page of dead jobs, newest first. `after` is the `next` of the previous
+/// page; `limit` is clamped to `1..=`[`MAX_PAGE`].
+pub async fn failed(
+    db: &PgPool,
+    _grant: &AdminGrant,
+    filter: &FailedFilter,
+    after: Option<&str>,
+    limit: Option<i64>,
+) -> Result<FailedPage, Error> {
+    let cursor = after.map(parse_cursor).transpose()?;
+    let limit = limit.unwrap_or(DEFAULT_PAGE).clamp(1, MAX_PAGE);
+    let (after_at, after_id) = cursor.unzip();
+    let mut rows = sqlx::query_as!(
+        FailedJob,
+        r#"
+        SELECT id AS "id: JobId", queue, kind, workspace_id, attempts, max_attempts,
+               last_error, created_at, finished_at
+          FROM kernel.jobs
+         WHERE state = 'failed'
+           AND ($1::text IS NULL OR kind = $1)
+           AND ($2::text IS NULL OR queue = $2)
+           AND ($3::timestamptz IS NULL OR (finished_at, id) < ($3, $4))
+         ORDER BY finished_at DESC, id DESC
+         LIMIT $5
+        "#,
+        filter.kind,
+        filter.queue,
+        after_at,
+        after_id,
+        limit + 1,
+    )
+    .fetch_all(db)
+    .await?;
+    let more = i64::try_from(rows.len()).is_ok_and(|n| n > limit);
+    if more {
+        rows.truncate(usize::try_from(limit).unwrap_or(usize::MAX));
+    }
+    let next = more
+        .then(|| rows.last())
+        .flatten()
+        .and_then(|last| Some(format_cursor(last.finished_at?, last.id)));
+    Ok(FailedPage { items: rows, next })
+}
+
+/// Put one dead job back on its queue: pending, due now, attempts reset.
+pub async fn retry(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Retry, Error> {
+    let id = Uuid::from(id);
+    let mut tx = db.begin().await?;
+    let requeued = sqlx::query!(
+        r#"
+        UPDATE kernel.jobs j
+           SET state = 'pending', run_at = now(), attempts = 0,
+               finished_at = NULL, locked_by = NULL, locked_until = NULL,
+               updated_at = now()
+         WHERE j.id = $1 AND j.state = 'failed'
+           AND (j.unique_key IS NULL OR NOT EXISTS (
+                SELECT 1 FROM kernel.jobs o
+                 WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                   AND o.state IN ('pending', 'running')))
+        RETURNING j.queue
+        "#,
+        id,
+    )
+    .fetch_optional(&mut *tx)
+    .await?;
+    if let Some(row) = requeued {
+        notify(&mut tx, &row.queue).await?;
+        tx.commit().await?;
+        return Ok(Retry::Requeued);
+    }
+    let state = sqlx::query_scalar!("SELECT state FROM kernel.jobs WHERE id = $1", id)
+        .fetch_optional(&mut *tx)
+        .await?;
+    Ok(match state.as_deref() {
+        None => Retry::Missing,
+        Some("failed") => Retry::Superseded,
+        Some(_) => Retry::Unchanged,
+    })
+}
+
+/// Put dead jobs of one kind back on their queue (optionally one queue),
+/// oldest first, at most [`RETRY_BATCH`] per call. Jobs whose unique key is
+/// held by another unfinished job are skipped. Returns how many were
+/// requeued; a result equal to the batch size means there may be more.
+pub async fn retry_kind(
+    db: &PgPool,
+    _grant: &AdminGrant,
+    kind: &str,
+    queue: Option<&str>,
+) -> Result<u64, Error> {
+    let mut tx = db.begin().await?;
+    let queues = sqlx::query_scalar!(
+        r#"
+        WITH locked AS (
+            SELECT j.id, j.unique_key
+              FROM kernel.jobs j
+             WHERE j.state = 'failed' AND j.kind = $1
+               AND ($2::text IS NULL OR j.queue = $2)
+               AND (j.unique_key IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM kernel.jobs o
+                     WHERE o.kind = j.kind AND o.unique_key = j.unique_key
+                       AND o.state IN ('pending', 'running')))
+             ORDER BY j.finished_at, j.id
+             LIMIT $3
+               FOR UPDATE SKIP LOCKED
+        ),
+        picked AS (
+            -- Two dead jobs sharing a unique key must not both come back.
+            SELECT id FROM (
+                SELECT id, unique_key,
+                       row_number() OVER (PARTITION BY unique_key ORDER BY id) AS n
+                  FROM locked
+            ) l
+             WHERE l.unique_key IS NULL OR l.n = 1
+        )
+        UPDATE kernel.jobs j
+           SET state = 'pending', run_at = now(), attempts = 0,
+               finished_at = NULL, locked_by = NULL, locked_until = NULL,
+               updated_at = now()
+          FROM picked
+         WHERE j.id = picked.id
+        RETURNING j.queue
+        "#,
+        kind,
+        queue,
+        RETRY_BATCH,
+    )
+    .fetch_all(&mut *tx)
+    .await?;
+    let mut touched = queues.clone();
+    touched.sort_unstable();
+    touched.dedup();
+    for queue in &touched {
+        notify(&mut tx, queue).await?;
+    }
+    tx.commit().await?;
+    Ok(queues.len() as u64)
+}
+
+/// Delete one dead job. A job that is not dead is never deleted.
+pub async fn discard(db: &PgPool, _grant: &AdminGrant, id: JobId) -> Result<Discard, Error> {
+    let id = Uuid::from(id);
+    let deleted = sqlx::query!(
+        "DELETE FROM kernel.jobs WHERE id = $1 AND state = 'failed'",
+        id
+    )
+    .execute(db)
+    .await?
+    .rows_affected();
+    if deleted > 0 {
+        return Ok(Discard::Discarded);
+    }
+    let exists = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM kernel.jobs WHERE id = $1) AS "exists!""#,
+        id
+    )
+    .fetch_one(db)
+    .await?;
+    Ok(if exists {
+        Discard::Unchanged
+    } else {
+        Discard::Missing
+    })
+}
+
+async fn notify(conn: &mut sqlx::PgConnection, queue: &str) -> Result<(), sqlx::Error> {
+    sqlx::query_scalar!("SELECT pg_notify($1, $2)", NOTIFY_CHANNEL, queue)
+        .fetch_one(conn)
+        .await?;
+    Ok(())
+}
+
+fn format_cursor(at: DateTime<Utc>, id: JobId) -> String {
+    format!("{}.{id}", at.timestamp_micros())
+}
+
+fn parse_cursor(cursor: &str) -> Result<(DateTime<Utc>, Uuid), Error> {
+    let parsed = cursor.split_once('.').and_then(|(micros, id)| {
+        Some((
+            DateTime::from_timestamp_micros(micros.parse().ok()?)?,
+            id.parse::<Uuid>().ok()?,
+        ))
+    });
+    parsed.ok_or_else(|| {
+        Error::BadRequest(
+            i18n::MESSAGES
+                .reason("invalid_query")
+                .arg("reason", "`after` is not a cursor from a previous page"),
+        )
+    })
+}

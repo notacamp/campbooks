@@ -129,5 +129,67 @@
     "duration": {
       "lessThanAMinute": "Moins d’une minute"
     }
+  },
+  "jobs": {
+    "title": "Tâches",
+    "refresh": "Actualiser",
+    "lead": "Le travail de fond que cette instance exécute, et les tâches qui ont abandonné. Le contenu d’une tâche n’est jamais affiché ici : seulement ce qui s’est exécuté, combien de fois et pourquoi cela s’est arrêté.",
+    "dismiss": "Fermer",
+    "loading": "Chargement de la file de tâches",
+    "cancel": "Annuler",
+    "loadError": {
+      "title": "Impossible de charger la file de tâches",
+      "lead": "Le serveur n’a pas répondu. Réessayez dans un instant.",
+      "retry": "Réessayer"
+    },
+    "queue": {
+      "title": "File",
+      "emptyTitle": "Rien n’est en file",
+      "emptyLead": "Aucune tâche n’est en attente, en cours ou en échec pour le moment.",
+      "showFailed": "Voir les échecs",
+      "retryAll": "Relancer toutes les tâches en échec",
+      "underAMinute": "moins d’une minute",
+      "counts": "Prêtes {{ready}} · Planifiées {{scheduled}} · En cours {{running}} · En échec {{failed}}",
+      "oldestWaiting": "la plus ancienne attend depuis {{age}}",
+      "expiredLeases_one": "{{count}} tâche en cours a perdu son processus",
+      "expiredLeases_other": "{{count}} tâches en cours ont perdu leur processus"
+    },
+    "retryAll": {
+      "question_one": "Relancer la {{count}} tâche {{kind}} en échec ? Elle repart de sa première tentative.",
+      "question_other": "Relancer les {{count}} tâches {{kind}} en échec ? Chacune repart de sa première tentative.",
+      "confirm": "Relancer",
+      "done_one": "{{count}} tâche {{kind}} est de nouveau dans la file.",
+      "done_other": "{{count}} tâches {{kind}} sont de nouveau dans la file.",
+      "more": "Il en reste : relancez encore pour remettre le reste en file.",
+      "none": "Aucune tâche {{kind}} en échec n’était à relancer.",
+      "error": "Impossible de relancer les tâches {{kind}}. Réessayez."
+    },
+    "failed": {
+      "title": "Tâches en échec",
+      "filter": "Afficher",
+      "allKinds": "Tous les types",
+      "emptyTitle": "Aucune tâche en échec",
+      "emptyLead": "Toutes les tâches se sont terminées ou sont encore en cours d’essai.",
+      "retried": "La tâche est de nouveau dans la file.",
+      "discarded": "La tâche a été abandonnée.",
+      "unchanged": "Cette tâche n’était plus en échec, donc rien n’a changé.",
+      "superseded": "Une autre tâche de ce type attend déjà, donc celle-ci a été laissée telle quelle.",
+      "retryError": "Impossible de relancer la tâche. Réessayez.",
+      "discardError": "Impossible d’abandonner la tâche. Réessayez.",
+      "more": "Afficher plus",
+      "when": "Échec le {{when}}",
+      "attempts": "{{attempts}} tentatives sur {{max}}",
+      "instanceWide": "toute l’instance",
+      "workspace": "espace de travail {{workspace}}",
+      "noError": "Aucune erreur n’a été enregistrée.",
+      "error": "Dernière erreur",
+      "copy": "Copier l’erreur",
+      "copied": "Copié.",
+      "copyFailed": "Impossible de copier. Sélectionnez le texte et copiez-le.",
+      "retry": "Relancer",
+      "discard": "Abandonner",
+      "discardConfirm": "Abandonner",
+      "discardQuestion": "Abandonner cette tâche {{kind}} ? Elle est supprimée définitivement."
+    }
   }
 }

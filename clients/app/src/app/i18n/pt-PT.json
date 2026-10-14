@@ -64,9 +64,10 @@
     "back": "Voltar ao Campbooks",
     "sections": {
       "system": "Sistema",
+      "jobs": "Tarefas",
+      "signups": "Registos",
       "people": "Pessoas",
-      "workspaces": "Espaços de trabalho",
-      "signups": "Registos"
+      "workspaces": "Espaços de trabalho"
     },
     "menuEntry": "Administração",
     "reauthTitle": "Inicie sessão novamente para continuar",
