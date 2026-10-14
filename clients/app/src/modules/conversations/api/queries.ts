@@ -3,6 +3,7 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -288,6 +289,45 @@ export function useConversationsByIds(workspaceId: string, ids: readonly string[
           signal,
         }),
       ).conversations,
+  });
+}
+
+/** The longest `ids` list `conversations.list` takes. */
+const IDS_MAX = 100;
+
+/**
+ * Like {@link useConversationsByIds} for any number of ids (asked in batches
+ * of 100): a map of the summaries you can see, by id. For screens that show
+ * another module's hits and act on them (search results).
+ */
+export function useConversationSummaries(
+  workspaceId: string,
+  ids: readonly string[],
+): ReadonlyMap<string, ConversationSummary> {
+  const sorted = [...new Set(ids)].toSorted();
+  const batches: string[][] = [];
+  for (let start = 0; start < sorted.length; start += IDS_MAX) {
+    batches.push(sorted.slice(start, start + IDS_MAX));
+  }
+  return useQueries({
+    queries: batches.map((batch) => ({
+      queryKey: operationKey("conversations.list", {
+        workspace_id: workspaceId,
+        ids: batch.join(","),
+      }),
+      placeholderData: keepPreviousData,
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        unwrap(
+          await api.GET("/api/v1/w/{workspace_id}/conversations", {
+            params: { path: { workspace_id: workspaceId }, query: { ids: batch.join(",") } },
+            signal,
+          }),
+        ).conversations,
+    })),
+    combine: (results) =>
+      new Map(
+        results.flatMap((result) => result.data ?? []).map((summary) => [summary.id, summary]),
+      ),
   });
 }
 

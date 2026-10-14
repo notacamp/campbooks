@@ -11,10 +11,12 @@ import { CommandMenu } from "./CommandMenu";
 function Screen({
   onInbox,
   onAsk,
+  onSearch,
   onSuggestion,
 }: {
   onInbox: () => void;
   onAsk?: (query: string) => void;
+  onSearch?: (query: string) => void;
   onSuggestion?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -40,6 +42,7 @@ function Screen({
           },
         ]}
         onAsk={onAsk}
+        onSearch={onSearch}
       />
     </>
   );
@@ -68,6 +71,29 @@ describe("CommandMenu", () => {
     expect(screen.getByRole("group", { name: "Suggested" })).toHaveTextContent("Réply to Sofia");
     expect(screen.getByRole("group", { name: "Go to" })).toHaveTextContent("InboxGthenI");
     expect(screen.queryByRole("option", { name: /Search or ask/ })).not.toBeInTheDocument();
+  });
+
+  it("offers to search conversations for the query, before Ask, and hands it over", () => {
+    const onSearch = vi.fn();
+    renderUi(<Screen onInbox={vi.fn()} onAsk={vi.fn()} onSearch={onSearch} />);
+    open();
+    const input = screen.getByRole("combobox");
+
+    fireEvent.change(input, { target: { value: "  lease " } });
+    const options = screen.getAllByRole("option");
+
+    expect(options.at(-2)).toHaveTextContent("Search conversations for “lease”");
+    expect(options.at(-1)).toHaveTextContent("Ask Campbooks: lease");
+    fireEvent.click(screen.getByRole("option", { name: /Search conversations/ }));
+    expect(onSearch).toHaveBeenCalledWith("lease");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("offers no search row without a query", () => {
+    renderUi(<Screen onInbox={vi.fn()} onSearch={vi.fn()} />);
+    open();
+
+    expect(screen.queryByRole("option", { name: /Search conversations/ })).not.toBeInTheDocument();
   });
 
   it("filters ignoring accents and runs the active command with Enter", () => {

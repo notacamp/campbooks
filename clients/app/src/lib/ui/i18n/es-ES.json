@@ -25,7 +25,8 @@
     "empty": "Nada coincide con «{{query}}»",
     "results": "Comandos",
     "ask": "Preguntar a Campbooks: {{query}}",
-    "askGroup": "Preguntar"
+    "askGroup": "Preguntar o buscar",
+    "search": "Buscar conversaciones con “{{query}}”"
   },
   "shortcutSheet": {
     "title": "Atajos de teclado"
@@ -102,5 +103,10 @@
   },
   "howDecided": {
     "title": "Cómo decidió Campbooks"
+  },
+  "searchField": {
+    "clear": "Borrar la búsqueda",
+    "filters": "Filtros de la búsqueda",
+    "remove": "Quitar el filtro: {{filter}}"
   }
 }

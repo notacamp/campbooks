@@ -1,0 +1,126 @@
+{
+  "field": {
+    "label": "Search conversations",
+    "placeholder": "Search conversations"
+  },
+  "overlay": {
+    "label": "Search",
+    "results": "Results",
+    "hintMove": "Move",
+    "hintOpen": "Open",
+    "hintAll": "All results",
+    "hintClose": "Close"
+  },
+  "shortcuts": {
+    "open": "Search conversations"
+  },
+  "row": {
+    "noSubject": "(no subject)"
+  },
+  "chip": {
+    "attachment": "Has attachment",
+    "is": {
+      "unread": "Unread",
+      "read": "Read",
+      "starred": "Starred"
+    },
+    "from": "From {{value}}",
+    "to": "To {{value}}",
+    "cc": "Cc {{value}}",
+    "subject": "Subject: {{value}}",
+    "in": "In {{value}}",
+    "label": "Label: {{value}}",
+    "date": {
+      "before": "Before {{value}}",
+      "after": "After {{value}}",
+      "older_than": "Older than {{value}}",
+      "newer_than": "Newer than {{value}}"
+    },
+    "other": "{{operator}}: {{value}}"
+  },
+  "warning": {
+    "label": "What was not understood",
+    "unknown_operator": "“{{operator}}:” is not a search operator, so it was searched as text.",
+    "empty_value": "“{{operator}}:” needs a value after it.",
+    "invalid_value": "The value after “{{operator}}:” was not understood.",
+    "other": "Part of this search was not understood."
+  },
+  "recent": {
+    "title": "Recent searches",
+    "clear": "Clear"
+  },
+  "tips": {
+    "title": "Narrow it down",
+    "from": {
+      "text": "From a person",
+      "example": "from:ana"
+    },
+    "attachment": {
+      "text": "With a file attached",
+      "example": "has:attachment"
+    },
+    "unread": {
+      "text": "Only what you have not read",
+      "example": "is:unread"
+    },
+    "phrase": {
+      "text": "An exact phrase",
+      "example": "\"october invoice\""
+    },
+    "exclude": {
+      "text": "Leave a word out",
+      "example": "-newsletter"
+    },
+    "date": {
+      "text": "Sent after a date, or recently",
+      "example": "after:2026-09-01"
+    }
+  },
+  "count_one": "{{count}} result",
+  "count_other": "{{count}} results",
+  "empty": {
+    "title": "No conversations match “{{query}}”",
+    "body": "Try fewer words, or other words.",
+    "bodyFilters": "Try removing a filter above, or fewer words."
+  },
+  "indexing": {
+    "title": "Still indexing older mail",
+    "body": "Older conversations may be missing from these results for now."
+  },
+  "error": {
+    "retry": "Try again",
+    "again": "Search again",
+    "too_long": {
+      "title": "That search is too long",
+      "body": "Shorten it to 512 characters or fewer."
+    },
+    "cursor": {
+      "title": "These results are out of date",
+      "body": "The search changed while more results were loading. Search again to start from the top."
+    },
+    "busy": {
+      "title": "Too many searches at once",
+      "body": "Wait a moment, then try again."
+    },
+    "other": {
+      "title": "Could not search",
+      "body": "Campbooks could not reach the server. Nothing was lost."
+    }
+  },
+  "page": {
+    "title": "Search",
+    "list": "Search results",
+    "order": "Order",
+    "newest": "Newest",
+    "relevance": "Most relevant",
+    "quick": "Quick filters",
+    "attachmentToggle": "Has attachment",
+    "unreadToggle": "Unread",
+    "more": "More results",
+    "loadingMore": "Loading more results",
+    "reader": "Conversation",
+    "readerTitle": "Pick a result",
+    "readerBody": "Choose one from the list, or use the keyboard:",
+    "back": "Back to results"
+  }
+}
