@@ -54,6 +54,12 @@ jobs:
       - name: Architecture (module boundaries, migration names)
         if: always()
         run: cargo xtask arch
+      - name: New migrations sort after the base branch's
+        if: always() && github.event_name == 'pull_request'
+        env: { BASE: "${{ github.base_ref }}" }
+        run: |
+          git fetch --no-tags --depth=1 origin "+refs/heads/$BASE:refs/remotes/origin/$BASE"
+          cargo xtask migrations --base "origin/$BASE"
       - name: OpenAPI drift
         if: always()
         run: cargo xtask openapi --check
@@ -201,3 +207,95 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  laya-image:
+    # Builds the Laya model server image (deploy/laya, the `decide` role) as
+    # published, natively on both architectures, and scans it. Not pushed. The
+    # image is large, so the build is skipped unless something it is built
+    # from (or its recipe) changed.
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: ubuntu-latest, arch: amd64 }
+          - { runner: ubuntu-24.04-arm, arch: arm64 }
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - name: Changed?
+        id: changed
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          paths=(deploy/laya .github/workflows/ci.yml .github/workflows/image.yml)
+          if ! files=$(git diff --name-only "$BASE" HEAD -- "${paths[@]}" 2>/dev/null); then
+            files=unknown   # no usable base (new branch, force push): build anyway
+          fi
+          if [ -n "$files" ]; then echo "run=true"; else echo "run=false"; fi >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+        if: steps.changed.outputs.run == 'true'
+      - uses: docker/build-push-action@v7
+        if: steps.changed.outputs.run == 'true'
+        with:
+          context: deploy/laya
+          load: true
+          tags: campbooks-laya:ci
+          cache-from: type=gha,scope=laya-${{ matrix.arch }}
+          cache-to: type=gha,scope=laya-${{ matrix.arch }},mode=max
+      - name: Trivy (HIGH/CRITICAL, fixable)
+        if: steps.changed.outputs.run == 'true'
+        # Pinned by SHA: this action's tags have been tampered with before.
+        uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
+        with:
+          image-ref: campbooks-laya:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+      - name: Smoke test (refuses no key; answers a decide request)
+        # Starts the image as compose does, lets it download the checkpoint, and
+        # times a few typed decisions on this runner's CPU (3 threads, as in the
+        # production budget). Fake email, no secrets: the key is generated here.
+        if: steps.changed.outputs.run == 'true'
+        timeout-minutes: 15
+        run: |
+          set +e
+          docker run --rm campbooks-laya:ci; code=$?
+          set -e
+          [ "$code" = 64 ] || { echo "::error::expected exit 64 without LAYA_API_KEY, got $code"; exit 1; }
+          key=$(openssl rand -hex 16)
+          # A failed checkpoint download (Hugging Face answering 5xx) exits the
+          # container; like `restart: unless-stopped` in compose, restart it.
+          docker run -d --name laya --restart on-failure:5 -p 127.0.0.1:8000:8000 \
+            -e LAYA_API_KEY="$key" -e LAYA_THREADS=3 --cpus 3 campbooks-laya:ci
+          for i in $(seq 1 120); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' laya)
+            [ "$s" = healthy ] && break
+            if [ "$(docker inspect -f '{{.State.Status}}' laya)" = exited ]; then
+              echo "::error::laya exited after $(docker inspect -f '{{.RestartCount}}' laya) restarts"
+              docker logs --tail 50 laya; exit 1
+            fi
+            sleep 5
+          done
+          [ "$s" = healthy ] || { docker logs --tail 50 laya; exit 1; }
+          echo "healthy after ~$((i * 5)) s, $(docker inspect -f '{{.RestartCount}}' laya) restarts (checkpoint download included)"
+          cat > /tmp/req.json <<'JSON'
+          {"model": "convaiinnovations/laya-multilingual",
+           "state": {"from": "Ana <ana@example.com>", "subject": "Invoice 2026-114 due Friday",
+                     "body": "Hi, attached is invoice 2026-114 for the September work. Could you confirm it will be paid by Friday? Thanks, Ana"},
+           "questions": {
+             "category": {"type": "choice", "instructions": "What is this email about?",
+                          "criteria": {"invoice": "A bill or payment request", "newsletter": "A newsletter or marketing", "personal": "A personal message"}},
+             "urgency": {"type": "score", "instructions": "How urgent is it?", "criteria": ["not urgent", "this week", "today"]},
+             "asks_user": {"type": "noul", "instructions": "The sender asks the recipient to do something."}}}
+          JSON
+          for n in 1 2 3 4 5; do
+            curl -sS -o /tmp/answer.json -w "request $n: HTTP %{http_code} in %{time_total} s\n" \
+              -H "Authorization: Bearer $key" -H 'Content-Type: application/json' \
+              --data @/tmp/req.json http://127.0.0.1:8000/v1/systemone | tee /tmp/status
+            grep -q 'HTTP 200' /tmp/status || { cat /tmp/answer.json; docker logs --tail 50 laya; exit 1; }
+          done
+          jq -c '.answers' /tmp/answer.json
+          docker stats --no-stream --format 'memory: {{.MemUsage}}' laya
+          docker rm -f laya >/dev/null

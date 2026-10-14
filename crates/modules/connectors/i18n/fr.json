@@ -10,6 +10,8 @@
     "no_offline_access": "Le fournisseur n’a pas permis à Campbooks de rester connecté. Associez de nouveau le compte et autorisez l’accès.",
     "account_mismatch": "Vous vous êtes connecté avec un autre compte que celui que vous étendez. Utilisez le même compte.",
     "account_connected_by_another_member": "Un autre membre de cet espace de travail a déjà associé ce compte.",
-    "needs_reauth": "Cette connexion nécessite que vous associiez de nouveau le compte avant de pouvoir synchroniser."
+    "needs_reauth": "Cette connexion nécessite que vous associiez de nouveau le compte avant de pouvoir synchroniser.",
+    "unknown_data_centre": "Campbooks ne reconnaît pas le centre de données Zoho de ce compte. Contactez votre administrateur.",
+    "no_mailbox": "Ce compte n’a aucune boîte aux lettres que Campbooks puisse lire."
   }
 }

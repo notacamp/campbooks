@@ -6,6 +6,10 @@ name: Publish next
 #   ghcr.io/notacamp/campbooks:next and :next-<sha> → Trivy → dispatch
 #   `campbooks-next-staging` to the private cloud repo, which pulls the tag.
 #
+# The Laya model server (the `decide` role, deploy/laya) is published next to
+# it as ghcr.io/notacamp/campbooks-laya with the same tags, so a deploy pins
+# both images with one tag. The dispatch waits for both.
+#
 # Tags stay in the `next*` namespace until cutover so they never collide with
 # the Rails releases (`X.Y.Z`, `latest`) published from `main`. The build,
 # scan and attestation live in `image.yml`; versioned releases of next are
@@ -63,15 +67,34 @@ jobs:
       id-token: write
       attestations: write
 
-  deploy-staging:
-    needs: [plan, image]
+  laya-image:
+    needs: plan
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ needs.plan.outputs.ref }}
+      image: campbooks-laya
+      context: deploy/laya
+      tags: |
+        ${{ needs.plan.outputs.sha_tag }}
+        next
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+  deploy:
+    needs: [plan, image, laya-image]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Dispatch the staging deploy (cloud repo)
-        # Best-effort like the Rails release dispatch: an expired token must not
-        # fail a publish whose image is already pushed. Recover by hand with
-        # `gh workflow run deploy-next-staging.yml -R <owner>/campbooks-cloud -f tag=<tag>`.
+      - name: Dispatch the staging and production deploys (cloud repo)
+        # Every green push to next deploys the image it just published, to
+        # staging and to production. Best-effort like the Rails release
+        # dispatch: an expired token must not fail a publish whose image is
+        # already pushed. Recover by hand with
+        # `gh workflow run deploy-next-staging.yml -R <owner>/campbooks-cloud -f tag=<tag>`
+        # (or deploy-next-prod.yml).
         env:
           DISPATCH_TOKEN: ${{ secrets.CAMPBOOKS_CLOUD_DISPATCH_TOKEN }}
           TAG: ${{ needs.plan.outputs.sha_tag }}
@@ -81,14 +104,16 @@ jobs:
             echo "::warning::CAMPBOOKS_CLOUD_DISPATCH_TOKEN not set — deploy $TAG by hand."
             exit 0
           fi
-          code=$(curl -sS -o /tmp/dispatch.out -w '%{http_code}' -X POST \
-            -H "Authorization: Bearer $DISPATCH_TOKEN" \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/$OWNER/campbooks-cloud/dispatches" \
-            -d "{\"event_type\":\"campbooks-next-staging\",\"client_payload\":{\"tag\":\"$TAG\"}}")
-          if [ "$code" = "204" ]; then
-            echo "Dispatched staging deploy of $TAG."
-          else
-            echo "::warning::Staging dispatch returned HTTP $code: $(cat /tmp/dispatch.out)"
-          fi
+          for target in staging prod; do
+            code=$(curl -sS -o /tmp/dispatch.out -w '%{http_code}' -X POST \
+              -H "Authorization: Bearer $DISPATCH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/$OWNER/campbooks-cloud/dispatches" \
+              -d "{\"event_type\":\"campbooks-next-$target\",\"client_payload\":{\"tag\":\"$TAG\"}}")
+            if [ "$code" = "204" ]; then
+              echo "Dispatched the $target deploy of $TAG."
+            else
+              echo "::warning::The $target dispatch returned HTTP $code: $(cat /tmp/dispatch.out)"
+            fi
+          done

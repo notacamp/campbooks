@@ -43,7 +43,9 @@ use crate::{
 pub use hub::ChangeHub;
 pub use sequence::{PruneChanges, SequenceChanges};
 pub use stream::{Subscription, open};
-pub use visibility::{NoContainers, Visibility, VisibilityFuture, VisibilityPort};
+pub use visibility::{
+    ContainersFuture, NoContainers, Visibility, VisibilityFuture, VisibilityPort,
+};
 
 /// The `LISTEN/NOTIFY` channel the sequencer signals on; the payload is the
 /// workspace whose cursor moved.

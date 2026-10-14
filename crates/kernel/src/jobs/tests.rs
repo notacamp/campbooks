@@ -31,6 +31,9 @@ struct Probe {
     fatal: bool,
     panic: bool,
     sleep_ms: u64,
+    /// Ask Postgres to read this text as a number (an error that quotes it).
+    #[serde(default)]
+    as_number: Option<String>,
 }
 
 impl Probe {
@@ -52,6 +55,12 @@ impl Job for Probe {
             tokio::time::sleep(Duration::from_millis(self.sleep_ms)).await;
         }
         assert!(!self.panic, "probe told to panic");
+        if let Some(text) = &self.as_number {
+            sqlx::query("SELECT $1::text::int")
+                .bind(text)
+                .fetch_one(ctx.pool())
+                .await?;
+        }
         let attempt = i32::try_from(ctx.attempt()).unwrap_or_default();
         let fail = self.fatal || ctx.attempt() <= self.fail_first;
         log(ctx, Self::NAME, &self.note, attempt).await?;
@@ -907,25 +916,31 @@ async fn schedules_enqueue_each_tick_once_across_workers(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn prune_deletes_old_succeeded_jobs_only(db: PgPool) {
+async fn prune_deletes_finished_jobs_past_their_retention(db: PgPool) {
     let state = state(db.clone()).await;
     for note in ["old", "recent"] {
         enqueue_probe(&state, &Probe::note(note), EnqueueOptions::default()).await;
     }
-    enqueue_probe(
-        &state,
-        &Probe {
-            fatal: true,
-            ..Probe::note("dead")
-        },
-        EnqueueOptions::default(),
-    )
-    .await;
+    for note in ["dead", "long-dead"] {
+        enqueue_probe(
+            &state,
+            &Probe {
+                fatal: true,
+                ..Probe::note(note)
+            },
+            EnqueueOptions::default(),
+        )
+        .await;
+    }
     let worker = Worker::new(state.clone());
     worker.run_until_idle().await;
+    // Succeeded jobs go after 168 hours, failed ones after 30 days.
     sqlx::query(
-        "UPDATE kernel.jobs SET finished_at = now() - interval '30 days'
-          WHERE payload->>'note' IN ('old', 'dead')",
+        "UPDATE kernel.jobs SET finished_at = now() - CASE payload->>'note'
+             WHEN 'old' THEN interval '8 days'
+             WHEN 'dead' THEN interval '20 days'
+             WHEN 'long-dead' THEN interval '31 days' END
+          WHERE payload->>'note' IN ('old', 'dead', 'long-dead')",
     )
     .execute(&db)
     .await
@@ -945,6 +960,125 @@ async fn prune_deletes_old_succeeded_jobs_only(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(left, ["dead", "recent"]);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_database_error_leaves_no_content_in_last_error(db: PgPool) {
+    let state = state(db.clone()).await;
+    let mail = "Subject: Q4 plan from maya@northwind-studio.example";
+    let id = created(
+        enqueue_probe(
+            &state,
+            &Probe {
+                as_number: Some(mail.to_owned()),
+                ..Probe::note("db")
+            },
+            EnqueueOptions::default(),
+        )
+        .await,
+    );
+    Worker::new(state).run_until_idle().await;
+    let error = job(&db, id).await.last_error.unwrap();
+    assert_eq!(error, "database error 22P02");
+    assert!(!error.contains("maya"), "{error}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn prune_events_keeps_recent_and_undelivered_events(db: PgPool) {
+    let state = state(db.clone()).await;
+    // Three old events, one of them still waiting for its consumer.
+    let mut ids = Vec::new();
+    for (n, age) in [(1, 120), (2, 120), (3, 10)] {
+        let id: uuid::Uuid = sqlx::query_scalar(
+            "INSERT INTO kernel.events (name, version, workspace_id, payload, occurred_at)
+             VALUES ('test.happened', 1, 'ws', jsonb_build_object('n', $1::int),
+                     now() - make_interval(days => $2))
+             RETURNING id",
+        )
+        .bind(n)
+        .bind(age)
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        ids.push(id);
+    }
+    sqlx::query(
+        "INSERT INTO kernel.jobs (queue, kind, payload, event_id, max_attempts, run_at)
+         VALUES ('events', 'test.later', '{}', $1, 1, now() + interval '1 day')",
+    )
+    .bind(ids[1])
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let mut tx = db.begin().await.unwrap();
+    enqueue(&mut tx, &PruneEvents, EnqueueOptions::default())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    Worker::new(state).run_until_idle().await;
+
+    let left: Vec<i32> = sqlx::query_scalar(
+        "SELECT (payload->>'n')::int FROM kernel.events WHERE name = 'test.happened' ORDER BY 1",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(left, [2, 3], "the 90-day-old delivered event is gone");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_purged_workspace_loses_its_finished_jobs_and_events(db: PgPool) {
+    let state = state(db.clone()).await;
+    for workspace in ["gone", "kept"] {
+        enqueue_probe(
+            &state,
+            &Probe::note(workspace),
+            EnqueueOptions::for_workspace(workspace),
+        )
+        .await;
+        sqlx::query(
+            "INSERT INTO kernel.events (name, version, workspace_id, payload)
+             VALUES ('test.happened', 1, $1, '{}')",
+        )
+        .bind(workspace)
+        .execute(&db)
+        .await
+        .unwrap();
+    }
+    Worker::new(state.clone()).run_until_idle().await;
+    // A job of the purged workspace still to run (another module's purge).
+    enqueue_probe(
+        &state,
+        &Probe::note("still-queued"),
+        EnqueueOptions::for_workspace("gone").run_at(Utc::now() + TimeDelta::days(1)),
+    )
+    .await;
+
+    let mut tx = db.begin().await.unwrap();
+    let (jobs, events) = purge_workspace(&mut tx, "gone").await.unwrap();
+    tx.commit().await.unwrap();
+    assert_eq!((jobs, events), (1, 1));
+    let left: Vec<(String, String)> = sqlx::query_as(
+        "SELECT workspace_id, payload->>'note' FROM kernel.jobs
+          WHERE kind = 'test.probe' ORDER BY 1, 2",
+    )
+    .fetch_all(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        left,
+        [
+            ("gone".to_owned(), "still-queued".to_owned()),
+            ("kept".to_owned(), "kept".to_owned())
+        ]
+    );
+    let events: Vec<String> =
+        sqlx::query_scalar("SELECT workspace_id FROM kernel.events WHERE name = 'test.happened'")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(events, ["kept"]);
 }
 
 // --- the run loop ------------------------------------------------------------
@@ -1011,7 +1145,7 @@ async fn enqueue_notifications_wake_an_idle_worker(db: PgPool) {
     wait_for_kernel_schedules(&db).await;
     stop.send(()).unwrap();
     // The probe, and the kernel's prunes and blob sweep scheduled at start-up.
-    assert_eq!(worker.await.unwrap().succeeded, 6);
+    assert_eq!(worker.await.unwrap().succeeded, 7);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1059,7 +1193,7 @@ async fn shutdown_finishes_quick_jobs_and_releases_slow_ones(db: PgPool) {
     let stats = worker.await.unwrap();
     // The quick probe and the kernel's prunes and blob sweep scheduled at
     // start-up.
-    assert_eq!((stats.succeeded, stats.released), (6, 1));
+    assert_eq!((stats.succeeded, stats.released), (7, 1));
     assert_eq!(job(&db, quick).await.state, "succeeded");
     let slow = job(&db, slow).await;
     assert_eq!((slow.state.as_str(), slow.attempts), ("pending", 0));
@@ -1088,6 +1222,7 @@ fn registry_collects_kernel_and_module_work() {
         registry.kind_names(),
         [
             "kernel.prune_changes",
+            "kernel.prune_events",
             "kernel.prune_idempotency",
             "kernel.prune_jobs",
             "kernel.prune_rate_limits",
@@ -1102,6 +1237,7 @@ fn registry_collects_kernel_and_module_work() {
         registry.schedule_names(),
         [
             "kernel.prune_jobs",
+            "kernel.prune_events",
             "kernel.sweep_blobs",
             "kernel.prune_idempotency",
             "kernel.prune_rate_limits",

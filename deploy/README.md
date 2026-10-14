@@ -103,7 +103,7 @@ isolation then rests on the queries alone.
 
 | Service | Role | Model | Notes |
 | --- | --- | --- | --- |
-| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | Built from `deploy/laya`; ~680 MB download on first start; about 2 GB of RAM |
+| `laya` | `decide` | `convaiinnovations/laya-multilingual` (Apache-2.0, 322M) | `ghcr.io/notacamp/campbooks-laya`; ~680 MB download on first start; about 2 GB of RAM |
 | `ollama` | `complete` (and `vision`) | `qwen3:8b` | Pull models with `docker compose exec ollama ollama pull …` |
 | `embeddings` | `embed` | `BAAI/bge-m3` | linux/amd64 only; on arm64 use Ollama's `bge-m3` |
 
@@ -118,13 +118,17 @@ recent laptop).
   key, so the `laya` service refuses to start until `CAMPBOOKS_AI__DECIDE__API_KEY` is
   set in `.env`. The server sends the same value. The service has no published port:
   only containers on the compose network reach it.
-- **The image.** There is no official image, so compose builds one from
-  `deploy/laya/Dockerfile`: Python slim, CPU-only PyTorch, `laya[serve]` and its
-  libraries at pinned versions, running as a non-root user. On first start it
-  downloads the multilingual checkpoint (at the commit the `laya` package lists as
-  reviewed) into the `laya-models` volume; later starts load it from there. Build it
-  again after an upgrade with `docker compose --profile ai build laya`. The image is
-  optional and is not scanned by the release pipeline (only the Campbooks image is).
+- **The image.** Laya has no official image, so the release pipeline publishes one
+  next to the Campbooks image: `ghcr.io/notacamp/campbooks-laya`, built from
+  `deploy/laya/Dockerfile` for linux/amd64 and linux/arm64, scanned and attested
+  like the server image and published under the same tags (`next`, `next-<sha>`,
+  `next-vX.Y.Z`), so pin both to the same tag. It is Python slim, CPU-only
+  PyTorch, `laya[serve]` and its libraries at pinned versions, running as a
+  non-root user. The checkpoint is not in the image: on first start it downloads
+  the multilingual checkpoint (at the commit the `laya` package lists as reviewed)
+  into the `laya-models` volume; later starts load it from there. To build the
+  image yourself, swap `image:` for the commented `build: ./laya` line in
+  `compose.yaml` and run `docker compose --profile ai build laya`.
 - **CPU threads.** Inference uses every core by default; set `LAYA_THREADS` on the
   `laya` service to cap it.
 - **Another model.** `CAMPBOOKS_AI__DECIDE__MODEL` also accepts
@@ -398,7 +402,7 @@ Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF
 ## Built-in sign-in (Campbooks as its own identity provider)
 
 Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
-Google, Microsoft or Zoho (passkeys follow) and issues every token itself, so the `idp`
+Google, Microsoft, Zoho or a passkey and issues every token itself, so the `idp`
 services above will go away. The built-in issuer is already in the server. It runs when
 `CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
 `CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
@@ -461,9 +465,11 @@ With the built-in issuer:
   `https://<host>` with no path, or Campbooks refuses to start. Set `CAMPBOOKS_ZOHO__CLIENT_ID` and
   `CAMPBOOKS_ZOHO__CLIENT_SECRET_FILE`. Campbooks only talks to Zoho's own accounts
   servers (`accounts.zoho.com`, `.eu`, `.in`, `.com.au`, `.jp`, `.ca`, `.sa`, `.uk`), so a
-  forged callback cannot send the code anywhere else. Zoho has no mailbox adapter yet.
-- **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks
-  and starting a link are rate-limited per client address. Behind a proxy every request
+  forged callback cannot send the code anywhere else. The same app connects Zoho Mail:
+  see Connected accounts.
+- **Behind a reverse proxy, set `CAMPBOOKS_TRUSTED_PROXIES`.** Sign-in, its callbacks,
+  starting a link, the token endpoint, client registration and the consent screen are
+  rate-limited per client address. Behind a proxy every request
   comes from the proxy, so without this setting all clients share one budget (30
   sign-ins a minute for everyone). Set it to the proxy's address or network, as
   comma-separated addresses or CIDR blocks, e.g. `CAMPBOOKS_TRUSTED_PROXIES=172.18.0.0/16`
@@ -476,6 +482,47 @@ With the built-in issuer:
   A provider account that is already another Campbooks account's way in is refused, never
   merged. The last way in can't be removed, and adding or removing one needs a sign-in in
   the last ten minutes. Disconnecting a mailbox keeps its sign-in.
+- **Apps other than the web app.** Every one of them gets in only after the person
+  allows it on Campbooks' consent screen, which names the app, says whether anyone
+  vouches for it, lists what it will be able to do and asks which workspace it may use.
+  People see and revoke what they allowed under Settings → Apps and integrations.
+  - **The desktop and mobile apps** (`campbooks-native`) sign in in the system browser
+    with a loopback or `com.notacamp.campbooks:` redirect. They are asked for every
+    time: any program on a device can listen on a loopback port.
+  - **A workspace's own apps.** Owners and admins register them under Settings → Apps
+    and integrations: a server-to-server app gets a client id and secret for the
+    `client_credentials` grant (`POST /oauth2/token`), its tokens work in that workspace
+    only, and the secret is shown once (rotate it if it is lost); a sign-in app gets a
+    client id for its users to allow.
+  - **MCP agents and other apps** find everything from the API's URL: a call without a
+    token answers `WWW-Authenticate: Bearer resource_metadata="…/.well-known/oauth-protected-resource/api"`,
+    which names this issuer. **Self-registration is off by default.** To let agents
+    connect without anyone setting them up first, turn on
+    `CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION=on` (they register at `/oauth2/register`:
+    public clients only, unused ones deleted after 30 days) and/or
+    `CAMPBOOKS_OAUTH__CLIENT_METADATA_DOCUMENTS=on` (an `https` URL of their metadata
+    document is their client id). With both off, `/oauth2/register` answers 404, the
+    issuer metadata lists no `registration_endpoint`, and such clients are unknown;
+    turning one off later also stops the clients that used it. Agents can still use a
+    sign-in app a workspace admin registers under Settings → Apps and integrations. The consent screen marks them unverified. Their
+    tokens are bound to one workspace (they see no other, and can't create or join one)
+    and can never manage accounts, apps or members. Registrations and document fetches
+    are also capped per hour for the whole instance.
+  - Access tokens now name `${CAMPBOOKS_PUBLIC_URL}/api` as their audience;
+    `CAMPBOOKS_AUTH__AUDIENCE` only applies to an outside identity provider.
+- **Passkeys.** Nothing to configure: people add passkeys under Settings → Ways to sign
+  in, sign in with them on the sign-in screen (the passkey button, `P`, or the browser's
+  autofill), and can create an account with a passkey alone. Passkeys belong to the host
+  of `CAMPBOOKS_PUBLIC_URL` (the WebAuthn relying party): **changing that host makes every
+  passkey stop working**, so people need another way in first. Browsers offer passkeys
+  only over `https://`, or `http://localhost` in development; on any other plain-http
+  host, or an IP address, the passkey options are hidden. Passkey-only accounts have no
+  email address, so on an `invite_only` instance passkeys can't create accounts (they
+  still sign in, and can be added once you are in). A passkey that reports an
+  authenticator counter going backwards (a possible clone) is allowed and recorded in
+  `identity.audit_events` as `passkey_sign_count_regressed`. Passkey ceremonies are
+  rate-limited per client address (set `CAMPBOOKS_TRUSTED_PROXIES` behind a proxy, as
+  above), and at most 30 passkey-only accounts are created per hour on the instance.
 
 ## Administrators
 
@@ -524,7 +571,7 @@ Permissions are `super` (everything), `system.read`, `signups.review`, `users.re
 
 ## Connected accounts
 
-Members connect outside accounts (Gmail today); Campbooks asks Google for consent through
+Members connect outside accounts (Gmail and Zoho Mail); Campbooks asks Google for consent through
 its built-in sign-in (the same redirect URI, `/auth/callback/google`), keeps the grant
 encrypted with the instance secret key (schema `connectors`), and
 syncs mail on its own: every minute while an account is busy, backing off to every few
@@ -545,6 +592,18 @@ hours when nothing changes. Nothing is connected until you register an OAuth cli
 A connection belongs to the workspace and records the member who granted it. When that
 member leaves the workspace, or the workspace is deleted, the grant is revoked at Google.
 Tuning (all optional) is the `CAMPBOOKS_CONNECTORS__*` block of `.env.example`.
+
+**Zoho Mail** uses the Zoho app of Sign in with Zoho (above): the same client, secret and
+redirect URI (`/auth/callback/zoho`, or `CAMPBOOKS_ZOHO__REDIRECT_PATH` behind a proxy
+that rewrites it). Signing in with Zoho then also asks for the mailbox, and members can
+connect more Zoho logins. The app must allow the scopes `openid`, `email`, `profile`,
+`ZohoMail.accounts.READ`, `ZohoMail.folders.READ` and `ZohoMail.messages.ALL` (a
+server-based Zoho app takes its scopes with each request, so there is nothing more to
+register). Each mail account of a Zoho login becomes its own
+inbox. Campbooks reads and writes each account's mail at its own data centre
+(`accounts.zoho.eu` → `mail.zoho.eu`), polls it (Zoho has no push), and keeps to
+`CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
+synced yet.
 
 Connecting needs the built-in sign-in: an install still on Rauthy (`CAMPBOOKS_AUTH__ISSUER`
 set) cannot connect mail until it switches. `connectors.start_connection` answers with the

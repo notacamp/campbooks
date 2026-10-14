@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: StreamId\" FROM connectors.streams WHERE inbox_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "285d2ae0430b9d2355b86c6d2ced8d2a54da66aa31a3f5b25d34f9983f950fb4"
+}

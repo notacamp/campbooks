@@ -4,6 +4,7 @@ import { Button, ConversationRow, EmptyState, SkeletonList, Visor } from "~/lib/
 
 import type { ConversationSummary, Stream } from "../../api/queries";
 import { avatarKind, displayName, listTime, streamName, type Translate } from "../../model";
+import { NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
   stream: Stream;
@@ -90,6 +91,11 @@ export function ConversationList({
             count={conversation.message_count}
             current={conversation.id === openId}
             selected={conversation.id === cursorId && conversation.id !== openId}
+            chips={
+              conversation.need === null || conversation.need === undefined ? undefined : (
+                <NeedChips need={conversation.need} now={now} />
+              )
+            }
             suggestion={
               suggestion === null || suggestion === undefined ? undefined : (
                 <span className="inline-flex items-center gap-1-5">

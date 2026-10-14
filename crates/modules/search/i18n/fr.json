@@ -1,0 +1,8 @@
+{
+  "errors": {
+    "invalid_limit": "La limite doit être comprise entre 1 et {{max}}.",
+    "query_too_long": "Cette recherche est trop longue ou contient trop de mots ou de filtres. Raccourcissez-la et réessayez.",
+    "cursor_mismatch": "Ce lien de page appartient à une autre recherche. Recommencez depuis la première page.",
+    "query_only_excludes": "Ajoutez quelque chose à chercher : une recherche ne peut pas seulement exclure des mots."
+  }
+}

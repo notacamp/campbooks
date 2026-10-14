@@ -78,13 +78,11 @@
   "scout": {
     "label": "Cómo está la cosa",
     "suggestion": "Sugiere {{stream}}",
-    "suggestionSure": "Sugiere {{stream}}, con un {{confidence}} % de seguridad",
     "suggestionNote": "Campbooks cree que esto va en {{stream}}. Es una sugerencia: nada se mueve hasta que tú lo digas.",
     "prompt": "¿Moverla?",
     "accept": "Mover a {{stream}}",
     "keep": "Dejar en {{stream}}",
     "sortedRule": "Ordenada en {{stream}} por una regla",
-    "sortedRuleSure": "Ordenada en {{stream}} por una regla, con un {{confidence}} % de seguridad",
     "sortedModel": "Ordenada en {{stream}} por Campbooks",
     "sortedMember": "La pusiste tú en {{stream}}",
     "sortedDefault": "En {{stream}}: nada la ha movido",
@@ -154,7 +152,8 @@
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes",
-    "nextAttachment": "Siguiente adjunto"
+    "nextAttachment": "Siguiente adjunto",
+    "notNeeded": "No hace falta (o es seguro)"
   },
   "compose": {
     "title": {
@@ -191,9 +190,9 @@
       "draft_not_editable": "Este mensaje ya está en camino.",
       "not_connected": "Este buzón ya no está conectado. Vuelve a conectarlo y envíalo de nuevo.",
       "needs_reauth": "Campbooks necesita tu permiso de nuevo para enviar desde este buzón. Vuelve a conectarlo y envíalo de nuevo.",
-      "rejected": "Gmail ha rechazado este mensaje. Revisa las direcciones e inténtalo de nuevo.",
-      "too_large": "Este mensaje es demasiado grande para que Gmail lo envíe.",
-      "unavailable": "No se ha podido contactar con Gmail, así que no se ha enviado nada. Inténtalo de nuevo.",
+      "rejected": "Tu proveedor de correo ha rechazado este mensaje. Revisa las direcciones e inténtalo de nuevo.",
+      "too_large": "Este mensaje es demasiado grande para que tu proveedor de correo lo envíe.",
+      "unavailable": "No se ha podido contactar con tu proveedor de correo, así que no se ha enviado nada. Inténtalo de nuevo.",
       "unknown_outcome": "Campbooks no ha podido confirmar que este mensaje se haya enviado. Revisa la carpeta Enviados antes de enviarlo de nuevo.",
       "unknown": "Algo ha salido mal. Inténtalo de nuevo.",
       "not_saved": "No se han podido guardar los últimos cambios, así que no se ha enviado nada. Inténtalo de nuevo.",
@@ -203,5 +202,62 @@
       "newMessage": "Mensaje nuevo"
     },
     "tooLate": "Ya es tarde para deshacer: se ha enviado."
+  },
+  "needs": {
+    "line": {
+      "reply": "{{name}} espera tu respuesta",
+      "question": "{{name}} te ha hecho una pregunta",
+      "do": "{{name}} te ha pedido que hagas algo",
+      "pay": "{{name}} ha enviado una factura para pagar",
+      "warning": "Esto puede ser phishing. No uses sus enlaces.",
+      "checkReply": "¿{{name}} necesita respuesta?",
+      "checkDo": "¿{{name}} te ha pedido que hagas algo?"
+    },
+    "chip": {
+      "reply": "Necesita respuesta",
+      "do": "Por hacer",
+      "pay": "Pagar",
+      "review": "Revisar",
+      "suspicious": "Parece sospechoso",
+      "check": "Confirmar"
+    },
+    "due": {
+      "today": "Vence hoy",
+      "tomorrow": "Vence mañana",
+      "on": "Vence el {{date}}",
+      "overdue": "Vencido · vencía el {{date}}"
+    },
+    "how": {
+      "yes": "Sí.",
+      "no": "No.",
+      "urgency0": "Sin prisa.",
+      "urgency1": "En los próximos días.",
+      "urgency2": "Hoy.",
+      "source": {
+        "rules": "Reglas",
+        "model": "Modelo",
+        "knn": "Correo parecido",
+        "cascade": "Reglas y luego modelo"
+      },
+      "suggestion": "una sugerencia",
+      "actsFrom": "actúa desde {{threshold}}",
+      "footnote": "Las reglas responden a partir de lo que el correo muestra a simple vista. Una respuesta solo actúa desde la confianza que su evaluación garantiza; por debajo es una sugerencia."
+    },
+    "actions": {
+      "done": "Hecho",
+      "notNeeded": "No hace falta",
+      "safe": "Es seguro",
+      "yes": "Sí",
+      "no": "No",
+      "questionPrompt": "Campbooks no está seguro."
+    },
+    "toast": {
+      "done": "Hecho · {{name}}",
+      "notNeeded": "No hace falta · {{name}}. Campbooks aprenderá de esto",
+      "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
+      "confirmed": "Gracias · {{name}} sigue en tu lista",
+      "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
+      "changed": "{{name}} ha cambiado mientras lo mirabas: vuelve a mirarlo."
+    }
   }
 }

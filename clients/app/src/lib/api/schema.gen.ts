@@ -21,6 +21,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/.well-known/oauth-protected-resource": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The same document at the root, for clients that look there. */
+        get: operations["identity.protected_resource_metadata_root"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/.well-known/oauth-protected-resource/api": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The API's protected-resource metadata (RFC 9728), at the path RFC 9728
+         *     §3.1 derives from its resource identifier, `<origin>/api`.
+         */
+        get: operations["identity.protected_resource_metadata"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/.well-known/openid-configuration": {
         parameters: {
             query?: never;
@@ -33,6 +70,40 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the apps you let in. */
+        get: operations["identity.list_consents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/consents/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke an app's access. */
+        delete: operations["identity.revoke_consent"];
         options?: never;
         head?: never;
         patch?: never;
@@ -87,6 +158,59 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the caller's passkeys. */
+        get: operations["identity.list_passkeys"];
+        put?: never;
+        /** Add a passkey. */
+        post: operations["identity.register_passkey"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/passkeys/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start adding a passkey. */
+        post: operations["identity.start_passkey_registration"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/identity/passkeys/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove a passkey. */
+        delete: operations["identity.remove_passkey"];
+        options?: never;
+        head?: never;
+        /** Rename a passkey. */
+        patch: operations["identity.rename_passkey"];
         trace?: never;
     };
     "/api/v1/identity/ways-in": {
@@ -174,6 +298,57 @@ export interface paths {
         head?: never;
         /** Update a workspace. */
         patch: operations["workspaces.update"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List what needs you. */
+        get: operations["attention.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put an item off until later, for yourself. */
+        post: operations["attention.snooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an item you put off back now. */
+        post: operations["attention.unsnooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/w/{workspace_id}/changes": {
@@ -395,6 +570,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer yes to a question Campbooks put (a Review need it was unsure of). */
+        post: operations["conversations.confirm_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back Done, Not needed or a confirmation: the need is as it was. */
+        post: operations["conversations.reopen_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark what a conversation needs as done, or as not needed. */
+        post: operations["conversations.resolve_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/read": {
         parameters: {
             query?: never;
@@ -568,6 +794,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/identity/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the workspace's own apps. */
+        get: operations["identity.list_clients"];
+        put?: never;
+        /** Register an app of the workspace's own. */
+        post: operations["identity.register_client"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one of the workspace's apps. */
+        delete: operations["identity.remove_client"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/identity/clients/{client_id}/secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Rotate an app's secret. */
+        post: operations["identity.rotate_client_secret"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/identity/held-grants/{id}/adopt": {
         parameters: {
             query?: never;
@@ -672,6 +950,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the records the caller may open. */
+        get: operations["search.query"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/security-events": {
         parameters: {
             query?: never;
@@ -758,6 +1053,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/consent/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What the consent screen shows for the waiting request `id`. */
+        get: operations["identity.get_consent_request"];
+        put?: never;
+        /** Answer the waiting request `id`. */
+        post: operations["identity.answer_consent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/new-account": {
         parameters: {
             query?: never;
@@ -773,6 +1086,74 @@ export interface paths {
         put?: never;
         /** Create the pending account, sign in, and hold its mailbox grant. */
         post: operations["identity.create_account"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish signing in with a passkey. */
+        post: operations["identity.finish_passkey_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-in/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start signing in with a passkey. */
+        post: operations["identity.start_passkey_sign_in"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-up": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish creating an account with a passkey. */
+        post: operations["identity.finish_passkey_sign_up"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/passkey/sign-up/options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start creating an account with a passkey. */
+        post: operations["identity.start_passkey_sign_up"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1116,6 +1497,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/oauth2/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a public client. */
+        post: operations["identity.register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/oauth2/revoke": {
         parameters: {
             query?: never;
@@ -1146,7 +1544,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Exchange an authorization code or a refresh token for tokens. */
+        /**
+         * Exchange an authorization code, a refresh token or a workspace client's
+         *     credentials for tokens.
+         */
         post: operations["identity.token"];
         delete?: never;
         options?: never;
@@ -1194,8 +1595,40 @@ export interface components {
             /** @description The connection's id (a `connectors.connection`). */
             connection: string;
         };
+        /** @description The person's answer. */
+        Answer: {
+            /** @description Allow or deny. */
+            decision: components["schemas"]["Decision"];
+            workspace_id?: components["schemas"]["WorkspaceId"] | null;
+        };
         /** @description An answer's value: a label (choice), a level (score) or yes/no. */
         AnswerView: boolean | number | string;
+        /** @description Where to go next. */
+        Answered: {
+            /**
+             * @description Navigate here: the app's redirect URI, with a code or
+             *     `error=access_denied`.
+             */
+            redirect: string;
+        };
+        /** @description A filter the query applied, for chips. */
+        AppliedFilter: {
+            /** @description The operator (`from`, `has`, `in`, `is`, `label`, …). */
+            operator: string;
+            /** @description Its value. */
+            value: string;
+        };
+        /** @description `AuthenticatorAssertionResponseJSON`: the authenticator's signature. */
+        AssertionResponse: {
+            /** @description The authenticator data, base64url. */
+            authenticatorData: string;
+            /** @description The client data, base64url. */
+            clientDataJSON: string;
+            /** @description The signature, base64url. */
+            signature: string;
+            /** @description The user handle the passkey was created with, base64url. */
+            userHandle?: string | null;
+        };
         /**
          * Format: binary
          * @description An attachment's bytes, as the OpenAPI document describes them (a binary
@@ -1228,6 +1661,51 @@ export interface components {
              */
             size: number;
         };
+        /** @description The caller's items. */
+        AttentionList: {
+            /**
+             * @description Open items per reason, every reason listed (open lists only; empty
+             *     for cleared).
+             */
+            counts: components["schemas"]["ReasonCount"][];
+            /**
+             * @description Open: by reason (review, reply, decide, do, pay), then overdue, by
+             *     due date, urgent first, oldest first. Cleared: newest first.
+             */
+            items: components["schemas"]["ItemView"][];
+        };
+        /** @description `AuthenticatorAttestationResponseJSON`: what the authenticator made. */
+        AttestationResponse: {
+            /** @description The attestation object (CBOR), base64url. */
+            attestationObject: string;
+            /** @description The client data, base64url. */
+            clientDataJSON: string;
+            /** @description How the browser reached the authenticator. */
+            transports?: string[];
+        };
+        /**
+         * @description `AuthenticationResponseJSON`: a sign-in with a passkey, as the browser
+         *     returns it.
+         */
+        AuthenticationCredential: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description The same, as the raw id. */
+            rawId: string;
+            /** @description The authenticator's response. */
+            response: components["schemas"]["AssertionResponse"];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description What the authenticator must do. */
+        AuthenticatorSelection: {
+            /** @description `true`, for browsers that predate `residentKey`. */
+            requireResidentKey: boolean;
+            /** @description `required`: a discoverable credential (a passkey). */
+            residentKey: string;
+            /** @description `required`. */
+            userVerification: string;
+        };
         BackchannelLogout: {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
@@ -1247,6 +1725,57 @@ export interface components {
          * @enum {string}
          */
         Channel: "email";
+        /**
+         * @description How a workspace client signs in.
+         * @enum {string}
+         */
+        ClientType: "confidential" | "public";
+        /** @description Yes to a question. */
+        Confirm: {
+            /** @description The message the question the member saw comes from. */
+            message_id: components["schemas"]["MessageId"];
+        };
+        /** @description An app the caller let in. */
+        ConnectedApp: {
+            /** @description The app's client id. */
+            client_id: string;
+            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            client_kind?: string | null;
+            /** @description Its name; `null` when the app is gone (its tokens no longer work). */
+            client_name?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was allowed.
+             */
+            granted_at: string;
+            /**
+             * Format: uuid
+             * @description The consent (what `identity.revoke_consent` takes).
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When it last got a token.
+             */
+            last_used_at?: string | null;
+            /** @description What it may do. */
+            scopes: string[];
+            /**
+             * @description Whether it is Campbooks' own app (a workspace's app says so by its
+             *     kind; every other name is its registrant's word).
+             */
+            verified: boolean;
+            /**
+             * Format: uuid
+             * @description The workspace it may use; `null` for Campbooks' own apps (all).
+             */
+            workspace_id?: string | null;
+        };
+        /** @description The apps the caller let in. */
+        ConnectedApps: {
+            /** @description Newest first. */
+            items: components["schemas"]["ConnectedApp"][];
+        };
         /**
          * Format: uuid
          * @description ConnectionId (UUIDv7)
@@ -1289,6 +1818,79 @@ export interface components {
             provider: components["schemas"]["Provider"];
             /** @description Its change streams. */
             streams: components["schemas"]["StreamView"][];
+        };
+        /** @description The app asking. */
+        ConsentClient: {
+            /**
+             * @description The redirect goes to an app on this device (loopback or a
+             *     private-use scheme): it is asked every time, and warned about.
+             */
+            device: boolean;
+            /** @description For a metadata-document client, the host serving its document. */
+            document_host?: string | null;
+            /** @description Its client id. */
+            id: string;
+            /** @description `first_party`, `workspace`, `dynamic` or `metadata_document`. */
+            kind: string;
+            /** @description Its logo (a workspace's own app only). */
+            logo_uri?: string | null;
+            /** @description Its name, as it registered it (only trustworthy when `verified`). */
+            name: string;
+            /**
+             * @description Where the browser goes next: the redirect URI's host (`None` for a
+             *     private-use scheme).
+             */
+            redirect_host?: string | null;
+            /**
+             * @description Whether it is Campbooks' own app. Every other app's name is its
+             *     registrant's word.
+             */
+            verified: boolean;
+            /**
+             * @description For a workspace's own app, the workspace that registered it (its
+             *     name, when the person belongs to it): what the screen says instead of
+             *     "verified".
+             */
+            workspace_name?: string | null;
+        };
+        /** @description What the consent screen shows. */
+        ConsentRequest: {
+            /** @description Their address. */
+            account_email?: string | null;
+            /** @description The signed-in person's name. */
+            account_name?: string | null;
+            /**
+             * @description Whether the person picks one workspace for it; `false` for
+             *     Campbooks' own apps, which work in all of them.
+             */
+            binds_workspace: boolean;
+            /** @description The app. */
+            client: components["schemas"]["ConsentClient"];
+            /** @description Whether "Allow" will be remembered (an exact `https` redirect). */
+            remembered: boolean;
+            /** @description What it asks to do. */
+            scopes: components["schemas"]["ConsentScope"][];
+            /**
+             * @description The workspaces it may be allowed in (a workspace's own app: its
+             *     workspace only).
+             */
+            workspaces: components["schemas"]["ConsentWorkspace"][];
+        };
+        /** @description One thing the app may do. */
+        ConsentScope: {
+            /** @description What it allows, in English (the screen translates by name). */
+            description: string;
+            /** @description The scope's name (`conversations:read`, `openid`…). */
+            name: string;
+        };
+        /** @description A workspace the person may let the app use. */
+        ConsentWorkspace: {
+            /** @description The workspace. */
+            id: components["schemas"]["WorkspaceId"];
+            /** @description Its name. */
+            name: string;
+            /** @description The person's role there. */
+            role: components["schemas"]["Role"];
         };
         /** @description A conversation and its newest messages, oldest first. */
         ConversationDetail: {
@@ -1335,6 +1937,7 @@ export interface components {
              * @description Messages in it.
              */
             message_count: number;
+            need?: components["schemas"]["NeedView"] | null;
             /** @description The start of the newest message's text. */
             snippet: string;
             /** @description Whether any message is starred. */
@@ -1382,6 +1985,55 @@ export interface components {
              */
             accept_url: string;
         };
+        /** @description `PublicKeyCredentialCreationOptionsJSON`: create a passkey. */
+        CreationOptions: {
+            /** @description `none`. */
+            attestation: string;
+            /** @description Discoverable, with user verification. */
+            authenticatorSelection: components["schemas"]["AuthenticatorSelection"];
+            /** @description The challenge, base64url (single use, five minutes). */
+            challenge: string;
+            /**
+             * @description The account's passkeys, so an authenticator holding one says so
+             *     instead of making a second.
+             */
+            excludeCredentials: components["schemas"]["CredentialDescriptor"][];
+            /** @description EdDSA, ES256, RS256. */
+            pubKeyCredParams: components["schemas"]["CredentialParameter"][];
+            /** @description The relying party. */
+            rp: components["schemas"]["RelyingPartyEntity"];
+            /**
+             * Format: int64
+             * @description Milliseconds.
+             */
+            timeout: number;
+            /** @description The account. */
+            user: components["schemas"]["UserEntity"];
+        };
+        /** @description A credential, by id. */
+        CredentialDescriptor: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description Transports the authenticator reported, when it did. */
+            transports?: string[];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description An algorithm the relying party accepts. */
+        CredentialParameter: {
+            /**
+             * Format: int64
+             * @description The COSE algorithm.
+             */
+            alg: number;
+            /** @description `public-key`. */
+            type: string;
+        };
+        /**
+         * @description Allow or deny.
+         * @enum {string}
+         */
+        Decision: "allow" | "deny";
         /**
          * @description What kind of strategy gave an answer.
          * @enum {string}
@@ -1409,6 +2061,12 @@ export interface components {
             reasons: components["schemas"]["ReasonView"][];
             /** @description Who answered. */
             source: components["schemas"]["DecisionSource"];
+            /**
+             * Format: int32
+             * @description The confidence, 0 to 100, from which an answer of this source to
+             *     this question may act; `None` when it never acts (a suggestion).
+             */
+            threshold?: number | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerView"];
         };
@@ -1580,6 +2238,49 @@ export interface components {
             /** @description Oldest first. */
             items: components["schemas"]["HeldGrant"][];
         };
+        /** @description One result: a record the caller may open, with what a list row shows. */
+        Hit: {
+            /** @description Its container (an inbox). */
+            container: components["schemas"]["RecordRef"];
+            /** @description The record's state, for the row. */
+            facets: components["schemas"]["HitFacets"];
+            from?: components["schemas"]["HitPerson"] | null;
+            matched?: components["schemas"]["RecordRef"] | null;
+            /**
+             * Format: date-time
+             * @description The record's time (a conversation's last message).
+             */
+            occurred_at: string;
+            /** @description The record (a conversation). */
+            record: components["schemas"]["RecordRef"];
+            /** @description A snippet of the best entry, hits marked. */
+            snippet: components["schemas"]["Segment"][];
+            /** @description The title, hits marked. */
+            title: components["schemas"]["Segment"][];
+        };
+        /** @description A hit's state. */
+        HitFacets: {
+            /** @description Some entry carries files. */
+            attachment?: boolean;
+            /**
+             * Format: int32
+             * @description How many entries (messages) it has.
+             */
+            count?: number;
+            /** @description Starred. */
+            starred?: boolean;
+            /** @description Its stream. */
+            stream?: string | null;
+            /** @description Something in it is unread. */
+            unread?: boolean;
+        };
+        /** @description A person on a hit. */
+        HitPerson: {
+            /** @description Their address. */
+            address: string;
+            /** @description Their display name. */
+            name?: string | null;
+        };
         /**
          * Format: uuid
          * @description InboxId (UUIDv7)
@@ -1665,6 +2366,66 @@ export interface components {
              *     by promotion, never by invitation.
              */
             role?: components["schemas"]["Role"];
+        };
+        /**
+         * Format: uuid
+         * @description ItemId (UUIDv7)
+         */
+        ItemId: string;
+        /**
+         * @description Whether an item still needs someone.
+         * @enum {string}
+         */
+        ItemState: "open" | "cleared";
+        /**
+         * @description An attention item, as the caller sees it. References and facts only: the
+         *     owning module renders who and what.
+         */
+        ItemView: {
+            /** @description The record that raised it. */
+            cause: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When it was cleared.
+             */
+            cleared_at?: string | null;
+            /**
+             * @description Why it was cleared (`replied`, `archived`, `trashed`, `done`,
+             *     `not_needed`), as the producing module said.
+             */
+            cleared_because?: string | null;
+            cleared_by?: components["schemas"]["UserId"] | null;
+            /** @description Who may see it: its container. */
+            container: components["schemas"]["RecordRef"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The item. */
+            id: components["schemas"]["ItemId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description Why. */
+            reason: components["schemas"]["Reason"];
+            /** @description The record it is about. */
+            record: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When its cause arrived.
+             */
+            since: string;
+            /**
+             * Format: date-time
+             * @description Until when the caller put it off ("Later"), when they did.
+             */
+            snoozed_until?: string | null;
+            /** @description Open or cleared. */
+            state: components["schemas"]["ItemState"];
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["Trust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
         };
         /**
          * @description What a workspace is for.
@@ -1782,6 +2543,55 @@ export interface components {
             /** @description The stream. */
             stream: components["schemas"]["Stream"];
         };
+        /**
+         * @description Whose answer raised a need.
+         * @enum {string}
+         */
+        NeedBasis: "rules" | "model" | "member";
+        /**
+         * @description The question whose answer raised a need.
+         * @enum {string}
+         */
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious";
+        /**
+         * @description Why a conversation needs its inbox's members (attention).
+         * @enum {string}
+         */
+        NeedReason: "reply" | "do" | "pay" | "review";
+        /**
+         * @description How much Campbooks stands behind a need.
+         * @enum {string}
+         */
+        NeedTrust: "sure" | "check";
+        /** @description A conversation's open need, as lists and the reader show it. */
+        NeedView: {
+            /** @description Whose answer raised it. */
+            basis: components["schemas"]["NeedBasis"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The message it comes from. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description The question that raised it. */
+            question: components["schemas"]["NeedQuestion"];
+            quote?: components["schemas"]["Quote"] | null;
+            /** @description Why. */
+            reason: components["schemas"]["NeedReason"];
+            /**
+             * @description The rule that decided it (`signals.reply_asked`, …), for the sentence
+             *     the client words it with.
+             * @example signals.reply_asked
+             */
+            rule?: string | null;
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["NeedTrust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
+        };
         /** @description The pending new account, as the new-account screen shows it. */
         NewAccount: {
             /** @description The name it gave. */
@@ -1812,6 +2622,50 @@ export interface components {
             subject?: string | null;
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
+        };
+        /**
+         * @description How a member resolves a need.
+         * @enum {string}
+         */
+        Outcome: "done" | "not_needed";
+        /** @description The query as understood. */
+        ParsedQuery: {
+            /** @description The filters applied. */
+            filters: components["schemas"]["AppliedFilter"][];
+            /** @description The free text, as searched. */
+            text: string;
+            /** @description What was not understood (and was searched as text, or ignored). */
+            warnings: components["schemas"]["QueryWarning"][];
+        };
+        /** @description A passkey, as its owner sees it. */
+        PasskeyView: {
+            /**
+             * Format: date-time
+             * @description When it was added.
+             */
+            created_at: string;
+            /**
+             * Format: uuid
+             * @description Its id.
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When it last signed in.
+             */
+            last_used_at?: string | null;
+            /** @description What its owner calls it. */
+            name: string;
+            /**
+             * @description Whether it may sync between devices (a password manager or a
+             *     platform account keeps it), as opposed to staying on one device.
+             */
+            synced: boolean;
+        };
+        /** @description The caller's passkeys. */
+        Passkeys: {
+            /** @description Oldest first. */
+            items: components["schemas"]["PasskeyView"][];
         };
         /**
          * @description Where a stream is in its reading.
@@ -1857,7 +2711,44 @@ export interface components {
          * @description An outside provider.
          * @enum {string}
          */
-        Provider: "google";
+        Provider: "google" | "zoho";
+        /** @description Something in the query that was not understood. */
+        QueryWarning: {
+            /** @description `unknown_operator`, `empty_value` or `invalid_value`. */
+            code: string;
+            /** @description The operator (or `tz`). */
+            operator: string;
+        };
+        /**
+         * @description The sender's sentence a need quotes, with who wrote it and when.
+         *     Untrusted mail content: clients show it as quoted plain text only.
+         */
+        Quote: {
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            sent_at: string;
+            /** @description The sentence, at most 240 characters. */
+            text: string;
+        };
+        /**
+         * @description Why an item needs someone, in the order Home shows the groups.
+         * @enum {string}
+         */
+        Reason: "review" | "reply" | "decide" | "do" | "pay";
+        /** @description How many open items there are for one reason. */
+        ReasonCount: {
+            /**
+             * Format: int32
+             * @description Open items with it.
+             */
+            count: number;
+            /** @description The reason. */
+            reason: components["schemas"]["Reason"];
+        };
         /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
@@ -1870,13 +2761,178 @@ export interface components {
              * @example signals.list_header
              */
             rule: string;
+            /**
+             * @description The sender's sentence holding the evidence, when it came from the
+             *     text. Untrusted: show it as quoted plain text only.
+             */
+            sentence?: string | null;
+        };
+        /**
+         * @description A pointer to any record of any module.
+         *
+         *     `type` is `<module>.<record>` (for example `conversations.thread`), the
+         *     same names operations list in `x-campbooks.records`; `id` is the record's
+         *     id as its module writes it (usually a UUID).
+         *
+         *     ```
+         *     use campbooks_kernel::records::RecordRef;
+         *
+         *     let thread = RecordRef::new(
+         *         "conversations.thread",
+         *         "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11",
+         *     );
+         *     assert_eq!(thread.module(), Some("conversations"));
+         *     assert_eq!(
+         *         serde_json::to_value(&thread).unwrap(),
+         *         serde_json::json!({"type": "conversations.thread", "id": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"})
+         *     );
+         *     ```
+         */
+        RecordRef: {
+            /**
+             * @description The record's id within its module.
+             * @example 0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11
+             */
+            id: string;
+            /**
+             * @description The record type, `<module>.<record>`.
+             * @example conversations.thread
+             */
+            type: string;
+        };
+        /** @description What to register. */
+        RegisterClient: {
+            /** @description Its name, 1 to 100 characters. */
+            name: string;
+            /** @description A public app's redirect URIs: 1 to 10, `https` or loopback `http`. */
+            redirect_uris?: string[];
+            /** @description The API scopes it may ask for (never `identity:*`). */
+            scopes: string[];
+            /**
+             * @description Confidential (server to server, with a secret) or public (a sign-in
+             *     app).
+             */
+            type: components["schemas"]["ClientType"];
+        };
+        /** @description The new passkey. */
+        RegisterPasskey: {
+            /** @description `PublicKeyCredential.toJSON()` of `navigator.credentials.create`. */
+            credential: components["schemas"]["RegistrationCredential"];
+            /** @description What to call it (default `Passkey`). */
+            name?: string | null;
+        };
+        /** @description What a client sends (RFC 7591 §2; the fields read). */
+        RegisterRequest: {
+            /** @description A name to show on the consent screen (with "unverified"). */
+            client_name?: string | null;
+            /** @description `authorization_code` and optionally `refresh_token`. */
+            grant_types?: string[] | null;
+            /** @description Where codes may go: `https`, or loopback `http` (any port). */
+            redirect_uris?: string[];
+            /** @description `code`. */
+            response_types?: string[] | null;
+            /**
+             * @description Space-separated scopes it may ask for; missing means every scope a
+             *     third party may hold.
+             */
+            scope?: string | null;
+            /** @description Must be `none` (or missing). */
+            token_endpoint_auth_method?: string | null;
+        };
+        /** @description The registered client (RFC 7591 §3.2.1). */
+        Registered: {
+            /** @description The new client id. */
+            client_id: string;
+            /**
+             * Format: int64
+             * @description When it was issued (seconds since the epoch).
+             */
+            client_id_issued_at: number;
+            /** @description The name it will be shown with. */
+            client_name: string;
+            /** @description Its grant types. */
+            grant_types: string[];
+            /** @description Its redirect URIs. */
+            redirect_uris: string[];
+            /** @description `["code"]`. */
+            response_types: string[];
+            /** @description The scopes it may ask for. */
+            scope: string;
+            /** @description `none`. */
+            token_endpoint_auth_method: string;
+        };
+        /** @description The new app, with its secret for the only time. */
+        RegisteredClient: {
+            /** @description The app. */
+            client: components["schemas"]["WorkspaceClient"];
+            /** @description A confidential app's secret: shown now, never again. */
+            client_secret?: string | null;
+        };
+        /** @description `RegistrationResponseJSON`: a new passkey, as the browser returns it. */
+        RegistrationCredential: {
+            /** @description The credential id, base64url. */
+            id: string;
+            /** @description The same, as the raw id. */
+            rawId: string;
+            /** @description The authenticator's response. */
+            response: components["schemas"]["AttestationResponse"];
+            /** @description `public-key`. */
+            type: string;
+        };
+        /** @description The relying party, as the browser shows it. */
+        RelyingPartyEntity: {
+            /** @description The relying-party id (the public URL's host). */
+            id: string;
+            /** @description Shown by the browser: `Campbooks`. */
+            name: string;
+        };
+        /** @description The new name. */
+        RenamePasskey: {
+            /** @description 1 to 64 characters. */
+            name: string;
         };
         /** @description What the sign-in screen shows for a waiting authorization request. */
         RequestInfo: {
             /** @description The client asking. */
             client_id: string;
-            /** @description The providers configured on this instance, in display order. */
+            /**
+             * @description Whether a passkey alone may create a new account here (not on an
+             *     invite-only instance).
+             */
+            passkey_sign_up: boolean;
+            /**
+             * @description The ways in this instance offers, in display order: the providers
+             *     configured, then `passkey` when it can offer passkeys (https, or
+             *     `localhost` in development).
+             */
             providers: string[];
+        };
+        /** @description `PublicKeyCredentialRequestOptionsJSON`: sign in with a passkey. */
+        RequestOptions: {
+            /** @description Empty: any of this site's passkeys (discoverable credentials). */
+            allowCredentials: components["schemas"]["CredentialDescriptor"][];
+            /** @description The challenge, base64url (single use, five minutes). */
+            challenge: string;
+            /** @description The relying-party id. */
+            rpId: string;
+            /**
+             * Format: int64
+             * @description Milliseconds.
+             */
+            timeout: number;
+            /** @description `required`. */
+            userVerification: string;
+        };
+        /** @description A member's verdict on a need. */
+        Resolve: {
+            /**
+             * @description The message the need the member saw comes from (`NeedView.message_id`):
+             *     when the open need comes from another one, nothing is recorded (409
+             *     `need_changed`).
+             */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Done or Not needed. */
+            outcome: components["schemas"]["Outcome"];
         };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
@@ -1894,6 +2950,20 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member";
+        /** @description A page of results. */
+        SearchResults: {
+            /** @description The results, in the order asked for. */
+            hits: components["schemas"]["Hit"][];
+            /**
+             * @description The index of some source is still being built: older records may be
+             *     missing for now.
+             */
+            indexing: boolean;
+            /** @description Pass it as `cursor` for the next page; `None` on the last one. */
+            next_cursor?: string | null;
+            /** @description The query as understood. */
+            query: components["schemas"]["ParsedQuery"];
+        };
         /**
          * Format: uuid
          * @description SecurityEventId (UUIDv7)
@@ -1923,6 +2993,16 @@ export interface components {
             metadata: unknown;
             user_id?: components["schemas"]["UserId"] | null;
         };
+        /**
+         * @description A run of plain text, part of a hit or not. Clients render it as text
+         *     (a `<mark>` around hits); it never carries markup.
+         */
+        Segment: {
+            /** @description Whether it matched the query. */
+            hit: boolean;
+            /** @description The text, verbatim. */
+            text: string;
+        };
         /** @description Which version of the draft to send: the one the member last saw saved. */
         SendDraft: {
             /**
@@ -1951,6 +3031,41 @@ export interface components {
             name?: string | null;
             /** @description Stable user id at the identity provider. */
             sub: string;
+        };
+        /** @description What a sign-in ceremony continues. */
+        SignInStart: {
+            /**
+             * @description The waiting authorization request (`/sign-in?request=`), completed
+             *     afterwards.
+             */
+            request?: string | null;
+            /** @description Otherwise, a same-origin path to land on. */
+            return_to?: string | null;
+        };
+        /** @description A new account with a passkey alone. */
+        SignUpStart: {
+            /**
+             * @description What to call the person (shown in the app; the passkey is saved
+             *     under it).
+             */
+            display_name: string;
+            /** @description The waiting authorization request, completed afterwards. */
+            request?: string | null;
+            /** @description Otherwise, a same-origin path to land on. */
+            return_to?: string | null;
+        };
+        /** @description Where to go once signed in. */
+        SignedInWith: {
+            /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
+            redirect: string;
+        };
+        /** @description Until when. */
+        Snooze: {
+            /**
+             * Format: date-time
+             * @description Later than now and less than a year away.
+             */
+            until: string;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -2052,6 +3167,11 @@ export interface components {
         };
         /** @description A change stream as the API shows it. */
         StreamView: {
+            /**
+             * @description The mailbox it reads (`messages`): one connection can reach several
+             *     (a Zoho login's mail accounts).
+             */
+            address?: string | null;
             /** @description The capability it reads. */
             capability: components["schemas"]["Capability"];
             inbox_id?: components["schemas"]["InboxId"] | null;
@@ -2093,12 +3213,19 @@ export interface components {
             code?: string | null;
             /** @description The PKCE verifier. */
             code_verifier?: string | null;
-            /** @description `authorization_code` or `refresh_token`. */
+            /** @description `authorization_code`, `refresh_token` or `client_credentials`. */
             grant_type?: string | null;
             /** @description The redirect URI the code was issued for. */
             redirect_uri?: string | null;
             /** @description The refresh token. */
             refresh_token?: string | null;
+            /** @description The resource the token is for (RFC 8707): the API's resource URI. */
+            resource?: string | null;
+            /**
+             * @description Space-separated scopes (`client_credentials`: at most what the
+             *     client was given; missing means all of them).
+             */
+            scope?: string | null;
         };
         /** @description A successful token response (RFC 6749 §5.1). */
         TokenResponse: {
@@ -2118,11 +3245,28 @@ export interface components {
             /** @description Always `Bearer`. */
             token_type: string;
         };
+        /**
+         * @description How much the producing module stands behind an item.
+         * @enum {string}
+         */
+        Trust: "sure" | "check";
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
             /** @description A new name, 1 to 100 characters (trimmed). */
             name?: string | null;
+        };
+        /** @description The account the credential is for. */
+        UserEntity: {
+            /** @description The person's name. */
+            displayName: string;
+            /**
+             * @description The user handle: the account id's 16 bytes, base64url. It holds no
+             *     personal information.
+             */
+            id: string;
+            /** @description What the passkey is saved under (an address or a name). */
+            name: string;
         };
         /**
          * Format: uuid
@@ -2177,6 +3321,39 @@ export interface components {
             items: components["schemas"]["WayIn"][];
             /** @description The providers this instance offers, in display order. */
             providers: string[];
+        };
+        /** @description A workspace client, as settings show it. Never its secret. */
+        WorkspaceClient: {
+            /** @description Its client id. */
+            client_id: string;
+            /**
+             * Format: date-time
+             * @description When it was registered.
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When it last got a token.
+             */
+            last_used_at?: string | null;
+            /** @description Its name. */
+            name: string;
+            /** @description A public client's redirect URIs. */
+            redirect_uris: string[];
+            /** @description The scopes it may ask for. */
+            scopes: string[];
+            /**
+             * Format: date-time
+             * @description When its secret last changed.
+             */
+            secret_rotated_at?: string | null;
+            /** @description Confidential or public. */
+            type: components["schemas"]["ClientType"];
+        };
+        /** @description The workspace's apps. */
+        WorkspaceClients: {
+            /** @description Oldest first. */
+            items: components["schemas"]["WorkspaceClient"][];
         };
         /** @description A deleted workspace. */
         WorkspaceDeletion: {
@@ -2254,6 +3431,60 @@ export interface operations {
             };
         };
     };
+    "identity.protected_resource_metadata_root": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.protected_resource_metadata": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The API's metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": Record<string, never>;
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     "identity.openid_configuration": {
         parameters: {
             query?: never;
@@ -2278,6 +3509,101 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    "identity.list_consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's connected apps. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectedApps"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.revoke_consent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The consent. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Revoked; the app's tokens stop working. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's consent, or already revoked. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -2445,6 +3771,289 @@ export interface operations {
             };
             /** @description `rate_limited`. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.list_passkeys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's passkeys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Passkeys"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:read`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.register_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterPasskey"];
+            };
+        };
+        responses: {
+            /** @description Added: a way in from now on. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, the sign-in is more than ten minutes old (`step_up_required`), or the passkey did not verify (`passkey_not_accepted`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `passkey_expired` (no registration waits: it took more than five minutes, or was used), or `passkey_already_registered`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_registration": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Options for `navigator.credentials.create`: a discoverable passkey, user verification required, attestation `none`, excluding the caller's passkeys. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationOptions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys (not https), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`: ten registrations are already waiting for this account. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The passkey. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; the sessions signed in with it ended. The authenticator still holds the credential: the person can delete it there. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's passkey, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is the account's last way in (`last_way_in`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.rename_passkey": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The passkey. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenamePasskey"];
+            };
+        };
+        responses: {
+            /** @description Renamed. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PasskeyView"];
+                };
+            };
+            /** @description `passkey_name_required`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not the caller's passkey, or gone. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -2760,6 +4369,190 @@ export interface operations {
                 };
             };
             /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.list": {
+        parameters: {
+            query?: {
+                /** @description `open` (default) or `cleared`. */
+                state?: "open" | "cleared";
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0,
+                 *     UTC): where their day starts, for Done today and for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionList"];
+                };
+            };
+            /** @description Not a state, or an offset beyond 14 hours (`invalid_offset`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Snooze"];
+            };
+        };
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description A time in the past or more than a year away (`invalid_until`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -3137,6 +4930,12 @@ export interface operations {
                 cursor?: string;
                 /** @description Page size, 1 to 100 (default 50). */
                 limit?: number;
+                /**
+                 * @description These conversations only (1 to 100 ids, comma-separated), whatever
+                 *     their stream or whether archived; those you cannot see are left
+                 *     out. Other filters and the cursor are ignored.
+                 */
+                ids?: string;
             };
             header?: never;
             path: {
@@ -3529,6 +5328,215 @@ export interface operations {
             };
             /** @description No such message, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.confirm_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Confirm"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No message id. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No question to answer (`no_open_need`), or not the one you saw (`need_changed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.reopen_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing to bring back (`nothing_to_reopen`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.resolve_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolve"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Not an outcome. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4299,6 +6307,230 @@ export interface operations {
             };
         };
     };
+    "identity.list_clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The workspace's apps. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspaceClients"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.register_client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterClient"];
+            };
+        };
+        responses: {
+            /** @description Registered; a confidential app's secret is shown this once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisteredClient"];
+                };
+            };
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, the caller is not an owner or admin (`not_workspace_admin`), or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not a member of the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.remove_client": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The app. */
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed; its tokens stop working. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, or the caller is not an owner or admin (`not_workspace_admin`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such app in the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.rotate_client_secret": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The app. */
+                client_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new secret, shown this once. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RegisteredClient"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:clients`, the caller is not an owner or admin, or the sign-in is more than ten minutes old (`step_up_required`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such app in the workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A sign-in app has no secret (`client_is_public`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.adopt_held_grant": {
         parameters: {
             query?: never;
@@ -4772,6 +7004,92 @@ export interface operations {
             };
         };
     };
+    "search.query": {
+        parameters: {
+            query?: {
+                /**
+                 * @description The query: words, `"phrases"`, `-word`, `a OR b` and operators
+                 *     (`from:`, `to:`, `cc:`, `subject:`, `has:attachment`, `in:`, `is:`,
+                 *     `label:`, `before:`, `after:`, `older_than:`, `newer_than:`). At most
+                 *     512 characters.
+                 */
+                q?: string;
+                /** @description `relevance` (default) or `newest`. */
+                sort?: "relevance" | "newest";
+                /** @description `true` while the member is typing: the last word matches as a prefix. */
+                prefix?: boolean;
+                /** @description Page size, 1 to 50 (default 20). */
+                limit?: number;
+                /** @description `next_cursor` of the previous page, with the same query and order. */
+                cursor?: string;
+                /** @description The caller's time zone for `before:` and `after:` (IANA, default UTC). */
+                tz?: string;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of results. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResults"];
+                };
+            };
+            /** @description A query too long, a bad limit, or a cursor from another query. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not in it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many queries; try again shortly. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "workspaces.list_security_events": {
         parameters: {
             query?: {
@@ -5095,6 +7413,100 @@ export interface operations {
             };
         };
     };
+    "identity.get_consent_request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The `request` the consent screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConsentRequest"];
+                };
+            };
+            /** @description No such request waiting for this browser's person, or another identity provider serves this instance. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "identity.answer_consent": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path: {
+                /** @description The `request` the consent screen was given. */
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Answer"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Answered"];
+                };
+            };
+            /** @description `consent_needs_workspace`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, `step_up_required` (sign in again: the sign-in is older than ten minutes), or `consent_wrong_workspace`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such request waiting for this browser's person, or a workspace the person does not belong to. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.get_new_account": {
         parameters: {
             query?: never;
@@ -5162,6 +7574,274 @@ export interface operations {
             };
             /** @description `sign_up_expired`, or `way_in_belongs_to_another_account` (another account took this identity meanwhile). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.finish_passkey_sign_in": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description `PublicKeyCredential.toJSON()` of the assertion. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AuthenticationCredential"];
+            };
+        };
+        responses: {
+            /** @description Signed in. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedInWith"];
+                };
+            };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `passkey_expired`: no ceremony waits for this browser (it took more than five minutes, or was used). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_sign_in": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignInStart"];
+            };
+        };
+        responses: {
+            /** @description Options for `navigator.credentials.get` (any of this site's passkeys, user verification required), with a ceremony cookie. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestOptions"];
+                };
+            };
+            /** @description `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys (not https), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.finish_passkey_sign_up": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        /** @description `PublicKeyCredential.toJSON()` of the new passkey. */
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegistrationCredential"];
+            };
+        };
+        responses: {
+            /** @description Created and signed in. */
+            201: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignedInWith"];
+                };
+            };
+            /** @description `invalid_body` (not a credential, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description This instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `passkey_expired`, or `passkey_already_registered`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `rate_limited`: too many ceremonies from this address, or too many passkey-only accounts made on this instance in the last hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.start_passkey_sign_up": {
+        parameters: {
+            query?: never;
+            header: {
+                /** @description Must be `1`. */
+                "x-campbooks-csrf": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SignUpStart"];
+            };
+        };
+        responses: {
+            /** @description Options for `navigator.credentials.create` (a discoverable passkey, user verification required, attestation `none`), with a ceremony cookie. */
+            200: {
+                headers: {
+                    "set-cookie"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreationOptions"];
+                };
+            };
+            /** @description `display_name_required`, `invalid_return_to`, or `invalid_body` (not JSON, or over 16 KiB). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such waiting sign-in request (or it expired), this instance offers no passkeys, or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`: too many ceremonies, or ten challenges waiting, for this address. */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5938,7 +8618,10 @@ export interface operations {
             query?: {
                 /** @description Must be `code`. */
                 response_type?: string;
-                /** @description The client. */
+                /**
+                 * @description The client: a registered id, or the `https` URL of its metadata
+                 *     document.
+                 */
                 client_id?: string;
                 /** @description One of the client's registered redirect URIs. */
                 redirect_uri?: string;
@@ -5956,6 +8639,8 @@ export interface operations {
                 prompt?: string;
                 /** @description Seconds since the person last authenticated, at most. */
                 max_age?: number;
+                /** @description The resource the token is for (RFC 8707): the API's resource URI. */
+                resource?: string;
             };
             header?: never;
             path?: never;
@@ -5963,7 +8648,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description To the client's redirect URI with `code` (signed in) or `error`, or to the sign-in screen. */
+            /** @description To the client's redirect URI with `code` (signed in, and no consent to ask) or `error`; to the sign-in screen; or to the consent screen. */
             303: {
                 headers: {
                     location?: string;
@@ -5986,6 +8671,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };
@@ -6113,6 +8807,53 @@ export interface operations {
             };
         };
     };
+    "identity.register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RegisterRequest"];
+            };
+        };
+        responses: {
+            /** @description Registered. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Registered"];
+                };
+            };
+            /** @description `invalid_redirect_uri` or `invalid_client_metadata`. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Dynamic registration is off on this instance (`CAMPBOOKS_OAUTH__DYNAMIC_REGISTRATION`), or another identity provider serves it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.revoke": {
         parameters: {
             query?: never;
@@ -6171,7 +8912,7 @@ export interface operations {
                     "application/json": components["schemas"]["TokenResponse"];
                 };
             };
-            /** @description `invalid_request`, `invalid_grant` or `unsupported_grant_type`. */
+            /** @description `invalid_request`, `invalid_grant`, `invalid_scope`, `invalid_target`, `unauthorized_client` or `unsupported_grant_type`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6191,6 +8932,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

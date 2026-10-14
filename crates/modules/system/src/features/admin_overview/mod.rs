@@ -86,6 +86,17 @@ pub enum AiProtocol {
     Laya,
 }
 
+/// Where an AI role's endpoint is, as far as mail content is concerned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AiLocation {
+    /// On the instance's own network (loopback or private address, a
+    /// compose service name, `localhost`, or `CAMPBOOKS_AI__INTERNAL_HOSTS`).
+    Instance,
+    /// Anywhere else: gets mail content only when the role opts in.
+    External,
+}
+
 /// One AI role, without a secret: the provider is shown as scheme, host
 /// and port only, and keys never.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -101,6 +112,13 @@ pub struct AiRoleStatus {
     pub endpoint: Option<String>,
     /// The protocol it speaks.
     pub protocol: Option<AiProtocol>,
+    /// Whether its endpoint is on the instance's network.
+    pub location: Option<AiLocation>,
+    /// Whether it may receive mail content: on the instance's network, or
+    /// opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When
+    /// `false`, nothing calls it with content (the decide pass leaves
+    /// sorting to rules); only the reachability probe runs.
+    pub content_allowed: Option<bool>,
     /// Whether the provider answered a probe within 3 seconds (probes are
     /// reused for a minute); `null` when not configured.
     pub reachable: Option<bool>,
@@ -122,6 +140,11 @@ impl From<campbooks_ai::RoleHealth> for AiRoleStatus {
                 campbooks_ai::Protocol::OpenAi => AiProtocol::Openai,
                 campbooks_ai::Protocol::Laya => AiProtocol::Laya,
             }),
+            location: health.location.map(|location| match location {
+                campbooks_ai::Location::Instance => AiLocation::Instance,
+                campbooks_ai::Location::External => AiLocation::External,
+            }),
+            content_allowed: health.content_allowed,
             reachable: health.reachable,
         }
     }

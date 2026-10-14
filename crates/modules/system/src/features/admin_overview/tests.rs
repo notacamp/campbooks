@@ -1,7 +1,7 @@
 use axum::http::{Method, StatusCode};
-use campbooks_ai::{AiConfig, Gateway, ProviderConfig, Role};
+use campbooks_ai::{AiConfig, ExternalContent, Gateway, ProviderConfig, Role};
 use campbooks_kernel::testing::TestResponse;
-use serde_json::json;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
 
@@ -26,6 +26,7 @@ impl World {
 fn gateway(roles: impl IntoIterator<Item = (Role, ProviderConfig)>) -> Gateway {
     Gateway::new(AiConfig {
         roles: roles.into_iter().collect(),
+        ..AiConfig::default()
     })
     .unwrap()
 }
@@ -41,11 +42,24 @@ async fn a_super_admin_sees_the_system_without_secrets(db: PgPool) {
         .uri()
         .replace("http://", "http://user:url-password@");
     let deps = Deps {
-        ai: Some(gateway([(
-            Role::Decide,
-            ProviderConfig::new(format!("{base}/v1").parse().unwrap(), "qwen3:8b")
-                .with_api_key("sk-ai-secret"),
-        )])),
+        ai: Some(gateway([
+            (
+                Role::Decide,
+                ProviderConfig::new(format!("{base}/v1").parse().unwrap(), "qwen3:8b")
+                    .with_api_key("sk-ai-secret"),
+            ),
+            // Off the instance's network (a documentation address): opted in…
+            (
+                Role::Embed,
+                ProviderConfig::new("http://203.0.113.7/v1".parse().unwrap(), "e")
+                    .with_external_content(ExternalContent::Allow),
+            ),
+            // …and not.
+            (
+                Role::Complete,
+                ProviderConfig::new("http://203.0.113.7/v1".parse().unwrap(), "c"),
+            ),
+        ])),
         facts: Facts {
             identity_provider: IdentityProvider::BuiltIn,
             sign_in_providers: vec!["google".into()],
@@ -73,7 +87,18 @@ async fn a_super_admin_sees_the_system_without_secrets(db: PgPool) {
     assert_eq!(ai[0]["endpoint"], provider.uri());
     assert_eq!(ai[0]["protocol"], "openai");
     assert_eq!(ai[0]["reachable"], true);
-    assert_eq!(ai[1]["configured"], false);
+    assert_eq!(ai[0]["location"], "instance");
+    assert_eq!(ai[0]["content_allowed"], true);
+    assert_eq!(
+        (&ai[1]["location"], &ai[1]["content_allowed"]),
+        (&json!("external"), &json!(true))
+    );
+    assert_eq!(
+        (&ai[2]["location"], &ai[2]["content_allowed"]),
+        (&json!("external"), &json!(false))
+    );
+    assert_eq!(ai[3]["configured"], false);
+    assert_eq!(ai[3]["location"], Value::Null);
 
     let text = body.to_string();
     for secret in [

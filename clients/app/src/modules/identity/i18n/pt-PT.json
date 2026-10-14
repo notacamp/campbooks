@@ -9,7 +9,9 @@
     "choice2": "Iniciar sessão com a segunda opção",
     "choice3": "Iniciar sessão com a terceira opção",
     "passkey": "Iniciar sessão com uma chave de acesso",
-    "addWayIn": "Adicionar uma forma de iniciar sessão"
+    "addWayIn": "Adicionar uma forma de iniciar sessão",
+    "addPasskey": "Adicionar uma chave de acesso",
+    "newApp": "Nova aplicação"
   },
   "signIn": {
     "title": "Iniciar sessão no Campbooks",
@@ -48,6 +50,35 @@
     "failed": {
       "title": "Não foi possível carregar as formas de iniciar sessão",
       "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
+    },
+    "passkeyWaiting": "À espera da sua chave de acesso…",
+    "passkeySignUp": "Ainda não tem conta? Crie uma com uma chave de acesso",
+    "passkeyField": {
+      "label": "Chaves de acesso guardadas",
+      "hint": "O seu navegador mostra aqui as chaves de acesso que guardou para o Campbooks.",
+      "placeholder": "Escolha uma chave de acesso"
+    },
+    "passkeyProblem": {
+      "cancelled": {
+        "title": "Não foi usada nenhuma chave de acesso.",
+        "lead": "Tente novamente quando quiser ou inicie sessão de outra forma."
+      },
+      "not_accepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Pode ter sido removida da sua conta. Experimente outra chave de acesso ou inicie sessão de outra forma."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Tente novamente."
+      },
+      "rate_limited": {
+        "title": "Demasiadas tentativas.",
+        "lead": "Aguarde um minuto e tente novamente."
+      },
+      "failed": {
+        "title": "Não foi possível iniciar sessão com uma chave de acesso.",
+        "lead": "Algo correu mal. Tente novamente ou inicie sessão de outra forma."
+      }
     }
   },
   "errors": {
@@ -245,6 +276,275 @@
       "unknown": {
         "title": "Algo correu mal.",
         "lead": "Nada mudou. Tente novamente."
+      }
+    }
+  },
+  "passkeySignUp": {
+    "eyebrow": "Nova conta",
+    "title": "Criar uma conta com uma chave de acesso",
+    "lead": "O seu dispositivo guarda a chave de acesso e desbloqueia-a com o rosto, a impressão digital ou o bloqueio de ecrã. Não há palavra-passe.",
+    "footer": "Não é preciso endereço de email. Pode adicionar Google, Microsoft ou Zoho mais tarde.",
+    "name": {
+      "label": "Como lhe devemos chamar?",
+      "placeholder": "O seu nome",
+      "hint": "Aparece no Campbooks e às pessoas que convidar.",
+      "required": "Diga-nos como lhe devemos chamar.",
+      "tooLong": "Use 64 caracteres ou menos."
+    },
+    "create": "Criar com uma chave de acesso",
+    "creating": "À espera da sua chave de acesso…",
+    "another": "Iniciar sessão de outra forma",
+    "nextTitle": "O que acontece a seguir",
+    "next1": "O seu dispositivo pede para guardar uma chave de acesso para o Campbooks.",
+    "next2": "Cria o seu primeiro espaço de trabalho.",
+    "next3": "Liga uma caixa de correio quando quiser.",
+    "problem": {
+      "cancelled": {
+        "title": "Não foi criada nenhuma chave de acesso.",
+        "lead": "Nada foi criado. Tente novamente quando quiser."
+      },
+      "exists": {
+        "title": "Este dispositivo já tem uma chave de acesso para isso.",
+        "lead": "Inicie sessão com ela."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Nada foi criado. Tente novamente."
+      },
+      "not_accepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Nada foi criado. Tente novamente ou use outro dispositivo."
+      },
+      "failed": {
+        "title": "Não foi possível criar a conta.",
+        "lead": "Nada foi criado. Tente novamente."
+      }
+    },
+    "inviteOnly": {
+      "title": "Este Campbooks só aceita pessoas convidadas",
+      "lead": "Inicie sessão com a conta para a qual o convite foi enviado. Pode adicionar uma chave de acesso depois de entrar."
+    },
+    "unsupported": {
+      "title": "Este navegador não pode usar chaves de acesso",
+      "lead": "Use outro navegador ou dispositivo, ou inicie sessão de outra forma."
+    }
+  },
+  "passkeys": {
+    "title": "Chaves de acesso",
+    "lead": "Inicie sessão com o rosto, a impressão digital ou o bloqueio de ecrã em vez de um fornecedor. As chaves de acesso não podem ser roubadas por phishing.",
+    "list": "As suas chaves de acesso",
+    "loading": "A carregar as suas chaves de acesso…",
+    "loadError": "Não foi possível carregar as suas chaves de acesso.",
+    "retry": "Tentar novamente",
+    "none": "Ainda não tem chaves de acesso.",
+    "add": "Adicionar uma chave de acesso",
+    "adding": "À espera da sua chave de acesso…",
+    "added": "{{name}} foi adicionada. Já pode iniciar sessão com ela.",
+    "nameOn": "Chave de acesso em {{device}}",
+    "synced": "Sincronizada entre os seus dispositivos",
+    "thisDevice": "Num só dispositivo",
+    "rename": "Mudar o nome",
+    "renameLabel": "Mudar o nome de {{name}}",
+    "removeLabel": "Remover {{name}}",
+    "nameLabel": "Nome",
+    "save": "Guardar",
+    "confirmRemove": "Deixar de iniciar sessão com {{name}}? Fica no seu dispositivo até a apagar lá, e quem tiver sessão iniciada com ela termina a sessão.",
+    "renameFailed": {
+      "title": "Não foi possível mudar o nome.",
+      "lead": "Use entre 1 e 64 caracteres e tente novamente."
+    },
+    "unsupported": "Este navegador não consegue criar chaves de acesso. Use outro navegador ou dispositivo para adicionar uma.",
+    "problem": {
+      "cancelled": {
+        "title": "Não foi adicionada nenhuma chave de acesso.",
+        "lead": "Tente novamente quando quiser."
+      },
+      "exists": {
+        "title": "Este dispositivo já tem uma chave de acesso para a sua conta.",
+        "lead": "Está na lista."
+      },
+      "expired": {
+        "title": "Demorou demasiado tempo.",
+        "lead": "Nada foi adicionado. Tente novamente."
+      },
+      "notAccepted": {
+        "title": "Essa chave de acesso não foi aceite.",
+        "lead": "Nada foi adicionado. Tente novamente ou use outro dispositivo."
+      },
+      "failed": {
+        "title": "Não foi possível adicionar uma chave de acesso.",
+        "lead": "Nada foi adicionado. Tente novamente."
+      }
+    }
+  },
+  "consent": {
+    "loading": "A carregar o que a aplicação pede…",
+    "eyebrow": "Autorizar acesso",
+    "title": "A aplicação {{app}} quer usar a sua conta Campbooks",
+    "lead": "Tem sessão iniciada como {{email}}.",
+    "leadNoEmail": "Tem sessão iniciada no Campbooks.",
+    "app": "A aplicação",
+    "unverified": "Não verificada",
+    "kind": {
+      "first_party": "Aplicação do próprio Campbooks.",
+      "workspace": "Registada por um administrador de {{workspace}}.",
+      "dynamic": "Registou-se sozinha. Ninguém verificou quem a fez.",
+      "metadata_document": "Descrita por {{host}}. Ninguém verificou quem a fez."
+    },
+    "can": "Vai poder",
+    "workspace": "Que espaço de trabalho pode usar?",
+    "workspaceLead": "Só vê e altera esse espaço de trabalho.",
+    "allWorkspaces": "Vai funcionar em todos os seus espaços de trabalho, como o Campbooks na web.",
+    "role": {
+      "owner": "Proprietário",
+      "admin": "Administrador",
+      "member": "Membro"
+    },
+    "noWorkspace": {
+      "title": "Junte-se primeiro a um espaço de trabalho",
+      "lead": "Esta aplicação funciona dentro de um espaço de trabalho, e ainda não pertence a nenhum."
+    },
+    "goesTo": "A seguir, vai para {{host}}.",
+    "goesToDevice": "A seguir, volta a uma aplicação neste dispositivo.",
+    "device": {
+      "title": "Só se acabou de iniciar isto",
+      "lead": "Uma aplicação neste dispositivo pediu isto. Autorize-a apenas se foi o próprio a iniciar sessão a partir dessa aplicação, agora mesmo: qualquer aplicação neste dispositivo pode pedir, e agiria em seu nome."
+    },
+    "unverifiedNote": {
+      "title": "Qualquer pessoa pode registar uma aplicação com qualquer nome",
+      "lead": "Autorize-a apenas se confia no sítio de onde veio."
+    },
+    "remembered": "Não voltamos a perguntar por esta aplicação. Pode revogá-la quando quiser em Definições → Aplicações e integrações.",
+    "everyTime": "Perguntamos sempre que esta aplicação iniciar sessão. Pode revogá-la quando quiser em Definições → Aplicações e integrações.",
+    "allow": "Autorizar",
+    "allowing": "A autorizar…",
+    "deny": "Recusar",
+    "stepUp": {
+      "title": "Inicie sessão novamente primeiro",
+      "lead": "Autorizar uma aplicação exige um início de sessão dos últimos dez minutos.",
+      "action": "Iniciar sessão novamente"
+    },
+    "gone": {
+      "title": "Este pedido já não está à espera",
+      "lead": "Expirou, já foi respondido ou era para outra pessoa. Recomece a partir da aplicação."
+    },
+    "home": "Ir para o Campbooks",
+    "failed": {
+      "title": "Não foi possível carregar este pedido",
+      "lead": "O Campbooks não respondeu. Verifique a ligação e tente novamente."
+    },
+    "retry": "Tentar novamente",
+    "answerFailed": {
+      "title": "Não foi possível concluir",
+      "lead": "Nada foi autorizado. Tente novamente."
+    },
+    "campbooks": "Campbooks",
+    "workspaceApp": "Aplicação de {{workspace}}",
+    "yourWorkspace": "o seu espaço de trabalho"
+  },
+  "scopes": {
+    "openid": "Saber quem é no Campbooks",
+    "profile": "Ver o seu nome",
+    "email": "Ver o seu endereço de email",
+    "offline_access": "Manter-se ligada quando não está, até a revogar",
+    "system_read": "Ver se este Campbooks está a funcionar",
+    "workspaces_read": "Ver os seus espaços de trabalho e os respetivos membros",
+    "workspaces_write": "Criar espaços de trabalho e alterar as definições",
+    "workspaces_admin": "Gerir membros e convites",
+    "connectors_read": "Ver as caixas de correio ligadas a um espaço de trabalho",
+    "connectors_write": "Ligar, sincronizar e desligar caixas de correio",
+    "conversations_read": "Ler as suas conversas e mensagens",
+    "conversations_write": "Responder, enviar, arquivar e organizar as suas conversas",
+    "identity_read": "Ver a sua conta e como inicia sessão",
+    "identity_write": "Alterar como inicia sessão",
+    "identity_clients": "Gerir as aplicações de um espaço de trabalho",
+    "conversations_send": "Enviar correio a partir das suas caixas de correio"
+  },
+  "apps": {
+    "title": "Aplicações e integrações",
+    "lead": "As aplicações que deixou entrar na sua conta e as aplicações deste espaço de trabalho.",
+    "loading": "A carregar aplicações…",
+    "loadError": {
+      "title": "Não foi possível carregar as suas aplicações",
+      "lead": "O Campbooks não respondeu. Tente novamente daqui a pouco.",
+      "retry": "Tentar novamente"
+    },
+    "connected": {
+      "title": "Aplicações ligadas",
+      "lead": "Aplicações que podem agir em seu nome. Revogar uma para-a de imediato.",
+      "list": "Aplicações que deixou entrar",
+      "empty": "Nenhuma aplicação pode agir em seu nome.",
+      "allWorkspaces": "Todos os seus espaços de trabalho",
+      "in": "Em {{workspace}}",
+      "elsewhere": "Num espaço de trabalho que deixou",
+      "granted": "Autorizada a {{date}}",
+      "lastUsed": "último uso a {{date}}",
+      "removedApp": "Uma aplicação que foi removida",
+      "revoke": "Revogar",
+      "revokeLabel": "Revogar {{app}}",
+      "confirmRevoke": "{{app}} deixa de funcionar de imediato, até a autorizar novamente.",
+      "cancel": "Cancelar",
+      "revokeFailed": "Não foi possível revogá-la. Tente novamente.",
+      "workspaceApp": "Aplicação do espaço de trabalho"
+    },
+    "workspace": {
+      "title": "Aplicações deste espaço de trabalho",
+      "lead": "Integrações de {{workspace}}: aplicações de servidor para servidor com um segredo, e aplicações de início de sessão que as pessoas autorizam.",
+      "list": "Aplicações de {{workspace}}",
+      "notAdmin": "Só os proprietários e administradores podem gerir as aplicações deste espaço de trabalho.",
+      "empty": "Ainda não há aplicações.",
+      "new": "Nova aplicação",
+      "name": "Nome",
+      "namePlaceholder": "Exportação noturna",
+      "type": "Que tipo de aplicação",
+      "types": {
+        "confidential": "Servidor para servidor",
+        "public": "Aplicação de início de sessão"
+      },
+      "typeLeads": {
+        "confidential": "Corre num servidor com um segredo e age pelo espaço de trabalho (credenciais de cliente).",
+        "public": "As pessoas iniciam sessão através dela e autorizam-na, uma a uma."
+      },
+      "access": "O que pode fazer",
+      "accessOptions": {
+        "read": "Ler",
+        "write": "Ler e alterar"
+      },
+      "accessLeads": {
+        "read": "Ver o correio e as definições do espaço de trabalho.",
+        "write": "Também responder, enviar, organizar e ligar caixas de correio."
+      },
+      "redirect": "Endereço de retorno",
+      "redirectHint": "Para onde as pessoas voltam depois de a autorizar: https://… ou http://127.0.0.1:porta/…",
+      "create": "Criar aplicação",
+      "creating": "A criar…",
+      "cancel": "Cancelar",
+      "created": "Criada a {{date}}",
+      "lastUsed": "último uso a {{date}}",
+      "neverUsed": "nunca usada",
+      "secretTitle": "Copie o segredo agora",
+      "secretLead": "Só é mostrado desta vez. Guarde-o num local seguro; se o perder, renove-o.",
+      "clientId": "ID de cliente",
+      "secret": "Segredo de cliente",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "copyFailed": "Selecione e copie",
+      "done": "Concluído",
+      "rotate": "Renovar segredo",
+      "rotateLabel": "Renovar o segredo de {{app}}",
+      "confirmRotate": "O segredo atual de {{app}} deixa de funcionar de imediato.",
+      "remove": "Remover",
+      "removeLabel": "Remover {{app}}",
+      "confirmRemove": "{{app}} e todos os tokens que tem deixam de funcionar.",
+      "errors": {
+        "name": "Dê-lhe um nome.",
+        "redirect": "Use um endereço https, ou http://127.0.0.1 com uma porta.",
+        "failed": "Não funcionou. Tente novamente."
+      },
+      "stepUp": {
+        "title": "Inicie sessão novamente primeiro",
+        "lead": "Criar ou renovar um segredo exige um início de sessão dos últimos dez minutos.",
+        "action": "Iniciar sessão novamente"
       }
     }
   }

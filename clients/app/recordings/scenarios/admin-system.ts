@@ -136,5 +136,9 @@ export default async function adminSystem({ page }: ScenarioContext): Promise<vo
     await pause(900);
   }
   await caption(page, "No secrets: addresses are shown as host only, keys and passwords never");
-  await pause(1200);
+  await caption(
+    page,
+    "Each AI role says where it is: a role outside this instance's network gets no mail unless the operator allows it",
+  );
+  await pause(2000);
 }

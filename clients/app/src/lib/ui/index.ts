@@ -68,6 +68,11 @@ export {
   type ConversationRowProps,
 } from "./components/ConversationRow/ConversationRow";
 export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
+export {
+  HowDecided,
+  type HowDecidedProps,
+  type HowDecidedRow,
+} from "./components/HowDecided/HowDecided";
 export { Dot, type DotProps } from "./components/Dot/Dot";
 export { Fact, FactList, type FactProps, type FactStatus } from "./components/Facts/Facts";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
@@ -111,6 +116,7 @@ export {
   type NoteChoiceOption,
   type NoteLink,
   type NoteProps,
+  type NoteQuote,
 } from "./components/Note/Note";
 export { Pill, type PillProps } from "./components/Pill/Pill";
 export {

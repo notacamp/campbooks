@@ -610,6 +610,74 @@ impl Upstream {
         })
     }
 
+    /// Revoke a refresh token Campbooks will not keep, at the server whose
+    /// issuer is `issuer` (Zoho caps the refresh tokens a person holds per
+    /// app, so one left behind could evict a mailbox connection's own).
+    /// Only Zoho revokes one token alone; for the others this does nothing
+    /// (revoking a Google token revokes the whole grant, a connected
+    /// mailbox's too). In the request body first (RFC 7009), then as the
+    /// query parameter Zoho documents.
+    pub async fn revoke_unkept(
+        &self,
+        issuer: &str,
+        refresh_token: &str,
+    ) -> Result<(), UpstreamError> {
+        if self.provider != Provider::Zoho {
+            return Ok(());
+        }
+        let Rule::Servers(servers) = &self.rule else {
+            return Ok(());
+        };
+        let issuer = issuer.trim_end_matches('/');
+        let Some(server) = servers
+            .iter()
+            .find(|v| v.server.issuer.trim_end_matches('/') == issuer)
+        else {
+            return Err(UpstreamError::Rejected(
+                "not one of the provider's servers".into(),
+            ));
+        };
+        // Next to the token endpoint (Zoho: `/oauth/v2/token/revoke`).
+        let url = Url::parse(&format!(
+            "{}/revoke",
+            server.server.token.as_str().trim_end_matches('/')
+        ))
+        .map_err(|e| UpstreamError::Unavailable(format!("revocation URL: {e}")))?;
+        let secret = self.secret().await?;
+        let body = self
+            .http
+            .post(url.clone())
+            .header(reqwest::header::CONTENT_TYPE, FORM)
+            .body(encode(&[
+                ("token", refresh_token),
+                ("client_id", self.client_id.as_str()),
+                ("client_secret", secret.expose_secret()),
+            ]))
+            .send()
+            .await
+            .map_err(|e| UpstreamError::Unavailable(e.without_url().to_string()))?;
+        if body.status().is_success() {
+            return Ok(());
+        }
+        let mut query = url;
+        query.query_pairs_mut().append_pair("token", refresh_token);
+        let response = self
+            .http
+            .post(query)
+            .header(reqwest::header::CONTENT_TYPE, FORM)
+            .send()
+            .await
+            .map_err(|e| UpstreamError::Unavailable(e.without_url().to_string()))?;
+        if response.status().is_success() {
+            Ok(())
+        } else {
+            Err(UpstreamError::Rejected(format!(
+                "revocation answered {}",
+                response.status().as_u16()
+            )))
+        }
+    }
+
     async fn exchange(
         &self,
         endpoint: &Url,

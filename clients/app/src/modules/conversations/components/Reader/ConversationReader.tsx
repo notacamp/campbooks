@@ -9,6 +9,7 @@ import {
   EmptyState,
   focusNextAttachment,
   Heading,
+  HowDecided,
   IconButton,
   MetaLine,
   Note,
@@ -26,9 +27,11 @@ import {
   openByDefault,
   placementLine,
   streamName,
-  whyLines,
   type Translate,
 } from "../../model";
+import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
+import { NeedChips } from "../Needs/NeedChips";
+import { useNeedActions } from "../Needs/use-need-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
 import { MovePicker } from "./MovePicker";
@@ -48,6 +51,8 @@ export interface ConversationReaderProps {
   onDone: (conversation: ConversationSummary) => void;
   /** The send slice's composer; Reply, Reply all and Forward are hidden without it. */
   renderReplySlot?: RenderReplySlot | undefined;
+  /** Open the reply composer once the conversation is loaded (Home's R). */
+  startReply?: boolean | undefined;
   now?: Date | undefined;
 }
 
@@ -66,6 +71,7 @@ export function ConversationReader({
   onNext,
   onDone,
   renderReplySlot,
+  startReply = false,
   now,
 }: ConversationReaderProps) {
   const { t: typed, i18n } = useTranslation("conversations");
@@ -74,6 +80,9 @@ export function ConversationReader({
   const query = useConversation(workspaceId, conversationId);
   const detail = query.data;
   const conversation = detail?.conversation;
+  const needActions = useNeedActions(workspaceId);
+  const need = conversation?.need ?? undefined;
+  const question = need?.trust === "check";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
   const [images, setImages] = useState<Set<string>>(new Set());
@@ -107,6 +116,20 @@ export function ConversationReader({
     nonce.current += 1;
     setReply({ mode, messageId: newest.id, nonce: nonce.current });
   };
+  // Home's R: answer the newest message as soon as it is here (once).
+  const repliedOnce = useRef(false);
+  useEffect(() => {
+    if (
+      startReply &&
+      !repliedOnce.current &&
+      newest !== undefined &&
+      renderReplySlot !== undefined
+    ) {
+      repliedOnce.current = true;
+      nonce.current += 1;
+      setReply({ mode: "reply", messageId: newest.id, nonce: nonce.current });
+    }
+  }, [startReply, newest, renderReplySlot]);
   const showAllImages = () => {
     setImages(new Set(messages.map((message) => message.id)));
   };
@@ -181,11 +204,34 @@ export function ConversationReader({
   useShortcut(
     "item.choice1",
     () => {
-      if (conversation !== undefined && suggestion !== undefined) {
+      if (conversation === undefined) {
+        return;
+      }
+      if (question) {
+        needActions.confirm(conversation);
+      } else if (suggestion !== undefined) {
         actions.move(conversation, suggestion.stream);
       }
     },
-    { enabled: suggestion !== undefined },
+    { enabled: question || suggestion !== undefined },
+  );
+  useShortcut(
+    "item.choice2",
+    () => {
+      if (conversation !== undefined) {
+        needActions.notNeeded(conversation);
+      }
+    },
+    { enabled: question },
+  );
+  useShortcut(
+    "conversations.resolve_need",
+    () => {
+      if (conversation !== undefined) {
+        needActions.notNeeded(conversation);
+      }
+    },
+    { enabled: need !== undefined && !question },
   );
 
   // Wrappers carry the responsive classes: a component's own styles win
@@ -373,33 +419,112 @@ export function ConversationReader({
             ]}
           />
         </div>
-        <Note
-          key={conversation.id}
-          label={t("scout.label")}
-          visor={suggestion === undefined ? "idle" : "unsure"}
-          confidence={placementLine(t, conversation, decisions)}
-          why={whyLines(t, exists, conversation, decisions)}
-          {...(suggestion === undefined
-            ? {}
-            : {
-                choice: {
-                  prompt: t("scout.prompt"),
-                  options: [
-                    {
-                      label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
-                      shortcut: "item.choice1",
-                      onSelect: () => {
-                        actions.move(conversation, suggestion.stream);
+        {need === undefined ? (
+          <Note
+            key={conversation.id}
+            label={t("scout.label")}
+            visor={suggestion === undefined ? "idle" : "unsure"}
+            footer={placementLine(t, conversation)}
+            how={
+              <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
+            }
+            {...(suggestion === undefined
+              ? {}
+              : {
+                  choice: {
+                    prompt: t("scout.prompt"),
+                    options: [
+                      {
+                        label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
+                        shortcut: "item.choice1",
+                        onSelect: () => {
+                          actions.move(conversation, suggestion.stream);
+                        },
                       },
-                    },
-                  ],
-                },
-              })}
-        >
-          {suggestion === undefined
-            ? noteSentence(t, decisions, i18n.language)
-            : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language)}`}
-        </Note>
+                    ],
+                  },
+                })}
+          >
+            {suggestion === undefined
+              ? noteSentence(t, decisions, i18n.language)
+              : `${t("scout.suggestionNote", { stream: streamName(t, suggestion.stream) })} ${noteSentence(t, decisions, i18n.language)}`}
+          </Note>
+        ) : (
+          <Note
+            key={conversation.id}
+            label={t("scout.label")}
+            visor={need.question === "suspicious" ? "alert" : question ? "unsure" : "idle"}
+            reasons={need.question === "suspicious" ? warningReasons(t, exists, decisions) : []}
+            {...(need.quote === null || need.quote === undefined
+              ? {}
+              : {
+                  quote: {
+                    text: need.quote.text,
+                    attribution: quoteAttribution(
+                      need,
+                      needSender(need, conversation),
+                      i18n.language,
+                    ),
+                  },
+                })}
+            chips={<NeedChips need={need} now={now} />}
+            {...(question
+              ? {
+                  choice: {
+                    prompt: t("needs.actions.questionPrompt"),
+                    options: [
+                      {
+                        label: t("needs.actions.yes"),
+                        shortcut: "item.choice1",
+                        onSelect: () => {
+                          needActions.confirm(conversation);
+                        },
+                      },
+                      {
+                        label: t("needs.actions.no"),
+                        shortcut: "item.choice2",
+                        onSelect: () => {
+                          needActions.notNeeded(conversation);
+                        },
+                      },
+                    ],
+                  },
+                }
+              : {
+                  actions: (
+                    <>
+                      <Button
+                        variant="secondary"
+                        onClick={() => {
+                          needActions.done(conversation);
+                        }}
+                      >
+                        {t("needs.actions.done")}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        shortcut="conversations.resolve_need"
+                        onClick={() => {
+                          needActions.notNeeded(conversation);
+                        }}
+                      >
+                        {t(
+                          need.question === "suspicious"
+                            ? "needs.actions.safe"
+                            : "needs.actions.notNeeded",
+                        )}
+                      </Button>
+                    </>
+                  ),
+                })}
+            footer={placementLine(t, conversation)}
+            how={
+              <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
+            }
+          >
+            {needSentence(t, need, needSender(need, conversation))}
+          </Note>
+        )}
         {messages.toReversed().map((message) => (
           <ThreadMessage
             key={message.id}

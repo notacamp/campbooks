@@ -114,11 +114,17 @@
       "notConfigured": "Not set up",
       "answering": "Answering",
       "notAnswering": "Not answering",
+      "notSentMail": "Not sent any mail",
       "protocol": {
         "openai": "OpenAI-compatible",
         "laya": "Laya"
       },
-      "detail": "{{model}} at {{endpoint}} · {{protocol}}"
+      "detail": "{{model}} at {{endpoint}} · {{protocol}}",
+      "where": {
+        "instance": "on this instance’s network",
+        "externalAllowed": "outside this instance’s network, allowed to receive mail",
+        "externalRefused": "outside this instance’s network, so mail is not sent to it"
+      }
     },
     "duration": {
       "lessThanAMinute": "Less than a minute"

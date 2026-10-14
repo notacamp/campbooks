@@ -56,6 +56,7 @@ fn fast_retry() -> RetryPolicy {
 fn gateway(provider: ProviderConfig) -> Gateway {
     Gateway::new(AiConfig {
         roles: [(Role::Decide, provider)].into(),
+        ..AiConfig::default()
     })
     .unwrap()
     .with_retry(fast_retry())
@@ -269,7 +270,7 @@ async fn persistent_server_errors_give_up_after_the_last_attempt() {
         .await
         .unwrap_err();
     assert!(
-        matches!(&err, Error::Status { status: 500, body } if body.contains("inference failed")),
+        matches!(&err, Error::Status { status: 500 }) && !err.to_string().contains("inference"),
         "{err:?}"
     );
 }
@@ -338,6 +339,7 @@ async fn slow_provider_times_out_without_retry() {
     let gw = Gateway::with_timeouts(
         AiConfig {
             roles: [(Role::Decide, laya(&server))].into(),
+            ..AiConfig::default()
         },
         Duration::from_secs(1),
         Duration::from_millis(200),
@@ -585,6 +587,40 @@ async fn instruct_answers_outside_the_schema_are_invalid() {
         assert!(
             matches!(err, Error::InvalidResponse(_)),
             "{content}: {err:?}"
+        );
+    }
+}
+
+/// An endpoint on the instance's network that answers 307 to another host.
+async fn redirecting_to(elsewhere: &MockServer) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(307)
+                .insert_header("location", format!("{}/v1/systemone", elsewhere.uri())),
+        )
+        .mount(&server)
+        .await;
+    server
+}
+
+#[tokio::test]
+async fn decide_never_follows_a_redirect_off_the_box() {
+    for protocol in [Protocol::Laya, Protocol::OpenAi] {
+        let elsewhere = MockServer::start().await;
+        let server = redirecting_to(&elsewhere).await;
+        let provider = match protocol {
+            Protocol::Laya => laya(&server),
+            Protocol::OpenAi => instruct(&server),
+        };
+        let err = gateway(provider)
+            .decide(&CTX, &state(), &questions())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Status { status: 307 }), "{err:?}");
+        assert!(
+            elsewhere.received_requests().await.unwrap().is_empty(),
+            "{protocol:?}: the mail went to the redirect target"
         );
     }
 }

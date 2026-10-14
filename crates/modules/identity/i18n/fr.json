@@ -12,6 +12,22 @@
     "step_up_required": "Reconnectez-vous d’abord : pour changer votre façon de vous connecter, il faut vous être connecté dans les dix dernières minutes.",
     "last_way_in": "C’est votre seul moyen de connexion : il ne peut pas être retiré. Ajoutez-en d’abord un autre.",
     "link_incomplete": "Précisez le fournisseur, l’espace de travail ou la boîte mail concernés.",
-    "mailbox_unsupported": "Campbooks ne peut pas encore connecter la boîte mail de ce fournisseur sur cette instance."
+    "mailbox_unsupported": "Campbooks ne peut pas encore connecter la boîte mail de ce fournisseur sur cette instance.",
+    "passkey_not_accepted": "Cette clé d’accès n’a pas été acceptée. Réessayez, ou connectez-vous autrement.",
+    "passkey_expired": "Cette demande de clé d’accès a pris trop de temps ou a déjà servi. Réessayez.",
+    "passkey_already_registered": "Cette clé d’accès permet déjà d’accéder à Campbooks.",
+    "display_name_required": "Dites-nous comment vous appeler.",
+    "passkey_name_required": "Donnez à la clé d’accès un nom de 1 à 64 caractères.",
+    "invalid_target": "Cette application a demandé l’accès à quelque chose que Campbooks ne fournit pas.",
+    "consent_request_not_found": "Cette demande d’autorisation d’une application a expiré ou a déjà reçu une réponse. Recommencez depuis l’application.",
+    "consent_needs_workspace": "Choisissez l’espace de travail que cette application peut utiliser.",
+    "consent_wrong_workspace": "Cette application appartient à un autre espace de travail et ne peut être autorisée que là-bas.",
+    "not_workspace_admin": "Seuls les propriétaires et les administrateurs de l’espace de travail peuvent gérer ses applications.",
+    "client_not_found": "Cette application n’existe pas dans cet espace de travail.",
+    "invalid_client_metadata": "Les informations de l’application ne sont pas acceptables : {{reason}}",
+    "client_needs_redirect": "Une application de connexion a besoin d’au moins une adresse de retour https ou de bouclage local.",
+    "client_scope_not_allowed": "Impossible de donner l’autorisation {{scope}} à des applications.",
+    "client_is_public": "Cette application connecte des personnes et n’a pas de secret à renouveler.",
+    "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom."
   }
 }

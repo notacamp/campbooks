@@ -13,9 +13,7 @@
     "redone": "Rétabli : {{label}}"
   },
   "note": {
-    "label": "Où en sont les choses",
-    "why": "Pourquoi ?",
-    "hideWhy": "Masquer le pourquoi"
+    "label": "Où en sont les choses"
   },
   "search": {
     "label": "Rechercher ou demander"
@@ -43,7 +41,10 @@
     "unsure": "Campbooks n’est pas sûr",
     "happy": "Campbooks est content",
     "alert": "Campbooks a besoin de votre attention",
-    "asleep": "Campbooks est en pause"
+    "asleep": "Campbooks est en pause",
+    "dizzy": "Campbooks a eu un accroc",
+    "starry": "Campbooks est ravi",
+    "hearts": "Campbooks adore"
   },
   "signal": {
     "review": "Vérifier",
@@ -97,5 +98,8 @@
     "previewOf": "Aperçu de {{name}}",
     "downloadOf": "Télécharger {{name}}",
     "previewTitle": "Aperçu de {{name}}"
+  },
+  "howDecided": {
+    "title": "Comment Campbooks a décidé"
   }
 }

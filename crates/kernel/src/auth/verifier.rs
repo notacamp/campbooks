@@ -153,7 +153,7 @@ impl Inner {
             .decode(token, &self.audience, &ALLOWED_TYPES, false)
             .await?;
         claims
-            .into_principal()
+            .into_principal(self.strict_type)
             .ok_or(Error::Unauthorized(AuthFailure::InvalidToken))
     }
 
@@ -265,8 +265,10 @@ struct CustomClaims {
 
 impl Claims {
     /// `None` when the token names no subject at all, or a client token names
-    /// two different workspaces.
-    fn into_principal(self) -> Option<Principal> {
+    /// two different workspaces. `own_issuer`: the token comes from the
+    /// in-process issuer, which binds a user's token to the workspace the
+    /// person chose on a consent screen (its root `workspace_id`).
+    fn into_principal(self, own_issuer: bool) -> Option<Principal> {
         let azp = self.azp.filter(|azp| !azp.is_empty());
         let sub = self.sub.filter(|sub| !sub.is_empty());
         let kind = match (&sub, &azp) {
@@ -274,10 +276,13 @@ impl Claims {
             (Some(_), _) => PrincipalKind::User,
             (None, _) => PrincipalKind::Client,
         };
-        // Only a client's workspace comes from its token: an admin sets a
-        // client's claims. A user's custom claims can come from attributes the
-        // user may edit, so a user's workspaces always come from membership.
+        // A client's workspace comes from its token: an admin sets a client's
+        // claims. A user's claims from an outside identity provider can come
+        // from attributes the user may edit, so they are ignored; the
+        // in-process issuer sets a user's `workspace_id` itself, from a
+        // consent, and `Workspace<S>` then admits that workspace only.
         let workspace = match kind {
+            PrincipalKind::User if own_issuer => self.workspace_id.filter(|w| !w.is_empty()),
             PrincipalKind::User => None,
             PrincipalKind::Client => {
                 let custom = self.custom.and_then(|custom| custom.workspace_id);
@@ -343,7 +348,7 @@ mod tests {
         let principal = claims(serde_json::json!({
             "sub": "user-1", "azp": "campbooks-web", "scope": "openid system:read"
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(principal.subject, "user-1");
         assert_eq!(principal.kind, PrincipalKind::User);
@@ -359,18 +364,18 @@ mod tests {
         let user = claims(serde_json::json!({
             "sub": "user-1", "azp": "campbooks-web", "auth_time": 1_700_000_000
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(
             user.auth_time,
             chrono::DateTime::from_timestamp(1_700_000_000, 0)
         );
         let none = claims(serde_json::json!({ "sub": "user-1" }))
-            .into_principal()
+            .into_principal(false)
             .unwrap();
         assert_eq!(none.auth_time, None);
         let client = claims(serde_json::json!({ "azp": "acme-sync", "auth_time": 1_700_000_000 }))
-            .into_principal()
+            .into_principal(false)
             .unwrap();
         assert_eq!(client.auth_time, None);
     }
@@ -378,14 +383,14 @@ mod tests {
     #[test]
     fn client_credentials_use_azp() {
         let principal = claims(serde_json::json!({ "azp": "acme-sync", "scope": "" }))
-            .into_principal()
+            .into_principal(false)
             .unwrap();
         assert_eq!(principal.subject, "acme-sync");
         assert_eq!(principal.kind, PrincipalKind::Client);
         assert!(principal.scopes.is_empty());
 
         let same = claims(serde_json::json!({ "sub": "acme-sync", "azp": "acme-sync" }))
-            .into_principal()
+            .into_principal(false)
             .unwrap();
         assert_eq!(same.kind, PrincipalKind::Client);
     }
@@ -394,12 +399,12 @@ mod tests {
     fn no_subject_at_all_is_rejected() {
         assert!(
             claims(serde_json::json!({ "scope": "x" }))
-                .into_principal()
+                .into_principal(false)
                 .is_none()
         );
         assert!(
             claims(serde_json::json!({ "sub": "", "azp": "" }))
-                .into_principal()
+                .into_principal(false)
                 .is_none()
         );
     }
@@ -408,25 +413,25 @@ mod tests {
     fn workspace_from_root_or_custom() {
         let root = claims(serde_json::json!({ "azp": "c", "workspace_id": "w1" }));
         assert_eq!(
-            root.into_principal().unwrap().workspace.as_deref(),
+            root.into_principal(false).unwrap().workspace.as_deref(),
             Some("w1")
         );
         let custom = claims(serde_json::json!({ "azp": "c", "custom": { "workspace_id": "w2" } }));
         assert_eq!(
-            custom.into_principal().unwrap().workspace.as_deref(),
+            custom.into_principal(false).unwrap().workspace.as_deref(),
             Some("w2")
         );
         let both = claims(serde_json::json!({
             "azp": "c", "workspace_id": "w1", "custom": { "workspace_id": "w1" }
         }));
         assert_eq!(
-            both.into_principal().unwrap().workspace.as_deref(),
+            both.into_principal(false).unwrap().workspace.as_deref(),
             Some("w1")
         );
         let conflicting = claims(serde_json::json!({
             "azp": "c", "workspace_id": "w1", "custom": { "workspace_id": "w2" }
         }));
-        assert!(conflicting.into_principal().is_none());
+        assert!(conflicting.into_principal(false).is_none());
     }
 
     #[test]
@@ -435,10 +440,26 @@ mod tests {
             "sub": "user-1", "azp": "campbooks-web",
             "workspace_id": "w1", "custom": { "workspace_id": "w2" }
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(user.kind, PrincipalKind::User);
         assert_eq!(user.workspace, None);
+    }
+
+    #[test]
+    fn the_own_issuer_binds_a_user_to_a_workspace_with_the_root_claim_only() {
+        let bound = claims(serde_json::json!({
+            "sub": "user-1", "azp": "a-third-party", "workspace_id": "w1",
+            "custom": { "workspace_id": "w2" }
+        }))
+        .into_principal(true)
+        .unwrap();
+        assert_eq!(bound.kind, PrincipalKind::User);
+        assert_eq!(bound.workspace.as_deref(), Some("w1"));
+        let unbound = claims(serde_json::json!({ "sub": "user-1", "azp": "campbooks-web" }))
+            .into_principal(true)
+            .unwrap();
+        assert_eq!(unbound.workspace, None);
     }
 
     #[test]
@@ -447,7 +468,7 @@ mod tests {
             "sub": "user-1", "azp": "campbooks-web", "email": " ana@example.com ",
             "email_verified": true, "preferred_username": "ana"
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(user.email.as_deref(), Some("ana@example.com"));
         assert!(user.email_verified);
@@ -456,7 +477,7 @@ mod tests {
         let named = claims(serde_json::json!({
             "sub": "user-1", "name": "Ana Lima", "preferred_username": "ana", "email": ""
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(named.name.as_deref(), Some("Ana Lima"));
         assert_eq!(named.email, None);
@@ -465,7 +486,7 @@ mod tests {
         let client = claims(serde_json::json!({
             "azp": "c", "email": "bot@example.com", "email_verified": true, "name": "Bot"
         }))
-        .into_principal()
+        .into_principal(false)
         .unwrap();
         assert_eq!(
             (client.email, client.email_verified, client.name),

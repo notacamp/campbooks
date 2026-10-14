@@ -39,7 +39,7 @@ describe("buildIdentityRoutes", () => {
     writeTabValue("signIn.returnTo", "");
   });
 
-  it("mounts /sign-in and /sign-in/new with their query", async () => {
+  it("mounts /sign-in, /sign-in/new and /sign-in/passkey with their query", async () => {
     mockApi({ [REQUEST_INFO]: { body: { client_id: "campbooks-web", providers: ["google"] } } });
     const root = createRootRoute({ component: Outlet });
     const routes = buildIdentityRoutes({ public: root, workspace: root });
@@ -52,6 +52,15 @@ describe("buildIdentityRoutes", () => {
     expect(await screen.findByRole("link", { name: /Continue with Google/u })).toBeVisible();
     await router.navigate({ to: "/sign-in/new", search: { request: REQUEST } });
     expect(router.state.location.pathname).toBe("/sign-in/new");
+    await router.navigate({ to: "/sign-in/passkey", search: { request: REQUEST } });
+    // No passkeys in this test browser: the screen says so.
+    expect(
+      await screen.findByRole("heading", { name: "This browser can’t use passkeys" }),
+    ).toBeVisible();
+    expect(screen.getByRole("link", { name: "Sign in another way" })).toHaveAttribute(
+      "href",
+      `/sign-in?request=${REQUEST}`,
+    );
   });
 });
 

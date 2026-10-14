@@ -1,5 +1,6 @@
 {
   "errors": {
+    "ai_external_content_refused": "O fornecedor de IA da função {{role}} está fora da rede desta instância, e esta instância não lhe envia correio. Um administrador pode autorizá-lo.",
     "ai_role_not_configured": "Esta instância não tem nenhum modelo de IA configurado para a função {{role}}. Um administrador pode configurá-lo."
   }
 }

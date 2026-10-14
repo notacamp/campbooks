@@ -18,7 +18,7 @@ use std::path::PathBuf;
 
 use aws_lc_rs::{
     aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey},
-    constant_time, digest, hkdf,
+    constant_time, digest, hkdf, hmac,
     rand::{SecureRandom as _, SystemRandom},
 };
 use base64::{
@@ -214,6 +214,71 @@ impl Cipher {
     }
 }
 
+/// The [`Signer`]'s key purpose. Never change it (every signed value in
+/// flight would stop verifying).
+const SIGNER_PURPOSE: &[u8] = b"campbooks kernel signed values v1";
+
+/// Signs short values the server hands out and takes back (opaque cursors),
+/// so a client cannot forge or alter them: HMAC-SHA256 under a key derived
+/// from the instance secret. Each use names itself in its `context`, so a
+/// value signed for one purpose never verifies for another. Cheap to clone.
+#[derive(Clone)]
+pub struct Signer {
+    key: std::sync::Arc<hmac::Key>,
+}
+
+impl std::fmt::Debug for Signer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Signer").finish_non_exhaustive()
+    }
+}
+
+impl Default for Signer {
+    /// A signer with a random key: values verify in this process only. The
+    /// server installs [`Signer::new`] instead.
+    fn default() -> Self {
+        Self::with_key(random_token().as_bytes())
+    }
+}
+
+impl Signer {
+    /// A signer keyed by `secret` (the instance secret): every process of
+    /// the install agrees.
+    pub fn new(secret: &SecretKey) -> Self {
+        Self::with_key(
+            derive_secret(secret, SIGNER_PURPOSE)
+                .expose_secret()
+                .as_bytes(),
+        )
+    }
+
+    fn with_key(key: &[u8]) -> Self {
+        Self {
+            key: std::sync::Arc::new(hmac::Key::new(hmac::HMAC_SHA256, key)),
+        }
+    }
+
+    fn input(context: &[u8], value: &[u8]) -> Vec<u8> {
+        let mut input = Vec::with_capacity(context.len() + 1 + value.len());
+        input.extend_from_slice(context);
+        input.push(0);
+        input.extend_from_slice(value);
+        input
+    }
+
+    /// The tag of `value` for `context`.
+    pub fn sign(&self, context: &[u8], value: &[u8]) -> Vec<u8> {
+        hmac::sign(&self.key, &Self::input(context, value))
+            .as_ref()
+            .to_vec()
+    }
+
+    /// Whether `tag` is `value`'s for `context` (constant time).
+    pub fn verify(&self, context: &[u8], value: &[u8], tag: &[u8]) -> bool {
+        hmac::verify(&self.key, &Self::input(context, value), tag).is_ok()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -328,5 +393,17 @@ mod tests {
             pkce_challenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk"),
             "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         );
+    }
+
+    #[test]
+    fn signed_values_verify_only_for_their_context_and_key() {
+        let secret = SecretKey([7_u8; SECRET_KEY_LEN]);
+        let signer = Signer::new(&secret);
+        let tag = signer.sign(b"search.cursor", b"page 2");
+        assert!(signer.verify(b"search.cursor", b"page 2", &tag));
+        assert!(!signer.verify(b"search.cursor", b"page 3", &tag));
+        assert!(!signer.verify(b"other", b"page 2", &tag));
+        assert!(Signer::new(&secret).verify(b"search.cursor", b"page 2", &tag));
+        assert!(!Signer::default().verify(b"search.cursor", b"page 2", &tag));
     }
 }

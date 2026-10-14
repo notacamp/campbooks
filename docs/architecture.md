@@ -53,6 +53,9 @@ crates/
     admin/                 campbooks-admin — instance administrators' profiles and the
                            admin audit trail (ADR 0015). Serves no route; profiles change
                            only through `campbooks-server admin`.
+    search/                campbooks-search — one index over the records a member may
+                           see, in Postgres (ADR 0016): kept current from events
+                           through the kernel's `SearchSource` port; `search.query`.
 migrations/                <ts>_<module>__<desc>.sql, one Postgres schema per module;
                            <ts>_kernel__<desc>.sql for the kernel's `kernel` schema,
                            <ts>_bff__<desc>.sql for the web BFF's `bff` schema
@@ -163,7 +166,9 @@ Workspace-owned resources live under `/api/v1/w/{workspace_id}/<module>/…`
 (the workspace itself is `/api/v1/w/{workspace_id}`). Their handlers take
 `kernel::tenancy::Workspace<S>` instead of `Scoped<S>`: after the token and
 scope checks it reads the workspace from the path, requires a client
-token's `workspace_id` claim to name it, and asks the `Membership` port —
+token's `workspace_id` claim to name it (and a user token that carries one,
+from an app the person allowed in one workspace, to name it too), and asks
+the `Membership` port —
 a kernel trait the `workspaces` module implements and the server registers
 in `AppState` — whether a user is a member, and with which role. Anything
 else is 404. Handlers then open `state.db.begin_for(workspace.id)`. The path,
@@ -293,7 +298,10 @@ workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
 key) or an `ordering_key` (jobs sharing it run one at a time, in order).
 Recurring work is `.schedule::<J>(every)`; each tick runs once however many
 workers run. A handler returns `JobError::Retry` (backoff with jitter) or
-`JobError::Fatal` (marked failed and kept for inspection). Workers claim jobs
+`JobError::Fatal` (marked failed and kept for inspection, 30 days by
+default: `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS`; the event log is pruned
+after `CAMPBOOKS_EVENTS__RETENTION_DAYS`, 90 by default, except events still
+being delivered). Workers claim jobs
 fairly across workspaces, lease them while they run, and reclaim jobs whose
 worker died. The design and its trade-offs are ADR 0012.
 
@@ -343,6 +351,18 @@ coarse choice and a fine one). Probabilities pass through a per (question
 type, option count) temperature, from config today and refitted from user
 corrections later. A module acts on an answer only through
 `answer.accept_if(threshold)` and asks the user below it.
+
+**Mail stays on the instance's network unless the operator opts in.** Every
+call that carries content (`chat`, `embed`, `decide`) goes through
+`AiConfig::provider_for_content`: a role whose base URL is off the
+instance's network (anything but a loopback or private address, `localhost`,
+a single-label compose name, or a host in `CAMPBOOKS_AI__INTERNAL_HOSTS`;
+never decided by DNS) is refused with `Error::ExternalContentRefused` unless
+`CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. The health probe sends no
+content and runs for every configured role. Provider error bodies are never
+kept (`Error::Status` holds the code only), and errors that would quote data
+are described by kind through `campbooks_kernel::redact` (a serde error's
+category and position, a Postgres error's SQLSTATE, constraint and table).
 
 The model is one **strategy** among several behind
 `campbooks_ai::decide::strategy::Strategy`, which all return the same
@@ -401,6 +421,23 @@ from `x-campbooks.records`) says which operations read which record types.
 A module whose events change records says so in `changes()`; nothing else
 is needed for its screens to stay current.
 
+### Search (ADR 0016)
+
+The `search` module keeps one index, in its own schema, of the records other
+modules let it search: *groups* (what a result is shown as, a conversation,
+inside a container such as an inbox) and their *entries* (the text inside,
+its messages). It learns that something changed from the owning module's
+ordinary events (ids only), then reads the record's current state through
+the kernel's `SearchSource` port (`kernel::search`), which the owning module
+implements and the server registers with `AppState::with_search_sources`.
+Text is matched with Postgres full-text search in the four shipped languages
+(accents ignored by `unaccent`; `pg_trgm` for partial names and addresses).
+At query time, results are limited to the containers the `Visibility` port
+lists for the caller (`visible_containers`) and to record types the caller
+holds a read scope for (`operations::ReadRules`, shared with the change
+feed). A workspace's index is built in the background on its first event or
+query, by paging through the same port.
+
 ### The web BFF
 
 `campbooks-server` signs browsers in itself (ADR 0004,
@@ -436,6 +473,22 @@ provider sign-in asks for their mailbox in the same consent; `identity` holds
 that grant until they put it in a workspace, then hands it to `connectors`
 through the kernel's `GrantIntake` port (`kernel::connections`), which
 `connectors` implements.
+
+Clients other than the web app (slice S4) are stored in `identity.clients`,
+under forced row-level security with a second policy for the protocol path:
+a workspace's own clients (`client_credentials`, or sign-in apps), clients
+that registered themselves (RFC 7591, `/oauth2/register`) and clients known
+by their metadata document (an `https` `client_id`, fetched through an SSRF
+guard). Every one of them, the native app included, gets a code only after
+the person allows it on the consent screen (`/consent`); the answer is
+remembered only for an exact `https` redirect, never for a loopback or
+custom-scheme one (RFC 8252 §8.6). A third party's token is bound to the
+workspace the person picked (`workspace_id`) and may hold no `identity:*`
+scope nor `admin:access`. Access tokens name the API's resource URI, `<origin>/api`, as `aud`
+(RFC 8707); `/.well-known/oauth-protected-resource/api` describes it
+(RFC 9728), and the API's Bearer challenges point there, so an MCP agent that
+knows only the API's URL finds the issuer. Endpoints anyone can call are
+rate-limited per client address through `kernel::rate_limit`.
 
 ### Instance administration (ADR 0015)
 

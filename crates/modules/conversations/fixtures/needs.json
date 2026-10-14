@@ -1,0 +1,146 @@
+{
+  "changes": [
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-1",
+        "thread_key": "thr-walkthrough",
+        "rfc_message_id": "needs-1@needs.example",
+        "from": {
+          "name": "Marta Ferreira",
+          "address": "marta@casa-lume.example"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Walkthrough on Thursday",
+        "sent_at": "2026-10-12T16:40:00Z",
+        "direction": "inbound",
+        "text": "Hi Sam,\n\nHope the move went well. Could you confirm Thursday’s walkthrough? The builders need to know by Wednesday.\n\nIf 10:00 doesn’t suit, 14:00 works too.\n\nMarta",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false
+      }
+    },
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-2",
+        "thread_key": "thr-lease",
+        "rfc_message_id": "needs-2@needs.example",
+        "from": {
+          "name": "Pedro Alves",
+          "address": "pedro.alves@example.com"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Lease for the studio",
+        "sent_at": "2026-10-12T10:12:00Z",
+        "direction": "inbound",
+        "text": "Hello Sam,\n\nPlease sign the attached lease and send it back by Friday 16 October.\n\nBest,\nPedro",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false,
+        "attachments": [
+          {
+            "filename": "Lease-Rua-do-Sol-12.pdf",
+            "content_type": "application/pdf",
+            "content": "%PDF-1.7 fictional lease"
+          }
+        ]
+      }
+    },
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-3",
+        "thread_key": "thr-invoice",
+        "rfc_message_id": "needs-3@needs.example",
+        "from": {
+          "name": "Acme Hosting",
+          "address": "billing@acme-hosting.example"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Your invoice INV-2041",
+        "sent_at": "2026-10-13T06:30:00Z",
+        "direction": "inbound",
+        "text": "Hello,\n\nYour invoice INV-2041 for the studio website is ready. Amount due: €49.00. Payment due by 30 October.\n\nAcme Hosting",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false
+      }
+    },
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-4",
+        "thread_key": "thr-verify",
+        "rfc_message_id": "needs-4@needs.example",
+        "from": {
+          "name": "IT Support",
+          "address": "it-support@at3lier-sol.example"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Action required: verify your mailbox",
+        "sent_at": "2026-10-13T07:52:00Z",
+        "direction": "inbound",
+        "text": "Dear user,\n\nYour mailbox will be closed today unless you verify your account using the link below.\n\nhttps://verify-mailbox.example/login\n\nIT Support",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false
+      }
+    },
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-5",
+        "thread_key": "thr-lunch",
+        "rfc_message_id": "needs-5@needs.example",
+        "from": {
+          "name": "Jonas Weber",
+          "address": "jonas@weber-studio.example"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Lunch on Friday?",
+        "sent_at": "2026-10-11T19:05:00Z",
+        "direction": "inbound",
+        "text": "Hey Sam,\n\nAre you still up for lunch on Friday, or should we move it to next week?\n\nJonas",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false
+      }
+    }
+  ]
+}

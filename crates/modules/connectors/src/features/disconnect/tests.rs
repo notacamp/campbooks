@@ -47,7 +47,7 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
                 + (SELECT count(*) FROM connectors.credentials)
                 + (SELECT count(*) FROM connectors.streams)
                 + (SELECT count(*) FROM connectors.sync_due)
-                + (SELECT count(*) FROM connectors.gmail_messages)
+                + (SELECT count(*) FROM connectors.messages)
                 + (SELECT count(*) FROM connectors.batches)
                 + (SELECT count(*) FROM kernel.blob_refs WHERE owner_type LIKE 'connectors.%')
            AS "n!""#

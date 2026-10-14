@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE search.backfills\n                  SET state = 'running', after_id = NULL, index_version = $3,\n                      started_at = now(), finished_at = NULL\n                WHERE workspace_id = $1 AND group_type = $2 AND index_version < $3\n                  AND state <> 'deleting'\n               RETURNING group_type",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "group_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "search.backfills",
+            "name": "group_type"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int2"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "e4e86a20e4885dd4449ca510b19b553d35097b0ac7be595860fd39c0529d357f"
+}

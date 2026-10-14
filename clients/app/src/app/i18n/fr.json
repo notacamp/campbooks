@@ -41,7 +41,8 @@
     "language": "Langue",
     "signOut": "Se déconnecter",
     "signingOut": "Déconnexion…",
-    "waysIn": "Moyens de connexion"
+    "waysIn": "Moyens de connexion",
+    "apps": "Applications et intégrations"
   },
   "home": {
     "title": "Rien n’a encore besoin de vous",

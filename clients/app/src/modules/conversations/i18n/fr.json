@@ -78,13 +78,11 @@
   "scout": {
     "label": "Où en sont les choses",
     "suggestion": "Suggère {{stream}}",
-    "suggestionSure": "Suggère {{stream}}, sûr à {{confidence}} %",
     "suggestionNote": "Campbooks pense que ceci va dans {{stream}}. C’est une suggestion : rien ne bouge sans votre accord.",
     "prompt": "La déplacer ?",
     "accept": "Déplacer vers {{stream}}",
     "keep": "Garder dans {{stream}}",
     "sortedRule": "Rangée dans {{stream}} par une règle",
-    "sortedRuleSure": "Rangée dans {{stream}} par une règle, sûr à {{confidence}} %",
     "sortedModel": "Rangée dans {{stream}} par Campbooks",
     "sortedMember": "Vous l’avez mise dans {{stream}}",
     "sortedDefault": "Dans {{stream}} : rien ne l’a déplacée",
@@ -154,7 +152,8 @@
     "replyAll": "Répondre à tous",
     "forward": "Transférer",
     "showImages": "Afficher les images",
-    "nextAttachment": "Pièce jointe suivante"
+    "nextAttachment": "Pièce jointe suivante",
+    "notNeeded": "Pas nécessaire (ou c’est sûr)"
   },
   "compose": {
     "title": {
@@ -191,9 +190,9 @@
       "draft_not_editable": "Ce message est déjà en route.",
       "not_connected": "Cette boîte mail n’est plus connectée. Reconnectez-la, puis renvoyez le message.",
       "needs_reauth": "Campbooks a de nouveau besoin de votre autorisation pour envoyer depuis cette boîte mail. Reconnectez-la, puis renvoyez le message.",
-      "rejected": "Gmail a refusé ce message. Vérifiez les adresses et réessayez.",
-      "too_large": "Ce message est trop lourd pour que Gmail l’envoie.",
-      "unavailable": "Gmail était injoignable, rien n’a été envoyé. Réessayez.",
+      "rejected": "Votre fournisseur de messagerie a refusé ce message. Vérifiez les adresses et réessayez.",
+      "too_large": "Ce message est trop lourd pour que votre fournisseur de messagerie l’envoie.",
+      "unavailable": "Votre fournisseur de messagerie était injoignable, rien n’a été envoyé. Réessayez.",
       "unknown_outcome": "Campbooks n’a pas pu confirmer l’envoi de ce message. Vérifiez votre dossier Envoyés avant de le renvoyer.",
       "unknown": "Un problème est survenu. Réessayez.",
       "not_saved": "Vos dernières modifications n’ont pas pu être enregistrées, rien n’a donc été envoyé. Réessayez.",
@@ -203,5 +202,62 @@
       "newMessage": "Nouveau message"
     },
     "tooLate": "Trop tard pour annuler : il a été envoyé."
+  },
+  "needs": {
+    "line": {
+      "reply": "{{name}} attend votre réponse",
+      "question": "{{name}} vous a posé une question",
+      "do": "{{name}} vous a demandé de faire quelque chose",
+      "pay": "{{name}} a envoyé une facture à payer",
+      "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
+      "checkReply": "Faut-il répondre à {{name}} ?",
+      "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?"
+    },
+    "chip": {
+      "reply": "À répondre",
+      "do": "À faire",
+      "pay": "À payer",
+      "review": "À vérifier",
+      "suspicious": "Semble suspect",
+      "check": "À confirmer"
+    },
+    "due": {
+      "today": "Pour aujourd’hui",
+      "tomorrow": "Pour demain",
+      "on": "Pour le {{date}}",
+      "overdue": "En retard · prévu le {{date}}"
+    },
+    "how": {
+      "yes": "Oui.",
+      "no": "Non.",
+      "urgency0": "Pas d’urgence.",
+      "urgency1": "Dans les prochains jours.",
+      "urgency2": "Aujourd’hui.",
+      "source": {
+        "rules": "Règles",
+        "model": "Modèle",
+        "knn": "Courriers similaires",
+        "cascade": "Règles puis modèle"
+      },
+      "suggestion": "une suggestion",
+      "actsFrom": "agit à partir de {{threshold}}",
+      "footnote": "Les règles répondent d’après ce que l’e-mail montre au premier regard. Une réponse n’agit qu’à partir de la confiance que son évaluation garantit ; en dessous, c’est une suggestion."
+    },
+    "actions": {
+      "done": "Fait",
+      "notNeeded": "Pas nécessaire",
+      "safe": "C’est sûr",
+      "yes": "Oui",
+      "no": "Non",
+      "questionPrompt": "Campbooks n’en est pas sûr."
+    },
+    "toast": {
+      "done": "Fait · {{name}}",
+      "notNeeded": "Pas nécessaire · {{name}}. Campbooks en tiendra compte",
+      "safe": "Marqué comme sûr · {{name}}. Campbooks en tiendra compte",
+      "confirmed": "Merci · {{name}} reste dans votre liste",
+      "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
+      "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+    }
   }
 }

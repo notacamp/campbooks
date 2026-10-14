@@ -64,6 +64,10 @@ pnpm --dir clients dev                                # the UI on http://localho
 pnpm --dir clients record first-run                   # [--base-url http://localhost:5173]
 ```
 
+The recorder only records this machine (`localhost`, `127.0.0.1`, `[::1]`) and refuses any
+other `--base-url`, so a recording is never made against a deployed instance and its real
+mail. `--allow-remote` overrides that, for a disposable instance holding demo data only.
+
 This writes `app/recordings/out/<scenario>-375.webm` and `<scenario>-desktop.webm`
 (gitignored). Maintainers upload with `upload-media <file>`; contributors drag the files into
 the PR's "## Recording" section.

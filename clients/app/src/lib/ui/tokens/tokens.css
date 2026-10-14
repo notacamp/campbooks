@@ -263,6 +263,9 @@
   --visor-eye: oklch(0.99 0.005 var(--neutral-h));
   --visor-eye-glow: oklch(0.99 0.005 var(--neutral-h) / 0.5);
   --visor-rim: light-dark(oklch(0 0 0 / 0), oklch(1 0 0 / 0.09));
+  /* Optional tints for the starry and hearts eyes (the `tinted` prop). Off by default: eyes stay white. */
+  --visor-tint-star: light-dark(oklch(0.86 0.13 85), oklch(0.9 0.12 85));
+  --visor-tint-heart: light-dark(oklch(0.72 0.15 10), oklch(0.76 0.14 10));
 
   --shadow-color: light-dark(oklch(0.3 0.04 var(--neutral-h) / 0.24), oklch(0 0 0 / 0.65));
   --shadow-overlay: 0 14px 36px -10px var(--shadow-color), 0 2px 8px -3px var(--shadow-color);
@@ -306,7 +309,11 @@
   --icon-stroke: 1.75;
   --duration-blink: 5.6s;
   --duration-scan: 1.25s;
-  --duration-pulse: 1.5s;
+  --duration-hop: 1.1s;
+  --duration-spin: 1.3s;
+  --duration-wobble: 2.6s;
+  --duration-twinkle: 1.8s;
+  --duration-beat: 1.4s;
   --duration-shimmer: 1.4s;
 }
 

@@ -145,7 +145,9 @@ Rules:
   `DocumentRead`; it never queries documents' tables).
 - **Ports for the few synchronous needs**, defined as traits in the kernel and
   implemented by one module: `Credentials` (connectors), `Access` (who may see
-  a container), `Decide` (the AI pass, implemented over `campbooks-ai`).
+  a container), `Decide` (the AI pass, implemented over `campbooks-ai`), and
+  `SearchSource` (how search reads a module's records, one per module that
+  has searchable records; ADR 0016).
 - **References, not joins.** Any record is addressable as
   `RecordRef { type, id }`; that's how a task points at the message it came
   from, and how attention, search and rules point at anything.
@@ -215,7 +217,8 @@ Everything that arrives and leaves as a message. Email is the first
 
 **Publishes** `MessageReceived`, `MessageSent`, `MessageDecided` (the AI
 pass result), `ConversationSorted`, `AttachmentReceived`,
-`ConversationAwaitingReply`. **Consumes** its change streams;
+`ConversationAwaitingReply`, `NeedChanged` (what a conversation needs from
+its inbox's members). **Consumes** its change streams;
 `PartyKindChanged`.
 **AI** one pass per inbound message: stream (`choice`), needs a reply
 (`noul`), asks the member for something (`noul`), contains a deadline
@@ -244,26 +247,39 @@ or behind a gate: drafts, rewrites, summaries.
 One queue of what needs each member, fed by every module.
 
 **Language**
-- **Attention item** — one thing that needs a member, pointing at a record
-  (`RecordRef`), with a **reason** declared by the module that raised it
-  (reply, decide, do, pay, chase, review, …) and the time it matters by.
+- **Need** — what one record needs from the members who can see it, declared
+  by the module that owns the record (a conversation's need: reply, do, pay
+  or review, with a due date). _Avoid_: task, flag.
+- **Attention item** — one need as the queue holds it, pointing at the record
+  (`RecordRef`), the container that decides who may see it, and the record
+  that caused it, with a **reason** (review, reply, decide, do, pay), a
+  **trust** (`sure`, or `check` for a question to the member) and the date it
+  matters by. Ids, enums and dates only: the owning module renders it.
   _Avoid_: feed item, card.
+- **Later** — a member putting an item off until a time, for themselves only;
+  a new cause brings it back.
 - **Log** — what Campbooks did on someone's behalf, each entry undoable while
-  the owning module allows it.
+  the owning module allows it (Home's "Done today" for now; the full log is
+  campbooks-cloud#89).
 
-**Consumes** every module's "needs attention" and "resolved" events.
-**Publishes** `NoticeRaised`. **AI** none in the queue itself; ranking is
-deterministic and explainable.
+**Consumes** `conversations.need_changed` (and every later module's need
+event), `workspaces.workspace_deleting`, `workspaces.member_left`.
+**Publishes** `attention.item_changed`; later `NoticeRaised`. **AI** none in
+the queue itself; ranking is deterministic and explainable.
 
 ### search
 
 **Language**
-- **Index entry** — a searchable projection of one record: text, chunks,
-  vectors and its access container. **Query** — what the member typed, parsed
-  into filters and text.
+- **Group** — what a result is shown as and what access applies to (a
+  conversation), inside a **container** (an inbox). **Entry** — searchable
+  text inside a group (a message). **Query** — what the member typed, parsed
+  into text and filters.
 
-**Consumes** `*Indexed` / `*Removed` events. **AI** `embed` for chunks and
-queries; `decide` to parse filters from a query (`choice`).
+**Consumes** the sources' ordinary events (`MessageReceived`, `MessageSent`,
+`ConversationChanged`; ids only), then pulls the current group through the
+source module's `SearchSource` port (ADR 0016); `WorkspaceDeleting`.
+**AI** none yet; later `embed` for entries and submitted queries, and
+`decide` to *suggest* filters (`choice`), never to apply them.
 
 ### notifications
 
@@ -407,8 +423,9 @@ behind it. The purposes and requirements below seed those changes.
   inboxes; merges proposed, never silent.
 - **attention** — rebuilt by replaying events; nothing shown that the member
   can't open; every automatic action logged with undo.
-- **search** — access enforced at query time; re-index on model change
-  without downtime; hybrid ranking.
+- **search** — access enforced at query time; Postgres full-text search in
+  four languages (ADR 0016); backfills page through the source port; later,
+  hybrid ranking with re-embedding on model change without downtime.
 - **notifications** — per-member preferences per reason; digest; push.
 - **schedule** — two-way sync through connectors with conflict checks;
   recurring occurrences; availability.

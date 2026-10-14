@@ -13,9 +13,7 @@
     "redone": "Refeito: {{label}}"
   },
   "note": {
-    "label": "Ponto da situação",
-    "why": "Porquê?",
-    "hideWhy": "Ocultar o porquê"
+    "label": "Ponto da situação"
   },
   "search": {
     "label": "Pesquisar ou perguntar"
@@ -43,7 +41,10 @@
     "unsure": "O Campbooks não tem a certeza",
     "happy": "O Campbooks está satisfeito",
     "alert": "O Campbooks precisa da sua atenção",
-    "asleep": "O Campbooks está em pausa"
+    "asleep": "O Campbooks está em pausa",
+    "dizzy": "O Campbooks tropeçou num problema",
+    "starry": "O Campbooks está radiante",
+    "hearts": "O Campbooks adorou"
   },
   "signal": {
     "review": "Rever",
@@ -97,5 +98,8 @@
     "previewOf": "Pré-visualizar {{name}}",
     "downloadOf": "Transferir {{name}}",
     "previewTitle": "Pré-visualização de {{name}}"
+  },
+  "howDecided": {
+    "title": "Como o Campbooks decidiu"
   }
 }

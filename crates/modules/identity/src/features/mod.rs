@@ -3,10 +3,23 @@
 
 pub mod adopt_held_grant;
 pub mod discard_held_grant;
+pub mod list_clients;
+pub mod list_consents;
 pub mod list_held_grants;
+pub mod list_passkeys;
 pub mod list_ways_in;
+pub mod member_left;
+pub mod register_client;
+pub mod register_passkey;
+pub mod remove_client;
+pub mod remove_passkey;
 pub mod remove_way_in;
+pub mod rename_passkey;
+pub mod revoke_consent;
+pub mod rotate_client_secret;
 pub mod start_link;
+pub mod start_passkey_registration;
+pub mod workspace_deleting;
 
 use std::sync::Arc;
 
@@ -20,6 +33,14 @@ use crate::deps::{Deps, Issuer};
 #[derive(Debug, serde::Deserialize)]
 pub struct HeldGrantPath {
     /// The held grant.
+    pub id: Uuid,
+}
+
+/// The passkey a path names (by field, so routes nested under the web
+/// BFF's `/bff/api/{*path}` still resolve).
+#[derive(Debug, serde::Deserialize)]
+pub struct PasskeyPath {
+    /// The passkey.
     pub id: Uuid,
 }
 

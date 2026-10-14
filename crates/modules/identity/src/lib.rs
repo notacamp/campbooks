@@ -2,7 +2,8 @@
 //! get (ADR 0014).
 //!
 //! The module owns **accounts** and their **ways in** (provider identities
-//! today; passkeys later), linked only by proven ownership, never by email.
+//! and passkeys), linked only by proven ownership, never by email. It is
+//! the instance's WebAuthn relying party ([`webauthn`]).
 //! It is the instance's **OAuth 2.1 authorization server and OIDC
 //! provider**, in-process, on the app's own origin: discovery, JWKS, the
 //! authorization and token endpoints, revocation and logout, with Ed25519
@@ -36,11 +37,13 @@ pub mod deps;
 pub mod domain;
 pub mod events;
 mod features;
+pub mod metadata;
 pub mod protocol;
 mod prune;
 pub mod scopes;
 pub mod upstream;
 mod web;
+pub mod webauthn;
 
 pub use consent::consent_door;
 pub use deps::Deps;
@@ -67,6 +70,12 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::ClientRegistered>()
+            .publishes::<events::ClientRemoved>()
+            .publishes::<events::ConsentGranted>()
+            .publishes::<events::ConsentRevoked>()
+            .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
     }
 }
@@ -80,8 +89,39 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::list_consents::handler))
+        .routes(routes!(features::revoke_consent::handler))
+        .routes(routes!(
+            features::list_clients::handler,
+            features::register_client::handler
+        ))
+        .routes(routes!(features::rotate_client_secret::handler))
+        .routes(routes!(features::remove_client::handler))
+        .merge(passkey_routes())
 }
 
+/// The passkey operations: their bodies (a credential, a name) are a few
+/// kilobytes at most.
+fn passkey_routes() -> OpenApiRouter<AppState> {
+    OpenApiRouter::new()
+        .routes(routes!(
+            features::list_passkeys::handler,
+            features::register_passkey::handler
+        ))
+        .routes(routes!(features::start_passkey_registration::handler))
+        .routes(routes!(
+            features::rename_passkey::handler,
+            features::remove_passkey::handler
+        ))
+        .layer(axum::extract::DefaultBodyLimit::max(
+            protocol::passkey::MAX_BODY,
+        ))
+}
+
+#[cfg(test)]
+mod clients_tests;
+#[cfg(test)]
+mod passkey_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]

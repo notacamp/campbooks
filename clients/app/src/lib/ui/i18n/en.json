@@ -13,9 +13,7 @@
     "redone": "Redone: {{label}}"
   },
   "note": {
-    "label": "Where things stand",
-    "why": "Why?",
-    "hideWhy": "Hide why"
+    "label": "Where things stand"
   },
   "search": {
     "label": "Search or ask"
@@ -43,7 +41,10 @@
     "unsure": "Campbooks is not sure",
     "happy": "Campbooks is happy",
     "alert": "Campbooks needs your attention",
-    "asleep": "Campbooks is paused"
+    "asleep": "Campbooks is paused",
+    "dizzy": "Campbooks hit a snag",
+    "starry": "Campbooks is delighted",
+    "hearts": "Campbooks loves this"
   },
   "signal": {
     "review": "Review",
@@ -97,5 +98,8 @@
     "previewOf": "Preview {{name}}",
     "downloadOf": "Download {{name}}",
     "previewTitle": "Preview of {{name}}"
+  },
+  "howDecided": {
+    "title": "How Campbooks decided"
   }
 }

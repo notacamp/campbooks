@@ -10,6 +10,8 @@
     "no_offline_access": "O fornecedor não permitiu que o Campbooks ficasse ligado. Ligue de novo e permita o acesso.",
     "account_mismatch": "Iniciou sessão com uma conta diferente da que está a alargar. Use a mesma conta.",
     "account_connected_by_another_member": "Outro membro deste espaço de trabalho já ligou esta conta.",
-    "needs_reauth": "Esta ligação precisa que volte a ligar a conta antes de poder sincronizar."
+    "needs_reauth": "Esta ligação precisa que volte a ligar a conta antes de poder sincronizar.",
+    "unknown_data_centre": "O Campbooks não reconhece o centro de dados Zoho desta conta. Fale com o administrador.",
+    "no_mailbox": "Esta conta não tem nenhuma caixa de correio que o Campbooks consiga ler."
   }
 }

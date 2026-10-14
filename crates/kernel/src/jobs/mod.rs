@@ -33,7 +33,7 @@ use serde::{Serialize, de::DeserializeOwned};
 use sqlx::{PgConnection, Postgres, Transaction};
 
 pub use context::JobContext;
-pub use maintenance::PruneJobs;
+pub use maintenance::{PruneEvents, PruneJobs, purge_workspace};
 pub(crate) use registry::is_dotted;
 pub use registry::{Background, ConsumerInfo, Registry, RegistryError};
 pub use worker::{Worker, WorkerStats};
@@ -146,10 +146,11 @@ impl JobError {
     }
 }
 
-/// Database errors are usually transient: retry.
+/// Database errors are usually transient: retry. The message names the
+/// error's kind (SQLSTATE, constraint, table), never the values it quotes.
 impl From<sqlx::Error> for JobError {
     fn from(err: sqlx::Error) -> Self {
-        Self::retry(format!("database: {err}"))
+        Self::retry(crate::redact::sqlx(&err))
     }
 }
 
