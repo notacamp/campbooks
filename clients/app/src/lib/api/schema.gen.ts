@@ -6530,7 +6530,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegisteredClient"];
                 };
             };
-            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`. */
             400: {
                 headers: {
                     [name: string]: unknown;

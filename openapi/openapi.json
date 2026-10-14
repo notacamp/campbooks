@@ -4817,7 +4817,7 @@
             }
           },
           "400": {
-            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`.",
             "content": {
               "application/problem+json": {
                 "schema": {
