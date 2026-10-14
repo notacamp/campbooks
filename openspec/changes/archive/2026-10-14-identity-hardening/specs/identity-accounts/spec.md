@@ -10,7 +10,9 @@ public URL) and no images or remote content. A delivery SHALL never send a
 notice twice to the same address, SHALL be retried while the mail server is
 unreachable, and SHALL leave an audit row with ids and counts only. Without
 mail, the audit row SHALL record `no_mail_transport`, and Ways to sign in SHALL
-mark the ways in added in the last seven days.
+mark the ways in added in the last seven days, never the one the account was
+made with (its sign-up provider account or passkey, which `PasskeyView` says
+with `signed_up_with`).
 
 #### Scenario: Zoho added
 - **WHEN** a person who signed up with Google (verified) adds a Zoho account (verified) on an instance that sends mail

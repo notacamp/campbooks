@@ -280,7 +280,7 @@ names what was added and when, links only to this instance, and carries no image
 tracking. Without a mail server nothing is sent; the notice is shown in the app (Settings
 → Ways to sign in highlights what is new) and kept in the account's history either way.
 
-Point the server at any SMTP server that accepts mail from it, with TLS:
+Point the server at any SMTP server that accepts mail from it, over TLS:
 
 ```sh
 CAMPBOOKS_MAIL__SMTP_URL=smtps://user:password@smtp.example.com                      # implicit TLS, port 465
@@ -289,7 +289,10 @@ CAMPBOOKS_MAIL__FROM=Campbooks <no-reply@example.com>
 ```
 
 Set both or neither: one without the other stops the server at startup, naming the
-setting. The URL holds the password, so it is a secret: the server never logs it or
+setting. TLS is required, so the password never crosses the network in clear: plain
+`smtp://`, or `tls=opportunistic` (which anyone on the path can strip), is refused at
+startup. The one exception is a relay on the same machine (`smtp://127.0.0.1:25`,
+`::1` or `localhost`) given no user or password. The URL holds the password, so it is a secret: the server never logs it or
 repeats it in an error, and `CAMPBOOKS_MAIL__SMTP_URL_FILE` reads it from a file instead
 (a Docker secret, for example). Mail is sent by the worker and retried when the server is
 unreachable; a notice is never sent twice.

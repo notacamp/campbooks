@@ -3,10 +3,12 @@
 ### Requirement: Instance mail transport
 The server SHALL send its own mail through the SMTP server named by
 `CAMPBOOKS_MAIL__SMTP_URL` (or the file `CAMPBOOKS_MAIL__SMTP_URL_FILE`),
-`smtps://` or `smtp://` with TLS, from `CAMPBOOKS_MAIL__FROM`. Both unset SHALL
-mean no mail is sent; one without the other, an unreadable file, a URL that
-is not SMTP or a sender that is not an address SHALL stop startup with an
-error naming the setting and never repeating the URL. The URL SHALL never be
+`smtps://` or `smtp://…?tls=required`, from `CAMPBOOKS_MAIL__FROM`. Both unset
+SHALL mean no mail is sent; one without the other, an unreadable file, a URL
+that is not SMTP, a URL without required TLS (plain `smtp://` or
+`tls=opportunistic`, unless to a loopback host with no user or password) or a
+sender that is not an address SHALL stop startup with an error naming the
+setting and never repeating the URL. The URL SHALL never be
 logged. Mail SHALL be sent from jobs, never inline in a request; a failure
 SHALL be recorded without the address or the server's reply. Every message
 SHALL have a plain-text and an HTML part saying the same, with no images or
@@ -19,6 +21,10 @@ remote content.
 #### Scenario: Half configured
 - **WHEN** `CAMPBOOKS_MAIL__SMTP_URL=smtp://user:hunter2@smtp.example.com` is set without `CAMPBOOKS_MAIL__FROM`
 - **THEN** startup fails with an error naming `CAMPBOOKS_MAIL__FROM` that does not contain `hunter2`
+
+#### Scenario: No TLS
+- **WHEN** `CAMPBOOKS_MAIL__SMTP_URL=smtp://user:hunter2@smtp.example.com` (or the same with `tls=opportunistic`) is set with a sender
+- **THEN** startup fails with an error naming `CAMPBOOKS_MAIL__SMTP_URL` and TLS that does not contain `hunter2`, while `smtp://127.0.0.1:2525` is accepted
 
 #### Scenario: A message
 - **WHEN** the instance sends a notice through an SMTP server

@@ -5,6 +5,9 @@
 //! - `CAMPBOOKS_MAIL__SMTP_URL` (or `…_FILE`): the transport, e.g.
 //!   `smtps://user:password@smtp.example.com` or
 //!   `smtp://user:password@smtp.example.com:587?tls=required` (STARTTLS).
+//!   TLS is required: plain `smtp://` (or `tls=opportunistic`, which a
+//!   network attacker can strip) would send the password in clear, so it is
+//!   accepted only for a loopback host without credentials (a local relay).
 //!   Secret: it is never logged, and errors never repeat it.
 //! - `CAMPBOOKS_MAIL__FROM`: the sender, e.g.
 //!   `Campbooks <no-reply@example.com>`.
@@ -96,6 +99,7 @@ impl MailConfig {
                          `Campbooks <no-reply@example.com>`"
                     )
                 })?;
+                encrypted_or_local(url.expose_secret())?;
                 let transport = AsyncSmtpTransport::<Tokio1Executor>::from_url(url.expose_secret())
                     .map_err(|_| {
                         "CAMPBOOKS_MAIL__SMTP_URL is not an smtp:// or smtps:// URL".to_owned()
@@ -120,6 +124,42 @@ impl MailConfig {
                 from,
             }),
         })
+    }
+}
+
+/// `Ok` when `url` reaches its server over TLS from the start (`smtps://`)
+/// or with STARTTLS required (`smtp://…?tls=required`), or is plain
+/// `smtp://` to a loopback host without credentials. The error names the
+/// setting and never repeats the URL.
+fn encrypted_or_local(url: &str) -> Result<(), String> {
+    let parsed = url::Url::parse(url)
+        .map_err(|_| "CAMPBOOKS_MAIL__SMTP_URL is not an smtp:// or smtps:// URL".to_owned())?;
+    let tls = parsed
+        .query_pairs()
+        .find(|(key, _)| key == "tls")
+        .map(|(_, value)| value.into_owned());
+    let loopback = match parsed.host() {
+        // `smtp` is not a special scheme to the URL parser: an IPv4 host
+        // comes back as a domain.
+        Some(url::Host::Domain(domain)) => {
+            domain.eq_ignore_ascii_case("localhost")
+                || domain
+                    .parse::<std::net::Ipv4Addr>()
+                    .is_ok_and(|ip| ip.is_loopback())
+        }
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        None => false,
+    };
+    let credentials = !parsed.username().is_empty() || parsed.password().is_some();
+    match (parsed.scheme(), tls.as_deref()) {
+        ("smtps", _) | ("smtp", Some("required")) => Ok(()),
+        ("smtp", None) if loopback && !credentials => Ok(()),
+        _ => Err(
+            "CAMPBOOKS_MAIL__SMTP_URL must use TLS: smtps://… or smtp://…?tls=required (plain \
+             smtp:// only to a loopback host, without a user or password)"
+                .to_owned(),
+        ),
     }
 }
 
@@ -443,6 +483,32 @@ mod tests {
             NoMailer.send(&outbox.sent()[0]).await,
             Err(MailError::NotConfigured)
         );
+    }
+
+    #[test]
+    fn the_password_never_travels_in_clear() {
+        let from = Some("no-reply@example.com");
+        for url in [
+            "smtps://user:hunter2@smtp.example.com",
+            "smtp://user:hunter2@smtp.example.com:587?tls=required",
+            "smtp://127.0.0.1:2525",
+            "smtp://localhost:2525",
+            "smtp://[::1]:2525",
+        ] {
+            assert!(config(Some(url), from).check().is_ok(), "{url}");
+        }
+        for url in [
+            "smtp://user:hunter2@smtp.example.com",
+            "smtp://user:hunter2@smtp.example.com:587?tls=opportunistic",
+            "smtp://smtp.example.com:25",
+            "smtp://user:hunter2@127.0.0.1:2525",
+            "smtp://hunter2@localhost:2525?tls=opportunistic",
+        ] {
+            let refused = config(Some(url), from).check().unwrap_err();
+            assert!(refused.contains("CAMPBOOKS_MAIL__SMTP_URL"), "{url}: {refused}");
+            assert!(refused.contains("TLS"), "{url}: {refused}");
+            assert!(!refused.contains("hunter2"), "{refused}");
+        }
     }
 
     #[test]
