@@ -15,6 +15,7 @@ import {
   buildIdentityRoutes,
   IDENTITY_SHORTCUTS,
   MailboxStep,
+  SuspendedAccounts,
 } from "~/modules/identity";
 import {
   buildSystemAdminRoutes,
@@ -80,6 +81,7 @@ export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
     // People and Workspaces show identity's account and connectors' health.
     ...buildWorkspacesAdminRoutes(admin, {
       AccountPanel: AccountAdminPanel,
+      AccountStandings: SuspendedAccounts,
       ConnectionsPanel: WorkspaceConnectionsAdmin,
     }),
   ] as const;

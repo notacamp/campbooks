@@ -52,8 +52,37 @@ All notable changes to Campbooks Next are documented here. The format follows
   and `Pragma: no-cache`, so browsers and proxies don't keep them.
 - `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
   `[::1]` unless `--allow-remote` is passed.
+- A failed job's error is cleaned before it is stored and logged: only its
+  first line, at most 500 characters, with quoted text, email addresses,
+  link paths and queries, and long tokens removed. Admin → Jobs shows the
+  cleaned message. Errors already stored are left as they are.
+
+### Removed
+- **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
+  no longer has the `idp`, `idp-init` and `idp-provision` services or the `idp-data`
+  volume, `deploy/idp/` is deleted, and the stack no longer sets
+  `CAMPBOOKS_AUTH__ISSUER`, so a default install signs in through Campbooks' own
+  issuer. **To upgrade:** copy the new `compose.yaml`, then
+  `docker compose up -d --remove-orphans` removes the three old containers (leaving
+  them running breaks nothing, they are just unused; an old compose file kept as it is
+  keeps working on Rauthy). The `idp-data` volume is left for you to delete once you are
+  sure (`docker volume rm <project>_idp-data`). **Accounts that lived in Rauthy are not
+  carried over:** those people sign in again with Google, Microsoft, Zoho or a passkey
+  and get a new Campbooks account. Move the `CAMPBOOKS_IDP_*` sign-in provider settings
+  to `CAMPBOOKS_GOOGLE__*`, `CAMPBOOKS_MICROSOFT__*` and `CAMPBOOKS_ZOHO__*`, put each
+  client secret in `deploy/secrets/<provider>-client-secret` (now mounted into the
+  server at `/run/secrets/campbooks`), and add
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/<provider>` to each provider's OAuth app (see
+  `deploy/README.md` -> Built-in sign-in and Upgrading from the Rauthy sign-in).
+  `CAMPBOOKS_IDP_*`, `CAMPBOOKS_BFF__IDP_INTERNAL_URL` and
+  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL` no longer do anything in the shipped stack.
+  Pointing `CAMPBOOKS_AUTH__ISSUER` at an outside OpenID Connect issuer is still
+  possible, but nothing is provisioned for it.
 
 ### Changed
+- Admin → People marks people whose account is suspended, and Admin →
+  Signups → Codes says what a code is: good for the number of signups set
+  when it is minted, until it is used up, expires or is revoked.
 - The event log is no longer kept forever: events older than
   `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
   events still being delivered, and failed jobs older than
@@ -97,9 +126,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 - Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
   join an instance that approves new accounts and approve or reject each request
   (a rejection can carry a note only administrators see), and mint, copy once and
-  revoke **single-use signup codes** for instances that ask for a code. A person
-  waiting for approval, approved, or not approved sees that on the create-workspace
-  screen the next time they open the app (they are not emailed yet). Codes are
+  revoke **signup codes** (each good for the number of signups you set) for
+  instances that ask for a code. A person waiting for approval, approved, or not
+  approved sees that on the create-workspace screen the next time they open the
+  app (they are not emailed yet). Codes are
   stored as digests, work for the number of uses and until the day you set, and are
   spent when the workspace is created, so two people cannot share the last use.
   `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and
