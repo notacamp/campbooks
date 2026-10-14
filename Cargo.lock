@@ -511,6 +511,7 @@ dependencies = [
  "figment",
  "http-body-util",
  "icu_normalizer",
+ "icu_properties",
  "jsonwebtoken",
  "reqwest",
  "secrecy",

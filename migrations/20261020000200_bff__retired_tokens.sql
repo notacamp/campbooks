@@ -1,3 +1,8 @@
+-- Fail fast rather than queue behind a long transaction while every request
+-- that touches these tables waits behind the migration; the server's start
+-- (and so the migration) is retried.
+SET LOCAL lock_timeout = '5s';
+
 -- Every token a web session's cookie held before the last two, kept (as its
 -- SHA-256) until the session ends: one presented again means the cookie was
 -- copied, however long ago, and the session ends. At most one row per

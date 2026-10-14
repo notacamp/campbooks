@@ -20,6 +20,7 @@ ciborium.workspace = true
 coset.workspace = true
 figment.workspace = true
 icu_normalizer.workspace = true
+icu_properties.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
 secrecy.workspace = true

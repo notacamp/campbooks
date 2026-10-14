@@ -1,5 +1,10 @@
 -- Identity hardening (security audit, batch 3).
---
+
+-- Fail fast rather than queue behind a long transaction while every request
+-- that touches these tables waits behind the migration; the server's start
+-- (and so the migration) is retried.
+SET LOCAL lock_timeout = '5s';
+
 -- `notices`: which security notices were sent, so a retried delivery never
 -- sends one twice. One row per event and recipient (`account`: the
 -- account's primary address; `way_in`: the new way in's address). The

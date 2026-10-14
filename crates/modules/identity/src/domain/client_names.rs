@@ -6,6 +6,11 @@
 //! itself off as Campbooks: "Campbooks" and "Not A Camp" belong to the
 //! first-party apps, whatever the case, spacing or look-alike letters.
 
+use icu_properties::{
+    CodePointMapData,
+    props::{GeneralCategory, GeneralCategoryGroup},
+};
+
 /// The longest name kept, in characters.
 pub const MAX_NAME: usize = 100;
 
@@ -55,33 +60,57 @@ fn is_invisible(c: char) -> bool {
 
 /// Whether `name` would read as Campbooks' own: once decomposed for
 /// compatibility (NFKD: full-width, mathematical and circled letters become
-/// plain ones), stripped of accents and other combining marks, lower-cased,
-/// stripped of everything but letters and digits, and with common
-/// look-alikes folded (Cyrillic and Greek letters, small capitals, letters
-/// with a stroke such as `ø` and `ł`, `0` for `o`, `1` for `l`…), it
-/// contains `campbooks` or `notacamp`. Any other letter outside ASCII that
-/// survives may stand for any letter: with an unknown letter in place of
-/// each `o`, `Campb··ks` still reads as Campbooks.
+/// plain ones), stripped of every mark (general category M: accents, vowel
+/// signs, overlays, in any script), lower-cased, ligatures split, stripped of
+/// everything but letters and digits, and with look-alikes folded (Cyrillic
+/// and Greek letters, small capitals, letters with a stroke such as `ø` and
+/// `ł`, `0` for `o`, `1` for `l`, `rn` for `m`…), it contains `campbooks` or
+/// `notacamp`. A letter outside ASCII nothing folds may stand for any letter,
+/// at most [`MAX_UNKNOWN`] of them in the word: `Campb··ks` still reads as
+/// Campbooks, while a name in another script is not a match by wildcards
+/// alone.
 pub fn impersonates_campbooks(name: &str) -> bool {
+    let categories = CodePointMapData::<GeneralCategory>::new();
     let decomposed = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd().normalize(name);
-    let skeleton: Vec<Folded> = clean(&decomposed)
+    let folded: Vec<Folded> = clean(&decomposed)
         .chars()
-        .filter(|c| !is_combining_mark(*c))
+        .filter(|c| !GeneralCategoryGroup::Mark.contains(categories.get(*c)))
         .flat_map(char::to_lowercase)
         .flat_map(ligature)
         .filter_map(fold)
         .collect();
+    let skeleton = rn_as_m(&folded);
     ["campbooks", "notacamp"].iter().any(|word| {
         skeleton.windows(word.len()).any(|window| {
-            window
-                .iter()
-                .zip(word.chars())
-                .all(|(folded, expected)| match folded {
-                    Folded::Ascii(c) => *c == expected,
-                    Folded::Other => true,
-                })
+            let unknown = window.iter().filter(|f| **f == Folded::Other).count();
+            unknown <= MAX_UNKNOWN
+                && window
+                    .iter()
+                    .zip(word.chars())
+                    .all(|(folded, expected)| match folded {
+                        Folded::Ascii(c) => *c == expected,
+                        Folded::Other => true,
+                    })
         })
     })
+}
+
+/// The most letters nothing folds that a match may lean on.
+const MAX_UNKNOWN: usize = 2;
+
+/// `skeleton` with every `r` directly followed by `n` read as one `m`.
+fn rn_as_m(skeleton: &[Folded]) -> Vec<Folded> {
+    let mut out = Vec::with_capacity(skeleton.len());
+    let mut rest = skeleton.iter().peekable();
+    while let Some(folded) = rest.next() {
+        if *folded == Folded::Ascii('r') && rest.peek() == Some(&&Folded::Ascii('n')) {
+            rest.next();
+            out.push(Folded::Ascii('m'));
+        } else {
+            out.push(*folded);
+        }
+    }
+    out
 }
 
 /// A ligature as the letters it joins (`ꝏ` is `oo`); any other character
@@ -106,15 +135,6 @@ enum Folded {
     Ascii(char),
     /// A letter outside ASCII nothing folds: it may read as any letter.
     Other,
-}
-
-/// A combining mark (accents, overlays…) left by decomposition.
-fn is_combining_mark(c: char) -> bool {
-    matches!(
-        u32::from(c),
-        0x0300..=0x036F | 0x0483..=0x0489 | 0x1AB0..=0x1AFF | 0x1DC0..=0x1DFF | 0x20D0..=0x20FF
-            | 0xFE20..=0xFE2F
-    )
 }
 
 /// One character of a name as the ASCII letter it looks like, or as an
@@ -192,6 +212,11 @@ mod tests {
             "Campbꝏks",
             "Νοt Α Cαmp",
             "Camp ☺ books",
+            "Campb\u{05B4}ooks",
+            "Campb\u{064E}ooks",
+            "Camp\u{0E31}books",
+            "Carnpbooks",
+            "Not A Carnp",
             "Campb\u{0D20}\u{0D20}ks",
         ] {
             assert!(impersonates_campbooks(fake), "{fake}");
@@ -201,6 +226,12 @@ mod tests {
             "Camping planner",
             "Books & Co",
             "Café Ørsted",
+            "José",
+            "Françoise",
+            "メールアシスタントプロ",
+            "我的邮件管理助手应用",
+            "تطبيق البريد",
+            "Learning Corner",
             "東京 Notes",
         ] {
             assert!(!impersonates_campbooks(fine), "{fine}");

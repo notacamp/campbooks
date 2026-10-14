@@ -69,6 +69,9 @@ icu_locale_core = "2.3.0"
 # Compatibility decomposition (NFKD) for look-alike app names (identity);
 # already in the graph through url -> idna.
 icu_normalizer = "2.3.0"
+# Unicode general categories (marks of every script) for look-alike app
+# names (identity); already in the graph through url -> idna.
+icu_properties = "2.3.0"
 
 # Errors, observability, misc
 thiserror = "2.0.21"
