@@ -72,7 +72,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   this upgrade, each inbox's conversations from the last
   `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) get their
   needs within a few minutes, in the background, from the answers already
-  stored: no AI call, nothing to run. Replied, archived and trashed mail is
+  stored: no AI call, nothing to run. Replied, archived, spam and trashed mail is
   handled as for new mail, and mail older than the window stays off Home.
 - **Home no longer asks about mail the rules already settled.** A model
   suggestion is put to you as a question ("Did GitHub ask you to do
