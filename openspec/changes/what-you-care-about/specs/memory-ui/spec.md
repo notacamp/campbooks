@@ -1,40 +1,49 @@
+## Purpose
+
+Scout's memory: the page where a member sees what Scout was taught,
+teaches it more in their own words, and answers the questions again.
+
 ## ADDED Requirements
 
+### Requirement: The Scout's memory page
+Settings SHALL have a Scout's memory page at
+`/w/{workspace_id}/settings/memory` with, in order: "Teach Scout
+something", the rules (a slot the conversations module fills), and "Answer
+the questions" (the question flow). On phones it SHALL be one column with
+no horizontal scrolling at 375px, in en, pt-PT, es-ES and fr.
+
+#### Scenario: Opening it
+- **WHEN** a member opens Scout's memory
+- **THEN** the composer is first, then the rules, then the way back to the questions
+
 ### Requirement: Teach Scout in your own words
-Scout's memory SHALL offer, above the rules, a composer, "Teach Scout
-something". `Enter` SHALL call `assistant.compile_instruction` and show,
+`Enter` in the composer SHALL call `assistant.compile_instruction` and show,
 while it runs, the visor thinking and "Only your sentence is sent, never
-your mail". For each clarification it SHALL ask the question with its
-candidates and a type-ahead; for each proposal it SHALL show the rule
-sentence, "You wrote: …", the match preview, the inbox, "Also for the N you
-already have", and Save (`Enter`), Change and Cancel (`Esc`). Save SHALL
-call `conversations.create_rule` with `state = active`. A note proposal
-SHALL be saved to the profile; an unsupported request SHALL be explained
-with the closest rule offered. When compile answers `compile_unavailable`,
-the composer SHALL be replaced by a manual rule builder (When … Then …)
-with the same preview and Save.
+your mail". For a proposal with a `who`, it SHALL ask "Who do you mean by
+…?" with the candidates and a field for an address or domain; for each
+proposal it SHALL show the rule sentence, "You wrote: …", the inbox, and
+Save (`Enter`) and Cancel (`Esc`), with the match preview once #125's
+`preview_rule` is on `next`. For `unsupported` it SHALL say what Scout
+can't do, in plain words for the reason, and for `unclear` how to say it
+as a rule; any proposal left SHALL be offered as the closest rule.
 
 #### Scenario: Anything from my accountant
-- **WHEN** a member types "anything from my accountant always matters", presses Enter, picks Rita Gomes, and presses Enter
-- **THEN** a rule "Always show mail from Rita Gomes (rita@silva-contas.example)" is created with origin `instruction`, and it appears in the rules list quoting the sentence
+- **WHEN** a member types "anything from my accountant always matters", presses Enter and picks Rita Gomes
+- **THEN** the proposal reads "Always show mail from rita@silva-contas.example", quoting what they wrote, with Save
 
-#### Scenario: Forward is not a rule
-- **WHEN** a member types "forward invoices to my accountant"
-- **THEN** Scout says it can't forward mail and offers to label mail with "invoice" in the subject instead, and nothing is saved until they choose
+#### Scenario: Forwarding
+- **WHEN** the answer is `unsupported` with `sends_mail`
+- **THEN** the page says Scout can't send or forward mail, and nothing is saved
 
-#### Scenario: No language model
-- **WHEN** compile answers `compile_unavailable`
-- **THEN** the manual builder is shown and saving it creates the same kind of rule
+### Requirement: A rule builder without AI
+When compile answers 503 (`ai_role_not_configured` or
+`ai_external_content_refused`), the composer SHALL say that this server
+has no language model for sentences and show a builder instead: a
+condition (the sender is, the sender's domain is, the subject contains,
+it's from a mailing list, it's an automatic notification) and an action
+(always show it, never needs me, move to a stream, archive), producing the
+same proposal card.
 
-### Requirement: About you in Scout's memory
-Scout's memory SHALL list, next to the rules, "About you": one sentence
-per profile answer and note in the member's locale, each with Change and
-Remove (Undo on a toast), plus "Answer the questions again" (the flow with
-the current answers selected) and "What Scout reads" (the exact
-preferences block and its length out of 600 characters). Rules with origin
-`onboarding` SHALL say "From your answers" and rules with origin
-`instruction` SHALL quote the member's words.
-
-#### Scenario: Removing an answer
-- **WHEN** a member removes "Clients, and invoices and payments, matter most to you"
-- **THEN** the profile loses its topics, the block's revision grows, and a toast offers Undo
+#### Scenario: No model
+- **WHEN** compile answers `ai_role_not_configured`
+- **THEN** the builder is shown, and choosing "the sender is" rita@silva-contas.example with "always show it" shows the same proposal as the composer would

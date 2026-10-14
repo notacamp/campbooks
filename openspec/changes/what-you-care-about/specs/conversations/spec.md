@@ -1,30 +1,40 @@
 ## ADDED Requirements
 
 ### Requirement: Who writes to the caller
-`GET /api/v1/w/{workspace_id}/conversations/senders`
-(`conversations.list_senders`, `conversations:read`) SHALL list the senders
-of inbound mail in the inboxes the caller can see: address, display name,
-registrable domain, messages received, messages the caller's inboxes
-replied to, messages opened, and the newest message's time. It SHALL accept
-`q` (matched case- and accent-insensitively against words of the address,
-display name and domain), `sort` (`replied`, `received` or `unopened`), an
-opaque cursor and a limit of 1 to 50 (else 400). A sender seen only in
-inboxes the caller cannot see SHALL never appear.
+`GET /api/v1/w/{workspace_id}/senders` (`conversations.list_senders`,
+`conversations:read`, callable by the assistant) SHALL list senders of
+inbound mail in the inboxes the caller can read: address, display name,
+messages received and messages the caller's inboxes replied to; never a
+subject or any text. Without `q` it SHALL return the 10 senders the
+caller's inboxes replied to most (then received most); with `q` (2 to 100
+characters) it SHALL return up to 10 senders whose address, display name
+or domain contains each of its words, case- and accent-insensitively, in
+the same order. `limit` SHALL be 1 to 10 (else 400). There SHALL be no
+cursor. A sender seen only in inboxes the caller cannot read SHALL never
+appear.
 
 #### Scenario: Suggestions for "always reach you"
-- **WHEN** a member lists senders sorted by `replied`
-- **THEN** the senders they replied to most come first, with their counts
+- **WHEN** a member lists senders without `q`
+- **THEN** the senders they replied to most come first, with their counts and no subjects
 
 #### Scenario: Another member's inbox
 - **WHEN** a sender wrote only to an inbox the caller is not in
-- **THEN** that sender is not listed
+- **THEN** that sender is not listed, for that caller or for a client token without the inbox
 
-### Requirement: The decide pass reads the inbox owner's preferences
-`conversations.decide_message` SHALL read the preferences block of the
-inbox owner through the kernel's `MemberPreferences` port and pass it in
-the decision context's preferences slot, and SHALL store the block's schema
-and revision with each decision. No block SHALL mean an empty slot.
+### Requirement: The caller's labels
+`GET /api/v1/w/{workspace_id}/labels` (`conversations.list_labels`,
+`conversations:read`, callable by the assistant) SHALL list the labels of
+the inboxes the caller can read: id, inbox and name.
 
-#### Scenario: A revised profile
-- **WHEN** the owner changes an answer and new mail arrives
-- **THEN** its decisions record the new revision, and earlier decisions keep theirs
+#### Scenario: Only readable inboxes
+- **WHEN** a member lists labels and another inbox has a label "Board"
+- **THEN** "Board" is not listed
+
+### Requirement: Shared inboxes are marked
+`conversations.list_inboxes` SHALL say of each inbox whether it is
+`shared`: whether anyone other than the caller holds a role on it. It
+SHALL never say who.
+
+#### Scenario: Sam's own inbox and the office inbox
+- **WHEN** Sam lists his inboxes and Ana also reads office@
+- **THEN** his own inbox says `shared` = false and office@ says `shared` = true
