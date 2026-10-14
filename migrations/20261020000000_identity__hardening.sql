@@ -13,7 +13,7 @@ CREATE TABLE identity.notices (
 );
 CREATE INDEX notices_account_idx ON identity.notices (account_id);
 
-GRANT SELECT, INSERT, DELETE ON identity.notices TO campbooks_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON identity.notices TO campbooks_app;
 
 -- An authorization request belongs to the browser that made it: the SHA-256
 -- of that browser's `__Host-campbooks_browser` cookie. Requests waiting at
