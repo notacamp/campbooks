@@ -26,6 +26,7 @@ pub mod module;
 pub mod operations;
 pub mod rate_limit;
 pub mod records;
+pub mod redact;
 pub mod search;
 pub mod signup;
 pub mod state;

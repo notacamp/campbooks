@@ -9,7 +9,7 @@ use std::{
 
 use serde_json::Value;
 
-use super::{Job, JobContext, JobError, JobHandler, PruneJobs};
+use super::{Job, JobContext, JobError, JobHandler, PruneEvents, PruneJobs};
 use crate::{
     Module,
     blobs::{SWEEP_EVERY, SweepBlobs},
@@ -343,7 +343,8 @@ pub struct RegistryError(pub Vec<String>);
 /// Owner name of the kernel's own background work.
 pub const KERNEL_OWNER: &str = "kernel";
 
-/// How often the kernel prunes succeeded jobs and expired idempotency keys.
+/// How often the kernel prunes finished jobs, old events and expired
+/// idempotency keys.
 pub const PRUNE_EVERY: Duration = Duration::from_hours(1);
 
 impl Registry {
@@ -365,6 +366,7 @@ impl Registry {
     ) -> Result<Self, RegistryError> {
         let kernel = Background::new()
             .schedule::<PruneJobs>(PRUNE_EVERY)
+            .schedule::<PruneEvents>(PRUNE_EVERY)
             .schedule::<SweepBlobs>(SWEEP_EVERY)
             .schedule::<PruneIdempotency>(PRUNE_EVERY)
             .schedule::<PruneRateLimits>(PRUNE_EVERY)

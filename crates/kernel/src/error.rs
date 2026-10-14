@@ -73,7 +73,8 @@ pub enum Error {
     /// A dependency (database, provider) is unavailable.
     #[error("unavailable: {0}")]
     Unavailable(Reason),
-    /// Anything else. Logged with its source; the client sees a generic message.
+    /// Anything else. Logged by kind ([`redact::error`](crate::redact::error),
+    /// never its data); the client sees a generic message.
     #[error("internal error")]
     Internal(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
@@ -156,7 +157,9 @@ impl From<sqlx::Error> for Error {
 impl IntoResponse for Error {
     fn into_response(self) -> Response {
         if let Self::Internal(source) = &self {
-            tracing::error!(error = %source, source_debug = ?source, "internal error");
+            // Never the source's `Debug` form or a database error's message:
+            // both can quote the row or document that failed (`redact`).
+            tracing::error!(error = %crate::redact::error(source.as_ref()), "internal error");
         }
         let challenge = self
             .www_authenticate()

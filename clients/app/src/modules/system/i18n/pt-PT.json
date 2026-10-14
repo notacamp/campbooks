@@ -114,11 +114,17 @@
       "notConfigured": "Não configurada",
       "answering": "A responder",
       "notAnswering": "Sem resposta",
+      "notSentMail": "Não recebe correio",
       "protocol": {
         "openai": "Compatível com OpenAI",
         "laya": "Laya"
       },
-      "detail": "{{model}} em {{endpoint}} · {{protocol}}"
+      "detail": "{{model}} em {{endpoint}} · {{protocol}}",
+      "where": {
+        "instance": "na rede desta instância",
+        "externalAllowed": "fora da rede desta instância, autorizado a receber correio",
+        "externalRefused": "fora da rede desta instância, por isso não lhe é enviado correio"
+      }
     },
     "duration": {
       "lessThanAMinute": "Menos de um minuto"

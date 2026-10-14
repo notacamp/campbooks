@@ -122,8 +122,10 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 
 /// Hard-delete a deleted workspace's records once its grace period is over:
 /// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
-/// it (foreign keys cascade) its members, invitations and security events. Runs in the workspace, so row-level
-/// security applies; a workspace that is gone already is a no-op.
+/// it (foreign keys cascade) its members, invitations and security events,
+/// and the kernel's change feed, event log and finished jobs of the
+/// workspace. Runs in the workspace, so row-level security applies; a
+/// workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
     /// The workspace.
@@ -178,9 +180,11 @@ impl Job for PurgeWorkspace {
         )
         .execute(&mut **tx)
         .await?;
-        // Its change feed goes with it.
+        // Its change feed, event log and finished jobs go with it (jobs
+        // still queued, such as other modules' purges, stay to run).
         campbooks_kernel::changes::purge_workspace(tx, &workspace).await?;
-        tracing::info!(workspace = %id, "workspace purged");
+        let (jobs, events) = campbooks_kernel::jobs::purge_workspace(tx, &workspace).await?;
+        tracing::info!(workspace = %id, jobs, events, "workspace purged");
         Ok(())
     }
 }
@@ -275,6 +279,16 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(changes, 0, "its change feed went with it");
+        let history: (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT count(*) FROM kernel.events WHERE workspace_id = $1),
+                    (SELECT count(*) FROM kernel.jobs
+                      WHERE workspace_id = $1 AND kind <> 'workspaces.purge_workspace')",
+        )
+        .bind(ws.to_string())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert_eq!(history, (0, 0), "its events and finished jobs went with it");
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

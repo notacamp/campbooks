@@ -137,9 +137,13 @@ pub fn unreadable(what: &str, err: &serde_json::Error) -> String {
     )
 }
 
-/// An HTTP client for providers: our user agent, the timeouts.
+/// An HTTP client for providers: our user agent, the timeouts, and no
+/// redirects. Requests carry access tokens and mail, and a redirect could
+/// carry the body (307/308) to another host; Gmail's and Zoho's APIs answer
+/// where they are asked, so a 3xx is an unexpected answer.
 pub fn http_client(name: &str) -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
         .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
         .timeout(HTTP_TIMEOUT)
         .connect_timeout(Duration::from_secs(10))
@@ -150,6 +154,30 @@ pub fn http_client(name: &str) -> Result<reqwest::Client, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn provider_clients_never_follow_a_redirect() {
+        use wiremock::{Mock, MockServer, ResponseTemplate, matchers::any};
+        let elsewhere = MockServer::start().await;
+        let provider = MockServer::start().await;
+        Mock::given(any())
+            .respond_with(
+                ResponseTemplate::new(307)
+                    .insert_header("location", format!("{}/steal", elsewhere.uri())),
+            )
+            .mount(&provider)
+            .await;
+        let response = http_client("test")
+            .unwrap()
+            .post(format!("{}/upload", provider.uri()))
+            .bearer_auth("access-token")
+            .body("Subject: Q4 plan")
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(response.status(), 307);
+        assert!(elsewhere.received_requests().await.unwrap().is_empty());
+    }
 
     #[test]
     fn scopes_split_on_spaces_and_commas() {

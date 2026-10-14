@@ -161,6 +161,17 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
     );
   }
   const reachable = role.reachable === true;
+  // A role off this instance's network that has not opted in gets no mail:
+  // nothing calls it but the reachability probe.
+  const refused = role.content_allowed === false;
+  const where =
+    role.location === "external"
+      ? refused
+        ? t("admin.ai.where.externalRefused")
+        : t("admin.ai.where.externalAllowed")
+      : role.location === "instance"
+        ? t("admin.ai.where.instance")
+        : undefined;
   const detail = t("admin.ai.detail", {
     model: role.model ?? "",
     endpoint: role.endpoint ?? "",
@@ -169,9 +180,18 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
         ? ""
         : t(`admin.ai.protocol.${role.protocol}`),
   });
+  const status = refused ? "off" : reachable ? "ok" : "problem";
   return (
-    <Fact label={label} status={reachable ? "ok" : "problem"} detail={detail}>
-      {reachable ? t("admin.ai.answering") : t("admin.ai.notAnswering")}
+    <Fact
+      label={label}
+      status={status}
+      detail={where === undefined ? detail : `${detail} · ${where}`}
+    >
+      {refused
+        ? t("admin.ai.notSentMail")
+        : reachable
+          ? t("admin.ai.answering")
+          : t("admin.ai.notAnswering")}
     </Fact>
   );
 }

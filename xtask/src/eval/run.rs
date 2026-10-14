@@ -13,7 +13,7 @@ use std::{
 
 use anyhow::{Result, anyhow};
 use campbooks_ai::{
-    AiConfig, Error, Gateway, Protocol, ProviderConfig, Role,
+    AiConfig, Error, ExternalContent, Gateway, Protocol, ProviderConfig, Role,
     decide::{
         AnswerValue, Question,
         knn::{Embedder, GatewayEmbedder, InMemoryNeighbours, Knn, LexicalEmbedder},
@@ -66,7 +66,10 @@ fn provider(prefix: &str, default_model: Option<&str>) -> Result<ProviderConfig,
     let model = var(&model_var)
         .or_else(|| default_model.map(str::to_owned))
         .ok_or_else(|| format!("{model_var} is not set"))?;
-    let mut config = ProviderConfig::new(base_url, model);
+    // The eval set is fictional (crates/ai/evals/decide), so a hosted
+    // endpoint may read it: no real mail ever goes through the eval.
+    let mut config =
+        ProviderConfig::new(base_url, model).with_external_content(ExternalContent::Allow);
     if let Some(key) = var(&format!("CAMPBOOKS_EVAL_{prefix}_API_KEY")) {
         config = config.with_api_key(SecretString::from(key));
     }
@@ -76,6 +79,7 @@ fn provider(prefix: &str, default_model: Option<&str>) -> Result<ProviderConfig,
 fn gateway(role: Role, config: ProviderConfig) -> Result<Gateway, String> {
     Gateway::new(AiConfig {
         roles: [(role, config)].into(),
+        ..AiConfig::default()
     })
     .map_err(|e| e.to_string())
 }

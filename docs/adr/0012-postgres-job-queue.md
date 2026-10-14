@@ -1,6 +1,6 @@
 # 0012 — Our own Postgres job queue; events fan out to jobs at publish time
 
-**Status:** Accepted · 2026-10-12
+**Status:** Accepted · 2026-10-12 · retention amended 2026-10-14 (campbooks-cloud#117, #65: OpenSpec `content-flow-hardening`)
 
 ## Context
 ADR 0011 asks for a durable queue and outbox in Postgres (issue #19): domain
@@ -103,9 +103,17 @@ Build our own queue in the kernel.
   exponentially from `CAMPBOOKS_JOBS__RETRY_BASE_MS` to
   `CAMPBOOKS_JOBS__RETRY_MAX_SECONDS` with 50–100 % jitter;
   `JobError::Fatal`, a panic on the last attempt, an undecodable payload or
-  an unknown kind mark the job `failed` (dead). Dead jobs stay; succeeded ones
-  are pruned after `CAMPBOOKS_JOBS__RETENTION_HOURS` by the hourly
-  `kernel.prune_jobs` schedule. The event log is never pruned.
+  an unknown kind mark the job `failed` (dead). Succeeded jobs are pruned
+  after `CAMPBOOKS_JOBS__RETENTION_HOURS` and dead ones after
+  `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS` (30) by the hourly
+  `kernel.prune_jobs` schedule. *Amended 2026-10-14:* the event log is
+  pruned too, after `CAMPBOOKS_EVENTS__RETENTION_DAYS` (90) by
+  `kernel.prune_events`, never while a delivery is pending. **Replay is
+  therefore limited to the retention window** (90 days by default):
+  `ReplayFrom::Beginning` means the oldest event still kept, and a consumer
+  added later cannot be fed older history from the log. A purged workspace
+  loses its events and finished jobs. History that outlives its use is a privacy cost, and a projection
+  that needs more than 90 days rebuilds from its module's own tables.
 - **Leases:** a claim leases the job for `CAMPBOOKS_JOBS__LEASE_SECONDS`,
   renewed every third of that while it runs; workers reclaim expired leases.
 - **Schedules** tick on epoch-aligned intervals. `kernel.schedules` records

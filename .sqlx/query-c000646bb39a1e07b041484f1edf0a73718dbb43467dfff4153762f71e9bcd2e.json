@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                DELETE FROM kernel.events\n                 WHERE id IN (\n                     SELECT e.id FROM kernel.events e\n                      WHERE e.occurred_at < now() - make_interval(days => $1)\n                        AND NOT EXISTS (\n                            SELECT 1 FROM kernel.jobs j\n                             WHERE j.event_id = e.id AND j.state IN ('pending', 'running'))\n                      LIMIT $2)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c000646bb39a1e07b041484f1edf0a73718dbb43467dfff4153762f71e9bcd2e"
+}

@@ -29,6 +29,34 @@ All notable changes to Campbooks Next are documented here. The format follows
 - The admin API asks for a sign-in from the last hour (was twelve hours), and
   app names that only look like "Campbooks" (full-width, accented, styled
   letters) are refused.
+- **Mail no longer goes to an AI provider outside your network unless you say
+  so.** Each AI role's address is checked: a loopback or private address,
+  `localhost`, a single-label name such as a compose service (`laya`,
+  `ollama`) or a host you list in `CAMPBOOKS_AI__INTERNAL_HOSTS` counts as
+  your network; anything else gets no mail content until you set
+  `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow` for that role. Without it the
+  gateway refuses (`ai_external_content_refused`) and the decide pass leaves
+  sorting to the rules. Admin → System shows where each role is and whether it
+  receives mail. **Self-hosters using a hosted provider:** add the opt-in for
+  each such role, or it stops being used after this upgrade.
+- Campbooks no longer follows HTTP redirects from AI providers, Gmail, Zoho
+  or the identity provider's key endpoint: a redirect could have carried mail
+  or tokens to another host. A 3xx is reported as an error.
+- Errors no longer carry mail: an AI provider's error body is not kept, and
+  logs and failed jobs describe database and JSON errors by kind and position
+  (SQLSTATE, constraint, table), never the values they quote.
+- API responses (`/api/`, `/bff/`, `/admin/`) carry `Cache-Control: no-store`
+  and `Pragma: no-cache`, so browsers and proxies don't keep them.
+- `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
+  `[::1]` unless `--allow-remote` is passed.
+
+### Changed
+- The event log is no longer kept forever: events older than
+  `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
+  events still being delivered, and failed jobs older than
+  `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS` (default 30) go too. Deleting a
+  workspace now also deletes its events and finished jobs when it is purged.
+  The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
