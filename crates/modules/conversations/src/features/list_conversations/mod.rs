@@ -18,7 +18,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         conversation::{ConversationSummary, SummaryRow},
-        needs, suggestions,
+        needs, rules, suggestions,
     },
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
@@ -106,6 +106,8 @@ pub async fn handler(
             .collect::<Result<Vec<_>>>()?;
         suggestions::attach(&mut tx, &mut conversations).await?;
         needs::attach(&mut tx, &mut conversations).await?;
+        rules::attach(&mut tx, &mut conversations).await?;
+        rules::attach(&mut tx, &mut conversations).await?;
         tx.commit().await?;
         return Ok(Json(ConversationList {
             conversations,
@@ -125,6 +127,7 @@ pub async fn handler(
         .collect::<Result<Vec<_>>>()?;
     suggestions::attach(&mut tx, &mut conversations).await?;
     needs::attach(&mut tx, &mut conversations).await?;
+    rules::attach(&mut tx, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);

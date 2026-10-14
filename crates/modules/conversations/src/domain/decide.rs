@@ -30,6 +30,8 @@ pub enum Source {
     Rules,
     /// The `decide` model.
     Model,
+    /// A rule a member taught (`campbooks_ai::decide::taught`).
+    Taught,
 }
 
 impl Source {
@@ -38,6 +40,7 @@ impl Source {
         match self {
             Self::Rules => "rules",
             Self::Model => "model",
+            Self::Taught => "taught",
         }
     }
 }

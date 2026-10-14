@@ -157,9 +157,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
             .publishes::<events::NeedChanged>()
+            .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
+            .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -203,7 +205,7 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
-        needs, send_draft, star, update_draft,
+        needs, rules, send_draft, star, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -232,6 +234,11 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(needs::resolve))
         .routes(routes!(needs::reopen))
         .routes(routes!(needs::confirm))
+        .routes(routes!(rules::preview))
+        .routes(routes!(rules::list))
+        .routes(routes!(rules::create))
+        .routes(routes!(rules::get, rules::update, rules::remove))
+        .routes(routes!(rules::confirm))
 }
 
 #[cfg(test)]
@@ -264,6 +271,7 @@ mod tests {
             "conversations.release_send",
             "conversations.record_send",
             "conversations.check_send",
+            "conversations.apply_rule",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }

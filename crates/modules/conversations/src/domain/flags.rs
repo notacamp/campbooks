@@ -31,7 +31,7 @@ pub enum Flag {
 }
 
 impl Flag {
-    const fn requested(self) -> RequestedChange {
+    pub const fn requested(self) -> RequestedChange {
         match self {
             Self::Read => RequestedChange::MarkRead,
             Self::Unread => RequestedChange::MarkUnread,
@@ -42,7 +42,7 @@ impl Flag {
         }
     }
 
-    const fn change(self) -> Change {
+    pub const fn change(self) -> Change {
         match self {
             Self::Read | Self::Unread => Change::Read,
             Self::Star | Self::Unstar => Change::Starred,
@@ -64,70 +64,7 @@ pub async fn apply(
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inbox = lock_conversation(&mut tx, access, id).await?;
-    let changed = match flag {
-        Flag::Read => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET read = true, updated_at = now()
-                  WHERE conversation_id = $1 AND NOT read RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        Flag::Unread => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET read = false, updated_at = now()
-                  WHERE id = (SELECT id FROM conversations.messages WHERE conversation_id = $1
-                               ORDER BY direction = 'inbound' DESC, sent_at DESC, id DESC LIMIT 1)
-                    AND read
-                 RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        Flag::Star => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET starred = true, updated_at = now()
-                  WHERE id = (SELECT id FROM conversations.messages WHERE conversation_id = $1
-                               ORDER BY sent_at DESC, id DESC LIMIT 1)
-                    AND NOT EXISTS (SELECT 1 FROM conversations.messages
-                                     WHERE conversation_id = $1 AND starred)
-                 RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        Flag::Unstar => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET starred = false, updated_at = now()
-                  WHERE conversation_id = $1 AND starred RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        Flag::Archive => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_inbox = false, updated_at = now()
-                  WHERE conversation_id = $1 AND in_inbox RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-        Flag::Unarchive => {
-            sqlx::query_scalar!(
-                "UPDATE conversations.messages SET in_inbox = true, updated_at = now()
-                  WHERE conversation_id = $1 AND NOT in_inbox AND NOT in_trash AND NOT in_spam
-                 RETURNING provider_message_id",
-                id as ConversationId
-            )
-            .fetch_all(&mut *tx)
-            .await?
-        }
-    };
+    let changed = change(&mut tx, id, flag).await?;
     if !changed.is_empty() {
         let changed = Changed {
             workspace: access.workspace.to_string(),
@@ -153,4 +90,78 @@ pub async fn apply(
     let summary = summary(&mut tx, id).await?;
     tx.commit().await?;
     Ok(summary)
+}
+
+/// Set `flag` on conversation `id`'s messages in `conn`, returning the
+/// provider ids of the messages that changed (none when it already was so).
+pub async fn change(
+    conn: &mut sqlx::PgConnection,
+    id: ConversationId,
+    flag: Flag,
+) -> Result<Vec<String>> {
+    let changed = match flag {
+        Flag::Read => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET read = true, updated_at = now()
+                  WHERE conversation_id = $1 AND NOT read RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Unread => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET read = false, updated_at = now()
+                  WHERE id = (SELECT id FROM conversations.messages WHERE conversation_id = $1
+                               ORDER BY direction = 'inbound' DESC, sent_at DESC, id DESC LIMIT 1)
+                    AND read
+                 RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Star => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET starred = true, updated_at = now()
+                  WHERE id = (SELECT id FROM conversations.messages WHERE conversation_id = $1
+                               ORDER BY sent_at DESC, id DESC LIMIT 1)
+                    AND NOT EXISTS (SELECT 1 FROM conversations.messages
+                                     WHERE conversation_id = $1 AND starred)
+                 RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Unstar => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET starred = false, updated_at = now()
+                  WHERE conversation_id = $1 AND starred RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Archive => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET in_inbox = false, updated_at = now()
+                  WHERE conversation_id = $1 AND in_inbox RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+        Flag::Unarchive => {
+            sqlx::query_scalar!(
+                "UPDATE conversations.messages SET in_inbox = true, updated_at = now()
+                  WHERE conversation_id = $1 AND NOT in_inbox AND NOT in_trash AND NOT in_spam
+                 RETURNING provider_message_id",
+                id as ConversationId
+            )
+            .fetch_all(&mut *conn)
+            .await?
+        }
+    };
+    Ok(changed)
 }

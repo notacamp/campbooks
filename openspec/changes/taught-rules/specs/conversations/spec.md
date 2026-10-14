@@ -167,7 +167,7 @@ publish `conversations.rule_changed` with the run's total and done.
 
 ### Requirement: Rule events
 Every change to a rule or its run SHALL publish `conversations.rule_changed`
-v1 (`contracts/conversations.rule_changed.v1.schema.json`) carrying the
+v1 carrying the
 workspace, inbox and rule ids, the rule's state, and the current run's kind,
 state, total and done; never its conditions, the member's words or any
 address. It SHALL declare an upsert of `conversations.rule` within its inbox.

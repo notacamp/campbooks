@@ -18,6 +18,10 @@
     "invalid_ids": "Pide entre 1 y {{max}} identificadores de conversación, separados por comas.",
     "no_open_need": "Aquí ya no hay nada que te necesite.",
     "nothing_to_reopen": "Aquí no hay nada que recuperar.",
-    "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo."
+    "need_changed": "Esto ha cambiado mientras lo mirabas. Vuelve a mirarlo.",
+    "invalid_rule": "No se puede guardar esta regla. Necesita de una a cuatro condiciones que digan a qué correos se aplica, y de una a cuatro acciones de tipos distintos.",
+    "rule_not_yours": "Solo quien enseñó esta regla, o un gestor de la bandeja de entrada, puede cambiarla.",
+    "rule_not_proposed": "Esta regla ya no está esperando un sí.",
+    "invalid_rule_query": "No se ha podido leer la regla que quieres previsualizar. Envía sus condiciones y acciones en JSON."
   }
 }

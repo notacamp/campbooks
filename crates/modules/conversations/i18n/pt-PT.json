@@ -18,6 +18,10 @@
     "invalid_ids": "Peça entre 1 e {{max}} identificadores de conversa, separados por vírgulas.",
     "no_open_need": "Já nada aqui precisa de si.",
     "nothing_to_reopen": "Não há nada para recuperar aqui.",
-    "need_changed": "Isto mudou enquanto estava a ver. Volte a ver."
+    "need_changed": "Isto mudou enquanto estava a ver. Volte a ver.",
+    "invalid_rule": "Não é possível guardar esta regra. Precisa de uma a quatro condições que digam a que mensagens se aplica, e de uma a quatro ações de tipos diferentes.",
+    "rule_not_yours": "Só quem ensinou esta regra, ou um gestor da caixa de entrada, a pode alterar.",
+    "rule_not_proposed": "Esta regra já não está à espera de um sim.",
+    "invalid_rule_query": "Não foi possível ler a regra a pré-visualizar. Envie as condições e as ações em JSON."
   }
 }

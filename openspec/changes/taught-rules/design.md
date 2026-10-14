@@ -394,7 +394,8 @@ Schema `conversations` (all with `workspace_id`, forced RLS):
 
 ## Events
 
-- `conversations.rule_changed` v1 (new, contract file): workspace, inbox,
+- `conversations.rule_changed` v1 (new; read by the change feed only, so no
+  cross-module contract file): workspace, inbox,
   rule id, state, and the current run's kind, state, total and done. No
   conditions, no text. Declares an upsert of `conversations.rule` within the
   inbox, so only the inbox's members see it.
