@@ -3,7 +3,7 @@
 //! keys, so scoped endpoints can be tested end to end without a real IdP or
 //! network access.
 //!
-//! It also plays the IdP side of the web BFF's sign-in (Rauthy's behaviour):
+//! It also plays the IdP side of the web BFF's sign-in (a conventional OIDC server's behaviour):
 //! [`TestIdp::authorize`] approves an authorization request as the browser
 //! would after a login, and its token endpoint redeems codes (PKCE S256,
 //! single use) and rotates refresh tokens, for the confidential client
@@ -48,11 +48,11 @@ use sqlx::PgPool;
 
 use crate::{AppState, config::AuthConfig};
 
-/// Path of the JWKS under the issuer, as Rauthy serves it.
+/// Path of the JWKS under the issuer, as an OIDC server serves it.
 const JWKS_PATH: &str = "oidc/certs";
 /// Lifetime of tokens from [`TestIdp::claims`].
 const TOKEN_LIFETIME_SECONDS: u64 = 300;
-/// The confidential web client the test IdP knows (Rauthy's `campbooks-web`).
+/// The confidential web client the test IdP knows (`campbooks-web`).
 pub const WEB_CLIENT_ID: &str = "campbooks-web";
 /// That client's secret.
 pub const WEB_CLIENT_SECRET: &str = "test-web-client-secret";
@@ -166,7 +166,7 @@ impl TestKey {
 
 impl TestIdp {
     /// Start an IdP on a free loopback port with one published signing key.
-    /// Its issuer is `http://127.0.0.1:<port>/auth/v1/` (Rauthy's layout).
+    /// Its issuer is `http://127.0.0.1:<port>/auth/v1/` (a layout with a path, to exercise issuer paths).
     ///
     /// # Panics
     /// If the test environment is broken (see the module docs).
@@ -242,7 +242,7 @@ impl TestIdp {
     }
 
     /// Claims of a valid user access token granting `scope` (space-separated
-    /// names) plus `openid`, as Rauthy issues them. Edit the value to test
+    /// names) plus `openid`, as an OIDC server issues them. Edit the value to test
     /// other cases.
     pub fn claims(&self, scope: &str) -> serde_json::Value {
         let now = jsonwebtoken::get_current_timestamp();
@@ -401,7 +401,7 @@ impl TestIdp {
     /// with `code`, `state` and `iss`.
     ///
     /// # Panics
-    /// If the request is not one Rauthy would accept from `campbooks-web`
+    /// If the request is not one an OIDC server would accept from `campbooks-web`
     /// (wrong client or response type, no S256 challenge, no state).
     pub fn authorize(&self, authorize_url: &str) -> String {
         let url = reqwest::Url::parse(authorize_url)
@@ -448,7 +448,7 @@ impl TestIdp {
         callback.into()
     }
 
-    /// An ID token for `subject` as Rauthy issues one to [`WEB_CLIENT_ID`]
+    /// An ID token for `subject` as an OIDC server issues one to [`WEB_CLIENT_ID`]
     /// (`EdDSA`, `typ: JWT`). Edit the claims to test other cases.
     pub fn id_token_claims(&self, subject: &str, nonce: &str, sid: &str) -> serde_json::Value {
         let now = jsonwebtoken::get_current_timestamp();
