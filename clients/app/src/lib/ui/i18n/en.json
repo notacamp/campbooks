@@ -5,6 +5,7 @@
   "loading": "Loading",
   "kbd": {
     "then": "then",
+    "or": "or",
     "shortcut": "Shortcut: {{keys}}"
   },
   "toast": {
@@ -24,7 +25,8 @@
     "empty": "Nothing matches “{{query}}”",
     "results": "Commands",
     "ask": "Ask Campbooks: {{query}}",
-    "askGroup": "Ask"
+    "askGroup": "Ask or search",
+    "search": "Search conversations for “{{query}}”"
   },
   "shortcutSheet": {
     "title": "Keyboard shortcuts"
@@ -101,5 +103,10 @@
   },
   "howDecided": {
     "title": "How Campbooks decided"
+  },
+  "searchField": {
+    "clear": "Clear search",
+    "filters": "Search filters",
+    "remove": "Remove filter: {{filter}}"
   }
 }

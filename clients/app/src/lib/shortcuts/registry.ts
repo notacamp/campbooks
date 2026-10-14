@@ -25,6 +25,12 @@ export interface ShortcutDefinition {
   id: string;
   /** Default binding (see keys.ts for the grammar). */
   keys: string;
+  /**
+   * Other bindings that run it too (↓ next to J). Hints draw `keys` first;
+   * a screen can take only `keys` (see `ShortcutBindOptions.alternates`), so
+   * the other keys keep their native job there.
+   */
+  alternateKeys?: readonly string[];
   scope: ShortcutScope;
   group: ShortcutGroup;
   /** i18n key with its namespace, e.g. "shortcuts:nav.inbox". */
@@ -34,6 +40,20 @@ export interface ShortcutDefinition {
 }
 
 export type ShortcutHandler = (event: KeyboardEvent | null) => void;
+
+export interface ShortcutBindOptions {
+  /**
+   * Run on the definition's `alternateKeys` too. Default true; false leaves
+   * those keys to the browser (arrows scrolling an open message).
+   */
+  alternates?: boolean;
+}
+
+/** Every binding of a definition: its `keys`, then its `alternateKeys`. */
+export const bindingsOf = (definition: ShortcutDefinition): string[] => [
+  definition.keys,
+  ...(definition.alternateKeys ?? []),
+];
 
 export interface ShortcutConflict {
   a: string;
@@ -52,12 +72,17 @@ function scopesOverlap(a: ShortcutScope, b: ShortcutScope): boolean {
 /** Every pair of definitions that would fight over the same keys. */
 export function findConflicts(definitions: readonly ShortcutDefinition[]): ShortcutConflict[] {
   const conflicts: ShortcutConflict[] = [];
-  const normalized = definitions.map((definition) => ({
-    definition,
-    chords: normalizeBinding(definition.keys).split(" "),
-  }));
+  const normalized = definitions.flatMap((definition) =>
+    bindingsOf(definition).map((keys) => ({
+      definition,
+      chords: normalizeBinding(keys).split(" "),
+    })),
+  );
   for (const [index, first] of normalized.entries()) {
     for (const second of normalized.slice(index + 1)) {
+      if (first.definition === second.definition) {
+        continue;
+      }
       if (!scopesOverlap(first.definition.scope, second.definition.scope)) {
         continue;
       }
@@ -84,7 +109,7 @@ export function findConflicts(definitions: readonly ShortcutDefinition[]): Short
  */
 export class ShortcutRegistry {
   readonly #definitions = new Map<string, ShortcutDefinition>();
-  readonly #handlers = new Map<string, ShortcutHandler[]>();
+  readonly #handlers = new Map<string, { handler: ShortcutHandler; alternates: boolean }[]>();
   readonly #listeners = new Set<() => void>();
   #version = 0;
 
@@ -98,7 +123,9 @@ export class ShortcutRegistry {
       if (this.#definitions.has(definition.id)) {
         throw new Error(`Shortcut "${definition.id}" is already defined`);
       }
-      parseBinding(definition.keys);
+      for (const keys of bindingsOf(definition)) {
+        parseBinding(keys);
+      }
     }
     const conflicts = findConflicts([...this.#definitions.values(), ...definitions]);
     const [conflict] = conflicts;
@@ -122,17 +149,22 @@ export class ShortcutRegistry {
   }
 
   /** Binds a handler; the most recent binding wins. Returns the unbind function. */
-  bind(id: string, handler: ShortcutHandler): () => void {
+  bind(
+    id: string,
+    handler: ShortcutHandler,
+    { alternates = true }: ShortcutBindOptions = {},
+  ): () => void {
     if (!this.#definitions.has(id)) {
       throw new Error(`Unknown shortcut "${id}": define it before binding a handler`);
     }
+    const entry = { handler, alternates };
     const stack = this.#handlers.get(id) ?? [];
-    stack.push(handler);
+    stack.push(entry);
     this.#handlers.set(id, stack);
     this.#changed();
     return () => {
       const current = this.#handlers.get(id) ?? [];
-      const position = current.lastIndexOf(handler);
+      const position = current.lastIndexOf(entry);
       if (position !== -1) {
         current.splice(position, 1);
         this.#changed();
@@ -144,13 +176,23 @@ export class ShortcutRegistry {
     return (this.#handlers.get(id)?.length ?? 0) > 0;
   }
 
+  /** The bindings the active handler for `id` takes; none when nothing is bound. */
+  liveBindings(id: string): string[] {
+    const definition = this.#definitions.get(id);
+    const active = this.#handlers.get(id)?.at(-1);
+    if (definition === undefined || active === undefined) {
+      return [];
+    }
+    return active.alternates ? bindingsOf(definition) : [definition.keys];
+  }
+
   /** Runs the active handler for `id`. Returns false when nothing is bound. */
   run(id: string, event: KeyboardEvent | null = null): boolean {
-    const handler = this.#handlers.get(id)?.at(-1);
-    if (handler === undefined) {
+    const active = this.#handlers.get(id)?.at(-1);
+    if (active === undefined) {
       return false;
     }
-    handler(event);
+    active.handler(event);
     return true;
   }
 

@@ -14,8 +14,9 @@ export interface ConversationRowProps {
   time: string;
   /** ISO timestamp for the <time> element. */
   dateTime?: string | undefined;
-  subject: string;
-  snippet: string;
+  /** Text, or a {@link Highlight} of it when the row is a search hit. */
+  subject: ReactNode;
+  snippet: ReactNode;
   unread?: boolean | undefined;
   starred?: boolean | undefined;
   /** Messages in the conversation; shown from 2. */
@@ -32,6 +33,11 @@ export interface ConversationRowProps {
   selected?: boolean | undefined;
   /** Element id, so the list can scroll the cursor into view. */
   id?: string | undefined;
+  /**
+   * An option of a listbox (the search overlay): focus stays in the field,
+   * so the row leaves the tab order and `selected` becomes `aria-selected`.
+   */
+  option?: boolean | undefined;
   onSelect: () => void;
 }
 
@@ -52,6 +58,7 @@ export function ConversationRow({
   current = false,
   selected = false,
   id,
+  option = false,
   onSelect,
 }: ConversationRowProps) {
   const { t } = useTranslation("ui");
@@ -59,6 +66,9 @@ export function ConversationRow({
     <button
       type="button"
       id={id}
+      role={option ? "option" : undefined}
+      tabIndex={option ? -1 : undefined}
+      aria-selected={option ? selected : undefined}
       className={styles["row"]}
       data-unread={unread || undefined}
       data-selected={selected || undefined}

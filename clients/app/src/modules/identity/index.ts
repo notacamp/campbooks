@@ -4,5 +4,6 @@ export { useHeldGrants } from "./api/queries";
 export { AccountAdminPanel } from "./components/AccountAdminPanel/AccountAdminPanel";
 export { MailboxOffer } from "./components/MailboxOffer/MailboxOffer";
 export { MailboxStep } from "./components/MailboxStep/MailboxStep";
+export { SuspendedAccounts } from "./components/SuspendedAccounts/SuspendedAccounts";
 export { buildIdentityRoutes } from "./routes";
 export { IDENTITY_SHORTCUTS } from "./shortcuts";

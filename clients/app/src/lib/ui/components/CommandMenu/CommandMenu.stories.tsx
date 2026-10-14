@@ -36,7 +36,13 @@ const suggestions: Command[] = [
 ];
 
 /** What a screen binds shows up in the menu with its keys (here: the G-then-X places). */
-function Screen({ onAsk }: { onAsk?: (query: string) => void }) {
+function Screen({
+  onAsk,
+  onSearch,
+}: {
+  onAsk?: (query: string) => void;
+  onSearch?: (query: string) => void;
+}) {
   const [open, setOpen] = useState(true);
   const go = fn();
   useShortcut("nav.home", go);
@@ -63,6 +69,7 @@ function Screen({ onAsk }: { onAsk?: (query: string) => void }) {
         }}
         commands={suggestions}
         onAsk={onAsk}
+        onSearch={onSearch}
       />
     </div>
   );
@@ -95,6 +102,18 @@ export const Ask: Story = {
     await userEvent.type(await body.findByRole("combobox"), "Anything I still owe Brightloop?");
     await expect(
       body.getByRole("option", { name: /Ask Campbooks: Anything I still owe Brightloop\?/ }),
+    ).toBeVisible();
+  },
+};
+
+/** With a query, a row also searches conversations for it (the search overlay takes over). */
+export const SearchConversations: Story = {
+  render: () => <Screen onAsk={fn()} onSearch={fn()} />,
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await userEvent.type(await body.findByRole("combobox"), "lease");
+    await expect(
+      body.getByRole("option", { name: /Search conversations for “lease”/ }),
     ).toBeVisible();
   },
 };

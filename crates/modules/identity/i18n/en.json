@@ -30,6 +30,7 @@
     "client_needs_redirect": "A sign-in app needs at least one https or loopback return address.",
     "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
     "client_is_public": "This app signs people in and has no secret to rotate.",
-    "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name."
+    "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name.",
+    "too_many_accounts": "Ask about at most {{max}} accounts at a time."
   }
 }

@@ -2,6 +2,7 @@ import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { renderUi } from "../../../../../test/render";
+import { Highlight } from "../Highlight/Highlight";
 import { NavItem } from "../NavItem/NavItem";
 
 import { ConversationRow } from "./ConversationRow";
@@ -42,6 +43,50 @@ describe("ConversationRow", () => {
     );
 
     expect(screen.getByRole("button")).not.toHaveAttribute("aria-current");
+  });
+});
+
+describe("ConversationRow in search", () => {
+  it("shows highlighted subject and snippet", () => {
+    renderUi(
+      <ConversationRow
+        from="Ana Lopes"
+        time="Fri"
+        subject={
+          <Highlight
+            segments={[
+              { text: "Invoice ", hit: false },
+              { text: "October", hit: true },
+            ]}
+          />
+        }
+        snippet="plain"
+        onSelect={vi.fn()}
+      />,
+    );
+
+    const row = screen.getByRole("button", { name: /Ana Lopes/ });
+    expect(row.querySelector("mark")?.textContent).toBe("October");
+  });
+
+  it("is a listbox option that keeps focus in the field", () => {
+    renderUi(
+      <div role="listbox" aria-label="Results">
+        <ConversationRow
+          from="Ana Lopes"
+          time="Fri"
+          subject="Invoice"
+          snippet="x"
+          option
+          selected
+          onSelect={vi.fn()}
+        />
+      </div>,
+    );
+
+    const option = screen.getByRole("option", { name: /Ana Lopes/ });
+    expect(option).toHaveAttribute("aria-selected", "true");
+    expect(option).toHaveAttribute("tabindex", "-1");
   });
 });
 
