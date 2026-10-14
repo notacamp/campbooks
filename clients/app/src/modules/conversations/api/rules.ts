@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import { api, operationKey, unwrap, type Schema } from "~/lib/api";
 
@@ -47,18 +47,28 @@ export async function suggestRules(
   );
 }
 
-/** `conversations.dismiss_rule_suggestion`: "Just this one". */
-export async function dismissSuggestion(
+/**
+ * `conversations.dismiss_rule_suggestion`: "Just this one", for every likeness
+ * the offer showed (whichever was chosen, none comes back). Rejects when one
+ * could not be recorded.
+ */
+export async function dismissSuggestions(
   workspaceId: string,
   conversationId: string,
-  key: string,
+  keys: readonly string[],
 ): Promise<void> {
-  await api.POST(
-    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss",
-    {
-      params: { path: { workspace_id: workspaceId, conversation_id: conversationId } },
-      body: { key },
-    },
+  await Promise.all(
+    keys.map(async (key) => {
+      unwrap(
+        await api.POST(
+          "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss",
+          {
+            params: { path: { workspace_id: workspaceId, conversation_id: conversationId } },
+            body: { key },
+          },
+        ),
+      );
+    }),
   );
 }
 
@@ -91,37 +101,100 @@ export function useRules(workspaceId: string) {
   });
 }
 
-/** The rule operations, each refreshing the rules it touched. */
+/** What a rule needs to be made again as it was (Undo after removing it). */
+export interface RuleToMake {
+  inboxId: string;
+  conditions: RuleCondition[];
+  actions: RuleAction[];
+  fromConversation?: string | null | undefined;
+  applyToExisting?: boolean | undefined;
+  origin?: RuleView["origin"] | undefined;
+  originText?: string | null | undefined;
+  teachingId?: string | null | undefined;
+  state?: "active" | "proposed" | undefined;
+}
+
+/**
+ * `rule` as a rule to make again: same conditions, actions, origin, words and
+ * teaching, waiting for a yes if it was. `applyToExisting` when what it
+ * changed was put back too.
+ */
+export function remake(rule: RuleView, applyToExisting = false): RuleToMake {
+  return {
+    inboxId: rule.inbox_id,
+    conditions: rule.conditions,
+    actions: rule.actions,
+    fromConversation: rule.from_conversation_id,
+    applyToExisting,
+    origin: rule.origin,
+    originText: rule.origin_text,
+    teachingId: rule.teaching_id,
+    state: rule.state === "proposed" ? "proposed" : "active",
+  };
+}
+
+/** Whether this screen already removed `ruleId`: a stale Undo must not remove it twice. */
+function removedKey(workspaceId: string, ruleId: string) {
+  return ["rules", "removed", workspaceId, ruleId] as const;
+}
+
+/**
+ * Refresh the conversation lists and readers: rows carry what a rule did to
+ * them, which changes as its run goes or when it is removed.
+ */
+export async function refreshConversations(
+  queryClient: QueryClient,
+  workspaceId: string,
+): Promise<void> {
+  await Promise.all([
+    queryClient.invalidateQueries({
+      queryKey: operationKey("conversations.list", { workspace_id: workspaceId }),
+    }),
+    queryClient.invalidateQueries({
+      queryKey: operationKey("conversations.get", { workspace_id: workspaceId }),
+    }),
+  ]);
+}
+
+/** The rule operations, each refreshing the rules and conversations it touched. */
 export function useRuleMutations(workspaceId: string) {
   const queryClient = useQueryClient();
   const settle = async () => {
-    await queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) }),
+      // Every rule of the workspace: its state and its run changed.
+      queryClient.invalidateQueries({
+        queryKey: operationKey("conversations.get_rule", { workspace_id: workspaceId }),
+      }),
+      refreshConversations(queryClient, workspaceId),
+    ]);
   };
   const create = useMutation({
-    mutationFn: async ({
-      inboxId,
-      conditions,
-      actions,
-      fromConversation,
-      applyToExisting = true,
-    }: {
-      inboxId: string;
-      conditions: RuleCondition[];
-      actions: RuleAction[];
-      fromConversation?: string | undefined;
-      applyToExisting?: boolean | undefined;
-    }) =>
+    mutationFn: async (rule: RuleToMake) =>
       unwrap(
         await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules", {
-          params: { path: { workspace_id: workspaceId, inbox_id: inboxId } },
+          params: { path: { workspace_id: workspaceId, inbox_id: rule.inboxId } },
           body: {
-            conditions,
-            actions,
-            apply_to_existing: applyToExisting,
-            ...(fromConversation === undefined ? {} : { from_conversation_id: fromConversation }),
+            conditions: rule.conditions,
+            actions: rule.actions,
+            apply_to_existing: rule.applyToExisting ?? true,
+            ...(rule.fromConversation === undefined || rule.fromConversation === null
+              ? {}
+              : { from_conversation_id: rule.fromConversation }),
+            ...(rule.origin === undefined ? {} : { origin: rule.origin }),
+            ...(rule.originText === undefined || rule.originText === null
+              ? {}
+              : { origin_text: rule.originText }),
+            ...(rule.teachingId === undefined || rule.teachingId === null
+              ? {}
+              : { teaching_id: rule.teachingId }),
+            ...(rule.state === undefined ? {} : { state: rule.state }),
           },
         }),
       ),
+    onSuccess: ({ rule }) => {
+      queryClient.removeQueries({ queryKey: removedKey(workspaceId, rule.id) });
+    },
     onSettled: settle,
   });
   const remove = useMutation({
@@ -131,6 +204,9 @@ export function useRuleMutations(workspaceId: string) {
           params: { path: { workspace_id: workspaceId, rule_id: ruleId }, query: { restore } },
         }),
       ),
+    onSuccess: (rule) => {
+      queryClient.setQueryData(removedKey(workspaceId, rule.id), true);
+    },
     onSettled: settle,
   });
   const confirm = useMutation({
@@ -143,5 +219,8 @@ export function useRuleMutations(workspaceId: string) {
       ),
     onSettled: settle,
   });
-  return { create, remove, confirm };
+  /** Whether `ruleId` was removed from this screen already. */
+  const wasRemoved = (ruleId: string) =>
+    queryClient.getQueryData<boolean>(removedKey(workspaceId, ruleId)) === true;
+  return { create, remove, confirm, wasRemoved };
 }

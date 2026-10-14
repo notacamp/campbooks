@@ -158,46 +158,48 @@ export function taughtStream(t: Translate, action: TaughtAction): string {
   return action.kind === "move_to_stream" ? streamName(t, action.stream) : "";
 }
 
-/** What a rule did to a conversation, for its row ("moved", "archived"…). */
-function markKind(actions: readonly RuleAction[]): "move" | "archive" | "read" | "clear" {
+/** What a rule did to a conversation, said on its row: the first action's line. */
+function markKey(actions: readonly RuleAction[]): string {
   const [first] = actions;
   switch (first?.action) {
+    case undefined:
+    case "move_to_stream": {
+      return "move";
+    }
     case "archive": {
       return "archive";
     }
     case "mark_read": {
       return "read";
     }
-    case "needs_reply":
-    case "asks_action":
-    case "surface": {
-      return "clear";
+    case "add_label": {
+      return "label";
     }
-    default: {
-      return "move";
+    case "needs_reply": {
+      return first.value ? "needsReply" : "noReply";
+    }
+    case "asks_action": {
+      return first.value ? "asksAction" : "noAction";
+    }
+    case "surface": {
+      return first.value === "always" ? "always" : "never";
     }
   }
 }
 
-/** Where a rule came from, for the rules list. */
-export function originLine(t: Translate, rule: RuleView): string {
-  switch (rule.origin) {
-    case "action": {
-      return t("rules.origin.action");
-    }
-    case "onboarding": {
-      return t("rules.origin.onboarding");
-    }
-    case "instruction": {
-      return t("rules.origin.instruction", { text: rule.origin_text ?? "" });
-    }
-    case "correction": {
-      return t("rules.origin.correction");
-    }
-    case "suggestion": {
-      return t("rules.origin.suggestion");
-    }
+/** Who taught a rule, as the rules list says it. */
+export type RuleAuthor = { kind: "you" } | { kind: "named"; name: string } | { kind: "someone" };
+
+/** Where a rule came from and who taught it, for the rules list. */
+export function originLine(t: Translate, rule: RuleView, author: RuleAuthor): string {
+  if (rule.origin === "suggestion") {
+    return t("rules.origin.suggestion");
   }
+  const options = {
+    name: author.kind === "named" ? author.name : "",
+    text: rule.origin_text ?? "",
+  };
+  return t(`rules.origin.${rule.origin}.${author.kind}`, options);
 }
 
 /** The stream a rule moves mail to, if it moves mail. */
@@ -208,8 +210,17 @@ export function ruleStream(actions: readonly RuleAction[]): Stream | undefined {
 
 /** A handled row's line: "Campbooks moved this · like 1,000 others from …". */
 export function ruleLine(t: Translate, mark: RuleMark, locale: string): string {
-  return t(`rules.row.${markKind(mark.actions)}`, {
-    count: new Intl.NumberFormat(locale).format(Math.max(0, mark.applied_count - 1)),
-    from: likenessShort(t, mark.conditions),
+  const line = t(`rules.row.${markKey(mark.actions)}`);
+  const others = Math.max(0, mark.applied_count - 1);
+  if (others === 0) {
+    return line;
+  }
+  return t("rules.row.withOthers", {
+    line,
+    others: t("rules.row.others", {
+      count: others,
+      n: new Intl.NumberFormat(locale).format(others),
+      from: likenessShort(t, mark.conditions),
+    }),
   });
 }

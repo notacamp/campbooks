@@ -287,7 +287,7 @@
       "noReply": "nunca necesitan respuesta",
       "asksAction": "piden algo",
       "noAction": "nunca piden nada",
-      "always": "siempre a la vista",
+      "always": "siempre en la bandeja de entrada",
       "never": "nunca te necesitan"
     },
     "likeness": {
@@ -298,71 +298,147 @@
     "offer": {
       "which": "Qué correos",
       "question": {
-        "move": "¿Mover los {{count}} como este a {{stream}}, y también los nuevos?",
-        "archive": "¿Archivar los {{count}} como este, y también los nuevos?",
-        "read": "¿Marcar como leídos los {{count}} como este, y también los nuevos?",
-        "clear": "¿Decir que los {{count}} como este nunca te necesitan, y también los nuevos?"
+        "move_one": "¿Mover el otro como este a {{stream}}, y también los nuevos?",
+        "move_other": "¿Mover los {{n}} como este a {{stream}}, y también los nuevos?",
+        "archive_one": "¿Archivar el otro como este, y también los nuevos?",
+        "archive_other": "¿Archivar los {{n}} como este, y también los nuevos?",
+        "read_one": "¿Marcar como leído el otro como este, y también los nuevos?",
+        "read_other": "¿Marcar como leídos los {{n}} como este, y también los nuevos?",
+        "clear_one": "¿Decir que el otro como este nunca te necesita, y también los nuevos?",
+        "clear_other": "¿Decir que los {{n}} como este nunca te necesitan, y también los nuevos?"
       },
       "accept": {
-        "move": "Mover los {{count}}",
-        "archive": "Archivar los {{count}}",
-        "read": "Marcar los {{count}} como leídos",
-        "clear": "Quitar los {{count}}"
+        "move_one": "Moverlo",
+        "move_other": "Mover los {{n}}",
+        "archive_one": "Archivarlo",
+        "archive_other": "Archivar los {{n}}",
+        "read_one": "Marcarlo como leído",
+        "read_other": "Marcar los {{n}} como leídos",
+        "clear_one": "Quitarlo",
+        "clear_other": "Quitar los {{n}}"
       },
       "justThis": "Solo este",
       "safe": "Ninguno parece sospechoso.",
-      "suspicious": "{{count}} que parecen sospechosos se quedan donde están.",
       "shared": "Para todos en {{inbox}}.",
-      "more": "y {{count}} más",
-      "foot": "Se convierte en una regla. Puedes deshacerla o quitarla más tarde."
+      "more": "y {{n}} más",
+      "foot": "Se convierte en una regla. Puedes deshacerla o quitarla más tarde.",
+      "questionAtLeast": {
+        "move": "¿Mover todos los correos como este (al menos {{n}}) a {{stream}}, y también los nuevos?",
+        "archive": "¿Archivar todos los correos como este (al menos {{n}}), y también los nuevos?",
+        "read": "¿Marcar como leídos todos los correos como este (al menos {{n}}), y también los nuevos?",
+        "clear": "¿Decir que todos los correos como este (al menos {{n}}) nunca te necesitan, y también los nuevos?"
+      },
+      "choose": {
+        "move": "¿Mover los correos como este a {{stream}}, y también los nuevos? Elige cuáles.",
+        "archive": "¿Archivar los correos como este, y también los nuevos? Elige cuáles.",
+        "read": "¿Marcar como leídos los correos como este, y también los nuevos? Elige cuáles.",
+        "clear": "¿Decir que los correos como este nunca te necesitan, y también los nuevos? Elige cuáles."
+      },
+      "acceptAtLeast": {
+        "move": "Moverlos todos",
+        "archive": "Archivarlos todos",
+        "read": "Marcarlos todos como leídos",
+        "clear": "Quitarlos todos"
+      },
+      "suspicious_one": "{{n}} que parece sospechoso se queda donde está.",
+      "suspicious_other": "{{n}} que parecen sospechosos se quedan donde están.",
+      "dismissFailed": "Campbooks no pudo guardar «Solo este», así que puede que vuelva a ofrecerlo.",
+      "partial": "Campbooks solo miró parte de esta bandeja, así que puede haber más."
     },
     "run": {
       "working": {
-        "move": "Moviendo {{count}} a {{stream}}",
-        "archive": "Archivando {{count}}",
-        "read": "Marcando {{count}} como leídos",
-        "clear": "Quitando {{count}}",
-        "revert": "Devolviendo {{count}}"
+        "move_one": "Moviendo {{n}} a {{stream}}",
+        "move_other": "Moviendo {{n}} a {{stream}}",
+        "archive_one": "Archivando {{n}}",
+        "archive_other": "Archivando {{n}}",
+        "read_one": "Marcando {{n}} como leído",
+        "read_other": "Marcando {{n}} como leídos",
+        "clear_one": "Quitando {{n}}",
+        "clear_other": "Quitando {{n}}",
+        "revert_one": "Devolviendo {{n}}",
+        "revert_other": "Devolviendo {{n}}"
       },
-      "progress": "{{done}} de {{total}} hechos",
+      "progress": "{{done}} de {{total}} revisados",
       "keepWorking": "Puedes seguir trabajando. Tu proveedor de correo se pone al día en segundo plano.",
       "done": {
-        "move": "{{count}} movidos a {{stream}}. Los nuevos también irán allí.",
-        "archive": "{{count}} archivados. Los nuevos también se archivarán.",
-        "read": "{{count}} marcados como leídos. Los nuevos también.",
-        "clear": "{{count}} quitados. Los nuevos no te necesitarán.",
-        "revert": "{{count}} devueltos."
+        "move_one": "{{n}} movido a {{stream}}. Los nuevos también irán allí.",
+        "move_other": "{{n}} movidos a {{stream}}. Los nuevos también irán allí.",
+        "archive_one": "{{n}} archivado. Los nuevos también se archivarán.",
+        "archive_other": "{{n}} archivados. Los nuevos también se archivarán.",
+        "read_one": "{{n}} marcado como leído. Los nuevos también.",
+        "read_other": "{{n}} marcados como leídos. Los nuevos también.",
+        "clear_one": "{{n}} quitado. Los nuevos no te necesitarán.",
+        "clear_other": "{{n}} quitados. Los nuevos no te necesitarán.",
+        "revert_one": "{{n}} devuelto. La regla está quitada.",
+        "revert_other": "{{n}} devueltos. La regla está quitada."
       },
-      "leftAlone": "{{count}} se quedaron como estaban: parecen sospechosos.",
       "undoAll": "Deshacer todo",
       "close": "Cerrar",
       "failed": "Campbooks no pudo crear esa regla. No ha cambiado nada.",
       "finding": "Buscando todos los correos como este",
-      "counting": "Contando…"
+      "counting": "Contando…",
+      "undoing": "Devolviendo lo que cambió la regla…",
+      "stopped_one": "Se detuvo tras cambiar {{n}}. La regla ya no actúa.",
+      "stopped_other": "Se detuvo tras cambiar {{n}}. La regla ya no actúa.",
+      "stoppedNone": "Se detuvo antes de cambiar nada. La regla ya no actúa.",
+      "removed": "Esta regla se quitó, así que ya no actúa.",
+      "leftAlone_one": "{{n}} se quedó como estaba: parece sospechoso.",
+      "leftAlone_other": "{{n}} se quedaron como estaban: parecen sospechosos.",
+      "undoFailed": "Campbooks no pudo deshacer esa regla. No se devolvió nada.",
+      "loadFailed": "Campbooks no pudo cargar el progreso de esta regla."
     },
     "toast": {
       "made": "Nueva regla · {{rule}}",
-      "stopped": "Regla quitada · {{rule}}"
+      "stopped": "Regla quitada · {{rule}}",
+      "kept": "Regla mantenida · {{rule}}",
+      "declined": "Regla rechazada · {{rule}}",
+      "failed": "Campbooks no pudo cambiar esa regla. No ha cambiado nada."
     },
     "row": {
-      "move": "Campbooks movió este · como otros {{count}} {{from}}",
-      "archive": "Campbooks archivó este · como otros {{count}} {{from}}",
-      "read": "Campbooks marcó este como leído · como otros {{count}} {{from}}",
-      "clear": "Campbooks quitó este · como otros {{count}} {{from}}"
+      "move": "Campbooks movió este",
+      "archive": "Campbooks archivó este",
+      "read": "Campbooks marcó este como leído",
+      "label": "Campbooks etiquetó este",
+      "needsReply": "Según Campbooks, este necesita respuesta",
+      "noReply": "Según Campbooks, este no necesita respuesta",
+      "asksAction": "Según Campbooks, este pide algo",
+      "noAction": "Según Campbooks, este no pide nada",
+      "always": "Campbooks mantiene este en la bandeja de entrada",
+      "never": "Según Campbooks, este nunca te necesita",
+      "withOthers": "{{line}} · {{others}}",
+      "others_one": "como otro {{from}}",
+      "others_other": "como otros {{n}} {{from}}"
     },
     "reader": {
       "stop": "Dejar de hacerlo"
     },
     "exception": {
-      "question": "Has devuelto {{count}} este mes. ¿Mantener la regla «{{rule}}»?",
       "remove": "Quitar la regla",
-      "keep": "Mantenerla"
+      "keep": "Mantenerla",
+      "question_one": "Devuelto una vez en los últimos 30 días. ¿Mantener la regla «{{rule}}»?",
+      "question_other": "Devuelto {{n}} veces en los últimos 30 días. ¿Mantener la regla «{{rule}}»?"
     },
     "origin": {
-      "action": "Lo enseñaste al ocuparte de un correo",
-      "onboarding": "De tus respuestas al configurar",
-      "instruction": "De tus propias palabras: «{{text}}»",
-      "correction": "Sugerida a partir de tus correcciones",
+      "action": {
+        "you": "Lo enseñaste al ocuparte de un correo",
+        "named": "{{name}} lo enseñó al ocuparse de un correo",
+        "someone": "Se enseñó al ocuparse de un correo"
+      },
+      "onboarding": {
+        "you": "De tus respuestas al configurar",
+        "named": "De las respuestas de {{name}} al configurar",
+        "someone": "De las respuestas al configurar"
+      },
+      "instruction": {
+        "you": "De tus propias palabras: «{{text}}»",
+        "named": "De las palabras de {{name}}: «{{text}}»",
+        "someone": "De las palabras de un miembro: «{{text}}»"
+      },
+      "correction": {
+        "you": "Sugerida a partir de tus correcciones",
+        "named": "Sugerida a partir de las correcciones de {{name}}",
+        "someone": "Sugerida a partir de correcciones en esta bandeja"
+      },
       "suggestion": "Sugerida por Campbooks"
     },
     "list": {
@@ -372,16 +448,23 @@
       "no": "No",
       "remove": "Quitar",
       "removeQuestion": "¿Quitar esta regla? Los correos nuevos dejan de cambiar por ella.",
-      "putBack": "Devolver también los {{count}} que cambió",
       "confirmRemove": "Quitar",
       "cancel": "Mantener",
       "forEveryone": "Para todos",
       "paused": "En pausa: quien la enseñó ya no puede cambiar esta bandeja de entrada",
-      "applied": "{{count}} hasta ahora",
-      "exceptions": "{{count}} que devolviste",
       "empty": "Aún no hay reglas. Cuando mueves, archivas o quitas un correo, Campbooks se ofrece a hacer lo mismo con los parecidos.",
       "leave": "Dejarlos como están",
-      "changedMail": "Los correos que cambió"
+      "changedMail": "Los correos que cambió",
+      "applied_one": "{{n}} hasta ahora",
+      "applied_other": "{{n}} hasta ahora",
+      "exceptions_one": "{{n}} devuelto en los últimos 30 días",
+      "exceptions_other": "{{n}} devueltos en los últimos 30 días",
+      "putBack_one": "Devolver también el que cambió",
+      "putBack_other": "Devolver también los {{n}} que cambió",
+      "lastActed": "Última vez {{time}}",
+      "failed": "No se pudieron cargar las reglas",
+      "retry": "Reintentar",
+      "inbox": "Una bandeja de entrada"
     }
   }
 }

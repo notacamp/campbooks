@@ -16,3 +16,6 @@ export const Partway: Story = {};
 export const Starting: Story = { args: { value: 0, children: "Starting" } };
 
 export const Finished: Story = { args: { value: 1000, children: "1,000 of 1,000 done" } };
+
+/** The total is not known yet (the run is still counting). */
+export const Indeterminate: Story = { args: { value: 0, max: 0, children: "Counting…" } };

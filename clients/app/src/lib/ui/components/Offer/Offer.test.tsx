@@ -37,6 +37,18 @@ describe("Offer and Progress", () => {
     expect(screen.getByText("340 of 1,000 done")).toBeInTheDocument();
   });
 
+  it("claims no figure while the total is unknown, and announces its line", () => {
+    renderUi(
+      <Progress label="Finding them" value={0} max={0}>
+        Counting…
+      </Progress>,
+    );
+    const bar = screen.getByRole("progressbar", { name: "Finding them" });
+    expect(bar).not.toHaveAttribute("aria-valuenow");
+    expect(bar).not.toHaveAttribute("aria-valuemax");
+    expect(screen.getByText("Counting…")).toHaveAttribute("aria-live", "polite");
+  });
+
   it("never runs past the end", () => {
     renderUi(<Progress label="Putting back" value={12} max={10} />);
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "10");

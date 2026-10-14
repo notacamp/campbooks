@@ -287,7 +287,7 @@
       "noReply": "nunca precisam de resposta",
       "asksAction": "pedem alguma coisa",
       "noAction": "nunca pedem nada",
-      "always": "sempre visíveis",
+      "always": "sempre mantidas na caixa de entrada",
       "never": "nunca precisam de si"
     },
     "likeness": {
@@ -298,71 +298,147 @@
     "offer": {
       "which": "Que mensagens",
       "question": {
-        "move": "Mover todas as {{count}} como esta para {{stream}}, e as novas também?",
-        "archive": "Arquivar todas as {{count}} como esta, e as novas também?",
-        "read": "Marcar como lidas todas as {{count}} como esta, e as novas também?",
-        "clear": "Dizer que todas as {{count}} como esta nunca precisam de si, e as novas também?"
+        "move_one": "Mover a outra como esta para {{stream}}, e as novas também?",
+        "move_other": "Mover todas as {{n}} como esta para {{stream}}, e as novas também?",
+        "archive_one": "Arquivar a outra como esta, e as novas também?",
+        "archive_other": "Arquivar todas as {{n}} como esta, e as novas também?",
+        "read_one": "Marcar como lida a outra como esta, e as novas também?",
+        "read_other": "Marcar como lidas todas as {{n}} como esta, e as novas também?",
+        "clear_one": "Dizer que a outra como esta nunca precisa de si, e as novas também?",
+        "clear_other": "Dizer que todas as {{n}} como esta nunca precisam de si, e as novas também?"
       },
       "accept": {
-        "move": "Mover as {{count}}",
-        "archive": "Arquivar as {{count}}",
-        "read": "Marcar as {{count}} como lidas",
-        "clear": "Limpar as {{count}}"
+        "move_one": "Movê-la",
+        "move_other": "Mover as {{n}}",
+        "archive_one": "Arquivá-la",
+        "archive_other": "Arquivar as {{n}}",
+        "read_one": "Marcá-la como lida",
+        "read_other": "Marcar as {{n}} como lidas",
+        "clear_one": "Limpá-la",
+        "clear_other": "Limpar as {{n}}"
       },
       "justThis": "Só esta",
       "safe": "Nenhuma parece suspeita.",
-      "suspicious": "{{count}} que parecem suspeitas ficam onde estão.",
       "shared": "Para todos em {{inbox}}.",
-      "more": "e mais {{count}}",
-      "foot": "Fica uma regra. Pode anulá-la, ou removê-la mais tarde."
+      "more": "e mais {{n}}",
+      "foot": "Fica uma regra. Pode anulá-la, ou removê-la mais tarde.",
+      "questionAtLeast": {
+        "move": "Mover todas as mensagens como esta (pelo menos {{n}}) para {{stream}}, e as novas também?",
+        "archive": "Arquivar todas as mensagens como esta (pelo menos {{n}}), e as novas também?",
+        "read": "Marcar como lidas todas as mensagens como esta (pelo menos {{n}}), e as novas também?",
+        "clear": "Dizer que todas as mensagens como esta (pelo menos {{n}}) nunca precisam de si, e as novas também?"
+      },
+      "choose": {
+        "move": "Mover as mensagens como esta para {{stream}}, e as novas também? Escolha quais.",
+        "archive": "Arquivar as mensagens como esta, e as novas também? Escolha quais.",
+        "read": "Marcar como lidas as mensagens como esta, e as novas também? Escolha quais.",
+        "clear": "Dizer que as mensagens como esta nunca precisam de si, e as novas também? Escolha quais."
+      },
+      "acceptAtLeast": {
+        "move": "Movê-las todas",
+        "archive": "Arquivá-las todas",
+        "read": "Marcá-las todas como lidas",
+        "clear": "Limpá-las todas"
+      },
+      "suspicious_one": "{{n}} que parece suspeita fica onde está.",
+      "suspicious_other": "{{n}} que parecem suspeitas ficam onde estão.",
+      "dismissFailed": "O Campbooks não conseguiu registar «Só esta», por isso pode voltar a sugeri-lo.",
+      "partial": "O Campbooks só viu parte desta caixa, por isso pode haver mais."
     },
     "run": {
       "working": {
-        "move": "A mover {{count}} para {{stream}}",
-        "archive": "A arquivar {{count}}",
-        "read": "A marcar {{count}} como lidas",
-        "clear": "A limpar {{count}}",
-        "revert": "A repor {{count}}"
+        "move_one": "A mover {{n}} para {{stream}}",
+        "move_other": "A mover {{n}} para {{stream}}",
+        "archive_one": "A arquivar {{n}}",
+        "archive_other": "A arquivar {{n}}",
+        "read_one": "A marcar {{n}} como lida",
+        "read_other": "A marcar {{n}} como lidas",
+        "clear_one": "A limpar {{n}}",
+        "clear_other": "A limpar {{n}}",
+        "revert_one": "A repor {{n}}",
+        "revert_other": "A repor {{n}}"
       },
-      "progress": "{{done}} de {{total}} feitas",
+      "progress": "{{done}} de {{total}} vistas",
       "keepWorking": "Pode continuar a trabalhar. O seu fornecedor de correio acompanha em segundo plano.",
       "done": {
-        "move": "{{count}} movidas para {{stream}}. As novas também vão para lá.",
-        "archive": "{{count}} arquivadas. As novas também serão arquivadas.",
-        "read": "{{count}} marcadas como lidas. As novas também serão.",
-        "clear": "{{count}} limpas. As novas não vão precisar de si.",
-        "revert": "{{count}} repostas."
+        "move_one": "{{n}} movida para {{stream}}. As novas também vão para lá.",
+        "move_other": "{{n}} movidas para {{stream}}. As novas também vão para lá.",
+        "archive_one": "{{n}} arquivada. As novas também serão arquivadas.",
+        "archive_other": "{{n}} arquivadas. As novas também serão arquivadas.",
+        "read_one": "{{n}} marcada como lida. As novas também serão.",
+        "read_other": "{{n}} marcadas como lidas. As novas também serão.",
+        "clear_one": "{{n}} limpa. As novas não vão precisar de si.",
+        "clear_other": "{{n}} limpas. As novas não vão precisar de si.",
+        "revert_one": "{{n}} reposta. A regra foi removida.",
+        "revert_other": "{{n}} repostas. A regra foi removida."
       },
-      "leftAlone": "{{count}} ficaram como estavam: parecem suspeitas.",
       "undoAll": "Anular tudo",
       "close": "Fechar",
       "failed": "O Campbooks não conseguiu criar essa regra. Nada mudou.",
       "finding": "A procurar todas as mensagens como esta",
-      "counting": "A contar…"
+      "counting": "A contar…",
+      "undoing": "A repor o que a regra alterou…",
+      "stopped_one": "Parou depois de alterar {{n}}. A regra já não age.",
+      "stopped_other": "Parou depois de alterar {{n}}. A regra já não age.",
+      "stoppedNone": "Parou antes de alterar alguma coisa. A regra já não age.",
+      "removed": "Esta regra foi removida, por isso já não age.",
+      "leftAlone_one": "{{n}} ficou como estava: parece suspeita.",
+      "leftAlone_other": "{{n}} ficaram como estavam: parecem suspeitas.",
+      "undoFailed": "O Campbooks não conseguiu anular essa regra. Nada foi reposto.",
+      "loadFailed": "O Campbooks não conseguiu carregar o progresso desta regra."
     },
     "toast": {
       "made": "Nova regra · {{rule}}",
-      "stopped": "Regra removida · {{rule}}"
+      "stopped": "Regra removida · {{rule}}",
+      "kept": "Regra mantida · {{rule}}",
+      "declined": "Regra recusada · {{rule}}",
+      "failed": "O Campbooks não conseguiu alterar essa regra. Nada mudou."
     },
     "row": {
-      "move": "O Campbooks moveu esta · como {{count}} outras {{from}}",
-      "archive": "O Campbooks arquivou esta · como {{count}} outras {{from}}",
-      "read": "O Campbooks marcou esta como lida · como {{count}} outras {{from}}",
-      "clear": "O Campbooks limpou esta · como {{count}} outras {{from}}"
+      "move": "O Campbooks moveu esta",
+      "archive": "O Campbooks arquivou esta",
+      "read": "O Campbooks marcou esta como lida",
+      "label": "O Campbooks etiquetou esta",
+      "needsReply": "Para o Campbooks, esta precisa de resposta",
+      "noReply": "Para o Campbooks, esta não precisa de resposta",
+      "asksAction": "Para o Campbooks, esta pede alguma coisa",
+      "noAction": "Para o Campbooks, esta não pede nada",
+      "always": "O Campbooks mantém esta na caixa de entrada",
+      "never": "Para o Campbooks, esta nunca precisa de si",
+      "withOthers": "{{line}} · {{others}}",
+      "others_one": "como outra {{from}}",
+      "others_other": "como {{n}} outras {{from}}"
     },
     "reader": {
       "stop": "Deixar de fazer isto"
     },
     "exception": {
-      "question": "Repôs {{count}} este mês. Manter a regra «{{rule}}»?",
       "remove": "Remover a regra",
-      "keep": "Manter"
+      "keep": "Manter",
+      "question_one": "Reposta uma vez nos últimos 30 dias. Manter a regra «{{rule}}»?",
+      "question_other": "Reposta {{n}} vezes nos últimos 30 dias. Manter a regra «{{rule}}»?"
     },
     "origin": {
-      "action": "Ensinou isto quando tratou de uma mensagem",
-      "onboarding": "Das suas respostas na configuração",
-      "instruction": "Das suas palavras: «{{text}}»",
-      "correction": "Sugerida a partir das suas correções",
+      "action": {
+        "you": "Ensinou isto quando tratou de uma mensagem",
+        "named": "{{name}} ensinou isto ao tratar de uma mensagem",
+        "someone": "Ensinada ao tratar de uma mensagem"
+      },
+      "onboarding": {
+        "you": "Das suas respostas na configuração",
+        "named": "Das respostas de {{name}} na configuração",
+        "someone": "Das respostas na configuração"
+      },
+      "instruction": {
+        "you": "Das suas palavras: «{{text}}»",
+        "named": "Das palavras de {{name}}: «{{text}}»",
+        "someone": "Das palavras de um membro: «{{text}}»"
+      },
+      "correction": {
+        "you": "Sugerida a partir das suas correções",
+        "named": "Sugerida a partir das correções de {{name}}",
+        "someone": "Sugerida a partir de correções nesta caixa"
+      },
       "suggestion": "Sugerida pelo Campbooks"
     },
     "list": {
@@ -372,16 +448,23 @@
       "no": "Não",
       "remove": "Remover",
       "removeQuestion": "Remover esta regra? As mensagens novas deixam de ser alteradas por ela.",
-      "putBack": "Repor também as {{count}} que alterou",
       "confirmRemove": "Remover",
       "cancel": "Manter",
       "forEveryone": "Para todos",
       "paused": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
-      "applied": "{{count}} até agora",
-      "exceptions": "{{count}} que repôs",
       "empty": "Ainda não há regras. Quando move, arquiva ou limpa uma mensagem, o Campbooks oferece-se para fazer o mesmo às parecidas.",
       "leave": "Deixá-las como estão",
-      "changedMail": "As mensagens que alterou"
+      "changedMail": "As mensagens que alterou",
+      "applied_one": "{{n}} até agora",
+      "applied_other": "{{n}} até agora",
+      "exceptions_one": "{{n}} reposta nos últimos 30 dias",
+      "exceptions_other": "{{n}} repostas nos últimos 30 dias",
+      "putBack_one": "Repor também a que alterou",
+      "putBack_other": "Repor também as {{n}} que alterou",
+      "lastActed": "Última vez {{time}}",
+      "failed": "Não foi possível carregar as regras",
+      "retry": "Tentar de novo",
+      "inbox": "Uma caixa de entrada"
     }
   }
 }

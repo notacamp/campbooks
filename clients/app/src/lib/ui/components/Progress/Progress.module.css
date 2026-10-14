@@ -27,8 +27,31 @@
   color: var(--text-secondary);
 }
 
+/* Not known yet: a short segment sweeps along the track. */
+.indeterminate .fill {
+  inline-size: 30%;
+  animation: sweep calc(var(--duration-slow) * 5) var(--ease-out) infinite;
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(340%);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .fill {
     transition: none;
+  }
+
+  /* Still: a dim full track says "working" without moving. */
+  .indeterminate .fill {
+    inline-size: 100%;
+    opacity: var(--opacity-dim);
+    animation: none;
   }
 }

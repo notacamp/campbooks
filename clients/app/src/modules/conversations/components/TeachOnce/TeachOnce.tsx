@@ -1,18 +1,27 @@
-import { createContext, use, useCallback, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  use,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
+import { useQueryClient } from "@tanstack/react-query";
 
-import { useShortcut } from "~/lib/shortcuts";
-import { Button, ChoiceCards, Line, Offer, Progress, useUndoToast } from "~/lib/ui";
+import { isTypingTarget, useShortcut } from "~/lib/shortcuts";
+import { Button, ChoiceCards, Line, Offer, Progress, useUndoToast, VisuallyHidden } from "~/lib/ui";
 
 import { useInboxes, type ConversationSummary } from "../../api/queries";
 import {
-  dismissSuggestion,
+  dismissSuggestions,
+  refreshConversations,
   suggestRules,
   useRule,
-  useRuleMutations,
   type RuleException,
   type RuleSuggestions,
-  type RuleView,
   type TaughtAction,
 } from "../../api/rules";
 import { listTime, streamName, type Translate } from "../../model";
@@ -24,8 +33,16 @@ import {
   taughtStream,
 } from "../../rules-text";
 
+import { useRuleActions } from "./use-rule-actions";
+
 /** Sample subjects an offer shows. */
 const SAMPLES = 3;
+
+/** What the offer said it would change: the run's title says the same number. */
+interface Expected {
+  count: number;
+  complete: boolean;
+}
 
 type Step =
   | { step: "idle" }
@@ -36,7 +53,13 @@ type Step =
       offer: RuleSuggestions;
       chosen: number | null;
     }
-  | { step: "running"; ruleId: string; action: TaughtAction; reverting: boolean }
+  | {
+      step: "running";
+      ruleId: string;
+      action: TaughtAction;
+      expected: Expected;
+      reverting: boolean;
+    }
   | { step: "question"; ruleId: string; recent: number };
 
 export interface TeachOnceApi {
@@ -44,6 +67,11 @@ export interface TeachOnceApi {
   after: (conversation: ConversationSummary, action: TaughtAction) => void;
   /** A member changed back what a rule did: ask about the rule at the second time. */
   exception: (exception: RuleException | null | undefined) => void;
+  /**
+   * An offer or a question is up and holds the choice keys (1): screens
+   * behind it leave theirs unbound and unhinted meanwhile.
+   */
+  offering: boolean;
 }
 
 const TeachOnceContext = createContext<TeachOnceApi | null>(null);
@@ -67,6 +95,7 @@ export function TeachOnceProvider({
   children: ReactNode;
 }) {
   const [state, setState] = useState<Step>({ step: "idle" });
+  const [announcement, setAnnouncement] = useState("");
   const asked = useRef(0);
 
   const after = useCallback(
@@ -99,75 +128,146 @@ export function TeachOnceProvider({
     }
   }, []);
 
-  const api = useMemo<TeachOnceApi>(() => ({ after, exception }), [after, exception]);
+  const offering = state.step === "asking" || state.step === "question";
+  const api = useMemo<TeachOnceApi>(
+    () => ({ after, exception, offering }),
+    [after, exception, offering],
+  );
 
   return (
     <TeachOnceContext value={api}>
       {children}
       {state.step === "idle" ? null : (
-        <TeachOffer workspaceId={workspaceId} state={state} setState={setState} />
+        <TeachOffer
+          workspaceId={workspaceId}
+          state={state}
+          setState={setState}
+          announce={setAnnouncement}
+        />
       )}
+      {/* Mounted for good, so what the offer says is read out as it changes. */}
+      <VisuallyHidden>
+        <span role="status" aria-live="polite">
+          {announcement}
+        </span>
+      </VisuallyHidden>
     </TeachOnceContext>
   );
+}
+
+interface StepProps<S extends Step["step"]> {
+  workspaceId: string;
+  state: Extract<Step, { step: S }>;
+  setState: (next: Step) => void;
+  announce: (text: string) => void;
+  /** Whether focus is inside the offer: Esc is the offer's only then. */
+  focused: boolean;
 }
 
 function TeachOffer({
   workspaceId,
   state,
   setState,
+  announce,
 }: {
   workspaceId: string;
   state: Exclude<Step, { step: "idle" }>;
   setState: (next: Step) => void;
+  announce: (text: string) => void;
 }) {
-  switch (state.step) {
-    case "asking": {
-      return <Asking workspaceId={workspaceId} state={state} setState={setState} />;
+  const ref = useRef<HTMLDivElement>(null);
+  const [focused, setFocused] = useState(false);
+  // When the offer appears or changes step, bring focus to its first action,
+  // unless the member is typing somewhere (never take focus from a composer).
+  useEffect(() => {
+    const active = document.activeElement;
+    const within = ref.current?.contains(active) === true;
+    if (isTypingTarget(active) && !within) {
+      return;
     }
-    case "running": {
-      return <Running workspaceId={workspaceId} state={state} setState={setState} />;
-    }
-    case "question": {
-      return <Question workspaceId={workspaceId} state={state} setState={setState} />;
-    }
-  }
+    ref.current?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus();
+  }, [state.step]);
+
+  // Whether focus is inside the offer, followed on the document.
+  useEffect(() => {
+    const follow = (event: FocusEvent) => {
+      const now = event.type === "focusin" ? event.target : event.relatedTarget;
+      setFocused(now instanceof Node && ref.current?.contains(now) === true);
+    };
+    document.addEventListener("focusin", follow);
+    document.addEventListener("focusout", follow);
+    return () => {
+      document.removeEventListener("focusin", follow);
+      document.removeEventListener("focusout", follow);
+    };
+  }, []);
+
+  const common = { workspaceId, setState, announce, focused };
+  return (
+    <div ref={ref} className="contents">
+      {state.step === "asking" ? <Asking {...common} state={state} /> : null}
+      {state.step === "running" ? <Running {...common} state={state} /> : null}
+      {state.step === "question" ? <Question {...common} state={state} /> : null}
+    </div>
+  );
 }
 
-function useT(): { t: Translate; locale: string } {
+function useT(): { t: Translate; locale: string; number: (n: number) => string } {
   const { t, i18n } = useTranslation("conversations");
-  return { t: t as unknown as Translate, locale: i18n.language };
+  const locale = i18n.language;
+  return {
+    t: t as unknown as Translate,
+    locale,
+    number: (n) => new Intl.NumberFormat(locale).format(n),
+  };
+}
+
+/** Say `text` through the polite live region whenever it changes. */
+function useAnnounce(announce: (text: string) => void, text: string) {
+  useEffect(() => {
+    announce(text);
+  }, [announce, text]);
 }
 
 /** "Move all 1,000 like this to Updates, and new ones too?" */
-function Asking({
-  workspaceId,
-  state,
-  setState,
-}: {
-  workspaceId: string;
-  state: Extract<Step, { step: "asking" }>;
-  setState: (next: Step) => void;
-}) {
-  const { t, locale } = useT();
+function Asking({ workspaceId, state, setState, announce, focused }: StepProps<"asking">) {
+  const { t, locale, number } = useT();
   const undo = useUndoToast();
   const inboxes = useInboxes(workspaceId);
-  const { create, remove } = useRuleMutations(workspaceId);
+  const { create, removeOnce } = useRuleActions(workspaceId);
   const { offer, conversation, action } = state;
   const chosen = state.chosen === null ? undefined : offer.suggestions[state.chosen];
   const kind = taughtKind(action);
-  const count = new Intl.NumberFormat(locale).format(chosen?.preview.would_change ?? 0);
   const stream = taughtStream(t, action);
   const inbox = inboxes.data?.find((item) => item.id === conversation.inbox_id);
+  const count = chosen?.preview.would_change ?? 0;
+  const complete = chosen?.preview.complete ?? true;
+  const counts = { count, n: number(count), stream };
   const skipped = chosen?.preview.skipped_suspicious ?? 0;
 
+  let title: string;
+  let accept: string;
+  if (chosen === undefined) {
+    title = t(`rules.offer.choose.${kind}`, { stream });
+    accept = t(`rules.offer.acceptAtLeast.${kind}`);
+  } else if (complete) {
+    title = t(`rules.offer.question.${kind}`, counts);
+    accept = t(`rules.offer.accept.${kind}`, counts);
+  } else {
+    title = t(`rules.offer.questionAtLeast.${kind}`, counts);
+    accept = t(`rules.offer.acceptAtLeast.${kind}`);
+  }
+  useAnnounce(announce, title);
+
   const dismiss = () => {
-    const key = chosen?.key ?? offer.suggestions[0]?.key;
-    if (key !== undefined) {
-      void dismissSuggestion(workspaceId, conversation.id, key).catch(() => null);
-    }
+    // "Just this one" turns down every likeness shown, so none comes back.
+    const keys = offer.suggestions.map((suggestion) => suggestion.key);
+    dismissSuggestions(workspaceId, conversation.id, keys).catch(() => {
+      undo.notify(t("rules.offer.dismissFailed"));
+    });
     setState({ step: "idle" });
   };
-  const accept = () => {
+  const accept_ = () => {
     if (chosen === undefined || create.isPending) {
       return;
     }
@@ -180,11 +280,17 @@ function Asking({
       },
       {
         onSuccess: ({ rule }) => {
-          setState({ step: "running", ruleId: rule.id, action, reverting: false });
+          setState({
+            step: "running",
+            ruleId: rule.id,
+            action,
+            expected: { count, complete },
+            reverting: false,
+          });
           undo.push({
             label: t("rules.toast.made", { rule: ruleSentence(t, locale, rule) }),
             undo: () => {
-              remove.mutate({ ruleId: rule.id, restore: true });
+              removeOnce(rule.id, true);
             },
           });
         },
@@ -195,16 +301,19 @@ function Asking({
       },
     );
   };
-  useShortcut("item.choice1", accept, { enabled: chosen !== undefined });
-  useShortcut("overlay.close", dismiss);
+  useShortcut("item.choice1", accept_, { enabled: chosen !== undefined });
+  useShortcut("overlay.close", dismiss, { enabled: focused });
 
   const samples = chosen?.preview.samples.slice(0, SAMPLES) ?? [];
-  const more = (chosen?.preview.would_change ?? 0) - samples.length;
+  const more = count - samples.length;
   return (
     <Offer
-      title={t(`rules.offer.question.${kind}`, { count, stream })}
+      title={title}
       detail={[
-        skipped > 0 ? t("rules.offer.suspicious", { count: skipped }) : t("rules.offer.safe"),
+        skipped > 0
+          ? t("rules.offer.suspicious", { count: skipped, n: number(skipped) })
+          : t("rules.offer.safe"),
+        complete ? "" : t("rules.offer.partial"),
         offer.shared && inbox !== undefined
           ? t("rules.offer.shared", { inbox: inbox.address })
           : "",
@@ -217,9 +326,9 @@ function Asking({
             variant="primary"
             shortcut="item.choice1"
             disabled={chosen === undefined || create.isPending}
-            onClick={accept}
+            onClick={accept_}
           >
-            {t(`rules.offer.accept.${kind}`, { count, stream })}
+            {accept}
           </Button>
           <Button variant="ghost" shortcut="overlay.close" onClick={dismiss}>
             {t("rules.offer.justThis")}
@@ -239,7 +348,7 @@ function Asking({
           options={offer.suggestions.map((suggestion, index) => ({
             value: String(index),
             title: likenessTitle(t, suggestion),
-            description: new Intl.NumberFormat(locale).format(suggestion.preview.would_change),
+            description: number(suggestion.preview.would_change),
           }))}
         />
       ) : null}
@@ -250,11 +359,7 @@ function Asking({
               {sample.subject}
             </Line>
           ))}
-          {more > 0 ? (
-            <Line>
-              {t("rules.offer.more", { count: new Intl.NumberFormat(locale).format(more) })}
-            </Line>
-          ) : null}
+          {more > 0 && complete ? <Line>{t("rules.offer.more", { n: number(more) })}</Line> : null}
         </div>
       )}
     </Offer>
@@ -262,133 +367,183 @@ function Asking({
 }
 
 /** The rule's run: progress, then what it did, with Undo all. */
-function Running({
-  workspaceId,
-  state,
-  setState,
-}: {
-  workspaceId: string;
-  state: Extract<Step, { step: "running" }>;
-  setState: (next: Step) => void;
-}) {
-  const { t, locale } = useT();
+function Running({ workspaceId, state, setState, announce, focused }: StepProps<"running">) {
+  const { t, number } = useT();
+  const queryClient = useQueryClient();
   const rule = useRule(workspaceId, state.ruleId);
-  const { remove } = useRuleMutations(workspaceId);
-  const run = rule.data?.run ?? undefined;
-  const number = (n: number) => new Intl.NumberFormat(locale).format(n);
-  const reverting = state.reverting || run?.kind === "revert";
+  const { removeRule, removing } = useRuleActions(workspaceId);
+  const data = rule.data;
+  const run = data?.run ?? undefined;
+  const stream = streamName(t, ruleStream(data?.actions ?? []) ?? "primary");
+  // Our own Undo all removes the rule too; only someone else's removal is news.
+  const removedElsewhere = data?.state === "removed" && !state.reverting;
+  const reverting = state.reverting;
+  const revertRun = reverting && run?.kind === "revert" ? run : undefined;
+  const applyRun = !reverting && run?.kind === "apply" ? run : undefined;
+  const shown = reverting ? revertRun : applyRun;
   const kind = reverting ? "revert" : taughtKind(state.action);
-  const stream = streamName(t, ruleStream(rule.data?.actions ?? []) ?? "primary");
-  const finished = run !== undefined && run.state !== "running";
+  const ended = shown !== undefined && shown.state !== "running";
+
+  // Rows say what the rule did to them: refresh them once a run ends.
+  useEffect(() => {
+    if (ended) {
+      void refreshConversations(queryClient, workspaceId);
+    }
+  }, [ended, queryClient, workspaceId]);
 
   const close = () => {
     setState({ step: "idle" });
   };
+  useShortcut("overlay.close", close, { enabled: focused });
+
+  let title: string;
+  let detail: string | undefined;
+  let progress: { value: number; max: number; line: string } | undefined;
+  if (rule.isError) {
+    title = t("rules.run.loadFailed");
+  } else if (removedElsewhere || shown?.state === "cancelled") {
+    const changed = applyRun?.changed ?? 0;
+    title =
+      changed > 0
+        ? t("rules.run.stopped", { count: changed, n: number(changed) })
+        : removedElsewhere
+          ? t("rules.run.removed")
+          : t("rules.run.stoppedNone");
+  } else if (reverting && revertRun === undefined) {
+    // Removed; the run putting mail back has not shown up yet.
+    title = t("rules.run.undoing");
+    progress = { value: 0, max: 0, line: t("rules.run.counting") };
+  } else if (shown?.counted !== true) {
+    title = reverting ? t("rules.run.undoing") : t("rules.run.finding");
+    progress = { value: 0, max: 0, line: t("rules.run.counting") };
+  } else if (ended) {
+    title = t(`rules.run.done.${kind}`, {
+      count: shown.changed,
+      n: number(shown.changed),
+      stream,
+    });
+    detail =
+      shown.skipped_suspicious > 0
+        ? t("rules.run.leftAlone", {
+            count: shown.skipped_suspicious,
+            n: number(shown.skipped_suspicious),
+          })
+        : undefined;
+  } else {
+    // The same number the offer gave, when it had them all.
+    const count =
+      !reverting && state.expected.complete && state.expected.count > 0
+        ? state.expected.count
+        : shown.total;
+    title = t(`rules.run.working.${kind}`, { count, n: number(count), stream });
+    detail = t("rules.run.keepWorking");
+    progress = {
+      value: shown.done,
+      max: shown.total,
+      line: t("rules.run.progress", { done: number(shown.done), total: number(shown.total) }),
+    };
+  }
+  const settled = rule.isError || removedElsewhere || ended || shown?.state === "cancelled";
+  useAnnounce(announce, settled ? title : "");
+
+  const canUndo =
+    !reverting &&
+    !removedElsewhere &&
+    !rule.isError &&
+    data?.may_change === true &&
+    applyRun !== undefined &&
+    applyRun.state !== "cancelled";
   const undoAll = () => {
-    if (rule.data === undefined || reverting) {
+    if (data === undefined || !canUndo || removing) {
       return;
     }
-    remove.mutate({ ruleId: state.ruleId, restore: true });
-    setState({ ...state, reverting: true });
+    removeRule(data, {
+      restore: true,
+      failure: t("rules.run.undoFailed"),
+      onDone: () => {
+        setState({ ...state, reverting: true });
+      },
+    });
   };
-  useShortcut("overlay.close", close);
 
-  const total = run?.counted === true ? run.total : undefined;
-  let title: string;
-  if (finished) {
-    title = t(`rules.run.done.${kind}`, { count: number(run.changed), stream });
-  } else if (total === undefined) {
-    title = t("rules.run.finding");
-  } else {
-    title = t(`rules.run.working.${kind}`, { count: number(total), stream });
-  }
   return (
     <Offer
-      visor={finished ? "happy" : "thinking"}
+      visor={settled ? (rule.isError ? "unsure" : "happy") : "thinking"}
       title={title}
-      detail={
-        finished
-          ? run.skipped_suspicious > 0
-            ? t("rules.run.leftAlone", { count: number(run.skipped_suspicious) })
-            : undefined
-          : t("rules.run.keepWorking")
-      }
+      detail={detail}
       actions={
         <>
-          {reverting ? null : (
-            <Button variant={finished ? "primary" : "secondary"} onClick={undoAll}>
+          {canUndo ? (
+            <Button variant={ended ? "primary" : "secondary"} disabled={removing} onClick={undoAll}>
               {t("rules.run.undoAll")}
             </Button>
-          )}
+          ) : null}
           <Button variant="ghost" shortcut="overlay.close" onClick={close}>
             {t("rules.run.close")}
           </Button>
         </>
       }
     >
-      {finished || run === undefined ? null : (
-        <Progress label={title} value={run.done} max={total ?? 0}>
-          {total === undefined
-            ? t("rules.run.counting")
-            : t("rules.run.progress", { done: number(run.done), total: number(total) })}
+      {progress === undefined ? null : (
+        <Progress label={title} value={progress.value} max={progress.max}>
+          {progress.line}
         </Progress>
       )}
     </Offer>
   );
 }
 
-/** "You changed back 2 this month. Keep the rule …?" */
-function Question({
-  workspaceId,
-  state,
-  setState,
-}: {
-  workspaceId: string;
-  state: Extract<Step, { step: "question" }>;
-  setState: (next: Step) => void;
-}) {
-  const { t, locale } = useT();
+/** "Changed back 2 times in the last 30 days. Keep the rule …?" */
+function Question({ workspaceId, state, setState, announce, focused }: StepProps<"question">) {
+  const { t, locale, number } = useT();
   const undo = useUndoToast();
   const rule = useRule(workspaceId, state.ruleId);
-  const { remove, create } = useRuleMutations(workspaceId);
-  const data: RuleView | undefined = rule.data;
+  const { removeRule, removing } = useRuleActions(workspaceId);
+  const data = rule.data;
   const keep = () => {
     setState({ step: "idle" });
   };
+  // A question about a rule that cannot be read is no question: say so.
+  useEffect(() => {
+    if (rule.isError) {
+      undo.notify(t("rules.run.loadFailed"));
+      setState({ step: "idle" });
+    }
+  }, [rule.isError, setState, t, undo]);
+  const canDrop = data?.may_change === true && data.state !== "removed";
   const drop = () => {
-    if (data === undefined) {
+    if (data === undefined || !canDrop || removing) {
       return;
     }
-    remove.mutate({ ruleId: data.id, restore: false });
-    undo.push({
-      label: t("rules.toast.stopped", { rule: ruleSentence(t, locale, data) }),
-      undo: () => {
-        create.mutate({
-          inboxId: data.inbox_id,
-          conditions: data.conditions,
-          actions: data.actions,
-          applyToExisting: false,
-        });
+    removeRule(data, {
+      restore: false,
+      onDone: () => {
+        setState({ step: "idle" });
       },
     });
-    setState({ step: "idle" });
   };
-  useShortcut("item.choice1", drop, { enabled: data?.may_change === true });
-  useShortcut("overlay.close", keep);
+  useShortcut("item.choice1", drop, { enabled: canDrop });
+  useShortcut("overlay.close", keep, { enabled: focused });
+  const title =
+    data === undefined
+      ? ""
+      : t("rules.exception.question", {
+          count: state.recent,
+          n: number(state.recent),
+          rule: ruleSentence(t, locale, data),
+        });
+  useAnnounce(announce, title);
   if (data === undefined) {
     return null;
   }
   return (
     <Offer
       visor="unsure"
-      title={t("rules.exception.question", {
-        count: state.recent,
-        rule: ruleSentence(t, locale, data),
-      })}
+      title={title}
       actions={
         <>
-          {data.may_change ? (
-            <Button variant="primary" shortcut="item.choice1" onClick={drop}>
+          {canDrop ? (
+            <Button variant="primary" shortcut="item.choice1" disabled={removing} onClick={drop}>
               {t("rules.exception.remove")}
             </Button>
           ) : null}

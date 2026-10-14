@@ -1,0 +1,111 @@
+import { useTranslation } from "react-i18next";
+
+import { useUndoToast } from "~/lib/ui";
+
+import { remake, useRuleMutations, type RuleView } from "../../api/rules";
+import type { Translate } from "../../model";
+import { ruleSentence } from "../../rules-text";
+
+/** Which toast a removal shows. */
+type RemovalLabel = "stopped" | "declined";
+
+/**
+ * Removing and keeping rules with the feedback every action gets: a toast
+ * once the server said yes (with Undo), a plain error toast when it said no.
+ * Undo after a removal makes the rule again as it was (its conditions,
+ * actions, origin, words and teaching; applied again when its mail was put
+ * back). A stale Undo never removes a rule twice.
+ */
+export function useRuleActions(workspaceId: string) {
+  const { t: typed, i18n } = useTranslation("conversations");
+  const t = typed as unknown as Translate;
+  const undo = useUndoToast();
+  const { create, remove, confirm, wasRemoved } = useRuleMutations(workspaceId);
+  const failed = () => {
+    undo.notify(t("rules.toast.failed"));
+  };
+  const sentence = (rule: RuleView) => ruleSentence(t, i18n.language, rule);
+
+  /** Remove `ruleId` (putting its mail back when `restore`), unless this screen already did. */
+  const removeOnce = (ruleId: string, restore: boolean, onSuccess?: () => void) => {
+    if (wasRemoved(ruleId)) {
+      return;
+    }
+    remove.mutate(
+      { ruleId, restore },
+      {
+        onSuccess: () => {
+          onSuccess?.();
+        },
+        onError: failed,
+      },
+    );
+  };
+
+  /** Remove `rule`; `onDone` once it is gone. */
+  const removeRule = (
+    rule: RuleView,
+    {
+      restore,
+      label = "stopped",
+      onDone,
+      failure,
+    }: {
+      restore: boolean;
+      label?: RemovalLabel | undefined;
+      onDone?: (() => void) | undefined;
+      /** What to say when it fails (default: the rule did not change). */
+      failure?: string | undefined;
+    },
+  ) => {
+    remove.mutate(
+      { ruleId: rule.id, restore },
+      {
+        onSuccess: () => {
+          onDone?.();
+          undo.push({
+            label: t(`rules.toast.${label}`, { rule: sentence(rule) }),
+            undo: () => {
+              create.mutate(remake(rule, restore), { onError: failed });
+            },
+          });
+        },
+        onError: () => {
+          if (failure === undefined) {
+            failed();
+          } else {
+            undo.notify(failure);
+          }
+        },
+      },
+    );
+  };
+
+  /** Say yes to a proposed `rule`; Undo removes it and puts back what it changed. */
+  const keepRule = (rule: RuleView) => {
+    confirm.mutate(
+      { ruleId: rule.id },
+      {
+        onSuccess: () => {
+          undo.push({
+            label: t("rules.toast.kept", { rule: sentence(rule) }),
+            undo: () => {
+              removeOnce(rule.id, true);
+            },
+          });
+        },
+        onError: failed,
+      },
+    );
+  };
+
+  return {
+    removeRule,
+    removeOnce,
+    keepRule,
+    removing: remove.isPending,
+    keeping: confirm.isPending,
+    create,
+    failed,
+  };
+}

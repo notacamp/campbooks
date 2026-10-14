@@ -17,11 +17,10 @@ import {
   ReaderBody,
   SkeletonList,
   Spacer,
-  useUndoToast,
 } from "~/lib/ui";
 
 import { useConversation, type ConversationSummary, type Stream } from "../../api/queries";
-import { useRuleMutations } from "../../api/rules";
+import { useRule } from "../../api/rules";
 import {
   avatarKind,
   displayName,
@@ -33,8 +32,10 @@ import {
 } from "../../model";
 import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
 import { NeedChips } from "../Needs/NeedChips";
-import { ruleLine, ruleSentence } from "../../rules-text";
+import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
+import { useTeachOnce } from "../TeachOnce/TeachOnce";
+import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
 import { MovePicker } from "./MovePicker";
@@ -87,29 +88,31 @@ export function ConversationReader({
   const detail = query.data;
   const conversation = detail?.conversation;
   const needActions = useNeedActions(workspaceId);
-  const ruleMutations = useRuleMutations(workspaceId);
-  const undoToast = useUndoToast();
+  const ruleActions = useRuleActions(workspaceId);
+  // While a teach-once offer or question is up, it holds the choice keys:
+  // the reader's own choices stay clickable but unbound and unhinted.
+  const offering = useTeachOnce()?.offering ?? false;
   const need = conversation?.need ?? undefined;
   const ruleMark = conversation?.rule ?? undefined;
+  // The rule that handled it, to know whether this member may stop it.
+  const markedRule = useRule(workspaceId, ruleMark?.id);
+  const stoppable =
+    markedRule.data !== undefined &&
+    markedRule.data.may_change &&
+    markedRule.data.state !== "removed";
   /** "Stop doing this": remove the rule that handled it; Undo makes it again. */
   const stopRule = () => {
-    if (ruleMark === undefined || conversation === undefined) {
+    if (markedRule.data === undefined || !stoppable) {
       return;
     }
-    const sentence = ruleSentence(t, i18n.language, ruleMark);
-    ruleMutations.remove.mutate({ ruleId: ruleMark.id, restore: false });
-    undoToast.push({
-      label: t("rules.toast.stopped", { rule: sentence }),
-      undo: () => {
-        ruleMutations.create.mutate({
-          inboxId: conversation.inbox_id,
-          conditions: ruleMark.conditions,
-          actions: ruleMark.actions,
-          applyToExisting: false,
-        });
-      },
-    });
+    ruleActions.removeRule(markedRule.data, { restore: false });
   };
+  const stopButton = stoppable ? (
+    <Button variant="ghost" disabled={ruleActions.removing} onClick={stopRule}>
+      {t("rules.reader.stop")}
+    </Button>
+  ) : null;
+  const choiceKey = (id: "item.choice1" | "item.choice2") => (offering ? {} : { shortcut: id });
   const footerLine = (summary: NonNullable<typeof conversation>) =>
     ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
@@ -244,7 +247,7 @@ export function ConversationReader({
         actions.move(conversation, suggestion.stream);
       }
     },
-    { enabled: question || suggestion !== undefined },
+    { enabled: (question || suggestion !== undefined) && !offering },
   );
   useShortcut(
     "item.choice2",
@@ -253,7 +256,7 @@ export function ConversationReader({
         needActions.notNeeded(conversation);
       }
     },
-    { enabled: question },
+    { enabled: question && !offering },
   );
   useShortcut(
     "conversations.resolve_need",
@@ -456,15 +459,7 @@ export function ConversationReader({
             label={t("scout.label")}
             visor={suggestion === undefined ? "idle" : "unsure"}
             footer={footerLine(conversation)}
-            {...(ruleMark === undefined
-              ? {}
-              : {
-                  actions: (
-                    <Button variant="ghost" onClick={stopRule}>
-                      {t("rules.reader.stop")}
-                    </Button>
-                  ),
-                })}
+            {...(stopButton === null ? {} : { actions: stopButton })}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
@@ -476,7 +471,7 @@ export function ConversationReader({
                     options: [
                       {
                         label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
-                        shortcut: "item.choice1",
+                        ...choiceKey("item.choice1"),
                         onSelect: () => {
                           actions.move(conversation, suggestion.stream);
                         },
@@ -515,20 +510,21 @@ export function ConversationReader({
                     options: [
                       {
                         label: t("needs.actions.yes"),
-                        shortcut: "item.choice1",
+                        ...choiceKey("item.choice1"),
                         onSelect: () => {
                           needActions.confirm(conversation);
                         },
                       },
                       {
                         label: t("needs.actions.no"),
-                        shortcut: "item.choice2",
+                        ...choiceKey("item.choice2"),
                         onSelect: () => {
                           needActions.notNeeded(conversation);
                         },
                       },
                     ],
                   },
+                  ...(stopButton === null ? {} : { actions: stopButton }),
                 }
               : {
                   actions: (
@@ -554,6 +550,7 @@ export function ConversationReader({
                             : "needs.actions.notNeeded",
                         )}
                       </Button>
+                      {stopButton}
                     </>
                   ),
                 })}

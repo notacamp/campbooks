@@ -286,6 +286,21 @@ export const STREAM_COUNTS = [
 /** The API paths of the demo workspace, behind the BFF. */
 export const W = `/bff/api/v1/w/${DUARTE.id}`;
 
+/** The Ledger rule's run over existing mail, finished. */
+export const LEDGER_RUN: NonNullable<Schema<"RuleView">["run"]> = {
+  id: "0192f1a0-0000-7000-8000-0000000000e3",
+  kind: "apply",
+  state: "done",
+  total: 40,
+  counted: true,
+  done: 40,
+  changed: 40,
+  skipped_suspicious: 0,
+  skipped_member: 0,
+  started_at: "2026-10-13T15:00:00Z",
+  finished_at: "2026-10-13T15:00:05Z",
+};
+
 /** A taught rule moving the Weekly Ledger's mail to Newsletters (teach once). */
 export const LEDGER_RULE: Schema<"RuleView"> = {
   id: "0192f1a0-0000-7000-8000-0000000000e1",
@@ -303,19 +318,7 @@ export const LEDGER_RULE: Schema<"RuleView"> = {
   applied_count: 40,
   last_applied_at: "2026-10-13T15:00:00Z",
   recent_exceptions: 0,
-  run: {
-    id: "0192f1a0-0000-7000-8000-0000000000e3",
-    kind: "apply",
-    state: "done",
-    total: 40,
-    counted: true,
-    done: 40,
-    changed: 40,
-    skipped_suspicious: 0,
-    skipped_member: 0,
-    started_at: "2026-10-13T15:00:00Z",
-    finished_at: "2026-10-13T15:00:05Z",
-  },
+  run: LEDGER_RUN,
   shared: false,
   may_change: true,
 };
