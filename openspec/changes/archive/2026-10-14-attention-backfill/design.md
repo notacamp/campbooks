@@ -81,10 +81,13 @@ needs by running the same statement in its own migration. Because
 
 ## Estimate
 
-The demo mailbox (`fixtures/needs.json`, five conversations from five
-senders) yields five needs: a reply with a due date, a do with a due date, a
-pay, a phishing warning and a reply. A mailbox that has had mail for a while
-gets at most one need per conversation whose last message is in the last 14
-days and whose newest inbound message's stored answers raise one; mostly
-person-to-person questions, requests and bills, since list and service mail
-(most of a typical inbox) asks nothing under the rules.
+On the demo mailbox the recordings use (the fake Gmail: 13 messages in 11
+conversations, all within the window, synced by a server that raised no
+needs), the backfill refreshed 11 conversations and raised 6 needs: one
+phishing warning, three replies (two with due dates), one request and one
+bill. The other five (a newsletter, receipts, notifications, a calendar
+invitation) ask nothing under the rules. So a mailbox gets roughly one need
+per person-to-person question, request or bill in the last 14 days; list
+and service mail, most of a typical inbox, raises none. For the production
+instance this means its recent person-to-person mail fills Home, not its
+history.
