@@ -152,3 +152,14 @@ export function useAcceptInvitation() {
     },
   });
 }
+
+/** `workspaces.get_signup`: where the caller stands with the instance's signup policy. */
+const signupStatusQuery = () =>
+  queryOptions({
+    queryKey: operationKey("workspaces.get_signup"),
+    queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/signup", { signal })),
+  });
+
+export function useSignupStatus() {
+  return useQuery(signupStatusQuery());
+}
