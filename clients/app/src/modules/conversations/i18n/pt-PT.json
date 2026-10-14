@@ -78,13 +78,11 @@
   "scout": {
     "label": "Ponto da situação",
     "suggestion": "Sugere {{stream}}",
-    "suggestionSure": "Sugere {{stream}}, com {{confidence}}% de certeza",
     "suggestionNote": "O Campbooks acha que isto pertence a {{stream}}. É uma sugestão: nada sai do sítio sem a sua decisão.",
     "prompt": "Mover?",
     "accept": "Mover para {{stream}}",
     "keep": "Manter em {{stream}}",
     "sortedRule": "Arrumada em {{stream}} por uma regra",
-    "sortedRuleSure": "Arrumada em {{stream}} por uma regra, com {{confidence}}% de certeza",
     "sortedModel": "Arrumada em {{stream}} pelo Campbooks",
     "sortedMember": "Moveu-a para {{stream}}",
     "sortedDefault": "Em {{stream}}: nada a moveu",
@@ -154,7 +152,8 @@
     "replyAll": "Responder a todos",
     "forward": "Reencaminhar",
     "showImages": "Mostrar imagens",
-    "nextAttachment": "Anexo seguinte"
+    "nextAttachment": "Anexo seguinte",
+    "notNeeded": "Não é preciso (ou é seguro)"
   },
   "compose": {
     "title": {
@@ -203,5 +202,62 @@
       "newMessage": "Nova mensagem"
     },
     "tooLate": "Já não é possível anular: a mensagem foi enviada."
+  },
+  "needs": {
+    "line": {
+      "reply": "{{name}} está à espera da sua resposta",
+      "question": "{{name}} fez-lhe uma pergunta",
+      "do": "{{name}} pediu-lhe para fazer algo",
+      "pay": "{{name}} enviou uma fatura para pagar",
+      "warning": "Isto pode ser phishing. Não use as ligações.",
+      "checkReply": "{{name}} precisa de resposta?",
+      "checkDo": "{{name}} pediu-lhe para fazer algo?"
+    },
+    "chip": {
+      "reply": "Precisa de resposta",
+      "do": "A fazer",
+      "pay": "Pagar",
+      "review": "Rever",
+      "suspicious": "Parece suspeito",
+      "check": "Confirmar"
+    },
+    "due": {
+      "today": "Até hoje",
+      "tomorrow": "Até amanhã",
+      "on": "Até {{date}}",
+      "overdue": "Em atraso · era até {{date}}"
+    },
+    "how": {
+      "yes": "Sim.",
+      "no": "Não.",
+      "urgency0": "Sem pressa.",
+      "urgency1": "Nos próximos dias.",
+      "urgency2": "Hoje.",
+      "source": {
+        "rules": "Regras",
+        "model": "Modelo",
+        "knn": "Correio semelhante",
+        "cascade": "Regras e depois modelo"
+      },
+      "suggestion": "uma sugestão",
+      "actsFrom": "age a partir de {{threshold}}",
+      "footnote": "As regras respondem a partir do que o email mostra à primeira vista. Uma resposta só age a partir da confiança que a sua avaliação garante; abaixo disso é uma sugestão."
+    },
+    "actions": {
+      "done": "Feito",
+      "notNeeded": "Não é preciso",
+      "safe": "É seguro",
+      "yes": "Sim",
+      "no": "Não",
+      "questionPrompt": "O Campbooks não tem a certeza."
+    },
+    "toast": {
+      "done": "Feito · {{name}}",
+      "notNeeded": "Não é preciso · {{name}}. O Campbooks vai aprender com isto",
+      "safe": "Marcado como seguro · {{name}}. O Campbooks vai aprender com isto",
+      "confirmed": "Obrigado · {{name}} fica na sua lista",
+      "failed": "Não foi possível alterar {{name}}: nada mudou. Tente de novo.",
+      "changed": "{{name}} mudou enquanto via: volte a ver."
+    }
   }
 }

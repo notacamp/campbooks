@@ -13,9 +13,7 @@
     "redone": "Refeito: {{label}}"
   },
   "note": {
-    "label": "Ponto da situação",
-    "why": "Porquê?",
-    "hideWhy": "Ocultar o porquê"
+    "label": "Ponto da situação"
   },
   "search": {
     "label": "Pesquisar ou perguntar"
@@ -100,5 +98,8 @@
     "previewOf": "Pré-visualizar {{name}}",
     "downloadOf": "Transferir {{name}}",
     "previewTitle": "Pré-visualização de {{name}}"
+  },
+  "howDecided": {
+    "title": "Como o Campbooks decidiu"
   }
 }

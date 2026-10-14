@@ -173,6 +173,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
+        campbooks_attention::module(),
         campbooks_search::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
@@ -313,6 +314,8 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
+        (name = "attention", description = "What needs you: one queue per member of what the \
+            records you may open ask of you (conversations today), with Later per member."),
         (name = "search", description = "One search over the records you may open: \
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \

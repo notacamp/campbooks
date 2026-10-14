@@ -1,4 +1,4 @@
-import { Fragment, useId, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import type { ShortcutId } from "~/lib/shortcuts";
@@ -31,21 +31,34 @@ export interface NoteChoice {
   options: NoteChoiceOption[];
 }
 
+export interface NoteQuote {
+  /** The sender's own sentence. Untrusted mail text: shown as quoted plain text only. */
+  text: string;
+  /** Who wrote it and when: "Marta Ferreira, Mon 12 Oct". */
+  attribution: string;
+}
+
 export interface NoteProps {
   /** The assistant's sentence about where things stand. */
   children: ReactNode;
-  /** The visor's mood; `unsure` when confidence is low. */
+  /** The visor's mood; `unsure` when confidence is low, `alert` for a warning. */
   visor?: VisorState | undefined;
   /** Compact text and visor, for phones. */
   compact?: boolean | undefined;
+  /** Why to be careful, before anything else (a phishing warning's tells). */
+  reasons?: string[] | undefined;
+  /** What the sender wrote, quoted. */
+  quote?: NoteQuote | undefined;
+  /** Short labels under the sentence ({@link Pill}s and {@link Tag}s). */
+  chips?: ReactNode | undefined;
   /** Records this conversation is linked to (task, document, event). */
   links?: NoteLink[] | undefined;
-  /** "Sorted into Primary, 98% sure". */
-  confidence?: string | undefined;
-  /** Reasons behind the sorting, shown under "Why?". */
-  why?: string[] | undefined;
   /** When unsure, the assistant asks instead of acting. */
   choice?: NoteChoice | undefined;
+  /** Buttons for what the note is about (Done, Not needed). */
+  actions?: ReactNode | undefined;
+  /** "How Campbooks decided" ({@link HowDecided}): the only place numbers appear. */
+  how?: ReactNode | undefined;
   /** Extra actions in the footer (e.g. "Move"). */
   footer?: ReactNode | undefined;
   /** Accessible name of the region. Defaults to "Where things stand". */
@@ -57,38 +70,17 @@ export function Note({
   children,
   visor = "idle",
   compact = false,
+  reasons = [],
+  quote,
+  chips,
   links = [],
-  confidence,
-  why = [],
   choice,
+  actions,
+  how,
   footer,
   label,
 }: NoteProps) {
   const { t } = useTranslation("ui");
-  const [whyOpen, setWhyOpen] = useState(false);
-  const whyId = useId();
-  const footItems: ReactNode[] = [];
-  if (confidence !== undefined) {
-    footItems.push(<span>{confidence}</span>);
-  }
-  if (why.length > 0) {
-    footItems.push(
-      <Button
-        variant="link"
-        aria-expanded={whyOpen}
-        aria-controls={whyId}
-        onClick={() => {
-          setWhyOpen((open) => !open);
-        }}
-      >
-        {whyOpen ? t("note.hideWhy") : t("note.why")}
-      </Button>,
-    );
-  }
-  if (footer !== undefined) {
-    footItems.push(footer);
-  }
-
   return (
     <section
       className={styles["note"]}
@@ -98,6 +90,20 @@ export function Note({
       <Visor state={visor} size={compact ? "md" : "lg"} />
       <div className={styles["body"]}>
         <p className={styles["text"]}>{children}</p>
+        {reasons.length === 0 ? null : (
+          <ul className={styles["reasons"]}>
+            {reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        )}
+        {quote === undefined ? null : (
+          <blockquote className={styles["quote"]}>
+            <q className={styles["quoteText"]}>{quote.text}</q>
+            <footer className={styles["attribution"]}>{quote.attribution}</footer>
+          </blockquote>
+        )}
+        {chips === undefined ? null : <div className={styles["chips"]}>{chips}</div>}
         {choice === undefined ? null : (
           <div className={styles["choice"]}>
             <span className={styles["prompt"]}>{choice.prompt}</span>
@@ -132,23 +138,9 @@ export function Note({
             ))}
           </div>
         )}
-        {footItems.length > 0 ? (
-          <div className={styles["foot"]}>
-            {footItems.map((item, index) => (
-              <Fragment key={index}>
-                {index > 0 ? <span aria-hidden="true">·</span> : null}
-                {item}
-              </Fragment>
-            ))}
-          </div>
-        ) : null}
-        {why.length > 0 ? (
-          <ul id={whyId} className={styles["why"]} hidden={!whyOpen}>
-            {why.map((reason) => (
-              <li key={reason}>{reason}</li>
-            ))}
-          </ul>
-        ) : null}
+        {actions === undefined ? null : <div className={styles["actions"]}>{actions}</div>}
+        {footer === undefined ? null : <div className={styles["foot"]}>{footer}</div>}
+        {how === undefined ? null : <div className={styles["how"]}>{how}</div>}
       </div>
     </section>
   );

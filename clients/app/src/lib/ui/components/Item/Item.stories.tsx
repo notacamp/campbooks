@@ -108,3 +108,39 @@ export const AsLink: Story = {
     what: "Send two August receipts",
   },
 };
+
+/** What needs you: the sentence, then the sender's own words on one line. */
+export const WithExcerpt: Story = {
+  args: {
+    who: "Marta Ferreira · Casa Lume",
+    what: "Marta Ferreira is waiting for your reply",
+    excerpt: "Could you confirm Thursday’s walkthrough? The builders need to know by Wednesday.",
+    avatar: { name: "Marta Ferreira" },
+    due: "Due tomorrow",
+    soon: true,
+    tags: [],
+  },
+};
+
+/** A warning, opened: its tells before the quote. */
+export const WarningOpen: Story = {
+  args: {
+    who: "it-support@at3lier-sol.example",
+    what: "This may be phishing",
+    avatar: { name: "IT Support", kind: "service" },
+    due: undefined,
+    tags: [],
+    expanded: true,
+    detail: (
+      <ItemDetail
+        reasons={[
+          "The sender’s domain imitates yours (at3lier-sol.example).",
+          "A link goes somewhere other than it says (verify-mailbox.example).",
+        ]}
+        quoteFrom="it-support@at3lier-sol.example, today 07:52"
+        quote="Your mailbox will be closed today unless you verify your account using the link below."
+        actions={<Button variant="secondary">It’s safe</Button>}
+      />
+    ),
+  },
+};
