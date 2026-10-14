@@ -33,7 +33,7 @@ use crate::{
         paths::ConversationPath,
         rules::{self, Candidate, RuleAction, RuleCondition, SurfaceWhen},
     },
-    features::rules::{RulePreview, compute_preview},
+    features::rules::{PREVIEW_DEADLINE, RulePreview, compute_preview},
     model::{ConversationId, InboxId, InboxRole, LabelId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
 };
@@ -213,6 +213,8 @@ async fn suggestions(
     id: ConversationId,
     query: SuggestQuery,
 ) -> Result<RuleSuggestions> {
+    // One deadline for every likeness's preview together.
+    let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
     let shared = rules::is_shared(conn, inbox).await?;
     let Some(candidate) = rules::candidate(conn, id).await? else {
         return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
@@ -236,7 +238,7 @@ async fn suggestions(
         if rules::validate(&conditions, &actions).is_err() {
             continue;
         }
-        let preview = compute_preview(conn, inbox, &conditions, &actions).await?;
+        let preview = compute_preview(conn, inbox, (&conditions, &actions), deadline).await?;
         // A likeness that would change nothing is no choice at all.
         if preview.would_change == 0 {
             continue;

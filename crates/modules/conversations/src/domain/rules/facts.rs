@@ -1,7 +1,10 @@
 //! What the engine and the runs read about a conversation: the facts of its
 //! newest inbound message, found with a prefilter an index can serve.
 
-use campbooks_ai::decide::{signals::email::subject_template, taught::Facts};
+use campbooks_ai::decide::{
+    signals::email::subject_template,
+    taught::{Facts, normalise_list_id},
+};
 use campbooks_kernel::{Error, Result};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
@@ -37,7 +40,8 @@ pub struct Candidate {
     pub subject_template: Option<String>,
     /// Its headers subset.
     pub headers: Headers,
-    /// It looks suspicious, or has an open Review need.
+    /// One of its messages looks suspicious (not only the newest), or it
+    /// has an open Review need.
     pub suspicious: bool,
     /// When the newest inbound message was sent.
     pub sent_at: DateTime<Utc>,
@@ -83,11 +87,9 @@ impl Prefilter {
                     p.domain = Some(v.trim().to_lowercase());
                     p.domain_like = Some(like_escape(&v.trim().to_lowercase()));
                 }
-                RuleCondition::ListId(v) => {
-                    let v = v.trim().to_lowercase();
-                    let v = v.trim_start_matches('<').trim_end_matches('>');
-                    p.list = Some(like_escape(v));
-                }
+                // The engine compares the id inside the brackets; the stored
+                // header holds it, whatever is around it.
+                RuleCondition::ListId(v) => p.list = Some(like_escape(&normalise_list_id(v))),
                 RuleCondition::SubjectTemplate(v) => p.template = Some(v.trim().to_owned()),
                 _ => {}
             }
@@ -216,7 +218,7 @@ async fn rows(
                m.sender_address AS "sender_address!", m.subject AS "subject!",
                m.subject_template, m.headers AS "headers!",
                (EXISTS (SELECT 1 FROM conversations.decisions d
-                         WHERE d.message_id = m.id AND d.question = 'suspicious'
+                         WHERE d.conversation_id = c.id AND d.question = 'suspicious'
                            AND d.value = 'true'::jsonb)
                 OR EXISTS (SELECT 1 FROM conversations.needs n
                             WHERE n.conversation_id = c.id AND n.state = 'open'
@@ -314,7 +316,7 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
                m.sender_address AS "sender_address!", m.subject AS "subject!",
                m.subject_template, m.headers AS "headers!",
                (EXISTS (SELECT 1 FROM conversations.decisions d
-                         WHERE d.message_id = m.id AND d.question = 'suspicious'
+                         WHERE d.conversation_id = c.id AND d.question = 'suspicious'
                            AND d.value = 'true'::jsonb)
                 OR EXISTS (SELECT 1 FROM conversations.needs n
                             WHERE n.conversation_id = c.id AND n.state = 'open'
@@ -336,17 +338,25 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
     row.map(Candidate::try_from).transpose()
 }
 
-/// Whether `inbox` ever wrote to `address`: they correspond, so mail from
-/// them is never hidden by a suggested rule.
+/// Sent messages [`corresponds`] looks through, newest first.
+pub const CORRESPONDENCE_WINDOW: i64 = 5_000;
+
+/// Whether `inbox` wrote to `address` in its last [`CORRESPONDENCE_WINDOW`]
+/// sent messages: they correspond, so mail from them is never hidden by a
+/// suggested rule. Served by `messages_outbound_idx`.
 pub async fn corresponds(conn: &mut PgConnection, inbox: InboxId, address: &str) -> Result<bool> {
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS (
-               SELECT 1 FROM conversations.messages
-                WHERE inbox_id = $1 AND direction = 'outbound'
-                  AND position(('"' || $2 || '"') IN lower(recipients::text)) > 0
+               SELECT 1 FROM (
+                   SELECT recipients FROM conversations.messages
+                    WHERE inbox_id = $1 AND direction = 'outbound'
+                    ORDER BY sent_at DESC LIMIT $3
+               ) sent
+                WHERE position(('"' || $2 || '"') IN lower(sent.recipients::text)) > 0
            ) AS "e!""#,
         inbox as InboxId,
         address.to_lowercase(),
+        CORRESPONDENCE_WINDOW,
     )
     .fetch_one(conn)
     .await?)

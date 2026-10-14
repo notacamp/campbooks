@@ -43,6 +43,10 @@ pub struct Before {
     /// Its stream and who put it there, when the rule moved it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stream: Option<(Stream, String)>,
+    /// The stream the rule moved it to, so it can be put back even after
+    /// the rule is changed to move mail elsewhere.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub moved_to: Option<Stream>,
     /// Whether the rule archived it.
     #[serde(default)]
     pub archived: bool,
@@ -145,6 +149,7 @@ async fn carry_out(
         && effects::place(tx, candidate.id, stream).await?
     {
         before.stream = Some((candidate.stream, candidate.stream_source.clone()));
+        before.moved_to = Some(stream);
         let messages = crate::domain::conversation::provider_message_ids(tx, candidate.id).await?;
         effects.add(
             Change::Stream,
@@ -331,9 +336,13 @@ pub async fn revert(
     .await?;
     let Some(row) = row else { return Ok(false) };
     let before: Before = serde_json::from_value(row.before).unwrap_or_default();
-    let moved_to = rule.actions.iter().find_map(|a| match a {
-        super::RuleAction::MoveToStream { stream } => Some(*stream),
-        _ => None,
+    // Where the rule moved it then; its action now, for an application
+    // recorded without it.
+    let moved_to = before.moved_to.or_else(|| {
+        rule.actions.iter().find_map(|a| match a {
+            super::RuleAction::MoveToStream { stream } => Some(*stream),
+            _ => None,
+        })
     });
     let effects = undo(tx, id, &before, moved_to).await?;
     if !before.answered.is_empty() {

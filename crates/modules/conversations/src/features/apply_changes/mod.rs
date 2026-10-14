@@ -579,9 +579,13 @@ impl Apply<'_> {
                               coalesce((SELECT array_agg(cl.label_id::text)
                                           FROM conversations.conversation_labels cl
                                          WHERE cl.conversation_id = c.id), '{}') AS "labels!",
-                              EXISTS (SELECT 1 FROM conversations.needs n
-                                       WHERE n.conversation_id = c.id AND n.state = 'open'
-                                         AND n.reason = 'review') AS "under_review!"
+                              (EXISTS (SELECT 1 FROM conversations.needs n
+                                        WHERE n.conversation_id = c.id AND n.state = 'open'
+                                          AND n.reason = 'review')
+                               OR EXISTS (SELECT 1 FROM conversations.decisions d
+                                           WHERE d.conversation_id = c.id
+                                             AND d.question = 'suspicious'
+                                             AND d.value = 'true'::jsonb)) AS "under_review!"
                          FROM conversations.conversations c WHERE c.id = $1"#,
                     conversation as ConversationId,
                 )
@@ -597,8 +601,9 @@ impl Apply<'_> {
             ),
         };
         let questions = triage_questions();
-        // Suspicious mail, or a conversation with an open Review need, is
-        // never hidden by a rule (archiving would clear the Review).
+        // Suspicious mail, a conversation with an earlier suspicious
+        // message, or one with an open Review need, is never hidden by a
+        // rule (archiving would clear the Review).
         let suspicious = under_review
             || questions.iter().zip(&prepared.answers).any(|(q, a)| {
                 q.id == triage::SUSPICIOUS

@@ -533,7 +533,7 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "A taught rule or its run changed (`contracts/conversations.rule_changed.v1.schema.json`).\nIds, enums and counts only: never its conditions, the member's words or\nan address.",
+        "description": "A taught rule or its run changed (no other module consumes it; its schema\nis in `openapi/events.json`).\nIds, enums and counts only: never its conditions, the member's words or\nan address.",
         "required": [
           "workspace",
           "inbox",

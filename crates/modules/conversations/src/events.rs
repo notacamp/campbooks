@@ -585,7 +585,8 @@ pub struct RunFacts {
     pub done: u32,
 }
 
-/// A taught rule or its run changed (`contracts/conversations.rule_changed.v1.schema.json`).
+/// A taught rule or its run changed (no other module consumes it; its schema
+/// is in `openapi/events.json`).
 /// Ids, enums and counts only: never its conditions, the member's words or
 /// an address.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]

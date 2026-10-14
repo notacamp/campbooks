@@ -71,8 +71,10 @@ pub async fn on_arrival(
     let at = (arrival.message, arrival.conversation);
     let this_message = || vec![arrival.provider_message_id.to_owned()];
     if let (Some(applied), Some(from)) = (&outcome.stream, &arrival.placed_from) {
-        ledger.of(&applied.rule).stream = Some(from.clone());
         let stream: Stream = applied.value.parse()?;
+        let before = ledger.of(&applied.rule);
+        before.stream = Some(from.clone());
+        before.moved_to = Some(stream);
         let answer = TaughtAnswer {
             question: triage::STREAM,
             value: json!(applied.value),
