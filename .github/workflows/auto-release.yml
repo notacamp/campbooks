@@ -22,7 +22,7 @@ jobs:
       contents: write  # to create the release + tag
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 2  # need the previous commit to diff VERSION
 
