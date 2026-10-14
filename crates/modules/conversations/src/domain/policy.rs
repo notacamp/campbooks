@@ -37,6 +37,7 @@ impl Switch {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Policy {
     entries: Vec<(&'static str, Source, Switch)>,
+    check_floor: f64,
 }
 
 impl Policy {
@@ -73,7 +74,17 @@ impl Policy {
                 ),
                 (questions::URGENCY, Source::Rules, Switch::ActAbove(0.75)),
             ],
+            check_floor: Self::CHECK_FLOOR,
         }
+    }
+
+    /// The confidence from which a model answer the policy does not accept
+    /// is put to the member as a question (a Review need, trust `check`).
+    pub const CHECK_FLOOR: f64 = 0.8;
+
+    /// [`CHECK_FLOOR`](Self::CHECK_FLOOR), unless set otherwise.
+    pub const fn check_floor(&self) -> f64 {
+        self.check_floor
     }
 
     /// The same table with `switch` for `question` answered by `source`.

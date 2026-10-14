@@ -22,6 +22,7 @@ function InboxPage() {
   const params: { workspaceId?: string; stream?: string; conversationId?: string } = useParams({
     strict: false,
   });
+  const search: { reply?: boolean } = useSearch({ strict: false });
   const workspaceId = params.workspaceId ?? "";
   const stream = params.stream ?? "";
   const { t } = useTranslation("conversations");
@@ -46,6 +47,7 @@ function InboxPage() {
       stream={stream}
       conversationId={params.conversationId}
       renderReplySlot={renderReplyComposer}
+      startReply={search.reply === true}
       composeAction={
         <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
           {t("compose.newMessage")}
@@ -94,6 +96,9 @@ export function buildConversationsRoutes<TParent extends AnyRoute>(parent: TPare
   const conversation = createRoute({
     getParentRoute: () => parent,
     path: "/inbox/$stream/$conversationId",
+    // `?reply=true` (Home's R) opens the reply composer.
+    validateSearch: (search: Record<string, unknown>): { reply?: boolean } =>
+      search["reply"] === true || search["reply"] === "true" ? { reply: true } : {},
     component: InboxPage,
   });
   const compose = createRoute({

@@ -110,11 +110,13 @@ describe("the inbox", () => {
     expect(folded.length).toBeGreaterThanOrEqual(2);
     fireEvent.click(within(reader).getByRole("button", { name: /Sam Rivera/u }));
     expect(await within(reader).findByText(/Is the timeline fixed\?/u)).toBeVisible();
-    // The note says what the decide pass thinks, as suggestions, with why.
+    // The note says what the decide pass thinks, as suggestions; how it
+    // decided (the only place with numbers) is folded away.
     const note = within(reader).getByRole("region", { name: "Where things stand" });
     expect(note).toHaveTextContent("it needs a reply and it mentions a date to meet");
-    fireEvent.click(within(note).getByRole("button", { name: "Why?" }));
-    expect(within(note).getByText("Mentions a date: It names a date (“Friday”).")).toBeVisible();
+    expect(note).not.toHaveTextContent("%");
+    fireEvent.click(within(note).getByText("How Campbooks decided"));
+    expect(within(note).getByText("Yes. It names a date (“Friday”).")).toBeVisible();
     await waitFor(() => {
       expect(api.calls.map((call) => call.route)).toContain(
         `POST ${W}/conversations/${Q4.id}/read`,

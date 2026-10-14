@@ -68,7 +68,9 @@ async function setUp(page: Page): Promise<string> {
   await page.getByRole("button", { name: "Create workspace" }).click();
   await page.getByRole("heading", { name: /will be connected to this workspace/u }).waitFor();
   await page.keyboard.press("Enter");
-  await page.getByRole("heading", { name: "Your mail" }).waitFor();
+  // Home: "Your mail" until the inbox exists, then what needs you.
+  await page.waitForURL(/\/w\/[^/]+$/u);
+  await page.getByRole("heading", { level: 1 }).waitFor();
   const { workspaces } = (await api(page, "GET", "/bff/api/v1/workspaces")) as {
     workspaces: { id: string }[];
   };
@@ -151,11 +153,11 @@ export default async function inbox({ page }: ScenarioContext): Promise<void> {
       .click();
   }
   await page.getByRole("heading", { name: "Five tax dates before year end" }).waitFor();
-  await caption(page, "The reader: Campbooks' read is a suggestion, with Why?");
-  await page.getByRole("button", { name: "Why?" }).click();
-  await caption(page, "Why? shows the stored reasons behind the suggestion", 2200);
+  await caption(page, "The reader: Campbooks' read is a suggestion");
+  await page.getByText("How Campbooks decided").click();
+  await caption(page, "How Campbooks decided shows the stored reasons behind it", 2200);
   await shot("02-reader-why");
-  await page.getByRole("button", { name: "Hide why" }).click();
+  await page.getByText("How Campbooks decided").click();
 
   await page.mouse.wheel(0, 300);
   await caption(

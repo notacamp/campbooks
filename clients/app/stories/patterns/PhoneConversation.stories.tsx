@@ -48,11 +48,6 @@ function PhoneConversation() {
             { icon: "check", title: "Review Q4 proposal", onSelect: noop },
             { icon: "event", title: "Held Thu 09:00", onSelect: noop },
           ]}
-          confidence="Primary, 98% sure"
-          why={[
-            "You have replied to Sofia 14 times this year.",
-            "It is not a bulk or automated sender.",
-          ]}
         >
           Sofia is waiting on your review by Thursday. Version 3 moves the timeline two weeks; the
           price is unchanged.

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO attention.snoozes (workspace_id, item_id, user_id, until)\n                VALUES ($1, $2, $3, $4)\n                ON CONFLICT (item_id, user_id) DO UPDATE\n                   SET until = EXCLUDED.until, created_at = now()\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "96f40367f07c410ce1ee32006db7ebe5ccb32f6afec1ca901a4c1651bdb258ea"
+}

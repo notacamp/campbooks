@@ -300,6 +300,57 @@ export interface paths {
         patch: operations["workspaces.update"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List what needs you. */
+        get: operations["attention.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put an item off until later, for yourself. */
+        post: operations["attention.snooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an item you put off back now. */
+        post: operations["attention.unsnooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/changes": {
         parameters: {
             query?: never;
@@ -513,6 +564,57 @@ export interface paths {
         get: operations["conversations.get_message_body"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer yes to a question Campbooks put (a Review need it was unsure of). */
+        post: operations["conversations.confirm_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back Done, Not needed or a confirmation: the need is as it was. */
+        post: operations["conversations.reopen_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark what a conversation needs as done, or as not needed. */
+        post: operations["conversations.resolve_need"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1559,6 +1661,19 @@ export interface components {
              */
             size: number;
         };
+        /** @description The caller's items. */
+        AttentionList: {
+            /**
+             * @description Open items per reason, every reason listed (open lists only; empty
+             *     for cleared).
+             */
+            counts: components["schemas"]["ReasonCount"][];
+            /**
+             * @description Open: by reason (review, reply, decide, do, pay), then overdue, by
+             *     due date, urgent first, oldest first. Cleared: newest first.
+             */
+            items: components["schemas"]["ItemView"][];
+        };
         /** @description `AuthenticatorAttestationResponseJSON`: what the authenticator made. */
         AttestationResponse: {
             /** @description The attestation object (CBOR), base64url. */
@@ -1615,6 +1730,11 @@ export interface components {
          * @enum {string}
          */
         ClientType: "confidential" | "public";
+        /** @description Yes to a question. */
+        Confirm: {
+            /** @description The message the question the member saw comes from. */
+            message_id: components["schemas"]["MessageId"];
+        };
         /** @description An app the caller let in. */
         ConnectedApp: {
             /** @description The app's client id. */
@@ -1817,6 +1937,7 @@ export interface components {
              * @description Messages in it.
              */
             message_count: number;
+            need?: components["schemas"]["NeedView"] | null;
             /** @description The start of the newest message's text. */
             snippet: string;
             /** @description Whether any message is starred. */
@@ -1940,6 +2061,12 @@ export interface components {
             reasons: components["schemas"]["ReasonView"][];
             /** @description Who answered. */
             source: components["schemas"]["DecisionSource"];
+            /**
+             * Format: int32
+             * @description The confidence, 0 to 100, from which an answer of this source to
+             *     this question may act; `None` when it never acts (a suggestion).
+             */
+            threshold?: number | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerView"];
         };
@@ -2241,6 +2368,66 @@ export interface components {
             role?: components["schemas"]["Role"];
         };
         /**
+         * Format: uuid
+         * @description ItemId (UUIDv7)
+         */
+        ItemId: string;
+        /**
+         * @description Whether an item still needs someone.
+         * @enum {string}
+         */
+        ItemState: "open" | "cleared";
+        /**
+         * @description An attention item, as the caller sees it. References and facts only: the
+         *     owning module renders who and what.
+         */
+        ItemView: {
+            /** @description The record that raised it. */
+            cause: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When it was cleared.
+             */
+            cleared_at?: string | null;
+            /**
+             * @description Why it was cleared (`replied`, `archived`, `trashed`, `done`,
+             *     `not_needed`), as the producing module said.
+             */
+            cleared_because?: string | null;
+            cleared_by?: components["schemas"]["UserId"] | null;
+            /** @description Who may see it: its container. */
+            container: components["schemas"]["RecordRef"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The item. */
+            id: components["schemas"]["ItemId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description Why. */
+            reason: components["schemas"]["Reason"];
+            /** @description The record it is about. */
+            record: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When its cause arrived.
+             */
+            since: string;
+            /**
+             * Format: date-time
+             * @description Until when the caller put it off ("Later"), when they did.
+             */
+            snoozed_until?: string | null;
+            /** @description Open or cleared. */
+            state: components["schemas"]["ItemState"];
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["Trust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
+        };
+        /**
          * @description What a workspace is for.
          * @enum {string}
          */
@@ -2356,6 +2543,55 @@ export interface components {
             /** @description The stream. */
             stream: components["schemas"]["Stream"];
         };
+        /**
+         * @description Whose answer raised a need.
+         * @enum {string}
+         */
+        NeedBasis: "rules" | "model" | "member";
+        /**
+         * @description The question whose answer raised a need.
+         * @enum {string}
+         */
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious";
+        /**
+         * @description Why a conversation needs its inbox's members (attention).
+         * @enum {string}
+         */
+        NeedReason: "reply" | "do" | "pay" | "review";
+        /**
+         * @description How much Campbooks stands behind a need.
+         * @enum {string}
+         */
+        NeedTrust: "sure" | "check";
+        /** @description A conversation's open need, as lists and the reader show it. */
+        NeedView: {
+            /** @description Whose answer raised it. */
+            basis: components["schemas"]["NeedBasis"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The message it comes from. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description The question that raised it. */
+            question: components["schemas"]["NeedQuestion"];
+            quote?: components["schemas"]["Quote"] | null;
+            /** @description Why. */
+            reason: components["schemas"]["NeedReason"];
+            /**
+             * @description The rule that decided it (`signals.reply_asked`, …), for the sentence
+             *     the client words it with.
+             * @example signals.reply_asked
+             */
+            rule?: string | null;
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["NeedTrust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
+        };
         /** @description The pending new account, as the new-account screen shows it. */
         NewAccount: {
             /** @description The name it gave. */
@@ -2387,6 +2623,11 @@ export interface components {
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
         };
+        /**
+         * @description How a member resolves a need.
+         * @enum {string}
+         */
+        Outcome: "done" | "not_needed";
         /** @description The query as understood. */
         ParsedQuery: {
             /** @description The filters applied. */
@@ -2479,6 +2720,36 @@ export interface components {
             operator: string;
         };
         /**
+         * @description The sender's sentence a need quotes, with who wrote it and when.
+         *     Untrusted mail content: clients show it as quoted plain text only.
+         */
+        Quote: {
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            sent_at: string;
+            /** @description The sentence, at most 240 characters. */
+            text: string;
+        };
+        /**
+         * @description Why an item needs someone, in the order Home shows the groups.
+         * @enum {string}
+         */
+        Reason: "review" | "reply" | "decide" | "do" | "pay";
+        /** @description How many open items there are for one reason. */
+        ReasonCount: {
+            /**
+             * Format: int32
+             * @description Open items with it.
+             */
+            count: number;
+            /** @description The reason. */
+            reason: components["schemas"]["Reason"];
+        };
+        /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
          */
@@ -2490,6 +2761,11 @@ export interface components {
              * @example signals.list_header
              */
             rule: string;
+            /**
+             * @description The sender's sentence holding the evidence, when it came from the
+             *     text. Untrusted: show it as quoted plain text only.
+             */
+            sentence?: string | null;
         };
         /**
          * @description A pointer to any record of any module.
@@ -2647,6 +2923,17 @@ export interface components {
             /** @description `required`. */
             userVerification: string;
         };
+        /** @description A member's verdict on a need. */
+        Resolve: {
+            /**
+             * @description The message the need the member saw comes from (`NeedView.message_id`):
+             *     when the open need comes from another one, nothing is recorded (409
+             *     `need_changed`).
+             */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Done or Not needed. */
+            outcome: components["schemas"]["Outcome"];
+        };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -2771,6 +3058,14 @@ export interface components {
         SignedInWith: {
             /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
             redirect: string;
+        };
+        /** @description Until when. */
+        Snooze: {
+            /**
+             * Format: date-time
+             * @description Later than now and less than a year away.
+             */
+            until: string;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -2950,6 +3245,11 @@ export interface components {
             /** @description Always `Bearer`. */
             token_type: string;
         };
+        /**
+         * @description How much the producing module stands behind an item.
+         * @enum {string}
+         */
+        Trust: "sure" | "check";
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -4079,6 +4379,190 @@ export interface operations {
             };
         };
     };
+    "attention.list": {
+        parameters: {
+            query?: {
+                /** @description `open` (default) or `cleared`. */
+                state?: "open" | "cleared";
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0,
+                 *     UTC): where their day starts, for Done today and for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionList"];
+                };
+            };
+            /** @description Not a state, or an offset beyond 14 hours (`invalid_offset`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Snooze"];
+            };
+        };
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description A time in the past or more than a year away (`invalid_until`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "changes.stream": {
         parameters: {
             query?: {
@@ -4446,6 +4930,12 @@ export interface operations {
                 cursor?: string;
                 /** @description Page size, 1 to 100 (default 50). */
                 limit?: number;
+                /**
+                 * @description These conversations only (1 to 100 ids, comma-separated), whatever
+                 *     their stream or whether archived; those you cannot see are left
+                 *     out. Other filters and the cursor are ignored.
+                 */
+                ids?: string;
             };
             header?: never;
             path: {
@@ -4838,6 +5328,215 @@ export interface operations {
             };
             /** @description No such message, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.confirm_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Confirm"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No message id. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No question to answer (`no_open_need`), or not the one you saw (`need_changed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.reopen_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing to bring back (`nothing_to_reopen`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.resolve_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolve"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Not an outcome. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -49,7 +49,7 @@ pub async fn read(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Read)
+    apply(&state, &workspace.access, id, Flag::Read, None)
         .await
         .map(Json)
 }
@@ -86,7 +86,7 @@ pub async fn unread(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Unread)
+    apply(&state, &workspace.access, id, Flag::Unread, None)
         .await
         .map(Json)
 }

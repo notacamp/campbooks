@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT container_type, container_id FROM attention.items\n            WHERE id = $1 AND state = 'open' FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "container_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "container_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "ede05c3a30e7b74f410dac4f13b7cf6382744a2f9fdeb7a4bcdb37ebe93ad8cf"
+}

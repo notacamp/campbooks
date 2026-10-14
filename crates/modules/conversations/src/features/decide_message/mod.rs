@@ -25,6 +25,7 @@ use crate::{
         blobs::read_text,
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
+        needs::{self, NeedSettings},
         policy::Policy,
         redact,
     },
@@ -39,16 +40,24 @@ pub struct DecideMessage {
     model: Option<Arc<dyn Strategy>>,
     backfill: TimeDelta,
     policy: Policy,
+    needs: NeedSettings,
 }
 
 impl DecideMessage {
     /// A pass asking `model`, for messages sent within `backfill_days`,
-    /// marking the answers `policy` accepts.
-    pub fn new(model: Option<Arc<dyn Strategy>>, backfill_days: u32, policy: Policy) -> Self {
+    /// marking the answers `policy` accepts and raising needs as `needs`
+    /// says.
+    pub fn new(
+        model: Option<Arc<dyn Strategy>>,
+        backfill_days: u32,
+        policy: Policy,
+        needs: NeedSettings,
+    ) -> Self {
         Self {
             model,
             backfill: TimeDelta::days(i64::from(backfill_days)),
             policy,
+            needs,
         }
     }
 }
@@ -93,10 +102,13 @@ impl EventConsumer for DecideMessage {
             answers: &answers,
             policy: &self.policy,
         };
+        let ctx_events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
         // The model pass never re-sorts: the stream was set when the message
         // was stored.
         recorded.store(tx, workspace, false).await?;
+        // The model's answers may put a question to the member.
+        needs::refresh(tx, &ctx_events, &facts.workspace, conversation, &self.needs).await?;
         Ok(())
     }
 }

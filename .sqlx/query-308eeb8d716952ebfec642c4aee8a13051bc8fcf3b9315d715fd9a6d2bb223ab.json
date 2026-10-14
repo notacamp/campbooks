@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM attention.items WHERE container_type = $1 AND container_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "308eeb8d716952ebfec642c4aee8a13051bc8fcf3b9315d715fd9a6d2bb223ab"
+}

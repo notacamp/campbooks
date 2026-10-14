@@ -359,6 +359,122 @@ impl From<&BlobRef> for BlobPointer {
     }
 }
 
+/// A small closed vocabulary with wire and database names.
+macro_rules! vocabulary {
+    ($(#[$meta:meta])* $name:ident { $($(#[$vmeta:meta])* $variant:ident => $wire:literal),+ $(,)? }) => {
+        $(#[$meta])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+        #[serde(rename_all = "snake_case")]
+        pub enum $name {
+            $($(#[$vmeta])* $variant),+
+        }
+
+        impl $name {
+            /// Every value.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// The wire and database name.
+            pub const fn as_str(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $wire),+
+                }
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = Error;
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                Self::ALL
+                    .iter()
+                    .copied()
+                    .find(|value| value.as_str() == s)
+                    .ok_or_else(|| {
+                        Error::internal(format!(concat!("unknown ", stringify!($name), " `{}`"), s))
+                    })
+            }
+        }
+    };
+}
+
+vocabulary!(
+    /// Why a conversation needs its inbox's members (attention).
+    NeedReason {
+        /// Someone is waiting for an answer.
+        Reply => "reply",
+        /// Someone asked for something to be done.
+        Do => "do",
+        /// Money is owed.
+        Pay => "pay",
+        /// Look before acting: a warning, or a question to the member.
+        Review => "review",
+    }
+);
+
+vocabulary!(
+    /// How much Campbooks stands behind a need.
+    NeedTrust {
+        /// An answer the policy lets act (or a member confirmed).
+        Sure => "sure",
+        /// A suggestion put to the member as a question.
+        Check => "check",
+    }
+);
+
+vocabulary!(
+    /// Whose answer raised a need.
+    NeedBasis {
+        /// The shared email signals.
+        Rules => "rules",
+        /// The `decide` model.
+        Model => "model",
+        /// A member confirmed it.
+        Member => "member",
+    }
+);
+
+vocabulary!(
+    /// The question whose answer raised a need.
+    NeedQuestion {
+        /// `needs_reply`.
+        NeedsReply => "needs_reply",
+        /// `asks_action`.
+        AsksAction => "asks_action",
+        /// `suspicious`.
+        Suspicious => "suspicious",
+    }
+);
+
+vocabulary!(
+    /// Why a need was cleared.
+    ClearCause {
+        /// A message was sent in the conversation after the one that raised it.
+        Replied => "replied",
+        /// The conversation was archived.
+        Archived => "archived",
+        /// Every message went to the trash or spam, or was removed.
+        Trashed => "trashed",
+        /// A member said it is done.
+        Done => "done",
+        /// A member said it was never needed.
+        NotNeeded => "not_needed",
+        /// A newer message replaced it.
+        Superseded => "superseded",
+    }
+);
+
+vocabulary!(
+    /// A member's verdict on a need.
+    NeedVerdict {
+        /// It is done.
+        Done => "done",
+        /// It was never needed (stored as a correction).
+        NotNeeded => "not_needed",
+        /// A question answered yes (stored as a correction).
+        Confirmed => "confirmed",
+    }
+);
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -402,6 +518,16 @@ mod tests {
         ] {
             assert_eq!(state.as_str().parse::<DraftState>().unwrap(), state);
         }
+        for reason in NeedReason::ALL {
+            assert_eq!(reason.as_str().parse::<NeedReason>().unwrap(), *reason);
+        }
+        for cause in ClearCause::ALL {
+            assert_eq!(
+                serde_json::to_value(cause).unwrap(),
+                serde_json::json!(cause.as_str())
+            );
+        }
+        assert!("later".parse::<NeedVerdict>().is_err());
         assert_eq!("email".parse::<Channel>().unwrap(), Channel::Email);
         assert!("sms".parse::<Channel>().is_err());
         assert!("spam".parse::<Stream>().is_err());

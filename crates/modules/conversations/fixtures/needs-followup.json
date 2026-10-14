@@ -1,0 +1,35 @@
+{
+  "changes": [
+    {
+      "op": "upsert",
+      "message": {
+        "provider_message_id": "needs-7",
+        "thread_key": "thr-lease",
+        "rfc_message_id": "needs-7@needs.example",
+        "in_reply_to": "needs-2@needs.example",
+        "references": [
+          "needs-2@needs.example"
+        ],
+        "from": {
+          "name": "Pedro Alves",
+          "address": "pedro.alves@example.com"
+        },
+        "to": [
+          {
+            "name": "Sam Rivers",
+            "address": "sam@example.com"
+          }
+        ],
+        "subject": "Re: Lease for the studio",
+        "sent_at": "2026-10-12T18:30:00Z",
+        "direction": "inbound",
+        "text": "Hello again,\n\nThe parking space is the second one on the left.\n\nPedro",
+        "mailbox": {
+          "in_inbox": true
+        },
+        "read": false,
+        "starred": false
+      }
+    }
+  ]
+}
