@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id AS \"id!: InboxId\" FROM conversations.inbox_members\n                    WHERE workspace_id = $1 AND user_id = $2\n                   UNION\n                   SELECT id AS \"id!: InboxId\" FROM conversations.inboxes\n                    WHERE workspace_id = $1 AND owner = $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id!: InboxId",
+        "type_info": "Uuid",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "cff053bbbe573b11e09650a4754e826d31c5fa108b7bcd74850706f0f911bf34"
+}

@@ -1921,7 +1921,12 @@
             "description": "`delete` (the default): the inboxes it fed are deleted, with their\nmessages, conversations, drafts, decisions, search entries and\nfiles. `keep`: they stay as read-only history, no longer synced.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/MailChoice"
+              "type": "string",
+              "description": "What becomes of the mail a connection brought in when it is removed\n(the owner's decision, campbooks-cloud#117): deleted with it (the\ndefault), or kept as read-only history. Only the member who connected\nit chooses when disconnecting; an owner or admin chooses when removing\nthat member.",
+              "enum": [
+                "delete",
+                "keep"
+              ]
             }
           }
         ],
@@ -4988,7 +4993,12 @@
             "description": "`delete` (the default): the mailboxes they connected are\ndisconnected and their mail deleted. `keep`: their mail stays as\nread-only history, no longer synced.",
             "required": false,
             "schema": {
-              "$ref": "#/components/schemas/MailChoice"
+              "type": "string",
+              "description": "What becomes of a departing member's mail (campbooks-cloud#117).",
+              "enum": [
+                "delete",
+                "keep"
+              ]
             }
           }
         ],

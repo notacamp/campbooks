@@ -73,6 +73,7 @@ pub struct RemoveQuery {
     /// `delete` (the default): the mailboxes they connected are
     /// disconnected and their mail deleted. `keep`: their mail stays as
     /// read-only history, no longer synced.
+    #[param(inline)]
     pub mail: Option<MailChoice>,
 }
 

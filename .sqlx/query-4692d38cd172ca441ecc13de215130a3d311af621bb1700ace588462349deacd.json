@@ -1,15 +1,15 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT inbox_id AS \"id: InboxId\" FROM conversations.inbox_members\n                    WHERE workspace_id = $1 AND user_id = $2",
+  "query": "SELECT inbox_id AS \"inbox_id: InboxId\" FROM conversations.messages WHERE id = $1",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "id: InboxId",
+        "name": "inbox_id: InboxId",
         "type_info": "Uuid",
         "origin": {
           "Table": {
-            "table": "conversations.inbox_members",
+            "table": "conversations.messages",
             "name": "inbox_id"
           }
         }
@@ -17,7 +17,6 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid"
       ]
     },
@@ -25,5 +24,5 @@
       false
     ]
   },
-  "hash": "904b9a9dacf50aeb4701e40e233872ed4a42fd0d136db3a0c12ae272e6f2b847"
+  "hash": "4692d38cd172ca441ecc13de215130a3d311af621bb1700ace588462349deacd"
 }

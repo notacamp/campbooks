@@ -774,6 +774,10 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     for frame in received {
         assert_eq!(frame.id.as_deref(), Some("3"));
     }
+    // Forty streams were mid-query a moment ago: close them and their pool
+    // before the test database is dropped.
+    drop(feeds);
+    world.server.state.db.close().await;
 }
 
 #[sqlx::test(migrations = "../../migrations")]

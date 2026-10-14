@@ -40,6 +40,7 @@ pub struct DisconnectQuery {
     /// `delete` (the default): the inboxes it fed are deleted, with their
     /// messages, conversations, drafts, decisions, search entries and
     /// files. `keep`: they stay as read-only history, no longer synced.
+    #[param(inline)]
     pub mail: Option<MailChoice>,
 }
 

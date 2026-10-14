@@ -134,6 +134,13 @@
           "inbox_ids"
         ],
         "properties": {
+          "account_subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's stable id of the account (the `OpenID` `sub`; opaque, never\nan address), so a way in that came only from this connection can be\ndropped with it."
+          },
           "connection": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection."
@@ -159,6 +166,17 @@
           "mail": {
             "$ref": "#/components/schemas/MailChoice",
             "description": "Delete the mail it brought in (the default), or keep it read-only."
+          },
+          "provider": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Provider",
+                "description": "Its provider."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "type": "string",

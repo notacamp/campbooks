@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT inbox_id AS \"inbox: InboxId\" FROM conversations.conversations\n            WHERE id = $1 AND inbox_id = ANY($2) FOR UPDATE",
+  "query": "SELECT inbox_id AS \"inbox: InboxId\" FROM conversations.conversations\n            WHERE id = $1 FOR UPDATE",
   "describe": {
     "columns": [
       {
@@ -17,13 +17,12 @@
     ],
     "parameters": {
       "Left": [
-        "Uuid",
-        "UuidArray"
+        "Uuid"
       ]
     },
     "nullable": [
       false
     ]
   },
-  "hash": "51f9016f8ddc7da0363d0a94ba739513423c1d6ce363ada187ae63c35f613da2"
+  "hash": "60ce817d512a8d715fa11c09dbfe02f6b7ae7fc6ee0dfd33e17d740109bc4cb5"
 }

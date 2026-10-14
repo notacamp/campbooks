@@ -1,23 +1,22 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT role FROM conversations.inbox_members WHERE inbox_id = $1 AND user_id = $2",
+  "query": "DELETE FROM conversations.inbox_members WHERE user_id = $1\n               RETURNING inbox_id AS \"inbox: InboxId\"",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "role",
-        "type_info": "Text",
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
         "origin": {
           "Table": {
             "table": "conversations.inbox_members",
-            "name": "role"
+            "name": "inbox_id"
           }
         }
       }
     ],
     "parameters": {
       "Left": [
-        "Uuid",
         "Uuid"
       ]
     },
@@ -25,5 +24,5 @@
       false
     ]
   },
-  "hash": "515ce3280cda8c3f29ec675e70b9440c67388b6eb0f3a389cd670991328fbf73"
+  "hash": "566c3adaa40c1cb2e733fe80c4a58fac18969e9f21be6ba1ea5372d204115961"
 }

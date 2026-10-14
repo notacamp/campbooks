@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT n.nspname || '.' || c.relname AS \"table!\"\n              FROM pg_class c\n              JOIN pg_namespace n ON n.oid = c.relnamespace\n             WHERE c.relkind IN ('r', 'p')\n               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public')\n               AND (EXISTS (SELECT 1 FROM pg_attribute a\n                             WHERE a.attrelid = c.oid AND a.attname = 'workspace_id'\n                               AND NOT a.attisdropped)\n                    OR (n.nspname, c.relname) = ('workspaces', 'workspaces'))\n               AND NOT (c.relrowsecurity AND c.relforcerowsecurity\n                        AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid))\n             ORDER BY 1\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "table!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "3f1dfecb0b247045f449a6e8c6d071f4ef5d63abb11c33d2dbae497a1c7e8498"
+}

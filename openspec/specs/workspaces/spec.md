@@ -27,3 +27,12 @@ policy tables, unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is set.
 #### Scenario: Refusal
 - **WHEN** the runtime role is a superuser (for example `CAMPBOOKS_DATABASE_ROLE` empty), or a migration URL is set and the runtime login is a superuser
 - **THEN** the server refuses to start unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is true
+
+### Requirement: Removing a member decides their mail
+`DELETE …/members/{user_id}` SHALL take `mail=delete` (the default) or
+`mail=keep`. `workspaces.member_left` SHALL carry the choice. A member who
+leaves on their own SHALL always have their mail deleted.
+
+#### Scenario: Offboarding with history kept
+- **WHEN** an owner removes a member with `mail=keep`
+- **THEN** `workspaces.member_left` says `"mail": "keep"`

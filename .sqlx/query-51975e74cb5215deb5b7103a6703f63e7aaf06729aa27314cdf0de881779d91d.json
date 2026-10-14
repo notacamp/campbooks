@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT i.id AS \"id: InboxId\", i.channel, i.address, i.display_name,\n               (SELECT m.role FROM conversations.inbox_members m\n                 WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,\n               (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c\n                 WHERE c.inbox_id = i.id AND c.archived_at IS NULL AND NOT c.trashed)\n                 AS \"unread_count!\"\n          FROM conversations.inboxes i\n         WHERE i.id = ANY($1)\n         ORDER BY i.address\n        ",
+  "query": "\n        SELECT i.id AS \"id: InboxId\", i.channel, i.address, i.display_name,\n               i.detached_at IS NOT NULL AS \"read_only!\",\n               (SELECT m.role FROM conversations.inbox_members m\n                 WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,\n               (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c\n                 WHERE c.inbox_id = i.id AND c.archived_at IS NULL AND NOT c.trashed)\n                 AS \"unread_count!\"\n          FROM conversations.inboxes i\n         WHERE i.id = ANY($1)\n         ORDER BY i.address\n        ",
   "describe": {
     "columns": [
       {
@@ -49,12 +49,18 @@
       },
       {
         "ordinal": 4,
+        "name": "read_only!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
         "name": "role",
         "type_info": "Text",
         "origin": "Expression"
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "unread_count!",
         "type_info": "Int4",
         "origin": "Expression"
@@ -72,8 +78,9 @@
       false,
       true,
       null,
+      null,
       null
     ]
   },
-  "hash": "d1015a82c7ea504961aab630f70d347dba5dde295f072991d4b7105c0ca1805b"
+  "hash": "51975e74cb5215deb5b7103a6703f63e7aaf06729aa27314cdf0de881779d91d"
 }

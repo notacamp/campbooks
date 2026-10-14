@@ -49,7 +49,7 @@ is built, what data each module owns, and the events.
 
 | Event | Change | Consumers |
 | --- | --- | --- |
-| `connectors.connection_removed` v1 | + `granted_by`, `mail` (optional, default `delete`); contract file added | `connectors` → `conversations.forget_connection` (new) |
+| `connectors.connection_removed` v1 | + `granted_by`, `provider`, `account_subject` (opaque provider id, for identity to drop connect-only ways in), `mail` (optional, default `delete`); contract file added | `connectors` → `conversations.forget_connection` (new) |
 | `workspaces.member_left` v1 | + `mail` (optional, default `delete`) | `connectors.revoke_departed_grants` (passes `mail` on), `conversations.forget_member` (new) |
 | `conversations.inbox_changed` v1 | new: a membership ended, the owner left, or the inbox was kept read-only | change feed only (allowlisted) |
 | `conversations.inbox_removed` v1 | new | `search.on_inbox_removed` (new) |

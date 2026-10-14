@@ -52,6 +52,8 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
     assert_eq!(removed[0]["mail"], "delete");
     assert_eq!(removed[0]["granted_by"], ana_id.to_string());
+    assert_eq!(removed[0]["provider"], "google");
+    assert!(removed[0]["account_subject"].is_string());
     assert_eq!(
         removed[0]["inbox_ids"][0],
         connection["streams"][0]["inbox_id"]

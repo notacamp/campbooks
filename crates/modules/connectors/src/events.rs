@@ -179,6 +179,14 @@ pub struct ConnectionRemoved {
     /// The member who had connected it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub granted_by: Option<UserId>,
+    /// Its provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<Provider>,
+    /// The provider's stable id of the account (the `OpenID` `sub`; opaque, never
+    /// an address), so a way in that came only from this connection can be
+    /// dropped with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_subject: Option<String>,
     /// Delete the mail it brought in (the default), or keep it read-only.
     #[serde(default)]
     pub mail: MailChoice,

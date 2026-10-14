@@ -1,11 +1,11 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT EXISTS (SELECT 1 FROM conversations.inbox_members\n                                           WHERE inbox_id = $1 AND user_id = $2) AS \"visible!\"",
+  "query": "SELECT true AS \"found!\" FROM workspaces.security_events\n                        WHERE workspace_id = $1 AND id = $2",
   "describe": {
     "columns": [
       {
         "ordinal": 0,
-        "name": "visible!",
+        "name": "found!",
         "type_info": "Bool",
         "origin": "Expression"
       }
@@ -20,5 +20,5 @@
       null
     ]
   },
-  "hash": "b117d9d64e6e4261c90959eedbf2251ce589389e4c73d235d0779060275d04b4"
+  "hash": "e6b11001a10166a9f0e6cced48f35e8e5b95477e25ceb92c75e42ce87cc029c4"
 }

@@ -94,8 +94,9 @@ pub async fn delete(
     mail: MailChoice,
 ) -> Result<bool> {
     let workspace_key = workspace.to_string();
-    let granted_by = sqlx::query_scalar!(
-        r#"SELECT granted_by AS "granted_by: UserId" FROM connectors.connections WHERE id = $1"#,
+    let removed = sqlx::query!(
+        r#"SELECT granted_by AS "granted_by: UserId", provider, account_subject
+             FROM connectors.connections WHERE id = $1"#,
         id as ConnectionId
     )
     .fetch_optional(&mut **tx)
@@ -155,7 +156,11 @@ pub async fn delete(
                 workspace: workspace_key,
                 connection: id,
                 inbox_ids,
-                granted_by,
+                granted_by: removed.as_ref().map(|r| r.granted_by),
+                provider: removed
+                    .as_ref()
+                    .and_then(|r| Provider::parse(&r.provider).ok()),
+                account_subject: removed.map(|r| r.account_subject),
                 mail,
             },
         )

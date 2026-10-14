@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
+  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id, audience, audience_user\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -79,6 +79,28 @@
             "name": "container_id"
           }
         }
+      },
+      {
+        "ordinal": 7,
+        "name": "audience",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "audience"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "audience_user",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "audience_user"
+          }
+        }
       }
     ],
     "parameters": {
@@ -95,8 +117,10 @@
       false,
       false,
       true,
+      true,
+      true,
       true
     ]
   },
-  "hash": "a08e1f20dfbc3ddc03bef316eff63524da67e92c29b2385f94e9f4e6d1ecc4c9"
+  "hash": "e7b0349642d6705458095022f566e2eb093ae0e081ec6e0144ded06af8b32434"
 }

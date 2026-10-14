@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)\n               OR EXISTS (SELECT 1 FROM conversations.inboxes\n                           WHERE id = $1 AND detached_at IS NOT NULL) AS \"closed!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "closed!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "24b650ac0b9eac697c603949f30038d52a298d40320d3ef15147d231579c355e"
+}

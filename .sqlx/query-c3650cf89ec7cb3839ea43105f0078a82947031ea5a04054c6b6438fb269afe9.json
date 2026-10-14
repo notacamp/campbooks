@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.inbox_id AS \"inbox_id!: InboxId\" FROM conversations.decisions d\n                                 JOIN conversations.messages m ON m.id = d.message_id\n                                WHERE d.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox_id!: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "inbox_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "c3650cf89ec7cb3839ea43105f0078a82947031ea5a04054c6b6438fb269afe9"
+}

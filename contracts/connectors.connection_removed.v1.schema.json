@@ -28,6 +28,18 @@
       "$ref": "#/$defs/uuid",
       "description": "The member who had connected it (a user id of the workspaces module)."
     },
+    "provider": {
+      "enum": [
+        "google",
+        "zoho"
+      ],
+      "description": "Its provider."
+    },
+    "account_subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The provider's stable id of the account (OpenID `sub`; opaque, never an address), so the identity module can drop a way in that came only from this connection."
+    },
     "mail": {
       "enum": [
         "delete",
