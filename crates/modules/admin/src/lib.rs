@@ -32,6 +32,27 @@ pub mod scopes;
 /// Module name: crate directory and Postgres schema.
 pub const NAME: &str = "admin";
 
+/// The module's part of the access catalogue (ADR 0017): admin profiles and
+/// the audit trail are reached by no operation; only the server's CLI
+/// writes them.
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
+    use campbooks_kernel::authz::{ResourceType, Tenancy};
+    [
+        ResourceType::new(
+            "admin.profile",
+            "An administrator's profile (their permissions): written by `campbooks-server \
+             admin` only, read by the kernel's admin check.",
+            Tenancy::Instance,
+        ),
+        ResourceType::new(
+            "admin.action",
+            "An entry of the admin audit trail: appended by the admin API, read with \
+             `campbooks-server admin log`.",
+            Tenancy::Instance,
+        ),
+    ]
+};
+
 /// The admin module: a scope, no routes, no background work.
 pub fn module() -> Module {
     Module {
@@ -40,6 +61,7 @@ pub fn module() -> Module {
         router: OpenApiRouter::new(),
         admin_router: None,
         background: Background::new(),
+        resources: campbooks_kernel::authz::Resources::declared(&RESOURCES),
     }
 }
 

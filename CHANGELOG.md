@@ -7,6 +7,44 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+
+- **Only the member who connected a mailbox can disconnect it.** Workspace owners and
+  admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
+- **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
+  attachments, conversations, labels, drafts, Campbooks' decisions, search entries and
+  inbox memberships, and its stored files are removed by the next blob sweep.
+  `DELETE …/connections/{id}?mail=keep` keeps the mail instead as read-only history
+  (no more syncing or sending). When an owner or admin removes a member,
+  `DELETE …/members/{user_id}?mail=keep` keeps the mail of the mailboxes that member
+  connected; otherwise it is deleted. A member who leaves loses every inbox
+  membership and their drafts, and gets none of it back if they rejoin. The inbox
+  list shows a kept mailbox as `read_only`. Keeping is refused (409 `keep_needs_a_reader`) when a
+  mailbox would have nobody left to read it. Kept mail can still be read and
+  deleted, and its scheduled sends go back to drafts. A disconnect never races a
+  sync: a batch landing at that moment is either fully deleted or dropped.
+- **A client a member registered acts for that member and no one else.** It reads
+  only the inboxes they read, and stops working (401) when they leave the workspace,
+  which also removes the clients they registered there. Client tokens no longer get
+  any inbox or attention item by themselves. A removed client's open change feed ends within a
+  heartbeat. A member removed and invited back can rejoin only once their departure
+  has been handled everywhere (409 `still_leaving` until then; a departure that
+  failed for good stays among the failed jobs, and blocks, until an operator replays
+  it), and a scheduled send
+  of someone no longer in the workspace goes back to a draft instead of out.
+- **Workspace owners and admins never read an inbox they are not a member of**, and
+  the change feed, search and every operation now enforce this through one access
+  check. Each resource type declares its owner and who else may do what (ADR 0017).
+  `cargo xtask arch` fails any operation that does not declare the access it needs.
+- The change feed rechecks access on every page. A member taken out of an inbox gets
+  a `reset` (`access_changed`) and no more of its ids. Drafts reach only their author,
+  and connections only the member who connected them, owners, admins and client tokens.
+- A repeated request with the same `Idempotency-Key` is answered from the stored
+  response only while the caller still has the scope, the workspace and the inbox the
+  first request used.
+- Row-level security now also covers the kernel's change feed, file catalogue, event
+  log and job queue. A search cursor only works in the workspace it came from, and
+  search reports `indexing` only to callers who can see an inbox.
+- **Self-hosters:** three new migrations run on start, with nothing to configure.
 - When a way to sign in is added to your account (a Google, Microsoft or Zoho
   account, or a passkey), you are told: by mail to your account's address and
   the new account's address (verified addresses only, in your language, no

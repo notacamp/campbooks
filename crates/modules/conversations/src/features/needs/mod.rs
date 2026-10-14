@@ -72,7 +72,7 @@ pub struct Confirm {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.reopen_need")
         .assistant()
-        .records(["conversations.conversation", "conversations.correction"])))),
+        .records(["conversations.conversation", "conversations.correction"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -125,7 +125,7 @@ pub async fn resolve(
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.reopen_need")
         .assistant()
-        .records(["conversations.conversation", "conversations.correction"])))),
+        .records(["conversations.conversation", "conversations.correction"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -173,7 +173,7 @@ pub async fn confirm(
     security(("bearer" = ["conversations:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.conversation", "conversations.correction"])))),
+        .records(["conversations.conversation", "conversations.correction"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -199,7 +199,7 @@ pub async fn reopen(
     let access = &workspace.access;
     let id = path.conversation_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    lock_conversation(&mut tx, access, id).await?;
+    lock_conversation(&state, &mut tx, access, id).await?;
     let withdrawn = sqlx::query_scalar!(
         r#"
         UPDATE conversations.needs n
@@ -247,7 +247,7 @@ async fn judge(
     seen: MessageId,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    lock_conversation(&mut tx, access, id).await?;
+    lock_conversation(state, &mut tx, access, id).await?;
     let need = sqlx::query!(
         r#"
         SELECT message_id AS "message: MessageId", question, basis, trust,

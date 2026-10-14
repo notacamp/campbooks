@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id AS \"inbox: InboxId\", user_id AS \"user: UserId\"\n                     FROM conversations.inbox_members\n                    WHERE inbox_id = ANY($1)\n                    ORDER BY inbox_id, user_id\n                      FOR SHARE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inbox_members",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "user: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inbox_members",
+            "name": "user_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "6bca8bd837ca7399ac542915eaec6eb9da1a91b0c1dd2d7075d9f4841fb4db62"
+}

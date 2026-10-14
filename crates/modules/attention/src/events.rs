@@ -128,3 +128,21 @@ impl DomainEvent for MemberLeft {
         Some(&self.workspace)
     }
 }
+
+/// `conversations.inbox_removed`: an inbox was deleted with everything in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InboxRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox (a container of items).
+    pub inbox: String,
+}
+
+impl DomainEvent for InboxRemoved {
+    const NAME: &'static str = "conversations.inbox_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}

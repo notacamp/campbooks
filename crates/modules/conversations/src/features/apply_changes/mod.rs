@@ -114,6 +114,23 @@ impl JobHandler for ApplyChanges {
         let state = ctx.state().clone();
         let ws = workspace.to_string();
 
+        if closed(&state, workspace, payload.inbox).await? {
+            // Deleted with its connection, or kept read-only: nothing syncs
+            // into it any more. The batch is let go.
+            let tx = ctx.tx().await?;
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox is closed");
+            return Ok(());
+        }
+
         let (bytes, cut) = read_bytes(&state.blobs, &ws, &payload.batch, MAX_BATCH_BYTES).await?;
         if cut {
             return Err(JobError::fatal("the change batch is larger than the limit"));
@@ -139,6 +156,29 @@ impl JobHandler for ApplyChanges {
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
+        // Asked again in the transaction that writes, holding the inbox
+        // `FOR SHARE` until it commits: a disconnect deleting or freezing it
+        // waits for this batch, or this batch sees it is closed.
+        let open = sqlx::query_scalar!(
+            r#"SELECT detached_at IS NULL AS "open!" FROM conversations.inboxes
+                WHERE id = $1 FOR SHARE"#,
+            batch.inbox as InboxId
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if open != Some(true) {
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox closed meanwhile");
+            return Ok(());
+        }
         let mut apply = Apply {
             state: &state,
             events: &events,
@@ -213,6 +253,25 @@ async fn survey(
     .await?;
     tx.commit().await?;
     Ok(known.into_iter().collect())
+}
+
+/// Whether `inbox` was deleted with its connection or kept read-only.
+async fn closed(
+    state: &AppState,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+) -> Result<bool, JobError> {
+    let mut tx = state.db.begin_for(workspace).await?;
+    let closed = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)
+               OR EXISTS (SELECT 1 FROM conversations.inboxes
+                           WHERE id = $1 AND detached_at IS NOT NULL) AS "closed!""#,
+        inbox as InboxId
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(closed)
 }
 
 /// What step 2 found out about a new message.

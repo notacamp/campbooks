@@ -98,17 +98,21 @@ impl From<Row> for WorkspaceClient {
 const COLUMNS: &str = "client_id, name, auth_method, allowed_scopes, redirect_uris, created_at, \
      secret_rotated_at, last_used_at";
 
-/// Refuse anyone but an owner or admin (403 `not_workspace_admin`).
-pub fn require_admin(access: &Access) -> Result<()> {
-    if access
-        .role
-        .is_some_and(campbooks_kernel::tenancy::Role::can_manage)
-    {
-        Ok(())
-    } else {
-        Err(Error::Denied(MESSAGES.reason("not_workspace_admin")))
-    }
+/// Ask the access catalogue (ADR 0017) whether `access` may take `action`
+/// on the workspace's clients: owners and admins only (403
+/// `not_workspace_admin`).
+pub fn require_admin(
+    state: &campbooks_kernel::AppState,
+    access: &Access,
+    action: campbooks_kernel::authz::Action,
+) -> Result<()> {
+    campbooks_kernel::authz::require_type(state, access, action, CLIENT_RECORD, || {
+        Error::Denied(MESSAGES.reason("not_workspace_admin"))
+    })
 }
+
+/// The record type of a workspace's client.
+pub const CLIENT_RECORD: &str = "identity.client";
 
 /// The workspace's clients, oldest first (the transaction is in the
 /// workspace).

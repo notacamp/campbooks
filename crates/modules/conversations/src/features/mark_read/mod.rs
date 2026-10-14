@@ -11,7 +11,7 @@ use crate::{
     domain::paths::ConversationPath,
     domain::{
         conversation::ConversationSummary,
-        flags::{Flag, apply},
+        flags::{self, Flag},
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -28,7 +28,7 @@ use crate::{
         .undo("conversations.mark_unread")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -49,7 +49,7 @@ pub async fn read(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Read, None)
+    flags::apply(&state, &workspace.access, id, Flag::Read, None)
         .await
         .map(Json)
 }
@@ -65,7 +65,7 @@ pub async fn read(
         .undo("conversations.mark_read")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -86,7 +86,7 @@ pub async fn unread(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Unread, None)
+    flags::apply(&state, &workspace.access, id, Flag::Unread, None)
         .await
         .map(Json)
 }

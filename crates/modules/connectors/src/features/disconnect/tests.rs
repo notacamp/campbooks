@@ -6,7 +6,7 @@ use campbooks_kernel::tenancy::{Role, WorkspaceId};
 use chrono::TimeDelta;
 use sqlx::PgPool;
 
-use crate::testkit::{Kit, synthetic};
+use crate::testkit::{Kit, assert_contract, synthetic};
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
@@ -18,9 +18,11 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     );
     let ws = WorkspaceId::new();
     let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
+    let ana_id = kit.join(&ana, ws, Role::Member);
     let bea = kit.user("bea");
     kit.join(&bea, ws, Role::Member);
+    let cid = kit.user("cid");
+    kit.join(&cid, ws, Role::Admin);
     let connection = kit.connect(&ana, ws).await;
     kit.run_jobs().await;
     let id = connection["id"].as_str().unwrap();
@@ -31,6 +33,15 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     let client = kit.delete(&kit.client(ws), &uri).await;
     assert_eq!(client.status, StatusCode::FORBIDDEN);
     assert_eq!(client.json["code"], "connection_needs_user");
+    // An admin sees it but only the member who connected it disconnects it.
+    let admin = kit.delete(&cid, &uri).await;
+    assert_eq!(admin.status, StatusCode::FORBIDDEN);
+    assert_eq!(admin.json["code"], "disconnect_owner_only");
+    assert!(
+        kit.payloads(ws, "connectors.connection_removed")
+            .await
+            .is_empty()
+    );
 
     assert_eq!(kit.delete(&ana, &uri).await.status, StatusCode::NO_CONTENT);
     let revoked = kit.google.revoked();
@@ -38,6 +49,11 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     assert!(revoked[0].starts_with("fake-refresh"));
     let removed = kit.payloads(ws, "connectors.connection_removed").await;
     assert_eq!(removed.len(), 1);
+    assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
+    assert_eq!(removed[0]["mail"], "delete");
+    assert_eq!(removed[0]["granted_by"], ana_id.to_string());
+    assert_eq!(removed[0]["provider"], "google");
+    assert!(removed[0]["account_subject"].is_string());
     assert_eq!(
         removed[0]["inbox_ids"][0],
         connection["streams"][0]["inbox_id"]
@@ -68,4 +84,32 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     assert_eq!(feed.first().map(String::as_str), Some("upsert"));
     assert_eq!(feed.last().map(String::as_str), Some("delete"));
     assert_eq!(kit.get(&ana, &uri).await.status, StatusCode::NOT_FOUND);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_grantor_may_keep_the_mail_read_only(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.google.seed(
+        &synthetic(1),
+        &["INBOX"],
+        kit.clock.now() - TimeDelta::hours(1),
+    );
+    let ws = WorkspaceId::new();
+    let ana = kit.user("ana");
+    kit.join(&ana, ws, Role::Member);
+    let connection = kit.connect(&ana, ws).await;
+    kit.run_jobs().await;
+    let id = connection["id"].as_str().unwrap();
+    let uri = format!("/api/v1/w/{ws}/connections/{id}?mail=keep");
+    assert_eq!(kit.delete(&ana, &uri).await.status, StatusCode::NO_CONTENT);
+    let removed = kit.payloads(ws, "connectors.connection_removed").await;
+    assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
+    assert_eq!(removed[0]["mail"], "keep");
+    let bad = kit
+        .delete(
+            &ana,
+            &format!("/api/v1/w/{ws}/connections/{id}?mail=archive"),
+        )
+        .await;
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 }

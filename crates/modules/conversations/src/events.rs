@@ -10,7 +10,10 @@
 //! workspace.
 
 use campbooks_kernel::{
-    DomainEvent, RecordRef, blobs::BlobRef, changes::Change as FeedChange, tenancy::UserId,
+    DomainEvent, RecordRef,
+    blobs::BlobRef,
+    changes::{Audience, Change as FeedChange},
+    tenancy::UserId,
 };
 use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
@@ -35,6 +38,12 @@ pub const DRAFT_RECORD: &str = "conversations.draft";
 /// `inbox` as the container of a change.
 fn inbox_record(inbox: InboxId) -> RecordRef {
     RecordRef::new(INBOX_RECORD, &inbox)
+}
+
+/// A draft's changes reach its author alone, or the client tokens for one a
+/// client wrote.
+fn draft_audience(author: Option<UserId>) -> Audience {
+    author.map_or(Audience::Clients, Audience::User)
 }
 
 impl MessageFacts {
@@ -368,6 +377,10 @@ pub struct SendRequested {
     /// The outgoing-message v1 document, a blob of the workspace.
     #[schema(value_type = BlobPointer)]
     pub message: BlobRef,
+    /// The draft's author; `None` for a client token's draft. Its change
+    /// reaches only them (a draft is private).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for SendRequested {
@@ -381,7 +394,8 @@ impl DomainEvent for SendRequested {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox_id)),
+                .within(inbox_record(self.inbox_id))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -399,6 +413,9 @@ pub struct DraftSent {
     /// The conversation it answered, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ConversationId>,
+    /// The draft's author; `None` for a client token's draft.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for DraftSent {
@@ -412,7 +429,8 @@ impl DomainEvent for DraftSent {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::delete(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox)),
+                .within(inbox_record(self.inbox))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -429,6 +447,9 @@ pub struct SendFailed {
     /// Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,
     /// `unavailable`, `unknown_outcome`).
     pub reason: String,
+    /// The draft's author; `None` for a client token's draft.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for SendFailed {
@@ -442,7 +463,8 @@ impl DomainEvent for SendFailed {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox)),
+                .within(inbox_record(self.inbox))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -556,6 +578,106 @@ impl DomainEvent for CapabilityGranted {
 
 /// The connection-account v1 document, as this module reads it
 /// (`contracts/connection-account.v1.schema.json`).
+/// The inbox changed in a way that may change who sees it, or what they
+/// may do there: a membership ended, its owner left, or it was kept
+/// read-only after its connection was removed. Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InboxChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+}
+
+impl DomainEvent for InboxChanged {
+    const NAME: &'static str = "conversations.inbox_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![FeedChange::upsert(inbox_record(self.inbox)).within(inbox_record(self.inbox))]
+    }
+}
+
+/// The inbox was deleted with everything in it (its connection was removed
+/// and its mail not kept). Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InboxRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+}
+
+impl DomainEvent for InboxRemoved {
+    const NAME: &'static str = "conversations.inbox_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![FeedChange::delete(inbox_record(self.inbox)).within(inbox_record(self.inbox))]
+    }
+}
+
+/// What becomes of a removed connection's mail
+/// (`contracts/connectors.connection_removed.v1.schema.json`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete the inboxes it fed (also when the field is absent).
+    #[default]
+    Delete,
+    /// Keep them read-only.
+    Keep,
+}
+
+/// `connectors.connection_removed` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The inboxes it fed.
+    pub inbox_ids: Vec<InboxId>,
+    /// Delete or keep their mail.
+    #[serde(default)]
+    pub mail: MailChoice,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_left` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberLeft {
+    /// The workspace.
+    pub workspace: String,
+    /// The former member.
+    pub user: UserId,
+}
+
+impl DomainEvent for MemberLeft {
+    const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct AccountDocument {
     /// The format version, 1.

@@ -22,7 +22,7 @@ use crate::{
     operation_id = "identity.sign_out_everywhere",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.session", "identity.refresh_family"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.session", "identity.refresh_family"]).access("identity.session", campbooks_kernel::authz::Action::Delete)))),
     responses(
         (status = NO_CONTENT, description = "Every session and refresh token of the account \
             ended, this one's included: sign in again."),
@@ -40,6 +40,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Unbound { principal, .. }: Unbound<IdentityWrite>,
 ) -> Result<StatusCode> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Delete,
+        "identity.session",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let now = issuer.now();
     let mut tx = state.db.begin().await?;

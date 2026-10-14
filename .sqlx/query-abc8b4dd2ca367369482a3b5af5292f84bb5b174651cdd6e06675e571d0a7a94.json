@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                DELETE FROM kernel.jobs\n                 WHERE id IN (\n                     SELECT id FROM kernel.jobs\n                      WHERE (state = 'succeeded'\n                             AND finished_at < now() - make_interval(hours => $1))\n                         OR (state = 'failed'\n                             AND finished_at < now() - make_interval(days => $2)\n                             AND NOT EXISTS (\n                                 SELECT 1 FROM kernel.events e\n                                  WHERE e.id = kernel.jobs.event_id AND e.name = ANY($4)))\n                      LIMIT $3)\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int4",
+        "Int4",
+        "Int8",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "abc8b4dd2ca367369482a3b5af5292f84bb5b174651cdd6e06675e571d0a7a94"
+}

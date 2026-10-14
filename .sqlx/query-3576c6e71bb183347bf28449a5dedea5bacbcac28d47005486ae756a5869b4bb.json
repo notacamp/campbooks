@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM attention.items\n              WHERE container_type = 'conversations.inbox' AND container_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3576c6e71bb183347bf28449a5dedea5bacbcac28d47005486ae756a5869b4bb"
+}

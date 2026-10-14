@@ -81,3 +81,22 @@ impl DomainEvent for WorkspaceDeleting {
         Some(&self.workspace)
     }
 }
+
+/// `conversations.inbox_removed` v1: an inbox was deleted with everything
+/// in it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InboxRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox (a container of the search index).
+    pub inbox: String,
+}
+
+impl DomainEvent for InboxRemoved {
+    const NAME: &'static str = "conversations.inbox_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}

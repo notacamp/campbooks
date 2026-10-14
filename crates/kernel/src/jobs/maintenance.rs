@@ -25,6 +25,9 @@ impl Job for PruneJobs {
         let jobs = &ctx.state().config.jobs;
         let hours = i32::try_from(jobs.retention_hours).unwrap_or(i32::MAX);
         let failed_days = i32::try_from(jobs.failed_retention_days).unwrap_or(i32::MAX);
+        // Failed deliveries of events that must settle stay until an
+        // operator acts: their absence would read as settled.
+        let settling = ctx.state().events.registry().settling_events();
         let mut pruned = 0_u64;
         loop {
             let deleted = sqlx::query!(
@@ -35,12 +38,16 @@ impl Job for PruneJobs {
                       WHERE (state = 'succeeded'
                              AND finished_at < now() - make_interval(hours => $1))
                          OR (state = 'failed'
-                             AND finished_at < now() - make_interval(days => $2))
+                             AND finished_at < now() - make_interval(days => $2)
+                             AND NOT EXISTS (
+                                 SELECT 1 FROM kernel.events e
+                                  WHERE e.id = kernel.jobs.event_id AND e.name = ANY($4)))
                       LIMIT $3)
                 "#,
                 hours,
                 failed_days,
                 PRUNE_BATCH,
+                &settling as &[&str],
             )
             .execute(ctx.pool())
             .await?
@@ -74,6 +81,7 @@ impl Job for PruneEvents {
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let days = i32::try_from(ctx.state().config.events.retention_days).unwrap_or(i32::MAX);
+        let settling = ctx.state().events.registry().settling_events();
         let mut pruned = 0_u64;
         loop {
             let deleted = sqlx::query!(
@@ -84,11 +92,14 @@ impl Job for PruneEvents {
                       WHERE e.occurred_at < now() - make_interval(days => $1)
                         AND NOT EXISTS (
                             SELECT 1 FROM kernel.jobs j
-                             WHERE j.event_id = e.id AND j.state IN ('pending', 'running'))
+                             WHERE j.event_id = e.id
+                               AND (j.state IN ('pending', 'running')
+                                    OR (j.state = 'failed' AND e.name = ANY($3))))
                       LIMIT $2)
                 "#,
                 days,
                 PRUNE_BATCH,
+                &settling as &[&str],
             )
             .execute(ctx.pool())
             .await?

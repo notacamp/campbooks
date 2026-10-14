@@ -47,7 +47,7 @@ pub struct WaysIn {
     operation_id = "identity.list_ways_in",
     tag = "identity",
     security(("bearer" = ["identity:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.provider_identity"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.provider_identity"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The caller's provider ways in.", body = WaysIn),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -63,6 +63,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<WaysIn>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Read,
+        "identity.provider_identity",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let items = accounts::ways_in(&state.db, account)
         .await?

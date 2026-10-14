@@ -45,7 +45,7 @@ impl HealthResponse {
     // Public: probes and support tools call it without a token.
     security(()),
     // A probe: neither rules nor the assistant have a reason to call it.
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("system.instance", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The instance and its database are up.", body = HealthResponse),
         (status = SERVICE_UNAVAILABLE, description = "The database is unreachable.",

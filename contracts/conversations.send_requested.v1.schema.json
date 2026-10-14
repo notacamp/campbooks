@@ -30,6 +30,10 @@
     "message": {
       "$ref": "#/$defs/blob",
       "description": "The outgoing-message v1 document, a blob of the workspace."
+    },
+    "author": {
+      "$ref": "#/$defs/uuid",
+      "description": "The draft's author (a user id of the workspaces module); absent for a client token's draft. Lets the change feed show the draft to its author alone."
     }
   },
   "$defs": {

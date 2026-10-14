@@ -5,8 +5,12 @@
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
 
-use axum::Json;
-use campbooks_kernel::{Operation, Problem, auth::Scoped};
+use axum::{Json, extract::State};
+use campbooks_kernel::{
+    AppState, Error, Operation, Problem,
+    auth::Scoped,
+    authz::{self, Action},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -32,8 +36,9 @@ pub struct {{feature_pascal}}Response {
     // (`.records(["{{name}}.<record>"])`), and opt in `.automation()` /
     // `.assistant()` if rules or the assistant may call it. A write starts
     // from `Operation::command(Risk::Low | Risk::High)` and names its
-    // inverse with `.undo("{{name}}.<verb>")`.
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    // inverse with `.undo("{{name}}.<verb>")`. `.access` names the resource
+    // type (in the module's `RESOURCES`) and the action (ADR 0017).
+    extensions(("x-campbooks" = json!(Operation::query().access("{{name}}.account", Action::Read)))),
     responses(
         (status = OK, description = "The answer for the caller.", body = {{feature_pascal}}Response),
         (status = UNAUTHORIZED, description = "No valid access token.",
@@ -43,16 +48,22 @@ pub struct {{feature_pascal}}Response {
     )
 )]
 pub async fn handler(
+    State(state): State<AppState>,
     Scoped { principal, .. }: Scoped<{{pascal}}Read>,
-) -> Json<{{feature_pascal}}Response> {
-    // To read this module's tables, also take `State(state): State<AppState>`,
-    // query `state.db` with `sqlx::query!` (then refresh the offline cache:
-    // `cargo sqlx prepare --workspace -- --all-targets`), return
-    // `campbooks_kernel::Result<Json<_>>`, and answer `Error::NotFound` for a
-    // record the principal may not see, never 403.
-    Json({{feature_pascal}}Response {
+) -> campbooks_kernel::Result<Json<{{feature_pascal}}Response>> {
+    // Ask the access catalogue first (ADR 0017). A workspace route takes
+    // `Workspace<S>`, opens `state.db.begin_for(workspace.id)` and asks
+    // `authz::require(&state, &mut tx, &workspace.access, action, &record, …)`;
+    // whoever may not read a record gets 404, never 403. To read this
+    // module's tables, query in that transaction with `sqlx::query!` (then
+    // refresh the offline cache:
+    // `cargo sqlx prepare --workspace -- --all-targets`).
+    authz::require_account(&state, &principal, Action::Read, "{{name}}.account", || {
+        Error::Forbidden
+    })?;
+    Ok(Json({{feature_pascal}}Response {
         subject: principal.subject,
-    })
+    }))
 }
 
 #[cfg(test)]

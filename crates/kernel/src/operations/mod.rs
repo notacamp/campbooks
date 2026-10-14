@@ -21,7 +21,7 @@
 //!         .undo("conversations.unarchive")
 //!         .automation()
 //!         .assistant()
-//!         .records(["conversations.thread"])))),
+//!         .records(["conversations.thread"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
 //!     responses(…),
 //! )]
 //! pub async fn handler(…) -> Result<…> { … }
@@ -96,6 +96,11 @@ pub struct Operation {
     pub risk: Risk,
     /// The record types (`<module>.<record>`) it reads or changes.
     pub records: Vec<String>,
+    /// The resource type it acts on and the action it takes, checked with
+    /// [`authz::authorize`](crate::authz::authorize) (ADR 0017). Required
+    /// by `cargo xtask arch` on every operation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub access: Option<crate::authz::OperationAccess>,
 }
 
 impl Operation {
@@ -109,6 +114,7 @@ impl Operation {
             assistant: false,
             risk: Risk::Low,
             records: Vec::new(),
+            access: None,
         }
     }
 
@@ -151,6 +157,17 @@ impl Operation {
         S: Into<String>,
     {
         self.records = records.into_iter().map(Into::into).collect();
+        self
+    }
+
+    /// The resource type (`<module>.<record>`, in the access catalogue) it
+    /// acts on, and the action (ADR 0017).
+    #[must_use]
+    pub fn access(mut self, resource: &str, action: crate::authz::Action) -> Self {
+        self.access = Some(crate::authz::OperationAccess {
+            resource: resource.to_owned(),
+            action,
+        });
         self
     }
 

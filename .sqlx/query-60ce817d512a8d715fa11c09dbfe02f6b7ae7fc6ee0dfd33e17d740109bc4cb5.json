@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id AS \"inbox: InboxId\" FROM conversations.conversations\n            WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "inbox_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "60ce817d512a8d715fa11c09dbfe02f6b7ae7fc6ee0dfd33e17d740109bc4cb5"
+}

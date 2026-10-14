@@ -1,6 +1,7 @@
 //! `GET /api/v1/w/{workspace_id}/members` — who belongs to a workspace.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result,
     db::BeginFor as _,
@@ -10,7 +11,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
-use crate::{domain::model::MemberView, scopes::WorkspacesRead};
+use crate::{
+    domain::{access::authorize_type, model::MemberView},
+    events::MEMBER_RECORD,
+    scopes::WorkspacesRead,
+};
 
 /// The members, in the order they joined.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -26,7 +31,7 @@ pub struct MemberList {
     operation_id = "workspaces.list_members",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["workspaces.member"]).access("workspaces.member", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The members.", body = MemberList),
@@ -47,6 +52,7 @@ pub async fn handler(
 
 /// The members of the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access) -> Result<MemberList> {
+    authorize_type(state, access, Action::Read, MEMBER_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let members = load(&mut tx, access.workspace, None).await?;
     tx.commit().await?;
