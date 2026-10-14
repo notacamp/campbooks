@@ -136,7 +136,10 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
     let listed = kit
         .api(Method::GET, "/api/v1/identity/passkeys", &token)
         .await;
-    assert_eq!(listed.json["items"][0]["signed_up_with"], true, "{listed:?}");
+    assert_eq!(
+        listed.json["items"][0]["signed_up_with"], true,
+        "{listed:?}"
+    );
     let mut laptop = Authenticator::new(ORIGIN, "localhost");
     let added = add_passkey(&kit, &token, &mut laptop, Alg::Ed25519).await;
     assert_eq!(added.status, StatusCode::CREATED, "{added:?}");
@@ -180,13 +183,12 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
             .any(|c| c.to_str().unwrap().starts_with("campbooks_webauthn=;")),
         "the ceremony cookie is cleared"
     );
-    let last_used: Option<chrono::DateTime<chrono::Utc>> =
-        sqlx::query_scalar(
-            "SELECT last_used_at FROM identity.passkeys WHERE added_via = 'sign_up'",
-        )
-        .fetch_one(&kit.state.db)
-            .await
-            .unwrap();
+    let last_used: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+        "SELECT last_used_at FROM identity.passkeys WHERE added_via = 'sign_up'",
+    )
+    .fetch_one(&kit.state.db)
+    .await
+    .unwrap();
     assert!(last_used.is_some());
 }
 

@@ -700,6 +700,53 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_cookie_rotations_old_still_ends_the_session(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let first = browser.cookie(SESSION).unwrap().to_owned();
+    // Two rotations while the person keeps using the app: the first token
+    // is past even the previous-token grace.
+    for _ in 0..2 {
+        exec(
+            &h.db,
+            "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+        )
+        .await;
+        assert_eq!(
+            browser.get("/bff/session").await.json()["authenticated"],
+            true
+        );
+    }
+    assert_ne!(browser.cookie(SESSION).unwrap(), first);
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        1
+    );
+
+    // A copy of the first cookie, presented much later.
+    let mut thief = Browser::new(&h.app);
+    thief.jar.insert(SESSION.to_owned(), first);
+    assert_eq!(
+        thief.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false,
+        "the session ended for both"
+    );
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        0,
+        "they go with the session"
+    );
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn sign_ins_are_rate_limited_per_address(db: PgPool) {
     let h = harness(db).await;
     let from =

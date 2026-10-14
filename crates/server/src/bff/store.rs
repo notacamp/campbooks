@@ -131,7 +131,9 @@ pub async fn touch(
 }
 
 /// Replace the session's token `old_hash` by `new_hash`, keeping the old one
-/// for the grace period. `false` when another request rotated it first.
+/// for the grace period and retiring the one before it (kept until the
+/// session ends, to recognise a copy). `false` when another request rotated
+/// it first.
 pub async fn rotate(
     db: &PgPool,
     id: Uuid,
@@ -139,7 +141,31 @@ pub async fn rotate(
     new_hash: &[u8],
     now: DateTime<Utc>,
 ) -> sqlx::Result<bool> {
-    let rotated = sqlx::query!(
+    let mut tx = db.begin().await?;
+    let Some(previous) = sqlx::query_scalar!(
+        "SELECT previous_token_hash FROM bff.sessions WHERE id = $1 AND token_hash = $2 FOR UPDATE",
+        id,
+        old_hash,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(false);
+    };
+    // The token before the previous one leaves the grace for good: kept, so
+    // a copy of it presented later is recognised.
+    if let Some(previous) = previous {
+        sqlx::query!(
+            "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
+             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            previous,
+            id,
+            now,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    sqlx::query!(
         r#"
         UPDATE bff.sessions
            SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4
@@ -150,10 +176,31 @@ pub async fn rotate(
         new_hash,
         now,
     )
-    .execute(db)
-    .await?
-    .rows_affected();
-    Ok(rotated == 1)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// The live session a retired token (one rotated away before the previous
+/// one) belonged to.
+pub async fn retired_session(
+    db: &PgPool,
+    hash: &[u8],
+    now: DateTime<Utc>,
+) -> sqlx::Result<Option<Uuid>> {
+    sqlx::query_scalar!(
+        r#"
+        SELECT s.id
+          FROM bff.retired_tokens r
+          JOIN bff.sessions s ON s.id = r.session_id
+         WHERE r.token_hash = $1 AND s.idle_expires_at > $2 AND s.expires_at > $2
+        "#,
+        hash,
+        now,
+    )
+    .fetch_optional(db)
+    .await
 }
 
 /// The session's tokens, locked until `tx` ends; `None` if it is gone.

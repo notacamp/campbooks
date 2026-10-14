@@ -333,6 +333,11 @@ impl Inner {
         let now = Utc::now();
         let token_hash = hash(&token);
         let Some(session) = store::find_session(&self.db, &token_hash, now).await? else {
+            if let Some(id) = store::retired_session(&self.db, &token_hash, now).await? {
+                // A token two or more rotations old: a copied cookie.
+                tracing::warn!("a retired web session token was presented again; the session ends");
+                self.terminate(id).await?;
+            }
             return Ok(None);
         };
         if !session.current && session.rotated_at <= now - ROTATION_GRACE {

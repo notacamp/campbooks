@@ -31,13 +31,18 @@ that 429 `rate_limited`. Calls made inside the server SHALL not be counted.
 
 ### Requirement: A copied web session ends
 The web BFF SHALL accept a rotated-away session cookie only during its
-two-minute grace. Presented later, the session SHALL end everywhere it
-reaches: the web session, its refresh token at the issuer and the issuer
-session; the log line SHALL name no session or person.
+two-minute grace. Presented later, however many rotations later while the
+session lives, the session SHALL end everywhere it reaches: the web session,
+its refresh token at the issuer and the issuer session; the log line SHALL
+name no session or person.
 
 #### Scenario: An old cookie comes back
 - **WHEN** a session's cookie rotated three minutes ago and the old value is presented
 - **THEN** neither browser is signed in any more and the session's refresh token is revoked
+
+#### Scenario: A copy two rotations old
+- **WHEN** a session rotated twice while in use and a copy of its first cookie is presented
+- **THEN** the session ends the same way
 
 ### Requirement: Names that read as Campbooks
 Before deciding whether an app's name reads as Campbooks or Not A Camp, the

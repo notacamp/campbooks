@@ -505,7 +505,10 @@ mod tests {
             "smtp://hunter2@localhost:2525?tls=opportunistic",
         ] {
             let refused = config(Some(url), from).check().unwrap_err();
-            assert!(refused.contains("CAMPBOOKS_MAIL__SMTP_URL"), "{url}: {refused}");
+            assert!(
+                refused.contains("CAMPBOOKS_MAIL__SMTP_URL"),
+                "{url}: {refused}"
+            );
             assert!(refused.contains("TLS"), "{url}: {refused}");
             assert!(!refused.contains("hunter2"), "{refused}");
         }

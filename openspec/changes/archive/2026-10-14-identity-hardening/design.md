@@ -56,8 +56,13 @@ which; `Inner::current` treats a previous token presented after
 copy may be the thief's. The session ends everywhere it reaches (row deleted,
 refresh token revoked at the issuer, issuer session ended with the ID token),
 the same teardown `/bff/logout` uses (now shared as `Inner::terminate`), and a
-warning is logged without ids. Only the last rotated-away token is known; one
-two rotations old is simply unknown (as before).
+warning is logged without ids. Older tokens are kept too: each rotation moves
+the token before the previous one into `bff.retired_tokens` (its SHA-256),
+kept until the session ends (cascade). A retired token presented at any time
+ends the session the same way, so an idle victim's copied cookie still trips
+it while the thief keeps the session alive. The memory is bounded: one row per
+rotation, at most the session's lifetime over the rotation period (about 720
+with the defaults of 30 days and one hour).
 
 ### Passkeys need a fresh sign-in
 `start_passkey_registration` asks for a sign-in from the last five minutes
@@ -120,13 +125,14 @@ hour.
    a takeover, which is when they no longer can. Kept as the fallback.
 
 **Copied sessions.**
-1. *End the session on a stale previous token (chosen):* cheap, no false
-   positives inside the grace window.
-2. *Bind sessions to the client IP or user agent:* breaks on mobile networks
+1. *End the session on any rotated-away token presented after the grace,
+   keeping retired hashes until the session ends (chosen):* no false positives
+   inside the grace window; bounded memory (about 720 hashes per session).
+2. *Only the last rotated-away token:* cheaper, but a thief who keeps the
+   session busy while the victim is idle rotates the victim's copy out of
+   reach.
+3. *Bind sessions to the client IP or user agent:* breaks on mobile networks
    and proxies; user agents are forgeable.
-3. *Keep a list of every rotated token:* catches older copies but grows
-   without bound for little more: the copy is caught at its first use after
-   the next rotation anyway.
 
 **Fresh sign-in for passkeys.**
 1. *Shorter `auth_time` window plus `max_age=0` from the app (chosen).*
