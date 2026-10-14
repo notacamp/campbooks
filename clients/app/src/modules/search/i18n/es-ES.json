@@ -1,0 +1,126 @@
+{
+  "field": {
+    "label": "Buscar conversaciones",
+    "placeholder": "Buscar conversaciones"
+  },
+  "overlay": {
+    "label": "Búsqueda",
+    "results": "Resultados",
+    "hintMove": "Mover",
+    "hintOpen": "Abrir",
+    "hintAll": "Todos los resultados",
+    "hintClose": "Cerrar"
+  },
+  "shortcuts": {
+    "open": "Buscar conversaciones"
+  },
+  "row": {
+    "noSubject": "(sin asunto)"
+  },
+  "chip": {
+    "attachment": "Con adjunto",
+    "is": {
+      "unread": "No leídas",
+      "read": "Leídas",
+      "starred": "Destacadas"
+    },
+    "from": "De {{value}}",
+    "to": "Para {{value}}",
+    "cc": "Cc {{value}}",
+    "subject": "Asunto: {{value}}",
+    "in": "En {{value}}",
+    "label": "Etiqueta: {{value}}",
+    "date": {
+      "before": "Antes del {{value}}",
+      "after": "Después del {{value}}",
+      "older_than": "Anteriores a {{value}}",
+      "newer_than": "Posteriores a {{value}}"
+    },
+    "other": "{{operator}}: {{value}}"
+  },
+  "warning": {
+    "label": "Lo que no se entendió",
+    "unknown_operator": "«{{operator}}:» no es un operador de búsqueda, así que se buscó como texto.",
+    "empty_value": "«{{operator}}:» necesita un valor a continuación.",
+    "invalid_value": "No se entendió el valor que sigue a «{{operator}}:».",
+    "other": "No se entendió una parte de esta búsqueda."
+  },
+  "recent": {
+    "title": "Búsquedas recientes",
+    "clear": "Borrar"
+  },
+  "tips": {
+    "title": "Afinar la búsqueda",
+    "from": {
+      "text": "De una persona",
+      "example": "from:ana"
+    },
+    "attachment": {
+      "text": "Con un archivo adjunto",
+      "example": "has:attachment"
+    },
+    "unread": {
+      "text": "Solo lo que no has leído",
+      "example": "is:unread"
+    },
+    "phrase": {
+      "text": "Una frase exacta",
+      "example": "\"factura de octubre\""
+    },
+    "exclude": {
+      "text": "Excluir una palabra",
+      "example": "-newsletter"
+    },
+    "date": {
+      "text": "Enviados después de una fecha",
+      "example": "after:2026-09-01"
+    }
+  },
+  "count_one": "{{count}} resultado",
+  "count_other": "{{count}} resultados",
+  "empty": {
+    "title": "Ninguna conversación coincide con «{{query}}»",
+    "body": "Prueba con menos palabras, o con otras.",
+    "bodyFilters": "Prueba a quitar un filtro de arriba, o a usar menos palabras."
+  },
+  "indexing": {
+    "title": "Aún se está indexando el correo antiguo",
+    "body": "Puede que falten conversaciones antiguas en estos resultados por ahora."
+  },
+  "error": {
+    "retry": "Reintentar",
+    "again": "Buscar de nuevo",
+    "too_long": {
+      "title": "Esta búsqueda es demasiado larga",
+      "body": "Acórtala a 512 caracteres o menos."
+    },
+    "cursor": {
+      "title": "Estos resultados están desactualizados",
+      "body": "La búsqueda cambió mientras se cargaban más resultados. Busca de nuevo para empezar desde arriba."
+    },
+    "busy": {
+      "title": "Demasiadas búsquedas seguidas",
+      "body": "Espera un momento y vuelve a intentarlo."
+    },
+    "other": {
+      "title": "No se pudo buscar",
+      "body": "Campbooks no pudo conectar con el servidor. No se ha perdido nada."
+    }
+  },
+  "page": {
+    "title": "Búsqueda",
+    "list": "Resultados de la búsqueda",
+    "order": "Orden",
+    "newest": "Más recientes",
+    "relevance": "Más relevantes",
+    "quick": "Filtros rápidos",
+    "attachmentToggle": "Con adjunto",
+    "unreadToggle": "No leídas",
+    "more": "Más resultados",
+    "loadingMore": "Cargando más resultados",
+    "reader": "Conversación",
+    "readerTitle": "Elige un resultado",
+    "readerBody": "Elige uno de la lista o usa el teclado:",
+    "back": "Volver a los resultados"
+  }
+}

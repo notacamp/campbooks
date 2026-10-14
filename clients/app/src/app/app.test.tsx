@@ -1,11 +1,13 @@
 import { createMemoryHistory, RouterProvider } from "@tanstack/react-router";
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readPref, writePref } from "~/lib/storage/prefs";
 
 import { readTabValue, writeTabValue } from "~/lib/storage/tab";
 
+import { W } from "../../test/demo/conversations";
+import { INVOICE_HIT, results } from "../../test/demo/search";
 import { CONNECTION, HELD_GRANT } from "../../test/demo/identity";
 import { ANA, DUARTE, HOUSEHOLD, PENDING, SESSION, SOFIA } from "../../test/demo/workspaces";
 import { mockApi, renderWithProviders } from "../../test/render";
@@ -224,5 +226,55 @@ describe("the app", () => {
     await waitFor(() => {
       expect(api.calls.some((call) => call.route === "POST /bff/logout")).toBe(true);
     });
+  });
+
+  it("opens search with / from a workspace page, and ⌘K hands its query over", async () => {
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      [LIST]: { body: { workspaces: [DUARTE] } },
+      [`GET ${W}/search`]: { body: results([INVOICE_HIT]) },
+    });
+    renderApp(`/w/${DUARTE.id}`);
+    await screen.findByRole("heading", { name: "Nothing needs you yet" });
+
+    fireEvent.keyDown(document.body, { key: "/" });
+    const search = await screen.findByRole("dialog", { name: "Search" });
+    expect(within(search).getByRole("combobox", { name: "Search conversations" })).toHaveFocus();
+    fireEvent.keyDown(within(search).getByRole("combobox"), { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: "Search" })).not.toBeInTheDocument();
+    });
+
+    fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
+    const menu = await screen.findByRole("dialog", { name: "Command menu" });
+    fireEvent.change(within(menu).getByRole("combobox"), { target: { value: "lease" } });
+    fireEvent.click(within(menu).getByRole("option", { name: /Search conversations for/u }));
+
+    const handed = await screen.findByRole("dialog", { name: "Search" });
+    expect(within(handed).getByRole("combobox")).toHaveValue("lease");
+    expect(screen.queryByRole("dialog", { name: "Command menu" })).not.toBeInTheDocument();
+  });
+
+  it("opens the results page instead on a phone", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query.includes("48rem"),
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      [LIST]: { body: { workspaces: [DUARTE] } },
+    });
+    const { router } = renderApp(`/w/${DUARTE.id}`);
+    await screen.findByRole("heading", { name: "Nothing needs you yet" });
+
+    fireEvent.keyDown(document.body, { key: "/" });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/search`);
+    });
+    expect(screen.queryByRole("dialog", { name: "Search" })).not.toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });

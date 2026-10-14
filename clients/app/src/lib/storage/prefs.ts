@@ -10,6 +10,8 @@ export type PrefKey =
   | "locale"
   | "theme"
   | "density"
+  /** The last queries typed in search (a JSON array of strings), newest first. */
+  | "searches"
   /** The workspace whose accent the boot script applies before first paint. */
   | "workspace"
   /** A workspace's accent preset: `accent.<workspace id>`. */

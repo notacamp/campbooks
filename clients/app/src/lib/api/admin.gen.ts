@@ -4,2014 +4,2014 @@
  */
 
 export interface paths {
-    "/admin/v1/connectors/workspaces/{workspace_id}/connections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See a workspace's connections and how they sync. */
-        get: operations["connectors.admin_list_connections"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/admin/v1/connectors/workspaces/{workspace_id}/connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/identity/accounts/{account_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See one account. */
-        get: operations["identity.admin_get_account"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** See a workspace's connections and how they sync. */
+    get: operations["connectors.admin_list_connections"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/identity/accounts/{account_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/identity/accounts/{account_id}/suspend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Suspend an account. */
-        post: operations["identity.admin_suspend_account"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** See one account. */
+    get: operations["identity.admin_get_account"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/identity/accounts/{account_id}/suspend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/identity/accounts/{account_id}/unsuspend": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Unsuspend an account. */
-        post: operations["identity.admin_unsuspend_account"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Suspend an account. */
+    post: operations["identity.admin_suspend_account"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/identity/accounts/{account_id}/unsuspend": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** The queue at a glance, by queue and kind. */
-        get: operations["system.admin_jobs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Unsuspend an account. */
+    post: operations["identity.admin_unsuspend_account"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/jobs/failed": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * The dead jobs, newest first: what failed and the last error, never the
-         *     job's payload.
-         */
-        get: operations["system.admin_failed_jobs"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** The queue at a glance, by queue and kind. */
+    get: operations["system.admin_jobs"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/jobs/failed": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/jobs/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retry the dead jobs of one kind, oldest first, up to 1000 per call. */
-        post: operations["system.admin_retry_jobs"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /**
+     * The dead jobs, newest first: what failed and the last error, never the
+     *     job's payload.
+     */
+    get: operations["system.admin_failed_jobs"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/jobs/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/jobs/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /** Delete one dead job. */
-        delete: operations["system.admin_discard_job"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Retry the dead jobs of one kind, oldest first, up to 1000 per call. */
+    post: operations["system.admin_retry_jobs"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/jobs/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/jobs/{id}/retry": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Retry one dead job. */
-        post: operations["system.admin_retry_job"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete one dead job. */
+    delete: operations["system.admin_discard_job"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/jobs/{id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/system/overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See the instance's version, health and configuration. */
-        get: operations["system.admin_overview"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Retry one dead job. */
+    post: operations["system.admin_retry_job"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/system/overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/signup-codes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List signup codes. */
-        get: operations["workspaces.admin_list_signup_codes"];
-        put?: never;
-        /** Mint a signup code. */
-        post: operations["workspaces.admin_mint_signup_code"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** See the instance's version, health and configuration. */
+    get: operations["system.admin_overview"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/signup-codes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/signup-codes/{code_id}/revoke": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Revoke a signup code. */
-        post: operations["workspaces.admin_revoke_signup_code"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List signup codes. */
+    get: operations["workspaces.admin_list_signup_codes"];
+    put?: never;
+    /** Mint a signup code. */
+    post: operations["workspaces.admin_mint_signup_code"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/signup-codes/{code_id}/revoke": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/signup-requests": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List signup requests. */
-        get: operations["workspaces.admin_list_signup_requests"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Revoke a signup code. */
+    post: operations["workspaces.admin_revoke_signup_code"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/signup-requests": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/signup-requests/{user_id}/approve": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Approve a signup request. */
-        post: operations["workspaces.admin_approve_signup_request"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List signup requests. */
+    get: operations["workspaces.admin_list_signup_requests"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/signup-requests/{user_id}/approve": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/signup-requests/{user_id}/reject": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Reject a signup request. */
-        post: operations["workspaces.admin_reject_signup_request"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Approve a signup request. */
+    post: operations["workspaces.admin_approve_signup_request"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/signup-requests/{user_id}/reject": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/users": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List people. */
-        get: operations["workspaces.admin_list_users"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Reject a signup request. */
+    post: operations["workspaces.admin_reject_signup_request"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/users": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/users/{user_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See one person. */
-        get: operations["workspaces.admin_get_user"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List people. */
+    get: operations["workspaces.admin_list_users"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/users/{user_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/workspaces": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List workspaces. */
-        get: operations["workspaces.admin_list_workspaces"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** See one person. */
+    get: operations["workspaces.admin_get_user"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/workspaces": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/admin/v1/workspaces/workspaces/{workspace_id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** See one workspace. */
-        get: operations["workspaces.admin_get_workspace"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** List workspaces. */
+    get: operations["workspaces.admin_list_workspaces"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/admin/v1/workspaces/workspaces/{workspace_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** See one workspace. */
+    get: operations["workspaces.admin_get_workspace"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** @description An identity account, as an administrator sees it. */
-        AdminAccount: {
-            /**
-             * Format: date-time
-             * @description When it was created.
-             */
-            created_at: string;
-            /** @description Its display name. */
-            display_name?: string | null;
-            /**
-             * Format: uuid
-             * @description The account (the `sub` of its tokens).
-             */
-            id: string;
-            /**
-             * Format: int64
-             * @description How many passkeys it has.
-             */
-            passkeys: number;
-            /** @description The address it was created with. */
-            primary_email?: string | null;
-            /** @description Whether a provider verified that address. */
-            primary_email_verified: boolean;
-            /** @description Its sign-ins. */
-            sessions: components["schemas"]["AdminSessions"];
-            /**
-             * Format: date-time
-             * @description When an administrator suspended it; absent unless suspended.
-             */
-            suspended_at?: string | null;
-            /** @description Its provider ways in, oldest first. */
-            ways_in: components["schemas"]["AdminWayIn"][];
-        };
-        /** @description A connection, as an administrator sees it. */
-        AdminConnection: {
-            /** @description The connected account's address. */
-            address: string;
-            /** @description What it lets Campbooks do. */
-            capabilities: components["schemas"]["Capability"][];
-            /**
-             * Format: date-time
-             * @description When it was connected.
-             */
-            created_at: string;
-            /** @description The member who connected it. */
-            granted_by: components["schemas"]["UserId"];
-            /** @description How it is doing. */
-            health: components["schemas"]["Health"];
-            /**
-             * Format: date-time
-             * @description Since when it has had this health.
-             */
-            health_changed_at: string;
-            /** @description Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …). */
-            health_reason?: string | null;
-            /** @description The connection. */
-            id: components["schemas"]["ConnectionId"];
-            /** @description The provider. */
-            provider: components["schemas"]["Provider"];
-            /** @description Its change streams. */
-            streams: components["schemas"]["AdminStream"][];
-        };
-        /** @description A workspace's connections. */
-        AdminConnectionList: {
-            /** @description Oldest first. */
-            connections: components["schemas"]["AdminConnection"][];
-        };
-        /** @description The instance at a glance, for administrators. */
-        AdminOverview: {
-            /**
-             * @description Each AI role: configured or not, model, provider and whether it
-             *     answers.
-             */
-            ai: components["schemas"]["AiRoleStatus"][];
-            /** @description Git commit the build came from, when known. */
-            commit?: string | null;
-            /** @description The effective configuration: enumerated facts only, no secret. */
-            configuration: components["schemas"]["ConfigSummary"];
-            /** @description Whether the database answers, and its migrations. */
-            database: components["schemas"]["DatabaseStatus"];
-            /** @description Who signs people in, and which providers are set up. */
-            services: components["schemas"]["Facts"];
-            /**
-             * Format: date-time
-             * @description When this server process started.
-             */
-            started_at: string;
-            /**
-             * Format: int64
-             * @description Seconds since then.
-             */
-            uptime_seconds: number;
-            /**
-             * @description Semantic version of the server.
-             * @example 0.1.0
-             */
-            version: string;
-        };
-        /** @description The account's sign-ins. */
-        AdminSessions: {
-            /**
-             * Format: int64
-             * @description Browsers signed in to the issuer right now.
-             */
-            active: number;
-            /**
-             * Format: date-time
-             * @description When the person last signed in.
-             */
-            last_sign_in_at?: string | null;
-        };
-        /** @description A stream's sync state, as an administrator sees it. */
-        AdminStream: {
-            /**
-             * @description The mailbox it reads (`messages`): one connection can reach several
-             *     (a Zoho login's mail accounts).
-             */
-            address?: string | null;
-            /** @description The capability it reads. */
-            capability: components["schemas"]["Capability"];
-            /**
-             * Format: int32
-             * @description How many runs in a row failed.
-             */
-            consecutive_failures: number;
-            /**
-             * Format: date-time
-             * @description When a run last finished.
-             */
-            last_synced_at?: string | null;
-            /** @description Paused until the member connects again. */
-            paused: boolean;
-            /** @description Where it is in its reading. */
-            phase: components["schemas"]["Phase"];
-        };
-        /** @description A person, as an administrator sees them. */
-        AdminUser: {
-            /**
-             * @description Their identity account (the `sub` of their tokens), for the identity
-             *     module's admin view of the account.
-             */
-            account_id: string;
-            /**
-             * Format: date-time
-             * @description When they first signed in.
-             */
-            created_at: string;
-            /** @description Their name, as their identity provider gives it. */
-            display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
-            email?: string | null;
-            /** @description The user. */
-            id: components["schemas"]["UserId"];
-            /**
-             * Format: int64
-             * @description How many workspaces they belong to (not counting deleted ones).
-             */
-            workspace_count: number;
-        };
-        /** @description A person and their workspaces. */
-        AdminUserDetail: {
-            /** @description Who they are. */
-            user: components["schemas"]["AdminUser"];
-            /** @description Their workspaces, in the order they joined. */
-            workspaces: components["schemas"]["AdminUserWorkspace"][];
-        };
-        /** @description One page of people. */
-        AdminUserPage: {
-            /** @description The `after` of the next page; absent on the last one. */
-            next?: string | null;
-            /** @description Newest first. */
-            users: components["schemas"]["AdminUser"][];
-        };
-        /** @description One of a person's workspaces. */
-        AdminUserWorkspace: {
-            /**
-             * Format: date-time
-             * @description When it was deleted (it is purged later); absent while it lives.
-             */
-            deleted_at?: string | null;
-            /** @description The workspace. */
-            id: components["schemas"]["WorkspaceId"];
-            /**
-             * Format: date-time
-             * @description When they joined.
-             */
-            joined_at: string;
-            /** @description What it is for. */
-            kind: components["schemas"]["Kind"];
-            /** @description Its name. */
-            name: string;
-            /** @description Their role in it. */
-            role: components["schemas"]["Role"];
-        };
-        /** @description A way in, as an administrator sees it. */
-        AdminWayIn: {
-            /** @description The address the provider gave when it was added. */
-            email?: string | null;
-            /**
-             * Format: date-time
-             * @description When it was last used to sign in.
-             */
-            last_used_at?: string | null;
-            /**
-             * Format: date-time
-             * @description When it was added.
-             */
-            linked_at: string;
-            /** @description `sign_up`, `link` or `connect`. */
-            linked_via: string;
-            /** @description `google`, `microsoft` or `zoho`. */
-            provider: string;
-        };
-        /** @description A workspace, as an administrator sees it. */
-        AdminWorkspace: {
-            /**
-             * Format: date-time
-             * @description When it was created.
-             */
-            created_at: string;
-            /**
-             * Format: date-time
-             * @description When it was deleted (it is purged later); absent while it lives.
-             */
-            deleted_at?: string | null;
-            /** @description The workspace. */
-            id: components["schemas"]["WorkspaceId"];
-            /** @description What it is for. */
-            kind: components["schemas"]["Kind"];
-            /**
-             * Format: int64
-             * @description How many members it has.
-             */
-            member_count: number;
-            /** @description Its name. */
-            name: string;
-            /** @description Its owners. */
-            owner_ids: components["schemas"]["UserId"][];
-        };
-        /** @description A workspace and who is in it. */
-        AdminWorkspaceDetail: {
-            /** @description Its members, in the order they joined. */
-            members: components["schemas"]["MemberView"][];
-            /**
-             * Format: int64
-             * @description How many invitations are pending (not accepted, not expired).
-             */
-            pending_invitations: number;
-            /** @description The workspace. */
-            workspace: components["schemas"]["AdminWorkspace"];
-        };
-        /** @description One page of workspaces. */
-        AdminWorkspacePage: {
-            /** @description The `after` of the next page; absent on the last one. */
-            next?: string | null;
-            /** @description Newest first. */
-            workspaces: components["schemas"]["AdminWorkspace"][];
-        };
-        /**
-         * @description Where an AI role's endpoint is, as far as mail content is concerned.
-         * @enum {string}
-         */
-        AiLocation: "instance" | "external";
-        /**
-         * @description The protocol a provider speaks.
-         * @enum {string}
-         */
-        AiProtocol: "openai" | "laya";
-        /**
-         * @description An AI role (ADR 0005).
-         * @enum {string}
-         */
-        AiRole: "decide" | "embed" | "complete" | "vision";
-        /**
-         * @description One AI role, without a secret: the provider is shown as scheme, host
-         *     and port only, and keys never.
-         */
-        AiRoleStatus: {
-            /** @description Whether a provider is configured for it. */
-            configured: boolean;
-            /**
-             * @description Whether it may receive mail content: on the instance's network, or
-             *     opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When
-             *     `false`, nothing calls it with content (the decide pass leaves
-             *     sorting to rules); only the reachability probe runs.
-             */
-            content_allowed?: boolean | null;
-            /**
-             * @description The provider's scheme, host and port.
-             * @example http://ollama:11434
-             */
-            endpoint?: string | null;
-            location?: components["schemas"]["AiLocation"] | null;
-            /** @description The model it calls. */
-            model?: string | null;
-            protocol?: components["schemas"]["AiProtocol"] | null;
-            /**
-             * @description Whether the provider answered a probe within 3 seconds (probes are
-             *     reused for a minute); `null` when not configured.
-             */
-            reachable?: boolean | null;
-            /** @description The role. */
-            role: components["schemas"]["AiRole"];
-        };
-        /**
-         * @description Which object store holds the blobs.
-         * @enum {string}
-         */
-        BlobBackend: "fs" | "s3";
-        /**
-         * @description What a connection lets Campbooks do with the account.
-         * @enum {string}
-         */
-        Capability: "messages" | "calendar" | "files" | "bank";
-        /**
-         * @description What a signup code can still do.
-         * @enum {string}
-         */
-        CodeState: "active" | "used_up" | "expired" | "revoked";
-        /**
-         * @description The non-secret facts of a [`Config`] an administrator sees
-         *     ([`Config::summary`]).
-         */
-        ConfigSummary: {
-            /** @description `CAMPBOOKS_BLOBS__BACKEND`. */
-            blob_store: components["schemas"]["BlobBackend"];
-            /** @description Whether migrations use a login of their own. */
-            database_logins: components["schemas"]["DatabaseLogins"];
-            /** @description `CAMPBOOKS_ENV`. */
-            environment: components["schemas"]["Environment"];
-            /** @description Whether traces and metrics are exported over OTLP. */
-            exports_telemetry: boolean;
-            /** @description Whether a Prometheus endpoint is open. */
-            metrics_endpoint: boolean;
-            /** @description When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`). */
-            migrations: components["schemas"]["Migrations"];
-            /** @description The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`. */
-            public_origin?: string | null;
-            /** @description Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`). */
-            serves_web_client: boolean;
-            /** @description `CAMPBOOKS_SIGNUP__POLICY` (never the codes). */
-            signup_policy: components["schemas"]["SignupPolicy"];
-        };
-        /**
-         * Format: uuid
-         * @description ConnectionId (UUIDv7)
-         */
-        ConnectionId: string;
-        /**
-         * @description How the server signs in to the database (`deploy/README.md`).
-         * @enum {string}
-         */
-        DatabaseLogins: "single" | "split";
-        /** @description The database, as this server sees it. */
-        DatabaseStatus: {
-            /**
-             * Format: int64
-             * @description How long a trivial query took, in milliseconds.
-             */
-            latency_ms?: number | null;
-            /**
-             * Format: int64
-             * @description The newest applied migration's version (`YYYYMMDDHHMMSS`).
-             */
-            latest_migration?: number | null;
-            /** @description The newest applied migration's description. */
-            latest_migration_description?: string | null;
-            /**
-             * Format: int64
-             * @description How many schema migrations are applied.
-             */
-            migrations_applied?: number | null;
-            /** @description Whether it answered within 3 seconds. */
-            reachable: boolean;
-        };
-        /**
-         * @description The kind of deployment (`CAMPBOOKS_ENV`).
-         * @enum {string}
-         */
-        Environment: "production" | "development";
-        /** @description Who signs people in, and the outside providers set up, by name only. */
-        Facts: {
-            /** @description Which identity provider issues tokens. */
-            identity_provider: components["schemas"]["IdentityProvider"];
-            /** @description The mail providers mailboxes can be connected from (`google`, …). */
-            mail_providers: string[];
-            /** @description The providers people can sign in with (`google`, …). */
-            sign_in_providers: string[];
-        };
-        /** @description A dead job: what ran and why it stopped, never its payload. */
-        FailedJob: {
-            /**
-             * Format: int32
-             * @description Attempts made.
-             */
-            attempts: number;
-            /**
-             * Format: date-time
-             * @description When it was enqueued.
-             */
-            created_at: string;
-            /**
-             * Format: date-time
-             * @description When it died.
-             */
-            finished_at?: string | null;
-            /** @description The job's id. */
-            id: components["schemas"]["JobId"];
-            /** @description The job's wire name. */
-            kind: string;
-            /** @description The last failure, truncated; never carries secrets. */
-            last_error?: string | null;
-            /**
-             * Format: int32
-             * @description Attempts it was allowed.
-             */
-            max_attempts: number;
-            /** @description The queue it ran on. */
-            queue: string;
-            /** @description The workspace it belongs to; `null` for instance-wide work. */
-            workspace_id?: string | null;
-        };
-        /** @description A page of dead jobs, newest first. */
-        FailedPage: {
-            /** @description The jobs. */
-            items: components["schemas"]["FailedJob"][];
-            /** @description Pass as `after` for the next page; `null` on the last one. */
-            next?: string | null;
-        };
-        /**
-         * @description How a connection is doing.
-         * @enum {string}
-         */
-        Health: "ok" | "needs_reauth" | "throttled" | "failing";
-        /**
-         * @description Which identity provider issues this instance's tokens (ADR 0014).
-         * @enum {string}
-         */
-        IdentityProvider: "built_in" | "external" | "none";
-        /** @description The result of acting on one job. */
-        JobAction: {
-            /** @description What happened. */
-            outcome: components["schemas"]["Outcome"];
-        };
-        /**
-         * Format: uuid
-         * @description JobId (UUIDv7)
-         */
-        JobId: string;
-        /**
-         * @description What a workspace is for.
-         * @enum {string}
-         */
-        Kind: "business" | "personal";
-        /** @description The jobs of one kind on one queue. */
-        KindSummary: {
-            /**
-             * Format: int64
-             * @description Running, but past its lease: the worker stopped renewing it and the
-             *     next upkeep hands it back.
-             */
-            expired_leases: number;
-            /**
-             * Format: int64
-             * @description Dead: out of attempts, or failed for good. Kept for inspection.
-             */
-            failed: number;
-            /** @description The job's wire name (`<module>.<job>`). */
-            kind: string;
-            /**
-             * Format: int64
-             * @description Age of the oldest ready job of this kind, in seconds.
-             */
-            oldest_ready_seconds?: number | null;
-            /** @description The queue they run on. */
-            queue: string;
-            /**
-             * Format: int64
-             * @description Pending and due now: waiting for a worker.
-             */
-            ready: number;
-            /**
-             * Format: int64
-             * @description Claimed by a worker.
-             */
-            running: number;
-            /**
-             * Format: int64
-             * @description Pending for later: new delayed work, or waiting out a retry backoff.
-             */
-            scheduled: number;
-        };
-        /** @description A member of a workspace. */
-        MemberView: {
-            /** @description Their name, as their identity provider gives it. */
-            display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
-            email?: string | null;
-            /**
-             * Format: date-time
-             * @description When they joined.
-             */
-            joined_at: string;
-            /** @description Their role. */
-            role: components["schemas"]["Role"];
-            /** @description The user. */
-            user_id: components["schemas"]["UserId"];
-        };
-        /**
-         * @description When schema migrations run.
-         * @enum {string}
-         */
-        Migrations: "on_start" | "separately";
-        /** @description A new signup code. */
-        MintSignupCode: {
-            /**
-             * Format: date-time
-             * @description After this it cannot be redeemed; must be in the future. Never
-             *     expires when absent.
-             */
-            expires_at?: string | null;
-            /**
-             * @description What it is for (who it goes to), 1 to 100 characters.
-             * @example Beta tester, Ana
-             */
-            label: string;
-            /**
-             * Format: int32
-             * @description How many times it can be redeemed: 1 to 100000, default 1.
-             */
-            max_uses?: number | null;
-        };
-        /** @description A freshly minted code. */
-        MintedSignupCode: {
-            /**
-             * @description The code to hand over, like `K7QM-2XWP-9DHE-RT4A`. Shown here once.
-             * @example K7QM-2XWP-9DHE-RT4A
-             */
-            code: string;
-            /** @description The stored code (without the code itself). */
-            entry: components["schemas"]["SignupCodeView"];
-        };
-        /**
-         * @description What a retry or discard did.
-         * @enum {string}
-         */
-        Outcome: "applied" | "unchanged" | "superseded";
-        /**
-         * @description Where a stream is in its reading.
-         * @enum {string}
-         */
-        Phase: "backfill" | "incremental" | "resync";
-        /**
-         * @description RFC 9457 problem details.
-         * @example {
-         *       "code": "not_found",
-         *       "detail": "This resource does not exist, or you cannot see it.",
-         *       "status": 404,
-         *       "title": "Not found",
-         *       "type": "about:blank"
-         *     }
-         */
-        Problem: {
-            /**
-             * @description Stable machine-readable reason (`not_found`, `invalid_token`,
-             *     `last_owner`, …); the same in every locale. Match on this, never on
-             *     `title` or `detail`.
-             */
-            code: string;
-            /** @description What went wrong in this occurrence, in the request's locale. */
-            detail: string;
-            /**
-             * Format: int32
-             * @description HTTP status code.
-             */
-            status: number;
-            /**
-             * @description Short summary of the problem type, in the request's locale
-             *     (`Content-Language`).
-             */
-            title: string;
-            /**
-             * @description URI identifying the problem type; `about:blank` when the HTTP status
-             *     says it all.
-             */
-            type: string;
-        };
-        /**
-         * @description An outside provider.
-         * @enum {string}
-         */
-        Provider: "google" | "zoho";
-        /**
-         * @description The queue at a glance: one row per queue and kind with unfinished or
-         *     failed work. Succeeded jobs are pruned and not counted.
-         */
-        QueueSummary: {
-            /**
-             * Format: date-time
-             * @description When the counts were taken.
-             */
-            at: string;
-            /** @description Counts per queue and kind, sorted by queue then kind. */
-            kinds: components["schemas"]["KindSummary"][];
-            /**
-             * Format: int64
-             * @description Age of the oldest job that is ready to run and waiting, in seconds.
-             */
-            oldest_ready_seconds?: number | null;
-        };
-        /** @description Why a request is turned down. */
-        RejectSignupRequest: {
-            /**
-             * @description An optional note for the administrators' records, at most 500
-             *     characters. The requester is told only that they were not approved.
-             */
-            reason?: string | null;
-        };
-        /**
-         * @description Where a user's signup request stands.
-         * @enum {string}
-         */
-        RequestStatus: "pending" | "approved" | "rejected";
-        /** @description Which dead jobs to retry. */
-        RetryKind: {
-            /** @description The kind (`<module>.<job>`). */
-            kind: string;
-            /** @description Only on this queue. */
-            queue?: string | null;
-        };
-        /** @description How many jobs a bulk retry requeued. */
-        RetryKindResult: {
-            /**
-             * @description Whether the batch limit was reached, so more dead jobs of the kind
-             *     may remain: call again.
-             */
-            more: boolean;
-            /**
-             * Format: int64
-             * @description Jobs put back on their queue.
-             */
-            requeued: number;
-        };
-        /**
-         * @description A member's role in a workspace.
-         * @enum {string}
-         */
-        Role: "owner" | "admin" | "member";
-        /**
-         * Format: uuid
-         * @description SignupCodeId (UUIDv7)
-         */
-        SignupCodeId: string;
-        /** @description A page of signup codes. */
-        SignupCodeList: {
-            /** @description The codes, newest first. */
-            codes: components["schemas"]["SignupCodeView"][];
-            /** @description Pass as `after` for the next page; `null` on the last one. */
-            next?: string | null;
-        };
-        /**
-         * @description One minted signup code. The code itself is never here: only its
-         *     administrators saw it, once, when it was minted.
-         */
-        SignupCodeView: {
-            /**
-             * Format: date-time
-             * @description When.
-             */
-            created_at: string;
-            /** @description The administrator who minted it (their account id). */
-            created_by: string;
-            /**
-             * Format: date-time
-             * @description After this it cannot be redeemed.
-             */
-            expires_at?: string | null;
-            /** @description Its id. */
-            id: components["schemas"]["SignupCodeId"];
-            /** @description What the administrator called it. */
-            label: string;
-            /**
-             * Format: int32
-             * @description How many times it can be redeemed.
-             */
-            max_uses: number;
-            /**
-             * Format: date-time
-             * @description When it was revoked.
-             */
-            revoked_at?: string | null;
-            /** @description What it can still do. */
-            state: components["schemas"]["CodeState"];
-            /**
-             * Format: int32
-             * @description How many times it was.
-             */
-            uses: number;
-        };
-        /**
-         * @description Who may create a workspace when they are not a member of any yet.
-         * @enum {string}
-         */
-        SignupPolicy: "open" | "invite_only" | "approval" | "code";
-        /** @description A page of signup requests. */
-        SignupRequestList: {
-            /** @description Pass as `after` for the next page; `null` on the last one. */
-            next?: string | null;
-            /** @description The requests: pending first, then newest first. */
-            requests: components["schemas"]["SignupRequestView"][];
-        };
-        /**
-         * @description One signup request, as an administrator sees it: who asked and where it
-         *     stands. No content, only the account's own name and address.
-         */
-        SignupRequestView: {
-            /**
-             * Format: date-time
-             * @description When an administrator decided.
-             */
-            decided_at?: string | null;
-            /** @description The deciding administrator's account id. */
-            decided_by?: string | null;
-            /** @description Their display name, when their sign-in carried one. */
-            display_name?: string | null;
-            /** @description Their email address, when their sign-in carried one. */
-            email?: string | null;
-            /** @description Why it was turned down, when the administrator said. */
-            reason?: string | null;
-            /**
-             * Format: date-time
-             * @description When they first asked.
-             */
-            requested_at: string;
-            /** @description Where the request stands. */
-            status: components["schemas"]["RequestStatus"];
-            /** @description The requesting user (also the request's id). */
-            user_id: components["schemas"]["UserId"];
-        };
-        /**
-         * Format: uuid
-         * @description UserId (UUIDv7)
-         */
-        UserId: string;
-        /**
-         * Format: uuid
-         * @description WorkspaceId (UUIDv7)
-         */
-        WorkspaceId: string;
+  schemas: {
+    /** @description An identity account, as an administrator sees it. */
+    AdminAccount: {
+      /**
+       * Format: date-time
+       * @description When it was created.
+       */
+      created_at: string;
+      /** @description Its display name. */
+      display_name?: string | null;
+      /**
+       * Format: uuid
+       * @description The account (the `sub` of its tokens).
+       */
+      id: string;
+      /**
+       * Format: int64
+       * @description How many passkeys it has.
+       */
+      passkeys: number;
+      /** @description The address it was created with. */
+      primary_email?: string | null;
+      /** @description Whether a provider verified that address. */
+      primary_email_verified: boolean;
+      /** @description Its sign-ins. */
+      sessions: components["schemas"]["AdminSessions"];
+      /**
+       * Format: date-time
+       * @description When an administrator suspended it; absent unless suspended.
+       */
+      suspended_at?: string | null;
+      /** @description Its provider ways in, oldest first. */
+      ways_in: components["schemas"]["AdminWayIn"][];
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** @description A connection, as an administrator sees it. */
+    AdminConnection: {
+      /** @description The connected account's address. */
+      address: string;
+      /** @description What it lets Campbooks do. */
+      capabilities: components["schemas"]["Capability"][];
+      /**
+       * Format: date-time
+       * @description When it was connected.
+       */
+      created_at: string;
+      /** @description The member who connected it. */
+      granted_by: components["schemas"]["UserId"];
+      /** @description How it is doing. */
+      health: components["schemas"]["Health"];
+      /**
+       * Format: date-time
+       * @description Since when it has had this health.
+       */
+      health_changed_at: string;
+      /** @description Why, when it is not `ok` (`grant_revoked`, `rate_limited`, …). */
+      health_reason?: string | null;
+      /** @description The connection. */
+      id: components["schemas"]["ConnectionId"];
+      /** @description The provider. */
+      provider: components["schemas"]["Provider"];
+      /** @description Its change streams. */
+      streams: components["schemas"]["AdminStream"][];
+    };
+    /** @description A workspace's connections. */
+    AdminConnectionList: {
+      /** @description Oldest first. */
+      connections: components["schemas"]["AdminConnection"][];
+    };
+    /** @description The instance at a glance, for administrators. */
+    AdminOverview: {
+      /**
+       * @description Each AI role: configured or not, model, provider and whether it
+       *     answers.
+       */
+      ai: components["schemas"]["AiRoleStatus"][];
+      /** @description Git commit the build came from, when known. */
+      commit?: string | null;
+      /** @description The effective configuration: enumerated facts only, no secret. */
+      configuration: components["schemas"]["ConfigSummary"];
+      /** @description Whether the database answers, and its migrations. */
+      database: components["schemas"]["DatabaseStatus"];
+      /** @description Who signs people in, and which providers are set up. */
+      services: components["schemas"]["Facts"];
+      /**
+       * Format: date-time
+       * @description When this server process started.
+       */
+      started_at: string;
+      /**
+       * Format: int64
+       * @description Seconds since then.
+       */
+      uptime_seconds: number;
+      /**
+       * @description Semantic version of the server.
+       * @example 0.1.0
+       */
+      version: string;
+    };
+    /** @description The account's sign-ins. */
+    AdminSessions: {
+      /**
+       * Format: int64
+       * @description Browsers signed in to the issuer right now.
+       */
+      active: number;
+      /**
+       * Format: date-time
+       * @description When the person last signed in.
+       */
+      last_sign_in_at?: string | null;
+    };
+    /** @description A stream's sync state, as an administrator sees it. */
+    AdminStream: {
+      /**
+       * @description The mailbox it reads (`messages`): one connection can reach several
+       *     (a Zoho login's mail accounts).
+       */
+      address?: string | null;
+      /** @description The capability it reads. */
+      capability: components["schemas"]["Capability"];
+      /**
+       * Format: int32
+       * @description How many runs in a row failed.
+       */
+      consecutive_failures: number;
+      /**
+       * Format: date-time
+       * @description When a run last finished.
+       */
+      last_synced_at?: string | null;
+      /** @description Paused until the member connects again. */
+      paused: boolean;
+      /** @description Where it is in its reading. */
+      phase: components["schemas"]["Phase"];
+    };
+    /** @description A person, as an administrator sees them. */
+    AdminUser: {
+      /**
+       * @description Their identity account (the `sub` of their tokens), for the identity
+       *     module's admin view of the account.
+       */
+      account_id: string;
+      /**
+       * Format: date-time
+       * @description When they first signed in.
+       */
+      created_at: string;
+      /** @description Their name, as their identity provider gives it. */
+      display_name?: string | null;
+      /** @description Their email address, as their identity provider gives it. */
+      email?: string | null;
+      /** @description The user. */
+      id: components["schemas"]["UserId"];
+      /**
+       * Format: int64
+       * @description How many workspaces they belong to (not counting deleted ones).
+       */
+      workspace_count: number;
+    };
+    /** @description A person and their workspaces. */
+    AdminUserDetail: {
+      /** @description Who they are. */
+      user: components["schemas"]["AdminUser"];
+      /** @description Their workspaces, in the order they joined. */
+      workspaces: components["schemas"]["AdminUserWorkspace"][];
+    };
+    /** @description One page of people. */
+    AdminUserPage: {
+      /** @description The `after` of the next page; absent on the last one. */
+      next?: string | null;
+      /** @description Newest first. */
+      users: components["schemas"]["AdminUser"][];
+    };
+    /** @description One of a person's workspaces. */
+    AdminUserWorkspace: {
+      /**
+       * Format: date-time
+       * @description When it was deleted (it is purged later); absent while it lives.
+       */
+      deleted_at?: string | null;
+      /** @description The workspace. */
+      id: components["schemas"]["WorkspaceId"];
+      /**
+       * Format: date-time
+       * @description When they joined.
+       */
+      joined_at: string;
+      /** @description What it is for. */
+      kind: components["schemas"]["Kind"];
+      /** @description Its name. */
+      name: string;
+      /** @description Their role in it. */
+      role: components["schemas"]["Role"];
+    };
+    /** @description A way in, as an administrator sees it. */
+    AdminWayIn: {
+      /** @description The address the provider gave when it was added. */
+      email?: string | null;
+      /**
+       * Format: date-time
+       * @description When it was last used to sign in.
+       */
+      last_used_at?: string | null;
+      /**
+       * Format: date-time
+       * @description When it was added.
+       */
+      linked_at: string;
+      /** @description `sign_up`, `link` or `connect`. */
+      linked_via: string;
+      /** @description `google`, `microsoft` or `zoho`. */
+      provider: string;
+    };
+    /** @description A workspace, as an administrator sees it. */
+    AdminWorkspace: {
+      /**
+       * Format: date-time
+       * @description When it was created.
+       */
+      created_at: string;
+      /**
+       * Format: date-time
+       * @description When it was deleted (it is purged later); absent while it lives.
+       */
+      deleted_at?: string | null;
+      /** @description The workspace. */
+      id: components["schemas"]["WorkspaceId"];
+      /** @description What it is for. */
+      kind: components["schemas"]["Kind"];
+      /**
+       * Format: int64
+       * @description How many members it has.
+       */
+      member_count: number;
+      /** @description Its name. */
+      name: string;
+      /** @description Its owners. */
+      owner_ids: components["schemas"]["UserId"][];
+    };
+    /** @description A workspace and who is in it. */
+    AdminWorkspaceDetail: {
+      /** @description Its members, in the order they joined. */
+      members: components["schemas"]["MemberView"][];
+      /**
+       * Format: int64
+       * @description How many invitations are pending (not accepted, not expired).
+       */
+      pending_invitations: number;
+      /** @description The workspace. */
+      workspace: components["schemas"]["AdminWorkspace"];
+    };
+    /** @description One page of workspaces. */
+    AdminWorkspacePage: {
+      /** @description The `after` of the next page; absent on the last one. */
+      next?: string | null;
+      /** @description Newest first. */
+      workspaces: components["schemas"]["AdminWorkspace"][];
+    };
+    /**
+     * @description Where an AI role's endpoint is, as far as mail content is concerned.
+     * @enum {string}
+     */
+    AiLocation: "instance" | "external";
+    /**
+     * @description The protocol a provider speaks.
+     * @enum {string}
+     */
+    AiProtocol: "openai" | "laya";
+    /**
+     * @description An AI role (ADR 0005).
+     * @enum {string}
+     */
+    AiRole: "decide" | "embed" | "complete" | "vision";
+    /**
+     * @description One AI role, without a secret: the provider is shown as scheme, host
+     *     and port only, and keys never.
+     */
+    AiRoleStatus: {
+      /** @description Whether a provider is configured for it. */
+      configured: boolean;
+      /**
+       * @description Whether it may receive mail content: on the instance's network, or
+       *     opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When
+       *     `false`, nothing calls it with content (the decide pass leaves
+       *     sorting to rules); only the reachability probe runs.
+       */
+      content_allowed?: boolean | null;
+      /**
+       * @description The provider's scheme, host and port.
+       * @example http://ollama:11434
+       */
+      endpoint?: string | null;
+      location?: components["schemas"]["AiLocation"] | null;
+      /** @description The model it calls. */
+      model?: string | null;
+      protocol?: components["schemas"]["AiProtocol"] | null;
+      /**
+       * @description Whether the provider answered a probe within 3 seconds (probes are
+       *     reused for a minute); `null` when not configured.
+       */
+      reachable?: boolean | null;
+      /** @description The role. */
+      role: components["schemas"]["AiRole"];
+    };
+    /**
+     * @description Which object store holds the blobs.
+     * @enum {string}
+     */
+    BlobBackend: "fs" | "s3";
+    /**
+     * @description What a connection lets Campbooks do with the account.
+     * @enum {string}
+     */
+    Capability: "messages" | "calendar" | "files" | "bank";
+    /**
+     * @description What a signup code can still do.
+     * @enum {string}
+     */
+    CodeState: "active" | "used_up" | "expired" | "revoked";
+    /**
+     * @description The non-secret facts of a [`Config`] an administrator sees
+     *     ([`Config::summary`]).
+     */
+    ConfigSummary: {
+      /** @description `CAMPBOOKS_BLOBS__BACKEND`. */
+      blob_store: components["schemas"]["BlobBackend"];
+      /** @description Whether migrations use a login of their own. */
+      database_logins: components["schemas"]["DatabaseLogins"];
+      /** @description `CAMPBOOKS_ENV`. */
+      environment: components["schemas"]["Environment"];
+      /** @description Whether traces and metrics are exported over OTLP. */
+      exports_telemetry: boolean;
+      /** @description Whether a Prometheus endpoint is open. */
+      metrics_endpoint: boolean;
+      /** @description When migrations run (`CAMPBOOKS_RUN_MIGRATIONS`). */
+      migrations: components["schemas"]["Migrations"];
+      /** @description The scheme, host and port of `CAMPBOOKS_PUBLIC_URL`. */
+      public_origin?: string | null;
+      /** @description Whether the server serves the web client (`CAMPBOOKS_WEB_DIR`). */
+      serves_web_client: boolean;
+      /** @description `CAMPBOOKS_SIGNUP__POLICY` (never the codes). */
+      signup_policy: components["schemas"]["SignupPolicy"];
+    };
+    /**
+     * Format: uuid
+     * @description ConnectionId (UUIDv7)
+     */
+    ConnectionId: string;
+    /**
+     * @description How the server signs in to the database (`deploy/README.md`).
+     * @enum {string}
+     */
+    DatabaseLogins: "single" | "split";
+    /** @description The database, as this server sees it. */
+    DatabaseStatus: {
+      /**
+       * Format: int64
+       * @description How long a trivial query took, in milliseconds.
+       */
+      latency_ms?: number | null;
+      /**
+       * Format: int64
+       * @description The newest applied migration's version (`YYYYMMDDHHMMSS`).
+       */
+      latest_migration?: number | null;
+      /** @description The newest applied migration's description. */
+      latest_migration_description?: string | null;
+      /**
+       * Format: int64
+       * @description How many schema migrations are applied.
+       */
+      migrations_applied?: number | null;
+      /** @description Whether it answered within 3 seconds. */
+      reachable: boolean;
+    };
+    /**
+     * @description The kind of deployment (`CAMPBOOKS_ENV`).
+     * @enum {string}
+     */
+    Environment: "production" | "development";
+    /** @description Who signs people in, and the outside providers set up, by name only. */
+    Facts: {
+      /** @description Which identity provider issues tokens. */
+      identity_provider: components["schemas"]["IdentityProvider"];
+      /** @description The mail providers mailboxes can be connected from (`google`, …). */
+      mail_providers: string[];
+      /** @description The providers people can sign in with (`google`, …). */
+      sign_in_providers: string[];
+    };
+    /** @description A dead job: what ran and why it stopped, never its payload. */
+    FailedJob: {
+      /**
+       * Format: int32
+       * @description Attempts made.
+       */
+      attempts: number;
+      /**
+       * Format: date-time
+       * @description When it was enqueued.
+       */
+      created_at: string;
+      /**
+       * Format: date-time
+       * @description When it died.
+       */
+      finished_at?: string | null;
+      /** @description The job's id. */
+      id: components["schemas"]["JobId"];
+      /** @description The job's wire name. */
+      kind: string;
+      /** @description The last failure, truncated; never carries secrets. */
+      last_error?: string | null;
+      /**
+       * Format: int32
+       * @description Attempts it was allowed.
+       */
+      max_attempts: number;
+      /** @description The queue it ran on. */
+      queue: string;
+      /** @description The workspace it belongs to; `null` for instance-wide work. */
+      workspace_id?: string | null;
+    };
+    /** @description A page of dead jobs, newest first. */
+    FailedPage: {
+      /** @description The jobs. */
+      items: components["schemas"]["FailedJob"][];
+      /** @description Pass as `after` for the next page; `null` on the last one. */
+      next?: string | null;
+    };
+    /**
+     * @description How a connection is doing.
+     * @enum {string}
+     */
+    Health: "ok" | "needs_reauth" | "throttled" | "failing";
+    /**
+     * @description Which identity provider issues this instance's tokens (ADR 0014).
+     * @enum {string}
+     */
+    IdentityProvider: "built_in" | "external" | "none";
+    /** @description The result of acting on one job. */
+    JobAction: {
+      /** @description What happened. */
+      outcome: components["schemas"]["Outcome"];
+    };
+    /**
+     * Format: uuid
+     * @description JobId (UUIDv7)
+     */
+    JobId: string;
+    /**
+     * @description What a workspace is for.
+     * @enum {string}
+     */
+    Kind: "business" | "personal";
+    /** @description The jobs of one kind on one queue. */
+    KindSummary: {
+      /**
+       * Format: int64
+       * @description Running, but past its lease: the worker stopped renewing it and the
+       *     next upkeep hands it back.
+       */
+      expired_leases: number;
+      /**
+       * Format: int64
+       * @description Dead: out of attempts, or failed for good. Kept for inspection.
+       */
+      failed: number;
+      /** @description The job's wire name (`<module>.<job>`). */
+      kind: string;
+      /**
+       * Format: int64
+       * @description Age of the oldest ready job of this kind, in seconds.
+       */
+      oldest_ready_seconds?: number | null;
+      /** @description The queue they run on. */
+      queue: string;
+      /**
+       * Format: int64
+       * @description Pending and due now: waiting for a worker.
+       */
+      ready: number;
+      /**
+       * Format: int64
+       * @description Claimed by a worker.
+       */
+      running: number;
+      /**
+       * Format: int64
+       * @description Pending for later: new delayed work, or waiting out a retry backoff.
+       */
+      scheduled: number;
+    };
+    /** @description A member of a workspace. */
+    MemberView: {
+      /** @description Their name, as their identity provider gives it. */
+      display_name?: string | null;
+      /** @description Their email address, as their identity provider gives it. */
+      email?: string | null;
+      /**
+       * Format: date-time
+       * @description When they joined.
+       */
+      joined_at: string;
+      /** @description Their role. */
+      role: components["schemas"]["Role"];
+      /** @description The user. */
+      user_id: components["schemas"]["UserId"];
+    };
+    /**
+     * @description When schema migrations run.
+     * @enum {string}
+     */
+    Migrations: "on_start" | "separately";
+    /** @description A new signup code. */
+    MintSignupCode: {
+      /**
+       * Format: date-time
+       * @description After this it cannot be redeemed; must be in the future. Never
+       *     expires when absent.
+       */
+      expires_at?: string | null;
+      /**
+       * @description What it is for (who it goes to), 1 to 100 characters.
+       * @example Beta tester, Ana
+       */
+      label: string;
+      /**
+       * Format: int32
+       * @description How many times it can be redeemed: 1 to 100000, default 1.
+       */
+      max_uses?: number | null;
+    };
+    /** @description A freshly minted code. */
+    MintedSignupCode: {
+      /**
+       * @description The code to hand over, like `K7QM-2XWP-9DHE-RT4A`. Shown here once.
+       * @example K7QM-2XWP-9DHE-RT4A
+       */
+      code: string;
+      /** @description The stored code (without the code itself). */
+      entry: components["schemas"]["SignupCodeView"];
+    };
+    /**
+     * @description What a retry or discard did.
+     * @enum {string}
+     */
+    Outcome: "applied" | "unchanged" | "superseded";
+    /**
+     * @description Where a stream is in its reading.
+     * @enum {string}
+     */
+    Phase: "backfill" | "incremental" | "resync";
+    /**
+     * @description RFC 9457 problem details.
+     * @example {
+     *       "code": "not_found",
+     *       "detail": "This resource does not exist, or you cannot see it.",
+     *       "status": 404,
+     *       "title": "Not found",
+     *       "type": "about:blank"
+     *     }
+     */
+    Problem: {
+      /**
+       * @description Stable machine-readable reason (`not_found`, `invalid_token`,
+       *     `last_owner`, …); the same in every locale. Match on this, never on
+       *     `title` or `detail`.
+       */
+      code: string;
+      /** @description What went wrong in this occurrence, in the request's locale. */
+      detail: string;
+      /**
+       * Format: int32
+       * @description HTTP status code.
+       */
+      status: number;
+      /**
+       * @description Short summary of the problem type, in the request's locale
+       *     (`Content-Language`).
+       */
+      title: string;
+      /**
+       * @description URI identifying the problem type; `about:blank` when the HTTP status
+       *     says it all.
+       */
+      type: string;
+    };
+    /**
+     * @description An outside provider.
+     * @enum {string}
+     */
+    Provider: "google" | "zoho";
+    /**
+     * @description The queue at a glance: one row per queue and kind with unfinished or
+     *     failed work. Succeeded jobs are pruned and not counted.
+     */
+    QueueSummary: {
+      /**
+       * Format: date-time
+       * @description When the counts were taken.
+       */
+      at: string;
+      /** @description Counts per queue and kind, sorted by queue then kind. */
+      kinds: components["schemas"]["KindSummary"][];
+      /**
+       * Format: int64
+       * @description Age of the oldest job that is ready to run and waiting, in seconds.
+       */
+      oldest_ready_seconds?: number | null;
+    };
+    /** @description Why a request is turned down. */
+    RejectSignupRequest: {
+      /**
+       * @description An optional note for the administrators' records, at most 500
+       *     characters. The requester is told only that they were not approved.
+       */
+      reason?: string | null;
+    };
+    /**
+     * @description Where a user's signup request stands.
+     * @enum {string}
+     */
+    RequestStatus: "pending" | "approved" | "rejected";
+    /** @description Which dead jobs to retry. */
+    RetryKind: {
+      /** @description The kind (`<module>.<job>`). */
+      kind: string;
+      /** @description Only on this queue. */
+      queue?: string | null;
+    };
+    /** @description How many jobs a bulk retry requeued. */
+    RetryKindResult: {
+      /**
+       * @description Whether the batch limit was reached, so more dead jobs of the kind
+       *     may remain: call again.
+       */
+      more: boolean;
+      /**
+       * Format: int64
+       * @description Jobs put back on their queue.
+       */
+      requeued: number;
+    };
+    /**
+     * @description A member's role in a workspace.
+     * @enum {string}
+     */
+    Role: "owner" | "admin" | "member";
+    /**
+     * Format: uuid
+     * @description SignupCodeId (UUIDv7)
+     */
+    SignupCodeId: string;
+    /** @description A page of signup codes. */
+    SignupCodeList: {
+      /** @description The codes, newest first. */
+      codes: components["schemas"]["SignupCodeView"][];
+      /** @description Pass as `after` for the next page; `null` on the last one. */
+      next?: string | null;
+    };
+    /**
+     * @description One minted signup code. The code itself is never here: only its
+     *     administrators saw it, once, when it was minted.
+     */
+    SignupCodeView: {
+      /**
+       * Format: date-time
+       * @description When.
+       */
+      created_at: string;
+      /** @description The administrator who minted it (their account id). */
+      created_by: string;
+      /**
+       * Format: date-time
+       * @description After this it cannot be redeemed.
+       */
+      expires_at?: string | null;
+      /** @description Its id. */
+      id: components["schemas"]["SignupCodeId"];
+      /** @description What the administrator called it. */
+      label: string;
+      /**
+       * Format: int32
+       * @description How many times it can be redeemed.
+       */
+      max_uses: number;
+      /**
+       * Format: date-time
+       * @description When it was revoked.
+       */
+      revoked_at?: string | null;
+      /** @description What it can still do. */
+      state: components["schemas"]["CodeState"];
+      /**
+       * Format: int32
+       * @description How many times it was.
+       */
+      uses: number;
+    };
+    /**
+     * @description Who may create a workspace when they are not a member of any yet.
+     * @enum {string}
+     */
+    SignupPolicy: "open" | "invite_only" | "approval" | "code";
+    /** @description A page of signup requests. */
+    SignupRequestList: {
+      /** @description Pass as `after` for the next page; `null` on the last one. */
+      next?: string | null;
+      /** @description The requests: pending first, then newest first. */
+      requests: components["schemas"]["SignupRequestView"][];
+    };
+    /**
+     * @description One signup request, as an administrator sees it: who asked and where it
+     *     stands. No content, only the account's own name and address.
+     */
+    SignupRequestView: {
+      /**
+       * Format: date-time
+       * @description When an administrator decided.
+       */
+      decided_at?: string | null;
+      /** @description The deciding administrator's account id. */
+      decided_by?: string | null;
+      /** @description Their display name, when their sign-in carried one. */
+      display_name?: string | null;
+      /** @description Their email address, when their sign-in carried one. */
+      email?: string | null;
+      /** @description Why it was turned down, when the administrator said. */
+      reason?: string | null;
+      /**
+       * Format: date-time
+       * @description When they first asked.
+       */
+      requested_at: string;
+      /** @description Where the request stands. */
+      status: components["schemas"]["RequestStatus"];
+      /** @description The requesting user (also the request's id). */
+      user_id: components["schemas"]["UserId"];
+    };
+    /**
+     * Format: uuid
+     * @description UserId (UUIDv7)
+     */
+    UserId: string;
+    /**
+     * Format: uuid
+     * @description WorkspaceId (UUIDv7)
+     */
+    WorkspaceId: string;
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    "connectors.admin_list_connections": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The workspace's connections (none for an unknown workspace). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminConnectionList"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `workspaces.read` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  "connectors.admin_list_connections": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The workspace. */
+        workspace_id: components["schemas"]["WorkspaceId"];
+      };
+      cookie?: never;
     };
-    "identity.admin_get_account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The account (a token `sub`). */
-                account_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description The workspace's connections (none for an unknown workspace). */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description The account. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminAccount"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such account (or another identity provider serves the instance), or not an administrator with `users.read`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["AdminConnectionList"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `workspaces.read` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "identity.admin_suspend_account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The account (a token `sub`). */
-                account_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The account, suspended (now or before). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminAccount"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such account, or not an administrator with `users.suspend`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `account_is_admin`: the account has an admin profile; revoke it with `campbooks-server admin revoke` first. */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "identity.admin_get_account": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The account (a token `sub`). */
+        account_id: string;
+      };
+      cookie?: never;
     };
-    "identity.admin_unsuspend_account": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The account (a token `sub`). */
-                account_id: string;
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description The account. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description The account, not suspended (now or before). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminAccount"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such account, or not an administrator with `users.suspend`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["AdminAccount"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such account (or another identity provider serves the instance), or not an administrator with `users.read`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "system.admin_jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Counts of waiting, scheduled, running and failed jobs. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueSummary"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `jobs.read`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "identity.admin_suspend_account": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The account (a token `sub`). */
+        account_id: string;
+      };
+      cookie?: never;
     };
-    "system.admin_failed_jobs": {
-        parameters: {
-            query?: {
-                /** @description Only this kind (`<module>.<job>`). */
-                kind?: string | null;
-                /** @description Only this queue. */
-                queue?: string | null;
-                /** @description The `next` of the previous page. */
-                after?: string | null;
-                /** @description Page size, 1 to 200 (default 50). */
-                limit?: number | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description The account, suspended (now or before). */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A page of dead jobs. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["FailedPage"];
-                };
-            };
-            /** @description Malformed query or cursor. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `jobs.read`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["AdminAccount"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such account, or not an administrator with `users.suspend`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `account_is_admin`: the account has an admin profile; revoke it with `campbooks-server admin revoke` first. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "system.admin_retry_jobs": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RetryKind"];
-            };
-        };
-        responses: {
-            /** @description How many were requeued. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["RetryKindResult"];
-                };
-            };
-            /** @description Malformed body. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `jobs.retry`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "identity.admin_unsuspend_account": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The account (a token `sub`). */
+        account_id: string;
+      };
+      cookie?: never;
     };
-    "system.admin_discard_job": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The job. */
-                id: components["schemas"]["JobId"];
-            };
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description The account, not suspended (now or before). */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Deleted, or nothing to do. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobAction"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `jobs.retry`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["AdminAccount"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such account, or not an administrator with `users.suspend`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "system.admin_retry_job": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The job. */
-                id: components["schemas"]["JobId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Requeued, or nothing to do. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["JobAction"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such job, or not an administrator with `jobs.retry`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "system.admin_overview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Counts of waiting, scheduled, running and failed jobs. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description The overview. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminOverview"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["QueueSummary"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `jobs.read`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "workspaces.admin_list_signup_codes": {
-        parameters: {
-            query?: {
-                /** @description Where the previous page ended (its `next`). */
-                after?: string;
-                /** @description How many: 1 to 200, default 50. */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A page of codes. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SignupCodeList"];
-                };
-            };
-            /** @description Invalid limit or cursor. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_failed_jobs": {
+    parameters: {
+      query?: {
+        /** @description Only this kind (`<module>.<job>`). */
+        kind?: string | null;
+        /** @description Only this queue. */
+        queue?: string | null;
+        /** @description The `next` of the previous page. */
+        after?: string | null;
+        /** @description Page size, 1 to 200 (default 50). */
+        limit?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "workspaces.admin_mint_signup_code": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description A page of dead jobs. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MintSignupCode"];
-            };
+        content: {
+          "application/json": components["schemas"]["FailedPage"];
         };
-        responses: {
-            /** @description Minted. The response is the only place the code appears. */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MintedSignupCode"];
-                };
-            };
-            /** @description Invalid label, number of uses or expiry. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+      };
+      /** @description Malformed query or cursor. */
+      400: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `jobs.read`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "workspaces.admin_revoke_signup_code": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The code. */
-                code_id: components["schemas"]["SignupCodeId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The code, revoked (also when it already was). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SignupCodeView"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such code, or not an administrator with `signups.review`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_retry_jobs": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "workspaces.admin_list_signup_requests": {
-        parameters: {
-            query?: {
-                /** @description Only requests in this state. */
-                status?: components["schemas"]["RequestStatus"];
-                /** @description Where the previous page ended (its `next`). */
-                after?: string;
-                /** @description How many: 1 to 200, default 50. */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description A page of requests. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SignupRequestList"];
-                };
-            };
-            /** @description Invalid limit or cursor. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RetryKind"];
+      };
     };
-    "workspaces.admin_approve_signup_request": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The requesting user. */
-                user_id: components["schemas"]["UserId"];
-            };
-            cookie?: never;
+    responses: {
+      /** @description How many were requeued. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description The request, approved (also when it already was). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SignupRequestView"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such request, or not an administrator with `signups.review`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["RetryKindResult"];
         };
+      };
+      /** @description Malformed body. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `jobs.retry`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "workspaces.admin_reject_signup_request": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The requesting user. */
-                user_id: components["schemas"]["UserId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["RejectSignupRequest"];
-            };
-        };
-        responses: {
-            /** @description The request, rejected (also when it already was). */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SignupRequestView"];
-                };
-            };
-            /** @description The reason is too long. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such request, or not an administrator with `signups.review`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_discard_job": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The job. */
+        id: components["schemas"]["JobId"];
+      };
+      cookie?: never;
     };
-    "workspaces.admin_list_users": {
-        parameters: {
-            query?: {
-                /** @description Only rows whose name or address starts with this (case-insensitive). */
-                q?: string;
-                /** @description The `next` cursor of the previous page. */
-                after?: string;
-                /** @description How many rows: 1 to 200, default 50. */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Deleted, or nothing to do. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A page of people. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserPage"];
-                };
-            };
-            /** @description `invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `users.read` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["JobAction"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `jobs.retry`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "workspaces.admin_get_user": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The user. */
-                user_id: components["schemas"]["UserId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The person and their workspaces. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminUserDetail"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such user, or not an administrator with `users.read`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_retry_job": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The job. */
+        id: components["schemas"]["JobId"];
+      };
+      cookie?: never;
     };
-    "workspaces.admin_list_workspaces": {
-        parameters: {
-            query?: {
-                /** @description Only rows whose name or address starts with this (case-insensitive). */
-                q?: string;
-                /** @description The `next` cursor of the previous page. */
-                after?: string;
-                /** @description How many rows: 1 to 200, default 50. */
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Requeued, or nothing to do. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description A page of workspaces. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminWorkspacePage"];
-                };
-            };
-            /** @description `invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Not an administrator with `workspaces.read` (the same answer as an unknown route). */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["JobAction"];
         };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such job, or not an administrator with `jobs.retry`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
     };
-    "workspaces.admin_get_workspace": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The workspace. */
-                workspace_id: components["schemas"]["WorkspaceId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The workspace and its members. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AdminWorkspaceDetail"];
-                };
-            };
-            /** @description `admin_reauth_required`: sign in again. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No such workspace, or not an administrator with `workspaces.read`. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["Problem"];
-                };
-            };
-        };
+  };
+  "system.admin_overview": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    requestBody?: never;
+    responses: {
+      /** @description The overview. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminOverview"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `system.read` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_list_signup_codes": {
+    parameters: {
+      query?: {
+        /** @description Where the previous page ended (its `next`). */
+        after?: string;
+        /** @description How many: 1 to 200, default 50. */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A page of codes. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SignupCodeList"];
+        };
+      };
+      /** @description Invalid limit or cursor. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_mint_signup_code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["MintSignupCode"];
+      };
+    };
+    responses: {
+      /** @description Minted. The response is the only place the code appears. */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MintedSignupCode"];
+        };
+      };
+      /** @description Invalid label, number of uses or expiry. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_revoke_signup_code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The code. */
+        code_id: components["schemas"]["SignupCodeId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The code, revoked (also when it already was). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SignupCodeView"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such code, or not an administrator with `signups.review`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_list_signup_requests": {
+    parameters: {
+      query?: {
+        /** @description Only requests in this state. */
+        status?: components["schemas"]["RequestStatus"];
+        /** @description Where the previous page ended (its `next`). */
+        after?: string;
+        /** @description How many: 1 to 200, default 50. */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A page of requests. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SignupRequestList"];
+        };
+      };
+      /** @description Invalid limit or cursor. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `signups.review` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_approve_signup_request": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The requesting user. */
+        user_id: components["schemas"]["UserId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The request, approved (also when it already was). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SignupRequestView"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such request, or not an administrator with `signups.review`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_reject_signup_request": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The requesting user. */
+        user_id: components["schemas"]["UserId"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RejectSignupRequest"];
+      };
+    };
+    responses: {
+      /** @description The request, rejected (also when it already was). */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SignupRequestView"];
+        };
+      };
+      /** @description The reason is too long. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such request, or not an administrator with `signups.review`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_list_users": {
+    parameters: {
+      query?: {
+        /** @description Only rows whose name or address starts with this (case-insensitive). */
+        q?: string;
+        /** @description The `next` cursor of the previous page. */
+        after?: string;
+        /** @description How many rows: 1 to 200, default 50. */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A page of people. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminUserPage"];
+        };
+      };
+      /** @description `invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `users.read` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_get_user": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The user. */
+        user_id: components["schemas"]["UserId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The person and their workspaces. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminUserDetail"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such user, or not an administrator with `users.read`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_list_workspaces": {
+    parameters: {
+      query?: {
+        /** @description Only rows whose name or address starts with this (case-insensitive). */
+        q?: string;
+        /** @description The `next` cursor of the previous page. */
+        after?: string;
+        /** @description How many rows: 1 to 200, default 50. */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description A page of workspaces. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminWorkspacePage"];
+        };
+      };
+      /** @description `invalid_query`, `invalid_limit`, `invalid_cursor` or `query_too_long`. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description Not an administrator with `workspaces.read` (the same answer as an unknown route). */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
+  "workspaces.admin_get_workspace": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        /** @description The workspace. */
+        workspace_id: components["schemas"]["WorkspaceId"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description The workspace and its members. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AdminWorkspaceDetail"];
+        };
+      };
+      /** @description `admin_reauth_required`: sign in again. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+      /** @description No such workspace, or not an administrator with `workspaces.read`. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/problem+json": components["schemas"]["Problem"];
+        };
+      };
+    };
+  };
 }
