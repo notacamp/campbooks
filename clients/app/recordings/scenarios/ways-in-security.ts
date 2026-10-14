@@ -113,7 +113,10 @@ export default async function waysInSecurity({ page }: ScenarioContext): Promise
   await add.scrollIntoViewIfNeeded();
   await add.click();
   await page.getByText(/is added\. You can sign in with it now/u).waitFor();
-  await caption(page, "A passkey too: New, and one more notice. It needs a sign-in from the last 5 minutes");
+  await caption(
+    page,
+    "A passkey too: New, and one more notice. It needs a sign-in from the last 5 minutes",
+  );
 
   // Sign out everywhere.
   const everywhere = page.getByRole("button", { name: "Sign out everywhere" });
