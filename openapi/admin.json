@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Campbooks admin API",
-    "description": "Instance administration. Every operation answers 404 (as for a route that does not exist) unless the caller is a user whose bearer token carries the `admin:access` scope and whose admin profile grants the operation's permission (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last sign-in (`auth_time`) is more than 12 hours old answers 401 `admin_reauth_required`. Every request past the profile check is recorded in the audit trail. These operations are not part of the operation catalogue (`/openapi.json`): automation and the assistant cannot call them. Admin profiles are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. The web app reaches this API through `/bff/admin/*`.",
+    "description": "Instance administration. Every operation answers 404 (as for a route that does not exist) unless the caller is a user whose bearer token carries the `admin:access` scope and whose admin profile grants the operation's permission (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last sign-in (`auth_time`) is more than an hour old answers 401 `admin_reauth_required`. Every request past the profile check is recorded in the audit trail. These operations are not part of the operation catalogue (`/openapi.json`): automation and the assistant cannot call them. Admin profiles are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. The web app reaches this API through `/bff/admin/*`.",
     "license": {
       "name": "Sustainable Use License",
       "identifier": "LicenseRef-Sustainable-Use"
@@ -730,7 +730,7 @@
             }
           },
           "401": {
-            "description": "`admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old).",
+            "description": "`admin_reauth_required`: sign in again (the last sign-in is more than an hour old).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2595,7 +2595,7 @@
               "string",
               "null"
             ],
-            "description": "Their email address, as their identity provider gives it."
+            "description": "Their email address, as their identity provider gives it, when it\nverified it (an unverified address is never shown: anyone can claim\none)."
           },
           "joined_at": {
             "type": "string",

@@ -359,7 +359,15 @@ async fn client_credentials(
     else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
     };
-    let allowed = client.allowed_scopes.clone().unwrap_or_default();
+    // What it was given, less anything a third party may no longer hold
+    // (the rules can tighten after registration).
+    let allowed: Vec<String> = client
+        .allowed_scopes
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|scope| clients::third_party_may_hold(scope))
+        .collect();
     let scope: Vec<&str> = match requested {
         None => allowed.iter().map(String::as_str).collect(),
         Some(requested) => {

@@ -20,7 +20,7 @@ use crate::{
 
 const SETTINGS: &str = "/w/ws/settings/sign-in";
 
-fn user(subject: &str) -> TestUser {
+pub(crate) fn user(subject: &str) -> TestUser {
     TestUser {
         subject: subject.to_owned(),
         name: "Sam Rivera".to_owned(),
@@ -37,7 +37,7 @@ async fn count(kit: &Kit, sql: &'static str) -> i64 {
 
 /// Start a `link` to `provider` and follow it to the provider: the
 /// authorization request the browser is sent to.
-async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
+pub(crate) async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
     let started = kit
         .start_link(
             access,
@@ -78,6 +78,7 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
         .map(|w| w["provider"].as_str().unwrap())
         .collect();
     assert_eq!(providers, ["google", "zoho"]);
+    assert_eq!(ways["items"][0]["linked_via"], "sign_up");
     assert_eq!(ways["items"][1]["linked_via"], "link");
     assert_eq!(ways["items"][1]["email"], "zoho-sam@example.com");
     assert_eq!(ways["providers"], json!(["google", "microsoft", "zoho"]));

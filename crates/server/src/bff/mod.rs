@@ -40,8 +40,10 @@ use axum::{
 };
 use campbooks_identity::events::AccountSuspended;
 use campbooks_kernel::{
-    AppState, Error, Event, EventHandler, Job, JobContext, JobError, auth::TokenVerifier,
+    AppState, Error, Event, EventHandler, Job, JobContext, JobError,
+    auth::TokenVerifier,
     jobs::Background,
+    rate_limit::{Limit, RateLimits, TrustedProxies},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -62,7 +64,7 @@ use self::{
     config::{ROTATION_GRACE, Timeouts},
     cookies::Cookies,
     oidc::{Oidc, OidcError},
-    store::Session,
+    store::{Reissue, Session},
 };
 
 /// Owner of the BFF's background work and its Postgres schema.
@@ -119,7 +121,15 @@ struct Inner {
     /// Serialize refreshes within this process; a row lock serializes them
     /// across processes.
     refresh_locks: Box<[tokio::sync::Mutex<()>]>,
+    /// Counts sign-ins started per address ([`LOGIN_LIMIT`]).
+    rate_limits: RateLimits,
+    /// The proxies whose `X-Forwarded-For` names the client.
+    trusted_proxies: TrustedProxies,
 }
+
+/// Sign-ins one address may start (each stores a sign-in transaction and
+/// may make the server fetch the provider's metadata).
+const LOGIN_LIMIT: Limit = Limit::new("bff.login", 30, Duration::from_mins(1));
 
 impl Bff {
     /// The BFF for `settings` (`None`: web sign-in is off and every endpoint
@@ -146,6 +156,8 @@ impl Bff {
                 refresh_locks: (0..REFRESH_LOCKS)
                     .map(|_| tokio::sync::Mutex::new(()))
                     .collect(),
+                rate_limits: state.rate_limits.clone(),
+                trusted_proxies: state.config.trusted_proxies.clone(),
             })
         });
         Self { inner }
@@ -190,11 +202,36 @@ impl Bff {
 }
 
 /// The BFF's background work: pruning ended sessions, and ending a
-/// suspended account's sessions.
+/// suspended account's sessions, or those of a person who signed out
+/// everywhere.
 pub fn background() -> Background {
     Background::new()
         .schedule::<PruneSessions>(PRUNE_EVERY)
         .on_event::<EndSuspendedSessions>()
+        .on_event::<EndSignedOutSessions>()
+}
+
+/// `bff.end_signed_out_sessions` ← `identity.signed_out_everywhere`: every
+/// web session of the account ends (their refresh tokens were already
+/// revoked at the issuer; this ends them now rather than at the next
+/// refresh).
+#[derive(Debug, Clone, Copy, Default)]
+pub struct EndSignedOutSessions;
+
+impl EventHandler for EndSignedOutSessions {
+    type Event = campbooks_identity::events::SignedOutEverywhere;
+    const NAME: &'static str = "bff.end_signed_out_sessions";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(ctx: &mut JobContext, event: Event<Self::Event>) -> Result<(), JobError> {
+        let subject = event.payload.account.to_string();
+        let ended = store::delete_for_logout(ctx.pool(), Some(&subject), None).await?;
+        tracing::info!(
+            sessions = ended,
+            "ended the web sessions of a sign-out everywhere"
+        );
+        Ok(())
+    }
 }
 
 /// An administrator suspended an account (ADR 0015): its web sessions end
@@ -295,16 +332,65 @@ impl Inner {
         };
         let now = Utc::now();
         let token_hash = hash(&token);
-        let Some(session) =
-            store::find_session(&self.db, &token_hash, now, now - ROTATION_GRACE).await?
-        else {
+        let Some(session) = store::find_session(&self.db, &token_hash, now).await? else {
+            if let Some(id) = store::retired_session(&self.db, &token_hash, now).await? {
+                // A token two or more rotations old: a copied cookie.
+                tracing::warn!("a retired web session token was presented again; the session ends");
+                self.terminate(id).await?;
+            }
             return Ok(None);
         };
+        let mut rotated = None;
+        if !session.current && session.rotated_at <= now - ROTATION_GRACE {
+            if session.token_delivered {
+                // A token rotated away minutes ago, presented again after its
+                // successor was used: the cookie was copied, and either copy
+                // may be the thief's. The session ends everywhere it reaches.
+                tracing::warn!(
+                    "a rotated-away web session token was presented again; the session ends"
+                );
+                self.terminate(session.id).await?;
+                return Ok(None);
+            }
+            // The successor never reached this browser (the response that
+            // carried it was lost): it gets another one. When a concurrent
+            // request (a page waking up fires several) reissued first, this
+            // one is within the new grace and goes through as it is; when
+            // the successor was presented meanwhile, this is a copy.
+            let fresh = random_token();
+            match store::reissue(
+                &self.db,
+                session.id,
+                &token_hash,
+                &hash(&fresh),
+                now,
+                now - ROTATION_GRACE,
+            )
+            .await?
+            {
+                Reissue::Reissued => {
+                    rotated = Some(
+                        self.cookies
+                            .set_session(&fresh, seconds_until(session.expires_at, now)),
+                    );
+                }
+                Reissue::WithinGrace => {}
+                Reissue::Delivered => {
+                    tracing::warn!(
+                        "a rotated-away web session token was presented again; the session ends"
+                    );
+                    self.terminate(session.id).await?;
+                    return Ok(None);
+                }
+                Reissue::Gone => return Ok(None),
+            }
+        } else if session.current && !session.token_delivered {
+            store::delivered(&self.db, session.id, &token_hash).await?;
+        }
         if now - session.last_seen_at >= TOUCH_EVERY {
             let idle_until = (now + self.timeouts.idle).min(session.expires_at);
             store::touch(&self.db, session.id, now, idle_until).await?;
         }
-        let mut rotated = None;
         if session.current && now - session.rotated_at >= self.timeouts.rotate {
             let fresh = random_token();
             if store::rotate(&self.db, session.id, &token_hash, &hash(&fresh), now).await? {
@@ -408,6 +494,44 @@ impl Inner {
              changed?); the session ends"
         );
         self.end(id).await
+    }
+
+    /// End session `id` everywhere it reaches: delete it, revoke its
+    /// refresh token at the identity provider, and end the in-process
+    /// issuer's session (its ID token is the proof). Whether the issuer
+    /// session was ended here. Failures past the deletion are logged: the
+    /// web session is gone either way.
+    async fn terminate(&self, id: Uuid) -> sqlx::Result<bool> {
+        let Some((refresh_token, id_token)) =
+            store::delete_session(&mut *self.db.acquire().await?, id).await?
+        else {
+            return Ok(false);
+        };
+        if let Some(sealed) = refresh_token {
+            match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
+                Ok(refresh_token) => {
+                    if let Err(err) = self.oidc.revoke(&refresh_token).await {
+                        tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
+                    }
+                }
+                Err(_) => {
+                    tracing::warn!("an ended session's refresh token could not be decrypted");
+                }
+            }
+        }
+        // The in-process issuer's session ends here, with the ID token as
+        // proof (ADR 0014): nothing for the browser to visit or forge.
+        if self.oidc.in_process()
+            && let Ok(id_token) = self.cipher.open(&id_token, &sealed_for(id, "id_token"))
+        {
+            match self.oidc.end_issuer_session(&id_token).await {
+                Ok(()) => return Ok(true),
+                Err(err) => {
+                    tracing::warn!(error = %err, "could not end the issuer session of an ended web session");
+                }
+            }
+        }
+        Ok(false)
     }
 
     async fn end(&self, id: Uuid) -> Result<String, AccessError> {

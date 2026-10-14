@@ -728,3 +728,97 @@ async fn adopting_a_mailbox_needs_the_connectors_write_scope_too(db: PgPool) {
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert!(kit.intake.adopted().is_empty());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn refreshing_never_outlives_the_sign_in_behind_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (code, verifier) = kit.sign_up().await;
+    // A sign-in near its end (30 days on): the family ends with it.
+    sqlx::query("UPDATE identity.sessions SET expires_at = now() + interval '1 hour'")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let tokens = kit.redeem(&code, &verifier).await;
+    assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
+    let (family, session): (chrono::DateTime<chrono::Utc>, chrono::DateTime<chrono::Utc>) =
+        sqlx::query_as(
+            "SELECT f.expires_at, s.expires_at
+               FROM identity.refresh_families f JOIN identity.sessions s ON s.id = f.session_id",
+        )
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(family, session);
+
+    // Past it, the refresh token is refused.
+    sqlx::raw_sql(
+        "UPDATE identity.refresh_families SET expires_at = now() - interval '1 second';
+         UPDATE identity.sessions SET expires_at = now() - interval '1 second'",
+    )
+    .execute(&kit.state.db)
+    .await
+    .unwrap();
+    let refused = kit
+        .refresh(tokens.json["refresh_token"].as_str().unwrap())
+        .await;
+    assert_eq!(refused.status, StatusCode::BAD_REQUEST, "{refused:?}");
+    assert_eq!(refused.json["error"], "invalid_grant");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_waiting_request_is_only_its_browsers(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.signed_up().await;
+    kit.new_browser();
+    let (url, _) = Kit::web_authorize();
+    let to_sign_in = kit.get(&url).await;
+    let cookie = to_sign_in.headers["set-cookie"]
+        .to_str()
+        .unwrap()
+        .to_owned();
+    assert!(
+        cookie.starts_with("campbooks_browser=") && cookie.contains("SameSite=Lax"),
+        "{cookie}"
+    );
+    let request = to_sign_in.location_query()["request"].clone();
+    assert_eq!(
+        kit.get(&format!("/auth/requests/{request}")).await.status,
+        StatusCode::OK
+    );
+
+    // The link reaches another browser (sent to someone): nothing there.
+    kit.new_browser();
+    let shown = kit.get(&format!("/auth/requests/{request}")).await;
+    assert_eq!(shown.status, StatusCode::NOT_FOUND, "{shown:?}");
+    // Signing in there does not finish it: no code for its client.
+    let signed_in = kit.round_trip(Some(&request)).await;
+    assert_eq!(signed_in.status, StatusCode::SEE_OTHER, "{signed_in:?}");
+    assert!(!signed_in.location().contains("code="), "{signed_in:?}");
+    let waiting: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.authorize_requests")
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(waiting, 1, "still waiting for its own browser");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn authorizing_and_signing_out_are_rate_limited_per_address(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.send_from(Some("203.0.113.7:4000"));
+    let (url, _) = Kit::web_authorize();
+    for _ in 0..60 {
+        assert_eq!(kit.get(&url).await.status, StatusCode::SEE_OTHER);
+    }
+    let limited = kit.get(&url).await;
+    assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS, "{limited:?}");
+    assert_eq!(limited.json["code"], "rate_limited");
+    for _ in 0..30 {
+        let refused = kit.get("/oauth2/end_session?id_token_hint=x").await;
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST);
+    }
+    let limited = kit.get("/oauth2/end_session?id_token_hint=x").await;
+    assert_eq!(limited.status, StatusCode::TOO_MANY_REQUESTS, "{limited:?}");
+    // Another address is not affected.
+    kit.send_from(Some("198.51.100.9:4000"));
+    assert_eq!(kit.get(&url).await.status, StatusCode::SEE_OTHER);
+}

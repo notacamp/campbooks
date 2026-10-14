@@ -23,7 +23,7 @@ import {
   useRenamePasskey,
   type PasskeyView,
 } from "../../api/queries";
-import { leavePage, stepUpUrl } from "../../model";
+import { addedRecently, leavePage, stepUpUrl } from "../../model";
 import { ceremonyFailure, deviceName, passkeysSupported } from "../../webauthn";
 
 export interface PasskeysSectionProps {
@@ -45,12 +45,15 @@ function useDateFormat() {
 const here = () => `${globalThis.location.pathname}${globalThis.location.search}`;
 
 /** What adding a passkey can come back with, as the section explains it. */
-type AddProblem = "stepUp" | "cancelled" | "exists" | "expired" | "notAccepted" | "failed";
+type AddProblem =
+  "stepUp" | "freshSignIn" | "cancelled" | "exists" | "expired" | "notAccepted" | "failed";
 
 function addProblem(error: unknown): AddProblem {
   switch (problemCode(error)) {
     case "step_up_required":
       return "stepUp";
+    case "fresh_sign_in_required":
+      return "freshSignIn";
     case "passkey_expired":
       return "expired";
     case "passkey_not_accepted":
@@ -94,7 +97,7 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
   };
   useShortcut("identity.add_passkey", start, { enabled: supported && passkeys.isSuccess });
   const stepUp = () => {
-    leave(stepUpUrl(returnTo ?? here()));
+    leave(stepUpUrl(returnTo ?? here(), { fresh: problem === "freshSignIn" }));
   };
 
   return (
@@ -105,8 +108,8 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
       <Text tone="tertiary" size="sm">
         {t("passkeys.lead")}
       </Text>
-      {problem === "stepUp" ? (
-        <StepUpBanner onSignIn={stepUp} />
+      {problem === "stepUp" || problem === "freshSignIn" ? (
+        <StepUpBanner fresh={problem === "freshSignIn"} onSignIn={stepUp} />
       ) : problem === undefined ? null : (
         <Banner
           tone={problem === "cancelled" ? "neutral" : "danger"}
@@ -178,7 +181,8 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
   );
 }
 
-function StepUpBanner({ onSignIn }: { onSignIn: () => void }) {
+/** "Sign in again first": within ten minutes, or (`fresh`) now, for a passkey. */
+function StepUpBanner({ fresh, onSignIn }: { fresh: boolean; onSignIn: () => void }) {
   const { t } = useTranslation("identity");
   return (
     <Banner
@@ -191,7 +195,7 @@ function StepUpBanner({ onSignIn }: { onSignIn: () => void }) {
         </Button>
       }
     >
-      {t("waysIn.stepUp.lead")}
+      {fresh ? t("passkeys.freshSignIn") : t("waysIn.stepUp.lead")}
     </Banner>
   );
 }
@@ -217,6 +221,13 @@ function PasskeyRow({ passkey, onStepUp }: { passkey: PasskeyView; onStepUp: () 
     <ListRow
       leading={<Icon name="key" size="lg" />}
       title={passkey.name}
+      badge={
+        passkey.signed_up_with
+          ? t("waysIn.signedUpWith")
+          : addedRecently(passkey.created_at)
+            ? t("waysIn.new")
+            : undefined
+      }
       meta={meta}
       trailing={
         mode === "idle" ? (

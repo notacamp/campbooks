@@ -866,7 +866,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time
@@ -1596,7 +1600,7 @@ export interface operations {
                     "application/json": components["schemas"]["AdminOverview"];
                 };
             };
-            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
+            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than an hour old). */
             401: {
                 headers: {
                     [name: string]: unknown;

@@ -712,7 +712,7 @@
             }
           },
           "403": {
-            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "description": "The token lacks `identity:write`, or the sign-in is more than five minutes old (`fresh_sign_in_required`: sign in again at `/bff/login?max_age=0`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -936,6 +936,67 @@
             "identity.passkey"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/sign-out-everywhere": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Sign out everywhere.",
+        "operationId": "identity.sign_out_everywhere",
+        "responses": {
+          "204": {
+            "description": "Every session and refresh token of the account ended, this one's included: sign in again."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance, or the token is bound to a workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.session",
+            "identity.refresh_family"
+          ],
+          "risk": "high"
         }
       }
     },
@@ -4756,7 +4817,7 @@
             }
           },
           "400": {
-            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7083,7 +7144,7 @@
             }
           },
           "404": {
-            "description": "No such request (or it expired), or another identity provider serves this instance."
+            "description": "No such request (or it expired, or another browser made it), or another identity provider serves this instance."
           }
         },
         "security": [
@@ -7205,7 +7266,7 @@
           "bff"
         ],
         "summary": "Read from the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_get",
         "parameters": [
           {
@@ -7271,7 +7332,7 @@
           "bff"
         ],
         "summary": "PUT to the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_put",
         "parameters": [
           {
@@ -7337,7 +7398,7 @@
           "bff"
         ],
         "summary": "POST to the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_post",
         "parameters": [
           {
@@ -7403,7 +7464,7 @@
           "bff"
         ],
         "summary": "DELETE in the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_delete",
         "parameters": [
           {
@@ -7469,7 +7530,7 @@
           "bff"
         ],
         "summary": "PATCH the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_patch",
         "parameters": [
           {
@@ -8090,6 +8151,16 @@
               }
             }
           },
+          "429": {
+            "description": "`rate_limited`: too many sign-ins started from this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "503": {
             "description": "`bff_not_configured`, or the identity provider is unreachable.",
             "content": {
@@ -8360,7 +8431,7 @@
             "description": "Another identity provider serves this instance."
           },
           "429": {
-            "description": "`rate_limited`: too many metadata-document clients looked up from this address.",
+            "description": "`rate_limited`: too many authorization requests, or metadata-document clients looked up, from this address.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8456,6 +8527,16 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -8513,6 +8594,16 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -10765,7 +10856,7 @@
               "string",
               "null"
             ],
-            "description": "Their email address, as their identity provider gives it."
+            "description": "Their email address, as their identity provider gives it, when it\nverified it (an unverified address is never shown: anyone can claim\none)."
           },
           "joined_at": {
             "type": "string",
@@ -11213,7 +11304,8 @@
           "id",
           "name",
           "synced",
-          "created_at"
+          "created_at",
+          "signed_up_with"
         ],
         "properties": {
           "created_at": {
@@ -11237,6 +11329,10 @@
           "name": {
             "type": "string",
             "description": "What its owner calls it."
+          },
+          "signed_up_with": {
+            "type": "boolean",
+            "description": "It was made with the account (a passkey-only sign-up), not added\nlater: never shown as a new way in."
           },
           "synced": {
             "type": "boolean",

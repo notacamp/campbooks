@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, token_hash = $1 AS \"current!\", rotated_at, subject, name, email,\n               access_token, access_expires_at, last_seen_at, expires_at\n          FROM bff.sessions\n         WHERE (token_hash = $1 OR (previous_token_hash = $1 AND rotated_at > $3))\n           AND idle_expires_at > $2\n           AND expires_at > $2\n        ",
+  "query": "\n        SELECT id, token_hash = $1 AS \"current!\", rotated_at, token_delivered, subject, name, email,\n               access_token, access_expires_at, last_seen_at, expires_at\n          FROM bff.sessions\n         WHERE (token_hash = $1 OR previous_token_hash = $1)\n           AND idle_expires_at > $2\n           AND expires_at > $2\n        ",
   "describe": {
     "columns": [
       {
@@ -33,6 +33,17 @@
       },
       {
         "ordinal": 3,
+        "name": "token_delivered",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "bff.sessions",
+            "name": "token_delivered"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "subject",
         "type_info": "Text",
         "origin": {
@@ -43,7 +54,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 5,
         "name": "name",
         "type_info": "Text",
         "origin": {
@@ -54,7 +65,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 6,
         "name": "email",
         "type_info": "Text",
         "origin": {
@@ -65,7 +76,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 7,
         "name": "access_token",
         "type_info": "Bytea",
         "origin": {
@@ -76,7 +87,7 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 8,
         "name": "access_expires_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -87,7 +98,7 @@
         }
       },
       {
-        "ordinal": 8,
+        "ordinal": 9,
         "name": "last_seen_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -98,7 +109,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 10,
         "name": "expires_at",
         "type_info": "Timestamptz",
         "origin": {
@@ -112,13 +123,13 @@
     "parameters": {
       "Left": [
         "Bytea",
-        "Timestamptz",
         "Timestamptz"
       ]
     },
     "nullable": [
       false,
       null,
+      false,
       false,
       false,
       true,
@@ -129,5 +140,5 @@
       false
     ]
   },
-  "hash": "c9ba088e1ec0845a30bde88baa379ce88d7dc67d327ee55a03ce497383e0105f"
+  "hash": "f0c02ddcaef239d0c5c8383aa47dc2cc9d65ae9f7c013a1f9a34606d2ae5e245"
 }

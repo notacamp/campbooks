@@ -220,7 +220,7 @@ pub enum AuthFailure {
     ExpiredToken,
     /// The token is valid, but the person signed in too long ago for an
     /// admin operation ([`Admin`](crate::admin::Admin)): sign in again
-    /// (RFC 9470 step-up, `max_age` 12 hours).
+    /// (RFC 9470 step-up, `max_age` 1 hour).
     AdminReauthRequired,
 }
 
@@ -242,8 +242,10 @@ impl AuthFailure {
         match self {
             Self::NotConfigured | Self::MissingToken => "Bearer",
             Self::InvalidToken | Self::ExpiredToken => r#"Bearer error="invalid_token""#,
+            // RFC 9470: `max_age` is `admin::REAUTH_AFTER` in seconds (the
+            // `admin` module's tests hold the two together).
             Self::AdminReauthRequired => {
-                r#"Bearer error="insufficient_user_authentication", max_age=43200"#
+                r#"Bearer error="insufficient_user_authentication", max_age=3600"#
             }
         }
     }

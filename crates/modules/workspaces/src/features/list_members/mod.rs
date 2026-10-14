@@ -61,7 +61,8 @@ pub async fn load(
 ) -> Result<Vec<MemberView>> {
     sqlx::query!(
         r#"
-        SELECT m.user_id AS "user_id: UserId", u.display_name, u.email, m.role, m.joined_at
+        SELECT m.user_id AS "user_id: UserId", u.display_name,
+               CASE WHEN u.email_verified THEN u.email END AS email, m.role, m.joined_at
           FROM workspaces.members m
           JOIN workspaces.users u ON u.id = m.user_id
          WHERE m.workspace_id = $1 AND ($2::uuid IS NULL OR m.user_id = $2)
@@ -112,5 +113,24 @@ mod tests {
             [("ana@example.com", "owner"), ("bea@example.com", "admin")]
         );
         assert_eq!(members[0]["display_name"], "ana");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_address_nobody_verified_is_never_shown(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let claimed = kit.user_with("dan", "ceo@example.com", false);
+        let ws = kit.create_workspace(&claimed, "Shop").await;
+        let path = format!("/api/v1/w/{ws}/members");
+        let listed = kit.get(&claimed, &path).await;
+        assert_eq!(listed.status, StatusCode::OK);
+        assert_eq!(listed.json["members"][0]["email"], serde_json::Value::Null);
+        assert_eq!(listed.json["members"][0]["display_name"], "dan");
+
+        // The provider verifies it at a later sign-in (the app lists the
+        // person's workspaces first): now it shows.
+        let verified = kit.user_with("dan", "ceo@example.com", true);
+        kit.get(&verified, "/api/v1/workspaces").await;
+        let listed = kit.get(&verified, &path).await;
+        assert_eq!(listed.json["members"][0]["email"], "ceo@example.com");
     }
 }

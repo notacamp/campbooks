@@ -165,7 +165,9 @@ pub struct MemberView {
     pub user_id: UserId,
     /// Their name, as their identity provider gives it.
     pub display_name: Option<String>,
-    /// Their email address, as their identity provider gives it.
+    /// Their email address, as their identity provider gives it, when it
+    /// verified it (an unverified address is never shown: anyone can claim
+    /// one).
     pub email: Option<String>,
     /// Their role.
     pub role: Role,

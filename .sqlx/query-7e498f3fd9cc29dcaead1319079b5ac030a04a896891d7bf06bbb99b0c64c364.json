@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT s.id\n          FROM bff.retired_tokens r\n          JOIN bff.sessions s ON s.id = r.session_id\n         WHERE r.token_hash = $1 AND s.idle_expires_at > $2 AND s.expires_at > $2\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "bff.sessions",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "7e498f3fd9cc29dcaead1319079b5ac030a04a896891d7bf06bbb99b0c64c364"
+}
