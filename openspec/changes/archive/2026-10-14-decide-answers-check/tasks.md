@@ -2,9 +2,9 @@
 
 ## 1. Investigation (campbooks-cloud#128)
 
-- [x] 1.1 Compare the request, the answer mapping and the serving setup with laya-serve 0.3.21's source and the model card; verify prod loads the published multilingual weights (sha256) and that a local laya-serve with the same pins answers like prod
-- [x] 1.2 Probe prod's Laya with fictional emails only (no restart, no configuration or database change): today's requests, negated statements, swapped option texts, yes/no questions, a two-option choice, JSON state, context; verify the mapping is not inverted and the model ignores the question
-- [x] 1.3 Run `cargo xtask eval decide --strategy laya` against a local laya-serve with prod's pins, plus the wording variants on half the set; record AUROC per question
+- [x] 1.1 Compare the request, the answer mapping and the serving setup with laya-serve 0.3.21's source and the model card; verify the deployed image loads the published multilingual weights (sha256) and that a local laya-serve with the same pins answers like the deployed one
+- [x] 1.2 Probe the deployed Laya with fictional emails only (no restart, no configuration or database change): today's requests, negated statements, swapped option texts, yes/no questions, a two-option choice, JSON state, context; verify the mapping is not inverted and the model ignores the question
+- [x] 1.3 Run `cargo xtask eval decide --strategy laya` against a local laya-serve with the `deploy/laya` pins, plus the wording variants on half the set; record AUROC per question
 
 ## 2. Context and questions (`campbooks-ai`)
 
@@ -22,7 +22,7 @@
 
 - [x] 4.1 The server spawns `keep_answers_checked` in every process
 - [x] 4.2 `conversations.decide_message`: checked model, recipient from the inbox, skip on `AnswersNotTrusted`; verify a failed check sorts exactly like no model, and the stamp and envelope version 2
-- [x] 4.3 Migration marking earlier model answers `laya-0.3.21-unchecked`/`unchecked`; read-side filters in suggestions and needs; verify unchecked answers are kept but not read and raise no need
+- [x] 4.3 Migration marking earlier model answers `laya-0.3.21-unchecked`/`unchecked`; read-side filters in suggestions and needs; verify unchecked answers are kept but not read, raise no need, and open Check questions from them are withdrawn as superseded on refresh
 - [x] 4.4 `AiAnswersCheck` in the admin overview; the System panel shows it in four languages; verify with component tests
 - [x] 4.5 Eval items get their owner as the recipient
 

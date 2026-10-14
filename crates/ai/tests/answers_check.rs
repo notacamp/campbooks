@@ -11,7 +11,8 @@
 //! - `before`: the requests before that change (no context, the questions
 //!   as declarative statements).
 //!
-//! Only fictional mail on reserved domains went into them; they hold
+//! Only the fictional check emails went into them (reserved domains, and
+//! GitHub's notification address for the code-review case); they hold
 //! probabilities and the score levels' legend, nothing else.
 
 // Helpers outside `#[test]` fns are not covered by clippy's test exemptions.
@@ -136,7 +137,7 @@ async fn the_recorded_laya_answers_fail_the_check() {
         Some("convaiinnovations/laya/multilingual")
     );
     assert_eq!(gateway.answers_check(), AnswersCheck::Done(report));
-    assert!(!gateway.answers_trusted(Duration::ZERO).await);
+    assert!(!gateway.answers_trusted());
 }
 
 #[tokio::test]
@@ -238,13 +239,13 @@ async fn an_unanswered_check_is_unavailable_and_not_trusted() {
     let (_server, gateway) = laya(ResponseTemplate::new(503)).await;
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Unavailable);
-    assert!(!gateway.answers_trusted(Duration::ZERO).await);
+    assert!(!gateway.answers_trusted());
 }
 
 #[tokio::test]
 async fn before_the_first_check_nothing_is_trusted() {
     let (_server, gateway) = laya(Right).await;
-    assert!(!gateway.answers_trusted(Duration::from_millis(10)).await);
+    assert!(!gateway.answers_trusted());
 }
 
 #[tokio::test]
@@ -255,7 +256,7 @@ async fn keep_checked_runs_at_once_and_stops() {
         server.received_requests().await.unwrap().len(),
         check::cases().len()
     );
-    assert!(gateway.answers_trusted(Duration::ZERO).await);
+    assert!(gateway.answers_trusted());
 
     // No decide role: nothing to check.
     let embed_only = Gateway::new(AiConfig {

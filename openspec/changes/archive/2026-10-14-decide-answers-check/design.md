@@ -8,7 +8,7 @@ mail only:
 
 | Suspect | Finding |
 | --- | --- |
-| Wrong checkpoint, revision or precision | Prod loads `convaiinnovations/laya` @ `55cf4c4e` (`multilingual/`) with `LAYA_REVISION=reviewed`. Its `model.safetensors` sha256 `9d628fd9…` is the published multilingual file. fp32 on CPU, `max_len` 1024, `head_max_len` 256, temperature 1. |
+| Wrong checkpoint, revision or precision | The `deploy/laya` image loads the reviewed revision of the multilingual checkpoint (`LAYA_REVISION=reviewed`); its `model.safetensors` is byte-identical to the published file. fp32 on CPU, `max_len` 1024, `head_max_len` 256, temperature 1. |
 | Request shape | `{model, state, questions}` with `choice` criteria as `{label: description}` in order, `score` criteria as a list, `noul` with `instructions` only: what `Agent._validate`/`render_options` expect. Our states fit easily: about 150 to 330 tokens. |
 | Answer mapping | `noul` is `p[1]` of the `[false, true]` option slots, choice probabilities are keyed by label, and score probabilities by level index. We read them by label and index, in question order. |
 | Inversion or position bias | When the `noul` option texts trade places (`labels`/`criteria` swapped), P(statement holds) follows the text. A `choice` between yes and no in either order gives the same answers. |
@@ -19,9 +19,9 @@ says of typed decisions ("fine-tune for a specific workflow"). The 1.000
 confidences come from probabilities that ship uncalibrated.
 
 What each change does, measured with the eight check emails (33 expected
-answers; the first three rows are prod's Laya, recorded as fixtures, the last
-two a local laya-serve with prod's pins) and on the eval set (a local
-laya-serve with prod's pins, through `cargo xtask eval decide` for the full
+answers; the first three rows are a deployed Laya, recorded as fixtures, the
+last two a local laya-serve with the `deploy/laya` pins) and on the eval set
+(a local laya-serve with the same pins, through `cargo xtask eval decide` for the full
 set):
 
 | Requests | Check emails | Eval set, AUROC `needs_reply` / `asks_action` / `has_deadline` / `suspicious` |
@@ -95,7 +95,8 @@ nothing in production.
 
 `campbooks_ai::decide::check`:
 
-- **Cases.** 8 fictional emails on reserved domains, each with the answers it
+- **Cases.** 8 fictional emails (reserved domains, except the code-review
+  notification, which uses GitHub's notification address), each with the answers it
   must get on some of the six questions: 33 expected answers. Every yes/no
   question has at least one yes case and one no case, so a model that always
   says yes (or no) can't pass. `stream` is graded too; `urgency` is not,
@@ -105,8 +106,10 @@ nothing in production.
   checkpoint 27.
 - **When.** `Gateway::keep_answers_checked` runs once at startup, then every
   6 h after a pass and every 15 min after a failure or an unanswered check,
-  until shutdown. The server spawns it in every process (API and worker),
-  since the check lives in each process's memory. It never runs per request.
+  until shutdown. The server spawns it in every process: with `api` and
+  `worker` run separately, each runs its own check (the API's feeds the admin
+  panel, the worker's gates the model pass), since the check lives in each
+  process's memory. Eight decide calls per process per period is cheap. It never runs per request.
   A model change means a configuration change, which means a restart, which
   means a new check.
 - **Result.** `AnswersCheck::{Pending, Done(CheckReport{outcome, right, total,
@@ -114,8 +117,10 @@ nothing in production.
   channel. The log gets one line per check: outcome, right and total. Never
   the answers, never the texts.
 - **Use.** `Model::checked()` (the conversations module's model strategy)
-  waits up to 30 s for a first check, then answers only if it passed; if not,
-  it fails with `Error::AnswersNotTrusted` before any request.
+  answers only if the last check passed. It never waits: until the first
+  check finishes it counts as not passed, so jobs flow on the rules at once
+  and no worker slot is held. Otherwise it fails with
+  `Error::AnswersNotTrusted` before any request.
   `conversations.decide_message` treats that error exactly like having no
   model: it returns without storing anything, and no job fails. Answers given
   under a passed check carry `model_version = checked:ctx<n>` (with the
@@ -139,10 +144,21 @@ that inside its own transaction for the one statement.
 The read side ignores model answers without the stamp:
 `suggestions::attach` (stream suggestions), `suggestions::for_message` (a
 conversation's decisions) and `needs::answers` (what raises a need) all add
-`source <> 'model' OR model_version LIKE 'checked:%'`. Nothing is deleted.
-The 264 answers in production stay for the owner to judge. Open Check
-questions that came from them stay open until the needs refresh re-reads
-them (the follow-up to notacamp/campbooks#487).
+`source <> 'model' OR model_version LIKE 'checked:%'`. Nothing is deleted:
+existing model decisions stay for the owner to judge. Check questions they
+already raised are withdrawn (`superseded`) on their conversation's next
+needs refresh: the refresh re-reads the message, its answers no longer raise
+the question, and notacamp/campbooks#487 withdraws an open need its message
+no longer raises (unless a member confirmed it).
+
+**Re-asking later.** A message seen while the model is untrusted gets no
+model row, so the `answered` check of `conversations.decide_message` (any
+model row) does not stop it from being asked again: a later re-decide (a
+replay of `message_received` for recent mail, once a model passes) picks it
+up. Messages with existing unchecked rows are not re-asked as they stand:
+`decisions` keeps one row per (message, question, source) and inserts skip a
+conflict, so re-deciding those would first need their rows cleared, which
+is the owner's call.
 
 ## Data ownership, events, scopes, AI
 

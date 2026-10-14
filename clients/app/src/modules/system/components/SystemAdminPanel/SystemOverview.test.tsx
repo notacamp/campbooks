@@ -97,6 +97,9 @@ describe("SystemOverview", () => {
 
     expect(await screen.findByText("Decisions")).toBeVisible();
     expect(valueOf("Decisions")).toHaveTextContent(/^Checking its answers/u);
+    // Not used yet: not shown as healthy.
+    expect(valueOf("Decisions").querySelector("[data-status='off']")).not.toBeNull();
+    expect(valueOf("Decisions").querySelector("[data-status='ok']")).toBeNull();
   });
 
   it("says when a role is outside the instance's network and gets no mail", async () => {

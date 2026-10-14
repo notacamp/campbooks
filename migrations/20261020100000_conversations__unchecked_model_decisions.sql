@@ -6,7 +6,10 @@
 --
 -- The table forces row-level security even for its owner, so the owner
 -- login running this migration lifts that for the one statement; the
--- migration's transaction hides the gap.
+-- migration's transaction hides the gap. That ALTER takes an ACCESS
+-- EXCLUSIVE lock: give up rather than queue behind long readers and block
+-- every request behind it (the next start retries the migration).
+SET LOCAL lock_timeout = '5s';
 ALTER TABLE conversations.decisions NO FORCE ROW LEVEL SECURITY;
 UPDATE conversations.decisions
    SET model_version = CASE WHEN model LIKE 'convaiinnovations/laya%'

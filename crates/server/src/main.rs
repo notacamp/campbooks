@@ -375,7 +375,6 @@ async fn blob_store(config: &Config, db: &PgPool) -> Result<BlobStore, String> {
     Ok(blobs)
 }
 
-/// Resolves once `stop` is flipped.
 /// The decide role's answers check: now, then periodically, never per
 /// request (`campbooks_ai::decide::check`). Every process keeps its own: the
 /// API shows it in the admin System panel, the worker gates the model pass
@@ -387,6 +386,7 @@ fn check_answers(composition: &campbooks_server::Composition, stop: &watch::Send
     }
 }
 
+/// Resolves once `stop` is flipped.
 fn stopped(stop: &watch::Sender<bool>) -> impl Future<Output = ()> + Send + 'static {
     let mut stop = stop.subscribe();
     async move {

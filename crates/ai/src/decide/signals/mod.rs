@@ -5,6 +5,7 @@
 //! harness (`cargo xtask eval decide`) measures the rules that ship.
 //! [`inbox`] is the context a model reads before an email.
 
+mod auth_results;
 pub mod dates;
 pub mod email;
 pub mod inbox;

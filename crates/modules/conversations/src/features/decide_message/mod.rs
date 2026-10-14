@@ -217,7 +217,7 @@ mod tests {
         AiConfig, Gateway, Protocol, ProviderConfig, Role,
         decide::check::{CheckOutcome, CheckReport},
     };
-    use campbooks_kernel::tenancy::WorkspaceId;
+    use campbooks_kernel::{db::BeginFor as _, tenancy::WorkspaceId};
     use serde_json::{Value, json};
     use sqlx::PgPool;
     use wiremock::{
@@ -269,12 +269,8 @@ mod tests {
         kit_with_checked_model(db, server, backfill_days, CheckOutcome::Passed).await
     }
 
-    async fn kit_with_checked_model(
-        db: PgPool,
-        server: &MockServer,
-        backfill_days: u32,
-        outcome: CheckOutcome,
-    ) -> Kit {
+    /// A Laya gateway on `server` whose answers check ended in `outcome`.
+    fn checked_gateway(server: &MockServer, outcome: CheckOutcome) -> Gateway {
         let provider = ProviderConfig::new(
             format!("{}/v1", server.uri()).parse().unwrap(),
             "convaiinnovations/laya-multilingual",
@@ -286,8 +282,17 @@ mod tests {
         })
         .unwrap();
         gateway.record_answers_check(check(outcome));
+        gateway
+    }
+
+    async fn kit_with_checked_model(
+        db: PgPool,
+        server: &MockServer,
+        backfill_days: u32,
+        outcome: CheckOutcome,
+    ) -> Kit {
         let deps = ConversationsDeps {
-            ai: Some(gateway),
+            ai: Some(checked_gateway(server, outcome)),
             config: ConversationsConfig {
                 decide_backfill_days: backfill_days,
                 ..ConversationsConfig::default()
@@ -363,6 +368,219 @@ mod tests {
             .unwrap();
         assert_eq!(replayed, 3);
         kit.run_jobs().await;
+    }
+
+    /// The model as it answered a code host's notification in production:
+    /// it asks for an action (0.875) with a deadline (0.976), no reply.
+    fn notification_answers() -> Value {
+        let noul = |v: f64, c: f64| json!({"type": "noul", "noul": v, "confidence": c});
+        json!({
+            "model": "laya-test",
+            "answers": {
+                "stream": {"type": "choice", "choice": "updates",
+                    "probabilities": {"primary": 0.2, "updates": 0.7, "receipts": 0.05,
+                                      "newsletters": 0.05}},
+                "needs_reply": noul(0.1, 0.9),
+                "asks_action": noul(0.875, 0.875),
+                "has_deadline": noul(0.976, 0.976),
+                "urgency": {"type": "score", "score": 1.0,
+                    "probabilities": {"0": 0.3, "1": 0.5, "2": 0.2}},
+                "suspicious": noul(0.02, 0.98)
+            }
+        })
+    }
+
+    /// Sam's inbox holding `fixture`, read by the rules and the model above.
+    async fn read_by_both(db: &PgPool, fixture: &str) -> (Kit, WorkspaceId) {
+        let recorded = serde_json::from_str(&crate::testkit::fixture(fixture)).unwrap();
+        read_recorded(db, &recorded).await
+    }
+
+    /// Sam's inbox holding the recorded batch `recorded`, read by the rules
+    /// and the model above.
+    async fn read_recorded(db: &PgPool, recorded: &Value) -> (Kit, WorkspaceId) {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/systemone"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(notification_answers()))
+            .expect(1)
+            .mount(&server)
+            .await;
+        let kit = kit_with_model(db.clone(), &server, 100_000).await;
+        let workspace = WorkspaceId::new();
+        let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+        let batch = crate::dev::record(&kit.state, workspace, inbox, recorded)
+            .await
+            .unwrap();
+        crate::dev::submit(&kit.state, workspace, &batch)
+            .await
+            .unwrap();
+        kit.run_jobs().await;
+        let model: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM conversations.decisions WHERE source = 'model'",
+        )
+        .fetch_one(db)
+        .await
+        .unwrap();
+        assert_eq!(model, 6, "the model pass ran");
+        (kit, workspace)
+    }
+
+    async fn needs(db: &PgPool) -> Vec<(String, String, String, String)> {
+        sqlx::query_as(
+            "SELECT reason, trust, basis, state FROM conversations.needs ORDER BY updated_at",
+        )
+        .fetch_all(db)
+        .await
+        .unwrap()
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_security_alert_is_a_sure_do_in_updates(db: PgPool) {
+        let (kit, _) = read_by_both(&db, "dependabot").await;
+        assert_eq!(
+            kit.stream_of("dependabot-1").await,
+            ("updates".to_owned(), "rules".to_owned())
+        );
+        assert_eq!(
+            needs(&db).await,
+            [(
+                "do".to_owned(),
+                "sure".to_owned(),
+                "rules".to_owned(),
+                "open".to_owned()
+            )]
+        );
+        // The rules' "no date" acted: the model's deadline is no due date.
+        let due: Option<chrono::NaiveDate> =
+            sqlx::query_scalar("SELECT due_on FROM conversations.needs")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(due, None);
+    }
+
+    /// The Dependabot fixture as a sender could make it look: `edit`ed.
+    fn dependabot_as(edit: impl Fn(&mut Value)) -> Value {
+        let mut recorded: Value =
+            serde_json::from_str(&crate::testkit::fixture("dependabot")).unwrap();
+        edit(&mut recorded["changes"][0]["message"]);
+        recorded
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_unauthenticated_alert_is_no_to_do(db: PgPool) {
+        // The same alert, its From spoofed through a provider that does not
+        // check (no results), or failing DMARC.
+        for results in [
+            Value::Null,
+            json!(
+                "mx.google.com; dkim=fail header.i=@github.com; dmarc=fail header.from=github.com"
+            ),
+        ] {
+            let recorded =
+                dependabot_as(|m| m["headers"]["authentication_results"] = results.clone());
+            let (_, _) = read_recorded(&db, &recorded).await;
+            let raised = needs(&db).await;
+            assert!(
+                raised.iter().all(|(reason, ..)| reason != "do"),
+                "{raised:?}"
+            );
+            sqlx::query("DELETE FROM conversations.inboxes")
+                .execute(&db)
+                .await
+                .unwrap();
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_look_alike_platform_is_no_to_do(db: PgPool) {
+        // It signs its own mail and names its own domain; it is not a listed
+        // platform, so its alert never acts.
+        let recorded = dependabot_as(|m| {
+            m["from"] =
+                json!({"name": "GitHub Security", "address": "alerts@githubsecurity.example"});
+            m["reply_to"] = json!([]);
+            m["headers"]["authentication_results"] = json!(
+                "mx.google.com; dkim=pass header.i=@githubsecurity.example; \
+                 dmarc=pass header.from=githubsecurity.example"
+            );
+        });
+        let (_, _) = read_recorded(&db, &recorded).await;
+        let raised = needs(&db).await;
+        assert!(
+            raised
+                .iter()
+                .all(|(reason, trust, ..)| reason != "do" && trust != "sure"),
+            "{raised:?}"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_notification_the_rules_settled_is_no_question(db: PgPool) {
+        let (_, _) = read_by_both(&db, "github-comment").await;
+        assert_eq!(needs(&db).await, []);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_question_raised_before_the_fix_is_withdrawn(db: PgPool) {
+        let (kit, workspace) = read_by_both(&db, "github-comment").await;
+        let conversation = kit.conversation_of("github-comment-1").await;
+        let message = kit.message_of("github-comment-1").await;
+        // What the earlier `raise` stored: the model's suggestion put as a
+        // question although the rules had settled it.
+        sqlx::query(
+            "INSERT INTO conversations.needs
+                 (conversation_id, workspace_id, message_id, reason, trust, basis, question,
+                  state, latest_inbound_id)
+             VALUES ($1::uuid, $2, $3::uuid, 'review', 'check', 'model', 'asks_action', 'open',
+                     $3::uuid)",
+        )
+        .bind(&conversation)
+        .bind(workspace.as_uuid())
+        .bind(&message)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let refresh = |kit: &Kit| {
+            let state = kit.state.clone();
+            let conversation = conversation.clone();
+            async move {
+                let mut tx = state.db.begin_for(workspace).await.unwrap();
+                crate::domain::needs::refresh(
+                    &mut tx,
+                    &state.events,
+                    &workspace.to_string(),
+                    conversation.parse().unwrap(),
+                    &crate::domain::needs::NeedSettings::new(
+                        36_500,
+                        &crate::domain::policy::Policy::baseline(),
+                    ),
+                )
+                .await
+                .unwrap();
+                tx.commit().await.unwrap();
+            }
+        };
+        refresh(&kit).await;
+        let (state, cause): (String, Option<String>) =
+            sqlx::query_as("SELECT state, cleared_because FROM conversations.needs")
+                .fetch_one(&db)
+                .await
+                .unwrap();
+        assert_eq!(
+            (state.as_str(), cause.as_deref()),
+            ("cleared", Some("superseded"))
+        );
+        let events = kit.events("conversations.need_changed").await;
+        assert_eq!(events.len(), 1, "{events:?}");
+        assert_eq!(events[0]["need"], Value::Null);
+        assert_eq!(events[0]["cleared_because"], "superseded");
+
+        // Again: nothing more to say.
+        refresh(&kit).await;
+        assert_eq!(kit.events("conversations.need_changed").await.len(), 1);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
@@ -520,7 +738,38 @@ mod tests {
             .respond_with(ResponseTemplate::new(200).set_body_json(laya_answers()))
             .mount(&server)
             .await;
-        let kit = kit_with_model(db.clone(), &server, 100_000).await;
+        // Rules that only record a reply or an action leave the model's
+        // "yes" to be put as a question.
+        let deps = ConversationsDeps {
+            ai: Some(checked_gateway(&server, CheckOutcome::Passed)),
+            config: ConversationsConfig {
+                decide_backfill_days: 100_000,
+                ..ConversationsConfig::default()
+            },
+            ..sorting_deps()
+        };
+        let kit = Kit::with_deps(
+            db.clone(),
+            deps.with_policy(
+                crate::Policy::baseline()
+                    .with(
+                        campbooks_ai::decide::signals::email::triage::STREAM,
+                        crate::domain::decide::Source::Rules,
+                        crate::Switch::ActAbove(0.9),
+                    )
+                    .with(
+                        campbooks_ai::decide::signals::email::triage::NEEDS_REPLY,
+                        crate::domain::decide::Source::Rules,
+                        crate::Switch::Record,
+                    )
+                    .with(
+                        campbooks_ai::decide::signals::email::triage::ASKS_ACTION,
+                        crate::domain::decide::Source::Rules,
+                        crate::Switch::Record,
+                    ),
+            ),
+        )
+        .await;
         let workspace = WorkspaceId::new();
         let (token, sam) = kit.member("sam", workspace);
         let inbox = kit
@@ -589,38 +838,53 @@ mod tests {
         .unwrap();
         assert!(kept > 0, "kept, not deleted");
 
-        // Read again, they raise no question.
+        // Read again on the next refresh, the open questions they raised are
+        // withdrawn (superseded), and none is raised again.
         let conversations: Vec<String> = sqlx::query_scalar(
-            "SELECT DISTINCT conversation_id::text FROM conversations.needs WHERE basis = 'model'",
+            "SELECT DISTINCT conversation_id::text FROM conversations.needs
+              WHERE basis = 'model' AND state = 'open'",
         )
         .fetch_all(&db)
         .await
         .unwrap();
+        let settings = crate::domain::needs::NeedSettings::new(36_500, &crate::Policy::baseline());
+        let refresh_all = || async {
+            for conversation in &conversations {
+                let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+                crate::domain::needs::refresh(
+                    &mut tx,
+                    &kit.state.events,
+                    &workspace.to_string(),
+                    conversation.parse().unwrap(),
+                    &settings,
+                )
+                .await
+                .unwrap();
+                tx.commit().await.unwrap();
+            }
+        };
+        refresh_all().await;
+        let (open, superseded): (i64, i64) = sqlx::query_as(
+            "SELECT count(*) FILTER (WHERE state = 'open'),
+                    count(*) FILTER (WHERE cleared_because = 'superseded')
+               FROM conversations.needs WHERE basis = 'model'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(open, 0);
+        assert_eq!(superseded, questions_before);
+
         sqlx::query("DELETE FROM conversations.needs")
             .execute(&db)
             .await
             .unwrap();
-        let settings = crate::domain::needs::NeedSettings::new(36_500, &crate::Policy::baseline());
-        for conversation in conversations {
-            let mut tx = campbooks_kernel::db::BeginFor::begin_for(&kit.state.db, workspace)
-                .await
-                .unwrap();
-            crate::domain::needs::refresh(
-                &mut tx,
-                &kit.state.events,
-                &workspace.to_string(),
-                conversation.parse().unwrap(),
-                &settings,
-            )
-            .await
-            .unwrap();
-            tx.commit().await.unwrap();
-        }
-        let questions_after: i64 =
+        refresh_all().await;
+        let raised_again: i64 =
             sqlx::query_scalar("SELECT count(*) FROM conversations.needs WHERE basis = 'model'")
                 .fetch_one(&db)
                 .await
                 .unwrap();
-        assert_eq!(questions_after, 0);
+        assert_eq!(raised_again, 0);
     }
 }

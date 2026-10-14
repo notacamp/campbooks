@@ -147,6 +147,10 @@ pub struct Headers {
     /// `Auto-Submitted`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auto_submitted: Option<String>,
+    /// The receiving provider's own `Authentication-Results`, as the
+    /// connector vouches for it (never a header the sender wrote).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_results: Option<String>,
 }
 
 /// An attachment, stored as a blob by the connector.

@@ -1,20 +1,25 @@
 import { execFileSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
 
 import type { Page } from "playwright";
 
 import { pause, type ScenarioContext } from "../context.ts";
 
-// The decide role's answers check (campbooks-cloud#128) on the real stack:
-// the server runs with `decide` pointed at a laya-serve (the
-// `deploy/laya` image's pins, multilingual checkpoint) that answers "yes" to
-// almost everything. At startup the server asks it about eight fictional
-// emails with obvious answers, it gets 8 of 33 right, and Admin → System says
-// its answers are not used. Nothing is intercepted. Server as in
-// `admin-system.ts`, plus:
+// The decide role's answers check (campbooks-cloud#128) on the real server:
+// at startup the server asks the decide model about eight fictional emails
+// with obvious answers. Until that check finishes the model is not used (the
+// System panel says it is being checked, not that it is healthy); once it
+// fails, the panel says its answers are not used. The decide endpoint is a
+// local stand-in replaying the answers laya-serve (the `deploy/laya` image)
+// gave for those emails, holding them until `CAMPBOOKS_FAKE_LAYA_RELEASE`
+// exists, so the pending state can be seen. The 375px run shows it pending;
+// the desktop run releases the answers and shows the check failing.
 //
+//   python3 fake_laya.py 18000 /tmp/release        # the stand-in
 //   CAMPBOOKS_AI__DECIDE__PROTOCOL=laya CAMPBOOKS_AI__DECIDE__BASE_URL=http://127.0.0.1:18000/v1 \
-//   CAMPBOOKS_AI__DECIDE__MODEL=convaiinnovations/laya-multilingual CAMPBOOKS_AI__DECIDE__API_KEY=… \
-//   cargo run -p campbooks-server -- all
+//   CAMPBOOKS_AI__DECIDE__MODEL=convaiinnovations/laya-multilingual \
+//   cargo run -p campbooks-server -- all            # plus the settings of `admin-system.ts`
+//   CAMPBOOKS_FAKE_LAYA_RELEASE=/tmp/release \
 //   CAMPBOOKS_ADMIN_GRANT='…/campbooks-server admin grant --account {account} --permission super --yes' \
 //   pnpm --dir clients record admin-decide-check
 //
@@ -89,6 +94,15 @@ function grantSuper(account: string): string {
   }).trim();
 }
 
+/** Lets the stand-in answer the check (see the header). */
+function releaseAnswers(): void {
+  const release = process.env["CAMPBOOKS_FAKE_LAYA_RELEASE"];
+  if (release === undefined || release === "") {
+    throw new Error("set CAMPBOOKS_FAKE_LAYA_RELEASE (see the scenario's header)");
+  }
+  writeFileSync(release, "");
+}
+
 export default async function adminDecideCheck({ page }: ScenarioContext): Promise<void> {
   await signInAsNewPerson(page);
   const session = await page.evaluate<{ user?: { sub?: string } }>(
@@ -103,17 +117,39 @@ export default async function adminDecideCheck({ page }: ScenarioContext): Promi
   await openAccountMenu(page);
   await page.getByRole("link", { name: "Administration" }).click();
   await page.getByRole("heading", { level: 1, name: "System" }).waitFor();
-  const decisions = page.getByText("Answers fail the check").first();
-  await decisions.waitFor();
-  await decisions.scrollIntoViewIfNeeded();
+
+  const narrow = (page.viewportSize()?.width ?? 1440) < 600;
+  const checking = page.getByText("Checking its answers").first();
+  await checking.waitFor();
+  await checking.scrollIntoViewIfNeeded();
   await pause(1200);
   await caption(
     page,
-    "At startup the server asked the decisions model (Laya) about eight made-up emails with obvious answers",
+    "Right after startup the server is still checking the decisions model on eight made-up emails with obvious answers",
   );
+  await caption(page, "Until it passes, its answers are not used: the rules sort mail");
+  if (narrow) {
+    await hideCaption(page);
+    await pause(2000);
+    return;
+  }
+
+  releaseAnswers();
+  await hideCaption(page);
+  const failed = page.getByText("Answers fail the check").first();
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await page.reload();
+    await page.getByRole("heading", { level: 1, name: "System" }).waitFor();
+    if (await failed.isVisible()) {
+      break;
+    }
+    await pause(1000);
+  }
+  await failed.scrollIntoViewIfNeeded();
+  await pause(1200);
   await caption(
     page,
-    "It got only 8 of 33 right (it says yes to almost everything), so its answers are not used: the rules sort mail alone",
+    "Laya got only 8 of 33 right (it says yes to almost everything), so its answers are not used",
   );
   await caption(
     page,

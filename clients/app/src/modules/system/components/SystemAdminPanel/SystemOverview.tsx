@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-import { Fact, FactList, Heading, Text } from "~/lib/ui";
+import { Fact, FactList, type FactStatus, Heading, Text } from "~/lib/ui";
 
 import type { AdminOverview, AiRoleStatus } from "../../api/admin";
 
@@ -182,7 +182,7 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
         : t(`admin.ai.protocol.${role.protocol}`),
   });
   const check = refused ? undefined : answersCheck(role, t);
-  const status = refused ? "off" : reachable && check?.trusted !== false ? "ok" : "problem";
+  const status = roleStatus(refused, reachable, check?.trusted);
   const facts = [detail, where, check?.detail].filter((part) => part !== undefined);
   return (
     <Fact label={label} status={status} detail={facts.join(" · ")}>
@@ -196,13 +196,32 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
 }
 
 /**
+ * A role's dot: off when it gets no mail or its answers are still being
+ * checked (not used yet), a problem when it does not answer or failed its
+ * answers check, ok otherwise.
+ */
+function roleStatus(
+  refused: boolean,
+  reachable: boolean,
+  trusted: boolean | undefined | null,
+): FactStatus {
+  if (refused || trusted === null) {
+    return "off";
+  }
+  if (!reachable || trusted === false) {
+    return "problem";
+  }
+  return "ok";
+}
+
+/**
  * The decide role's answers check in words: whether the model got obvious
  * fictional emails right, and so whether its answers are used.
  */
 function answersCheck(
   role: AiRoleStatus,
   t: TFunction<"system">,
-): { headline: string; detail: string; trusted: boolean | undefined } | undefined {
+): { headline: string; detail: string; trusted: boolean | null } | undefined {
   const check = role.answers_check;
   if (check === undefined || check === null) {
     return undefined;
@@ -213,7 +232,7 @@ function answersCheck(
       return {
         headline: t("admin.ai.check.pending"),
         detail: t("admin.ai.check.pendingDetail"),
-        trusted: undefined,
+        trusted: null,
       };
     case "passed":
       return {

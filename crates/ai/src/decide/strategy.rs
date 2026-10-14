@@ -19,14 +19,7 @@
 //! answer may act, is measured by `cargo xtask eval decide` on the eval set
 //! in `crates/ai/evals/decide/`.
 
-use std::{
-    collections::HashMap,
-    fmt,
-    future::Future,
-    pin::Pin,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{collections::HashMap, fmt, future::Future, pin::Pin, sync::Arc, time::Instant};
 
 use super::{Answer, AnswerValue, DecisionContext, Question, signals::email::Envelope};
 use crate::{Error, Gateway};
@@ -129,10 +122,6 @@ pub struct Model {
     checked: bool,
 }
 
-/// How long a checked [`Model`] waits for the first answers check after
-/// startup before it counts as not passed.
-pub const FIRST_CHECK_WAIT: Duration = Duration::from_secs(30);
-
 impl Model {
     /// A strategy named `name` asking `gateway`'s `decide` role, filed under
     /// `purpose` (`<module>.<decision>`).
@@ -146,7 +135,8 @@ impl Model {
     }
 
     /// The same strategy, answering only while the role's answers check
-    /// ([`super::check`]) passes: otherwise it fails with
+    /// ([`super::check`]) passes, without waiting for one still running:
+    /// otherwise it fails with
     /// [`Error::AnswersNotTrusted`] before calling the model, and the
     /// answers it gives carry the check's [`stamp`](super::check::stamp) as
     /// their `model_version`. The check itself runs elsewhere
@@ -172,7 +162,7 @@ impl Strategy for Model {
             if questions.is_empty() {
                 return Ok(Decisions::default());
             }
-            if self.checked && !self.gateway.answers_trusted(FIRST_CHECK_WAIT).await {
+            if self.checked && !self.gateway.answers_trusted() {
                 return Err(Error::AnswersNotTrusted);
             }
             let answers = self

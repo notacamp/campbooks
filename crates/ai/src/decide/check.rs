@@ -154,8 +154,10 @@ fn email(from: Party, subject: &str, headers: &[(&str, &str)], body: &str) -> En
     }
 }
 
-/// The eight fictional emails, all on reserved domains, and what each must
-/// get: 33 expected answers in all.
+/// The eight fictional emails and what each must get: 33 expected answers
+/// in all. Every sender is on a reserved domain except the code-review
+/// notification's, which uses GitHub's real notification address so the
+/// case looks like the mail it stands for; its text is made up.
 pub fn cases() -> Vec<Case> {
     vec![
         newsletter(),
@@ -489,18 +491,10 @@ impl Gateway {
     }
 
     /// Whether the `decide` role's answers may be used: its last check
-    /// passed. Waits up to `wait` for a first check still running.
-    pub async fn answers_trusted(&self, wait: Duration) -> bool {
-        let mut seen = self.checks.0.subscribe();
-        let done = tokio::time::timeout(
-            wait,
-            seen.wait_for(|check| matches!(check, AnswersCheck::Done(_))),
-        )
-        .await;
-        match done {
-            Ok(Ok(check)) => matches!(&*check, AnswersCheck::Done(report) if report.passed()),
-            _ => false,
-        }
+    /// passed. Never waits: before the first check finishes the answer is
+    /// no, so callers carry on without the model at once.
+    pub fn answers_trusted(&self) -> bool {
+        matches!(&*self.checks.0.borrow(), AnswersCheck::Done(report) if report.passed())
     }
 }
 

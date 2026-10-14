@@ -57,15 +57,15 @@ with its outcome and counts only, never the answers.
 
 ### Requirement: An unchecked model is not used
 A model strategy built `checked` SHALL answer only while the last answers check
-passed, waiting at most 30 seconds for a first check; otherwise it SHALL fail
+passed, without waiting for a first check still running; otherwise it SHALL fail
 with `AnswersNotTrusted` before calling the model. Answers it gives SHALL carry
 `model_version` `checked:ctx<context version>`, followed by `:<provider
 version>` when the provider reports one. An unchecked model strategy (the eval
 harness) SHALL leave the version as the provider gave it.
 
 #### Scenario: Before the first check finishes
-- **WHEN** a message arrives right after startup and no check finishes within 30 seconds
-- **THEN** the model is not asked about it
+- **WHEN** a message arrives right after startup, before the first check finishes
+- **THEN** the model is not asked about it and the rules sort it at once
 
 #### Scenario: A passed check
 - **WHEN** the check passed

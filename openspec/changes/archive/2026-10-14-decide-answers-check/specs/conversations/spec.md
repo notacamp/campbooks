@@ -102,4 +102,4 @@ inbox SHALL never raise one.
 
 #### Scenario: Unchecked model answers
 - **WHEN** a message's only `needs_reply` true is a model answer marked `laya-0.3.21-unchecked`
-- **THEN** reading it raises no `check` need
+- **THEN** reading it raises no `check` need, and an open `check` need it raised before is withdrawn as `superseded` on the next refresh
