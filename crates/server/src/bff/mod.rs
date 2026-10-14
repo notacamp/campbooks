@@ -77,9 +77,9 @@ pub const SESSION_SCHEME: &str = "session";
 /// How often expired sessions and sign-ins are deleted.
 pub const PRUNE_EVERY: Duration = Duration::from_mins(15);
 
-/// Refresh the access token this long before it expires. Rauthy refuses a
-/// refresh token earlier than 60 s before the access token's expiry (and
-/// revokes the session if one tries), so this stays well inside that window.
+/// Refresh the access token this long before it expires. Some issuers
+/// refuse a refresh token earlier than 60 s before the access token's expiry
+/// (and revoke the session if one tries), so this stays well inside that window.
 pub const REFRESH_BEFORE_EXPIRY: TimeDelta = TimeDelta::seconds(30);
 
 /// Record use of a session at most this often.

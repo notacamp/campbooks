@@ -23,7 +23,7 @@
 //!   (`/.well-known/*`, `/oauth2/*`, `/auth/*`), which serve browsers and
 //!   OAuth clients and are mounted by the server next to the web BFF.
 //!
-//! While another identity provider is configured (Rauthy, until slice S5),
+//! While another identity provider is configured (an outside OIDC issuer),
 //! the issuer does not run and both answer 404.
 
 #![forbid(unsafe_code)]
