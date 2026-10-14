@@ -62,7 +62,7 @@ pub async fn execute(
         .await?
         .filter(|c| connections::visible(access, c.granted_by))
         .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection).await?;
+    let view = connections::view(&mut tx, connection, access.user).await?;
     tx.commit().await?;
     Ok(view)
 }

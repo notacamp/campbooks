@@ -25,6 +25,7 @@ function consent(overrides: Partial<MailboxConsent> = {}): MailboxConsent {
     starting: false,
     refusal: undefined,
     signInAgain: vi.fn(),
+    wayInFate: () => "kept",
     ...overrides,
   };
 }
@@ -181,7 +182,19 @@ describe("MailboxesPage", () => {
     expect(screen.queryByRole("button", { name: "Disconnect sofia@example.com" })).toBeNull();
   });
 
-  it("only deletes the mail of a shared mailbox a member connected", async () => {
+  it("says the way in goes too when it came only from connecting", async () => {
+    api([CONNECTION, ZOHO_CONNECTION]);
+    renderPage({ consent: consent({ wayInFate: () => "removed" }) });
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Disconnect ana.duarte@example.net" }),
+    );
+    expect(screen.getByText(/also stops being a way to sign in/u)).toBeVisible();
+    // Keeping the history is the grantor's choice, whatever the mailbox.
+    expect(screen.getByRole("radio", { name: "Keep its history, read-only" })).not.toBeChecked();
+  });
+
+  it("says a shared mailbox is not a way in", async () => {
     mockApi({
       "GET /bff/session": { body: SESSION },
       [`GET /bff/api/v1/w/${HOUSEHOLD.id}/connections`]: {
@@ -189,12 +202,24 @@ describe("MailboxesPage", () => {
       },
       [`GET /bff/api/v1/w/${HOUSEHOLD.id}/members`]: { body: { members: [ANA] } },
     });
-    renderWithProviders(<MailboxesPage workspace={HOUSEHOLD} consent={consent()} />);
+    renderWithProviders(
+      <MailboxesPage workspace={HOUSEHOLD} consent={consent({ wayInFate: () => "none" })} />,
+    );
 
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect loja@example.com" }));
-    expect(screen.queryByRole("radio")).toBeNull();
-    expect(screen.getByText(/Keeping it is for your own mailboxes/u)).toBeVisible();
     expect(screen.getByText(/isn’t one of your ways to sign in/u)).toBeVisible();
+  });
+
+  it("treats a disconnect that finds nothing as an error, not a success", async () => {
+    api([CONNECTION], { [DISCONNECT(CONNECTION.id)]: problem(404, "not_found") });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Disconnect ana@example.com" }));
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "ana@example.com wasn’t found: it may already be disconnected",
+    );
+    expect(screen.queryByText("ana@example.com is disconnected")).toBeNull();
   });
 
   it("asks to disconnect the chosen mailbox with Backspace, after J", async () => {
@@ -217,7 +242,7 @@ describe("MailboxesPage", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect ana@example.com" }));
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "ana@example.com couldn't be disconnected",
+      "ana@example.com couldn’t be disconnected",
     );
   });
 

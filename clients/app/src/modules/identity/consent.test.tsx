@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DUARTE } from "../../../test/demo/workspaces";
 import { mockApi, problem, renderWithProviders } from "../../../test/render";
 
-import { useMailboxConsent } from "./consent";
+import { useMailboxConsent, wayInFate } from "./consent";
 
 const WAYS = "GET /bff/api/v1/identity/ways-in";
 const LINK = "POST /bff/api/v1/identity/links";
@@ -114,5 +114,30 @@ describe("useMailboxConsent", () => {
     renderWithProviders(<Door leave={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "connect" }));
     expect(await screen.findByText("refusal: rate_limited")).toBeVisible();
+  });
+});
+
+describe("wayInFate", () => {
+  const way = (provider: string, email: string, linked_via: string) => ({
+    id: email,
+    kind: "provider",
+    provider,
+    email,
+    linked_via,
+    linked_at: "2026-10-01T09:00:00Z",
+    last_used_at: null,
+  });
+  const signedUp = way("google", "ana@example.com", "sign_up");
+  const connected = way("zoho", "ana@example.net", "connect");
+
+  it("removes a way in added only by connecting, unless it is the last one", () => {
+    expect(wayInFate([signedUp, connected], 0, "zoho", "ANA@example.net")).toBe("removed");
+    expect(wayInFate([connected], 0, "zoho", "ana@example.net")).toBe("kept");
+    expect(wayInFate([connected], 1, "zoho", "ana@example.net")).toBe("removed");
+  });
+
+  it("keeps one you signed up or linked with, and says when there is none", () => {
+    expect(wayInFate([signedUp, connected], 0, "google", "ana@example.com")).toBe("kept");
+    expect(wayInFate([signedUp], 0, "zoho", "loja@example.com")).toBe("none");
   });
 });

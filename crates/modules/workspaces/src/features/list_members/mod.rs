@@ -48,16 +48,17 @@ pub async fn handler(
 /// The members of the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access) -> Result<MemberList> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let members = load(&mut tx, access.workspace, None).await?;
+    let members = load(&mut tx, access.workspace, None, access.user).await?;
     tx.commit().await?;
     Ok(MemberList { members })
 }
 
-/// The members of `workspace` (only `user`, when given).
+/// The members of `workspace` (only `user`, when given), marking `caller`.
 pub async fn load(
     conn: &mut PgConnection,
     workspace: WorkspaceId,
     user: Option<UserId>,
+    caller: Option<UserId>,
 ) -> Result<Vec<MemberView>> {
     sqlx::query!(
         r#"
@@ -80,6 +81,7 @@ pub async fn load(
             email: row.email,
             role: row.role.parse::<Role>()?,
             joined_at: row.joined_at,
+            you: caller == Some(row.user_id),
         })
     })
     .collect()
@@ -112,5 +114,8 @@ mod tests {
             [("ana@example.com", "owner"), ("bea@example.com", "admin")]
         );
         assert_eq!(members[0]["display_name"], "ana");
+        // The caller is marked by id, never matched by email.
+        assert_eq!(members[0]["you"], false);
+        assert_eq!(members[1]["you"], true);
     }
 }

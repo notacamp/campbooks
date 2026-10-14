@@ -10,7 +10,7 @@
   },
   "mailboxes": {
     "title": "Mailboxes",
-    "lead": "The mailboxes Campbooks reads for {{workspace}}. Each one syncs on its own, and none of them changes how anyone signs in.",
+    "lead": "The mailboxes Campbooks reads for {{workspace}}. Each one syncs on its own.",
     "list": "Connected mailboxes",
     "loading": "Loading the mailboxes",
     "onlyYours": "You see the mailboxes you connected. Owners and admins see all of them.",
@@ -45,7 +45,6 @@
     "confirm": "Disconnect",
     "cancel": "Keep it",
     "done": "{{address}} is disconnected",
-    "failed": "{{address}} couldn't be disconnected. Try again.",
     "choice": "What happens to its mail in Campbooks",
     "delete": {
       "title": "Delete its mail from Campbooks",
@@ -55,12 +54,19 @@
       "title": "Keep its history, read-only",
       "lead": "What is already here stays readable and searchable. Nothing new arrives, and nothing goes back to {{provider}}."
     },
-    "deleteOnly": "Its mail leaves Campbooks: messages, attachments, search results and drafts. Keeping it is for your own mailboxes, or for an owner or admin.",
     "atProvider": "Either way, the mail stays in {{provider}}: nothing is deleted there.",
-    "signInKept": "You can still sign in to Campbooks with this account.",
-    "signInNever": "It isn’t one of your ways to sign in, so nothing changes there.",
     "doneDeleted": "Its mail is leaving Campbooks. It is still in {{provider}}.",
-    "doneKept": "Its history stays here, read-only. Its mail is still in {{provider}}."
+    "doneKept": "Its history stays here, read-only. Its mail is still in {{provider}}.",
+    "wayIn": {
+      "removed": "It also stops being a way to sign in to Campbooks: you added it by connecting this mailbox.",
+      "kept": "You can still sign in to Campbooks with this account.",
+      "none": "It isn’t one of your ways to sign in, so nothing changes there."
+    },
+    "errors": {
+      "gone": "{{address}} wasn’t found: it may already be disconnected. Reload the page to see the list as it is.",
+      "notYours": "Only the person who connected {{address}} can disconnect it.",
+      "failed": "{{address}} couldn’t be disconnected. Try again."
+    }
   },
   "connect": {
     "title": "Connect a mailbox",

@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
-import { errorStatus, useSession } from "~/lib/api";
+import { errorStatus, problemCode } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
@@ -25,7 +25,7 @@ import {
 import { useMembers, type Member, type Workspace } from "~/modules/workspaces";
 
 import { useConnections, useDisconnect, type Connection, type MailChoice } from "../../api/queries";
-import type { MailboxConsent } from "../../consent";
+import type { MailboxConsent, WayInFate } from "../../consent";
 import {
   firstChoice,
   healthTone,
@@ -50,16 +50,17 @@ function useProviderName() {
 
 /**
  * Settings → Mailboxes: the workspace's mailboxes you may see, how each is
- * doing, Reconnect for yours that need it, Disconnect (confirmed in place:
- * the mail stays, and so does signing in with that account), and Connect a
- * mailbox through the front door. ⇧C connects, J/K choose a mailbox, R
+ * doing, Reconnect and Disconnect for the ones you connected (Disconnect
+ * confirmed in place: delete its mail here or keep its history read-only;
+ * the mail at the provider is never touched; a way in added only by
+ * connecting it goes with it), and Connect a mailbox through the front door
+ * (also as a way in, or not). ⇧C connects, J/K choose a mailbox, R
  * reconnects it, ⌫ asks to disconnect it.
  */
 export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps) {
   const { t } = useTranslation("connectors");
   const connections = useConnections(workspace.id);
   const members = useMembers(workspace.id);
-  const session = useSession();
   const providerName = useProviderName();
   const connectGroup = useRef<HTMLDivElement>(null);
   const [chosen, setChosen] = useState<string | undefined>();
@@ -68,9 +69,8 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
     { address: string; provider: string; mail: MailChoice } | undefined
   >();
 
-  const myEmail = session.data?.user?.email?.toLowerCase();
-  const me = members.data?.find((member) => member.email?.toLowerCase() === myEmail);
-  const mine = (connection: Connection) => me?.user_id === connection.granted_by;
+  // The server marks the caller's own connections (by id, never by email).
+  const mine = (connection: Connection) => connection.granted_by_you;
   const list = connections.data ?? [];
   const current = list.some((connection) => connection.id === chosen)
     ? chosen
@@ -182,7 +182,6 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
                 providerName={providerName(connection.provider)}
                 grantor={members.data?.find((member) => member.user_id === connection.granted_by)}
                 mine={mine(connection)}
-                manages={seesAll}
                 selected={connection.id === current}
                 confirming={connection.id === confirming}
                 consent={consent}
@@ -288,8 +287,6 @@ interface MailboxRowProps {
   grantor: Member | undefined;
   /** You connected it (only you can reconnect or disconnect it). */
   mine: boolean;
-  /** You are an owner or admin here (you may keep any of your mailboxes' mail). */
-  manages: boolean;
   /** The row the keys act on. */
   selected: boolean;
   /** Its Disconnect confirmation is open. */
@@ -306,7 +303,6 @@ function MailboxRow({
   providerName,
   grantor,
   mine,
-  manages,
   selected,
   confirming,
   consent,
@@ -316,11 +312,8 @@ function MailboxRow({
 }: MailboxRowProps) {
   const { t } = useTranslation("connectors");
   const disconnect = useDisconnect(workspaceId);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<"gone" | "notYours" | "failed" | undefined>();
   const [mail, setMail] = useState<MailChoice>("delete");
-  // Keeping the history is for your own mailbox (you sign in with it), or
-  // for an owner or admin.
-  const mayKeep = connection.grantor_signs_in || manages;
   const { address } = connection;
   const grantorName = grantor?.display_name ?? grantor?.email ?? undefined;
   const by = mine
@@ -378,7 +371,7 @@ function MailboxRow({
               aria-label={t("row.disconnectLabel", { address })}
               aria-expanded={confirming}
               onClick={() => {
-                setFailed(false);
+                setFailed(undefined);
                 setMail("delete");
                 onConfirm(true);
               }}
@@ -399,21 +392,22 @@ function MailboxRow({
             onConfirm(false);
           }}
           onConfirm={() => {
-            const chosen = mayKeep ? mail : "delete";
             disconnect.mutate(
-              { connectionId: connection.id, mail: chosen },
+              { connectionId: connection.id, mail },
               {
                 onSuccess: () => {
-                  onDisconnected(chosen);
+                  onDisconnected(mail);
                 },
                 onError: (error) => {
                   onConfirm(false);
-                  // Already gone (or never yours to see): the list catches up.
-                  if (errorStatus(error) === 404) {
-                    onDisconnected(chosen);
-                  } else {
-                    setFailed(true);
-                  }
+                  // Never a silent success: a 404 is said as one.
+                  setFailed(
+                    errorStatus(error) === 404
+                      ? "gone"
+                      : problemCode(error) === "disconnect_owner_only"
+                        ? "notYours"
+                        : "failed",
+                  );
                 },
               },
             );
@@ -422,37 +416,34 @@ function MailboxRow({
           <DisconnectChoice
             address={address}
             provider={providerName}
-            mayKeep={mayKeep}
-            signsIn={connection.grantor_signs_in}
+            wayIn={consent.wayInFate(connection.provider, address)}
             mail={mail}
             onMail={setMail}
           />
         </InlineConfirm>
       ) : null}
-      {failed ? (
-        <Banner tone="danger" role="alert" title={t("disconnect.failed", { address })} />
-      ) : null}
+      {failed === undefined ? null : (
+        <Banner tone="danger" role="alert" title={t(`disconnect.errors.${failed}`, { address })} />
+      )}
     </ListRow>
   );
 }
 
 /**
  * What Disconnect does, said before it happens: syncing stops, what becomes
- * of the mail here (delete by default; keep read-only where allowed), that
- * the mail stays at the provider, and whether the way in stays.
+ * of the mail here (delete by default, or keep its history read-only), that
+ * the mail stays at the provider, and what becomes of the way in.
  */
 function DisconnectChoice({
   address,
   provider,
-  mayKeep,
-  signsIn,
+  wayIn,
   mail,
   onMail,
 }: {
   address: string;
   provider: string;
-  mayKeep: boolean;
-  signsIn: boolean;
+  wayIn: WayInFate | undefined;
   mail: MailChoice;
   onMail: (mail: MailChoice) => void;
 }) {
@@ -460,30 +451,26 @@ function DisconnectChoice({
   return (
     <div className="flex flex-col gap-3">
       <span>{t("disconnect.question", { address, provider })}</span>
-      {mayKeep ? (
-        <ChoiceCards
-          label={t("disconnect.choice")}
-          value={mail}
-          onChange={onMail}
-          options={[
-            {
-              value: "delete",
-              title: t("disconnect.delete.title"),
-              description: t("disconnect.delete.lead"),
-            },
-            {
-              value: "keep",
-              title: t("disconnect.keep.title"),
-              description: t("disconnect.keep.lead", { provider }),
-            },
-          ]}
-        />
-      ) : (
-        <span>{t("disconnect.deleteOnly")}</span>
-      )}
+      <ChoiceCards
+        label={t("disconnect.choice")}
+        value={mail}
+        onChange={onMail}
+        options={[
+          {
+            value: "delete",
+            title: t("disconnect.delete.title"),
+            description: t("disconnect.delete.lead"),
+          },
+          {
+            value: "keep",
+            title: t("disconnect.keep.title"),
+            description: t("disconnect.keep.lead", { provider }),
+          },
+        ]}
+      />
       <span>
-        {t("disconnect.atProvider", { provider })}{" "}
-        {signsIn ? t("disconnect.signInKept") : t("disconnect.signInNever")}
+        {t("disconnect.atProvider", { provider })}
+        {wayIn === undefined ? null : <> {t(`disconnect.wayIn.${wayIn}`)}</>}
       </span>
     </div>
   );

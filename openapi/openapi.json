@@ -8501,6 +8501,7 @@
           "address",
           "address_verified",
           "granted_by",
+          "granted_by_you",
           "capabilities",
           "health",
           "health_changed_at",
@@ -8539,6 +8540,10 @@
           "granted_by": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member who granted it."
+          },
+          "granted_by_you": {
+            "type": "boolean",
+            "description": "The caller granted it (only they may reconnect or disconnect it)."
           },
           "grantor_signs_in": {
             "type": "boolean",
@@ -9893,7 +9898,8 @@
         "required": [
           "user_id",
           "role",
-          "joined_at"
+          "joined_at",
+          "you"
         ],
         "properties": {
           "display_name": {
@@ -9922,6 +9928,10 @@
           "user_id": {
             "$ref": "#/components/schemas/UserId",
             "description": "The user."
+          },
+          "you": {
+            "type": "boolean",
+            "description": "It is the caller (by user id, never by email)."
           }
         }
       },

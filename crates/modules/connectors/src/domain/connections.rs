@@ -84,8 +84,12 @@ async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec
         .collect()
 }
 
-/// `connection` as the API shows it, with its streams.
-pub async fn view(conn: &mut PgConnection, connection: Connection) -> Result<ConnectionView> {
+/// `connection` as the API shows it to `caller`, with its streams.
+pub async fn view(
+    conn: &mut PgConnection,
+    connection: Connection,
+    caller: Option<UserId>,
+) -> Result<ConnectionView> {
     let rows = sqlx::query!(
         r#"SELECT s.id AS "id: StreamId", s.capability, s.inbox_id AS "inbox_id: InboxId",
                   s.address, s.phase, s.paused, s.last_synced_at, s.last_change_at,
@@ -120,6 +124,7 @@ pub async fn view(conn: &mut PgConnection, connection: Connection) -> Result<Con
         address_verified: connection.address_verified,
         display_name: connection.display_name,
         granted_by: connection.granted_by,
+        granted_by_you: caller == Some(connection.granted_by),
         capabilities: connection.capabilities,
         health: connection.health,
         health_reason: connection.health_reason,

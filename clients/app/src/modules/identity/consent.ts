@@ -1,10 +1,39 @@
 import { useState } from "react";
 
 import { errorStatus, problemCode } from "~/lib/api";
-import type { ConsentRefusal, ConsentStart, UseMailboxConsent } from "~/modules/connectors";
+import type {
+  ConsentRefusal,
+  ConsentStart,
+  UseMailboxConsent,
+  WayInFate,
+} from "~/modules/connectors";
 
-import { useStartLink, useWaysIn } from "./api/queries";
+import { usePasskeys, useStartLink, useWaysIn, type WayIn } from "./api/queries";
 import { leavePage, stepUpUrl } from "./model";
+
+/**
+ * What disconnecting `address` at `provider` does to your way in, as the
+ * server decides it: a way in added only by connecting the mailbox goes with
+ * it, unless it is your last way in (provider accounts and passkeys).
+ * Whether another of your connections still uses the account is not known
+ * here; then the server keeps it, and the page has said it goes.
+ */
+export function wayInFate(
+  items: readonly WayIn[],
+  passkeys: number,
+  provider: string,
+  address: string,
+): WayInFate {
+  const way = items.find(
+    (candidate) =>
+      candidate.provider === provider && candidate.email?.toLowerCase() === address.toLowerCase(),
+  );
+  if (way === undefined) {
+    return "none";
+  }
+  const last = items.length + passkeys <= 1;
+  return way.linked_via === "connect" && !last ? "removed" : "kept";
+}
 
 /** Why `identity.start_link` refused, in the words the Mailboxes page has. */
 function consentRefusal(error: unknown): ConsentRefusal {
@@ -28,6 +57,7 @@ export function useMailboxConsent(
   leave: (url: string) => void = leavePage,
 ): ReturnType<UseMailboxConsent> {
   const ways = useWaysIn();
+  const passkeys = usePasskeys();
   const link = useStartLink();
   const [refusal, setRefusal] = useState<ConsentRefusal | undefined>();
   const [leaving, setLeaving] = useState(false);
@@ -70,5 +100,9 @@ export function useMailboxConsent(
     signInAgain: () => {
       leave(stepUpUrl(returnTo));
     },
+    wayInFate: (provider, address) =>
+      ways.data === undefined
+        ? undefined
+        : wayInFate(ways.data.items, passkeys.data?.items.length ?? 0, provider, address),
   };
 }

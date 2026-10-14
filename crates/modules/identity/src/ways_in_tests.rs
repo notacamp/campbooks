@@ -741,6 +741,81 @@ async fn a_zoho_refresh_token_campbooks_does_not_keep_is_revoked(db: PgPool) {
     assert!(kit.intake.adopted().is_empty());
 }
 
+/// Start a `connect` of `provider` without a way in (`sign_in: false`) as
+/// `access`, and follow it through the provider: where the browser lands.
+async fn connect_shared(kit: &Kit, access: &str, provider: Provider) -> String {
+    let started = kit
+        .start_link(
+            access,
+            &json!({ "purpose": "connect", "provider": provider.as_str(), "sign_in": false,
+                     "workspace_id": uuid::Uuid::now_v7(), "return_to": SETTINGS }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    let to_provider = kit.get(started.json["url"].as_str().unwrap()).await;
+    kit.via(provider, &to_provider.location()).await.location()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_connect_of_another_accounts_way_in_is_refused(db: PgPool) {
+    let kit = Kit::new(db).await;
+    // Bea signs up with Google account `x`: it is her way in.
+    kit.google.set_user(user("x"));
+    let bea = kit.signed_up().await;
+    let bea_ways = kit.ways_in(&bea).await;
+    // Ana, in another browser, connects `x` as a shared mailbox.
+    kit.new_browser();
+    kit.google.set_user(user("ana"));
+    let ana = kit.signed_up().await;
+    kit.google.set_user(user("x"));
+    let back = connect_shared(&kit, &ana, Provider::Google).await;
+
+    assert_eq!(
+        back,
+        format!("{SETTINGS}?link_error=way_in_belongs_to_another_account")
+    );
+    assert!(kit.intake.adopted().is_empty(), "nothing adopted");
+    // A Google token is dropped, never revoked: revoking it would revoke
+    // Bea's whole grant to the app (see `revoke_unkept`).
+    assert!(kit.google.revoked_tokens().is_empty());
+    assert_eq!(kit.ways_in(&bea).await, bea_ways, "Bea's way in untouched");
+    assert_eq!(
+        kit.ways_in(&ana).await["items"].as_array().unwrap().len(),
+        1
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_zoho_connect_of_another_accounts_way_in_revokes_its_token(db: PgPool) {
+    let kit = Kit::new(db).await;
+    kit.intake.sync_zoho();
+    // Bea's Zoho account `zoho-x` is her way in.
+    kit.google.set_user(user("bea"));
+    let bea = kit.signed_up().await;
+    kit.zoho.set_user(user("zoho-x"));
+    let at_zoho = link_to(&kit, &bea, Provider::Zoho).await;
+    kit.via(Provider::Zoho, &at_zoho).await;
+    let bea_ways = kit.ways_in(&bea).await;
+    // Ana connects it as a shared mailbox.
+    kit.new_browser();
+    kit.google.set_user(user("ana"));
+    let ana = kit.signed_up().await;
+    let before = kit.zoho.revoked_tokens().len();
+    let back = connect_shared(&kit, &ana, Provider::Zoho).await;
+
+    assert_eq!(
+        back,
+        format!("{SETTINGS}?link_error=way_in_belongs_to_another_account")
+    );
+    assert!(kit.intake.adopted().is_empty(), "nothing adopted");
+    assert_eq!(
+        kit.zoho.revoked_tokens().len(),
+        before + 1,
+        "its token revoked"
+    );
+    assert_eq!(kit.ways_in(&bea).await, bea_ways, "Bea's way in untouched");
+}
+
 /// Ways in, live sessions and connections handed over, as counts.
 async fn footprint(kit: &Kit) -> (i64, i64, usize) {
     (

@@ -1683,6 +1683,8 @@ export interface components {
             display_name?: string | null;
             /** @description The member who granted it. */
             granted_by: components["schemas"]["UserId"];
+            /** @description The caller granted it (only they may reconnect or disconnect it). */
+            granted_by_you: boolean;
             /**
              * @description Its grantor also signs in with this account: their own mailbox, not
              *     a shared one. Decides who may keep its mail when disconnecting.
@@ -2301,6 +2303,8 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
+            /** @description It is the caller (by user id, never by email). */
+            you: boolean;
         };
         /** @description A message's bodies. */
         MessageBody: {

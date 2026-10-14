@@ -9,9 +9,11 @@ import { UndoProvider } from "~/lib/ui";
 import { createAppRouter } from "../../src/app/router";
 import {
   CONNECTION,
+  GOOGLE_WAY_IN,
   SHARED_CONNECTION,
   SOFIA_CONNECTION,
   ZOHO_CONNECTION,
+  ZOHO_WAY_IN,
 } from "../../test/demo/identity";
 import { ANA, DUARTE, HOUSEHOLD, SESSION, SOFIA } from "../../test/demo/workspaces";
 
@@ -48,9 +50,11 @@ function signedIn({
     "GET /bff/session": { body: SESSION },
     "GET /bff/api/v1/workspaces": { body: { workspaces: [workspace] } },
     "GET /bff/api/v1/identity/held-grants": { body: { items: [] } },
+    "GET /bff/api/v1/identity/passkeys": { body: { items: [] } },
     "GET /bff/api/v1/identity/ways-in": {
       body: {
-        items: [],
+        // Ana signed up with Google, and added Zoho by connecting its mailbox.
+        items: [GOOGLE_WAY_IN, { ...ZOHO_WAY_IN, linked_via: "connect" }],
         providers: ["google", "microsoft", "zoho"],
         mailbox_providers: mailboxProviders,
       },
@@ -164,8 +168,26 @@ export const KeepHistory: Story = {
   },
 };
 
-/** A member's shared mailbox: its mail can only be deleted. */
-export const SharedMailboxMember: Story = {
+/** Zoho was added only by connecting it: disconnecting it removes that way in too. */
+export const WayInGoesWithIt: Story = {
+  args: {
+    path: PAGE,
+    api: signedIn({
+      connections: [CONNECTION, { ...ZOHO_CONNECTION, health: "ok" }],
+      disconnect: { status: 204 },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Disconnect ana.duarte@example.net" }),
+    );
+    await expect(canvas.getByText(/also stops being a way to sign in/u)).toBeVisible();
+  },
+};
+
+/** A shared mailbox: not a way in, so nothing changes there. */
+export const SharedMailbox: Story = {
   args: {
     path: `/w/${HOUSEHOLD.id}/settings/mailboxes`,
     api: signedIn({
@@ -179,7 +201,20 @@ export const SharedMailboxMember: Story = {
     await userEvent.click(
       await canvas.findByRole("button", { name: "Disconnect loja@example.com" }),
     );
-    await expect(canvas.getByText(/Keeping it is for your own mailboxes/u)).toBeVisible();
+    await expect(canvas.getByText(/isn’t one of your ways to sign in/u)).toBeVisible();
+  },
+};
+
+/** A disconnect that finds nothing is said, never shown as done. */
+export const DisconnectNotFound: Story = {
+  args: { path: PAGE, api: signedIn({ disconnect: { status: 404 } }) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      await canvas.findByRole("button", { name: "Disconnect ana@example.com" }),
+    );
+    await userEvent.click(canvas.getByRole("button", { name: "Disconnect" }));
+    await expect(await canvas.findByText(/wasn’t found/u)).toBeVisible();
   },
 };
 

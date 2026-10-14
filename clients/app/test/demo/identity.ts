@@ -29,6 +29,7 @@ export const CONNECTION: Schema<"ConnectionView"> = {
   health_changed_at: "2026-10-13T09:00:00Z",
   health_reason: null,
   grantor_signs_in: true,
+  granted_by_you: true,
   streams: [],
   created_at: "2026-10-13T09:00:00Z",
 };
@@ -82,6 +83,7 @@ export const SOFIA_CONNECTION: Schema<"ConnectionView"> = {
   address: "sofia@example.com",
   display_name: "Sofia Pessoa",
   granted_by: "0192f1a0-0000-7000-8000-0000000000a2",
+  granted_by_you: false,
   health: "throttled",
   health_reason: "rate_limited",
 };

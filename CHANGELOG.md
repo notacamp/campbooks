@@ -23,12 +23,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   becomes a way in); reconnect a mailbox of yours that stopped; or
   disconnect one, choosing whether its mail in Campbooks is deleted (the
   default) or kept as read-only history. The mail at Gmail or Zoho is never
-  touched. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
+  touched; a way to sign in that came only from connecting that mailbox
+  goes with it. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
   "Connect your mail" now opens it, and Settings lists its sections
   (Members, Mailboxes, Ways to sign in) in the sidebar and, on phones,
   under the header. API: `identity.list_ways_in` returns
   `mailbox_providers`; `identity.start_link` takes `sign_in` for a connect
-  (default `true`); connections show `grantor_signs_in`.
+  (default `true`); connections show `grantor_signs_in` and
+  `granted_by_you`, and members `you` (the app no longer works out who you
+  are by matching email addresses).
 
 - Apps other than Campbooks on the web can use your account, with your say
   each time. A consent screen names the app, says whether anyone vouches for

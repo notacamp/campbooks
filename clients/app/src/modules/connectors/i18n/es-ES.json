@@ -10,7 +10,7 @@
   },
   "mailboxes": {
     "title": "Buzones",
-    "lead": "Los buzones que Campbooks lee para {{workspace}}. Cada uno se sincroniza por su cuenta, y ninguno cambia cómo inicia sesión nadie.",
+    "lead": "Los buzones que Campbooks lee para {{workspace}}. Cada uno se sincroniza por su cuenta.",
     "list": "Buzones conectados",
     "loading": "Cargando los buzones",
     "onlyYours": "Ves los buzones que has conectado tú. Los propietarios y administradores los ven todos.",
@@ -45,7 +45,6 @@
     "confirm": "Desconectar",
     "cancel": "Conservarlo",
     "done": "{{address}} se ha desconectado",
-    "failed": "No se ha podido desconectar {{address}}. Vuelve a intentarlo.",
     "choice": "Qué pasa con su correo en Campbooks",
     "delete": {
       "title": "Borrar su correo de Campbooks",
@@ -55,12 +54,19 @@
       "title": "Conservar su historial, solo lectura",
       "lead": "Lo que ya está aquí sigue pudiéndose leer y buscar. No llega nada nuevo y no vuelve nada a {{provider}}."
     },
-    "deleteOnly": "Su correo sale de Campbooks: mensajes, adjuntos, resultados de búsqueda y borradores. Conservarlo es cosa de tus propios buzones, o de un propietario o administrador.",
     "atProvider": "En cualquier caso, el correo sigue en {{provider}}: allí no se borra nada.",
-    "signInKept": "Podrás seguir iniciando sesión en Campbooks con esta cuenta.",
-    "signInNever": "No es una de tus formas de iniciar sesión, así que ahí no cambia nada.",
     "doneDeleted": "Su correo está saliendo de Campbooks. Sigue en {{provider}}.",
-    "doneKept": "Su historial se queda aquí, solo lectura. Su correo sigue en {{provider}}."
+    "doneKept": "Su historial se queda aquí, solo lectura. Su correo sigue en {{provider}}.",
+    "wayIn": {
+      "removed": "También deja de ser una forma de iniciar sesión en Campbooks: la añadiste al conectar este buzón.",
+      "kept": "Podrás seguir iniciando sesión en Campbooks con esta cuenta.",
+      "none": "No es una de tus formas de iniciar sesión, así que ahí no cambia nada."
+    },
+    "errors": {
+      "gone": "No se ha encontrado {{address}}: puede que ya esté desconectado. Recarga la página para ver la lista actual.",
+      "notYours": "Solo quien conectó {{address}} puede desconectarlo.",
+      "failed": "No se ha podido desconectar {{address}}. Vuelve a intentarlo."
+    }
   },
   "connect": {
     "title": "Conectar un buzón",

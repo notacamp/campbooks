@@ -10,7 +10,7 @@
   },
   "mailboxes": {
     "title": "Caixas de correio",
-    "lead": "As caixas de correio que o Campbooks lê para {{workspace}}. Cada uma sincroniza por si, e nenhuma muda a forma como alguém inicia sessão.",
+    "lead": "As caixas de correio que o Campbooks lê para {{workspace}}. Cada uma sincroniza por si.",
     "list": "Caixas de correio ligadas",
     "loading": "A carregar as caixas de correio",
     "onlyYours": "Vê as caixas de correio que ligou. Os proprietários e administradores veem todas.",
@@ -45,7 +45,6 @@
     "confirm": "Desligar",
     "cancel": "Manter",
     "done": "{{address}} foi desligada",
-    "failed": "Não foi possível desligar {{address}}. Tente novamente.",
     "choice": "O que acontece ao correio dela no Campbooks",
     "delete": {
       "title": "Apagar o correio dela do Campbooks",
@@ -55,12 +54,19 @@
       "title": "Manter o histórico, só de leitura",
       "lead": "O que já está aqui continua legível e pesquisável. Nada de novo chega, e nada volta ao {{provider}}."
     },
-    "deleteOnly": "O correio dela sai do Campbooks: mensagens, anexos, resultados de pesquisa e rascunhos. Mantê-lo é para as suas próprias caixas de correio, ou para um proprietário ou administrador.",
     "atProvider": "Em qualquer caso, o correio fica no {{provider}}: nada é apagado lá.",
-    "signInKept": "Continua a poder iniciar sessão no Campbooks com esta conta.",
-    "signInNever": "Não é uma das suas formas de iniciar sessão, por isso nada muda aí.",
     "doneDeleted": "O correio dela está a sair do Campbooks. Continua no {{provider}}.",
-    "doneKept": "O histórico fica aqui, só de leitura. O correio continua no {{provider}}."
+    "doneKept": "O histórico fica aqui, só de leitura. O correio continua no {{provider}}.",
+    "wayIn": {
+      "removed": "Também deixa de ser uma forma de iniciar sessão no Campbooks: adicionou-a ao ligar esta caixa de correio.",
+      "kept": "Continua a poder iniciar sessão no Campbooks com esta conta.",
+      "none": "Não é uma das suas formas de iniciar sessão, por isso nada muda aí."
+    },
+    "errors": {
+      "gone": "Não foi possível encontrar {{address}}: pode já estar desligada. Recarregue a página para ver a lista atual.",
+      "notYours": "Só quem ligou {{address}} a pode desligar.",
+      "failed": "Não foi possível desligar {{address}}. Tente novamente."
+    }
   },
   "connect": {
     "title": "Ligar uma caixa de correio",

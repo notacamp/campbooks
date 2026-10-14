@@ -216,6 +216,11 @@ Three decisions arrived during this change and are built here.
    on `connection_removed` with `mail = delete`. Until it lands, nothing
    consumes the event and the mail stays in Campbooks whatever the choice.
    The confirmation describes what each choice will do.
+   - **Superseded by batch 1 of #117** (its disconnect backend replaces this
+     one when it lands): only the grantor disconnects (403
+     `disconnect_owner_only`), so keeping the history is always the
+     grantor's choice; owners and admins keep a leaver's mail at offboarding
+     (`DELETE …/members/{user}?mail=keep`). The page follows that shape now.
    - *Alternative considered:* a separate `connectors.purge_mail` operation
      after a disconnect. Rejected: two calls for one decision, and a window
      where a disconnected mailbox's mail has no stated fate.
@@ -227,10 +232,23 @@ Member departure and workspace deletion publish `mail = delete`.
 - **Mail after Disconnect.** Until #117's purge consumes `mail = delete`,
   a deleted mailbox's conversations stay. The contract (`mail` on the
   operation and the event) is what the two pieces agree on.
-- **A way in that came only from a connect** stays after a disconnect
-  today, and the confirmation says so. #117 also decides it should be
-  removed with the connection; when identity does that, the confirmation's
-  sign-in sentence changes with it.
+- **A way in that came only from a connect** goes with its connection
+  (approved #117 decision, overriding #68's first position). The
+  confirmation says so from `identity.list_ways_in` (`linked_via =
+  connect`, not the last way in counting passkeys); `identity` removes it
+  on `connectors.connection_removed` once that event carries `provider`,
+  `account_subject` and `granted_by` (batch 1 of #117). The page cannot see
+  whether another of the person's connections uses the same account (then
+  the way in stays), so in that rare case it says the way in goes when it
+  stays.
+- **`grantor_signs_in` can go stale.** It is set when a grant arrives and
+  never cleared, so removing the way in afterwards (Ways to sign in) leaves
+  it `true`. Nothing decides access from it any more (keeping the history
+  is the grantor's choice, batch 1's rule). Better: compute it from the
+  live ways in on read; until then, treat it as a hint.
+- **Who "you" are** comes from the server (`ConnectionView.granted_by_you`,
+  `MemberView.you`), never from matching emails, which a person without an
+  address (or two sharing one) would get wrong.
 - **Revoking at Google revokes the person's whole grant to the app**, which
   may include a sign-in's consent; signing in again simply asks again, so
   the way in still works, as the confirmation promises.

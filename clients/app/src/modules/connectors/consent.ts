@@ -13,6 +13,14 @@ export type ConsentStart =
   | { purpose: "connect"; provider: string; signIn: boolean }
   | { purpose: "reconnect"; connection: string };
 
+/**
+ * What disconnecting a mailbox does to the way in of its account:
+ * `removed` when it was added only by connecting it and is not your last way
+ * in; `kept` when you sign in with it otherwise; `none` when it is not one
+ * of your ways in. `undefined` until known.
+ */
+export type WayInFate = "removed" | "kept" | "none";
+
 /** Why starting was refused before anyone left the page. */
 export type ConsentRefusal = "step_up" | "unsupported" | "rate_limited" | "failed";
 
@@ -29,6 +37,8 @@ export interface MailboxConsent {
   refusal: ConsentRefusal | undefined;
   /** Sign in again (a fresh sign-in), coming back to the page. */
   signInAgain: () => void;
+  /** What disconnecting the mailbox `address` at `provider` does to your way in. */
+  wayInFate: (provider: string, address: string) => WayInFate | undefined;
 }
 
 /** The hook the app shell hands to `buildConnectorsRoutes`. */

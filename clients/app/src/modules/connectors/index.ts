@@ -5,6 +5,12 @@ export {
   ConnectedMailboxes,
   type InAppLink,
 } from "./components/ConnectedMailboxes/ConnectedMailboxes";
-export type { ConsentRefusal, ConsentStart, MailboxConsent, UseMailboxConsent } from "./consent";
+export type {
+  ConsentRefusal,
+  ConsentStart,
+  MailboxConsent,
+  UseMailboxConsent,
+  WayInFate,
+} from "./consent";
 export { buildConnectorsRoutes } from "./routes";
 export { CONNECTORS_SHORTCUTS } from "./shortcuts";
