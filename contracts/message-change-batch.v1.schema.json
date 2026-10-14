@@ -90,7 +90,11 @@
             "list_id": { "type": ["string", "null"] },
             "list_unsubscribe": { "type": ["string", "null"] },
             "precedence": { "type": ["string", "null"] },
-            "auto_submitted": { "type": ["string", "null"] }
+            "auto_submitted": { "type": ["string", "null"] },
+            "authentication_results": {
+              "type": ["string", "null"],
+              "description": "The receiving provider's own Authentication-Results (RFC 8601), unfolded: the topmost one, only when its authserv-id is the provider's. A connector that cannot tell leaves it out."
+            }
           }
         },
         "raw": { "oneOf": [{ "$ref": "#/$defs/blobRef" }, { "type": "null" }], "description": "The raw message (RFC 5322), when kept." },

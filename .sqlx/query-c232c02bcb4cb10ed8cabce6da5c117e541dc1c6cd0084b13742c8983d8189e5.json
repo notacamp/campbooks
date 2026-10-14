@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT sent_at FROM conversations.messages WHERE id = $1",
+  "query": "SELECT sent_at FROM conversations.messages\n          WHERE id = $1 AND NOT in_spam AND NOT in_trash",
   "describe": {
     "columns": [
       {
@@ -24,5 +24,5 @@
       false
     ]
   },
-  "hash": "d08b786234baa2ddc7ce95eaba2444e9379efb52d682250982bf4ff0256ce0b0"
+  "hash": "c232c02bcb4cb10ed8cabce6da5c117e541dc1c6cd0084b13742c8983d8189e5"
 }

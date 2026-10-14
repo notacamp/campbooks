@@ -102,6 +102,35 @@ pub enum IndexOp {
     },
 }
 
+/// The provider that received a message: whose `Authentication-Results`
+/// header is trusted (its authserv-id), and no one else's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Receiver {
+    /// Gmail (`mx.google.com`).
+    Gmail,
+    /// Zoho Mail, in any of its data centres.
+    Zoho,
+}
+
+impl Receiver {
+    /// The authserv-ids the provider stamps its own results with. An id not
+    /// listed here is not trusted, so an unknown one reads as no result at
+    /// all.
+    ///
+    /// Zoho trusts none yet: nobody has seen which `Authentication-Results`
+    /// (if any, rather than only `ARC-Authentication-Results`) Zoho adds on
+    /// top of a received message, and if it adds none, a header naming its
+    /// servers would be one the sender wrote. TODO(campbooks-cloud#132):
+    /// list Zoho's ids once a recorded Zoho message shows them, with a test
+    /// over that recording.
+    pub const fn authserv_ids(self) -> &'static [&'static str] {
+        match self {
+            Self::Gmail => &["mx.google.com"],
+            Self::Zoho => &[],
+        }
+    }
+}
+
 /// A fetched message, as [`store_message`] stores it.
 #[derive(Debug, Clone)]
 pub struct Fetched {
@@ -118,6 +147,8 @@ pub struct Fetched {
     pub raw: Vec<u8>,
     /// Its state, in the contract's terms.
     pub flags: Flags,
+    /// The provider that received it.
+    pub receiver: Receiver,
 }
 
 /// Store a fetched message's blobs (its raw bytes, bodies, attachments and
@@ -129,7 +160,7 @@ pub async fn store_message(
     fetched: Fetched,
     generation: i32,
 ) -> Result<(NormalizedMessage, IndexOp), ReadError> {
-    let parsed = parse::parse(&fetched.raw);
+    let parsed = parse::parse(&fetched.raw, fetched.receiver);
     let mut blobs = Vec::new();
     let raw_blob = store.put(workspace, fetched.raw, "message/rfc822").await?;
     blobs.push(raw_blob.clone());

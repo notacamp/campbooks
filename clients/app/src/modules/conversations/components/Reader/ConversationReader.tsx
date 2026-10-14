@@ -43,6 +43,8 @@ export interface ConversationReaderProps {
   conversationId: string;
   /** The stream the list shows (Back goes there). */
   stream: Stream;
+  /** What Back says when the list is not a stream (search results). */
+  backLabel?: string | undefined;
   actions: InboxActions;
   onBack: () => void;
   onPrevious: () => void;
@@ -65,6 +67,7 @@ export function ConversationReader({
   workspaceId,
   conversationId,
   stream,
+  backLabel,
   actions,
   onBack,
   onPrevious,
@@ -177,8 +180,9 @@ export function ConversationReader({
     { enabled: active },
   );
   useShortcut("overlay.close", onBack, { enabled: !moving });
-  useShortcut("list.next", onNext);
-  useShortcut("list.previous", onPrevious);
+  // J/K step between conversations; the arrows keep scrolling this one.
+  useShortcut("list.next", onNext, { alternates: false });
+  useShortcut("list.previous", onPrevious, { alternates: false });
   const canReply = active && renderReplySlot !== undefined;
   useShortcut(
     "item.reply",
@@ -239,7 +243,7 @@ export function ConversationReader({
   const back = (
     <span className="flex lg:hidden">
       <Button variant="ghost" icon="chevron-left" onClick={onBack} shortcut="overlay.close">
-        {t("reader.back", { stream: streamName(t, stream) })}
+        {backLabel ?? t("reader.back", { stream: streamName(t, stream) })}
       </Button>
     </span>
   );

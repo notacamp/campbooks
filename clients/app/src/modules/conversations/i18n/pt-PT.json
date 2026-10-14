@@ -123,6 +123,7 @@
       "payment_due": "Há um pagamento a fazer («{{evidence}}»).",
       "already_paid": "Diz que já está pago («{{evidence}}»).",
       "action_asked": "Pede-lhe que faça algo («{{evidence}}»).",
+      "security_alert": "É um alerta de segurança sobre algo seu («{{evidence}}»).",
       "conditional_ask": "Só pede algo se se aplicar («{{evidence}}»).",
       "notice": "É um aviso: não há nada a fazer.",
       "request": "Faz um pedido («{{evidence}}»).",
