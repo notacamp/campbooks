@@ -57,7 +57,9 @@ pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
-pub use features::{inbox_visibility::visibility, search_source::search_source};
+pub use features::{
+    inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
+};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
@@ -159,6 +161,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::SendRequested>()
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
+            .publishes::<events::InboxChanged>()
+            .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
@@ -176,8 +180,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
             ))
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()
+            .on_event::<features::forget_connection::ForgetConnection>()
+            .on_event::<features::forget_member::ForgetMember>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
+        resources: domain::resources::resources(),
     }
 }
 

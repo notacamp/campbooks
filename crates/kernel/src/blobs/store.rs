@@ -341,6 +341,39 @@ impl BlobStore {
         Ok(detached.unsigned_abs())
     }
 
+    /// Detach, in `tx`, every blob held by the records `ids` of type `kind`
+    /// (for example every message of a removed inbox), in one statement.
+    /// Returns how many references were dropped.
+    pub async fn detach_owners(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        workspace: &str,
+        kind: &str,
+        ids: &[Uuid],
+    ) -> Result<u64, BlobError> {
+        check_workspace(workspace)?;
+        check_owner(&BlobOwner::new(kind.to_owned(), Uuid::nil()))?;
+        let detached = sqlx::query_scalar!(
+            r#"
+            WITH gone AS (
+                DELETE FROM kernel.blob_refs
+                 WHERE workspace_id = $1 AND owner_type = $2 AND owner_id = ANY($3)
+                RETURNING hash
+            ), touched AS (
+                UPDATE kernel.blobs b SET touched_at = now()
+                 WHERE b.workspace_id = $1 AND b.hash IN (SELECT hash FROM gone)
+            )
+            SELECT count(*) AS "count!" FROM gone
+            "#,
+            workspace,
+            kind,
+            ids,
+        )
+        .fetch_one(&mut **tx)
+        .await?;
+        Ok(detached.unsigned_abs())
+    }
+
     /// Delete every blob of `workspace` — objects, catalogue rows and
     /// references — whoever holds them. For workspace deletion only (the
     /// `workspaces` module's purge job calls it once the grace period of a

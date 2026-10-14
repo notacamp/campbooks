@@ -37,7 +37,7 @@ pub struct Adopted {
     tag = "identity",
     // Connecting a mailbox is a connectors write too.
     security(("bearer" = ["identity:write", "connectors:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"]).access("identity.held_grant", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("id" = uuid::Uuid, Path, description = "The held grant."),
@@ -62,6 +62,13 @@ pub async fn handler(
     workspace: Workspace<IdentityWrite>,
     Path(path): Path<super::HeldGrantPath>,
 ) -> Result<Json<Adopted>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &workspace.principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.held_grant",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     if !workspace.principal.has_scope(CONNECTORS_WRITE) {
         return Err(Error::InsufficientScope(CONNECTORS_WRITE));
     }

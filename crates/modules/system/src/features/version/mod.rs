@@ -41,7 +41,7 @@ impl VersionResponse {
     // Public: probes and support tools call it without a token.
     security(()),
     // A probe: neither rules nor the assistant have a reason to call it.
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("system.instance", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The running build.", body = VersionResponse),
     )

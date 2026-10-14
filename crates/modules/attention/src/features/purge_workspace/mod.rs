@@ -6,7 +6,7 @@ use campbooks_kernel::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::events::{MemberLeft, WorkspaceDeleting};
+use crate::events::{InboxRemoved, MemberLeft, WorkspaceDeleting};
 
 /// Schedules the purge for the end of the grace period.
 pub struct ScheduleWorkspacePurge;
@@ -55,6 +55,32 @@ impl Job for PurgeWorkspace {
 
 /// Forgets a former member's snoozes.
 pub struct ForgetMember;
+
+/// `conversations.inbox_removed` → forget every item in that inbox, and with
+/// them every member's "Later".
+pub struct ForgetInbox;
+
+impl EventHandler for ForgetInbox {
+    type Event = InboxRemoved;
+    const NAME: &'static str = "attention.forget_inbox";
+    const QUEUE: &'static str = "default";
+
+    async fn handle(ctx: &mut JobContext, event: Event<InboxRemoved>) -> Result<(), JobError> {
+        let removed = event.payload;
+        let tx = ctx.tx().await?;
+        // Snoozes go with their items.
+        let items = sqlx::query!(
+            "DELETE FROM attention.items
+              WHERE container_type = 'conversations.inbox' AND container_id = $1",
+            removed.inbox,
+        )
+        .execute(&mut **tx)
+        .await?
+        .rows_affected();
+        tracing::info!(items, "attention forgot a removed inbox");
+        Ok(())
+    }
+}
 
 impl EventHandler for ForgetMember {
     type Event = MemberLeft;

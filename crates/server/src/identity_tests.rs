@@ -925,6 +925,50 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
         assert_eq!(reply.status, expected, "{}", reply.body);
     }
     step("client_credentials -> Work's inboxes 200, Home's 404");
+    // 200, not 403: a bare client sees no inbox, so the composed server's
+    // directory (identity's, not the stub) resolved it to the admin who
+    // registered it (ADR 0017).
+    // Even holding `identity:clients` (no client may register for it; this
+    // token is minted by hand), a client acting for an admin manages no
+    // clients: the handler takes a person's own token only.
+    let manager = campbooks_identity::domain::tokens::client_access_token(
+        &issuer.url,
+        &issuer.keys.signer(&db).await.unwrap(),
+        &sync,
+        "identity:clients conversations:read",
+        work.parse().unwrap(),
+        &format!("{ORIGIN}/api"),
+        chrono::Utc::now(),
+    )
+    .unwrap();
+    let listed = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{work}/identity/clients"),
+            &[("authorization", &format!("Bearer {manager}"))],
+            None,
+        )
+        .await;
+    assert_eq!(listed.status, StatusCode::NOT_FOUND, "{}", listed.body);
+    step("acting for an admin, the client still may not list the workspace's clients: 404");
+    let removed = browser
+        .send(
+            Method::DELETE,
+            &format!("/bff/api/v1/w/{work}/identity/clients/{sync}"),
+            None,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{}", removed.body);
+    let after = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{work}/inboxes"),
+            &[("authorization", &bearer)],
+            None,
+        )
+        .await;
+    assert_eq!(after.status, StatusCode::UNAUTHORIZED, "{}", after.body);
+    step("the admin removes it: its token -> 401");
 
     let text = logs.text();
     for secret in [secret.as_str(), access.as_str(), code.as_str()] {

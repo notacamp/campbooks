@@ -74,6 +74,20 @@ impl Membership for TestMembership {
         };
         Box::pin(async move { Ok::<_, Error>(access) })
     }
+
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+    ) -> campbooks_kernel::tenancy::RoleFuture<'a> {
+        let member = self
+            .members
+            .lock()
+            .ok()
+            .is_some_and(|m| m.iter().any(|((_, w), u)| *w == workspace && *u == user));
+        Box::pin(async move { Ok(member.then_some(Role::Member)) })
+    }
 }
 
 /// The module over a fresh database.
@@ -126,6 +140,16 @@ impl Kit {
         let mut claims = self.idp.claims(ALL_SCOPES);
         claims["sub"] = sub.into();
         (self.idp.token(&claims), user)
+    }
+
+    /// `sub` leaves `workspace` (their inbox memberships stay until
+    /// `workspaces.member_left` is handled).
+    pub fn leave(&self, sub: &str, workspace: WorkspaceId) {
+        self.membership
+            .members
+            .lock()
+            .unwrap()
+            .remove(&(sub.to_owned(), workspace));
     }
 
     /// A client token bound to `workspace`.

@@ -4,7 +4,7 @@
 use axum::{
     Json, Router,
     body::Body,
-    extract::{Path, Query},
+    extract::{Path, Query, State},
     http::{Request, StatusCode, header},
 };
 use serde::Deserialize;
@@ -151,8 +151,38 @@ async fn flaky(_: Scoped<TestWrite>) -> crate::Error {
     )
 }
 
+/// Edit a box inside a workspace: checks the box (a container) like a
+/// module's handler, and notes it for the idempotency layer.
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/boxes/{id}/edit",
+    operation_id = "test.edit_box",
+    params(("workspace_id" = String, Path), ("id" = String, Path)),
+    security(("bearer" = ["test:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["test.box"])))),
+    responses((status = OK, body = Value)),
+)]
+async fn edit_box(
+    State(state): State<AppState>,
+    workspace: crate::tenancy::Workspace<TestWrite>,
+    Path(path): Path<(String, String)>,
+) -> Result<Json<Value>, crate::Error> {
+    let id = path.1;
+    let container = crate::RecordRef::new("test.box", &id);
+    if !state
+        .visibility
+        .container_visible(&state.db, &workspace.access, &container)
+        .await?
+    {
+        return Err(crate::Error::NotFound);
+    }
+    idempotency::checked_container(container);
+    Ok(Json(json!({ "box": id, "run": uuid::Uuid::now_v7() })))
+}
+
 fn api() -> OpenApiRouter<AppState> {
     OpenApiRouter::new()
+        .routes(routes!(edit_box))
         .routes(routes!(archive))
         .routes(routes!(unarchive))
         .routes(routes!(list_notes))
@@ -195,7 +225,7 @@ fn status(error: &InvokeError) -> Option<StatusCode> {
 fn catalogue_reads_ids_metadata_and_routes() {
     let (_, spec) = api().split_for_parts();
     let catalogue = Catalogue::from_openapi(&spec);
-    assert_eq!(catalogue.len(), 5);
+    assert_eq!(catalogue.len(), 6);
 
     let archive = catalogue.get("test.archive").unwrap();
     assert_eq!(archive.method, axum::http::Method::POST);
@@ -742,4 +772,120 @@ async fn expired_keys_are_pruned_and_reusable(db: PgPool) {
         .await
         .unwrap();
     assert_eq!(rows, 0);
+}
+
+// --- a replay is authorized like the request it repeats ---------------------
+
+/// Membership and container visibility the test switches off.
+#[derive(Debug, Default)]
+struct Switches {
+    left: std::sync::atomic::AtomicBool,
+    hidden: std::sync::atomic::AtomicBool,
+}
+
+#[derive(Debug, Clone)]
+struct SwitchPorts(std::sync::Arc<Switches>);
+
+impl crate::tenancy::Membership for SwitchPorts {
+    fn resolve<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        principal: &'a Principal,
+        workspace: crate::tenancy::WorkspaceId,
+    ) -> crate::tenancy::MembershipFuture<'a> {
+        let member = !self.0.left.load(std::sync::atomic::Ordering::SeqCst);
+        let user = principal
+            .subject
+            .parse::<uuid::Uuid>()
+            .ok()
+            .map(crate::tenancy::UserId::from_uuid);
+        Box::pin(async move {
+            Ok(member.then_some(crate::tenancy::Access {
+                workspace,
+                user,
+                role: Some(crate::tenancy::Role::Member),
+            }))
+        })
+    }
+}
+
+impl crate::changes::Visibility for SwitchPorts {
+    fn container_visible<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _access: &'a crate::tenancy::Access,
+        _container: &'a crate::RecordRef,
+    ) -> crate::changes::VisibilityFuture<'a> {
+        let visible = !self.0.hidden.load(std::sync::atomic::Ordering::SeqCst);
+        Box::pin(async move { Ok(visible) })
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_replay_needs_the_access_the_first_run_had(db: PgPool) {
+    let idp = TestIdp::start().await;
+    let switches = SwitchPorts(std::sync::Arc::default());
+    let state = idp
+        .state(db)
+        .with_membership(std::sync::Arc::new(switches.clone()))
+        .with_visibility(std::sync::Arc::new(switches.clone()));
+    let (app, _) = app(state);
+    let subject = uuid::Uuid::now_v7().to_string();
+    let token = |scopes: &str| {
+        let mut claims = idp.claims(scopes);
+        claims["sub"] = json!(subject);
+        idp.token(&claims)
+    };
+    let http = Http {
+        app,
+        token: token("test:write"),
+        idp: idp.clone(),
+    };
+    let ws = crate::tenancy::WorkspaceId::new();
+    let uri = format!("/api/v1/w/{ws}/boxes/b1/edit");
+    let (status, _, first) = http.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, headers, again) = http.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!((status, again.clone()), (StatusCode::OK, first.clone()));
+    assert_eq!(headers[idempotency::REPLAYED_HEADER], "true");
+
+    // Out of the box: the stored response is not served (the 404 the
+    // handler gives), and the operation does not run again either.
+    switches
+        .0
+        .hidden
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let (status, headers, body) = http.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+    switches
+        .0
+        .hidden
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+
+    // Out of the workspace: 404 too.
+    switches
+        .0
+        .left
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let (status, ..) = http.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    switches
+        .0
+        .left
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+
+    // Without the scope any more: 403, like the handler.
+    let reader = Http {
+        app: http.app.clone(),
+        token: token("test:read"),
+        idp: idp.clone(),
+    };
+    let (status, headers, _) = reader.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(!headers.contains_key(idempotency::REPLAYED_HEADER));
+
+    // Allowed again: the same stored response.
+    let (status, _, last) = http.send("POST", &uri, Some("k-box"), None).await;
+    assert_eq!((status, last), (StatusCode::OK, first));
 }

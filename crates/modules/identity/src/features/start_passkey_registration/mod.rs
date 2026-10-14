@@ -36,7 +36,7 @@ const REGISTRATION_LIMIT: Limit =
     operation_id = "identity.start_passkey_registration",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"]).access("identity.passkey", campbooks_kernel::authz::Action::Write)))),
     responses(
         (status = CREATED, description = "Options for `navigator.credentials.create`: a \
             discoverable passkey, user verification required, attestation `none`, excluding \
@@ -60,6 +60,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Unbound { principal, .. }: Unbound<IdentityWrite>,
 ) -> Result<(StatusCode, Json<CreationOptions>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let rp = passkey::relying_party(&issuer).ok_or(Error::NotFound)?;
     let now = issuer.now();

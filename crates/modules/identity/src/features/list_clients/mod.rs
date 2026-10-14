@@ -30,7 +30,7 @@ pub struct WorkspaceClients {
     operation_id = "identity.list_clients",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The workspace's apps.", body = WorkspaceClients),
@@ -48,8 +48,14 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     workspace: Workspace<IdentityClients>,
 ) -> Result<Json<WorkspaceClients>> {
+    // A person's own token only: refuses client tokens and
+    // workspace-bound tokens, even one acting for an admin.
     super::account(&deps, &workspace.principal)?;
-    workspace_clients::require_admin(&workspace.access)?;
+    workspace_clients::require_admin(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Read,
+    )?;
     let mut tx = state.db.begin_for(workspace.id).await?;
     let items = workspace_clients::list(&mut tx).await?;
     tx.commit().await?;

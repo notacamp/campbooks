@@ -28,7 +28,7 @@ pub struct RenamePasskey {
     operation_id = "identity.rename_passkey",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.passkey"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.passkey"]).access("identity.passkey", campbooks_kernel::authz::Action::Write)))),
     params(("id" = uuid::Uuid, Path, description = "The passkey.")),
     request_body = RenamePasskey,
     responses(
@@ -50,6 +50,13 @@ pub async fn handler(
     Path(path): Path<PasskeyPath>,
     JsonBody(input): JsonBody<RenamePasskey>,
 ) -> Result<Json<PasskeyView>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (_, account) = super::account(&deps, &principal)?;
     let name = passkeys::clean_name(&input.name)
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("passkey_name_required")))?;

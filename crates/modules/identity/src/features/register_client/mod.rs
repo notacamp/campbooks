@@ -58,7 +58,7 @@ pub struct RegisteredClient {
     operation_id = "identity.register_client",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = RegisterClient,
     responses(
@@ -83,7 +83,11 @@ pub async fn handler(
     JsonBody(body): JsonBody<RegisterClient>,
 ) -> Result<(StatusCode, Json<RegisteredClient>)> {
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
-    workspace_clients::require_admin(&workspace.access)?;
+    workspace_clients::require_admin(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Create,
+    )?;
     let now = issuer.now();
     step_up::require_recent(&workspace.principal, now)?;
     let name = client_names::clean(&body.name);

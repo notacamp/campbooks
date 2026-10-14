@@ -21,5 +21,6 @@ it superseded. Disagree? Write a new ADR that supersedes the old one.
 | [0014](0014-campbooks-owned-identity.md) | Campbooks owns identity: every owned mailbox is a way in, and Campbooks issues the tokens | Accepted |
 | [0015](0015-instance-admin-profiles-and-admin-api.md) | Instance administration: admin profiles (CLI only) and a separate admin API | Accepted |
 | [0016](0016-search-in-postgres.md) | Search runs inside Postgres, as a projection that pulls through source ports | Accepted |
+| [0017](0017-resource-ownership-and-access.md) | Resource ownership and access: one catalogue, one central check, RLS underneath | Accepted |
 
 Template: Context → Decision → Consequences → Alternatives considered.

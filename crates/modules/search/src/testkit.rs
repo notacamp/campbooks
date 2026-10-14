@@ -62,7 +62,7 @@ impl ScopeName for ConversationsRead {
     path = "/api/v1/test/conversations",
     operation_id = "conversations.list",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     responses((status = OK, description = "Nothing."))
 )]
 async fn list_conversations(_: Scoped<ConversationsRead>) -> Json<()> {
@@ -506,6 +506,9 @@ impl Kit {
     /// conversations module would (not yet delivered).
     pub async fn announce(&self, workspace: WorkspaceId, id: &str) {
         let mut tx = self.state.db.begin().await.unwrap();
+        campbooks_kernel::db::set_workspace(&mut tx, &workspace.to_string())
+            .await
+            .unwrap();
         self.state
             .events
             .publish(

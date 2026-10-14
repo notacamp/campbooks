@@ -2343,6 +2343,11 @@ export interface components {
             display_name?: string | null;
             /** @description The inbox. */
             id: components["schemas"]["InboxId"];
+            /**
+             * @description Kept as read-only history after its connection was removed: no
+             *     longer synced, nothing can be written or sent from it.
+             */
+            read_only: boolean;
             role?: components["schemas"]["InboxRole"] | null;
             /**
              * Format: int32
@@ -4956,7 +4961,14 @@ export interface operations {
     };
     "connectors.disconnect": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the inboxes it fed are deleted, with their
+                 *     messages, conversations, drafts, decisions, search entries and
+                 *     files. `keep`: they stay as read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -4984,7 +4996,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6964,7 +6976,14 @@ export interface operations {
     };
     "workspaces.remove_member": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the mailboxes they connected are
+                 *     disconnected and their mail deleted. `keep`: their mail stays as
+                 *     read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -7010,7 +7029,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `last_owner`: the workspace would have no owner. */
+            /** @description `last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7500,7 +7519,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            /** @description `invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute. */
             409: {
                 headers: {
                     [name: string]: unknown;

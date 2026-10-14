@@ -462,6 +462,9 @@ async fn reply(kit: &Kit, mailbox: &Connected, parent: &str) -> SendId {
         .await
         .unwrap();
     let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &mailbox.ws.to_string())
+        .await
+        .unwrap();
     kit.state
         .events
         .publish(

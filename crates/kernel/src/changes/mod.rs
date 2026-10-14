@@ -38,6 +38,7 @@ use crate::{
     events::EventId,
     jobs::{self, Job as _},
     records::RecordRef,
+    tenancy::{Access, UserId},
 };
 
 pub use hub::ChangeHub;
@@ -82,9 +83,62 @@ impl ChangeOp {
     }
 }
 
+/// Who may see a change beyond the rules of its record type and container,
+/// for records private to a person: their drafts, the connections they
+/// granted. Decided by the kernel from the caller's
+/// [`Access`](crate::tenancy::Access) alone, so it works for records that
+/// are already gone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Audience {
+    /// Only this user (never a client token).
+    User(UserId),
+    /// This user, the workspace's owners and admins, and client tokens of
+    /// the workspace (who see every connection over the API).
+    UserAndManagers(UserId),
+    /// Client tokens of the workspace only (a record a client wrote).
+    Clients,
+}
+
+impl Audience {
+    /// Whether the caller with `access` is in the audience.
+    pub fn admits(self, access: &Access) -> bool {
+        match self {
+            Self::User(user) => access.user == Some(user),
+            Self::UserAndManagers(user) => match access.user {
+                None => true,
+                Some(caller) => {
+                    caller == user || access.role.is_some_and(crate::tenancy::Role::can_manage)
+                }
+            },
+            Self::Clients => access.user.is_none(),
+        }
+    }
+
+    /// The stored kind and user.
+    fn columns(self) -> (&'static str, Option<String>) {
+        match self {
+            Self::User(user) => ("user", Some(user.to_string())),
+            Self::UserAndManagers(user) => ("user_and_managers", Some(user.to_string())),
+            Self::Clients => ("clients", None),
+        }
+    }
+
+    /// From the stored kind and user; `None` for an unknown or malformed
+    /// pair, which the stream treats as visible to nobody.
+    fn from_columns(kind: &str, user: Option<&str>) -> Option<Self> {
+        let user = || user.and_then(|u| u.parse::<UserId>().ok());
+        match kind {
+            "user" => user().map(Self::User),
+            "user_and_managers" => user().map(Self::UserAndManagers),
+            "clients" => Some(Self::Clients),
+            _ => None,
+        }
+    }
+}
+
 /// One record a domain event changed: its reference and what happened to
-/// it, and, when not every member may see it, the container it lives in.
-/// Never record contents.
+/// it, and, when not every member may see it, the container it lives in
+/// and the people it is private to. Never record contents.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Change {
     /// The changed record.
@@ -95,6 +149,9 @@ pub struct Change {
     /// calendar); `None` when every member may. Checked through the
     /// [`Visibility`] port.
     pub container: Option<RecordRef>,
+    /// Who it is private to; `None` when everyone the other rules admit may
+    /// see it.
+    pub audience: Option<Audience>,
 }
 
 impl Change {
@@ -104,6 +161,7 @@ impl Change {
             record,
             op: ChangeOp::Upsert,
             container: None,
+            audience: None,
         }
     }
 
@@ -113,6 +171,7 @@ impl Change {
             record,
             op: ChangeOp::Delete,
             container: None,
+            audience: None,
         }
     }
 
@@ -120,6 +179,13 @@ impl Change {
     #[must_use]
     pub fn within(mut self, container: RecordRef) -> Self {
         self.container = Some(container);
+        self
+    }
+
+    /// The same change, shown only to `audience`.
+    #[must_use]
+    pub fn for_audience(mut self, audience: Audience) -> Self {
+        self.audience = Some(audience);
         self
     }
 }
@@ -163,14 +229,25 @@ pub(crate) async fn record(
         .iter()
         .map(|c| c.container.as_ref().map(|r| r.id.as_str()))
         .collect();
+    let (audiences, audience_users): (Vec<Option<&str>>, Vec<Option<String>>) = changes
+        .iter()
+        .map(|c| match c.audience.map(Audience::columns) {
+            Some((kind, user)) => (Some(kind), user),
+            None => (None, None),
+        })
+        .unzip();
     // Rows are inserted in declared order, so `published` keeps it.
     sqlx::query!(
         r#"
         INSERT INTO kernel.changes
-            (workspace_id, event_id, record_type, record_id, op, container_type, container_id)
-        SELECT $1, $2, c.record_type, c.record_id, c.op, c.container_type, c.container_id
-          FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::text[])
-               WITH ORDINALITY AS c(record_type, record_id, op, container_type, container_id, n)
+            (workspace_id, event_id, record_type, record_id, op, container_type, container_id,
+             audience, audience_user)
+        SELECT $1, $2, c.record_type, c.record_id, c.op, c.container_type, c.container_id,
+               c.audience, c.audience_user
+          FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[],
+                      $9::text[])
+               WITH ORDINALITY AS c(record_type, record_id, op, container_type, container_id,
+                                    audience, audience_user, n)
          ORDER BY c.n
         "#,
         workspace,
@@ -180,6 +257,8 @@ pub(crate) async fn record(
         &ops as &[&str],
         &container_types as &[Option<&str>],
         &container_ids as &[Option<&str>],
+        &audiences as &[Option<&str>],
+        &audience_users as &[Option<String>],
     )
     .execute(&mut **tx)
     .await?;
