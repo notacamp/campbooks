@@ -1396,3 +1396,366 @@ fn errors_are_truncated() {
     assert_eq!(truncate_error(&long).chars().count(), MAX_ERROR_LEN + 1);
     assert_eq!(truncate_error("short"), "short");
 }
+
+// --- administration ----------------------------------------------------------
+
+mod administration {
+    use super::*;
+    use crate::{
+        admin::{AdminGrant, PermissionSet},
+        jobs::admin::{self, Discard, FailedFilter, Retry},
+    };
+
+    fn grant() -> AdminGrant {
+        AdminGrant::new("ops".into(), PermissionSet::from_names(["super"]))
+    }
+
+    fn doomed(note: &str) -> Probe {
+        Probe {
+            fatal: true,
+            ..Probe::note(note)
+        }
+    }
+
+    /// Enqueue `probe`, let a worker run it to its death, return its id.
+    async fn die(state: &AppState, probe: &Probe, options: EnqueueOptions) -> JobId {
+        let id = created(enqueue_probe(state, probe, options).await);
+        Worker::new(state.clone()).run_until_idle().await;
+        assert_eq!(job(&state.db, id).await.state, "failed");
+        id
+    }
+
+    /// Make a dead job runnable: the cause was fixed.
+    async fn fix(db: &PgPool, id: JobId) {
+        sqlx::query("UPDATE kernel.jobs SET payload = $2 WHERE id = $1")
+            .bind(id)
+            .bind(serde_json::to_value(Probe::note("fixed")).unwrap())
+            .execute(db)
+            .await
+            .unwrap();
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn summary_counts_by_queue_and_kind_without_payloads(db: PgPool) {
+        let state = state(db.clone()).await;
+        die(&state, &doomed("secret-note"), EnqueueOptions::default()).await;
+        enqueue_probe(&state, &Probe::note("ready"), EnqueueOptions::default()).await;
+        enqueue_probe(
+            &state,
+            &Probe::note("later"),
+            EnqueueOptions {
+                run_at: Some(Utc::now() + TimeDelta::hours(1)),
+                ..EnqueueOptions::default()
+            },
+        )
+        .await;
+        enqueue_probe(&state, &Probe::note("done"), EnqueueOptions::default()).await;
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'succeeded', finished_at = now()
+              WHERE payload->>'note' = 'done'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+        // A running job past its lease.
+        let lost =
+            created(enqueue_probe(&state, &Probe::note("lost"), EnqueueOptions::default()).await);
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'running', locked_by = 'w',
+                    locked_until = now() - interval '1 minute', started_at = now()
+              WHERE id = $1",
+        )
+        .bind(lost)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let summary = admin::summary(&db, &grant()).await.unwrap();
+        let [probe] = summary.kinds.as_slice() else {
+            panic!("one kind expected: {summary:?}");
+        };
+        assert_eq!(
+            (probe.queue.as_str(), probe.kind.as_str()),
+            ("default", "test.probe")
+        );
+        assert_eq!(
+            (
+                probe.ready,
+                probe.scheduled,
+                probe.running,
+                probe.expired_leases,
+                probe.failed
+            ),
+            (1, 1, 1, 1, 1)
+        );
+        assert!(probe.oldest_ready_seconds.is_some());
+        let text = serde_json::to_string(&summary).unwrap();
+        assert!(!text.contains("secret-note"), "{text}");
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn failed_lists_newest_first_in_pages_without_payloads(db: PgPool) {
+        let state = state(db.clone()).await;
+        let mut ids = Vec::new();
+        for n in 0..5 {
+            ids.push(
+                die(
+                    &state,
+                    &doomed(&format!("note-{n}")),
+                    EnqueueOptions::for_workspace("ws-1"),
+                )
+                .await,
+            );
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+        enqueue_probe(&state, &Probe::note("fine"), EnqueueOptions::default()).await;
+
+        let none = FailedFilter::default();
+        let first = admin::failed(&db, &grant(), &none, None, Some(2))
+            .await
+            .unwrap();
+        assert_eq!(
+            first.items.iter().map(|j| j.id).collect::<Vec<_>>(),
+            [ids[4], ids[3]]
+        );
+        assert_eq!(first.items[0].workspace_id.as_deref(), Some("ws-1"));
+        assert_eq!(
+            first.items[0].last_error.as_deref(),
+            Some("probe told to fail")
+        );
+        let second = admin::failed(&db, &grant(), &none, first.next.as_deref(), Some(2))
+            .await
+            .unwrap();
+        assert_eq!(
+            second.items.iter().map(|j| j.id).collect::<Vec<_>>(),
+            [ids[2], ids[1]]
+        );
+        let last = admin::failed(&db, &grant(), &none, second.next.as_deref(), Some(2))
+            .await
+            .unwrap();
+        assert_eq!(
+            last.items.iter().map(|j| j.id).collect::<Vec<_>>(),
+            [ids[0]]
+        );
+        assert!(last.next.is_none());
+
+        let other_kind = FailedFilter {
+            kind: Some("nope".into()),
+            ..FailedFilter::default()
+        };
+        assert!(
+            admin::failed(&db, &grant(), &other_kind, None, None)
+                .await
+                .unwrap()
+                .items
+                .is_empty()
+        );
+        let text = serde_json::to_string(&first).unwrap();
+        assert!(
+            !text.contains("note-") && !text.contains("payload"),
+            "{text}"
+        );
+
+        let bad = admin::failed(&db, &grant(), &none, Some("garbage"), None).await;
+        assert!(matches!(bad, Err(crate::Error::BadRequest(_))));
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn retry_touches_only_dead_jobs_and_is_idempotent(db: PgPool) {
+        let state = state(db.clone()).await;
+        let dead = die(&state, &doomed("x"), EnqueueOptions::default()).await;
+        fix(&db, dead).await;
+        let pending =
+            created(enqueue_probe(&state, &Probe::note("p"), EnqueueOptions::default()).await);
+        let running =
+            created(enqueue_probe(&state, &Probe::note("r"), EnqueueOptions::default()).await);
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'running', locked_by = 'w',
+                    locked_until = now() + interval '1 minute', attempts = 1
+              WHERE id = $1",
+        )
+        .bind(running)
+        .execute(&db)
+        .await
+        .unwrap();
+        let done =
+            created(enqueue_probe(&state, &Probe::note("d"), EnqueueOptions::default()).await);
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'succeeded', finished_at = now() WHERE id = $1",
+        )
+        .bind(done)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        for id in [pending, running, done] {
+            let before = job(&db, id).await;
+            assert_eq!(
+                admin::retry(&db, &grant(), id).await.unwrap(),
+                Retry::Unchanged
+            );
+            let after = job(&db, id).await;
+            assert_eq!(
+                (before.state, before.attempts),
+                (after.state, after.attempts)
+            );
+        }
+        assert_eq!(
+            admin::retry(&db, &grant(), JobId::new()).await.unwrap(),
+            Retry::Missing
+        );
+
+        assert_eq!(
+            admin::retry(&db, &grant(), dead).await.unwrap(),
+            Retry::Requeued
+        );
+        let row = job(&db, dead).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("pending", 0));
+        assert!(row.finished_at.is_none() && row.locked_by.is_none());
+        // Twice is the same as once.
+        assert_eq!(
+            admin::retry(&db, &grant(), dead).await.unwrap(),
+            Retry::Unchanged
+        );
+
+        // The worker runs it again, and the other jobs were not disturbed.
+        sqlx::query("DELETE FROM kernel.jobs WHERE id = ANY($1)")
+            .bind([pending, running, done].map(uuid::Uuid::from))
+            .execute(&db)
+            .await
+            .unwrap();
+        Worker::new(state).run_until_idle().await;
+        let row = job(&db, dead).await;
+        assert_eq!((row.state.as_str(), row.attempts), ("succeeded", 1));
+        assert_eq!(notes(&db, Probe::NAME).await, ["fixed"]);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn discard_deletes_only_dead_jobs(db: PgPool) {
+        let state = state(db.clone()).await;
+        let dead = die(&state, &doomed("x"), EnqueueOptions::default()).await;
+        let pending =
+            created(enqueue_probe(&state, &Probe::note("p"), EnqueueOptions::default()).await);
+        assert_eq!(
+            admin::discard(&db, &grant(), pending).await.unwrap(),
+            Discard::Unchanged
+        );
+        assert_eq!(job(&db, pending).await.state, "pending");
+        assert_eq!(
+            admin::discard(&db, &grant(), dead).await.unwrap(),
+            Discard::Discarded
+        );
+        assert_eq!(
+            admin::discard(&db, &grant(), dead).await.unwrap(),
+            Discard::Missing
+        );
+        assert_eq!(count(&db, "SELECT count(*) FROM kernel.jobs").await, 1);
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn retry_kind_is_bounded_and_skips_a_held_unique_key(db: PgPool) {
+        let state = state(db.clone()).await;
+        let a = die(&state, &doomed("a"), EnqueueOptions::default().unique("k")).await;
+        let b = die(&state, &doomed("b"), EnqueueOptions::default().unique("k")).await;
+        let c = die(&state, &doomed("c"), EnqueueOptions::default()).await;
+        let other = die(&state, &doomed("o"), EnqueueOptions::default()).await;
+        sqlx::query("UPDATE kernel.jobs SET kind = 'test.other' WHERE id = $1")
+            .bind(other)
+            .execute(&db)
+            .await
+            .unwrap();
+
+        // `a` and `b` share a key: only one of them comes back.
+        let n = admin::retry_kind(&db, &grant(), "test.probe", None)
+            .await
+            .unwrap();
+        assert_eq!(n, 2);
+        let states = [a, b, c, other].map(|id| id);
+        let mut pending = 0;
+        for id in states {
+            if job(&db, id).await.state == "pending" {
+                pending += 1;
+            }
+        }
+        assert_eq!(pending, 2, "one of the pair, and c");
+        assert_eq!(job(&db, other).await.state, "failed");
+        // The other of the pair stays dead while its key is held; nothing more to do.
+        assert_eq!(
+            admin::retry_kind(&db, &grant(), "test.probe", None)
+                .await
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            admin::retry_kind(&db, &grant(), "test.probe", Some("nope"))
+                .await
+                .unwrap(),
+            0
+        );
+    }
+
+    /// Retrying while workers claim: every job runs exactly once per retry.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn retries_racing_workers_never_double_run(db: PgPool) {
+        let state = state_with(db.clone(), |jobs| jobs.per_workspace = 10_000).await;
+        let mut ids = Vec::new();
+        for n in 0..40 {
+            ids.push(die(&state, &doomed(&format!("j{n}")), EnqueueOptions::default()).await);
+        }
+        sqlx::query("DELETE FROM job_log")
+            .execute(&db)
+            .await
+            .unwrap();
+        for id in &ids {
+            fix(&db, *id).await;
+        }
+
+        let workers = (0..3)
+            .map(|_| Worker::new(state.clone()))
+            .collect::<Vec<_>>();
+        let g = grant();
+        let retrying = async {
+            for _ in 0..4 {
+                let (a, b) = tokio::join!(
+                    admin::retry_kind(&db, &g, "test.probe", None),
+                    admin::retry_kind(&db, &g, "test.probe", None)
+                );
+                a.unwrap();
+                b.unwrap();
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        };
+        let running = async {
+            for _ in 0..4 {
+                tokio::join!(
+                    workers[0].run_until_idle(),
+                    workers[1].run_until_idle(),
+                    workers[2].run_until_idle()
+                );
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        };
+        tokio::join!(retrying, running);
+        for worker in &workers {
+            worker.run_until_idle().await;
+        }
+
+        assert_eq!(
+            count(
+                &db,
+                "SELECT count(*) FROM kernel.jobs WHERE state = 'succeeded'"
+            )
+            .await,
+            40
+        );
+        assert_eq!(
+            count(&db, "SELECT count(*) FROM job_log").await,
+            40,
+            "a job ran twice"
+        );
+        assert_eq!(
+            count(&db, "SELECT max(attempts)::bigint FROM kernel.jobs").await,
+            1
+        );
+    }
+}

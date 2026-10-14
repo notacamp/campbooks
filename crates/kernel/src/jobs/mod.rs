@@ -17,6 +17,7 @@
 //!   exponential backoff and jitter, and marks [`JobError::Fatal`] or
 //!   exhausted jobs failed (dead, kept for inspection).
 
+pub mod admin;
 mod context;
 mod maintenance;
 mod registry;

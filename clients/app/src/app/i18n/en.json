@@ -64,9 +64,10 @@
     "back": "Back to Campbooks",
     "sections": {
       "system": "System",
+      "jobs": "Jobs",
+      "signups": "Signups",
       "people": "People",
-      "workspaces": "Workspaces",
-      "signups": "Signups"
+      "workspaces": "Workspaces"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Sign in again to continue",

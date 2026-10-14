@@ -275,6 +275,369 @@
         }
       }
     },
+    "/admin/v1/system/jobs": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "The queue at a glance, by queue and kind.",
+        "operationId": "system.admin_jobs",
+        "responses": {
+          "200": {
+            "description": "Counts of waiting, scheduled, running and failed jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSummary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `jobs.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "jobs.read"
+        }
+      }
+    },
+    "/admin/v1/system/jobs/failed": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "The dead jobs, newest first: what failed and the last error, never the\njob's payload.",
+        "operationId": "system.admin_failed_jobs",
+        "parameters": [
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "Only this kind (`<module>.<job>`).",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "queue",
+            "in": "query",
+            "description": "Only this queue.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "The `next` of the previous page.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, 1 to 200 (default 50).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of dead jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailedPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed query or cursor.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `jobs.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "jobs.read"
+        }
+      }
+    },
+    "/admin/v1/system/jobs/retry": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Retry the dead jobs of one kind, oldest first, up to 1000 per call.",
+        "operationId": "system.admin_retry_jobs",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RetryKind"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "How many were requeued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetryKindResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed body.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `jobs.retry`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "jobs.retry"
+        }
+      }
+    },
+    "/admin/v1/system/jobs/{id}": {
+      "delete": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Delete one dead job.",
+        "operationId": "system.admin_discard_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The job.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JobId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted, or nothing to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAction"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `jobs.retry`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "jobs.retry"
+        }
+      }
+    },
+    "/admin/v1/system/jobs/{id}/retry": {
+      "post": {
+        "tags": [
+          "system"
+        ],
+        "summary": "Retry one dead job.",
+        "operationId": "system.admin_retry_job",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "The job.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JobId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Requeued, or nothing to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobAction"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such job, or not an administrator with `jobs.retry`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": true,
+          "permission": "jobs.retry"
+        }
+      }
+    },
     "/admin/v1/system/overview": {
       "get": {
         "tags": [
@@ -1913,6 +2276,92 @@
           }
         }
       },
+      "FailedJob": {
+        "type": "object",
+        "description": "A dead job: what ran and why it stopped, never its payload.",
+        "required": [
+          "id",
+          "queue",
+          "kind",
+          "attempts",
+          "max_attempts",
+          "created_at"
+        ],
+        "properties": {
+          "attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Attempts made."
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When it was enqueued."
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When it died."
+          },
+          "id": {
+            "$ref": "#/components/schemas/JobId",
+            "description": "The job's id."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The job's wire name."
+          },
+          "last_error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The last failure, truncated; never carries secrets."
+          },
+          "max_attempts": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Attempts it was allowed."
+          },
+          "queue": {
+            "type": "string",
+            "description": "The queue it ran on."
+          },
+          "workspace_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The workspace it belongs to; `null` for instance-wide work."
+          }
+        }
+      },
+      "FailedPage": {
+        "type": "object",
+        "description": "A page of dead jobs, newest first.",
+        "required": [
+          "items"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FailedJob"
+            },
+            "description": "The jobs."
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Pass as `after` for the next page; `null` on the last one."
+          }
+        }
+      },
       "Health": {
         "type": "string",
         "description": "How a connection is doing.",
@@ -1932,6 +2381,24 @@
           "none"
         ]
       },
+      "JobAction": {
+        "type": "object",
+        "description": "The result of acting on one job.",
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/Outcome",
+            "description": "What happened."
+          }
+        }
+      },
+      "JobId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "JobId (UUIDv7)"
+      },
       "Kind": {
         "type": "string",
         "description": "What a workspace is for.",
@@ -1939,6 +2406,62 @@
           "business",
           "personal"
         ]
+      },
+      "KindSummary": {
+        "type": "object",
+        "description": "The jobs of one kind on one queue.",
+        "required": [
+          "queue",
+          "kind",
+          "ready",
+          "scheduled",
+          "running",
+          "expired_leases",
+          "failed"
+        ],
+        "properties": {
+          "expired_leases": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Running, but past its lease: the worker stopped renewing it and the\nnext upkeep hands it back."
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Dead: out of attempts, or failed for good. Kept for inspection."
+          },
+          "kind": {
+            "type": "string",
+            "description": "The job's wire name (`<module>.<job>`)."
+          },
+          "oldest_ready_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Age of the oldest ready job of this kind, in seconds."
+          },
+          "queue": {
+            "type": "string",
+            "description": "The queue they run on."
+          },
+          "ready": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pending and due now: waiting for a worker."
+          },
+          "running": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Claimed by a worker."
+          },
+          "scheduled": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Pending for later: new delayed work, or waiting out a retry backoff."
+          }
+        }
       },
       "MemberView": {
         "type": "object",
@@ -2036,6 +2559,15 @@
           }
         }
       },
+      "Outcome": {
+        "type": "string",
+        "description": "What a retry or discard did.",
+        "enum": [
+          "applied",
+          "unchanged",
+          "superseded"
+        ]
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -2095,6 +2627,36 @@
           "zoho"
         ]
       },
+      "QueueSummary": {
+        "type": "object",
+        "description": "The queue at a glance: one row per queue and kind with unfinished or\nfailed work. Succeeded jobs are pruned and not counted.",
+        "required": [
+          "at",
+          "kinds"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the counts were taken."
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/KindSummary"
+            },
+            "description": "Counts per queue and kind, sorted by queue then kind."
+          },
+          "oldest_ready_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Age of the oldest job that is ready to run and waiting, in seconds."
+          }
+        }
+      },
       "RejectSignupRequest": {
         "type": "object",
         "description": "Why a request is turned down.",
@@ -2117,6 +2679,47 @@
           "approved",
           "rejected"
         ]
+      },
+      "RetryKind": {
+        "type": "object",
+        "description": "Which dead jobs to retry.",
+        "required": [
+          "kind"
+        ],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "description": "The kind (`<module>.<job>`)."
+          },
+          "queue": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Only on this queue."
+          }
+        },
+        "additionalProperties": false
+      },
+      "RetryKindResult": {
+        "type": "object",
+        "description": "How many jobs a bulk retry requeued.",
+        "required": [
+          "requeued",
+          "more"
+        ],
+        "properties": {
+          "more": {
+            "type": "boolean",
+            "description": "Whether the batch limit was reached, so more dead jobs of the kind\nmay remain: call again."
+          },
+          "requeued": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Jobs put back on their queue.",
+            "minimum": 0
+          }
+        }
       },
       "Role": {
         "type": "string",

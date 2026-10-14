@@ -644,6 +644,7 @@ dependencies = [
  "tracing",
  "utoipa",
  "utoipa-axum",
+ "uuid",
  "wiremock",
 ]
 

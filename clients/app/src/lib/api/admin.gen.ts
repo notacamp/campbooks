@@ -72,6 +72,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/system/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The queue at a glance, by queue and kind. */
+        get: operations["system.admin_jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/system/jobs/failed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The dead jobs, newest first: what failed and the last error, never the
+         *     job's payload.
+         */
+        get: operations["system.admin_failed_jobs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/system/jobs/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry the dead jobs of one kind, oldest first, up to 1000 per call. */
+        post: operations["system.admin_retry_jobs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/system/jobs/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete one dead job. */
+        delete: operations["system.admin_discard_job"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/v1/system/jobs/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retry one dead job. */
+        post: operations["system.admin_retry_job"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/system/overview": {
         parameters: {
             query?: never;
@@ -636,6 +724,46 @@ export interface components {
             /** @description The providers people can sign in with (`google`, …). */
             sign_in_providers: string[];
         };
+        /** @description A dead job: what ran and why it stopped, never its payload. */
+        FailedJob: {
+            /**
+             * Format: int32
+             * @description Attempts made.
+             */
+            attempts: number;
+            /**
+             * Format: date-time
+             * @description When it was enqueued.
+             */
+            created_at: string;
+            /**
+             * Format: date-time
+             * @description When it died.
+             */
+            finished_at?: string | null;
+            /** @description The job's id. */
+            id: components["schemas"]["JobId"];
+            /** @description The job's wire name. */
+            kind: string;
+            /** @description The last failure, truncated; never carries secrets. */
+            last_error?: string | null;
+            /**
+             * Format: int32
+             * @description Attempts it was allowed.
+             */
+            max_attempts: number;
+            /** @description The queue it ran on. */
+            queue: string;
+            /** @description The workspace it belongs to; `null` for instance-wide work. */
+            workspace_id?: string | null;
+        };
+        /** @description A page of dead jobs, newest first. */
+        FailedPage: {
+            /** @description The jobs. */
+            items: components["schemas"]["FailedJob"][];
+            /** @description Pass as `after` for the next page; `null` on the last one. */
+            next?: string | null;
+        };
         /**
          * @description How a connection is doing.
          * @enum {string}
@@ -646,11 +774,59 @@ export interface components {
          * @enum {string}
          */
         IdentityProvider: "built_in" | "external" | "none";
+        /** @description The result of acting on one job. */
+        JobAction: {
+            /** @description What happened. */
+            outcome: components["schemas"]["Outcome"];
+        };
+        /**
+         * Format: uuid
+         * @description JobId (UUIDv7)
+         */
+        JobId: string;
         /**
          * @description What a workspace is for.
          * @enum {string}
          */
         Kind: "business" | "personal";
+        /** @description The jobs of one kind on one queue. */
+        KindSummary: {
+            /**
+             * Format: int64
+             * @description Running, but past its lease: the worker stopped renewing it and the
+             *     next upkeep hands it back.
+             */
+            expired_leases: number;
+            /**
+             * Format: int64
+             * @description Dead: out of attempts, or failed for good. Kept for inspection.
+             */
+            failed: number;
+            /** @description The job's wire name (`<module>.<job>`). */
+            kind: string;
+            /**
+             * Format: int64
+             * @description Age of the oldest ready job of this kind, in seconds.
+             */
+            oldest_ready_seconds?: number | null;
+            /** @description The queue they run on. */
+            queue: string;
+            /**
+             * Format: int64
+             * @description Pending and due now: waiting for a worker.
+             */
+            ready: number;
+            /**
+             * Format: int64
+             * @description Claimed by a worker.
+             */
+            running: number;
+            /**
+             * Format: int64
+             * @description Pending for later: new delayed work, or waiting out a retry backoff.
+             */
+            scheduled: number;
+        };
         /** @description A member of a workspace. */
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
@@ -706,6 +882,11 @@ export interface components {
             entry: components["schemas"]["SignupCodeView"];
         };
         /**
+         * @description What a retry or discard did.
+         * @enum {string}
+         */
+        Outcome: "applied" | "unchanged" | "superseded";
+        /**
          * @description Where a stream is in its reading.
          * @enum {string}
          */
@@ -750,6 +931,24 @@ export interface components {
          * @enum {string}
          */
         Provider: "google" | "zoho";
+        /**
+         * @description The queue at a glance: one row per queue and kind with unfinished or
+         *     failed work. Succeeded jobs are pruned and not counted.
+         */
+        QueueSummary: {
+            /**
+             * Format: date-time
+             * @description When the counts were taken.
+             */
+            at: string;
+            /** @description Counts per queue and kind, sorted by queue then kind. */
+            kinds: components["schemas"]["KindSummary"][];
+            /**
+             * Format: int64
+             * @description Age of the oldest job that is ready to run and waiting, in seconds.
+             */
+            oldest_ready_seconds?: number | null;
+        };
         /** @description Why a request is turned down. */
         RejectSignupRequest: {
             /**
@@ -763,6 +962,26 @@ export interface components {
          * @enum {string}
          */
         RequestStatus: "pending" | "approved" | "rejected";
+        /** @description Which dead jobs to retry. */
+        RetryKind: {
+            /** @description The kind (`<module>.<job>`). */
+            kind: string;
+            /** @description Only on this queue. */
+            queue?: string | null;
+        };
+        /** @description How many jobs a bulk retry requeued. */
+        RetryKindResult: {
+            /**
+             * @description Whether the batch limit was reached, so more dead jobs of the kind
+             *     may remain: call again.
+             */
+            more: boolean;
+            /**
+             * Format: int64
+             * @description Jobs put back on their queue.
+             */
+            requeued: number;
+        };
         /**
          * @description A member's role in a workspace.
          * @enum {string}
@@ -1041,6 +1260,233 @@ export interface operations {
                 };
             };
             /** @description No such account, or not an administrator with `users.suspend`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Counts of waiting, scheduled, running and failed jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueSummary"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `jobs.read`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_failed_jobs": {
+        parameters: {
+            query?: {
+                /** @description Only this kind (`<module>.<job>`). */
+                kind?: string | null;
+                /** @description Only this queue. */
+                queue?: string | null;
+                /** @description The `next` of the previous page. */
+                after?: string | null;
+                /** @description Page size, 1 to 200 (default 50). */
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of dead jobs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FailedPage"];
+                };
+            };
+            /** @description Malformed query or cursor. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `jobs.read`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_retry_jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RetryKind"];
+            };
+        };
+        responses: {
+            /** @description How many were requeued. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetryKindResult"];
+                };
+            };
+            /** @description Malformed body. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `jobs.retry`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_discard_job": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job. */
+                id: components["schemas"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted, or nothing to do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAction"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `jobs.retry`. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "system.admin_retry_job": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The job. */
+                id: components["schemas"]["JobId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Requeued, or nothing to do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobAction"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such job, or not an administrator with `jobs.retry`. */
             404: {
                 headers: {
                     [name: string]: unknown;

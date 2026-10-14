@@ -23,6 +23,7 @@ utoipa-axum.workspace = true
 [dev-dependencies]
 campbooks-kernel = { workspace = true, features = ["test-util"] }
 serde_json.workspace = true
+uuid.workspace = true
 wiremock.workspace = true
 
 [lints]

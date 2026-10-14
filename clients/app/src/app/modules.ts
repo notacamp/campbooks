@@ -16,7 +16,12 @@ import {
   IDENTITY_SHORTCUTS,
   MailboxStep,
 } from "~/modules/identity";
-import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
+import {
+  buildSystemAdminRoutes,
+  buildSystemRoutes,
+  JOBS_ADMIN_SECTION,
+  SYSTEM_ADMIN_SECTION,
+} from "~/modules/system";
 import {
   buildWorkspacesAdminRoutes,
   buildWorkspacesRoutes,
@@ -86,6 +91,7 @@ export const ADMIN_SECTIONS = [
   PEOPLE_ADMIN_SECTION,
   WORKSPACES_ADMIN_SECTION,
   SIGNUPS_ADMIN_SECTION,
+  JOBS_ADMIN_SECTION,
 ] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
