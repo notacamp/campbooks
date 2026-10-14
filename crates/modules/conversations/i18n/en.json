@@ -19,6 +19,10 @@
     "no_open_need": "Nothing here needs you any more.",
     "nothing_to_reopen": "There is nothing to bring back here.",
     "need_changed": "This changed while you were looking at it. Have another look.",
-    "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders."
+    "invalid_senders_query": "Search with 2 to 100 characters, and ask for 1 to {{max}} senders.",
+    "invalid_rule": "This rule can't be saved. It needs one to four conditions that say which mail it is about, and one to four actions of different kinds.",
+    "rule_not_yours": "Only the person who taught this rule, or a manager of the inbox, can change it.",
+    "rule_not_proposed": "This rule is not waiting for a yes any more.",
+    "invalid_rule_query": "The rule to preview could not be read. Send its conditions and actions as JSON."
   }
 }

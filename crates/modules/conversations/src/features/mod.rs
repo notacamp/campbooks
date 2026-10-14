@@ -1,6 +1,7 @@
 //! One folder per use case.
 
 pub mod apply_changes;
+pub mod apply_rule;
 pub mod archive;
 pub mod check_send;
 pub mod create_draft;
@@ -24,6 +25,7 @@ pub mod needs;
 pub mod purge_workspace;
 pub mod record_send;
 pub mod release_send;
+pub mod rules;
 pub mod search_source;
 pub mod send_draft;
 pub mod star;

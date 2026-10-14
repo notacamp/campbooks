@@ -14,5 +14,7 @@ pub mod paths;
 pub mod plain_text;
 pub mod policy;
 pub mod redact;
+pub mod rule_runs;
+pub mod rules;
 pub mod sanitize;
 pub mod suggestions;

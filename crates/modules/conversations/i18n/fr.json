@@ -19,6 +19,10 @@
     "no_open_need": "Plus rien ici n’a besoin de vous.",
     "nothing_to_reopen": "Il n’y a rien à rétablir ici.",
     "need_changed": "Ceci a changé pendant que vous le regardiez. Jetez-y un nouveau coup d’œil.",
-    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs."
+    "invalid_senders_query": "Recherchez avec 2 à 100 caractères et demandez entre 1 et {{max}} expéditeurs.",
+    "invalid_rule": "Impossible d'enregistrer cette règle. Il lui faut une à quatre conditions qui disent à quels e-mails elle s'applique, et une à quatre actions de types différents.",
+    "rule_not_yours": "Seule la personne qui a appris cette règle, ou un gestionnaire de la boîte de réception, peut la modifier.",
+    "rule_not_proposed": "Cette règle n'attend plus de réponse.",
+    "invalid_rule_query": "Impossible de lire la règle à prévisualiser. Envoyez ses conditions et ses actions en JSON."
   }
 }
