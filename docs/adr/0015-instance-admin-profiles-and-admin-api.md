@@ -67,9 +67,10 @@ OAuth scope and never appears in a token.
      first-party clients** (the web BFF and the native app), never to
      workspace API clients or dynamically registered ones, so a third-party
      app a super admin signs in to cannot use the admin API;
-  3. **recent authentication**: the token's `auth_time` is at most 12 hours
-     old, or the call is refused with code `admin_reauth_required` and the
-     client sends the user through sign-in again;
+  3. **recent authentication**: the token's `auth_time` is at most one hour
+     old (twelve hours until the identity audit, campbooks-cloud#117), or
+     the call is refused with code `admin_reauth_required` and the client
+     sends the user through sign-in again;
   4. an admin profile holding `P` (or `super`).
   Any failure of (1), (2) or (4) answers **404**, the same as a route that
   doesn't exist, so the API does not reveal who is an administrator. (3)
@@ -130,7 +131,7 @@ nothing is shown.
   granted by the operator after the first sign-in.
 - One more document to keep generated, one more router field, one more
   extractor. In exchange, admin power is unreachable from the assistant,
-  third-party apps and tokens older than 12 hours, and every use leaves a
+  third-party apps and tokens older than an hour, and every use leaves a
   trace.
 - Revoking a profile takes effect on the next request (profiles are read per
   request, not cached in tokens).

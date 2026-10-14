@@ -6,6 +6,30 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+- When a way to sign in is added to your account (a Google, Microsoft or Zoho
+  account, or a passkey), you are told: by mail to your account's address and
+  the new account's address (verified addresses only, in your language, no
+  tracking) when the instance has a mail server, and on Settings → Ways to
+  sign in, which marks what was added this week, either way. New settings
+  `CAMPBOOKS_MAIL__SMTP_URL` (or `_FILE`) and `CAMPBOOKS_MAIL__FROM`; see
+  deploy/README.md → Outgoing mail.
+- Sign out everywhere (Settings → Ways to sign in): ends every sign-in to
+  your account, on every device and in every app.
+- A copied web session cookie used after the real one moved on ends the
+  session for both, and its tokens at the identity provider.
+- Adding a passkey needs a sign-in from the last five minutes (the app signs
+  you in again first).
+- A sign-in link opened in another browser no longer completes there.
+- Refresh tokens end with the sign-in they came from.
+- Signing in, authorizing and signing out are rate-limited per address;
+  passkey-only sign-ups allow 5 per address an hour (200 per instance).
+- Workspace members' addresses are shown only when the identity provider
+  verified them.
+- The admin API asks for a sign-in from the last hour (was twelve hours), and
+  app names that only look like "Campbooks" (full-width, accented, styled
+  letters) are refused.
+
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
