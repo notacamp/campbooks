@@ -71,7 +71,8 @@ instead of a sign-out; the undelivered successor is retired, so a copy of it
 presented later still ends the session. Only one request reissues: the locked
 row must still be past its grace, and the reissue starts a new one, so the
 other requests a waking page fires with the same old token go through as
-within the grace, with no cookie of their own.
+within the grace, with no cookie of their own; one whose successor was
+presented between its lookup and the lock is a copy, and ends the session.
 
 ### Passkeys need a fresh sign-in
 `start_passkey_registration` asks for a sign-in from the last five minutes
@@ -113,7 +114,11 @@ The name is decomposed for compatibility (NFKD), stripped of every mark
 (general category M, `icu_properties`), then reduced to its UTS #39
 confusables skeleton (`unicode-security`, Unicode 16 data: Cyrillic, Greek,
 Armenian, Cherokee, Coptic, IPA, digits of other scripts; `rn` and `m` share
-one), before and after lower-casing, with leetspeak digits read as letters.
+one), before and after lower-casing, with leetspeak read as letters (`4` and
+`@` for `a`, `$` for `s`, `()` for `o`, `æ` for `a`). The checks read the
+whole normalised name: normalisation can lengthen a name many times (`ﷺ` is
+18 characters), and only what is stored is cut to 100. `campbook` covers the
+plural.
 It reads as Campbooks when its skeleton contains the skeleton of `campbooks`
 or `notacamp`, ignoring spaces and punctuation. A letter or digit nothing maps
 stands for any character, and so does a symbol (or the symbol is ignored,

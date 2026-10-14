@@ -813,6 +813,63 @@ async fn a_waking_page_reissues_once_and_stays_signed_in(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_reissue_says_why_it_did_not(db: PgPool) {
+    use campbooks_kernel::crypto::hash;
+
+    use super::store::Reissue;
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    browser.get("/bff/session").await;
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM bff.sessions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    let now = chrono::Utc::now();
+    let grace_since = now - super::config::ROTATION_GRACE;
+    let reissue = |previous: &str| {
+        let previous = hash(previous);
+        let db = h.db.clone();
+        async move {
+            store::reissue(&db, id, &previous, &hash("fresh"), now, grace_since)
+                .await
+                .unwrap()
+        }
+    };
+
+    // The successor was presented meanwhile: the old token is a copy.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET token_delivered = true, rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::Delivered);
+    // Another request reissued a moment ago: within the new grace.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET token_delivered = false, rotated_at = now()",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::WithinGrace);
+    // Not this session's previous token at all.
+    assert_eq!(reissue("someone-else").await, Reissue::Gone);
+    // Past the grace, undelivered: reissued.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::Reissued);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_cookie_rotations_old_still_ends_the_session(db: PgPool) {
     let h = harness(db).await;
     let mut browser = Browser::new(&h.app);

@@ -22,18 +22,20 @@ pub const MAX_NAME: usize = 100;
 /// runs of whitespace collapsed, trimmed and cut to [`MAX_NAME`]
 /// characters. Empty when nothing visible is left.
 pub fn clean(name: &str) -> String {
+    visible(name).chars().take(MAX_NAME).collect()
+}
+
+/// [`clean`] without the cut: what the checks read after normalisation,
+/// which can lengthen a name many times (`ﷺ` is 18 characters), so nothing
+/// pushed past [`MAX_NAME`] escapes them. Names are at most [`MAX_NAME`]
+/// characters before, so this stays small.
+fn visible(name: &str) -> String {
     let visible: String = name
         .chars()
         .filter(|c| !is_invisible(*c))
         .map(|c| if c.is_whitespace() { ' ' } else { c })
         .collect();
-    visible
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .chars()
-        .take(MAX_NAME)
-        .collect()
+    visible.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn is_invisible(c: char) -> bool {
@@ -101,7 +103,7 @@ pub fn impersonates_campbooks(name: &str) -> bool {
 pub fn mixes_scripts(name: &str) -> bool {
     let categories = CodePointMapData::<GeneralCategory>::new();
     let composed = icu_normalizer::ComposingNormalizerBorrowed::new_nfkc().normalize(name);
-    let cleaned = clean(&composed);
+    let cleaned = visible(&composed);
     cleaned
         .split(|c: char| {
             let category = categories.get(c);
@@ -113,8 +115,9 @@ pub fn mixes_scripts(name: &str) -> bool {
         .any(|word| word.detect_restriction_level() > RestrictionLevel::HighlyRestrictive)
 }
 
-/// The names only Campbooks' own apps may take.
-const RESERVED: [&str; 2] = ["campbooks", "notacamp"];
+/// The names only Campbooks' own apps may take (`campbook` covers the
+/// plural too).
+const RESERVED: [&str; 2] = ["campbook", "notacamp"];
 
 /// The most characters nothing maps that a match may lean on.
 const MAX_UNKNOWN: usize = 2;
@@ -137,7 +140,17 @@ fn skeleton(name: &str) -> Vec<Folded> {
     let categories = CodePointMapData::<GeneralCategory>::new();
     let not_a_mark = |c: &char| !GeneralCategoryGroup::Mark.contains(categories.get(*c));
     let decomposed = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd().normalize(name);
-    let plain: String = clean(&decomposed).chars().filter(not_a_mark).collect();
+    // `()` drawn for `o`, and ligatures read as their first letter (`æ`).
+    let plain: String = visible(&decomposed)
+        .replace("()", "o")
+        .chars()
+        .filter(not_a_mark)
+        .map(|c| match c {
+            'æ' | 'Æ' => 'a',
+            'œ' | 'Œ' => 'o',
+            c => c,
+        })
+        .collect();
     // Look-alikes first (the table maps capitals of other scripts to Latin
     // capitals), then lower case, then once more for the lower-case ones
     // (`m` and `rn` meet there).
@@ -148,7 +161,7 @@ fn skeleton(name: &str) -> Vec<Folded> {
         .flat_map(char::to_lowercase)
         .filter(not_a_mark)
         .filter_map(|c| {
-            if c.is_ascii_alphanumeric() {
+            if c.is_ascii_alphanumeric() || c == '@' || c == '$' {
                 return Some(Folded::Ascii(leet(c)));
             }
             if c.is_ascii() {
@@ -168,11 +181,12 @@ fn skeleton(name: &str) -> Vec<Folded> {
         .collect()
 }
 
-/// A digit written for the letter it resembles (`4` for `a`); any other
-/// character as itself.
+/// A digit or sign written for the letter it resembles (`4` and `@` for
+/// `a`, `$` for `s`); any other character as itself.
 fn leet(c: char) -> char {
     match c {
-        '4' => 'a',
+        '4' | '@' => 'a',
+        '$' => 's',
         '8' => 'b',
         '3' => 'e',
         '5' => 's',
@@ -257,6 +271,19 @@ mod tests {
             "Campb߀߀ks",
             "Campb○○ks",
             "Campb◯◯ks",
+            // Lengthened past 100 characters by normalisation.
+            &format!("{} Campbooks", "\u{FDFA}".repeat(6)),
+            "Ứng dụng quản lý thư điện tử chính thức được chứng nhận bởi đội ngũ Campbooks",
+            &format!("{} Campbooks", "é".repeat(60)),
+            &format!("{} C\u{0430}mpb\u{043E}\u{043E}ks", "…".repeat(40)),
+            &format!("{} Not A Camp", "⑴".repeat(34)),
+            // ASCII leet, the singular, a ligature.
+            "C@mpbooks",
+            "Campbook$",
+            "C@mpb00k$",
+            "Campb()()ks",
+            "Campbook",
+            "Cæmpbooks",
         ] {
             assert!(impersonates_campbooks(fake), "{fake}");
         }
@@ -292,6 +319,7 @@ mod tests {
             "ⲥampbօօks",
             "Nоt Ꭺ Ꮯɑmp",
             "Pаypal Sync",
+            &format!("{} C\u{0430}mpb\u{043E}\u{043E}ks", "…".repeat(40)),
             "Gооgle Drive",
             // Small capitals: Latin, but no identifier may use them.
             "ᴄᴀᴍᴘʙᴏᴏᴋꜱ",

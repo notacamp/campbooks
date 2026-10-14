@@ -198,13 +198,28 @@ pub async fn delivered(db: &PgPool, id: Uuid, hash: &[u8]) -> sqlx::Result<()> {
     Ok(())
 }
 
+/// What [`reissue`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reissue {
+    /// The new token replaced the undelivered one.
+    Reissued,
+    /// Another request presenting the same previous token reissued first:
+    /// this one is within the new grace.
+    WithinGrace,
+    /// The current token was presented meanwhile: the previous one coming
+    /// back now is a copy.
+    Delivered,
+    /// The previous token is no longer the session's previous one (a
+    /// rotation moved on, or the session ended).
+    Gone,
+}
+
 /// The browser still presents the previous token `previous_hash` because
-/// the current one never reached it: issue `new_hash` in its place. The
-/// undelivered token is retired (presented later, it is a copy) and the
-/// previous one starts a new grace (`rotated_at` = `now`). Only once the
-/// previous token is past its grace (rotated at or before `grace_since`):
-/// `false` when another request presenting it reissued first (it is within
-/// the new grace), or the current token was delivered meanwhile.
+/// the current one never reached it: issue `new_hash` in its place, once the
+/// previous token is past its grace (rotated at or before `grace_since`).
+/// The undelivered token is retired (presented later, it is a copy) and the
+/// previous one starts a new grace (`rotated_at` = `now`), so concurrent
+/// requests with it reissue only once.
 pub async fn reissue(
     db: &PgPool,
     id: Uuid,
@@ -212,26 +227,30 @@ pub async fn reissue(
     new_hash: &[u8],
     now: DateTime<Utc>,
     grace_since: DateTime<Utc>,
-) -> sqlx::Result<bool> {
+) -> sqlx::Result<Reissue> {
     let mut tx = db.begin().await?;
-    let Some(undelivered) = sqlx::query_scalar!(
-        "SELECT token_hash FROM bff.sessions
-          WHERE id = $1 AND previous_token_hash = $2 AND NOT token_delivered
-            AND rotated_at <= $3
+    let Some(row) = sqlx::query!(
+        "SELECT token_hash, token_delivered, rotated_at FROM bff.sessions
+          WHERE id = $1 AND previous_token_hash = $2
           FOR UPDATE",
         id,
         previous_hash,
-        grace_since,
     )
     .fetch_optional(&mut *tx)
     .await?
     else {
-        return Ok(false);
+        return Ok(Reissue::Gone);
     };
+    if row.token_delivered {
+        return Ok(Reissue::Delivered);
+    }
+    if row.rotated_at > grace_since {
+        return Ok(Reissue::WithinGrace);
+    }
     sqlx::query!(
         "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
          VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
-        undelivered,
+        row.token_hash,
         id,
         now,
     )
@@ -246,7 +265,7 @@ pub async fn reissue(
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
-    Ok(true)
+    Ok(Reissue::Reissued)
 }
 
 /// The live session a retired token (one rotated away before the previous

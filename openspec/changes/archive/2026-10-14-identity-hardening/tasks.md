@@ -38,3 +38,5 @@
 - [x] 5.10 `lock_timeout` in the three migrations
 - [x] 5.11 Names: UTS #39 confusables skeleton (`unicode-security`), unmapped symbols and digits as wildcards, no mixed-script words
 - [x] 5.12 BFF: one reissue per lost rotation; concurrent requests go through within the new grace
+- [x] 5.13 Names checked whole after normalisation (no cut before the checks); `@`, `$`, `()`, `æ`, singular `campbook`
+- [x] 5.14 `reissue` says why it did not (`Reissue`): a successor delivered meanwhile ends the session

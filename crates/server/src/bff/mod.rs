@@ -64,7 +64,7 @@ use self::{
     config::{ROTATION_GRACE, Timeouts},
     cookies::Cookies,
     oidc::{Oidc, OidcError},
-    store::Session,
+    store::{Reissue, Session},
 };
 
 /// Owner of the BFF's background work and its Postgres schema.
@@ -355,9 +355,10 @@ impl Inner {
             // The successor never reached this browser (the response that
             // carried it was lost): it gets another one. When a concurrent
             // request (a page waking up fires several) reissued first, this
-            // one is within the new grace and goes through as it is.
+            // one is within the new grace and goes through as it is; when
+            // the successor was presented meanwhile, this is a copy.
             let fresh = random_token();
-            if store::reissue(
+            match store::reissue(
                 &self.db,
                 session.id,
                 &token_hash,
@@ -367,10 +368,21 @@ impl Inner {
             )
             .await?
             {
-                rotated = Some(
-                    self.cookies
-                        .set_session(&fresh, seconds_until(session.expires_at, now)),
-                );
+                Reissue::Reissued => {
+                    rotated = Some(
+                        self.cookies
+                            .set_session(&fresh, seconds_until(session.expires_at, now)),
+                    );
+                }
+                Reissue::WithinGrace => {}
+                Reissue::Delivered => {
+                    tracing::warn!(
+                        "a rotated-away web session token was presented again; the session ends"
+                    );
+                    self.terminate(session.id).await?;
+                    return Ok(None);
+                }
+                Reissue::Gone => return Ok(None),
             }
         } else if session.current && !session.token_delivered {
             store::delivered(&self.db, session.id, &token_hash).await?;
