@@ -60,14 +60,18 @@ warning is logged without ids. Older tokens are kept too: each rotation moves
 the token before the previous one into `bff.retired_tokens` (its SHA-256),
 kept until the session ends (cascade). A retired token presented at any time
 ends the session the same way, so an idle victim's copied cookie still trips
-it while the thief keeps the session alive. The memory is bounded: one row per
-rotation, at most the session's lifetime over the rotation period (about 720
-with the defaults of 30 days and one hour). A rotated-away token is a theft
+it while the thief keeps the session alive. The memory is bounded: a row per
+rotation (an hour by default), or per reissue (below), which waits out the
+two-minute grace, so at most about one row per two minutes of a session's
+life, usually about 720 over the default 30 days. A rotated-away token is a theft
 signal only once its successor has been presented (`token_delivered`): until
 then the response carrying the new cookie may have been lost (an aborted
 fetch, a reload, a sleeping laptop), and the old token gets a fresh rotation
 instead of a sign-out; the undelivered successor is retired, so a copy of it
-presented later still ends the session.
+presented later still ends the session. Only one request reissues: the locked
+row must still be past its grace, and the reissue starts a new one, so the
+other requests a waking page fires with the same old token go through as
+within the grace, with no cookie of their own.
 
 ### Passkeys need a fresh sign-in
 `start_passkey_registration` asks for a sign-in from the last five minutes
@@ -105,14 +109,21 @@ the last sign-in; members' addresses are listed only when verified, and the
 unverified claim cannot block an invitation).
 
 ### Look-alike app names
-Every mark (general category M, from `icu_properties`, already in the
-graph) is dropped after NFKD, so vowel signs and accents of any script cannot
-shift a match; `rn` reads as `m`; letters with no decomposition (small
-capitals, stroked letters) and ligatures are folded. A letter nothing folds
-stands for any letter, but a match may rest on at most two of them, so
-`Campbʘʘks` is refused while a Japanese or Arabic name is not. A full UTS #39
-confusables skeleton was the alternative: a new dependency and data table for
-what this list and the wildcard limit already cover for two fixed words.
+The name is decomposed for compatibility (NFKD), stripped of every mark
+(general category M, `icu_properties`), then reduced to its UTS #39
+confusables skeleton (`unicode-security`, Unicode 16 data: Cyrillic, Greek,
+Armenian, Cherokee, Coptic, IPA, digits of other scripts; `rn` and `m` share
+one), before and after lower-casing, with leetspeak digits read as letters.
+It reads as Campbooks when its skeleton contains the skeleton of `campbooks`
+or `notacamp`, ignoring spaces and punctuation. A letter or digit nothing maps
+stands for any character, and so does a symbol (or the symbol is ignored,
+whichever matches), at most two per match, so `Campb○○ks` is refused while a
+Japanese or Arabic name is not. Separately, a word may not mix scripts beyond
+UTS #39's "highly restrictive" level (Latin with Cyrillic, Greek, Armenian,
+Cherokee…, or a letter no identifier may use, such as small capitals):
+`client_name_mixed_scripts` for a workspace's app; a self-registered agent is
+shown under its redirect host instead. A hand-written fold table was the
+earlier approach: it cannot keep up with the confusables data.
 
 ### Delta-review fixes
 App names are decomposed with NFKD and stripped of combining marks before
@@ -142,7 +153,8 @@ hour.
 **Copied sessions.**
 1. *End the session on any rotated-away token presented after the grace,
    keeping retired hashes until the session ends (chosen):* no false positives
-   inside the grace window; bounded memory (about 720 hashes per session).
+   inside the grace window; bounded memory (about one hash per two minutes
+   of a session's life at most, typically one an hour).
 2. *Only the last rotated-away token:* cheaper, but a thief who keeps the
    session busy while the victim is idle rotates the victim's copy out of
    reach.

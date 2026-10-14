@@ -32,7 +32,8 @@
     "client_is_public": "Esta aplicação inicia sessão de pessoas e não tem segredo para renovar.",
     "client_name_reserved": "Só as aplicações do próprio Campbooks se podem chamar Campbooks ou Not A Camp. Escolha outro nome.",
     "fresh_sign_in_required": "Inicie sessão novamente primeiro: adicionar uma chave de acesso exige um início de sessão nos últimos cinco minutos.",
-    "too_many_accounts": "Pergunte por no máximo {{max}} contas de cada vez."
+    "too_many_accounts": "Pergunte por no máximo {{max}} contas de cada vez.",
+    "client_name_mixed_scripts": "Use um só alfabeto em cada palavra do nome da aplicação: letras de alfabetos diferentes podem passar por outras."
   },
   "notices": {
     "way_in_added": {

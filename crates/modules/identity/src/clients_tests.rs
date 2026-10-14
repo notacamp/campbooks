@@ -1182,6 +1182,34 @@ async fn nobody_else_may_be_called_campbooks(db: PgPool) {
         .await;
     assert_eq!(reserved.status, StatusCode::BAD_REQUEST);
     assert_eq!(reserved.json["code"], "client_name_reserved");
+    let mixed = kit
+        .api_json(
+            Method::POST,
+            &format!("/api/v1/w/{HOME}/identity/clients"),
+            &web,
+            &serde_json::json!({ "name": "P\u{0430}yroll sync", "type": "confidential", "scopes": [] }),
+        )
+        .await;
+    assert_eq!(mixed.status, StatusCode::BAD_REQUEST);
+    assert_eq!(mixed.json["code"], "client_name_mixed_scripts");
+    let mixed_agent = register(
+        &kit,
+        &serde_json::json!({
+            "client_name": "G\u{043E}\u{043E}gle Drive",
+            "redirect_uris": [AGENT_CALLBACK],
+        }),
+    )
+    .await;
+    assert_eq!(mixed_agent.json["client_name"], "agent.example.com");
+    let japanese = register(
+        &kit,
+        &serde_json::json!({
+            "client_name": "メールアシスタントプロ",
+            "redirect_uris": [AGENT_CALLBACK],
+        }),
+    )
+    .await;
+    assert_eq!(japanese.json["client_name"], "メールアシスタントプロ");
     let write = kit
         .api_json(
             Method::POST,

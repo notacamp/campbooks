@@ -32,7 +32,8 @@
     "client_is_public": "Cette application connecte des personnes et n’a pas de secret à renouveler.",
     "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom.",
     "fresh_sign_in_required": "Reconnectez-vous d’abord : ajouter une clé d’accès demande une connexion de moins de cinq minutes.",
-    "too_many_accounts": "Demandez au plus {{max}} comptes à la fois."
+    "too_many_accounts": "Demandez au plus {{max}} comptes à la fois.",
+    "client_name_mixed_scripts": "Utilisez un seul alphabet par mot dans le nom de l’application : des lettres d’alphabets différents peuvent se faire passer pour d’autres."
   },
   "notices": {
     "way_in_added": {

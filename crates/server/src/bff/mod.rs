@@ -353,15 +353,25 @@ impl Inner {
                 return Ok(None);
             }
             // The successor never reached this browser (the response that
-            // carried it was lost): it gets another one.
+            // carried it was lost): it gets another one. When a concurrent
+            // request (a page waking up fires several) reissued first, this
+            // one is within the new grace and goes through as it is.
             let fresh = random_token();
-            if !store::reissue(&self.db, session.id, &token_hash, &hash(&fresh), now).await? {
-                return Ok(None);
+            if store::reissue(
+                &self.db,
+                session.id,
+                &token_hash,
+                &hash(&fresh),
+                now,
+                now - ROTATION_GRACE,
+            )
+            .await?
+            {
+                rotated = Some(
+                    self.cookies
+                        .set_session(&fresh, seconds_until(session.expires_at, now)),
+                );
             }
-            rotated = Some(
-                self.cookies
-                    .set_session(&fresh, seconds_until(session.expires_at, now)),
-            );
         } else if session.current && !session.token_delivered {
             store::delivered(&self.db, session.id, &token_hash).await?;
         }

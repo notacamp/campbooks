@@ -4,12 +4,15 @@
 //! workspace admin typed is cleaned of invisible formatting and direction
 //! characters, which could make it read as something else, and may not pass
 //! itself off as Campbooks: "Campbooks" and "Not A Camp" belong to the
-//! first-party apps, whatever the case, spacing or look-alike letters.
+//! first-party apps, whatever the case, spacing or look-alike letters (the
+//! Unicode confusables table, UTS #39). Nor may one word mix scripts, the way
+//! a Cyrillic `а` hides in a Latin word.
 
 use icu_properties::{
     CodePointMapData,
     props::{GeneralCategory, GeneralCategoryGroup},
 };
+use unicode_security::{RestrictionLevel, RestrictionLevelDetection as _};
 
 /// The longest name kept, in characters.
 pub const MAX_NAME: usize = 100;
@@ -58,119 +61,143 @@ fn is_invisible(c: char) -> bool {
         )
 }
 
-/// Whether `name` would read as Campbooks' own: once decomposed for
+/// Whether `name` would read as Campbooks' own. The name is decomposed for
 /// compatibility (NFKD: full-width, mathematical and circled letters become
 /// plain ones), stripped of every mark (general category M: accents, vowel
-/// signs, overlays, in any script), lower-cased, ligatures split, stripped of
-/// everything but letters and digits, and with look-alikes folded (Cyrillic
-/// and Greek letters, small capitals, letters with a stroke such as `ø` and
-/// `ł`, `0` for `o`, `1` for `l`, `rn` for `m`…), it contains `campbooks` or
-/// `notacamp`. A letter outside ASCII nothing folds may stand for any letter,
-/// at most [`MAX_UNKNOWN`] of them in the word: `Campb··ks` still reads as
-/// Campbooks, while a name in another script is not a match by wildcards
-/// alone.
+/// signs, overlays, in any script) and lower-cased, then reduced to its
+/// UTS #39 confusables skeleton (the Unicode Consortium's table of
+/// look-alikes: Cyrillic, Greek, Armenian, Cherokee, Coptic, IPA, digits of
+/// other scripts…; `rn` and `m` share one), with leetspeak digits read as
+/// letters. It reads as Campbooks when that skeleton contains the skeleton of
+/// `campbooks` or `notacamp`, ignoring spaces and punctuation. A letter or
+/// digit nothing maps stands for any character, and so does a symbol (or the
+/// symbol is ignored, whichever matches), at most [`MAX_UNKNOWN`] of them in
+/// the word: `Campb○○ks` reads as Campbooks, while a name in another script is
+/// not a match by wildcards alone.
 pub fn impersonates_campbooks(name: &str) -> bool {
-    let categories = CodePointMapData::<GeneralCategory>::new();
-    let decomposed = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd().normalize(name);
-    let folded: Vec<Folded> = clean(&decomposed)
-        .chars()
-        .filter(|c| !GeneralCategoryGroup::Mark.contains(categories.get(*c)))
-        .flat_map(char::to_lowercase)
-        .flat_map(ligature)
-        .filter_map(fold)
+    let read = skeleton(name);
+    let without_symbols: Vec<Folded> = read
+        .iter()
+        .copied()
+        .filter(|f| *f != Folded::Symbol)
         .collect();
-    let skeleton = rn_as_m(&folded);
-    ["campbooks", "notacamp"].iter().any(|word| {
-        skeleton.windows(word.len()).any(|window| {
-            let unknown = window.iter().filter(|f| **f == Folded::Other).count();
-            unknown <= MAX_UNKNOWN
-                && window
-                    .iter()
-                    .zip(word.chars())
-                    .all(|(folded, expected)| match folded {
-                        Folded::Ascii(c) => *c == expected,
-                        Folded::Other => true,
-                    })
-        })
+    RESERVED.iter().any(|word| {
+        let word: Vec<char> = skeleton(word)
+            .into_iter()
+            .filter_map(|f| match f {
+                Folded::Ascii(c) => Some(c),
+                Folded::Unknown | Folded::Symbol => None,
+            })
+            .collect();
+        contains(&read, &word) || contains(&without_symbols, &word)
     })
 }
 
-/// The most letters nothing folds that a match may lean on.
+/// Whether a word of `name` mixes scripts in a way that lets it pass for
+/// another word: worse than UTS #39's "highly restrictive" (Latin with
+/// Armenian, Cherokee, Coptic, Cyrillic, Greek…, or a letter no identifier
+/// may use). A name in one script, Latin or not, or Latin with Han, kana or
+/// Hangul, is fine.
+pub fn mixes_scripts(name: &str) -> bool {
+    let categories = CodePointMapData::<GeneralCategory>::new();
+    let composed = icu_normalizer::ComposingNormalizerBorrowed::new_nfkc().normalize(name);
+    let cleaned = clean(&composed);
+    cleaned
+        .split(|c: char| {
+            let category = categories.get(c);
+            !(GeneralCategoryGroup::Letter.contains(category)
+                || GeneralCategoryGroup::Mark.contains(category)
+                || GeneralCategoryGroup::Number.contains(category))
+        })
+        .filter(|word| !word.is_empty())
+        .any(|word| word.detect_restriction_level() > RestrictionLevel::HighlyRestrictive)
+}
+
+/// The names only Campbooks' own apps may take.
+const RESERVED: [&str; 2] = ["campbooks", "notacamp"];
+
+/// The most characters nothing maps that a match may lean on.
 const MAX_UNKNOWN: usize = 2;
-
-/// `skeleton` with every `r` directly followed by `n` read as one `m`.
-fn rn_as_m(skeleton: &[Folded]) -> Vec<Folded> {
-    let mut out = Vec::with_capacity(skeleton.len());
-    let mut rest = skeleton.iter().peekable();
-    while let Some(folded) = rest.next() {
-        if *folded == Folded::Ascii('r') && rest.peek() == Some(&&Folded::Ascii('n')) {
-            rest.next();
-            out.push(Folded::Ascii('m'));
-        } else {
-            out.push(*folded);
-        }
-    }
-    out
-}
-
-/// A ligature as the letters it joins (`ꝏ` is `oo`); any other character
-/// as itself.
-fn ligature(c: char) -> impl Iterator<Item = char> {
-    let pair = match c {
-        'ꝏ' => Some(['o', 'o']),
-        'æ' => Some(['a', 'e']),
-        'œ' => Some(['o', 'e']),
-        'ß' => Some(['s', 's']),
-        'ꜳ' => Some(['a', 'a']),
-        _ => None,
-    };
-    let (first, second) = pair.map_or((c, None), |[a, b]| (a, Some(b)));
-    std::iter::once(first).chain(second)
-}
 
 /// One character of a name's skeleton.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Folded {
     /// The ASCII letter or digit it reads as.
     Ascii(char),
-    /// A letter outside ASCII nothing folds: it may read as any letter.
-    Other,
+    /// A letter or digit outside ASCII nothing maps: it may read as anything.
+    Unknown,
+    /// A symbol outside ASCII nothing maps (`○`, `☺`): it may read as
+    /// anything, or be ignored.
+    Symbol,
 }
 
-/// One character of a name as the ASCII letter it looks like, or as an
-/// unknown letter; `None` for what is dropped (spaces, punctuation,
-/// symbols).
-fn fold(c: char) -> Option<Folded> {
-    let folded = match c {
-        'а' | 'α' | '@' | '4' | 'ᴀ' => 'a',
-        'в' | 'β' | 'ь' | '8' | 'ʙ' | 'ᴃ' => 'b',
-        'с' | 'ϲ' | '(' | 'ᴄ' | 'ȼ' => 'c',
-        'đ' | 'ᴅ' => 'd',
-        'е' | 'ε' | '3' | 'ᴇ' | 'ɇ' => 'e',
-        'ɢ' => 'g',
-        'һ' | 'ħ' | 'ʜ' => 'h',
-        'і' | 'ι' | '!' | '|' | 'ı' | 'ɪ' | 'ɨ' => 'i',
-        'ȷ' | 'ᴊ' => 'j',
-        'к' | 'κ' | 'ᴋ' => 'k',
-        '1' | 'ӏ' | 'ł' | 'ʟ' | 'ƚ' | 'ŀ' => 'l',
-        'м' | 'μ' | 'ᴍ' => 'm',
-        'п' | 'η' | 'ɴ' => 'n',
-        'о' | 'ο' | 'σ' | '0' | 'ø' | 'ᴏ' | 'ɵ' | 'ᴓ' => 'o',
-        'р' | 'ρ' | 'ᴘ' | 'ᵽ' => 'p',
-        'ʀ' => 'r',
-        'ѕ' | '5' | '$' | 'ꜱ' => 's',
-        'т' | 'τ' | '7' | '+' | 'ŧ' | 'ᴛ' => 't',
-        'ᴜ' | 'ʉ' => 'u',
-        'ᴠ' => 'v',
-        'ᴡ' => 'w',
-        'х' | 'χ' => 'x',
-        'у' | 'γ' | 'ʏ' => 'y',
-        'ᴢ' | 'ƶ' => 'z',
-        c if c.is_ascii_alphanumeric() => c,
-        c if c.is_alphabetic() => return Some(Folded::Other),
-        _ => return None,
-    };
-    Some(Folded::Ascii(folded))
+/// `name` as the characters it reads as (see [`impersonates_campbooks`]);
+/// spaces and punctuation are left out.
+fn skeleton(name: &str) -> Vec<Folded> {
+    let categories = CodePointMapData::<GeneralCategory>::new();
+    let not_a_mark = |c: &char| !GeneralCategoryGroup::Mark.contains(categories.get(*c));
+    let decomposed = icu_normalizer::DecomposingNormalizerBorrowed::new_nfkd().normalize(name);
+    let plain: String = clean(&decomposed).chars().filter(not_a_mark).collect();
+    // Look-alikes first (the table maps capitals of other scripts to Latin
+    // capitals), then lower case, then once more for the lower-case ones
+    // (`m` and `rn` meet there).
+    let lower: String = unicode_security::skeleton(&plain)
+        .flat_map(char::to_lowercase)
+        .collect();
+    unicode_security::skeleton(&lower)
+        .flat_map(char::to_lowercase)
+        .filter(not_a_mark)
+        .filter_map(|c| {
+            if c.is_ascii_alphanumeric() {
+                return Some(Folded::Ascii(leet(c)));
+            }
+            if c.is_ascii() {
+                return None;
+            }
+            let category = categories.get(c);
+            if GeneralCategoryGroup::Letter.contains(category)
+                || GeneralCategoryGroup::Number.contains(category)
+            {
+                Some(Folded::Unknown)
+            } else if GeneralCategoryGroup::Symbol.contains(category) {
+                Some(Folded::Symbol)
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// A digit written for the letter it resembles (`4` for `a`); any other
+/// character as itself.
+fn leet(c: char) -> char {
+    match c {
+        '4' => 'a',
+        '8' => 'b',
+        '3' => 'e',
+        '5' => 's',
+        '7' => 't',
+        c => c,
+    }
+}
+
+/// Whether `skeleton` holds `word` somewhere, each unknown character standing
+/// for any one of its letters, at most [`MAX_UNKNOWN`] of them.
+fn contains(skeleton: &[Folded], word: &[char]) -> bool {
+    skeleton.windows(word.len()).any(|window| {
+        window
+            .iter()
+            .filter(|f| !matches!(f, Folded::Ascii(_)))
+            .count()
+            <= MAX_UNKNOWN
+            && window
+                .iter()
+                .zip(word)
+                .all(|(folded, expected)| match folded {
+                    Folded::Ascii(c) => c == expected,
+                    Folded::Unknown | Folded::Symbol => true,
+                })
+    })
 }
 
 #[cfg(test)]
@@ -207,7 +234,6 @@ mod tests {
             "Ⓒⓐⓜⓟⓑⓞⓞⓚⓢ",
             "Nöt Á Cämp",
             "Campbøøks",
-            "ᴄᴀᴍᴘʙᴏᴏᴋꜱ",
             "Campbʘʘks",
             "Campbꝏks",
             "Νοt Α Cαmp",
@@ -218,12 +244,27 @@ mod tests {
             "Carnpbooks",
             "Not A Carnp",
             "Campb\u{0D20}\u{0D20}ks",
+            // Homoglyphs of other scripts (UTS #39 confusables).
+            "Cɑmpbօօks",
+            "ᏟᎪᎷᏢᏴOOᏦᏚ",
+            "Ꮯampbօօks",
+            "Ꮯɑmpbօօkѕ",
+            "ⲥampbօօks",
+            "Nоt Ꭺ Ꮯɑmp",
+            // Zeros of other scripts, and circles.
+            "Campb००ks",
+            "Campb๐๐ks",
+            "Campb߀߀ks",
+            "Campb○○ks",
+            "Campb◯◯ks",
         ] {
             assert!(impersonates_campbooks(fake), "{fake}");
         }
         for fine in [
             "Desk Agent",
             "Camping planner",
+            "Camping Notebook",
+            "Bookcamp",
             "Books & Co",
             "Café Ørsted",
             "José",
@@ -233,8 +274,46 @@ mod tests {
             "تطبيق البريد",
             "Learning Corner",
             "東京 Notes",
+            "Ελληνικό ταχυδρομείο",
+            "Почтовый помощник",
+            "메일 도우미",
+            "ფოსტის ასისტენტი",
+            "Փոստի օգնական",
         ] {
             assert!(!impersonates_campbooks(fine), "{fine}");
+        }
+    }
+
+    #[test]
+    fn a_word_keeps_to_one_script() {
+        for mixed in [
+            "Cɑmpbօօks",
+            "Ꮯampbօօks",
+            "ⲥampbօօks",
+            "Nоt Ꭺ Ꮯɑmp",
+            "Pаypal Sync",
+            "Gооgle Drive",
+            // Small capitals: Latin, but no identifier may use them.
+            "ᴄᴀᴍᴘʙᴏᴏᴋꜱ",
+        ] {
+            assert!(mixes_scripts(mixed), "{mixed}");
+        }
+        for single in [
+            "Desk Agent",
+            "José's Books",
+            "Françoise",
+            "メールアシスタントプロ",
+            "Gmail助手",
+            "我的邮件管理助手应用",
+            "تطبيق البريد",
+            "Ελληνικό ταχυδρομείο",
+            "Почтовый помощник",
+            "메일 도우미",
+            "ფოსტის ასისტენტი",
+            "Փոստի օգնական",
+            "Sync 2",
+        ] {
+            assert!(!mixes_scripts(single), "{single}");
         }
     }
 }

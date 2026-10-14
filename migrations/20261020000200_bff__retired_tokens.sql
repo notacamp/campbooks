@@ -5,9 +5,10 @@ SET LOCAL lock_timeout = '5s';
 
 -- Every token a web session's cookie held before the last two, kept (as its
 -- SHA-256) until the session ends: one presented again means the cookie was
--- copied, however long ago, and the session ends. At most one row per
--- rotation, so a session holds at most its lifetime over the rotation period
--- (about 720 with the defaults); they go with the session.
+-- copied, however long ago, and the session ends. A row is added by a
+-- rotation, or by a reissue (below), which waits for the two-minute grace:
+-- at most about one row per two minutes of a session's life, usually one
+-- per rotation period (an hour); they go with the session.
 CREATE TABLE bff.retired_tokens (
     token_hash bytea PRIMARY KEY,
     session_id uuid NOT NULL REFERENCES bff.sessions (id) ON DELETE CASCADE,

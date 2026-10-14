@@ -36,3 +36,5 @@
 - [x] 5.8 Names: drop every mark (general category M), `rn` as `m`, at most two unknown letters per match
 - [x] 5.9 BFF: a lost rotation gets a fresh one (`token_delivered`); theft only once the successor was used
 - [x] 5.10 `lock_timeout` in the three migrations
+- [x] 5.11 Names: UTS #39 confusables skeleton (`unicode-security`), unmapped symbols and digits as wildcards, no mixed-script words
+- [x] 5.12 BFF: one reissue per lost rotation; concurrent requests go through within the new grace

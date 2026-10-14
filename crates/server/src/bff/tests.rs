@@ -753,6 +753,66 @@ async fn a_lost_rotation_gets_another_instead_of_a_sign_out(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_waking_page_reissues_once_and_stays_signed_in(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    // The rotation's response is lost.
+    assert!(
+        browser
+            .get("/bff/session")
+            .await
+            .set_cookie(SESSION)
+            .is_some()
+    );
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+
+    // The page wakes and fires several requests with the old cookie at once.
+    let mut tabs: Vec<Browser> = (0..4)
+        .map(|_| {
+            let mut tab = Browser::new(&h.app);
+            tab.jar.insert(SESSION.to_owned(), old.clone());
+            tab
+        })
+        .collect();
+    let replies =
+        futures_util::future::join_all(tabs.iter_mut().map(|tab| tab.get("/bff/session"))).await;
+    for reply in &replies {
+        assert_eq!(reply.json()["authenticated"], true, "{}", reply.body);
+    }
+    let fresh: Vec<&Browser> = tabs
+        .iter()
+        .filter(|tab| tab.cookie(SESSION) != Some(old.as_str()))
+        .collect();
+    assert_eq!(fresh.len(), 1, "one reissue");
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        1,
+        "only the lost cookie is retired"
+    );
+    let mut woken = Browser::new(&h.app);
+    woken.jar.insert(
+        SESSION.to_owned(),
+        fresh[0].cookie(SESSION).unwrap().to_owned(),
+    );
+    assert_eq!(
+        woken.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert!(h.idp.revoked_tokens().is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn a_cookie_rotations_old_still_ends_the_session(db: PgPool) {
     let h = harness(db).await;
     let mut browser = Browser::new(&h.app);

@@ -201,22 +201,27 @@ pub async fn delivered(db: &PgPool, id: Uuid, hash: &[u8]) -> sqlx::Result<()> {
 /// The browser still presents the previous token `previous_hash` because
 /// the current one never reached it: issue `new_hash` in its place. The
 /// undelivered token is retired (presented later, it is a copy) and the
-/// previous one keeps its grace. `false` when the current token has been
-/// delivered meanwhile, or another request did this first.
+/// previous one starts a new grace (`rotated_at` = `now`). Only once the
+/// previous token is past its grace (rotated at or before `grace_since`):
+/// `false` when another request presenting it reissued first (it is within
+/// the new grace), or the current token was delivered meanwhile.
 pub async fn reissue(
     db: &PgPool,
     id: Uuid,
     previous_hash: &[u8],
     new_hash: &[u8],
     now: DateTime<Utc>,
+    grace_since: DateTime<Utc>,
 ) -> sqlx::Result<bool> {
     let mut tx = db.begin().await?;
     let Some(undelivered) = sqlx::query_scalar!(
         "SELECT token_hash FROM bff.sessions
           WHERE id = $1 AND previous_token_hash = $2 AND NOT token_delivered
+            AND rotated_at <= $3
           FOR UPDATE",
         id,
         previous_hash,
+        grace_since,
     )
     .fetch_optional(&mut *tx)
     .await?

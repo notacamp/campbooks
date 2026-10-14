@@ -72,6 +72,9 @@ icu_normalizer = "2.3.0"
 # Unicode general categories (marks of every script) for look-alike app
 # names (identity); already in the graph through url -> idna.
 icu_properties = "2.3.0"
+# UTS #39 confusables skeletons and mixed-script detection for look-alike app
+# names (identity).
+unicode-security = "0.1.2"
 
 # Errors, observability, misc
 thiserror = "2.0.21"

@@ -439,6 +439,10 @@ count as rotated away.
 - **WHEN** a rotation's response is lost and the browser presents its old cookie three minutes later
 - **THEN** it stays signed in with a fresh cookie, nothing is revoked, and the lost cookie, presented later, ends the session
 
+#### Scenario: A waking page fires several requests
+- **WHEN** two requests present the same old cookie at once after a lost rotation
+- **THEN** one gets a fresh cookie, the other goes through within the grace, and the session stays signed in
+
 #### Scenario: A copy two rotations old
 - **WHEN** a session rotated twice while in use and a copy of its first cookie is presented
 - **THEN** the session ends the same way
@@ -446,12 +450,15 @@ count as rotated away.
 ### Requirement: Names that read as Campbooks
 Before deciding whether an app's name reads as Campbooks or Not A Camp, the
 server SHALL decompose it for compatibility (NFKD), drop every mark
-(general category M, in any script), split ligatures, and fold case,
-spacing, look-alike punctuation and letters (Cyrillic, Greek, small
-capitals, letters with a stroke, `rn` for `m`), so full-width, mathematical,
-circled and accented variants count too; any other letter outside ASCII
-SHALL count as any letter, but a match SHALL rest on at most two such
-letters, so a name in another script is not refused for its length alone.
+(general category M, in any script), reduce it to its UTS #39 confusables
+skeleton and fold case, spaces and punctuation, so full-width, mathematical,
+circled, accented and other scripts' look-alike variants count too; any
+other letter, digit or symbol outside ASCII nothing maps SHALL count as any
+character, but a match SHALL rest on at most two of them, so a name in
+another script is not refused for its length alone. A word of an app's name
+SHALL NOT mix scripts beyond UTS #39's "highly restrictive" level (400
+`client_name_mixed_scripts` for a workspace's app; a self-registered agent
+is shown under its redirect host).
 
 #### Scenario: A full-width name
 - **WHEN** a workspace registers an app named `Ｃａｍｐｂｏｏｋｓ` or `Cámpbooks`
@@ -460,6 +467,14 @@ letters, so a name in another script is not refused for its length alone.
 #### Scenario: Letters with no decomposition
 - **WHEN** a workspace registers an app named `Campbøøks` or `ᴄᴀᴍᴘʙᴏᴏᴋꜱ`
 - **THEN** the answer is 400 `client_name_reserved`
+
+#### Scenario: Homoglyphs of other scripts
+- **WHEN** a workspace registers an app named `Cɑmpbօօks`, `ᏟᎪᎷᏢᏴOOᏦᏚ` or `Campb○○ks`
+- **THEN** it is refused (`client_name_reserved`)
+
+#### Scenario: A word mixing scripts
+- **WHEN** a workspace registers an app named `Pаyroll sync` with a Cyrillic `а`
+- **THEN** the answer is 400 `client_name_mixed_scripts`
 
 #### Scenario: Other scripts
 - **WHEN** a workspace registers an app named `メールアシスタントプロ`, `José` or `Françoise`
