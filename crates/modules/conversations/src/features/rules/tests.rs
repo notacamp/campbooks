@@ -656,16 +656,19 @@ async fn a_thousand_lookalikes_taught_once(db: PgPool) {
     let created = kit.post(&sam, &rules, Some(move_github())).await;
     let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
     println!(
-        "Rule created ({}), run of {} started",
-        created.json["rule"]["state"].as_str().unwrap_or_default(),
-        created.json["rule"]["run"]["total"]
+        "Rule created ({}); its run counts and moves them in the background",
+        created.json["rule"]["state"].as_str().unwrap_or_default()
     );
     kit.run_jobs().await;
+    let rule_now = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+        .await;
+    println!("  counted: {}", rule_now.json["run"]["total"]);
     for event in kit.events("conversations.rule_changed").await {
-        println!(
-            "  progress: {} of {} done",
-            event["run"]["done"], event["run"]["total"]
-        );
+        let done = &event["run"]["done"];
+        if done.as_i64().unwrap_or_default() > 0 {
+            println!("  progress: {done} of {} done", event["run"]["total"]);
+        }
     }
     println!(
         "Now: {} in Primary, {} in Updates",
