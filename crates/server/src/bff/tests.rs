@@ -996,7 +996,7 @@ async fn an_expiring_access_token_is_refreshed_and_the_refresh_token_rotates(db:
         .await
         .unwrap();
 
-    // Not due: no refresh (Rauthy would end the session on an early one).
+    // Not due: no refresh (some issuers end the session on an early one).
     browser.get("/bff/api/v1/test/whoami").await;
     assert_eq!(h.idp.refreshes(), 0);
 

@@ -85,7 +85,10 @@ tracked as a sub-issue of campbooks-cloud#75:
 4. **S3** (#80): passkeys.
 5. **S4** (#81): native apps, workspace clients, consent, DCR and client
    metadata documents for MCP agents.
-6. **S5** (#82): Rauthy removed and staging cut over.
+6. **S5** (#82): Rauthy removed and staging cut over. Done: the compose
+   services, `deploy/idp/` and the Rauthy docs are gone. Pointing
+   `CAMPBOOKS_AUTH__ISSUER` at an outside OIDC issuer remains possible, but
+   nothing is provisioned for it (OpenSpec change `remove-rauthy`).
 
 After S1a, S2–S5 can proceed in parallel. The OpenID conformance suite runs
 against staging, then security review #57, before production.

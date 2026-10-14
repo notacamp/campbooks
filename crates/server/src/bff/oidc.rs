@@ -1,10 +1,10 @@
 //! The BFF's side of OIDC: discovery, the authorization request,
 //! and the token, refresh, revocation and end-session endpoints, as a
-//! confidential client authenticating with `client_secret_post` (the method
-//! Rauthy accepts for every grant).
+//! confidential client authenticating with `client_secret_post` (the most widely
+//! supported method).
 //!
 //! The browser and the server may reach the IdP at different addresses (in
-//! docker compose the server uses `http://idp:8080`): the authorization and
+//! a container network the server uses an internal URL): the authorization and
 //! end-session URLs are the public ones from discovery, while discovery,
 //! token and revocation requests go to the internal issuer.
 //!

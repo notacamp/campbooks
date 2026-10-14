@@ -4,9 +4,8 @@
 //! The issuer runs **in this process** when the instance has a secret key
 //! (`CAMPBOOKS_SECRET_KEY[_FILE]`) and no other identity provider is
 //! configured (`CAMPBOOKS_AUTH__ISSUER` unset, or set to this instance's
-//! public origin). Until Rauthy is removed (ADR 0014, slice S5), an install
-//! whose `CAMPBOOKS_AUTH__ISSUER` names Rauthy keeps using it, and every
-//! identity endpoint answers 404.
+//! public origin). An install whose `CAMPBOOKS_AUTH__ISSUER` names an outside
+//! issuer keeps using it, and every identity endpoint answers 404.
 
 use std::{path::PathBuf, sync::Arc};
 
@@ -161,7 +160,7 @@ impl Deps {
             .issuer()
             .is_some_and(|issuer| issuer.trim_end_matches('/') != url)
         {
-            // Another identity provider (Rauthy) is configured.
+            // Another identity provider is configured.
             return Ok(Self::default());
         }
         let Some(secret) = secret else {
@@ -401,7 +400,7 @@ mod tests {
         .unwrap();
         assert!(same.issuer.is_some());
 
-        let rauthy = deps(
+        let outside = deps(
             &config(
                 "https://app.example.com",
                 Some("https://auth.example.com/auth/v1/"),
@@ -410,7 +409,7 @@ mod tests {
             &serde_json::json!({}),
         )
         .unwrap();
-        assert!(rauthy.issuer.is_none());
+        assert!(outside.issuer.is_none());
 
         let no_secret = deps(
             &config("https://app.example.com", None),
@@ -596,10 +595,10 @@ mod tests {
                 .is_some()
         );
         // Another identity provider: this check is not ours to make.
-        let mut rauthy = config("http://app.example.com", Some("http://auth.example.com/"));
-        rauthy.env = Environment::Production;
+        let mut outside = config("http://app.example.com", Some("http://auth.example.com/"));
+        outside.env = Environment::Production;
         assert!(
-            deps(&rauthy, KEY, &serde_json::json!({}))
+            deps(&outside, KEY, &serde_json::json!({}))
                 .unwrap()
                 .issuer
                 .is_none()
