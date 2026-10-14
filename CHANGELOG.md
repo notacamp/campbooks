@@ -17,6 +17,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   sorting to the rules. Admin → System shows where each role is and whether it
   receives mail. **Self-hosters using a hosted provider:** add the opt-in for
   each such role, or it stops being used after this upgrade.
+- Campbooks no longer follows HTTP redirects from AI providers, Gmail, Zoho
+  or the identity provider's key endpoint: a redirect could have carried mail
+  or tokens to another host. A 3xx is reported as an error.
 - Errors no longer carry mail: an AI provider's error body is not kept, and
   logs and failed jobs describe database and JSON errors by kind and position
   (SQLSTATE, constraint, table), never the values they quote.

@@ -590,3 +590,37 @@ async fn instruct_answers_outside_the_schema_are_invalid() {
         );
     }
 }
+
+/// An endpoint on the instance's network that answers 307 to another host.
+async fn redirecting_to(elsewhere: &MockServer) -> MockServer {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(307)
+                .insert_header("location", format!("{}/v1/systemone", elsewhere.uri())),
+        )
+        .mount(&server)
+        .await;
+    server
+}
+
+#[tokio::test]
+async fn decide_never_follows_a_redirect_off_the_box() {
+    for protocol in [Protocol::Laya, Protocol::OpenAi] {
+        let elsewhere = MockServer::start().await;
+        let server = redirecting_to(&elsewhere).await;
+        let provider = match protocol {
+            Protocol::Laya => laya(&server),
+            Protocol::OpenAi => instruct(&server),
+        };
+        let err = gateway(provider)
+            .decide(&CTX, &state(), &questions())
+            .await
+            .unwrap_err();
+        assert!(matches!(err, Error::Status { status: 307 }), "{err:?}");
+        assert!(
+            elsewhere.received_requests().await.unwrap().is_empty(),
+            "{protocol:?}: the mail went to the redirect target"
+        );
+    }
+}

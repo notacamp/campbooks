@@ -220,3 +220,39 @@ async fn malformed_response_is_invalid_response() {
         .await;
     assert!(matches!(err, Err(Error::InvalidResponse(_))));
 }
+
+#[tokio::test]
+async fn chat_and_embed_never_follow_a_redirect_off_the_box() {
+    let elsewhere = MockServer::start().await;
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(308)
+                .insert_header("location", format!("{}/v1/x", elsewhere.uri())),
+        )
+        .mount(&server)
+        .await;
+    let gw = gateway([
+        (Role::Complete, provider(&server, "m", None)),
+        (Role::Embed, provider(&server, "e", None)),
+    ]);
+    let chat = gw
+        .chat(
+            Role::Complete,
+            ChatRequest::new(vec![Message::user("Subject: Q4 plan")]),
+        )
+        .await;
+    assert!(
+        matches!(chat, Err(Error::Status { status: 308 })),
+        "{chat:?}"
+    );
+    let embed = gw.embed(&["Subject: Q4 plan".into()]).await;
+    assert!(
+        matches!(embed, Err(Error::Status { status: 308 })),
+        "{embed:?}"
+    );
+    assert!(
+        elsewhere.received_requests().await.unwrap().is_empty(),
+        "the mail went to the redirect target"
+    );
+}

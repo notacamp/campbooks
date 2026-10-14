@@ -50,6 +50,14 @@ when `decide` is not configured. Nothing is undone because nothing was sent.
 A single-label name can be made to resolve elsewhere through a search
 domain; that is a deliberate operator setup and documented.
 
+### No redirects on any client that carries content or tokens
+
+An on-network endpoint answering 307/308 to an outside host would make
+reqwest re-send the POST (and the mail in it) there. The AI gateway's client,
+the connectors' provider client (Gmail, Zoho) and the kernel's JWKS client
+use `redirect::Policy::none()`; the BFF, the upstream identity client and
+the client-metadata fetch already did. A 3xx is an error like any other.
+
 ### The opt-in is per role and defaults to deny
 
 `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow|deny` (blank = deny). A role

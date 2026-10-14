@@ -12,7 +12,9 @@ instance's network when its host is a loopback or private address
 (`10/8`, `172.16/12`, `192.168/16`, `fc00::/7`), `localhost` or a
 `.localhost` name, a single-label name, or a name listed in
 `CAMPBOOKS_AI__INTERNAL_HOSTS` (exactly, or under a `.domain` entry), and as
-external otherwise, without consulting DNS. The system SHALL NOT send mail
+external otherwise, without consulting DNS. The AI gateway SHALL NOT follow
+HTTP redirects: a 3xx answer is a provider error, and nothing is sent to the
+redirect target. The system SHALL NOT send mail
 content (chat, embeddings or decide requests) to an external role unless
 `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`; such a call SHALL fail with
 the problem code `ai_external_content_refused` before any request is made.
@@ -29,6 +31,10 @@ Health probes, which carry no content, SHALL run for every configured role.
 #### Scenario: Opted in
 - **WHEN** `CAMPBOOKS_AI__COMPLETE__BASE_URL` is a hosted endpoint and `CAMPBOOKS_AI__COMPLETE__EXTERNAL_CONTENT=allow`
 - **THEN** calls of the `complete` role are sent to it
+
+#### Scenario: On-network endpoint redirects elsewhere
+- **WHEN** a role's on-network endpoint answers 307 or 308 pointing at another host
+- **THEN** the call fails with that status and the other host receives nothing
 
 #### Scenario: Stray opt-in
 - **WHEN** `CAMPBOOKS_AI__COMPLETE__EXTERNAL_CONTENT=allow` is set but the role has no base URL and no model

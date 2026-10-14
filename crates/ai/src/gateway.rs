@@ -320,6 +320,11 @@ impl Gateway {
         let http = Client::builder()
             .connect_timeout(connect_timeout)
             .timeout(request_timeout)
+            // Never follow a redirect: an endpoint on the instance's network
+            // answering 307 to an outside host would otherwise have us POST
+            // the mail there, past the external-content check. A 3xx is an
+            // `Error::Status` like any other non-success answer.
+            .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {

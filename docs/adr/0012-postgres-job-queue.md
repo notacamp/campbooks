@@ -108,9 +108,11 @@ Build our own queue in the kernel.
   `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS` (30) by the hourly
   `kernel.prune_jobs` schedule. *Amended 2026-10-14:* the event log is
   pruned too, after `CAMPBOOKS_EVENTS__RETENTION_DAYS` (90) by
-  `kernel.prune_events`, never while a delivery is pending, so a replay
-  reaches back that far; a purged workspace loses its events and finished
-  jobs. History that outlives its use is a privacy cost, and a projection
+  `kernel.prune_events`, never while a delivery is pending. **Replay is
+  therefore limited to the retention window** (90 days by default):
+  `ReplayFrom::Beginning` means the oldest event still kept, and a consumer
+  added later cannot be fed older history from the log. A purged workspace
+  loses its events and finished jobs. History that outlives its use is a privacy cost, and a projection
   that needs more than 90 days rebuilds from its module's own tables.
 - **Leases:** a claim leases the job for `CAMPBOOKS_JOBS__LEASE_SECONDS`,
   renewed every third of that while it runs; workers reclaim expired leases.
