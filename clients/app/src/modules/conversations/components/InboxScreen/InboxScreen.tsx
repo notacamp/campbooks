@@ -103,19 +103,26 @@ export function InboxScreen({
 
   const current = conversationId ?? cursor ?? ids[0];
   const step = (by: number) => {
-    // The first J or K in a list lands on its first row.
+    // The first J or ↓ in a list lands on its first row.
     const index =
       current === undefined || (conversationId === undefined && cursor === undefined)
         ? -by
         : ids.indexOf(current);
+    // Moving past the last row loaded asks for the next page.
+    if (by > 0 && index + by >= ids.length && list.hasNextPage && !list.isFetchingNextPage) {
+      void list.fetchNextPage();
+    }
     const next = ids[Math.min(ids.length - 1, Math.max(0, index + by))];
     if (next === undefined) {
       return;
     }
+    // Not every environment scrolls (tests run without layout).
+    const row: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+      document.getElementById(rowId(next));
+    row?.scrollIntoView?.({ block: "nearest" });
     if (conversationId === undefined) {
       setCursor(next);
-      document.getElementById(rowId(next))?.scrollIntoView({ block: "nearest" });
-    } else {
+    } else if (next !== conversationId) {
       open(next);
     }
   };
@@ -139,8 +146,8 @@ export function InboxScreen({
   const listConversation = (id: string | undefined) =>
     loaded?.find((conversation) => conversation.id === id);
 
-  // In the list (no conversation open): J/K move the cursor, Enter opens,
-  // and the item shortcuts act on the row under the cursor.
+  // In the list (no conversation open): J/K or ↓/↑ move the cursor, Enter
+  // opens, and the item shortcuts act on the row under the cursor.
   const listActive = conversationId === undefined;
   useShortcut(
     "list.next",
@@ -271,7 +278,7 @@ export function InboxScreen({
             </EmptyState>
             <div className="flex w-full max-w-measure flex-col">
               {READER_HINTS.map((id) => (
-                <Line key={id} trailing={<KbdHint shortcut={id} announce />}>
+                <Line key={id} trailing={<KbdHint shortcut={id} withAlternates announce />}>
                   {tShortcuts(id)}
                 </Line>
               ))}

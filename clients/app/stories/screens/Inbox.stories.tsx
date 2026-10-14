@@ -121,6 +121,30 @@ export const KeyboardCursor: Story = {
   },
 };
 
+/**
+ * ↓ and ↑ move the cursor like J and K, and Enter opens the row under it.
+ * In the open conversation the arrows are the browser's again (they scroll
+ * the message): J and K step between conversations.
+ */
+export const ArrowKeys: Story = {
+  args: { path: `${PATH}/primary`, api: inbox() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText(Q4.subject);
+    const row = (id: string) => canvasElement.querySelector(`#conversation-${id}`);
+
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{ArrowUp}");
+    // Q4, the NDA, the Ledger, then back up to the NDA.
+    await expect(row(PRIMARY[1]?.id ?? "")).toHaveAttribute("data-selected", "true");
+
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(await canvas.findByTitle("Message from The Weekly Ledger")).toBeVisible();
+
+    await userEvent.keyboard("{ArrowDown}");
+    await expect(row(LEDGER.id)).toHaveAttribute("aria-current", "true");
+  },
+};
+
 /** A thread: the newest message open in its sandboxed frame, older ones folded. */
 export const Thread: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
