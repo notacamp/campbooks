@@ -461,10 +461,11 @@ One OpenSpec change. Built in this order, each step testable on its own:
 5. Client: the offer, progress and Undo, the row and reader lines, the
    exception question, Settings → Scout's memory.
 
-If the PR grows too large, it splits into two stacked changes with their own
-spec slices: (1)–(4) `taught-rules` (backend, terminal recording) and (5)
-`teach-once-ui` (375px and desktop recording), agreed with the coordinator
-first.
+Agreed with the coordinator (2026-10-14): two stacked changes, each with its
+own spec slice, recording and gates. This change, `taught-rules`, is steps
+(1)–(4) (backend, terminal recording). `teach-once-ui` is step (5) (the
+client, 375px and desktop recording), on top of it. The design above covers
+both; the UI change's spec deltas are `inbox-ui` and `memory-ui`.
 
 ## Risks
 
@@ -484,7 +485,8 @@ first.
 ## Open questions for the owner
 
 Each has a recommended default; the implementation follows the default
-unless the owner says otherwise.
+unless the owner says otherwise (the coordinator confirmed defaults 1 to 3
+on 2026-10-14).
 
 1. **When to offer.** Right after the first action (recommended: the owner's
    "at least after the first"), or only once the member has done the same
@@ -497,4 +499,7 @@ unless the owner says otherwise.
    only managers may teach?
 4. **The name in copy.** The shipped UI says "Campbooks"; the prototype says
    "Visor" for what the assistant did and "Scout's memory" for the page.
-   Which name does the assistant go by in these strings?
+   Default (coordinator, 2026-10-14): use the shipped client's vocabulary
+   ("Campbooks moved this", "How Campbooks decided"), with the assistant's
+   name held in one i18n key so a rename is one change. Which name should
+   these strings use?

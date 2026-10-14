@@ -3,6 +3,7 @@
 - [x] 0.1 Proposal, design with alternatives, spec deltas, visual prototype (https://claude.ai/artifact/2y7z5yvKsMpKC6nVTsPrw7)
 - [x] 0.2 Owner direction: one shared, deterministic rules system; don't wait for approval (open questions take their recommended defaults)
 - [x] 0.3 Shared rule model handed to #121 (compiles language and onboarding answers into these operations)
+- [x] 0.4 Split agreed with the coordinator: this change is the backend (PR A); the client is the stacked change `teach-once-ui` (PR B)
 
 ## 1. Engine (`campbooks-ai`)
 
@@ -32,18 +33,10 @@
 - [ ] 4.3 `suggest_rules` (likenesses broad → narrow, default by machine sender / List-Id / template, correspondents, thresholds) and `dismiss_rule_suggestion` (30 days, then for good); tests
 - [ ] 4.4 Terminal recording (vhs): create a rule over 1,000 demo conversations, watch progress, a new message handled on arrival, undo all
 
-## 5. Client
+## 5. Finish
 
-- [ ] 5.1 `lib/ui`: `Offer` (docked card / sheet with likeness radios, preview, actions), `Progress` bar, rule line on `ConversationRow`; stories and tests in light and dark with axe
-- [ ] 5.2 `conversations` module: the offer after M/E/U/X/label, accept (Y) / dismiss (Esc), progress from the feed, Undo all (Z), list refetch throttle; the reader note's rule line with Move back / Stop doing this; the exception toasts
-- [ ] 5.3 Settings → Scout's memory: rules per inbox as sentences (four locales), origins, Waiting for you (Y / Esc), Edit (likeness and actions with preview), Remove with put-back; shortcuts in the registry
-- [ ] 5.4 Strings in en, pt-PT, es-ES, fr
-
-## 6. Finish
-
-- [x] 6.1 `docs/domain-map.md`: taught rule, likeness, run, application, exception in conversations' language
-- [ ] 6.2 OpenAPI regenerated, client types regenerated, `openapi/events.json` regenerated
-- [ ] 6.3 CHANGELOG updated
-- [ ] 6.4 Gates green; migration duplicate check against `next`
-- [ ] 6.5 UI verified and recorded at 375px and desktop: teaching one email and the lookalikes moving
-- [ ] 6.6 Archive the change into `openspec/specs/`
+- [x] 5.1 `docs/domain-map.md`: taught rule, likeness, run, application, exception in conversations' language
+- [ ] 5.2 OpenAPI regenerated, client types regenerated, `openapi/events.json` regenerated
+- [ ] 5.3 CHANGELOG updated
+- [ ] 5.4 Gates green; migration duplicate check against `next`
+- [ ] 5.5 Archive the change into `openspec/specs/`

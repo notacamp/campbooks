@@ -26,9 +26,11 @@ Modules touched:
   stage, application on arrival and in bulk, exceptions, undo). No new module,
   no new cross-module dependency, no `architecture.toml` entry.
 - **`attention`**: understands a need cleared by a rule (cause `rule`).
-- **Client**: the offer after an action, the bulk apply with progress and
-  Undo, the "Visor moved this" line on rows and in the reader, the exception
-  question, and a Settings → Scout's memory page.
+- **Client**: nothing in this change. The offer after an action, the bulk
+  apply with progress and Undo, the line on handled rows, the exception
+  question and the Settings page that lists the rules are the stacked change
+  `teach-once-ui` (its own PR, on top of this one), built on the operations
+  defined here.
 
 ## What Changes
 
