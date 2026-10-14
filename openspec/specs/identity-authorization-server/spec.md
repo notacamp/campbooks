@@ -439,9 +439,15 @@ name no session or person.
 ### Requirement: Names that read as Campbooks
 Before deciding whether an app's name reads as Campbooks or Not A Camp, the
 server SHALL decompose it for compatibility (NFKD), drop combining marks,
-and fold case, spacing and look-alike punctuation, so full-width,
-mathematical, circled and accented variants count too.
+split ligatures, and fold case, spacing, look-alike punctuation and letters
+(Cyrillic, Greek, small capitals, letters with a stroke), so full-width,
+mathematical, circled and accented variants count too; any other letter
+outside ASCII SHALL count as any letter.
 
 #### Scenario: A full-width name
 - **WHEN** a workspace registers an app named `Ｃａｍｐｂｏｏｋｓ` or `Cámpbooks`
+- **THEN** the answer is 400 `client_name_reserved`
+
+#### Scenario: Letters with no decomposition
+- **WHEN** a workspace registers an app named `Campbøøks` or `ᴄᴀᴍᴘʙᴏᴏᴋꜱ`
 - **THEN** the answer is 400 `client_name_reserved`

@@ -29,6 +29,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 - The admin API asks for a sign-in from the last hour (was twelve hours), and
   app names that only look like "Campbooks" (full-width, accented, styled
   letters) are refused.
+- Upgrading: sign-ins waiting at the moment of the upgrade start again from
+  the app; refresh tokens of the native app (90 days) and of other apps (365
+  days) now end with the sign-in they came from (30 days), so those apps ask
+  to sign in again then; existing members' addresses that the identity
+  provider never verified stop showing until their next sign-in verifies
+  them; a mail server is only accepted over TLS (`smtps://` or
+  `smtp://…?tls=required`), except a relay on the same machine.
 - **Mail no longer goes to an AI provider outside your network unless you say
   so.** Each AI role's address is checked: a loopback or private address,
   `localhost`, a single-label name such as a compose service (`laya`,

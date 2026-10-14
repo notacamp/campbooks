@@ -24,3 +24,12 @@
 ## 4. Docs and generated
 - [x] 4.1 `deploy/.env.example`, `deploy/README.md` (Outgoing mail), CHANGELOG, ADR 0015 (one hour)
 - [x] 4.2 OpenAPI, events, client types, `.sqlx`
+
+## 5. Security review fixes
+- [x] 5.1 `PasskeyView.signed_up_with` (from `passkeys.added_via`, backfilled from account creation): the sign-up passkey is never "New"
+- [x] 5.2 Mail transport refuses plain or opportunistic SMTP unless loopback without credentials
+- [x] 5.3 `browser_hash` nullable (rollback-safe), table locked for the drop
+- [x] 5.4 Test: client credentials drop a stored scope above the ceiling
+- [x] 5.5 Retired BFF token hashes kept until the session ends (`bff.retired_tokens`)
+- [x] 5.6 Look-alike names: small capitals, stroked letters, ligatures; unknown letters as wildcards
+- [x] 5.7 `aria-expanded` on Sign out everywhere; CHANGELOG upgrade notes
