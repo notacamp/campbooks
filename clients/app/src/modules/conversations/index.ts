@@ -28,3 +28,9 @@ export { useInboxActions } from "./components/InboxScreen/use-inbox-actions";
 export { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 export { displayName, listTime } from "./model";
 export { isStream, type Stream } from "./api/queries";
+/**
+ * The rules slot of Scout's memory: the assistant module's page fills it
+ * (campbooks-cloud#121), so it has no caller here yet.
+ * @public
+ */
+export { RulesList } from "./components/Rules/RulesList";

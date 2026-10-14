@@ -1,0 +1,34 @@
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.track {
+  overflow: hidden;
+  block-size: var(--progress-height);
+  border-radius: var(--radius-full);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+}
+
+.fill {
+  display: block;
+  inline-size: calc(var(--progress, 0) * 100%);
+  block-size: 100%;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  transition: inline-size var(--duration-base) var(--ease-out);
+}
+
+.line {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill {
+    transition: none;
+  }
+}

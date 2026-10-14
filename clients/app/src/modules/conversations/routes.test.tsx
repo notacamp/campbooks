@@ -13,6 +13,8 @@ import {
   INBOX,
   LEDGER,
   LEDGER_DETAIL,
+  LEDGER_RULE,
+  LEDGER_SUGGESTIONS,
   ledgerBody,
   PRIMARY,
   Q4,
@@ -166,6 +168,73 @@ describe("the inbox", () => {
       (call) => call.route === `POST ${W}/conversations/${LEDGER.id}/stream`,
     );
     expect(moved?.body).toEqual({ stream: "newsletters" });
+  });
+
+  it("offers to do the same to every lookalike, then shows the rule's run with Undo all", async () => {
+    const api = inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/rule-suggestions`]: { body: LEDGER_SUGGESTIONS },
+      [`POST ${W}/inboxes/${INBOX.id}/rules`]: {
+        status: 201,
+        body: { rule: LEDGER_RULE, acted_without_asking: false },
+      },
+      [`GET ${W}/rules/${LEDGER_RULE.id}`]: { body: LEDGER_RULE },
+      [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },
+      [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: { body: { ...LEDGER_RULE, state: "removed" } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByRole("heading", { name: LEDGER.subject });
+
+    // Move it (the suggestion's 1), and the offer asks about the 40 like it.
+    fireEvent.keyDown(document, { key: "1" });
+    const offer = await screen.findByRole("dialog", {
+      name: "Move all 40 like this to Newsletters, and new ones too?",
+    });
+    expect(within(offer).getByText("What changes for freelancers in 2027")).toBeVisible();
+    expect(within(offer).getByText("None of them looks suspicious.")).toBeVisible();
+
+    // 1 accepts: the rule is made from the chosen likeness.
+    fireEvent.keyDown(document, { key: "1" });
+    expect(
+      await screen.findByRole("dialog", {
+        name: "Moved 40 to Newsletters. New ones will go there too.",
+      }),
+    ).toBeVisible();
+    const made = api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`);
+    expect(made?.body).toMatchObject({
+      conditions: LEDGER_SUGGESTIONS.suggestions[0]?.conditions,
+      actions: [{ action: "move_to_stream", stream: "newsletters" }],
+      apply_to_existing: true,
+      from_conversation_id: LEDGER.id,
+    });
+
+    // Undo all puts them back.
+    fireEvent.click(screen.getByRole("button", { name: "Undo all" }));
+    await waitFor(() => {
+      expect(
+        api.calls.some((call) => call.route === `DELETE ${W}/rules/${LEDGER_RULE.id}`),
+      ).toBe(true);
+    });
+  });
+
+  it("forgets the offer for this mail with Just this one", async () => {
+    const api = inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/rule-suggestions`]: { body: LEDGER_SUGGESTIONS },
+      [`POST ${W}/conversations/${LEDGER.id}/rule-suggestions/dismiss`]: { status: 204 },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByRole("heading", { name: LEDGER.subject });
+    fireEvent.keyDown(document, { key: "1" });
+    await screen.findByRole("dialog", { name: /Move all 40/u });
+    fireEvent.click(screen.getByRole("button", { name: /Just this one/u }));
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Move all 40/u })).toBeNull();
+    });
+    const dismissed = api.calls.find(
+      (call) => call.route === `POST ${W}/conversations/${LEDGER.id}/rule-suggestions/dismiss`,
+    );
+    expect(dismissed?.body).toEqual({ key: "sender|ledger" });
   });
 
   it("says when a conversation is gone, and when the list cannot load", async () => {

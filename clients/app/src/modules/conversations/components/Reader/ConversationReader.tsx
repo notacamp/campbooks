@@ -17,9 +17,11 @@ import {
   ReaderBody,
   SkeletonList,
   Spacer,
+  useUndoToast,
 } from "~/lib/ui";
 
 import { useConversation, type ConversationSummary, type Stream } from "../../api/queries";
+import { useRuleMutations } from "../../api/rules";
 import {
   avatarKind,
   displayName,
@@ -31,6 +33,7 @@ import {
 } from "../../model";
 import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
 import { NeedChips } from "../Needs/NeedChips";
+import { ruleLine, ruleSentence } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
@@ -84,7 +87,31 @@ export function ConversationReader({
   const detail = query.data;
   const conversation = detail?.conversation;
   const needActions = useNeedActions(workspaceId);
+  const ruleMutations = useRuleMutations(workspaceId);
+  const undoToast = useUndoToast();
   const need = conversation?.need ?? undefined;
+  const ruleMark = conversation?.rule ?? undefined;
+  /** "Stop doing this": remove the rule that handled it; Undo makes it again. */
+  const stopRule = () => {
+    if (ruleMark === undefined || conversation === undefined) {
+      return;
+    }
+    const sentence = ruleSentence(t, i18n.language, ruleMark);
+    ruleMutations.remove.mutate({ ruleId: ruleMark.id, restore: false });
+    undoToast.push({
+      label: t("rules.toast.stopped", { rule: sentence }),
+      undo: () => {
+        ruleMutations.create.mutate({
+          inboxId: conversation.inbox_id,
+          conditions: ruleMark.conditions,
+          actions: ruleMark.actions,
+          applyToExisting: false,
+        });
+      },
+    });
+  };
+  const footerLine = (summary: NonNullable<typeof conversation>) =>
+    ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
@@ -428,7 +455,16 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={suggestion === undefined ? "idle" : "unsure"}
-            footer={placementLine(t, conversation)}
+            footer={footerLine(conversation)}
+            {...(ruleMark === undefined
+              ? {}
+              : {
+                  actions: (
+                    <Button variant="ghost" onClick={stopRule}>
+                      {t("rules.reader.stop")}
+                    </Button>
+                  ),
+                })}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
@@ -521,7 +557,7 @@ export function ConversationReader({
                     </>
                   ),
                 })}
-            footer={placementLine(t, conversation)}
+            footer={footerLine(conversation)}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }

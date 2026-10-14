@@ -4,6 +4,7 @@ import { Button, ConversationRow, EmptyState, SkeletonList, Visor } from "~/lib/
 
 import type { ConversationSummary, Stream } from "../../api/queries";
 import { avatarKind, displayName, listTime, streamName, type Translate } from "../../model";
+import { ruleLine } from "../../rules-text";
 import { NeedChips } from "../Needs/NeedChips";
 
 export interface ConversationListProps {
@@ -97,7 +98,14 @@ export function ConversationList({
               )
             }
             suggestion={
-              suggestion === null || suggestion === undefined ? undefined : (
+              suggestion === null || suggestion === undefined ? (
+                conversation.rule === null || conversation.rule === undefined ? undefined : (
+                  <span className="inline-flex items-center gap-1-5">
+                    <Visor size="sm" />
+                    {ruleLine(t, conversation.rule, i18n.language)}
+                  </span>
+                )
+              ) : (
                 <span className="inline-flex items-center gap-1-5">
                   <Visor size="sm" />
                   {t("scout.suggestion", { stream: streamName(t, suggestion.stream) })}
