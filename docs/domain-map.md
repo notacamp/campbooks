@@ -216,6 +216,17 @@ Everything that arrives and leaves as a message. Email is the first
 - **Label** — the member's own mark on a conversation, mirrored with the
   provider when it has labels. _Avoid_: tag.
 - **Draft**, **Scheduled send**, **Signature**.
+- **Taught rule** — a deterministic condition → action pair a member taught
+  Campbooks for one inbox (from an action, an onboarding answer, their own
+  words, or corrections). It runs before any model, always gives the same
+  result for the same mail, and is listed in Scout's memory. "Rule" in the
+  UI. _Avoid_: habit, filter, inbox rule (automation's **Rule** builds on it
+  later).
+- **Likeness** — a taught rule's conditions, said in plain words ("from
+  notifications@github.com"). **Run** — one pass of a rule over existing
+  mail; **application** — one conversation it changed, with what it was
+  before; **exception** — a conversation a member changed back, which the
+  rule then leaves alone.
 
 **Publishes** `MessageReceived`, `MessageSent`, `MessageDecided` (the AI
 pass result), `ConversationSorted`, `AttachmentReceived`,
