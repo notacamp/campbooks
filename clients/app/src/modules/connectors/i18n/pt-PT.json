@@ -9,5 +9,34 @@
       "throttled": "Em pausa por momentos",
       "failing": "Sem sincronizar"
     }
+  },
+  "admin": {
+    "title": "Contas ligadas",
+    "loading": "A carregar as contas ligadas…",
+    "loadError": "Não foi possível carregar as contas ligadas.",
+    "retry": "Tentar novamente",
+    "none": "Nenhuma conta ligada neste espaço de trabalho.",
+    "health": {
+      "ok": "A sincronizar",
+      "needs_reauth": "O membro tem de voltar a ligar",
+      "throttled": "Abrandado pelo fornecedor",
+      "failing": "Com falhas"
+    },
+    "since": "desde {{date}}",
+    "provider": {
+      "google": "Google",
+      "zoho": "Zoho"
+    },
+    "capability": {
+      "messages": "Correio",
+      "calendar": "Calendário",
+      "files": "Ficheiros",
+      "bank": "Banco"
+    },
+    "lastSynced": "Última sincronização a {{date}}",
+    "neverSynced": "Ainda não sincronizado",
+    "paused": "Em pausa",
+    "failures_one": "{{count}} execução falhada seguida",
+    "failures_other": "{{count}} execuções falhadas seguidas"
   }
 }

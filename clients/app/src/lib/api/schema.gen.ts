@@ -7696,7 +7696,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account). */
+            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), or `account_suspended` (it verified, but an administrator suspended the account). */
             403: {
                 headers: {
                     [name: string]: unknown;

@@ -327,8 +327,9 @@ async fn take_ceremony(
             headers(("set-cookie" = String))),
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, or `passkey_not_accepted` (it did \
-            not verify, or it is no longer a way into any account).",
+        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted` (it did \
+            not verify, or it is no longer a way into any account), or `account_suspended` (it \
+            verified, but an administrator suspended the account).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -379,6 +380,11 @@ pub async fn sign_in(
             },
         )
         .map_err(not_accepted)?;
+    // Only now, with the holder proven, say why the account cannot sign in.
+    if accounts::is_suspended(&mut tx, passkey.account_id).await? {
+        tracing::info!("a suspended account tried to sign in with a passkey");
+        return Err(Error::Denied(MESSAGES.reason("account_suspended")));
+    }
     let reported = i64::from(verified.sign_count);
     if (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count {
         // A counter that does not move forward may mean a cloned

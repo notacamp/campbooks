@@ -9,5 +9,34 @@
       "throttled": "En pause un instant",
       "failing": "Ne se synchronise plus"
     }
+  },
+  "admin": {
+    "title": "Comptes connectés",
+    "loading": "Chargement des comptes connectés…",
+    "loadError": "Impossible de charger les comptes connectés.",
+    "retry": "Réessayer",
+    "none": "Aucun compte connecté dans cet espace de travail.",
+    "health": {
+      "ok": "Synchronisation en cours",
+      "needs_reauth": "Le membre doit le reconnecter",
+      "throttled": "Ralenti par le fournisseur",
+      "failing": "En échec"
+    },
+    "since": "depuis le {{date}}",
+    "provider": {
+      "google": "Google",
+      "zoho": "Zoho"
+    },
+    "capability": {
+      "messages": "E-mails",
+      "calendar": "Agenda",
+      "files": "Fichiers",
+      "bank": "Banque"
+    },
+    "lastSynced": "Dernière synchronisation le {{date}}",
+    "neverSynced": "Pas encore synchronisé",
+    "paused": "En pause",
+    "failures_one": "{{count}} échec d’affilée",
+    "failures_other": "{{count}} échecs d’affilée"
   }
 }

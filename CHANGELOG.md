@@ -44,6 +44,22 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Admin → People and Admin → Workspaces, for administrators (ADR 0015):
+  everyone who has signed in and every workspace, searchable and paged,
+  with a person's workspaces and roles, how they sign in (ways in, passkeys,
+  live sessions, last sign-in), and a workspace's members, pending
+  invitations (counted) and each connected mailbox's health and sync state.
+  Metadata only: no mail, subject or document is ever shown or counted.
+  Needs the `users.read` and `workspaces.read` admin permissions (`super`
+  has both).
+- Suspending an account (admin permission `users.suspend`): the person is
+  signed out everywhere at once (issuer sessions ended, refresh tokens
+  revoked, web sessions dropped) and cannot sign in again until unsuspended;
+  nothing else changes. Every suspension is recorded in the account's audit
+  trail. An administrator's account cannot be suspended until its admin
+  profile is revoked with `campbooks-server admin revoke`. Access tokens a
+  native app already holds stay valid until they expire (at most ten
+  minutes).
 - Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
   join an instance that approves new accounts and approve or reject each request
   (a rejection can carry a note only administrators see), and mint, copy once and

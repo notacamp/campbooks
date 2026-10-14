@@ -77,7 +77,7 @@ const SIGN_IN_ERRORS = [
   "invalid_state",
   "provider_unavailable",
   "login_failed",
-  "account_disabled",
+  "account_suspended",
   "way_in_belongs_to_another_account",
   "signup_invite_only",
 ] as const;

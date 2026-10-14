@@ -64,6 +64,8 @@
     "back": "Voltar ao Campbooks",
     "sections": {
       "system": "Sistema",
+      "people": "Pessoas",
+      "workspaces": "Espaços de trabalho",
       "signups": "Registos"
     },
     "menuEntry": "Administração",
