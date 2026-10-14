@@ -1,7 +1,7 @@
--- Wait at most 5 s for a lock (the seed briefly takes `inboxes` exclusively
+-- Wait at most 10 s for a lock (the seed briefly takes `inboxes` exclusively
 -- to lift and restore its forced row-level security): a busy instance fails
 -- this migration fast, and the next start retries it, rather than stalling.
-SET LOCAL lock_timeout = '5s';
+SET LOCAL lock_timeout = '10s';
 
 -- Needs for mail stored before attention existed (campbooks-cloud#123).
 --
@@ -14,7 +14,9 @@ SET LOCAL lock_timeout = '5s';
 CREATE TABLE conversations.needs_backfills (
     inbox_id uuid PRIMARY KEY REFERENCES conversations.inboxes (id) ON DELETE CASCADE,
     workspace_id uuid NOT NULL,
-    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending', 'running', 'done')),
+    -- `failed`: its page job ran out of attempts; the cursor says where.
+    state text NOT NULL DEFAULT 'pending'
+        CHECK (state IN ('pending', 'running', 'done', 'failed')),
     -- The last conversation id of the page done so far (pages go by id).
     after_id uuid,
     -- Conversations refreshed so far.
@@ -52,6 +54,23 @@ CREATE POLICY workspace_isolation ON conversations.needs_backfills USING
 CREATE POLICY maintenance_reads_backfills ON conversations.needs_backfills FOR SELECT
     USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL);
 CREATE POLICY maintenance_starts_backfills ON conversations.needs_backfills FOR UPDATE
-    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL);
+    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL)
+    WITH CHECK (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL
+                AND state = 'running');
+
+-- A row never moves to another inbox or workspace, whoever updates it.
+CREATE FUNCTION conversations.needs_backfills_keep_owner() RETURNS trigger
+    LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.inbox_id IS DISTINCT FROM OLD.inbox_id
+       OR NEW.workspace_id IS DISTINCT FROM OLD.workspace_id THEN
+        RAISE EXCEPTION 'needs_backfills rows keep their inbox and workspace'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END
+$$;
+CREATE TRIGGER needs_backfills_keep_owner BEFORE UPDATE ON conversations.needs_backfills
+    FOR EACH ROW EXECUTE FUNCTION conversations.needs_backfills_keep_owner();
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON conversations.needs_backfills TO campbooks_app;

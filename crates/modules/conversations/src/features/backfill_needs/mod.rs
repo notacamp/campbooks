@@ -24,12 +24,13 @@
 use std::time::Duration;
 
 use campbooks_kernel::{
-    Job, JobContext, JobError, JobHandler,
-    jobs::{self, EnqueueOptions},
+    EventBus, Job, JobContext, JobError, JobHandler,
+    jobs::{self, EnqueueOptions, Enqueued},
     tenancy::WorkspaceId,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use sqlx::{Connection as _, Postgres, Transaction};
 
 use crate::{
     domain::needs::{self, NeedSettings},
@@ -42,10 +43,13 @@ pub const EVERY: Duration = Duration::from_mins(1);
 /// Conversations refreshed per job.
 pub const PAGE: i64 = 100;
 
-/// Backfills started per tick.
-const DISPATCH_BATCH: i64 = 100;
+/// Backfills started, and running ones checked, per tick.
+const DISPATCH_BATCH: i64 = 500;
 
-/// The dispatcher tick: start every pending backfill.
+/// The dispatcher tick: start pending backfills, and give a running one
+/// whose page job is gone (lost, or failed before it could record the
+/// inbox as failed) its job again. Enqueueing a page that is already
+/// queued or running is a no-op (one job per inbox and cursor).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DispatchNeedsBackfills;
 
@@ -56,29 +60,43 @@ impl Job for DispatchNeedsBackfills {
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let tx = ctx.tx().await?;
-        let started = sqlx::query!(
+        sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
                 WHERE b.inbox_id IN (
                     SELECT inbox_id FROM conversations.needs_backfills
                      WHERE state = 'pending'
-                     ORDER BY created_at
+                     ORDER BY created_at, inbox_id
                      LIMIT $1
-                     FOR UPDATE SKIP LOCKED)
-            RETURNING b.inbox_id AS "inbox: InboxId", b.workspace_id AS "workspace: WorkspaceId",
-                      b.after_id AS "after: ConversationId""#,
+                     FOR UPDATE SKIP LOCKED)"#,
+            DISPATCH_BATCH,
+        )
+        .execute(&mut **tx)
+        .await?;
+        let running = sqlx::query!(
+            r#"SELECT inbox_id AS "inbox: InboxId", workspace_id AS "workspace: WorkspaceId",
+                      after_id AS "after: ConversationId"
+                 FROM conversations.needs_backfills
+                WHERE state = 'running'
+                ORDER BY created_at, inbox_id
+                LIMIT $1"#,
             DISPATCH_BATCH,
         )
         .fetch_all(&mut **tx)
         .await?;
-        for row in &started {
+        let mut queued = 0_usize;
+        for row in &running {
             let page = Page {
                 inbox: row.inbox,
                 after: row.after,
             };
-            jobs::enqueue_to::<BackfillNeeds>(tx, &page, page.options(row.workspace)).await?;
+            let enqueued =
+                jobs::enqueue_to::<BackfillNeeds>(tx, &page, page.options(row.workspace)).await?;
+            if matches!(enqueued, Enqueued::Created(_)) {
+                queued += 1;
+            }
         }
-        if !started.is_empty() {
-            tracing::info!(inboxes = started.len(), "needs backfills started");
+        if queued > 0 {
+            tracing::info!(inboxes = queued, "needs backfill pages queued");
         }
         Ok(())
     }
@@ -130,6 +148,7 @@ impl JobHandler for BackfillNeeds {
             .and_then(|w| w.parse().ok())
             .ok_or_else(|| JobError::fatal("needs backfill enqueued outside a workspace"))?;
         let events = ctx.state().events.clone();
+        let last_attempt = ctx.is_last_attempt();
         let tx = ctx.tx().await?;
         let current = sqlx::query!(
             r#"SELECT state, after_id AS "after: ConversationId"
@@ -138,7 +157,8 @@ impl JobHandler for BackfillNeeds {
         )
         .fetch_optional(&mut **tx)
         .await?;
-        // Gone with its inbox, finished, or this page was done already.
+        // Gone with its inbox, finished, failed, or this page was done
+        // already.
         let Some(current) = current else {
             return Ok(());
         };
@@ -146,6 +166,47 @@ impl JobHandler for BackfillNeeds {
             return Ok(());
         }
 
+        // The page in a savepoint: on the last attempt a failure is undone
+        // and the inbox recorded as failed at this cursor, rather than left
+        // running for ever.
+        let mut work = (**tx).begin().await?;
+        match self.page(&mut work, &events, workspace, page).await {
+            Ok(()) => {
+                work.commit().await?;
+                Ok(())
+            }
+            Err(error) if last_attempt => {
+                work.rollback().await?;
+                sqlx::query!(
+                    "UPDATE conversations.needs_backfills
+                        SET state = 'failed', finished_at = now()
+                      WHERE inbox_id = $1",
+                    page.inbox as InboxId,
+                )
+                .execute(&mut **tx)
+                .await?;
+                tracing::warn!(
+                    inbox = %page.inbox,
+                    error = %error,
+                    "needs backfill gave up on an inbox"
+                );
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
+    }
+}
+
+impl BackfillNeeds {
+    /// Refresh one page of the inbox's conversations, record the cursor and
+    /// enqueue the next page.
+    async fn page(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        events: &EventBus,
+        workspace: WorkspaceId,
+        page: Page,
+    ) -> Result<(), JobError> {
         // Recent conversations, and any whose need is open (an old one may
         // no longer be supported by its answers).
         let since = Utc::now() - self.needs.window;
@@ -167,7 +228,20 @@ impl JobHandler for BackfillNeeds {
         .await?;
         let ws = workspace.to_string();
         for id in &ids {
-            needs::refresh(tx, &events, &ws, *id, &self.needs).await?;
+            // One conversation that cannot be worked out is skipped, not the
+            // page: its own savepoint is undone, and the rest go on.
+            let mut one = (**tx).begin().await?;
+            match needs::refresh(&mut one, events, &ws, *id, &self.needs).await {
+                Ok(()) => one.commit().await?,
+                Err(error) => {
+                    one.rollback().await?;
+                    tracing::warn!(
+                        conversation = %id,
+                        error = error.code(),
+                        "needs backfill skipped a conversation"
+                    );
+                }
+            }
         }
 
         let last = ids.last().copied().or(page.after);

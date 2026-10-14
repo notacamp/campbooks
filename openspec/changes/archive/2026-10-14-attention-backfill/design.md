@@ -4,11 +4,22 @@
 
 - **`conversations.needs_backfills`** (schema `conversations`): one row per
   inbox, `inbox_id` (primary key, cascades with the inbox), `workspace_id`,
-  `state` (`pending`, `running`, `done`), `after_id` (the page cursor),
+  `state` (`pending`, `running`, `done`, `failed`), `after_id` (the page cursor),
   `refreshed`, timestamps. Forced row-level security per workspace, plus two
   narrow maintenance policies (`SELECT` and `UPDATE`) for transactions that
   set no workspace: the dispatcher reads ids and states and starts rows,
   and sees no content. Granted to the runtime role.
+- **Robustness**: each conversation is refreshed in its own savepoint, so
+  one that cannot be worked out is logged (its id and the error's code) and
+  skipped; the page runs in a savepoint too, and on the job's last attempt
+  a failure is undone and the row recorded `failed` at its cursor rather
+  than left `running`. Each tick also re-queues the page job of every
+  `running` row: enqueueing a page already queued or running is a no-op
+  (unique per inbox and cursor), so only a lost job comes back. The
+  maintenance `UPDATE` policy only lets the dispatcher set `state =
+  'running'`, and a trigger keeps every row's `inbox_id` and
+  `workspace_id`, whoever updates it. The migration sets `lock_timeout` to
+  10 s, so a busy instance fails it fast and the next start retries it.
 - **Jobs**: `conversations.dispatch_needs_backfills` (scheduled every
   minute, queue `maintenance`, no workspace) and
   `conversations.backfill_needs` (one page, queue `maintenance`, priority

@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "UPDATE conversations.needs_backfills b SET state = 'running'\n                WHERE b.inbox_id IN (\n                    SELECT inbox_id FROM conversations.needs_backfills\n                     WHERE state = 'pending'\n                     ORDER BY created_at\n                     LIMIT $1\n                     FOR UPDATE SKIP LOCKED)\n            RETURNING b.inbox_id AS \"inbox: InboxId\", b.workspace_id AS \"workspace: WorkspaceId\",\n                      b.after_id AS \"after: ConversationId\"",
+  "query": "SELECT inbox_id AS \"inbox: InboxId\", workspace_id AS \"workspace: WorkspaceId\",\n                      after_id AS \"after: ConversationId\"\n                 FROM conversations.needs_backfills\n                WHERE state = 'running'\n                ORDER BY created_at, inbox_id\n                LIMIT $1",
   "describe": {
     "columns": [
       {
@@ -48,5 +48,5 @@
       true
     ]
   },
-  "hash": "44a6a4f8dece26ee399f530497964adf8eaf7951d939113a4217a18c40758fa6"
+  "hash": "3e3f1fc2f1a37831ff5ccf02a77be8471d087d23a656c51bb27952dff690a541"
 }

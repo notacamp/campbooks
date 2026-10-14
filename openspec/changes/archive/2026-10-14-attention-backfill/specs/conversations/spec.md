@@ -9,7 +9,9 @@ open need, SHALL be refreshed as live mail is, from the messages and
 decisions already stored, in the conversation's workspace, a page at a time.
 No AI role and no rules strategy SHALL be asked. Each change SHALL publish
 `conversations.need_changed` as for live mail, and running it again SHALL
-change nothing.
+change nothing. A conversation whose need cannot be worked out SHALL be
+skipped without undoing the others, and an inbox whose page keeps failing
+SHALL be recorded as failed at its cursor, never left running.
 
 #### Scenario: Mail stored before the upgrade
 - **WHEN** an inbox holds a question from Marta answered by the rules before the upgrade, and the upgraded server starts
@@ -30,6 +32,10 @@ change nothing.
 #### Scenario: Another workspace
 - **WHEN** one workspace's inboxes are backfilled
 - **THEN** no other workspace's needs or events change
+
+#### Scenario: One conversation that cannot be worked out
+- **WHEN** one conversation's stored answers no longer decode
+- **THEN** it is skipped, the inbox's other conversations get their needs, and the inbox's backfill finishes
 
 #### Scenario: A question its answers no longer support
 - **WHEN** an inbox has an open `check` need whose message's accepted answers say it asks nothing

@@ -431,3 +431,91 @@ async fn an_open_question_its_answers_no_longer_support_is_withdrawn(db: PgPool)
     assert_eq!(events.len(), 1, "{events:?}");
     assert_eq!(events[0]["cleared_because"], "superseded");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_conversation_that_cannot_be_worked_out_is_skipped(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    // The bill's stored reasons no longer decode: its refresh fails.
+    sqlx::query(
+        "UPDATE conversations.decisions SET reasons = '\"not a list\"'
+          WHERE message_id = (SELECT id FROM conversations.messages
+                               WHERE provider_message_id = 'needs-3')",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    seed(&db).await;
+    tick(&kit).await;
+    let raised: Vec<String> = needs_of(&db, workspace)
+        .await
+        .into_iter()
+        .map(|(message, ..)| message)
+        .collect();
+    assert_eq!(raised, ["needs-1", "needs-2", "needs-4", "needs-5"]);
+    let state: String = sqlx::query_scalar("SELECT state FROM conversations.needs_backfills")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(state, "done");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_running_backfill_whose_job_is_gone_is_queued_again(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    before_attention(&db, workspace).await;
+    seed(&db).await;
+    // Started by a tick whose page job was then lost.
+    sqlx::query("UPDATE conversations.needs_backfills SET state = 'running'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let (kit, _model) = upgraded(&db, sorting_deps()).await;
+    tick(&kit).await;
+    assert_eq!(needs_of(&db, workspace).await.len(), 5);
+    // One page for one small inbox: no job was queued twice.
+    let pages: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.backfill_needs'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(pages, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    seed(&db).await;
+    // The dispatcher's context (no workspace) may only start rows.
+    let mut tx = kit.state.db.begin().await.unwrap();
+    let moved = sqlx::query(
+        "UPDATE conversations.needs_backfills SET state = 'running', workspace_id = $1",
+    )
+    .bind(WorkspaceId::new().as_uuid())
+    .execute(&mut *tx)
+    .await;
+    assert!(moved.is_err(), "moved to another workspace");
+    tx.rollback().await.unwrap();
+    let mut tx = kit.state.db.begin().await.unwrap();
+    let finished = sqlx::query("UPDATE conversations.needs_backfills SET state = 'done'")
+        .execute(&mut *tx)
+        .await;
+    assert!(finished.is_err(), "the dispatcher may only start rows");
+    tx.rollback().await.unwrap();
+    // Nor may the workspace's own jobs move a row.
+    let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace.to_string())
+        .await
+        .unwrap();
+    let moved =
+        sqlx::query("UPDATE conversations.needs_backfills SET inbox_id = gen_random_uuid()")
+            .execute(&mut *tx)
+            .await;
+    assert!(moved.is_err(), "moved to another inbox");
+}
