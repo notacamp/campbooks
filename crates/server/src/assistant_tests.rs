@@ -194,9 +194,7 @@ async fn do_it_and_tell_me_starts_scouts_next_proposal(db: PgPool) {
     let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
 
     // Ask first (the default): Scout's proposal waits for a yes.
-    let (status, waiting) = server
-        .call(&ines, "POST", &rules, Some(suggestion()))
-        .await;
+    let (status, waiting) = server.call(&ines, "POST", &rules, Some(suggestion())).await;
     assert_eq!(status, StatusCode::CREATED, "{waiting}");
     assert_eq!(waiting["rule"]["state"], "proposed");
     assert_eq!(waiting["acted_without_asking"], false);
@@ -222,9 +220,7 @@ async fn do_it_and_tell_me_starts_scouts_next_proposal(db: PgPool) {
         )
         .await;
     assert_eq!(status, StatusCode::OK, "{profile}");
-    let (status, started) = server
-        .call(&ines, "POST", &rules, Some(suggestion()))
-        .await;
+    let (status, started) = server.call(&ines, "POST", &rules, Some(suggestion())).await;
     assert_eq!(status, StatusCode::CREATED, "{started}");
     assert_eq!(started["rule"]["state"], "active");
     assert_eq!(started["acted_without_asking"], true);
@@ -255,10 +251,7 @@ async fn who_candidates_come_only_from_the_members_own_inboxes(db: PgPool) {
     let gateway = Gateway::new(AiConfig {
         roles: [(
             Role::Complete,
-            ProviderConfig::new(
-                format!("{}/v1", model.uri()).parse().unwrap(),
-                "test-model",
-            ),
+            ProviderConfig::new(format!("{}/v1", model.uri()).parse().unwrap(), "test-model"),
         )]
         .into(),
         ..AiConfig::default()
