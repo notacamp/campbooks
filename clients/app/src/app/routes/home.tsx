@@ -13,7 +13,9 @@ import {
   Tag,
   Text,
 } from "~/lib/ui";
+import { WhatNeedsYou } from "~/modules/attention";
 import { ConnectedMailboxes, useConnections } from "~/modules/connectors";
+import { useInboxes } from "~/modules/conversations";
 import { MailboxOffer, useHeldGrants } from "~/modules/identity";
 import { useWorkspaces } from "~/modules/workspaces";
 
@@ -56,10 +58,27 @@ function MailSection({ workspaceId }: { workspaceId: string }) {
 }
 
 /**
+ * A workspace's Home: what needs the user once they can see an inbox
+ * (attention), else the first-run Home.
+ */
+export function Home() {
+  const { workspaceId } = useParams({ strict: false });
+  const inboxes = useInboxes(workspaceId ?? "");
+  if (inboxes.isPending) {
+    // A moment, so neither Home flashes before the other.
+    return null;
+  }
+  if (inboxes.data !== undefined && inboxes.data.length > 0) {
+    return <WhatNeedsYou workspaceId={workspaceId ?? ""} />;
+  }
+  return <EmptyHome />;
+}
+
+/**
  * A workspace's Home before anything can need the user: says so, the mail
  * section, and the keyboard shortcuts that already work.
  */
-export function EmptyHome() {
+function EmptyHome() {
   const { t, i18n } = useTranslation();
   // Shortcut labels are namespaced keys only known at runtime.
   const translate = t as unknown as (key: string) => string;

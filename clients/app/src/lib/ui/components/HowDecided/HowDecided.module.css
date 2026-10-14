@@ -1,0 +1,39 @@
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-0-5) var(--space-3);
+  align-items: baseline;
+}
+
+.question {
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.answer {
+  grid-column: 1 / -1;
+  color: var(--text-secondary);
+}
+
+.source {
+  grid-row: 1;
+  grid-column: 2;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-tertiary);
+  text-align: right;
+}
+
+.footnote {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}

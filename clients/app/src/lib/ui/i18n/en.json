@@ -13,9 +13,7 @@
     "redone": "Redone: {{label}}"
   },
   "note": {
-    "label": "Where things stand",
-    "why": "Why?",
-    "hideWhy": "Hide why"
+    "label": "Where things stand"
   },
   "search": {
     "label": "Search or ask"
@@ -100,5 +98,8 @@
     "previewOf": "Preview {{name}}",
     "downloadOf": "Download {{name}}",
     "previewTitle": "Preview of {{name}}"
+  },
+  "howDecided": {
+    "title": "How Campbooks decided"
   }
 }

@@ -66,7 +66,12 @@ impl Recorded<'_> {
             let reasons: Vec<_> = decided
                 .reasons
                 .iter()
-                .map(|r| json!({"rule": r.rule, "evidence": r.evidence}))
+                .map(|r| match &r.sentence {
+                    Some(sentence) => {
+                        json!({"rule": r.rule, "evidence": r.evidence, "sentence": sentence})
+                    }
+                    None => json!({"rule": r.rule, "evidence": r.evidence}),
+                })
                 .collect();
             let latency_ms = i32::try_from(answer.latency.as_millis()).unwrap_or(i32::MAX);
             sqlx::query!(

@@ -13,9 +13,7 @@
     "redone": "Rehecho: {{label}}"
   },
   "note": {
-    "label": "Cómo están las cosas",
-    "why": "¿Por qué?",
-    "hideWhy": "Ocultar el porqué"
+    "label": "Cómo están las cosas"
   },
   "search": {
     "label": "Buscar o preguntar"
@@ -100,5 +98,8 @@
     "previewOf": "Vista previa de {{name}}",
     "downloadOf": "Descargar {{name}}",
     "previewTitle": "Vista previa de {{name}}"
+  },
+  "howDecided": {
+    "title": "Cómo decidió Campbooks"
   }
 }

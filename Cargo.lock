@@ -410,6 +410,7 @@ name = "campbooks-ai"
 version = "0.1.0"
 dependencies = [
  "campbooks-kernel",
+ "chrono",
  "figment",
  "opentelemetry",
  "opentelemetry_sdk",
@@ -425,6 +426,22 @@ dependencies = [
  "tracing-subscriber",
  "url",
  "wiremock",
+]
+
+[[package]]
+name = "campbooks-attention"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "campbooks-kernel",
+ "chrono",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
+ "tracing",
+ "utoipa",
+ "utoipa-axum",
 ]
 
 [[package]]
@@ -573,6 +590,7 @@ dependencies = [
  "base64 0.22.1",
  "campbooks-admin",
  "campbooks-ai",
+ "campbooks-attention",
  "campbooks-connectors",
  "campbooks-conversations",
  "campbooks-identity",

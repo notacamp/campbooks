@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO attention.items\n            (id, workspace_id, record_type, record_id, container_type, container_id,\n             cause_type, cause_id, latest_id, since, state, cleared_because,\n             cleared_by, cleared_at, producer_revision)\n        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'cleared', $11, $12, now(), $13)\n        ON CONFLICT (workspace_id, record_type, record_id) DO UPDATE\n           SET state = 'cleared', cleared_because = EXCLUDED.cleared_because,\n               cleared_by = EXCLUDED.cleared_by, cleared_at = now(),\n               latest_id = EXCLUDED.latest_id,\n               producer_revision = EXCLUDED.producer_revision, updated_at = now()\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Text",
+        "Timestamptz",
+        "Text",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "ea31881619ff93768fdac945ca94ada7e2d4838fc21f4e076d85d83ff72f93f4"
+}

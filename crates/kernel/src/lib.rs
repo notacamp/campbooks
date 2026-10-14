@@ -33,6 +33,7 @@ pub mod telemetry;
 pub mod tenancy;
 #[cfg(any(test, feature = "test-util"))]
 pub mod testing;
+pub mod text;
 
 pub use config::Config;
 pub use error::{Error, Problem, Result};

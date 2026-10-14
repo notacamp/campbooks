@@ -44,6 +44,13 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.star",
   },
   {
+    id: "conversations.resolve_need",
+    keys: "x",
+    scope: "item",
+    group: "item",
+    label: "conversations:shortcuts.notNeeded",
+  },
+  {
     id: "conversations.mark_unread",
     keys: "u",
     scope: "item",
