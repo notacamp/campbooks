@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT m.user_id AS \"user_id: UserId\", u.display_name, u.email, m.role, m.joined_at\n          FROM workspaces.members m\n          JOIN workspaces.users u ON u.id = m.user_id\n         WHERE m.workspace_id = $1 AND ($2::uuid IS NULL OR m.user_id = $2)\n         ORDER BY m.joined_at, m.user_id\n        ",
+  "query": "\n        SELECT m.user_id AS \"user_id: UserId\", u.display_name,\n               CASE WHEN u.email_verified THEN u.email END AS email, m.role, m.joined_at\n          FROM workspaces.members m\n          JOIN workspaces.users u ON u.id = m.user_id\n         WHERE m.workspace_id = $1 AND ($2::uuid IS NULL OR m.user_id = $2)\n         ORDER BY m.joined_at, m.user_id\n        ",
   "describe": {
     "columns": [
       {
@@ -29,12 +29,7 @@
         "ordinal": 2,
         "name": "email",
         "type_info": "Text",
-        "origin": {
-          "Table": {
-            "table": "workspaces.users",
-            "name": "email"
-          }
-        }
+        "origin": "Expression"
       },
       {
         "ordinal": 3,
@@ -68,10 +63,10 @@
     "nullable": [
       false,
       true,
-      true,
+      null,
       false,
       false
     ]
   },
-  "hash": "68031122c86f917f79dfd130ab5c62cc034d9e54c8b6834e77f5b56ba8d0f381"
+  "hash": "e4c3c1013040863a821d0387396724a61b85cd837de1cd4c7e59bd3fbe24337d"
 }

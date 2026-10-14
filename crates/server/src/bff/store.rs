@@ -31,6 +31,9 @@ pub struct Session {
     /// The cookie carried the current token (not the rotated-away one).
     pub current: bool,
     pub rotated_at: DateTime<Utc>,
+    /// The current token has been presented at least once since it was
+    /// issued.
+    pub token_delivered: bool,
     pub subject: String,
     pub name: Option<String>,
     pub email: Option<String>,
@@ -87,27 +90,26 @@ pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()>
     Ok(())
 }
 
-/// The live session whose current token, or whose previous token rotated
-/// away after `grace_since`, hashes to `hash`.
+/// The live session whose current token, or whose previous token, hashes
+/// to `hash`. [`Session::current`] says which; the caller decides whether a
+/// previous token is still within its grace (or a replay).
 pub async fn find_session(
     db: &PgPool,
     hash: &[u8],
     now: DateTime<Utc>,
-    grace_since: DateTime<Utc>,
 ) -> sqlx::Result<Option<Session>> {
     sqlx::query_as!(
         Session,
         r#"
-        SELECT id, token_hash = $1 AS "current!", rotated_at, subject, name, email,
+        SELECT id, token_hash = $1 AS "current!", rotated_at, token_delivered, subject, name, email,
                access_token, access_expires_at, last_seen_at, expires_at
           FROM bff.sessions
-         WHERE (token_hash = $1 OR (previous_token_hash = $1 AND rotated_at > $3))
+         WHERE (token_hash = $1 OR previous_token_hash = $1)
            AND idle_expires_at > $2
            AND expires_at > $2
         "#,
         hash,
         now,
-        grace_since,
     )
     .fetch_optional(db)
     .await
@@ -132,7 +134,9 @@ pub async fn touch(
 }
 
 /// Replace the session's token `old_hash` by `new_hash`, keeping the old one
-/// for the grace period. `false` when another request rotated it first.
+/// for the grace period and retiring the one before it (kept until the
+/// session ends, to recognise a copy). `false` when another request rotated
+/// it first.
 pub async fn rotate(
     db: &PgPool,
     id: Uuid,
@@ -140,10 +144,35 @@ pub async fn rotate(
     new_hash: &[u8],
     now: DateTime<Utc>,
 ) -> sqlx::Result<bool> {
-    let rotated = sqlx::query!(
+    let mut tx = db.begin().await?;
+    let Some(previous) = sqlx::query_scalar!(
+        "SELECT previous_token_hash FROM bff.sessions WHERE id = $1 AND token_hash = $2 FOR UPDATE",
+        id,
+        old_hash,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(false);
+    };
+    // The token before the previous one leaves the grace for good: kept, so
+    // a copy of it presented later is recognised.
+    if let Some(previous) = previous {
+        sqlx::query!(
+            "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
+             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            previous,
+            id,
+            now,
+        )
+        .execute(&mut *tx)
+        .await?;
+    }
+    sqlx::query!(
         r#"
         UPDATE bff.sessions
-           SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4
+           SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4,
+               token_delivered = false
          WHERE id = $1 AND token_hash = $2
         "#,
         id,
@@ -151,10 +180,113 @@ pub async fn rotate(
         new_hash,
         now,
     )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// Record that the session's current token `hash` reached the browser.
+pub async fn delivered(db: &PgPool, id: Uuid, hash: &[u8]) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE bff.sessions SET token_delivered = true WHERE id = $1 AND token_hash = $2",
+        id,
+        hash,
+    )
     .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// What [`reissue`] did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Reissue {
+    /// The new token replaced the undelivered one.
+    Reissued,
+    /// Another request presenting the same previous token reissued first:
+    /// this one is within the new grace.
+    WithinGrace,
+    /// The current token was presented meanwhile: the previous one coming
+    /// back now is a copy.
+    Delivered,
+    /// The previous token is no longer the session's previous one (a
+    /// rotation moved on, or the session ended).
+    Gone,
+}
+
+/// The browser still presents the previous token `previous_hash` because
+/// the current one never reached it: issue `new_hash` in its place, once the
+/// previous token is past its grace (rotated at or before `grace_since`).
+/// The undelivered token is retired (presented later, it is a copy) and the
+/// previous one starts a new grace (`rotated_at` = `now`), so concurrent
+/// requests with it reissue only once.
+pub async fn reissue(
+    db: &PgPool,
+    id: Uuid,
+    previous_hash: &[u8],
+    new_hash: &[u8],
+    now: DateTime<Utc>,
+    grace_since: DateTime<Utc>,
+) -> sqlx::Result<Reissue> {
+    let mut tx = db.begin().await?;
+    let Some(row) = sqlx::query!(
+        "SELECT token_hash, token_delivered, rotated_at FROM bff.sessions
+          WHERE id = $1 AND previous_token_hash = $2
+          FOR UPDATE",
+        id,
+        previous_hash,
+    )
+    .fetch_optional(&mut *tx)
     .await?
-    .rows_affected();
-    Ok(rotated == 1)
+    else {
+        return Ok(Reissue::Gone);
+    };
+    if row.token_delivered {
+        return Ok(Reissue::Delivered);
+    }
+    if row.rotated_at > grace_since {
+        return Ok(Reissue::WithinGrace);
+    }
+    sqlx::query!(
+        "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        row.token_hash,
+        id,
+        now,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE bff.sessions SET token_hash = $2, rotated_at = $3 WHERE id = $1",
+        id,
+        new_hash,
+        now,
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(Reissue::Reissued)
+}
+
+/// The live session a retired token (one rotated away before the previous
+/// one) belonged to.
+pub async fn retired_session(
+    db: &PgPool,
+    hash: &[u8],
+    now: DateTime<Utc>,
+) -> sqlx::Result<Option<Uuid>> {
+    sqlx::query_scalar!(
+        r#"
+        SELECT s.id
+          FROM bff.retired_tokens r
+          JOIN bff.sessions s ON s.id = r.session_id
+         WHERE r.token_hash = $1 AND s.idle_expires_at > $2 AND s.expires_at > $2
+        "#,
+        hash,
+        now,
+    )
+    .fetch_optional(db)
+    .await
 }
 
 /// The session's tokens, locked until `tx` ends; `None` if it is gone.

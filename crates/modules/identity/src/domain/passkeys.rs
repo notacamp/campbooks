@@ -47,13 +47,17 @@ pub struct Passkey {
     pub created_at: DateTime<Utc>,
     /// When it last signed someone in.
     pub last_used_at: Option<DateTime<Utc>>,
+    /// It was made with the account (a passkey-only sign-up), not added
+    /// later.
+    pub signed_up_with: bool,
 }
 
 /// The columns of a [`Passkey`].
 macro_rules! columns {
     () => {
         "id, account_id, credential_id, public_key, alg, sign_count, transports, \
-         backup_eligible, backup_state, name, created_at, last_used_at"
+         backup_eligible, backup_state, name, created_at, last_used_at, \
+         added_via = 'sign_up' AS signed_up_with"
     };
 }
 
@@ -92,21 +96,24 @@ pub async fn create_account(
     Ok(())
 }
 
-/// Store `credential` as a way into `account`, named `name`. `None` when
-/// that credential id is already registered (to anyone).
+/// Store `credential` as a way into `account`, named `name`, made with the
+/// account when `signed_up_with` (a passkey-only sign-up). `None` when that
+/// credential id is already registered (to anyone).
 pub async fn insert(
     conn: &mut PgConnection,
     account: Uuid,
     credential: &NewCredential,
     name: &str,
+    signed_up_with: bool,
     now: DateTime<Utc>,
 ) -> Result<Option<Uuid>> {
     let id = Uuid::now_v7();
     let inserted = sqlx::query(
         "INSERT INTO identity.passkeys
              (id, account_id, credential_id, public_key, alg, sign_count, aaguid, transports,
-              backup_eligible, backup_state, name, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+              backup_eligible, backup_state, name, created_at, added_via)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+                 CASE WHEN $13 THEN 'sign_up' ELSE 'passkey' END)
          ON CONFLICT (credential_id) DO NOTHING",
     )
     .bind(id)
@@ -121,6 +128,7 @@ pub async fn insert(
     .bind(credential.backup_state)
     .bind(name)
     .bind(now)
+    .bind(signed_up_with)
     .execute(conn)
     .await?
     .rows_affected();

@@ -25,6 +25,8 @@ use regex::Regex;
 use serde::Deserialize;
 
 use super::auth_results;
+use super::inbox::Hints;
+pub use super::inbox::Recipient;
 use crate::{
     Error,
     decide::{
@@ -52,7 +54,11 @@ pub mod triage {
 }
 
 /// The triage questions, worded for a `decide` model. The labels and their
-/// meaning follow `crates/ai/evals/decide/mail-triage/LABELLING.md`.
+/// meaning follow `crates/ai/evals/decide/mail-triage/LABELLING.md`. `noul`
+/// questions are yes/no questions, the form Laya documents; a declarative
+/// statement got the same answer as its negation (campbooks-cloud#128).
+/// Changing a wording changes what the model reads: bump
+/// [`super::inbox::CONTEXT_VERSION`] with it.
 pub fn triage_questions() -> Vec<Question> {
     vec![
         Question::choice(
@@ -83,18 +89,19 @@ pub fn triage_questions() -> Vec<Question> {
         ),
         Question::noul(
             triage::NEEDS_REPLY,
-            "The sender expects a written reply from the recipient.",
+            "Does the sender expect the recipient to write back?",
         ),
         Question::noul(
             triage::ASKS_ACTION,
-            "The sender asks the recipient to do something, such as reply, pay, sign, send, \
-             review, confirm or renew. Marketing calls to action and \"if this wasn't you\" notes \
-             do not count.",
+            "Does the sender ask the recipient to do something, such as pay, sign, send, review, \
+             confirm or renew? Marketing calls to action and \"if this wasn't you\" notes do not \
+             count.",
         ),
         Question::noul(
             triage::HAS_DEADLINE,
-            "The email gives a time by which the recipient must act, or after which something \
-             affecting them lapses. A meeting time alone or a sale ending does not count.",
+            "Does the email give a date or time by which the recipient must act, or after which \
+             something affecting them lapses? A meeting time alone or a sale ending does not \
+             count.",
         ),
         Question::score(
             triage::URGENCY,
@@ -107,8 +114,9 @@ pub fn triage_questions() -> Vec<Question> {
         ),
         Question::noul(
             triage::SUSPICIOUS,
-            "The email is phishing, a scam or an impersonation (a look-alike sender domain, \
-             credentials or payment asked for through a link, an urgent transfer or gift cards).",
+            "Is this email phishing, a scam or an impersonation, such as a look-alike sender \
+             domain, credentials or payment asked for through a link, an urgent transfer or gift \
+             cards?",
         ),
     ]
 }
@@ -157,6 +165,10 @@ pub struct Envelope {
     /// Plain-text body, quoted history included.
     #[serde(default)]
     pub body: String,
+    /// Whose inbox it arrived in, when known: what a `decide` model is told
+    /// about the recipient ([`super::inbox`]).
+    #[serde(default)]
+    pub recipient: Option<Recipient>,
 }
 
 impl fmt::Debug for Party {
@@ -196,11 +208,14 @@ impl Envelope {
             .map(|(_, v)| v.as_str())
     }
 
-    /// The compact state a `decide` model reads (ADR 0009): sender,
-    /// recipients, subject, the bulk headers present, the attachment list and
-    /// the first part of the body.
+    /// The compact state a `decide` model reads (ADR 0009): the triage
+    /// context ([`super::inbox::preamble`]: what Campbooks is, who the
+    /// recipient is, the rules' hints), then the email: sender, recipients,
+    /// subject, the bulk headers present, the attachment list and the first
+    /// part of the body.
     pub fn decision_state(&self) -> DecisionState {
-        let mut out = format!("From: {}\n", party(&self.from));
+        let mut out = super::inbox::preamble(self);
+        let _ = writeln!(out, "From: {}", party(&self.from));
         let to: Vec<String> = self.to.iter().chain(&self.cc).map(party).collect();
         if !to.is_empty() {
             let _ = writeln!(out, "To: {}", to.join(", "));
@@ -222,6 +237,20 @@ impl Envelope {
         out.push('\n');
         out.push_str(&truncate(&self.body, STATE_BODY_CHARS));
         DecisionState::Text(out)
+    }
+
+    /// What the rules saw on the envelope's face, for a model's context:
+    /// list headers (and the `List-Id`), a service sender, automatic
+    /// sending. Hints, not decisions.
+    pub(crate) fn hints(&self) -> Hints {
+        let (auto_reply, automated_sender) = automation(self, &self.subject);
+        Hints {
+            list: bulk_header(self).is_some(),
+            list_id: self.header("list-id").map(str::to_owned),
+            service_sender: AUTOMATED_LOCAL.is_match(local_part(&self.from.address)),
+            automatic: auto_reply.is_some()
+                || automated_sender.is_some_and(|s| s.starts_with("Auto-Submitted")),
+        }
     }
 
     /// The text a k-NN embedder reads: sender, subject, header names,
@@ -2486,7 +2515,9 @@ mod tests {
         };
         assert!(state.contains("Subject: Fatura"));
         assert!(state.contains("list-id: <news.example>"));
-        assert!(state.chars().count() < 1700);
+        // The body is cut at 1,500 characters; the triage context adds
+        // about 550.
+        assert!(state.chars().count() < 2300);
         assert!(!format!("{env:?}").contains("Fatura"));
     }
 

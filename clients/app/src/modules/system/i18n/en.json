@@ -124,6 +124,15 @@
         "instance": "on this instance’s network",
         "externalAllowed": "outside this instance’s network, allowed to receive mail",
         "externalRefused": "outside this instance’s network, so mail is not sent to it"
+      },
+      "check": {
+        "pending": "Checking its answers",
+        "pendingDetail": "its answers are used once it gets obvious test emails right",
+        "passed": "got {{right}} of {{total}} test answers right",
+        "failed": "Answers fail the check",
+        "failedDetail": "got only {{right}} of {{total}} obvious test answers right, so its answers are not used and the rules sort mail alone",
+        "unavailable": "Did not answer the check",
+        "unavailableDetail": "its answers are not used until it does"
       }
     },
     "duration": {

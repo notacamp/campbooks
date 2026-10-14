@@ -71,7 +71,7 @@
     },
     "menuEntry": "Administration",
     "reauthTitle": "Reconnectez-vous pour continuer",
-    "reauthLead": "L’administration demande une connexion datant de moins de 12 heures, pour que personne ne puisse utiliser une ancienne session pour modifier cette instance. Vous reviendrez directement ici.",
+    "reauthLead": "L’administration demande une connexion datant de moins d’une heure, pour que personne ne puisse utiliser une ancienne session pour modifier cette instance. Vous reviendrez directement ici.",
     "reauthAction": "Se reconnecter",
     "unreachableTitle": "Impossible d’ouvrir l’administration",
     "unreachableLead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez."

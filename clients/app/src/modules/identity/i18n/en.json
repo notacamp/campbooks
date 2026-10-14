@@ -281,6 +281,19 @@
         "title": "Something went wrong.",
         "lead": "Nothing changed. Try again."
       }
+    },
+    "new": "New",
+    "recent": {
+      "title": "A way to sign in was added this week",
+      "lead": "It’s marked New below. If you didn’t add it, remove it, then sign out everywhere."
+    },
+    "everywhere": {
+      "title": "Sign out everywhere",
+      "lead": "Ends every sign-in to your account: this browser, your other devices and every app you allowed. Do it if you lose a device or see a way to sign in you didn’t add.",
+      "action": "Sign out everywhere",
+      "confirm": "Yes, sign out everywhere",
+      "confirmLead": "Sign out of Campbooks on every device and in every app, this browser included? You’ll sign in again here next.",
+      "failed": "Couldn’t sign out everywhere. Nothing changed; try again."
     }
   },
   "passkeySignUp": {
@@ -379,7 +392,8 @@
         "title": "Couldn’t add a passkey.",
         "lead": "Nothing was added. Try again."
       }
-    }
+    },
+    "freshSignIn": "For your security, adding a passkey needs a sign-in from the last five minutes. Sign in again; it takes you straight back here."
   },
   "admin": {
     "title": "Account",

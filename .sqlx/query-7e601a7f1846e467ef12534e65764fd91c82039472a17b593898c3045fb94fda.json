@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id AS \"id: DecisionId\", question, source, value, confidence, acted, reasons\n          FROM conversations.decisions WHERE message_id = $1\n        ",
+  "query": "\n        SELECT id AS \"id: DecisionId\", question, source, value, confidence, acted, reasons\n          FROM conversations.decisions\n         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')\n        ",
   "describe": {
     "columns": [
       {
@@ -96,5 +96,5 @@
       false
     ]
   },
-  "hash": "1b48ee4e9a735eb420cc48a7bf250f91b2fc2d457397a0ece1463261b183e3fd"
+  "hash": "7e601a7f1846e467ef12534e65764fd91c82039472a17b593898c3045fb94fda"
 }

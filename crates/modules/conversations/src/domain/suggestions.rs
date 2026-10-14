@@ -146,7 +146,8 @@ impl DecisionRow {
 }
 
 /// Fill in each summary's [`StreamSuggestion`]: the newest stream answer on
-/// record (the model's before the rules' for the same message), when it did
+/// record (the model's before the rules' for the same message; a model's
+/// only when given under a passed answers check), when it did
 /// not act, names another stream than the conversation's, and no member
 /// placed the conversation.
 pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummary]) -> Result<()> {
@@ -167,6 +168,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
           FROM conversations.decisions d
           JOIN conversations.messages m ON m.id = d.message_id
          WHERE d.conversation_id = ANY($1) AND d.question = 'stream'
+           AND (d.source <> 'model' OR d.model_version LIKE 'checked:%')
          ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'taught') DESC, (d.source = 'model') DESC, d.created_at DESC
         "#,
         &ids as &[ConversationId],
@@ -193,8 +195,9 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
     Ok(())
 }
 
-/// Every question's answer about `message` (the model's before the rules'),
-/// in the question's order of asking.
+/// Every question's answer about `message` (the model's before the rules';
+/// a model's only when given under a passed answers check), in the
+/// question's order of asking.
 pub async fn for_message(conn: &mut PgConnection, message: MessageId) -> Result<Vec<DecisionView>> {
     let rows = sqlx::query_as!(
         DecisionRow,
@@ -203,7 +206,7 @@ pub async fn for_message(conn: &mut PgConnection, message: MessageId) -> Result<
                conversation_id AS "conversation_id: ConversationId", question, value, source,
                round(confidence * 100)::smallint AS confidence, acted, reasons
           FROM conversations.decisions
-         WHERE message_id = $1
+         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')
          ORDER BY question, (source = 'taught') DESC, (source = 'model') DESC, created_at DESC
         "#,
         message as MessageId,

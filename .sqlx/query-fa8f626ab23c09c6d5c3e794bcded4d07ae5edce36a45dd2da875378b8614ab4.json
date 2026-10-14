@@ -1,6 +1,10 @@
 {
   "db_name": "PostgreSQL",
+<<<<<<<< HEAD:.sqlx/query-fa8f626ab23c09c6d5c3e794bcded4d07ae5edce36a45dd2da875378b8614ab4.json
   "query": "\n        SELECT DISTINCT ON (d.conversation_id)\n               d.conversation_id AS \"conversation_id: ConversationId\", d.question, d.value,\n               d.source, round(d.confidence * 100)::smallint AS confidence, d.acted, d.reasons\n          FROM conversations.decisions d\n          JOIN conversations.messages m ON m.id = d.message_id\n         WHERE d.conversation_id = ANY($1) AND d.question = 'stream'\n         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'taught') DESC, (d.source = 'model') DESC, d.created_at DESC\n        ",
+========
+  "query": "\n        SELECT DISTINCT ON (d.conversation_id)\n               d.conversation_id AS \"conversation_id: ConversationId\", d.question, d.value,\n               d.source, round(d.confidence * 100)::smallint AS confidence, d.acted, d.reasons\n          FROM conversations.decisions d\n          JOIN conversations.messages m ON m.id = d.message_id\n         WHERE d.conversation_id = ANY($1) AND d.question = 'stream'\n           AND (d.source <> 'model' OR d.model_version LIKE 'checked:%')\n         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'model') DESC, d.created_at DESC\n        ",
+>>>>>>>> origin/next:.sqlx/query-c6f7d6452028f2ecbdc41a1278972db546b6224789c667a8ce8a43ef8beca99d.json
   "describe": {
     "columns": [
       {
@@ -91,5 +95,9 @@
       false
     ]
   },
+<<<<<<<< HEAD:.sqlx/query-fa8f626ab23c09c6d5c3e794bcded4d07ae5edce36a45dd2da875378b8614ab4.json
   "hash": "fa8f626ab23c09c6d5c3e794bcded4d07ae5edce36a45dd2da875378b8614ab4"
+========
+  "hash": "c6f7d6452028f2ecbdc41a1278972db546b6224789c667a8ce8a43ef8beca99d"
+>>>>>>>> origin/next:.sqlx/query-c6f7d6452028f2ecbdc41a1278972db546b6224789c667a8ce8a43ef8beca99d.json
 }

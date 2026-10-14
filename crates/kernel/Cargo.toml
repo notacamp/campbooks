@@ -28,6 +28,7 @@ icu_plurals.workspace = true
 ipnet.workspace = true
 http-body-util = { workspace = true, optional = true }
 jsonwebtoken.workspace = true
+lettre.workspace = true
 # sqlx's pool options take a `log` level (`db::connect_runtime`).
 log.workspace = true
 object_store.workspace = true
@@ -41,6 +42,8 @@ serde_json.workspace = true
 sqlx.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+# Checking the mail transport URL asks for TLS (`mail`).
+url.workspace = true
 tower.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true

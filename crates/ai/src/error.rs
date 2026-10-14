@@ -40,6 +40,11 @@ pub enum Error {
         /// The endpoint's host, from the configuration.
         host: String,
     },
+    /// The `decide` model has not passed its answers check
+    /// ([`crate::decide::check`]), so its answers are not used; nothing was
+    /// sent.
+    #[error("the decide model has not passed its answers check; its answers are not used")]
+    AnswersNotTrusted,
 }
 
 impl From<Error> for campbooks_kernel::Error {

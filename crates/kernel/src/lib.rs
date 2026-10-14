@@ -21,6 +21,7 @@ pub mod i18n;
 pub mod idempotency;
 pub mod ids;
 pub mod jobs;
+pub mod mail;
 pub mod module;
 pub mod operations;
 pub mod preferences;

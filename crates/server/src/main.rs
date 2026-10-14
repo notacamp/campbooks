@@ -231,6 +231,32 @@ fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
     })
 }
 
+/// Startup checks of the settings `role` uses; the web BFF's settings when
+/// it serves the API with web sign-in.
+fn check(config: &Config, role: Role) -> Result<Option<bff::Settings>, String> {
+    config.check()?;
+    let bff = if role.api() {
+        check_api_config(config)?
+    } else {
+        None
+    };
+    if role.worker() {
+        config.jobs.check()?;
+    }
+    Ok(bff)
+}
+
+/// The instance's mailer (`CAMPBOOKS_MAIL__*`), saying which it is.
+fn mailer(config: &Config) -> Result<campbooks_kernel::mail::MailerPort, String> {
+    let mailer = config.mail.mailer()?;
+    if mailer.is_configured() {
+        tracing::info!("security notices are sent by mail");
+    } else {
+        tracing::info!("no mail transport configured; security notices are shown in the app only");
+    }
+    Ok(mailer)
+}
+
 fn runtime() -> Result<tokio::runtime::Runtime, String> {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -243,15 +269,7 @@ async fn run(
     role: Role,
     telemetry: &Telemetry,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    config.check()?;
-    let bff = if role.api() {
-        check_api_config(&config)?
-    } else {
-        None
-    };
-    if role.worker() {
-        config.jobs.check()?;
-    }
+    let bff = check(&config, role)?;
     let composition = campbooks_server::Composition::from_env(&config)?;
     log_composition(&composition);
     let registry = campbooks_server::registry_with(&composition)?;
@@ -263,6 +281,7 @@ async fn run(
     telemetry.observe_pool(&db, config.database_max_connections);
 
     let blobs = blob_store(&config, &db).await?;
+    let mailer = mailer(&config)?;
 
     let bind_addr = config.bind_addr;
     let metrics_addr = config.telemetry.metrics_addr;
@@ -272,13 +291,16 @@ async fn run(
             .with_signer(signer()?)
             .with_metrics(telemetry.metrics())
             .with_registry(registry)
-            .with_blobs(blobs),
+            .with_blobs(blobs)
+            .with_mailer(mailer),
         &composition,
     );
     // Flipped to `true` on Ctrl-C/SIGTERM, or when one part stops, so the
     // other parts stop too.
     let stop = Arc::new(watch::channel(false).0);
     let mut parts: JoinSet<Result<(), String>> = JoinSet::new();
+
+    check_answers(&composition, &stop);
 
     if role.api() {
         if let Some(issuer) = &composition.identity.issuer {
@@ -371,6 +393,17 @@ async fn blob_store(config: &Config, db: &PgPool) -> Result<BlobStore, String> {
         ),
     }
     Ok(blobs)
+}
+
+/// The decide role's answers check: now, then periodically, never per
+/// request (`campbooks_ai::decide::check`). Every process keeps its own: the
+/// API shows it in the admin System panel, the worker gates the model pass
+/// on it.
+fn check_answers(composition: &campbooks_server::Composition, stop: &watch::Sender<bool>) {
+    if let Some(gateway) = composition.system.ai.clone() {
+        let stopped = stopped(stop);
+        tokio::spawn(async move { gateway.keep_answers_checked(stopped).await });
+    }
 }
 
 /// Resolves once `stop` is flipped.

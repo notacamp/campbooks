@@ -3,7 +3,7 @@
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result,
+    AppState, Operation, Problem, Result,
     db::BeginFor as _,
     tenancy::{Workspace, WorkspaceId},
 };
@@ -48,7 +48,7 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     workspace: Workspace<IdentityClients>,
 ) -> Result<Json<WorkspaceClients>> {
-    deps.issuer.as_ref().ok_or(Error::NotFound)?;
+    super::account(&deps, &workspace.principal)?;
     workspace_clients::require_admin(&workspace.access)?;
     let mut tx = state.db.begin_for(workspace.id).await?;
     let items = workspace_clients::list(&mut tx).await?;

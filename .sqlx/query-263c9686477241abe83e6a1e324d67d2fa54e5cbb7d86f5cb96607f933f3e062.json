@@ -1,6 +1,10 @@
 {
   "db_name": "PostgreSQL",
+<<<<<<<< HEAD:.sqlx/query-263c9686477241abe83e6a1e324d67d2fa54e5cbb7d86f5cb96607f933f3e062.json
   "query": "\n        SELECT DISTINCT ON (question)\n               conversation_id AS \"conversation_id: ConversationId\", question, value, source,\n               round(confidence * 100)::smallint AS confidence, acted, reasons\n          FROM conversations.decisions\n         WHERE message_id = $1\n         ORDER BY question, (source = 'taught') DESC, (source = 'model') DESC, created_at DESC\n        ",
+========
+  "query": "\n        SELECT DISTINCT ON (question)\n               conversation_id AS \"conversation_id: ConversationId\", question, value, source,\n               round(confidence * 100)::smallint AS confidence, acted, reasons\n          FROM conversations.decisions\n         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')\n         ORDER BY question, (source = 'model') DESC, created_at DESC\n        ",
+>>>>>>>> origin/next:.sqlx/query-cf3a4f7297ea397b84ef92456d47d9053e29a2fbf3ab1cf5333cb8ae2cff7845.json
   "describe": {
     "columns": [
       {
@@ -91,5 +95,9 @@
       false
     ]
   },
+<<<<<<<< HEAD:.sqlx/query-263c9686477241abe83e6a1e324d67d2fa54e5cbb7d86f5cb96607f933f3e062.json
   "hash": "263c9686477241abe83e6a1e324d67d2fa54e5cbb7d86f5cb96607f933f3e062"
+========
+  "hash": "cf3a4f7297ea397b84ef92456d47d9053e29a2fbf3ab1cf5333cb8ae2cff7845"
+>>>>>>>> origin/next:.sqlx/query-cf3a4f7297ea397b84ef92456d47d9053e29a2fbf3ab1cf5333cb8ae2cff7845.json
 }

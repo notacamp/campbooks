@@ -36,7 +36,7 @@ const SESSION_REQUIRED = "session_required";
 
 /**
  * The admin API's problem `code` when the last sign-in is too old for it
- * (more than 12 hours): sign in again with {@link loginUrl}'s `fresh`. Not a
+ * (more than an hour): sign in again with {@link loginUrl}'s `fresh`. Not a
  * signed-out session, so the transport leaves it to the caller.
  */
 export const ADMIN_REAUTH_REQUIRED = "admin_reauth_required";

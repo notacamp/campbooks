@@ -425,12 +425,15 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     .await?)
 }
 
-/// The answers stored about `message`.
+/// The answers stored about `message`. A model's answer counts only when it
+/// was given while the model passed its answers check
+/// (`campbooks_ai::decide::check::STAMP`): the rest are kept, never read.
 async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answer>> {
     let rows = sqlx::query!(
         r#"
         SELECT id AS "id: DecisionId", question, source, value, confidence, acted, reasons
-          FROM conversations.decisions WHERE message_id = $1
+          FROM conversations.decisions
+         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')
         "#,
         message as MessageId,
     )

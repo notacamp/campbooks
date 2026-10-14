@@ -629,6 +629,35 @@ export interface components {
             workspaces: components["schemas"]["AdminWorkspace"][];
         };
         /**
+         * @description How the `decide` model did on its answers check (eight fictional emails
+         *     whose answers are not in doubt). While it does not pass, the model's
+         *     answers are not used: the inbox is sorted by the rules alone.
+         */
+        AiAnswersCheck: {
+            /**
+             * Format: date-time
+             * @description When the last check finished.
+             */
+            checked_at?: string | null;
+            /**
+             * Format: int32
+             * @description Expected answers the model got right, once a check finished.
+             */
+            right?: number | null;
+            /** @description Where the check stands. */
+            state: components["schemas"]["AiAnswersCheckState"];
+            /**
+             * Format: int32
+             * @description Expected answers asked, once a check finished.
+             */
+            total?: number | null;
+        };
+        /**
+         * @description Where the answers check stands.
+         * @enum {string}
+         */
+        AiAnswersCheckState: "pending" | "passed" | "failed" | "unavailable";
+        /**
          * @description Where an AI role's endpoint is, as far as mail content is concerned.
          * @enum {string}
          */
@@ -648,6 +677,7 @@ export interface components {
          *     and port only, and keys never.
          */
         AiRoleStatus: {
+            answers_check?: components["schemas"]["AiAnswersCheck"] | null;
             /** @description Whether a provider is configured for it. */
             configured: boolean;
             /**
@@ -866,7 +896,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time
@@ -1596,7 +1630,7 @@ export interface operations {
                     "application/json": components["schemas"]["AdminOverview"];
                 };
             };
-            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than 12 hours old). */
+            /** @description `admin_reauth_required`: sign in again (the last sign-in is more than an hour old). */
             401: {
                 headers: {
                     [name: string]: unknown;

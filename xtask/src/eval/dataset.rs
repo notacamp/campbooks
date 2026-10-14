@@ -7,7 +7,10 @@ use std::{
 };
 
 use anyhow::{Context as _, Result, bail};
-use campbooks_ai::decide::{AnswerValue, Question, signals::email::Envelope};
+use campbooks_ai::decide::{
+    AnswerValue, Question,
+    signals::email::{Envelope, Recipient},
+};
 use serde::Deserialize;
 
 /// `manifest.json`.
@@ -119,8 +122,21 @@ impl Dataset {
                 if line.trim().is_empty() {
                     continue;
                 }
-                let item: Item = serde_json::from_str(line)
+                let mut item: Item = serde_json::from_str(line)
                     .with_context(|| format!("{}:{}", path.display(), n + 1))?;
+                // Every message of the set arrived in its workspace owner's
+                // personal inbox, the first `To`: what the decide pass tells
+                // a model about the recipient.
+                let envelope = &mut item.message.envelope;
+                if envelope.recipient.is_none()
+                    && let Some(owner) = envelope.to.first()
+                {
+                    envelope.recipient = Some(Recipient {
+                        name: owner.name.clone(),
+                        addresses: vec![owner.address.clone()],
+                        shared: false,
+                    });
+                }
                 items.push(item);
             }
         }

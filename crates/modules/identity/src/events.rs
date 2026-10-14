@@ -79,10 +79,33 @@ pub struct WayInAdded {
     pub provider: Option<String>,
     /// How it was added: `sign_up`, `link`, `connect` or `passkey`.
     pub via: String,
+    /// The provider identity or passkey added (absent from events published
+    /// before it was recorded).
+    #[serde(default)]
+    pub way_in: Option<Uuid>,
 }
 
 impl DomainEvent for WayInAdded {
     const NAME: &'static str = "identity.way_in_added";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// A person signed out everywhere: every issuer session of the account
+/// ended and every refresh token it held was revoked. The web BFF ends its
+/// own sessions of the account on it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SignedOutEverywhere {
+    /// The account (the `sub` of its tokens).
+    pub account: Uuid,
+}
+
+impl DomainEvent for SignedOutEverywhere {
+    const NAME: &'static str = "identity.signed_out_everywhere";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
 
