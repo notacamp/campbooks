@@ -237,7 +237,8 @@ async fn suggestions(
             continue;
         }
         let preview = compute_preview(conn, inbox, &conditions, &actions).await?;
-        if preview.matching == 0 {
+        // A likeness that would change nothing is no choice at all.
+        if preview.would_change == 0 {
             continue;
         }
         let key = suggestion_key(likeness, &conditions, &actions);
