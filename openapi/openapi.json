@@ -6238,7 +6238,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Read one taught rule.",
+        "summary": "Read one taught rule (a removed one too, with the run putting its mail\nback).",
         "operationId": "conversations.get_rule",
         "parameters": [
           {
@@ -6262,7 +6262,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The rule.",
+            "description": "The rule, removed or not.",
             "content": {
               "application/json": {
                 "schema": {

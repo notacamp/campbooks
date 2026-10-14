@@ -278,10 +278,16 @@ async fn undo_all_puts_back_what_no_one_changed_since(db: PgPool) {
             );
         }
     }
+    // Still readable while (and after) its mail goes back, but no longer listed.
     let gone = kit
         .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
         .await;
-    assert_eq!(gone.status, StatusCode::NOT_FOUND);
+    assert_eq!(gone.json["state"], "removed");
+    assert_eq!(gone.json["run"]["kind"], "revert");
+    assert_eq!(gone.json["run"]["state"], "done");
+    assert_eq!(gone.json["run"]["changed"], 119);
+    let listed = kit.get(&sam, &format!("/api/v1/w/{workspace}/rules")).await;
+    assert_eq!(listed.json["rules"].as_array().unwrap().len(), 0);
     // New mail is no longer moved.
     kit.ingest_value(workspace, inbox, &notifications("after", 1, GITHUB, None))
         .await;

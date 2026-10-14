@@ -726,9 +726,10 @@ SHALL make a proposed rule active (with `apply_to_existing`), else answer 409
 SHALL change its conditions or actions, pause it, or let a manager adopt it.
 `DELETE …/rules/{rule_id}` (`conversations.remove_rule`) SHALL remove it, and
 with `restore=true` put back what it changed. `GET …/rules`
-(`conversations.list_rules`, proposed rules first) and
-`GET …/rules/{rule_id}` (`conversations.get_rule`) SHALL list the rules of
-the inboxes the caller can see with their counts, latest run and recent
+(`conversations.list_rules`, proposed rules first, removed ones left out) and
+`GET …/rules/{rule_id}` (`conversations.get_rule`, a removed one too, so the
+run putting its mail back can be followed) SHALL answer the rules of the
+inboxes the caller can see with their counts, latest run and recent
 exceptions. A rule with the same conditions and an action of the same kind
 as an active one SHALL replace it.
 

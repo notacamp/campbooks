@@ -924,7 +924,8 @@ pub async fn list(
     Ok(Json(RuleList { rules: views }))
 }
 
-/// Read one taught rule.
+/// Read one taught rule (a removed one too, with the run putting its mail
+/// back).
 #[utoipa::path(
     get,
     path = "/api/v1/w/{workspace_id}/rules/{rule_id}",
@@ -937,7 +938,7 @@ pub async fn list(
         ("rule_id" = RuleId, Path, description = "The rule."),
     ),
     responses(
-        (status = OK, description = "The rule.", body = RuleView),
+        (status = OK, description = "The rule, removed or not.", body = RuleView),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope.", body = Problem,
@@ -953,7 +954,17 @@ pub async fn get(
 ) -> Result<Json<RuleView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let rule = visible_rule(&mut tx, access, path.rule_id).await?;
+    // A removed rule stays readable, so the run putting its mail back can be
+    // followed.
+    let rule = rules::find_any(&mut tx, path.rule_id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    if !visible_inboxes(&mut tx, access)
+        .await?
+        .contains(&rule.inbox)
+    {
+        return Err(Error::NotFound);
+    }
     let view = view(&mut tx, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))
