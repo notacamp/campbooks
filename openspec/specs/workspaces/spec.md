@@ -27,3 +27,14 @@ policy tables, unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is set.
 #### Scenario: Refusal
 - **WHEN** the runtime role is a superuser (for example `CAMPBOOKS_DATABASE_ROLE` empty), or a migration URL is set and the runtime login is a superuser
 - **THEN** the server refuses to start unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is true
+
+### Requirement: Unverified addresses are not shown as members'
+The workspaces module SHALL record whether the identity provider verified a
+user's address at their last sign-in. A member's address SHALL be listed
+(`workspaces.list_members`, `workspaces.change_role`) only when verified, and
+inviting an address SHALL treat it as a member's only when a member verified
+it.
+
+#### Scenario: A claimed address
+- **WHEN** a person whose provider did not verify `ceo@example.com` creates a workspace and its members are listed
+- **THEN** their entry has no address, and after a sign-in where the provider verifies it the address is listed
