@@ -153,7 +153,9 @@ explicit check and the policy fire on every publish.
 
    (b) is stricter but touches every kernel query and the publish path of
    every module. We chose (a): the pool and `.begin()` lint covers the
-   remaining gap in module code.
+   remaining gap in module code. The security review found that gap too wide;
+   this change makes `publish` refuse workspace events in such a
+   transaction, and (b) is campbooks-cloud#129.
 5. **Idempotent replay:**
    - (a) re-run the handler;
    - (b) refuse replays entirely;
@@ -167,6 +169,15 @@ explicit check and the policy fire on every publish.
 
    (a) duplicates data and needs a new reader. (b) reuses everything, with
    one flag.
+7. **Clients:**
+   - (a) a blanket grant to the workspace's client tokens;
+   - (b) a client acts for the member who registered it.
+
+   The security review rejected (a): a client would read inboxes its
+   creator cannot, and outlive them. We chose (b): the issuer answers
+   whom a client acts for (`ClientDirectory`), the caller then has that
+   member's access, and a departed member's clients are removed and
+   refused (401).
 
 Nothing here copies the Rails app on `main`. It checked access per
 controller (`before_action`) and kept mail on disconnect.

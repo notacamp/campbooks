@@ -37,7 +37,11 @@ to be declared once, checked centrally, and enforced by CI.
    while they hold a container role, to whoever may see a container of
    another module (an attention item in an inbox, answered by the
    `Visibility` port), to client tokens (explicit and narrower), or to
-   anyone (public types). The kernel builds one catalogue
+   anyone (public types). A client a member registered acts for that member
+   (`ClientDirectory` port, answered by the issuer): it gets their access,
+   no more, and stops working (401) once they leave or the client is
+   removed. Inbox and inbox-contained types grant nothing to clients as
+   such. The kernel builds one catalogue
    from all modules (`Registry::resources`, installed in `AppState`) and
    rejects duplicate or misnamed types and unknown container roles.
 2. **One central check**, `authz::authorize(state, tx, access, action,
@@ -56,7 +60,11 @@ to be declared once, checked centrally, and enforced by CI.
    workspace-keyed tables now carry it too: the change feed, the blob
    catalogue, the event log and the queue. A workspace transaction cannot
    read or write another workspace's kernel rows. `EventBus::publish`
-   refuses an event of another workspace than its transaction's.
+   refuses an event of another workspace than its transaction's, and a
+   workspace event in a transaction with no workspace set. A transaction
+   with no workspace set still sees every workspace (the kernel's sweeps
+   rely on it); making that an explicit kernel scope is
+   campbooks-cloud#129.
 4. **Enforcement.** Every operation declares `x-campbooks.access =
    {resource, action}`. `cargo xtask arch` fails:
    - an undeclared operation, or one naming an unknown type or an action
@@ -82,9 +90,15 @@ to be declared once, checked centrally, and enforced by CI.
 - Disconnecting deletes the mail by default. `?mail=keep` keeps it
   read-only, and only the owner can choose that, being the only one who
   disconnects. When a member is removed, an owner or admin may choose
-  `?mail=keep` for the mailboxes that member connected. A member who
-  leaves on their own keeps nothing. A kept inbox's facts say `frozen`, and
-  the check then refuses every action but `read`.
+  `?mail=keep` for the mailboxes that member connected, unless an inbox
+  would then have nobody left to read it (409 `keep_needs_a_reader`,
+  answered by the `KeptMail` port). A member who leaves on their own keeps
+  nothing. A kept inbox's facts say `frozen`, and the check then refuses
+  every action but `read` and `delete`. Its scheduled sends go back to
+  drafts, and a send released later re-checks `send`.
+- A disconnect and a sync batch never interleave: removing or freezing an
+  inbox locks it first, and a batch holds it `FOR SHARE` and is dropped
+  when it finds the inbox closed.
 
 ## Alternatives considered
 
@@ -122,7 +136,8 @@ Not copied from the Rails app on `main`. That app used per-controller
 
 - A new resource type cannot ship without declaring its owner, sharing and
   client grant. A new operation cannot ship without declaring what it does
-  to which type, and calling the check.
+  to which type, and calling the check with that type (by name, by a
+  constant holding it, or through a helper listed for it).
 - The identity module's account resources, the web BFF's session and proxy
   operations, and workspace-bound third-party tokens are registered in the
   catalogue. Their per-instance facts move onto the check in a follow-up

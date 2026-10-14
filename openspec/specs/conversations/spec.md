@@ -621,7 +621,11 @@ memberships. It SHALL also let go of every file they held (the sweep
 deletes them), remember the inbox as removed so no late batch or replayed
 grant brings it back, and publish `conversations.inbox_removed`. With
 `mail=keep` it SHALL mark each inbox read-only: no batch is applied to it,
-nothing is written or sent from it, and its members keep reading. It SHALL
+nothing is written or sent from it (its scheduled sends go back to drafts,
+and a send is released only while its author may still send it), and its
+members keep reading; authors may still delete their drafts. A batch being
+applied when the connection goes SHALL either finish before the inbox is
+deleted or frozen, or be dropped. It SHALL
 then publish `conversations.inbox_changed`, and the inbox list SHALL show
 it as `read_only`.
 

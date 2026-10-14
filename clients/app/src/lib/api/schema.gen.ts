@@ -6958,7 +6958,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `last_owner`: the workspace would have no owner. */
+            /** @description `last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail). */
             409: {
                 headers: {
                     [name: string]: unknown;
