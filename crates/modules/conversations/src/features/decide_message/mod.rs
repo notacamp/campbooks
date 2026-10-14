@@ -341,6 +341,13 @@ mod tests {
 
     /// Sam's inbox holding `fixture`, read by the rules and the model above.
     async fn read_by_both(db: &PgPool, fixture: &str) -> (Kit, WorkspaceId) {
+        let recorded = serde_json::from_str(&crate::testkit::fixture(fixture)).unwrap();
+        read_recorded(db, &recorded).await
+    }
+
+    /// Sam's inbox holding the recorded batch `recorded`, read by the rules
+    /// and the model above.
+    async fn read_recorded(db: &PgPool, recorded: &Value) -> (Kit, WorkspaceId) {
         let server = MockServer::start().await;
         Mock::given(method("POST"))
             .and(path("/v1/systemone"))
@@ -351,7 +358,13 @@ mod tests {
         let kit = kit_with_model(db.clone(), &server, 100_000).await;
         let workspace = WorkspaceId::new();
         let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
-        kit.ingest(workspace, inbox, fixture).await;
+        let batch = crate::dev::record(&kit.state, workspace, inbox, recorded)
+            .await
+            .unwrap();
+        crate::dev::submit(&kit.state, workspace, &batch)
+            .await
+            .unwrap();
+        kit.run_jobs().await;
         let model: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM conversations.decisions WHERE source = 'model'",
         )
@@ -394,6 +407,62 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(due, None);
+    }
+
+    /// The Dependabot fixture as a sender could make it look: `edit`ed.
+    fn dependabot_as(edit: impl Fn(&mut Value)) -> Value {
+        let mut recorded: Value =
+            serde_json::from_str(&crate::testkit::fixture("dependabot")).unwrap();
+        edit(&mut recorded["changes"][0]["message"]);
+        recorded
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_unauthenticated_alert_is_no_to_do(db: PgPool) {
+        // The same alert, its From spoofed through a provider that does not
+        // check (no results), or failing DMARC.
+        for results in [
+            Value::Null,
+            json!(
+                "mx.google.com; dkim=fail header.i=@github.com; dmarc=fail header.from=github.com"
+            ),
+        ] {
+            let recorded =
+                dependabot_as(|m| m["headers"]["authentication_results"] = results.clone());
+            let (_, _) = read_recorded(&db, &recorded).await;
+            let raised = needs(&db).await;
+            assert!(
+                raised.iter().all(|(reason, ..)| reason != "do"),
+                "{raised:?}"
+            );
+            sqlx::query("DELETE FROM conversations.inboxes")
+                .execute(&db)
+                .await
+                .unwrap();
+        }
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_look_alike_platform_is_no_to_do(db: PgPool) {
+        // It signs its own mail and names its own domain; it is not a listed
+        // platform, so its alert never acts.
+        let recorded = dependabot_as(|m| {
+            m["from"] =
+                json!({"name": "GitHub Security", "address": "alerts@githubsecurity.example"});
+            m["reply_to"] = json!([]);
+            m["headers"]["authentication_results"] = json!(
+                "mx.google.com; dkim=pass header.i=@githubsecurity.example; \
+                 dmarc=pass header.from=githubsecurity.example"
+            );
+        });
+        let (_, _) = read_recorded(&db, &recorded).await;
+        let raised = needs(&db).await;
+        assert!(
+            raised
+                .iter()
+                .all(|(reason, trust, ..)| reason != "do" && trust != "sure"),
+            "{raised:?}"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

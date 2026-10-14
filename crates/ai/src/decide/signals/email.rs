@@ -481,9 +481,10 @@ static DUE: LazyLock<Regex> = LazyLock::new(|| {
     ])
 });
 
-/// A subject that says something of yours needs fixing: a security alert, a
-/// vulnerability found, an action required. Read only in the subject of a
-/// service's mail that names its own domain (see [`security_alert`]).
+/// A subject that names a security problem: a security alert or advisory,
+/// a vulnerability. Read only in the subject of an authenticated service's
+/// mail (see [`security_alert`]). "Action required" alone is not one: it is
+/// what phishing says ([`ACTION_NOW`]).
 static SECURITY_ALERT: LazyLock<Regex> = LazyLock::new(|| {
     phrases(&[
         "security alert",
@@ -492,24 +493,35 @@ static SECURITY_ALERT: LazyLock<Regex> = LazyLock::new(|| {
         "vulnerabilities",
         "vulnerable dependency",
         "dependabot alert",
-        "action required",
         "alerta de segurança",
         "aviso de segurança",
         "vulnerabilidade",
         "vulnerabilidades",
-        "ação necessária",
         "alerta de seguridad",
         "aviso de seguridad",
         "vulnerabilidad",
-        "acción requerida",
-        "acción necesaria",
         "alerte de sécurité",
         "avis de sécurité",
         "vulnérabilité",
         "vulnérabilités",
-        "action requise",
     ])
 });
+
+/// Code hosts and package registries whose authenticated security alerts
+/// are a sure to-do: the alert is about the recipient's code, and the next
+/// step is in the mail. Kept short on purpose; an authenticated sender not
+/// listed here is answered below the confidence answers act from, so at
+/// most a question, never a to-do.
+const SECURITY_PLATFORMS: [&str; 8] = [
+    "github.com",
+    "gitlab.com",
+    "bitbucket.org",
+    "npmjs.com",
+    "pypi.org",
+    "rubygems.org",
+    "crates.io",
+    "snyk.io",
+];
 
 static NOTIFICATION: LazyLock<Regex> = LazyLock::new(|| {
     phrases(&[
@@ -1084,7 +1096,7 @@ struct Read {
     paid: Option<String>,
     due: Option<String>,
     notification: Option<String>,
-    security_alert: Option<String>,
+    security_alert: Option<SecurityAlert>,
     marketing: Option<String>,
     request: Option<String>,
     reply_ask: Option<String>,
@@ -1173,10 +1185,23 @@ fn phishing_tells(
     (phishing, phishing_ask, due)
 }
 
+/// Whether `host` is a plain ASCII domain: no internationalised label
+/// (`xn--`, or Unicode a parser left as is), which can look like another.
+fn plain_domain(host: &str) -> bool {
+    !host.is_empty()
+        && host.is_ascii()
+        && host
+            .split('.')
+            .all(|label| !label.to_ascii_lowercase().starts_with("xn--"))
+}
+
 /// Whether the sender's display name names its own domain: "GitHub" at
 /// `github.com`, not "GitHub" at `github-alerts.example`. Names and domain
-/// labels compare letters and digits only.
+/// labels compare letters and digits only; the domain must be plain ASCII.
 fn names_own_domain(from: &Party) -> bool {
+    if !plain_domain(domain(&from.address)) {
+        return false;
+    }
     let squash = |s: &str| -> String {
         s.chars()
             .filter(|c| c.is_alphanumeric())
@@ -1191,23 +1216,75 @@ fn names_own_domain(from: &Party) -> bool {
     squash(&from.name) == label || from.name.split_whitespace().any(|w| squash(w) == label)
 }
 
-/// The security alert words of a service's notification about something of
-/// the recipient's (a vulnerability in their code, an advisory on their
-/// account): only from a service sender (list or automated address) whose
-/// display name names its own domain, with no phishing tell and no
-/// marketing words ("action required: claim your discount" stays a
-/// newsletter).
+/// Whether the receiving provider authenticated the sender's domain: its
+/// own `Authentication-Results` (the connector keeps no other) says
+/// `dmarc=pass` for the From domain, or `dkim=pass` for a signing domain
+/// aligned with it (the same registrable domain). Absent or failing results
+/// authenticate nothing.
+fn authenticated(env: &Envelope) -> bool {
+    let Some(results) = env.header("authentication-results") else {
+        return false;
+    };
+    let from = registrable(domain(&env.from.address));
+    if !plain_domain(&from) {
+        return false;
+    }
+    let aligned = |words: &[&str], key: &str| {
+        words
+            .iter()
+            .filter_map(|w| w.strip_prefix(key))
+            .any(|d| registrable(d.rsplit('@').next().unwrap_or_default()) == from)
+    };
+    // The first part is the authserv-id; then one result per method.
+    results.split(';').skip(1).any(|part| {
+        let part = part.to_ascii_lowercase();
+        let words: Vec<&str> = part.split_whitespace().collect();
+        let Some(method) = words.first().and_then(|w| w.split('(').next()) else {
+            return false;
+        };
+        match method {
+            "dmarc=pass" => aligned(&words, "header.from="),
+            "dkim=pass" => aligned(&words, "header.d=") || aligned(&words, "header.i="),
+            _ => false,
+        }
+    })
+}
+
+/// A security alert about something of the recipient's (a vulnerability in
+/// their code, an advisory on their account).
+#[derive(Debug, Clone)]
+struct SecurityAlert {
+    /// The words that say so.
+    words: String,
+    /// From a listed platform ([`SECURITY_PLATFORMS`]): a sure to-do.
+    platform: bool,
+}
+
+/// A service's security alert, if it is one: only from a service sender
+/// (list or automated address) whose provider authenticated its plain-ASCII
+/// domain and whose display name names that domain, with no phishing tell
+/// and no marketing words.
 fn security_alert(
     env: &Envelope,
     subject: &str,
     service: bool,
     marketing: Option<&str>,
     phishing: &[Reason],
-) -> Option<String> {
-    if !service || marketing.is_some() || !phishing.is_empty() || !names_own_domain(&env.from) {
+) -> Option<SecurityAlert> {
+    if !service
+        || marketing.is_some()
+        || !phishing.is_empty()
+        || !names_own_domain(&env.from)
+        || !authenticated(env)
+    {
         return None;
     }
-    first_match(&SECURITY_ALERT, subject)
+    let words = first_match(&SECURITY_ALERT, subject)?;
+    let host = registrable(domain(&env.from.address));
+    Some(SecurityAlert {
+        words,
+        platform: SECURITY_PLATFORMS.contains(&host.as_str()),
+    })
 }
 
 /// A "today" cue in the subject or the actionable text, or a window of 24
@@ -1330,9 +1407,12 @@ mod conf {
     pub const NOTHING_ASKED: f64 = 0.95;
     pub const MARKETING_NO_DEADLINE: f64 = 0.93;
     pub const NOT_URGENT: f64 = 0.95;
-    /// Not in `mail-triage` v1 yet (no labelled security alerts): a prior,
-    /// to be replaced by its measured precision once the set has them.
+    /// Not in `mail-triage` v1 yet (no labelled security alerts): priors,
+    /// to be replaced by measured precision once the set has them. A listed
+    /// platform's alert acts; another authenticated sender's stays below
+    /// every operating point the baseline acts from (0.75 and up).
     pub const SECURITY_ALERT: f64 = 0.9;
+    pub const SECURITY_ALERT_UNLISTED: f64 = 0.6;
     pub const TODAY: f64 = 0.9;
     pub const SUSPICIOUS_CALM: f64 = 0.93;
     pub const DAYS: f64 = 0.92;
@@ -1368,12 +1448,9 @@ fn stream(r: &Read) -> (usize, f64, Vec<Reason>) {
         .as_ref()
         .map(|n| Reason::new("signals.notification_words", n));
     if let Some(alert) = &r.security_alert {
-        let alert = Reason::new("signals.security_alert", alert);
-        return (
-            1,
-            conf::SECURITY_ALERT,
-            list.into_iter().chain([alert]).collect(),
-        );
+        let confidence = alert.confidence();
+        let alert = Reason::new("signals.security_alert", &alert.words);
+        return (1, confidence, list.into_iter().chain([alert]).collect());
     }
     if let Some(list) = list {
         return match (money, notice) {
@@ -1440,14 +1517,24 @@ fn needs_reply(r: &Read) -> Ruled {
     ))
 }
 
+impl SecurityAlert {
+    fn confidence(&self) -> f64 {
+        if self.platform {
+            conf::SECURITY_ALERT
+        } else {
+            conf::SECURITY_ALERT_UNLISTED
+        }
+    }
+}
+
 fn asks_action(r: &Read) -> Ruled {
     // A service telling you something of yours needs fixing is a to-do,
     // even when it comes through a list.
     if let Some(alert) = &r.security_alert {
         return Some((
             1,
-            conf::SECURITY_ALERT,
-            vec![Reason::new("signals.security_alert", alert)],
+            alert.confidence(),
+            vec![Reason::new("signals.security_alert", &alert.words)],
         ));
     }
     let newsletter = (r.bulk.is_some() || r.unsubscribe.is_some()) && r.money.is_none();
@@ -1861,10 +1948,18 @@ mod tests {
         env
     }
 
-    /// A code host's security alert about the recipient's repository: list
-    /// mail from the host's own domain.
-    fn security_alert_mail(name: &str, from: &str, subject: &str) -> Envelope {
-        with_header(
+    /// The receiving provider's results for mail signed by `domain`.
+    fn passed(domain: &str) -> String {
+        format!(
+            "mx.google.com; dkim=pass header.i=@{domain} header.s=s1; \
+             spf=pass smtp.mailfrom={domain}; dmarc=pass (p=REJECT dis=NONE) header.from={domain}"
+        )
+    }
+
+    /// A security alert about the recipient's repository: list mail, with
+    /// the receiving provider's `results` (none when `None`).
+    fn alert(name: &str, from: &str, subject: &str, results: Option<&str>) -> Envelope {
+        let env = with_header(
             named(
                 mail(
                     from,
@@ -1877,19 +1972,32 @@ mod tests {
             ),
             "List-Id",
             "<demo-shop.example-org.github.com>",
-        )
+        );
+        match results {
+            Some(results) => with_header(env, "Authentication-Results", results),
+            None => env,
+        }
+    }
+
+    const SUBJECT: &str = "[example-org/demo-shop] High severity vulnerability in tiny-template";
+
+    /// The rules' `asks_action` answer when it is the security alert rule's.
+    fn alert_answer(env: &Envelope) -> Option<Decided> {
+        ask(env, triage::ASKS_ACTION)
+            .filter(|d| d.reasons.iter().any(|r| r.rule == "signals.security_alert"))
     }
 
     #[test]
-    fn a_security_alert_from_the_platform_is_a_to_do() {
-        let env = security_alert_mail(
+    fn an_authenticated_platform_alert_is_a_to_do() {
+        let env = alert(
             "GitHub",
             "notifications@github.com",
-            "[example-org/demo-shop] High severity vulnerability in tiny-template",
+            SUBJECT,
+            Some(&passed("github.com")),
         );
-        let asks = ask(&env, triage::ASKS_ACTION).unwrap();
+        let asks = alert_answer(&env).unwrap();
         assert_eq!(asks.answer.value, AnswerValue::Noul(true));
-        assert_eq!(asks.reasons[0].rule, "signals.security_alert");
+        assert!(asks.answer.confidence.unwrap() >= 0.9);
         assert!(
             asks.reasons[0]
                 .sentence
@@ -1902,28 +2010,89 @@ mod tests {
             value(&env, triage::NEEDS_REPLY),
             Some(AnswerValue::Noul(false))
         );
+        // A DKIM signature of the same domain is enough without DMARC.
+        let dkim = alert(
+            "GitHub",
+            "noreply@github.com",
+            SUBJECT,
+            Some("mx.zohomail.com; dkim=pass header.d=github.com; spf=pass"),
+        );
+        assert!(alert_answer(&dkim).is_some());
     }
 
     #[test]
-    fn a_security_alert_from_another_domain_is_not_one() {
-        // The name claims the platform, the domain is someone else's.
-        for (name, from) in [
-            ("GitHub", "notifications@github-alerts.example"),
-            ("GitHub", "alerts@g1thub.example"),
-            ("Security Team", "notifications@github.com"),
+    fn an_unauthenticated_alert_is_no_to_do() {
+        for results in [
+            None,
+            Some(
+                "mx.google.com; dkim=fail header.i=@github.com; dmarc=fail header.from=github.com",
+            ),
+            Some("mx.google.com; spf=pass smtp.mailfrom=github.com"),
+            // Signed, but by someone else's domain.
+            Some("mx.google.com; dkim=pass header.i=@mailer.example; dmarc=none"),
         ] {
-            let env = security_alert_mail(
+            let env = alert("GitHub", "notifications@github.com", SUBJECT, results);
+            assert!(alert_answer(&env).is_none(), "{results:?}");
+        }
+    }
+
+    #[test]
+    fn a_look_alike_with_its_own_signature_is_never_sure() {
+        // Each signs its own mail, names its own domain, and trips no
+        // phishing tell: at most a question.
+        for (name, from) in [
+            ("GitHub Security", "alerts@githubsecurity.example"),
+            ("Githhub", "alerts@githhub.example"),
+            ("GitHub Notify", "alerts@github-notify.example"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(
                 name,
                 from,
-                "[example-org/demo-shop] High severity vulnerability in tiny-template",
+                "Security alert: new sign-in to your account",
+                Some(&passed(host)),
             );
-            let asks = ask(&env, triage::ASKS_ACTION);
-            assert!(
-                asks.as_ref()
-                    .is_none_or(|d| d.reasons.iter().all(|r| r.rule != "signals.security_alert")),
-                "{name} <{from}>: {asks:?}"
-            );
+            if let Some(asks) = alert_answer(&env) {
+                assert!(asks.answer.confidence.unwrap() < 0.75, "{name} <{from}>");
+            }
         }
+    }
+
+    #[test]
+    fn an_international_look_alike_domain_is_not_one() {
+        // A Cyrillic "і", as a parser may leave it, and as punycode.
+        for (name, host) in [("Gіthub", "gіthub.com"), ("Github", "xn--gthub-n4a.com")] {
+            let env = alert(
+                name,
+                &format!("alerts@{host}"),
+                SUBJECT,
+                Some(&passed(host)),
+            );
+            assert!(alert_answer(&env).is_none(), "{host}");
+        }
+    }
+
+    #[test]
+    fn the_name_must_be_the_domain_s() {
+        for (name, from) in [
+            ("GitHub", "notifications@github-alerts.example"),
+            ("Security Team", "notifications@github.com"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(name, from, SUBJECT, Some(&passed(host)));
+            assert!(alert_answer(&env).is_none(), "{name} <{from}>");
+        }
+    }
+
+    #[test]
+    fn action_required_alone_is_no_security_alert() {
+        let env = alert(
+            "GitHub",
+            "notifications@github.com",
+            "[example-org/demo-shop] Action required: review your settings",
+            Some(&passed("github.com")),
+        );
+        assert!(alert_answer(&env).is_none());
     }
 
     #[test]
@@ -1957,7 +2126,7 @@ mod tests {
                     "Same here on Safari 18. Any idea when this lands?\n\n\
                      You are receiving this because you are subscribed to this thread.",
                 ),
-                "Rui Tavares",
+                "Octavia Quill",
             ),
             "List-Id",
             "<demo-shop.example-org.github.com>",

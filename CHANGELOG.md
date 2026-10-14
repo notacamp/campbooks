@@ -64,12 +64,16 @@ All notable changes to Campbooks Next are documented here. The format follows
   something?") only when no answer Campbooks acts on already said no; a
   plain notification stays off Home. Questions raised that way before this
   fix are withdrawn the next time their conversation is refreshed.
-- **Security alerts about something of yours are a to-do.** A service's
-  notification that says a vulnerability was found, a security alert or an
-  action required (in all four languages), from a sender whose name matches
-  its own domain, with no phishing tell and no marketing, now shows on Home as
-  Do and sorts to Updates. Other notifications from the same service ask
-  nothing.
+- **Security alerts about your code are a to-do.** A security alert or
+  vulnerability notice (in all four languages) from a code host or package
+  registry (GitHub, GitLab, Bitbucket, npm, PyPI, RubyGems, crates.io, Snyk)
+  now shows on Home as Do and sorts to Updates, but only when your mail
+  provider authenticated the sender (DMARC, or DKIM for the sender's own
+  domain), the sender's name matches its domain, and nothing in it looks
+  like phishing or marketing. Other services' alerts are at most a question,
+  and other notifications from the same service ask nothing. Gmail and Zoho
+  mailboxes now keep the provider's own `Authentication-Results` with each
+  message for this.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by

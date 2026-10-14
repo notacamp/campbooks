@@ -2,7 +2,10 @@
 
 ## Data ownership and events
 
-Nothing new is stored. `conversations.needs` (schema `conversations`) keeps
+`connectors` adds one optional field to the message change it publishes
+(`headers.authentication_results`, `MessageChangeBatch` v1, backward
+compatible); `conversations` stores it with the message's other headers
+(`messages.headers`, jsonb). Nothing else new is stored. `conversations.needs` (schema `conversations`) keeps
 its columns; a withdrawn need is written as `state = 'cleared'`,
 `cleared_because = 'superseded'`, and `conversations.need_changed` v1 is
 published in the same transaction exactly as for any other clear (null need,
@@ -63,32 +66,51 @@ the same service ask nothing.
 
 | Option | Trade-off |
 | --- | --- |
-| A. A rules signal (chosen) | Deterministic, explainable ("It is a security alert about something of yours"), no AI; narrow guardrails keep phishing and marketing out |
+| A. A rules signal on authenticated mail, acting only for listed platforms (chosen) | Deterministic, explainable ("It is a security alert about something of yours"), no AI; a short list to keep, and other services' alerts are at most a question |
 | B. Let the model decide for list mail | The model is unmeasured and never acts under the policy; it would also bring back questions for every notification |
-| C. A per-sender allowlist (github.com, gitlab.com…) | Precise for known hosts, but a list to maintain and nothing for other services; the generic shape covers them |
+| C. The generic shape alone, any sender naming its own domain | Covers every service, but a look-alike domain that signs its own mail passes it: rejected by the security review |
 
-Guardrails, all required:
+Guardrails, all required (a security review of the first version showed
+that headers a sender controls are not enough: look-alike domains with
+their own DKIM, a spoofed From through a provider that does not enforce
+DMARC, a Cyrillic domain, and a bare "action required" all became a sure Do):
 
-- **Service sender:** list mail or an automated local part (the signals'
-  existing notions).
-- **The sender names its own domain:** a word of the display name, or the
-  whole name, equals the first label of the sender's registrable domain,
-  letters and digits only ("GitHub" at `github.com`; not "GitHub" at
-  `github-alerts.example`, not "Security Team" at `github.com`). This is the
-  "domain matches the platform it claims" check.
-- **No phishing tell** (look-alike domain, reply-to elsewhere, phishing
-  phrases): a phishing "security alert" stays a warning, and the needs'
-  suspicious check runs first anyway.
-- **No marketing words** in the subject or text: "Action required: claim
-  your discount" stays a newsletter.
-- **Subject only:** a newsletter article about vulnerabilities is not an
-  alert.
+- **Authenticated by the receiving provider.** The connector keeps the
+  topmost `Authentication-Results` only when its authserv-id is the
+  receiving provider's (Gmail `mx.google.com`, Zoho's regional exchangers;
+  anything else, or an unknown id, is no result). The rule answers only on
+  `dmarc=pass` for the From domain, or `dkim=pass` for a signing domain with
+  the same registrable domain. Absent or failing results: no answer.
+- **A sure Do only for listed platforms.** `github.com`, `gitlab.com`,
+  `bitbucket.org`, `npmjs.com`, `pypi.org`, `rubygems.org`, `crates.io`,
+  `snyk.io`: code hosts and package registries, whose alerts are about the
+  recipient's code. Any other authenticated sender gets 0.6, below every
+  operating point the baseline acts from (0.75 and up): at most a question.
+  A look-alike that signs its own mail (`githubsecurity.example`) lands
+  here.
+- **Plain ASCII domains, named by the sender.** A word of the display name,
+  or the whole name, equals the first label of the sender's registrable
+  domain, letters and digits only; a domain with an `xn--` label or
+  non-ASCII characters never qualifies ("Gіthub" with a Cyrillic і).
+- **A security word.** "Action required" alone is what phishing says
+  (`ACTION_NOW`); it is not in the list.
+- **Service sender, no phishing tell, no marketing words, subject only**, as
+  before.
 
-It answers `asks_action` true (`signals.security_alert`, ahead of
-`signals.list_mail`), and `stream` Updates with the same confidence. Its
-confidence (0.9) is a prior: `mail-triage` v1 has no security alerts, the
-offline eval is unchanged (the rule fires on none of its 320 items), and
-labelling some is the follow-up that measures it.
+The follow-up Home card will offer the alert's own link as the main action;
+the spec says that a message's links may be offered that way only when its
+sender is authenticated like this and it is not suspicious.
+
+| Option for trusting the sender | Trade-off |
+| --- | --- |
+| A. The receiving provider's `Authentication-Results`, by authserv-id (chosen) | The provider already checked SPF, DKIM and DMARC; we read one header, keep it only from the receiver, and need no crypto or DNS. Depends on knowing each provider's authserv-id: an unknown one reads as no result (fails closed) |
+| B. Verify DKIM ourselves | Independent of the provider, but DNS lookups at sync time, key rotation and a new crate, for what the provider already did |
+| C. An allow-list of sender addresses | Simple, but a spoofed From passes it unchanged; nothing proves the mail came from there |
+
+Zoho's authserv-ids are its regional mail exchangers' names
+(`mx.zohomail.com`, `mx.zoho.eu`, …); they have not been checked against a
+live Zoho mailbox yet, and an id not listed simply means no security alert
+is recognised there.
 
 ## What the model sees for such mail
 
@@ -102,3 +124,10 @@ the model echo the rules rather than add an independent opinion, which
 defeats the cascade's purpose and would bias the eval; adding a short neutral
 "sender kind" line (person, service, list) is the one piece worth measuring.
 Not changed here.
+
+## Confidence
+
+The listed platforms' answer (0.9) and the others' (0.6) are priors:
+`mail-triage` v1 has no security alerts, the offline eval is unchanged (the
+rule fires on none of its 320 items, which carry no authentication
+results), and labelling some is the follow-up that measures them.

@@ -23,6 +23,6 @@ that against the schema.
 | `needs.json` | What needs Sam: a question with a date, a lease to sign, a bill, a phishing message, a lunch question |
 | `needs-followup.json` | Pedro writes again about the lease, asking nothing new |
 | `needs-replied.json` | Sam's reply to the lunch question, sent from another client |
-| `dependabot.json` | A code host's security alert: list mail with Review, Dismiss and Upgrade links, asking nothing of a person (from the service's public notification address; the organisation, repository and package are invented) |
+| `dependabot.json` | A code host's security alert: list mail with Review, Dismiss and Upgrade links, authenticated by the receiving provider (DKIM and DMARC pass) (from the service's public notification address; the organisation, repository and package are invented) |
 | `github-comment.json` | The same code host's notification of a comment on an issue Sam watches: list mail that asks Sam nothing |
 | `late-parent.json` | Two replies stored before the message they answer (no thread keys) |

@@ -5,7 +5,7 @@
       "thread_key": "thr-issue-17",
       "rfc_message_id": "example-org/demo-shop/issues/17/2041@github.com",
       "in_reply_to": "example-org/demo-shop/issues/17@github.com",
-      "from": {"name": "Rui Tavares", "address": "notifications@github.com"},
+      "from": {"name": "Octavia Quill", "address": "notifications@github.com"},
       "to": [{"name": "example-org/demo-shop", "address": "demo-shop@noreply.github.com"}],
       "cc": [{"name": "Sam Rivers", "address": "sam@example.com"}],
       "reply_to": [{"name": "example-org/demo-shop", "address": "reply+EXAMPLE@reply.github.com"}],

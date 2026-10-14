@@ -1,6 +1,7 @@
 # Proposal
 
-Module: `conversations` (needs), and the email signals in `campbooks-ai`.
+Modules: `conversations` (needs), `connectors` (authentication results),
+and the email signals in `campbooks-ai`.
 Tracking: https://github.com/notacamp/campbooks-cloud/issues/123 (attention
 follow-ups after campbooks-cloud#39).
 
@@ -34,14 +35,23 @@ question and not hidden. The rules had no signal for it.
   raised before this fix whenever the conversation is refreshed; the needs
   backfill (the next change) refreshes every recent conversation and every
   open need on upgrade.
-- **Security alerts are a to-do.** A new rules signal,
-  `signals.security_alert`, answers `asks_action` true for a service's
-  notification whose subject says something of the recipient's needs fixing
-  ("security alert", "security advisory", "vulnerability", "action
-  required", in the four languages), and sorts it to Updates. It applies
-  only to a service sender (list mail or an automated address) whose display
-  name names its own domain ("GitHub" at `github.com`), with no phishing tell
-  and no marketing words, and it outranks `signals.list_mail`'s "no".
+- **Security alerts are a to-do, from an authenticated platform.** A new
+  rules signal, `signals.security_alert`, answers `asks_action` true for a
+  service's notification whose subject names a security problem ("security
+  alert", "security advisory", "vulnerability", in the four languages;
+  "action required" alone is not one), and sorts it to Updates. It applies
+  only to a service sender (list mail or an automated address) with a plain
+  ASCII domain its display name names ("GitHub" at `github.com`), with no
+  phishing tell and no marketing words, and only when the receiving
+  provider authenticated it (`dmarc=pass`, or `dkim=pass` aligned with the
+  From domain). It outranks `signals.list_mail`'s "no". The answer acts (a
+  sure Do) only for a short list of code hosts and package registries;
+  any other authenticated sender gets an answer below every operating
+  point, at most a question.
+- **Connectors carry the receiving provider's authentication results.** The
+  Gmail and Zoho adapters keep the topmost `Authentication-Results` when its
+  authserv-id is their provider's, and no other, in the message change
+  (`headers.authentication_results`, optional, `MessageChangeBatch` v1).
 - Two fixtures: a Dependabot-style security alert and a comment
   notification from the same code host. The reason's sentence is shown in
   the reader in all four languages.

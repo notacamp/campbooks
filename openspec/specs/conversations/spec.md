@@ -633,24 +633,46 @@ SHALL list nothing for other container types.
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason
 `signals.security_alert`, and `stream` `updates`, for a message whose subject
-says something of the recipient's needs fixing (a security alert or
-advisory, a vulnerability, an action required, in English, European
-Portuguese, Spanish and French) when the sender is a service (list mail or an
-automated address) whose display name names the sender's own domain, the
-message has no phishing tell and carries no marketing words. It SHALL take
-precedence over the list-mail "no action" answer.
+names a security problem (a security alert or advisory, a vulnerability, in
+English, European Portuguese, Spanish and French; "action required" alone is
+not one) only when all of these hold: the sender is a service (list mail or
+an automated address); its domain is plain ASCII (no internationalised
+label) and its display name names that domain; the receiving provider's own
+authentication results show `dmarc=pass` for the From domain or `dkim=pass`
+for a signing domain with the same registrable domain; the message has no
+phishing tell and carries no marketing words. It SHALL take precedence over
+the list-mail "no action" answer. A sure `do` need from a security alert
+SHALL require an authenticated sender on the listed code hosts and package
+registries (`github.com`, `gitlab.com`, `bitbucket.org`, `npmjs.com`,
+`pypi.org`, `rubygems.org`, `crates.io`, `snyk.io`); for any other
+authenticated sender the answer SHALL stay below every confidence the policy
+acts from, so it raises at most a question. Anything that offers a message's
+own links as the action on its need SHALL offer them only for a message
+whose sender is authenticated this way and that is not suspicious.
 
 #### Scenario: A dependency vulnerability
-- **WHEN** "GitHub" `<notifications@github.com>` sends list mail titled "[example-org/demo-shop] High severity vulnerability in tiny-template" with Review, Dismiss and Upgrade links, and the model also answers `asks_action` true with 0.875
+- **WHEN** "GitHub" `<notifications@github.com>` sends list mail titled "[example-org/demo-shop] High severity vulnerability in tiny-template" with Review, Dismiss and Upgrade links, the receiving provider reports `dkim=pass` and `dmarc=pass` for `github.com`, and the model also answers `asks_action` true with 0.875
 - **THEN** the conversation is sorted to Updates and has a `sure` `do` need with basis `rules`
+
+#### Scenario: The same alert, not authenticated
+- **WHEN** the same alert arrives with no authentication results from the receiving provider, or with `dmarc=fail`
+- **THEN** no `do` need is raised
+
+#### Scenario: A look-alike that signs its own mail
+- **WHEN** "GitHub Security" `<alerts@githubsecurity.example>`, with `dkim=pass` and `dmarc=pass` for its own domain, sends "Security alert: new sign-in to your account"
+- **THEN** no `sure` need is raised
+
+#### Scenario: An internationalised look-alike
+- **WHEN** the sender's domain spells "github" with a Cyrillic letter, or as `xn--` punycode
+- **THEN** `asks_action` is not answered by `signals.security_alert`
+
+#### Scenario: Action required alone
+- **WHEN** an authenticated GitHub notification's subject says "Action required: review your settings" and names no security problem
+- **THEN** `asks_action` is not answered by `signals.security_alert`
 
 #### Scenario: A comment on a watched issue
 - **WHEN** the same code host sends a notification of a comment on an issue the member watches
 - **THEN** no need is raised
-
-#### Scenario: A look-alike platform
-- **WHEN** "GitHub" `<notifications@github-alerts.example>` sends the same alert
-- **THEN** `asks_action` is not answered by `signals.security_alert`
 
 #### Scenario: Marketing that says action required
 - **WHEN** a newsletter's subject is "Action required: claim your discount"
