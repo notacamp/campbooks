@@ -49,7 +49,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   last row loads more. In an open conversation the arrows scroll it (J and K
   still go to the next or previous one), and they're never taken from a
   field, a menu or a dialog. The `?` sheet and the empty reader show "J or ↓".
-  Home's "what needs you" list moves with the arrows too.
+  Home's "what needs you" list moves with the arrows too (an open item scrolls).
 - Admin → Jobs: administrators with the `jobs.read` permission see the
   background queue by kind (waiting, scheduled, running, running with a lost
   worker, failed) and the jobs that gave up with their last error (monospace,
