@@ -45,6 +45,7 @@ use crate::{
         conversation::{Changed, recount},
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
+        needs::{self, NeedSettings},
         policy::Policy,
         redact,
     },
@@ -81,13 +82,18 @@ pub const BATCH_RECORD: &str = "conversations.change_batch";
 pub struct ApplyChanges {
     rules: Arc<dyn Strategy>,
     policy: Policy,
+    needs: NeedSettings,
 }
 
 impl ApplyChanges {
     /// A handler sorting with `rules`, acting on their answers as `policy`
-    /// allows.
-    pub fn new(rules: Arc<dyn Strategy>, policy: Policy) -> Self {
-        Self { rules, policy }
+    /// allows, and raising needs as `needs` says.
+    pub fn new(rules: Arc<dyn Strategy>, policy: Policy, needs: NeedSettings) -> Self {
+        Self {
+            rules,
+            policy,
+            needs,
+        }
     }
 }
 
@@ -156,6 +162,7 @@ impl JobHandler for ApplyChanges {
             workspace,
             ws: &ws,
             policy: &self.policy,
+            needs: &self.needs,
             inbox: batch.inbox,
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
@@ -345,6 +352,7 @@ struct Apply<'a> {
     workspace: WorkspaceId,
     ws: &'a str,
     policy: &'a Policy,
+    needs: &'a NeedSettings,
     inbox: InboxId,
     /// Conversations whose existing messages changed or went: what changed
     /// and which messages, announced at the end.
@@ -793,6 +801,12 @@ impl Apply<'_> {
                 recount(tx, *conversation).await?;
             }
         }
+        let refresh: BTreeSet<ConversationId> = self
+            .new_in
+            .iter()
+            .chain(self.touched.keys())
+            .copied()
+            .collect();
         for (conversation, (changes, provider_ids)) in self.touched {
             Changed {
                 workspace: self.ws.to_owned(),
@@ -804,6 +818,11 @@ impl Apply<'_> {
             }
             .publish(self.events, tx)
             .await?;
+        }
+        // What each conversation needs now, once its counts and state are
+        // current (a conversation that is gone changes nothing).
+        for conversation in refresh {
+            needs::refresh(tx, self.events, self.ws, conversation, self.needs).await?;
         }
         Ok(())
     }

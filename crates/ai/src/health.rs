@@ -11,7 +11,7 @@ use std::{
 use secrecy::ExposeSecret as _;
 use serde::Serialize;
 
-use crate::{Gateway, Protocol, ProviderConfig, Role, gateway::endpoint};
+use crate::{Gateway, Location, Protocol, ProviderConfig, Role, gateway::endpoint};
 
 /// How long a probe may take before the provider counts as unreachable.
 pub const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
@@ -32,6 +32,12 @@ pub struct RoleHealth {
     pub endpoint: Option<String>,
     /// The protocol it speaks, when configured.
     pub protocol: Option<Protocol>,
+    /// Whether its endpoint is on the instance's network, when configured.
+    pub location: Option<Location>,
+    /// Whether it may receive mail content (on the instance's network, or
+    /// opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`), when
+    /// configured.
+    pub content_allowed: Option<bool>,
     /// Whether the provider answered a probe (`GET <base_url>/models`, any
     /// non-5xx status) within [`PROBE_TIMEOUT`]; `None` when not configured.
     pub reachable: Option<bool>,
@@ -47,6 +53,8 @@ pub fn unconfigured() -> Vec<RoleHealth> {
             model: None,
             endpoint: None,
             protocol: None,
+            location: None,
+            content_allowed: None,
             reachable: None,
         })
         .collect()
@@ -74,9 +82,11 @@ impl Probes {
 }
 
 impl Gateway {
-    /// Every role: configured or not, its model and endpoint, and whether
-    /// its provider answers (probed at most once per [`PROBE_CACHE`], all
-    /// roles at once).
+    /// Every role: configured or not, its model and endpoint, where that
+    /// endpoint is and whether it may receive mail content, and whether its
+    /// provider answers (probed at most once per [`PROBE_CACHE`], all roles
+    /// at once). The probe is a `GET` that carries no content, so it runs
+    /// for every configured role, opted in or not.
     pub async fn health(&self) -> Vec<RoleHealth> {
         let mut probes = tokio::task::JoinSet::new();
         for role in Role::ALL {
@@ -99,6 +109,8 @@ impl Gateway {
                     model: Some(provider.model.clone()),
                     endpoint: campbooks_kernel::config::origin_of(provider.base_url.as_str()),
                     protocol: Some(provider.protocol),
+                    location: Some(self.config().location(provider)),
+                    content_allowed: Some(self.config().content_allowed(provider)),
                     reachable: Some(reachable.get(&role).copied().unwrap_or(false)),
                 },
                 Err(_) => RoleHealth {
@@ -107,6 +119,8 @@ impl Gateway {
                     model: None,
                     endpoint: None,
                     protocol: None,
+                    location: None,
+                    content_allowed: None,
                     reachable: None,
                 },
             })

@@ -34,8 +34,10 @@ to be declared once, checked centrally, and enforced by CI.
    `write`, `delete`, `send`, `share`, `disconnect`) and its **sharing**:
    grants of actions to a workspace role, to a role in the resource's
    container (an inbox's `reader` < `sender` < `manager`), to the owner
-   while they hold a container role, to client tokens (explicit and
-   narrower), or to anyone (public types). The kernel builds one catalogue
+   while they hold a container role, to whoever may see a container of
+   another module (an attention item in an inbox, answered by the
+   `Visibility` port), to client tokens (explicit and narrower), or to
+   anyone (public types). The kernel builds one catalogue
    from all modules (`Registry::resources`, installed in `AppState`) and
    rejects duplicate or misnamed types and unknown container roles.
 2. **One central check**, `authz::authorize(state, tx, access, action,

@@ -1,0 +1,112 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT r.user_id AS \"user_id: UserId\", u.display_name, u.email, r.status,\n                  r.requested_at, r.decided_at, r.decided_by, r.reason\n             FROM workspaces.signup_requests r\n             JOIN workspaces.users u ON u.id = r.user_id\n            WHERE r.user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "user_id: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "display_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "email",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "email"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "status",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "status"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "requested_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "requested_at"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "decided_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "decided_at"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "decided_by",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "decided_by"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "reason",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_requests",
+            "name": "reason"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "cc451c53c91c7da45891f4fced448755e30b33a1ffe72e6104b763fc2a3efe50"
+}

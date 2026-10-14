@@ -24,6 +24,8 @@ export interface ConversationRowProps {
   attachment?: boolean | undefined;
   /** A line under the snippet: the assistant's suggestion ("Scout suggests Newsletters"). */
   suggestion?: ReactNode | undefined;
+  /** What it needs from you, as {@link Pill}s and {@link Tag}s ("Needs a reply", "Due Thu"). */
+  chips?: ReactNode | undefined;
   /** The conversation open in the reader. */
   current?: boolean | undefined;
   /** The keyboard cursor (J/K) is on it. */
@@ -46,6 +48,7 @@ export function ConversationRow({
   count,
   attachment = false,
   suggestion,
+  chips,
   current = false,
   selected = false,
   id,
@@ -87,6 +90,7 @@ export function ConversationRow({
       </span>{" "}
       <span className={styles["subject"]}>{subject}</span>{" "}
       <span className={styles["snippet"]}>{snippet}</span>
+      {chips === undefined ? null : <span className={styles["chips"]}>{chips}</span>}
       {suggestion === undefined ? null : <span className={styles["suggestion"]}>{suggestion}</span>}
     </button>
   );

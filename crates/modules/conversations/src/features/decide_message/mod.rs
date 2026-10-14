@@ -25,6 +25,7 @@ use crate::{
         blobs::read_text,
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
+        needs::{self, NeedSettings},
         policy::Policy,
         redact,
     },
@@ -39,16 +40,24 @@ pub struct DecideMessage {
     model: Option<Arc<dyn Strategy>>,
     backfill: TimeDelta,
     policy: Policy,
+    needs: NeedSettings,
 }
 
 impl DecideMessage {
     /// A pass asking `model`, for messages sent within `backfill_days`,
-    /// marking the answers `policy` accepts.
-    pub fn new(model: Option<Arc<dyn Strategy>>, backfill_days: u32, policy: Policy) -> Self {
+    /// marking the answers `policy` accepts and raising needs as `needs`
+    /// says.
+    pub fn new(
+        model: Option<Arc<dyn Strategy>>,
+        backfill_days: u32,
+        policy: Policy,
+        needs: NeedSettings,
+    ) -> Self {
         Self {
             model,
             backfill: TimeDelta::days(i64::from(backfill_days)),
             policy,
+            needs,
         }
     }
 }
@@ -93,10 +102,13 @@ impl EventConsumer for DecideMessage {
             answers: &answers,
             policy: &self.policy,
         };
+        let ctx_events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
         // The model pass never re-sorts: the stream was set when the message
         // was stored.
         recorded.store(tx, workspace, false).await?;
+        // The model's answers may put a question to the member.
+        needs::refresh(tx, &ctx_events, &facts.workspace, conversation, &self.needs).await?;
         Ok(())
     }
 }
@@ -228,6 +240,7 @@ mod tests {
         .with_protocol(Protocol::Laya);
         let gateway = Gateway::new(AiConfig {
             roles: [(Role::Decide, provider)].into(),
+            ..AiConfig::default()
         })
         .unwrap();
         let deps = ConversationsDeps {
@@ -357,5 +370,48 @@ mod tests {
             errors.iter().all(|e| e == "decide provider answered 400"),
             "{errors:?}"
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn an_off_network_decide_role_without_opt_in_leaves_sorting_to_rules(db: PgPool) {
+        // `decide.example.com` is off the instance's network: no mail goes
+        // there (nothing could answer anyway), rules alone sort.
+        let provider = ProviderConfig::new(
+            "https://decide.example.com/v1".parse().unwrap(),
+            "convaiinnovations/laya-multilingual",
+        )
+        .with_protocol(Protocol::Laya);
+        let gateway = Gateway::new(AiConfig {
+            roles: [(Role::Decide, provider)].into(),
+            ..AiConfig::default()
+        })
+        .unwrap();
+        let deps = ConversationsDeps {
+            ai: Some(gateway),
+            ..sorting_deps()
+        };
+        let kit = Kit::with_deps(db.clone(), deps).await;
+        let workspace = WorkspaceId::new();
+        let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
+        kit.ingest(workspace, inbox, "en").await;
+
+        let by_source: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT source, count(*) FROM conversations.decisions GROUP BY 1 ORDER BY 1",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        assert!(
+            by_source.iter().all(|(source, _)| source == "rules"),
+            "{by_source:?}"
+        );
+        assert!(!by_source.is_empty(), "rules still answered");
+        let failed: i64 = sqlx::query_scalar(
+            "SELECT count(*) FROM kernel.jobs WHERE state = 'failed' OR last_error IS NOT NULL",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        assert_eq!(failed, 0);
     }
 }

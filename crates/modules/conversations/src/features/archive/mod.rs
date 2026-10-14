@@ -1,7 +1,7 @@
 //! `POST …/conversations/{conversation_id}/archive` and `/unarchive` — take a
 //! conversation out of the inbox, or put it back.
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Workspace, WorkspaceId},
@@ -12,6 +12,7 @@ use crate::{
     domain::{
         conversation::ConversationSummary,
         flags::{self, Flag},
+        needs::NeedSettings,
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -45,11 +46,12 @@ use crate::{
 )]
 pub async fn archive(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Archive)
+    flags::apply(&state, &workspace.access, id, Flag::Archive, Some(&needs))
         .await
         .map(Json)
 }
@@ -82,11 +84,12 @@ pub async fn archive(
 )]
 pub async fn unarchive(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Unarchive)
+    flags::apply(&state, &workspace.access, id, Flag::Unarchive, Some(&needs))
         .await
         .map(Json)
 }

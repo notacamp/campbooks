@@ -29,6 +29,7 @@ fn provider(server: &MockServer, model: &str, api_key: Option<&str>) -> Provider
 fn gateway(roles: impl IntoIterator<Item = (Role, ProviderConfig)>) -> Gateway {
     Gateway::new(AiConfig {
         roles: roles.into_iter().collect::<HashMap<_, _>>(),
+        ..AiConfig::default()
     })
     .unwrap()
 }
@@ -109,24 +110,77 @@ async fn unconfigured_role_fails_without_a_request() {
 }
 
 #[tokio::test]
-async fn provider_errors_surface_status_and_body() {
+async fn provider_errors_surface_the_status_never_the_body() {
+    // A provider's error can echo the request: the mail it was given.
+    let echo = "Subject: Q4 plan — from maya@northwind-studio.example";
     let server = MockServer::start().await;
     Mock::given(method("POST"))
-        .respond_with(ResponseTemplate::new(429).set_body_string("rate limited"))
+        .respond_with(ResponseTemplate::new(400).set_body_string(echo))
         .mount(&server)
         .await;
 
     let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
-    match gw
+    let err = gw
+        .chat(Role::Complete, ChatRequest::new(vec![Message::user(echo)]))
+        .await
+        .unwrap_err();
+    assert!(matches!(err, Error::Status { status: 400 }), "{err:?}");
+    for shown in [err.to_string(), format!("{err:?}")] {
+        assert!(!shown.contains("maya"), "{shown}");
+        assert!(!shown.contains("Q4"), "{shown}");
+    }
+}
+
+#[tokio::test]
+async fn an_unreadable_answer_is_described_without_its_text() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(200)
+                .set_body_json(json!({"choices": "Dear Maya, the Q4 plan is attached"})),
+        )
+        .mount(&server)
+        .await;
+    let gw = gateway([(Role::Complete, provider(&server, "m", None))]);
+    let err = gw
         .chat(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
         .await
-    {
-        Err(Error::Status { status, body }) => {
-            assert_eq!(status, 429);
-            assert_eq!(body, "rate limited");
-        }
-        other => panic!("expected status error, got {other:?}"),
+        .unwrap_err();
+    assert!(matches!(err, Error::InvalidResponse(_)), "{err:?}");
+    for shown in [err.to_string(), format!("{err:?}")] {
+        assert!(!shown.contains("Maya"), "{shown}");
     }
+}
+
+#[tokio::test]
+async fn an_off_network_role_gets_no_content_without_opt_in() {
+    // Nothing listens there, and nothing is sent: the gateway refuses first.
+    let external = ProviderConfig::new("https://api.example.com/v1".parse().unwrap(), "m");
+    let gw = gateway([
+        (Role::Complete, external.clone()),
+        (Role::Embed, external.clone()),
+    ]);
+    let refused = |result: Result<_, Error>| {
+        matches!(
+            result,
+            Err(Error::ExternalContentRefused { host, .. }) if host == "api.example.com"
+        )
+    };
+    assert!(refused(
+        gw.chat(Role::Complete, ChatRequest::new(vec![Message::user("hi")]))
+            .await
+            .map(|_| ())
+    ));
+    assert!(refused(gw.embed(&["hi".into()]).await.map(|_| ())));
+    let err = gw
+        .chat(Role::Complete, ChatRequest::default())
+        .await
+        .unwrap_err();
+    assert!(
+        err.to_string()
+            .contains("CAMPBOOKS_AI__COMPLETE__EXTERNAL_CONTENT=allow"),
+        "{err}"
+    );
 }
 
 #[tokio::test]
@@ -140,6 +194,7 @@ async fn slow_provider_times_out() {
     let gw = Gateway::with_timeouts(
         AiConfig {
             roles: [(Role::Complete, provider(&server, "m", None))].into(),
+            ..AiConfig::default()
         },
         Duration::from_secs(1),
         Duration::from_millis(200),
@@ -164,4 +219,40 @@ async fn malformed_response_is_invalid_response() {
         .chat(Role::Decide, ChatRequest::new(vec![Message::user("hi")]))
         .await;
     assert!(matches!(err, Err(Error::InvalidResponse(_))));
+}
+
+#[tokio::test]
+async fn chat_and_embed_never_follow_a_redirect_off_the_box() {
+    let elsewhere = MockServer::start().await;
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .respond_with(
+            ResponseTemplate::new(308)
+                .insert_header("location", format!("{}/v1/x", elsewhere.uri())),
+        )
+        .mount(&server)
+        .await;
+    let gw = gateway([
+        (Role::Complete, provider(&server, "m", None)),
+        (Role::Embed, provider(&server, "e", None)),
+    ]);
+    let chat = gw
+        .chat(
+            Role::Complete,
+            ChatRequest::new(vec![Message::user("Subject: Q4 plan")]),
+        )
+        .await;
+    assert!(
+        matches!(chat, Err(Error::Status { status: 308 })),
+        "{chat:?}"
+    );
+    let embed = gw.embed(&["Subject: Q4 plan".into()]).await;
+    assert!(
+        matches!(embed, Err(Error::Status { status: 308 })),
+        "{embed:?}"
+    );
+    assert!(
+        elsewhere.received_requests().await.unwrap().is_empty(),
+        "the mail went to the redirect target"
+    );
 }

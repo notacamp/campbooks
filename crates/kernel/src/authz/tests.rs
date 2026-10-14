@@ -306,3 +306,34 @@ fn actions_round_trip() {
     }
     assert_eq!(Action::parse("own"), None);
 }
+
+#[test]
+fn container_viewers_follow_the_visibility_answer() {
+    const SEEN: ResourceType = ResourceType {
+        container: Some("t.box"),
+        grants: &[Grant::new(Grantee::ContainerViewers, &[Action::Read])],
+        ..ResourceType::new(
+            "t.seen",
+            "Lives in another module's box.",
+            Tenancy::Workspace,
+        )
+    };
+    let types: &'static [ResourceType] = Box::leak(Box::new([BOX, SEEN]));
+    let c = Catalogue::new([&Resources::declared(types)]).unwrap();
+    let caller = member(UserId::new(), Role::Owner);
+    let facts = in_box(OwnerFact::Nobody, None);
+    assert_eq!(
+        decide(&c, &caller, Action::Read, "t.seen", Some(&facts)),
+        Decision::NotFound
+    );
+    let seen = facts.visible(true);
+    assert_eq!(
+        decide(&c, &caller, Action::Read, "t.seen", Some(&seen)),
+        Decision::Allow
+    );
+    // Clients need their own grant, whatever the port says.
+    assert_eq!(
+        decide(&c, &client(), Action::Read, "t.seen", Some(&seen)),
+        Decision::NotFound
+    );
+}

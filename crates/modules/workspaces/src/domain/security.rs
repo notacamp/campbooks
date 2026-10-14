@@ -28,6 +28,12 @@ pub enum SecurityKind {
     /// A user asked to create a workspace on an instance whose signup needs
     /// approval.
     SignupRequested,
+    /// An administrator approved a signup request.
+    SignupApproved,
+    /// An administrator turned a signup request down.
+    SignupRejected,
+    /// A signup code was spent creating a workspace.
+    SignupCodeRedeemed,
 }
 
 impl SecurityKind {
@@ -43,6 +49,9 @@ impl SecurityKind {
             Self::MemberLeft => "member_left",
             Self::WorkspaceDeleted => "workspace_deleted",
             Self::SignupRequested => "signup_requested",
+            Self::SignupApproved => "signup_approved",
+            Self::SignupRejected => "signup_rejected",
+            Self::SignupCodeRedeemed => "signup_code_redeemed",
         }
     }
 }

@@ -146,9 +146,9 @@ export const SuggestionWithWhy: Story = {
   args: { path: `${PATH}/primary/${LEDGER.id}`, api: inbox() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "Why?" }));
+    await userEvent.click(await canvas.findByText("How Campbooks decided"));
     await expect(
-      canvas.getByText("Stream: It carries a mailing-list header (List-Unsubscribe)."),
+      canvas.getByText(/It carries a mailing-list header \(List-Unsubscribe\)\./u),
     ).toBeVisible();
   },
 };

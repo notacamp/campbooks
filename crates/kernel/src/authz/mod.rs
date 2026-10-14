@@ -150,6 +150,11 @@ pub enum Grantee {
     /// The owner, while their role in the container is at least this one
     /// (a draft's author who may still send from its inbox).
     OwnerWithContainerRole(&'static str),
+    /// Members who may see the resource's container, as the kernel's
+    /// [`Visibility`](crate::changes::Visibility) port answers: for records
+    /// of one module living in another module's container (an attention
+    /// item in an inbox).
+    ContainerViewers,
     /// Client tokens bound to the workspace: a narrower grant than a
     /// member's, listed explicitly.
     Clients,
@@ -250,6 +255,10 @@ pub struct Facts {
     /// Kept read-only (a disconnected mailbox kept as history): every
     /// action but `read` is refused.
     pub frozen: bool,
+    /// Whether the caller may see the container, as the visibility port
+    /// says; filled by [`authorize`] for types granting to
+    /// [`Grantee::ContainerViewers`].
+    pub container_visible: bool,
 }
 
 impl Facts {
@@ -260,6 +269,7 @@ impl Facts {
             container: None,
             container_role: None,
             frozen: false,
+            container_visible: false,
         }
     }
 
@@ -268,6 +278,13 @@ impl Facts {
     pub fn within(mut self, container: RecordRef, role: Option<String>) -> Self {
         self.container = Some(container);
         self.container_role = role;
+        self
+    }
+
+    /// The same facts, with the container visible to the caller or not.
+    #[must_use]
+    pub fn visible(mut self, visible: bool) -> Self {
+        self.container_visible = visible;
         self
     }
 
@@ -387,11 +404,12 @@ impl Catalogue {
                 else {
                     continue;
                 };
-                let ladder = declared
-                    .container
-                    .and_then(|container| self.get(container))
-                    .map(|container| container.roles)
-                    .unwrap_or_default();
+                // A container of a module not in this catalogue (a module's
+                // own tests) is checked where the full catalogue is built.
+                let Some(container) = declared.container.and_then(|c| self.get(c)) else {
+                    continue;
+                };
+                let ladder = container.roles;
                 if !ladder.contains(&role) {
                     return Err(format!(
                         "resource type `{}` grants to container role `{role}`, which its \
@@ -407,6 +425,15 @@ impl Catalogue {
     /// The type named `name`.
     pub fn get(&self, name: &str) -> Option<&ResourceType> {
         self.types.get(name).map(|(declared, _)| declared)
+    }
+
+    /// Containers some type names that no type declares: empty for a
+    /// complete catalogue (the server's tests check it).
+    pub fn missing_containers(&self) -> Vec<&'static str> {
+        self.iter()
+            .filter_map(|declared| declared.container)
+            .filter(|container| self.get(container).is_none())
+            .collect()
     }
 
     /// Whether it holds no type.
@@ -502,6 +529,7 @@ fn allowed(
                 .is_some_and(|role| workspace_rank(role) >= workspace_rank(min)),
             Grantee::ContainerRole(min) => access.user.is_some() && at_least(min),
             Grantee::OwnerWithContainerRole(min) => is_owner && at_least(min),
+            Grantee::ContainerViewers => access.user.is_some() && facts.container_visible,
             Grantee::Clients => access.user.is_none(),
             Grantee::OwningClients => access.user.is_none() && facts.owner == OwnerFact::Clients,
             // The main API never admits an administrator as one.
@@ -559,7 +587,26 @@ pub async fn authorize(
     let Some(port) = catalogue.facts_of(&resource.record_type) else {
         return Ok(Decision::NotFound);
     };
-    let facts = port.facts(conn, access, resource).await?;
+    let mut facts = port.facts(conn, access, resource).await?;
+    // A record in another module's container (an attention item in an
+    // inbox): the visibility port says whether the caller sees it.
+    let viewers = catalogue
+        .get(&resource.record_type)
+        .is_some_and(|declared| {
+            declared
+                .grants
+                .iter()
+                .any(|grant| grant.to == Grantee::ContainerViewers)
+        });
+    if viewers
+        && let Some(found) = facts.as_mut()
+        && let Some(container) = found.container.clone()
+    {
+        found.container_visible = state
+            .visibility
+            .container_visible(&state.db, access, &container)
+            .await?;
+    }
     let decision = decide(
         catalogue,
         access,
@@ -633,6 +680,7 @@ pub fn authorize_type(
                                 .is_some_and(|role| workspace_rank(role) >= workspace_rank(min)),
                             Grantee::ContainerRole(_)
                             | Grantee::OwnerWithContainerRole(_)
+                            | Grantee::ContainerViewers
                             | Grantee::Anyone => true,
                             Grantee::Clients | Grantee::OwningClients | Grantee::InstanceAdmins => {
                                 false

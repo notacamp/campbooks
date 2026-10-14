@@ -76,6 +76,35 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
     (header::X_FRAME_OPTIONS, "DENY"),
 ];
 
+/// Path prefixes whose responses carry people's data (the API, the web BFF
+/// and its proxied API, the admin API): never stored by a browser or a shared
+/// cache ([`no_store`]).
+pub const NO_STORE_PREFIXES: [&str; 3] = ["/api/", "/bff/", "/admin/"];
+
+/// `Cache-Control: no-store` and `Pragma: no-cache` on every response under
+/// [`NO_STORE_PREFIXES`], whatever the handler set (a handler's own
+/// `no-store` variant, such as `private, no-store`, is kept). One layer, so
+/// no endpoint can forget it.
+async fn no_store(request: AxumRequest, next: middleware::Next) -> axum::response::Response {
+    let path = request.uri().path();
+    let private = NO_STORE_PREFIXES
+        .iter()
+        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'));
+    let mut response = next.run(request).await;
+    if private {
+        let headers = response.headers_mut();
+        let stores = headers
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|value| !value.contains("no-store"));
+        if stores {
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        }
+        headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    }
+    response
+}
+
 /// Name of the OpenAPI security scheme every scoped operation references:
 /// `security(("bearer" = ["<scope>"]))`.
 pub const SECURITY_SCHEME: &str = "bearer";
@@ -175,6 +204,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
+        campbooks_attention::module(),
         campbooks_search::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
@@ -330,6 +360,8 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
+        (name = "attention", description = "What needs you: one queue per member of what the \
+            records you may open ask of you (conversations today), with Later per member."),
         (name = "search", description = "One search over the records you may open: \
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
@@ -564,6 +596,7 @@ fn compose(
             .layer(nosniff)
             .layer(referrer)
             .layer(frame)
+            .layer(middleware::from_fn(no_store))
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
             .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
@@ -1194,6 +1227,40 @@ mod tests {
             for (name, value) in &SECURITY_HEADERS {
                 assert_eq!(header(&raw, name), Some(*value), "{name}");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn api_responses_are_never_stored() {
+        let dir = WebDir::new();
+        let web = web_app(&dir);
+        for (raw, uri) in [
+            (fetch(&app(), "/api/v1/system/version", None).await, "api"),
+            (fetch(&app(), "/api/v1/nope", None).await, "api 404"),
+            (
+                fetch(&web, "/bff/api/v1/system/version", None).await,
+                "bff api",
+            ),
+            (fetch(&web, "/bff/session", None).await, "bff session"),
+            (
+                fetch(&web, "/admin/v1/system/overview", None).await,
+                "admin",
+            ),
+        ] {
+            assert_eq!(
+                header(&raw, &header::CACHE_CONTROL),
+                Some("no-store"),
+                "{uri}"
+            );
+            assert_eq!(header(&raw, &header::PRAGMA), Some("no-cache"), "{uri}");
+        }
+        // The web client's own files keep their caching.
+        for raw in [
+            fetch(&web, "/", HTML).await,
+            fetch(&web, "/assets/x.js", None).await,
+        ] {
+            assert_ne!(header(&raw, &header::CACHE_CONTROL), Some("no-store"));
+            assert_eq!(header(&raw, &header::PRAGMA), None);
         }
     }
 

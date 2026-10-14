@@ -32,13 +32,14 @@ pub enum ReadError {
     /// The provider refused or failed.
     #[error(transparent)]
     Provider(#[from] ProviderError),
-    /// The database failed.
-    #[error("database: {0}")]
+    /// The database failed. Shown by kind only: a database error's message
+    /// can quote the row it failed on.
+    #[error("{}", campbooks_kernel::redact::sqlx(.0))]
     Database(#[from] sqlx::Error),
     /// The blob store failed.
     #[error("blob store: {0}")]
     Blob(#[from] BlobError),
-    /// Stored data did not decode.
+    /// Stored data did not decode: what and where, never the data.
     #[error("{0}")]
     Corrupt(String),
     /// A query of the module failed.
@@ -191,8 +192,12 @@ pub async fn store_message(
         read: flags.read,
         starred: flags.starred,
     };
-    let document_bytes = serde_json::to_vec(&message)
-        .map_err(|e| ReadError::Corrupt(format!("encoding a message document: {e}")))?;
+    let document_bytes = serde_json::to_vec(&message).map_err(|e| {
+        ReadError::Corrupt(format!(
+            "encoding a message document: {}",
+            campbooks_kernel::redact::json(&e)
+        ))
+    })?;
     let document = store
         .put(workspace, document_bytes, "application/json")
         .await?;
@@ -232,8 +237,12 @@ pub async fn document(
     while let Some(chunk) = stream.next().await {
         bytes.extend_from_slice(&chunk?);
     }
-    serde_json::from_slice(&bytes)
-        .map_err(|e| ReadError::Corrupt(format!("a stored message document: {e}")))
+    serde_json::from_slice(&bytes).map_err(|e| {
+        ReadError::Corrupt(format!(
+            "a stored message document: {}",
+            campbooks_kernel::redact::json(&e)
+        ))
+    })
 }
 
 /// An index row's document reference.
@@ -245,4 +254,38 @@ pub fn document_ref(hash: &str, size: i64) -> Result<BlobRef, ReadError> {
         size: u64::try_from(size).unwrap_or(0),
         content_type: "application/json".to_owned(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::{blobs::BlobStore, config::BlobsConfig, tenancy::WorkspaceId};
+    use sqlx::PgPool;
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_corrupt_document_is_reported_without_its_content(db: PgPool) {
+        let store = BlobStore::memory(&BlobsConfig::default(), db);
+        let workspace = WorkspaceId::new().to_string();
+        // A message document with mail where a flag belongs: serde's own
+        // message quotes it.
+        let corrupt = br#"{"read": "Q4 plan from maya@northwind-studio.example"}"#;
+        let raw = serde_json::from_slice::<NormalizedMessage>(corrupt).unwrap_err();
+        assert!(raw.to_string().contains("maya@"), "{raw}");
+        let blob = store
+            .put(&workspace, corrupt.as_slice(), "application/json")
+            .await
+            .unwrap();
+        let err = document(&store, &workspace, &blob).await.unwrap_err();
+        // What sync jobs store in `last_error` and log.
+        for shown in [err.to_string(), format!("{err:?}")] {
+            assert!(!shown.contains("maya"), "{shown}");
+            assert!(!shown.contains("Q4"), "{shown}");
+        }
+        assert!(
+            err.to_string()
+                .starts_with("a stored message document: Data error at line 1"),
+            "{err}"
+        );
+    }
 }

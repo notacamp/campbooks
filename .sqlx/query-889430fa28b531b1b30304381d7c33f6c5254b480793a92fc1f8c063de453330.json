@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO workspaces.signup_requests (user_id) VALUES ($1)\n                     ON CONFLICT (user_id) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "889430fa28b531b1b30304381d7c33f6c5254b480793a92fc1f8c063de453330"
+}

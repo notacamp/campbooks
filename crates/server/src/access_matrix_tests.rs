@@ -339,6 +339,33 @@ impl World {
         [message, conversation, attachment, decision, label]
     }
 
+    /// What needs the inbox's readers: an attention item about the
+    /// conversation.
+    async fn seed_item(
+        &self,
+        inbox: campbooks_conversations::model::InboxId,
+        conversation: &str,
+        message: &str,
+    ) -> Uuid {
+        let item = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO attention.items
+                 (id, workspace_id, record_type, record_id, container_type, container_id,
+                  cause_type, cause_id, reason, trust, since, state, producer_revision)
+             VALUES ($1, $2, 'conversations.conversation', $3, 'conversations.inbox', $4,
+                     'conversations.message', $5, 'reply', 'sure', now(), 'open', 1)",
+        )
+        .bind(item)
+        .bind(self.a.as_uuid())
+        .bind(conversation)
+        .bind(inbox.to_string())
+        .bind(message)
+        .execute(&self.db)
+        .await
+        .unwrap();
+        item
+    }
+
     /// One record of every other type, and what the inbox holds.
     async fn seed_records(
         &mut self,
@@ -362,6 +389,7 @@ impl World {
         .execute(&db)
         .await
         .unwrap();
+        let item = self.seed_item(inbox, &conversation, &message).await;
         let draft = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO conversations.drafts (id, workspace_id, inbox_id, author, kind)
@@ -414,6 +442,7 @@ impl World {
             ("conversations.label", label.clone()),
             ("conversations.correction", correction.to_string()),
             ("conversations.draft", draft.to_string()),
+            ("attention.item", item.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
             "SELECT id::text FROM conversations.conversations WHERE inbox_id = $1
@@ -423,7 +452,13 @@ impl World {
         .fetch_all(&db)
         .await
         .unwrap();
-        ids.extend([inbox.to_string(), draft.to_string(), attachment, label]);
+        ids.extend([
+            inbox.to_string(),
+            draft.to_string(),
+            item.to_string(),
+            attachment,
+            label,
+        ]);
         self.inbox_ids = ids;
     }
 
@@ -453,6 +488,10 @@ impl World {
             "conversations.draft" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Sender))).within(inbox, role)
             }
+            // Everything else inside the inbox, this module's or another's.
+            "attention.item" => Facts::owned_by(OwnerFact::Nobody)
+                .within(inbox, None)
+                .visible(role.is_some()),
             name if name.starts_with("conversations.") => {
                 Facts::owned_by(OwnerFact::Nobody).within(inbox, role)
             }
@@ -519,6 +558,7 @@ impl World {
 async fn every_resource_answers_each_principal_as_its_catalogue_declares(db: PgPool) {
     let world = World::new(db).await;
     let catalogue = world.state.resources.clone();
+    assert_eq!(catalogue.missing_containers(), Vec::<&str>::new());
     let workspace_types: Vec<_> = catalogue
         .iter()
         .filter(|declared| declared.tenancy == Tenancy::Workspace)
@@ -650,6 +690,13 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "identity.register_passkey" => json!({"credential": {}}),
         "identity.rename_passkey" => json!({"name": "Laptop"}),
         "identity.register_client" => json!({"name": "Matrix agent", "scopes": []}),
+        "attention.snooze" => json!({"until": chrono::Utc::now() + chrono::TimeDelta::days(1)}),
+        "conversations.resolve_need" => {
+            json!({"outcome": "done", "message_id": world.instances["conversations.message"]})
+        }
+        "conversations.confirm_need" => {
+            json!({"message_id": world.instances["conversations.message"]})
+        }
         _ => return None,
     })
 }
@@ -666,6 +713,7 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.message" => "{message_id}",
         "conversations.attachment" => "{attachment_id}",
         "conversations.draft" => "{draft_id}",
+        "attention.item" => "{item_id}",
         "conversations.inbox" if id == "conversations.create_draft" => {
             return world.instances.get(resource).cloned();
         }
@@ -693,6 +741,7 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{connection_id}", &world.instances["connectors.connection"])
         .replace("{label_id}", &world.instances["conversations.label"])
         .replace("{user_id}", &world.instances["workspaces.member"])
+        .replace("{item_id}", &world.instances["attention.item"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 

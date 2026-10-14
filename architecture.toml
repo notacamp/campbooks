@@ -172,3 +172,7 @@ reason = "Way-in and connected-app notices to come (campbooks-cloud#117 batch 3)
 [[access.unconsumed_events]]
 name = "identity.consent_revoked"
 reason = "Connected-app notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "attention.item_changed"
+reason = "The change feed: Home and the inbox's need chips refresh from it."

@@ -127,6 +127,10 @@ pub struct Config {
     #[serde(default)]
     pub changes: ChangesConfig,
 
+    /// The event log (`CAMPBOOKS_EVENTS__*`).
+    #[serde(default)]
+    pub events: EventsConfig,
+
     /// Traces and metrics export (`CAMPBOOKS_TELEMETRY__*`); off by default.
     #[serde(default)]
     pub telemetry: TelemetryConfig,
@@ -210,8 +214,8 @@ impl Config {
                  (letters, digits, underscores)"
             ));
         }
-        self.signup.check()?;
         self.changes.check()?;
+        self.events.check()?;
         self.telemetry.check()
     }
 }
@@ -394,7 +398,8 @@ pub enum SignupPolicy {
     /// Nobody until an instance administrator approves them; the request is
     /// recorded.
     Approval,
-    /// Whoever presents one of the configured signup codes.
+    /// Whoever presents a valid signup code: one configured in the
+    /// environment, or one an administrator minted.
     Code,
 }
 
@@ -407,7 +412,9 @@ pub struct SignupConfig {
     /// `approval` or `code`.
     pub policy: SignupPolicy,
     /// `CAMPBOOKS_SIGNUP__CODES`: comma-separated codes accepted under the
-    /// `code` policy. Each can be used any number of times. Secret.
+    /// `code` policy. Each can be used any number of times. Secret. This is
+    /// the legacy path: administrators mint single-use codes in the admin
+    /// section, which need no setting.
     pub codes: Option<SecretString>,
 }
 
@@ -425,17 +432,6 @@ impl SignupConfig {
                     .collect()
             })
             .unwrap_or_default()
-    }
-
-    /// Startup check: the `code` policy needs at least one code.
-    pub fn check(&self) -> Result<(), String> {
-        if self.policy == SignupPolicy::Code && self.codes().is_empty() {
-            return Err(
-                "CAMPBOOKS_SIGNUP__POLICY=code needs at least one code in CAMPBOOKS_SIGNUP__CODES"
-                    .to_owned(),
-            );
-        }
-        Ok(())
     }
 }
 
@@ -595,9 +591,11 @@ pub struct JobsConfig {
     /// is handed to another worker.
     pub lease_seconds: u64,
     /// How long succeeded jobs are kept before the hourly prune deletes them
-    /// (`CAMPBOOKS_JOBS__RETENTION_HOURS`). Failed jobs are kept for
-    /// inspection, and the event log is never pruned.
+    /// (`CAMPBOOKS_JOBS__RETENTION_HOURS`).
     pub retention_hours: u64,
+    /// How long failed jobs are kept for inspection before the hourly prune
+    /// deletes them (`CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS`, default 30).
+    pub failed_retention_days: u64,
     /// How long a stopping worker waits for running jobs to finish before it
     /// hands them back to the queue (`CAMPBOOKS_JOBS__SHUTDOWN_GRACE_SECONDS`).
     /// Keep it below the container stop timeout (10 s by default).
@@ -617,6 +615,7 @@ impl Default for JobsConfig {
             poll_interval_ms: 5_000,
             lease_seconds: 60,
             retention_hours: 168,
+            failed_retention_days: 30,
             shutdown_grace_seconds: 8,
             retry_base_ms: 1_000,
             retry_max_seconds: 3_600,
@@ -638,6 +637,11 @@ impl JobsConfig {
             ),
             ("LEASE_SECONDS", self.lease_seconds >= 3, "at least 3"),
             ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
+            (
+                "FAILED_RETENTION_DAYS",
+                self.failed_retention_days >= 1,
+                "at least 1",
+            ),
             ("RETRY_BASE_MS", self.retry_base_ms >= 1, "at least 1"),
             (
                 "RETRY_MAX_SECONDS",
@@ -648,6 +652,34 @@ impl JobsConfig {
         match checks.iter().find(|(_, ok, _)| !ok) {
             Some((name, _, rule)) => Err(format!("CAMPBOOKS_JOBS__{name} must be {rule}")),
             None => Ok(()),
+        }
+    }
+}
+
+/// Event log settings (`CAMPBOOKS_EVENTS__*`, ADR 0012).
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct EventsConfig {
+    /// How long published events are kept before the hourly prune deletes
+    /// them (`CAMPBOOKS_EVENTS__RETENTION_DAYS`, default 90). Replaying a
+    /// consumer reaches back this far at most; an event still waiting to be
+    /// delivered is never pruned.
+    pub retention_days: u64,
+}
+
+impl Default for EventsConfig {
+    fn default() -> Self {
+        Self { retention_days: 90 }
+    }
+}
+
+impl EventsConfig {
+    /// Startup check: the retention is at least a day.
+    pub fn check(&self) -> Result<(), String> {
+        if self.retention_days >= 1 {
+            Ok(())
+        } else {
+            Err("CAMPBOOKS_EVENTS__RETENTION_DAYS must be at least 1".to_owned())
         }
     }
 }
@@ -961,6 +993,8 @@ mod tests {
         assert_eq!(config.auth.audience, "campbooks-api");
         assert_eq!(config.auth.leeway_seconds, 60);
         assert_eq!(config.jobs, JobsConfig::default());
+        assert_eq!(config.jobs.failed_retention_days, 30);
+        assert_eq!(config.events.retention_days, 90);
         assert!(config.jobs.check().is_ok());
         assert_eq!(config.database_role(), Some("campbooks_app"));
         assert_eq!(config.env, Environment::Production);
@@ -1049,6 +1083,36 @@ mod tests {
         assert_eq!(config.auth.audience, "my-api");
         assert_eq!(config.auth.leeway_seconds, 5);
         assert!(config.auth.check().is_ok());
+    }
+
+    #[test]
+    fn retention_is_configurable_and_at_least_a_day() {
+        let figment = figment(&[("database_url", "postgres://localhost/x")])
+            .merge(Serialized::default(
+                "events",
+                serde_json::json!({ "retention_days": 30 }),
+            ))
+            .merge(Serialized::default(
+                "jobs",
+                serde_json::json!({ "failed_retention_days": 7 }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert_eq!(config.events.retention_days, 30);
+        assert_eq!(config.jobs.failed_retention_days, 7);
+        assert!(config.check().is_ok());
+
+        let mut zero = config.clone();
+        zero.events.retention_days = 0;
+        assert!(
+            zero.check()
+                .unwrap_err()
+                .contains("CAMPBOOKS_EVENTS__RETENTION_DAYS")
+        );
+        let jobs = JobsConfig {
+            failed_retention_days: 0,
+            ..JobsConfig::default()
+        };
+        assert!(jobs.check().unwrap_err().contains("FAILED_RETENTION_DAYS"));
     }
 
     #[test]
@@ -1294,13 +1358,10 @@ mod tests {
                 .contains("CAMPBOOKS_CHANGES__MAX_CONNECTION_SECONDS")
         );
         config.changes = ChangesConfig::default();
+        // The `code` policy needs no environment code: administrators mint
+        // single-use codes in the database.
         config.signup.policy = SignupPolicy::Code;
-        assert!(
-            config
-                .check()
-                .unwrap_err()
-                .contains("CAMPBOOKS_SIGNUP__CODES")
-        );
+        assert!(config.check().is_ok());
         for policy in ["open", "invite_only", "approval"] {
             let figment = figment(&[("database_url", "postgres://localhost/x")]).merge(
                 Serialized::default("signup", serde_json::json!({ "policy": policy })),

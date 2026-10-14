@@ -1,11 +1,15 @@
 // Records a scenario at 375px (mobile) and desktop widths as .webm files.
 // Usage: pnpm --dir clients record <scenario> [--base-url http://localhost:5173]
+// The base URL must be on this machine (localhost, 127.0.0.1, [::1]): a
+// recording is never made against a deployed instance. `--allow-remote`
+// overrides that, for a disposable instance holding demo data only.
 import { existsSync, readdirSync, mkdirSync, renameSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { chromium, type BrowserContextOptions } from "playwright";
 import type { ScenarioContext } from "../recordings/context.ts";
+import { refuseTarget } from "./record-target.ts";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "recordings");
 const scenariosDir = path.join(root, "scenarios");
@@ -31,9 +35,14 @@ function fail(message: string): never {
 async function main(): Promise<void> {
   const { values, positionals } = parseArgs({
     allowPositionals: true,
-    options: { "base-url": { type: "string", default: "http://localhost:5173" } },
+    options: {
+      "base-url": { type: "string", default: "http://localhost:5173" },
+      "allow-remote": { type: "boolean", default: false },
+    },
   });
   const baseURL = values["base-url"];
+  const refused = refuseTarget(baseURL, values["allow-remote"]);
+  if (refused !== undefined) fail(refused);
   const name = positionals[0];
   const available = readdirSync(scenariosDir)
     .filter((file) => file.endsWith(".ts"))

@@ -32,6 +32,34 @@ All notable changes to Campbooks Next are documented here. The format follows
   log and job queue. A search cursor only works in the workspace it came from, and
   search reports `indexing` only to callers who can see an inbox.
 - **Self-hosters:** three new migrations run on start, with nothing to configure.
+- **Mail no longer goes to an AI provider outside your network unless you say
+  so.** Each AI role's address is checked: a loopback or private address,
+  `localhost`, a single-label name such as a compose service (`laya`,
+  `ollama`) or a host you list in `CAMPBOOKS_AI__INTERNAL_HOSTS` counts as
+  your network; anything else gets no mail content until you set
+  `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow` for that role. Without it the
+  gateway refuses (`ai_external_content_refused`) and the decide pass leaves
+  sorting to the rules. Admin → System shows where each role is and whether it
+  receives mail. **Self-hosters using a hosted provider:** add the opt-in for
+  each such role, or it stops being used after this upgrade.
+- Campbooks no longer follows HTTP redirects from AI providers, Gmail, Zoho
+  or the identity provider's key endpoint: a redirect could have carried mail
+  or tokens to another host. A 3xx is reported as an error.
+- Errors no longer carry mail: an AI provider's error body is not kept, and
+  logs and failed jobs describe database and JSON errors by kind and position
+  (SQLSTATE, constraint, table), never the values they quote.
+- API responses (`/api/`, `/bff/`, `/admin/`) carry `Cache-Control: no-store`
+  and `Pragma: no-cache`, so browsers and proxies don't keep them.
+- `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
+  `[::1]` unless `--allow-remote` is passed.
+
+### Changed
+- The event log is no longer kept forever: events older than
+  `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
+  events still being delivered, and failed jobs older than
+  `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS` (default 30) go too. Deleting a
+  workspace now also deletes its events and finished jobs when it is purged.
+  The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
@@ -41,6 +69,33 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
+  join an instance that approves new accounts and approve or reject each request
+  (a rejection can carry a note only administrators see), and mint, copy once and
+  revoke **single-use signup codes** for instances that ask for a code. A person
+  waiting for approval, approved, or not approved sees that on the create-workspace
+  screen the next time they open the app (they are not emailed yet). Codes are
+  stored as digests, work for the number of uses and until the day you set, and are
+  spent when the workspace is created, so two people cannot share the last use.
+  `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and
+  `CAMPBOOKS_SIGNUP__POLICY=code` no longer needs it to start. A refused request
+  now says `signup_rejected`, and asking again no longer repeats the request.
+- What needs you. Home now lists what your mail asks of you, grouped Review,
+  Reply, Decide, Do and Pay, due soonest first: a question you owe an answer
+  to, a request, a bill, a phishing warning. Each says why in a sentence and
+  quotes the sender's own words; the numbers stay behind "How Campbooks
+  decided". J/K, Enter, R reply, E done, L later, X not needed (or "It's
+  safe"), Z undo, and "Done today" lists what left your list. The inbox shows
+  the same as chips on rows and in the reader's note, which no longer shows a
+  percentage. It runs on the rules alone (no AI role needed); replying from
+  any client, archiving a reply or a warning, and the trash clear an item;
+  bills and requests stay until Done. Only mail from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) counts. A new
+  module, `attention`, with the scopes `attention:read` and `attention:write`
+  (the web app gets them at the next sign-in). "Done today" and what is
+  overdue follow your device's time zone; deadline words ("Thursday") are
+  read against the message's date in UTC until accounts carry a time zone. Migrations add
+  `conversations.needs` and the `attention` schema; nothing to do.
 - Apps other than Campbooks on the web can use your account, with your say
   each time. A consent screen names the app, says whether anyone vouches for
   it, lists what it will be able to do in plain words, and asks which

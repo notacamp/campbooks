@@ -14,7 +14,17 @@ use crate::{
     testkit::{Kit, contract, fixture},
 };
 
-const FIXTURES: [&str; 6] = ["en", "pt-PT", "es-ES", "fr", "followup", "late-parent"];
+const FIXTURES: [&str; 9] = [
+    "en",
+    "pt-PT",
+    "es-ES",
+    "fr",
+    "followup",
+    "late-parent",
+    "needs",
+    "needs-replied",
+    "needs-followup",
+];
 
 async fn setup(kit: &Kit, address: &str) -> (WorkspaceId, InboxId) {
     let workspace = WorkspaceId::new();

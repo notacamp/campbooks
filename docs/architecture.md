@@ -331,7 +331,10 @@ workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
 key) or an `ordering_key` (jobs sharing it run one at a time, in order).
 Recurring work is `.schedule::<J>(every)`; each tick runs once however many
 workers run. A handler returns `JobError::Retry` (backoff with jitter) or
-`JobError::Fatal` (marked failed and kept for inspection). Workers claim jobs
+`JobError::Fatal` (marked failed and kept for inspection, 30 days by
+default: `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS`; the event log is pruned
+after `CAMPBOOKS_EVENTS__RETENTION_DAYS`, 90 by default, except events still
+being delivered). Workers claim jobs
 fairly across workspaces, lease them while they run, and reclaim jobs whose
 worker died. The design and its trade-offs are ADR 0012.
 
@@ -381,6 +384,18 @@ coarse choice and a fine one). Probabilities pass through a per (question
 type, option count) temperature, from config today and refitted from user
 corrections later. A module acts on an answer only through
 `answer.accept_if(threshold)` and asks the user below it.
+
+**Mail stays on the instance's network unless the operator opts in.** Every
+call that carries content (`chat`, `embed`, `decide`) goes through
+`AiConfig::provider_for_content`: a role whose base URL is off the
+instance's network (anything but a loopback or private address, `localhost`,
+a single-label compose name, or a host in `CAMPBOOKS_AI__INTERNAL_HOSTS`;
+never decided by DNS) is refused with `Error::ExternalContentRefused` unless
+`CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. The health probe sends no
+content and runs for every configured role. Provider error bodies are never
+kept (`Error::Status` holds the code only), and errors that would quote data
+are described by kind through `campbooks_kernel::redact` (a serde error's
+category and position, a Postgres error's SQLSTATE, constraint and table).
 
 The model is one **strategy** among several behind
 `campbooks_ai::decide::strategy::Strategy`, which all return the same

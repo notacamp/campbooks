@@ -21,7 +21,7 @@ mod gateway;
 mod health;
 mod telemetry;
 
-pub use config::{AiConfig, Protocol, ProviderConfig, Role};
+pub use config::{AiConfig, ExternalContent, Location, Protocol, ProviderConfig, Role};
 pub use error::Error;
 pub use health::{PROBE_CACHE, PROBE_TIMEOUT, RoleHealth, unconfigured};
 

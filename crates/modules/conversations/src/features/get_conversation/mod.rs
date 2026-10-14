@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     blobs::BlobRef,
@@ -26,6 +26,7 @@ use crate::{
         attachments::is_raster,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
+        policy::Policy,
         suggestions::{self, DecisionView},
     },
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
@@ -156,6 +157,7 @@ pub struct Bodies {
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    Extension(policy): Extension<Policy>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationDetail>> {
@@ -202,10 +204,13 @@ pub async fn handler(
         .rev()
         .find(|r| r.direction == crate::model::Direction::Inbound.as_str())
         .map(|r| r.id);
-    let decisions = match newest_inbound {
+    let mut decisions = match newest_inbound {
         Some(message) => suggestions::for_message(&mut tx, message).await?,
         None => Vec::new(),
     };
+    for view in &mut decisions {
+        view.threshold = suggestions::threshold(&policy, view);
+    }
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;

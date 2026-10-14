@@ -23,7 +23,7 @@ is built, what data each module owns, and the events.
 
 ## Data ownership and migrations
 
-- `kernel` (`20261019100000_kernel__workspace_isolation`):
+- `kernel` (`20261019110000_kernel__workspace_isolation`):
   - RLS on `changes`, `change_heads`, `blobs` and `blob_refs`: a
     transaction with no workspace set sees every row (the kernel's
     cross-workspace workers), and one with a workspace set sees only that
@@ -37,11 +37,11 @@ is built, what data each module owns, and the events.
   workspace sees every kernel row: module code cannot reach that path
   (`cargo xtask arch` rejects `.begin()` and pool queries on workspace
   tables in modules), and module tables stay strict.
-- `connectors` (`…100100_connectors__schedule_policies`):
+- `connectors` (`…110100_connectors__schedule_policies`):
   `maintenance_reads_schedule` becomes `FOR SELECT`, and
   `maintenance_leases_schedule` is a new `FOR UPDATE` policy. The dispatcher
   can no longer insert or delete schedule rows.
-- `conversations` (`…100200_conversations__inbox_lifecycle`):
+- `conversations` (`…110200_conversations__inbox_lifecycle`):
   `inboxes.owner` (backfilled from the managing member) and
   `inboxes.detached_at`; `removed_inboxes` (ids and a timestamp, RLS).
 

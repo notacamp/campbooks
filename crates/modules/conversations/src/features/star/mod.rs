@@ -49,7 +49,7 @@ pub async fn star(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Star)
+    flags::apply(&state, &workspace.access, id, Flag::Star, None)
         .await
         .map(Json)
 }
@@ -86,7 +86,7 @@ pub async fn unstar(
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    flags::apply(&state, &workspace.access, id, Flag::Unstar)
+    flags::apply(&state, &workspace.access, id, Flag::Unstar, None)
         .await
         .map(Json)
 }

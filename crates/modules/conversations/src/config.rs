@@ -8,6 +8,10 @@ use serde::Deserialize;
 /// backfill), unless configured otherwise.
 pub const DEFAULT_DECIDE_BACKFILL_DAYS: u32 = 14;
 
+/// Only inbound messages sent within this many days raise a need (attention),
+/// unless configured otherwise.
+pub const DEFAULT_NEEDS_WINDOW_DAYS: u32 = 14;
+
 /// Seconds a send waits before it leaves, so it can be taken back, unless
 /// configured otherwise.
 pub const DEFAULT_UNDO_SEND_SECONDS: u32 = 10;
@@ -30,6 +34,15 @@ pub struct ConversationsConfig {
     /// most 60; 0 sends at once).
     #[serde(default = "default_undo_send_seconds")]
     pub undo_send_seconds: u32,
+    /// Only inbound messages sent within this many days raise a need on the
+    /// members' Home, so a first sync of old mail fills nothing
+    /// (`CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS`, default 14).
+    #[serde(default = "default_needs_window_days")]
+    pub needs_window_days: u32,
+}
+
+const fn default_needs_window_days() -> u32 {
+    DEFAULT_NEEDS_WINDOW_DAYS
 }
 
 const fn default_undo_send_seconds() -> u32 {
@@ -45,6 +58,7 @@ impl Default for ConversationsConfig {
         Self {
             decide_backfill_days: DEFAULT_DECIDE_BACKFILL_DAYS,
             undo_send_seconds: DEFAULT_UNDO_SEND_SECONDS,
+            needs_window_days: DEFAULT_NEEDS_WINDOW_DAYS,
         }
     }
 }
@@ -84,6 +98,7 @@ mod tests {
         let config = ConversationsConfig::from_figment(&Figment::new()).unwrap();
         assert_eq!(config.decide_backfill_days, 14);
         assert_eq!(config.undo_send_seconds, 10);
+        assert_eq!(config.needs_window_days, 14);
     }
 
     #[test]

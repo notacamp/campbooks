@@ -11,6 +11,12 @@
     "signup_invite_only": "New accounts on this instance are by invitation only.",
     "signup_requires_approval": "Your request to join was sent. An administrator has to approve it before you can create a workspace.",
     "signup_code_invalid": "This signup code is not valid.",
-    "last_owner": "A workspace needs at least one owner. Make someone else an owner first."
+    "last_owner": "A workspace needs at least one owner. Make someone else an owner first.",
+    "signup_rejected": "Your request to join was not approved. Contact the instance's administrator if you think this is a mistake.",
+    "invalid_label": "The label must be 1 to {{max}} characters long.",
+    "invalid_max_uses": "The number of uses must be between 1 and {{max}}.",
+    "invalid_expiry": "The expiry must be in the future.",
+    "invalid_reason": "The reason must be at most {{max}} characters long.",
+    "invalid_cursor": "This page cursor is not valid."
   }
 }

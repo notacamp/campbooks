@@ -15,13 +15,13 @@ use campbooks_kernel::{
     changes::{Audience, Change as FeedChange},
     tenancy::UserId,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ConnectionId, ConversationId, DraftId, InboxId, LabelId, MessageId,
-    SendId, Stream,
+    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, LabelId,
+    MessageId, NeedReason, NeedTrust, SendId, Stream,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -214,6 +214,67 @@ impl DomainEvent for ConversationChanged {
             FeedChange::delete(record)
         };
         vec![change.within(inbox_record(self.inbox))]
+    }
+}
+
+/// What a conversation needs, as `need_changed` carries it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedFacts {
+    /// Why.
+    pub reason: NeedReason,
+    /// How much Campbooks stands behind it.
+    pub trust: NeedTrust,
+    /// When it is due, when the message names a date that resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_on: Option<NaiveDate>,
+    /// Whether it is for today.
+    pub urgent: bool,
+}
+
+/// A conversation's need changed: it opened, changed, or was cleared.
+/// Ids, enums and a date only (`contracts/conversations.need_changed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the need.
+    pub inbox: InboxId,
+    /// The conversation.
+    pub conversation: ConversationId,
+    /// The inbound message the need comes from.
+    pub message: MessageId,
+    /// Grows with every change of this conversation's need; apply only
+    /// newer ones (deliveries are not ordered).
+    pub revision: i64,
+    /// When that message was sent.
+    pub sent_at: DateTime<Utc>,
+    /// The need, or `None` once cleared.
+    pub need: Option<NeedFacts>,
+    /// Why it was cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleared_because: Option<ClearCause>,
+    /// The member who cleared it, when one did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleared_by: Option<UserId>,
+    /// The conversation's newest inbound message: when it changes, the
+    /// sender wrote again (a member's Later ends) even if the need did not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_message: Option<MessageId>,
+}
+
+impl DomainEvent for NeedChanged {
+    const NAME: &'static str = "conversations.need_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+        ]
     }
 }
 
