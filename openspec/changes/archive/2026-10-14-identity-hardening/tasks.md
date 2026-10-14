@@ -33,3 +33,6 @@
 - [x] 5.5 Retired BFF token hashes kept until the session ends (`bff.retired_tokens`)
 - [x] 5.6 Look-alike names: small capitals, stroked letters, ligatures; unknown letters as wildcards
 - [x] 5.7 `aria-expanded` on Sign out everywhere; CHANGELOG upgrade notes
+- [x] 5.8 Names: drop every mark (general category M), `rn` as `m`, at most two unknown letters per match
+- [x] 5.9 BFF: a lost rotation gets a fresh one (`token_delivered`); theft only once the successor was used
+- [x] 5.10 `lock_timeout` in the three migrations

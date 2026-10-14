@@ -32,13 +32,20 @@ that 429 `rate_limited`. Calls made inside the server SHALL not be counted.
 ### Requirement: A copied web session ends
 The web BFF SHALL accept a rotated-away session cookie only during its
 two-minute grace. Presented later, however many rotations later while the
-session lives, the session SHALL end everywhere it reaches: the web session,
-its refresh token at the issuer and the issuer session; the log line SHALL
-name no session or person.
+session lives, once its successor has been used, the session SHALL end
+everywhere it reaches: the web session, its refresh token at the issuer and
+the issuer session; the log line SHALL name no session or person. While the
+successor has never been presented (the response carrying it was lost), the
+old cookie SHALL instead get a fresh one, and the undelivered successor SHALL
+count as rotated away.
 
 #### Scenario: An old cookie comes back
 - **WHEN** a session's cookie rotated three minutes ago and the old value is presented
 - **THEN** neither browser is signed in any more and the session's refresh token is revoked
+
+#### Scenario: The new cookie never arrived
+- **WHEN** a rotation's response is lost and the browser presents its old cookie three minutes later
+- **THEN** it stays signed in with a fresh cookie, nothing is revoked, and the lost cookie, presented later, ends the session
 
 #### Scenario: A copy two rotations old
 - **WHEN** a session rotated twice while in use and a copy of its first cookie is presented
@@ -46,11 +53,13 @@ name no session or person.
 
 ### Requirement: Names that read as Campbooks
 Before deciding whether an app's name reads as Campbooks or Not A Camp, the
-server SHALL decompose it for compatibility (NFKD), drop combining marks,
-split ligatures, and fold case, spacing, look-alike punctuation and letters
-(Cyrillic, Greek, small capitals, letters with a stroke), so full-width,
-mathematical, circled and accented variants count too; any other letter
-outside ASCII SHALL count as any letter.
+server SHALL decompose it for compatibility (NFKD), drop every mark
+(general category M, in any script), split ligatures, and fold case,
+spacing, look-alike punctuation and letters (Cyrillic, Greek, small
+capitals, letters with a stroke, `rn` for `m`), so full-width, mathematical,
+circled and accented variants count too; any other letter outside ASCII
+SHALL count as any letter, but a match SHALL rest on at most two such
+letters, so a name in another script is not refused for its length alone.
 
 #### Scenario: A full-width name
 - **WHEN** a workspace registers an app named `Ｃａｍｐｂｏｏｋｓ` or `Cámpbooks`
@@ -59,6 +68,10 @@ outside ASCII SHALL count as any letter.
 #### Scenario: Letters with no decomposition
 - **WHEN** a workspace registers an app named `Campbøøks` or `ᴄᴀᴍᴘʙᴏᴏᴋꜱ`
 - **THEN** the answer is 400 `client_name_reserved`
+
+#### Scenario: Other scripts
+- **WHEN** a workspace registers an app named `メールアシスタントプロ`, `José` or `Françoise`
+- **THEN** it is registered under that name
 
 ## MODIFIED Requirements
 

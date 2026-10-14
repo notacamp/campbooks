@@ -78,6 +78,7 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
         .map(|w| w["provider"].as_str().unwrap())
         .collect();
     assert_eq!(providers, ["google", "zoho"]);
+    assert_eq!(ways["items"][0]["linked_via"], "sign_up");
     assert_eq!(ways["items"][1]["linked_via"], "link");
     assert_eq!(ways["items"][1]["email"], "zoho-sam@example.com");
     assert_eq!(ways["providers"], json!(["google", "microsoft", "zoho"]));

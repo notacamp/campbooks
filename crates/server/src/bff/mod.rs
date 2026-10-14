@@ -340,21 +340,35 @@ impl Inner {
             }
             return Ok(None);
         };
+        let mut rotated = None;
         if !session.current && session.rotated_at <= now - ROTATION_GRACE {
-            // A token rotated away minutes ago, presented again: the cookie
-            // was copied, and either copy may be the thief's. The session
-            // ends everywhere it reaches.
-            tracing::warn!(
-                "a rotated-away web session token was presented again; the session ends"
+            if session.token_delivered {
+                // A token rotated away minutes ago, presented again after its
+                // successor was used: the cookie was copied, and either copy
+                // may be the thief's. The session ends everywhere it reaches.
+                tracing::warn!(
+                    "a rotated-away web session token was presented again; the session ends"
+                );
+                self.terminate(session.id).await?;
+                return Ok(None);
+            }
+            // The successor never reached this browser (the response that
+            // carried it was lost): it gets another one.
+            let fresh = random_token();
+            if !store::reissue(&self.db, session.id, &token_hash, &hash(&fresh), now).await? {
+                return Ok(None);
+            }
+            rotated = Some(
+                self.cookies
+                    .set_session(&fresh, seconds_until(session.expires_at, now)),
             );
-            self.terminate(session.id).await?;
-            return Ok(None);
+        } else if session.current && !session.token_delivered {
+            store::delivered(&self.db, session.id, &token_hash).await?;
         }
         if now - session.last_seen_at >= TOUCH_EVERY {
             let idle_until = (now + self.timeouts.idle).min(session.expires_at);
             store::touch(&self.db, session.id, now, idle_until).await?;
         }
-        let mut rotated = None;
         if session.current && now - session.rotated_at >= self.timeouts.rotate {
             let fresh = random_token();
             if store::rotate(&self.db, session.id, &token_hash, &hash(&fresh), now).await? {

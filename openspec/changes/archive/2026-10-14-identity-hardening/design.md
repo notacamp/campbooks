@@ -62,7 +62,12 @@ kept until the session ends (cascade). A retired token presented at any time
 ends the session the same way, so an idle victim's copied cookie still trips
 it while the thief keeps the session alive. The memory is bounded: one row per
 rotation, at most the session's lifetime over the rotation period (about 720
-with the defaults of 30 days and one hour).
+with the defaults of 30 days and one hour). A rotated-away token is a theft
+signal only once its successor has been presented (`token_delivered`): until
+then the response carrying the new cookie may have been lost (an aborted
+fetch, a reload, a sleeping laptop), and the old token gets a fresh rotation
+instead of a sign-out; the undelivered successor is retired, so a copy of it
+presented later still ends the session.
 
 ### Passkeys need a fresh sign-in
 `start_passkey_registration` asks for a sign-in from the last five minutes
@@ -98,6 +103,16 @@ In-process calls (the BFF's own) have no address and are never counted.
 the last sign-in; members' addresses are listed only when verified, and the
 "already a member" check of an invitation matches verified addresses only (an
 unverified claim cannot block an invitation).
+
+### Look-alike app names
+Every mark (general category M, from `icu_properties`, already in the
+graph) is dropped after NFKD, so vowel signs and accents of any script cannot
+shift a match; `rn` reads as `m`; letters with no decomposition (small
+capitals, stroked letters) and ligatures are folded. A letter nothing folds
+stands for any letter, but a match may rest on at most two of them, so
+`Campbʘʘks` is refused while a Japanese or Arabic name is not. A full UTS #39
+confusables skeleton was the alternative: a new dependency and data table for
+what this list and the wildcard limit already cover for two fixed words.
 
 ### Delta-review fixes
 App names are decomposed with NFKD and stripped of combining marks before

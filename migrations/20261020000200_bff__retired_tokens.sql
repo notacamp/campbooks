@@ -16,3 +16,10 @@ CREATE TABLE bff.retired_tokens (
 CREATE INDEX retired_tokens_session_idx ON bff.retired_tokens (session_id);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON bff.retired_tokens TO campbooks_app;
+
+-- Whether the session's current token has reached the browser: false from a
+-- rotation until a request presents it. A token rotated away is a theft
+-- signal only once its successor was used; until then the response carrying
+-- the new cookie may simply have been lost (an aborted fetch, a reload, a
+-- sleeping laptop), and the old token gets a fresh rotation instead.
+ALTER TABLE bff.sessions ADD COLUMN token_delivered boolean NOT NULL DEFAULT true;

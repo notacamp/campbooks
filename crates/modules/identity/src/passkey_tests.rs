@@ -140,6 +140,11 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
         listed.json["items"][0]["signed_up_with"], true,
         "{listed:?}"
     );
+    // Its ways in are the passkeys alone: there is no provider way in to
+    // flag (a provider sign-up's says `linked_via: sign_up`), so the
+    // passkeys list is where the app reads it.
+    let ways = kit.ways_in(&token).await;
+    assert_eq!(ways["items"], json!([]), "{ways}");
     let mut laptop = Authenticator::new(ORIGIN, "localhost");
     let added = add_passkey(&kit, &token, &mut laptop, Alg::Ed25519).await;
     assert_eq!(added.status, StatusCode::CREATED, "{added:?}");

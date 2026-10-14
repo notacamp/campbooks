@@ -31,6 +31,9 @@ pub struct Session {
     /// The cookie carried the current token (not the rotated-away one).
     pub current: bool,
     pub rotated_at: DateTime<Utc>,
+    /// The current token has been presented at least once since it was
+    /// issued.
+    pub token_delivered: bool,
     pub subject: String,
     pub name: Option<String>,
     pub email: Option<String>,
@@ -98,7 +101,7 @@ pub async fn find_session(
     sqlx::query_as!(
         Session,
         r#"
-        SELECT id, token_hash = $1 AS "current!", rotated_at, subject, name, email,
+        SELECT id, token_hash = $1 AS "current!", rotated_at, token_delivered, subject, name, email,
                access_token, access_expires_at, last_seen_at, expires_at
           FROM bff.sessions
          WHERE (token_hash = $1 OR previous_token_hash = $1)
@@ -168,11 +171,70 @@ pub async fn rotate(
     sqlx::query!(
         r#"
         UPDATE bff.sessions
-           SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4
+           SET previous_token_hash = token_hash, token_hash = $3, rotated_at = $4,
+               token_delivered = false
          WHERE id = $1 AND token_hash = $2
         "#,
         id,
         old_hash,
+        new_hash,
+        now,
+    )
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(true)
+}
+
+/// Record that the session's current token `hash` reached the browser.
+pub async fn delivered(db: &PgPool, id: Uuid, hash: &[u8]) -> sqlx::Result<()> {
+    sqlx::query!(
+        "UPDATE bff.sessions SET token_delivered = true WHERE id = $1 AND token_hash = $2",
+        id,
+        hash,
+    )
+    .execute(db)
+    .await?;
+    Ok(())
+}
+
+/// The browser still presents the previous token `previous_hash` because
+/// the current one never reached it: issue `new_hash` in its place. The
+/// undelivered token is retired (presented later, it is a copy) and the
+/// previous one keeps its grace. `false` when the current token has been
+/// delivered meanwhile, or another request did this first.
+pub async fn reissue(
+    db: &PgPool,
+    id: Uuid,
+    previous_hash: &[u8],
+    new_hash: &[u8],
+    now: DateTime<Utc>,
+) -> sqlx::Result<bool> {
+    let mut tx = db.begin().await?;
+    let Some(undelivered) = sqlx::query_scalar!(
+        "SELECT token_hash FROM bff.sessions
+          WHERE id = $1 AND previous_token_hash = $2 AND NOT token_delivered
+          FOR UPDATE",
+        id,
+        previous_hash,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    else {
+        return Ok(false);
+    };
+    sqlx::query!(
+        "INSERT INTO bff.retired_tokens (token_hash, session_id, retired_at)
+         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+        undelivered,
+        id,
+        now,
+    )
+    .execute(&mut *tx)
+    .await?;
+    sqlx::query!(
+        "UPDATE bff.sessions SET token_hash = $2, rotated_at = $3 WHERE id = $1",
+        id,
         new_hash,
         now,
     )

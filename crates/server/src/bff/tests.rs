@@ -676,6 +676,11 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     let reply = stale.get("/bff/session").await;
     assert_eq!(reply.json()["authenticated"], true);
     assert!(reply.set_cookie(SESSION).is_none());
+    // The browser uses its new id: the rotation reached it.
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
     // Past the grace, the old id is a copied cookie (and either copy may be
     // a thief's): the session ends for both, and its refresh token is
     // revoked at the identity provider.
@@ -697,6 +702,54 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     let revoked = h.idp.revoked_tokens();
     assert_eq!(revoked.len(), 1);
     assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_lost_rotation_gets_another_instead_of_a_sign_out(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    // The response carrying the new id is lost (an aborted fetch, a
+    // reload): the browser keeps the old one.
+    let rotated = browser.get("/bff/session").await;
+    assert!(rotated.set_cookie(SESSION).is_some());
+    let lost = browser.cookie(SESSION).unwrap().to_owned();
+    browser.jar.insert(SESSION.to_owned(), old.clone());
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+
+    // Minutes later the old id still opens the session, with a fresh one.
+    let again = browser.get("/bff/session").await;
+    assert_eq!(again.json()["authenticated"], true, "{}", again.body);
+    let fresh = browser.cookie(SESSION).unwrap().to_owned();
+    assert_ne!(fresh, old);
+    assert_ne!(fresh, lost);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert!(h.idp.revoked_tokens().is_empty(), "nothing revoked");
+
+    // The lost id is retired: a copy of it presented later is a theft.
+    let mut copy = Browser::new(&h.app);
+    copy.jar.insert(SESSION.to_owned(), lost);
+    assert_eq!(
+        copy.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
 }
 
 #[sqlx::test(migrations = "../../migrations")]
