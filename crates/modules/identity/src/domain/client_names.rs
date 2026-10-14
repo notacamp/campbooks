@@ -186,10 +186,9 @@ fn skeleton(name: &str) -> Vec<Folded> {
 fn leet(c: char) -> char {
     match c {
         '4' | '@' => 'a',
-        '$' => 's',
         '8' => 'b',
         '3' => 'e',
-        '5' => 's',
+        '5' | '$' => 's',
         '7' => 't',
         c => c,
     }
