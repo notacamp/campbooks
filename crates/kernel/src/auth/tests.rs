@@ -974,7 +974,7 @@ async fn the_in_process_issuer_requires_at_jwt_on_access_tokens() {
         .await
         .assert_invalid();
 
-    // An outside identity provider may still say `JWT` (Rauthy 0.36).
+    // An outside identity provider may still say `JWT`.
     let (remote, _) = verifier(&idp);
     assert_eq!(
         call_with(&app(remote), &idp.id_token(&idp.claims("test:read")))

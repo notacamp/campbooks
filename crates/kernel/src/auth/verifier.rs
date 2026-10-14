@@ -22,7 +22,7 @@ pub(super) const ALLOWED_ALGORITHMS: [Algorithm; 2] = [Algorithm::EdDSA, Algorit
 
 /// Header `typ` values accepted when present (RFC 9068 §2.1; compared without
 /// regard to case, with or without the `application/` prefix). An outside
-/// identity provider may still label access tokens `JWT` (Rauthy 0.36).
+/// identity provider may still label access tokens `JWT`.
 const ALLOWED_TYPES: [&str; 2] = ["jwt", "at+jwt"];
 
 /// The only header `typ` accepted, and required, on access tokens of the

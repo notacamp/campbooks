@@ -29,6 +29,28 @@ All notable changes to Campbooks Next are documented here. The format follows
 - `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
   `[::1]` unless `--allow-remote` is passed.
 
+### Removed
+- **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
+  no longer has the `idp`, `idp-init` and `idp-provision` services or the `idp-data`
+  volume, `deploy/idp/` is deleted, and the stack no longer sets
+  `CAMPBOOKS_AUTH__ISSUER`, so a default install signs in through Campbooks' own
+  issuer. **To upgrade:** copy the new `compose.yaml`, then
+  `docker compose up -d --remove-orphans` removes the three old containers (leaving
+  them running breaks nothing, they are just unused; an old compose file kept as it is
+  keeps working on Rauthy). The `idp-data` volume is left for you to delete once you are
+  sure (`docker volume rm <project>_idp-data`). **Accounts that lived in Rauthy are not
+  carried over:** those people sign in again with Google, Microsoft, Zoho or a passkey
+  and get a new Campbooks account. Move the `CAMPBOOKS_IDP_*` sign-in provider settings
+  to `CAMPBOOKS_GOOGLE__*`, `CAMPBOOKS_MICROSOFT__*` and `CAMPBOOKS_ZOHO__*`, put each
+  client secret in `deploy/secrets/<provider>-client-secret` (now mounted into the
+  server at `/run/secrets/campbooks`), and add
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/<provider>` to each provider's OAuth app (see
+  `deploy/README.md` -> Built-in sign-in and Upgrading from the Rauthy sign-in).
+  `CAMPBOOKS_IDP_*`, `CAMPBOOKS_BFF__IDP_INTERNAL_URL` and
+  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL` no longer do anything in the shipped stack.
+  Pointing `CAMPBOOKS_AUTH__ISSUER` at an outside OpenID Connect issuer is still
+  possible, but nothing is provisioned for it.
+
 ### Changed
 
 - The event log is no longer kept forever: events older than
