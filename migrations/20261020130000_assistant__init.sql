@@ -2,6 +2,10 @@
 -- each member told Scout about how they want it to act. Other modules'
 -- records are referenced by ID only: no cross-schema joins or foreign keys
 -- (checked by `cargo xtask arch`).
+-- Only new objects are created here; the timeout keeps an unexpected lock
+-- wait from holding up a deploy.
+SET LOCAL lock_timeout = '5s';
+
 CREATE SCHEMA IF NOT EXISTS assistant;
 
 -- One row per member and workspace, private to that member: every query
