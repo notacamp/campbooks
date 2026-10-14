@@ -8,7 +8,7 @@ export default mergeConfig(
     test: {
       environment: "jsdom",
       setupFiles: ["./test/setup.ts"],
-      include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}"],
+      include: ["src/**/*.test.{ts,tsx}", "test/**/*.test.{ts,tsx}", "scripts/**/*.test.ts"],
       exclude: ["test/fixtures/**"],
       restoreMocks: true,
       // Above Testing Library's async timeout (test/setup.ts): screens load

@@ -577,6 +577,14 @@
           }
         }
       },
+      "AiLocation": {
+        "type": "string",
+        "description": "Where an AI role's endpoint is, as far as mail content is concerned.",
+        "enum": [
+          "instance",
+          "external"
+        ]
+      },
       "AiProtocol": {
         "type": "string",
         "description": "The protocol a provider speaks.",
@@ -607,6 +615,13 @@
             "type": "boolean",
             "description": "Whether a provider is configured for it."
           },
+          "content_allowed": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "Whether it may receive mail content: on the instance's network, or\nopted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When\n`false`, nothing calls it with content (the decide pass leaves\nsorting to rules); only the reachability probe runs."
+          },
           "endpoint": {
             "type": [
               "string",
@@ -614,6 +629,17 @@
             ],
             "description": "The provider's scheme, host and port.",
             "example": "http://ollama:11434"
+          },
+          "location": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AiLocation",
+                "description": "Whether its endpoint is on the instance's network."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "model": {
             "type": [

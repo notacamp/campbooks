@@ -27,6 +27,7 @@ fn gateway(role: Role, server: &MockServer, protocol: Protocol) -> Gateway {
         .with_protocol(protocol);
     Gateway::new(AiConfig {
         roles: [(role, provider)].into(),
+        ..AiConfig::default()
     })
     .unwrap()
 }

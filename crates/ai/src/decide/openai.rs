@@ -157,8 +157,12 @@ impl Response {
             .next()
             .ok_or_else(|| Error::InvalidResponse("no choices".into()))?;
         let content = choice.message.content.unwrap_or_default();
-        let object: Map<String, Value> = serde_json::from_str(&content)
-            .map_err(|e| Error::InvalidResponse(format!("the answer is not a JSON object: {e}")))?;
+        let object: Map<String, Value> = serde_json::from_str(&content).map_err(|e| {
+            Error::InvalidResponse(format!(
+                "the answer is not a JSON object: {}",
+                campbooks_kernel::redact::json(&e)
+            ))
+        })?;
         let tokens = choice
             .logprobs
             .and_then(|l| l.content)

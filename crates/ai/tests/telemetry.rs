@@ -47,6 +47,7 @@ async fn chat_is_a_client_span_that_propagates_the_trace() {
             ProviderConfig::new(format!("{}/v1", server.uri()).parse().unwrap(), "qwen3:8b")
                 .with_api_key("sk-secret"),
         )]),
+        ..AiConfig::default()
     })
     .unwrap();
 

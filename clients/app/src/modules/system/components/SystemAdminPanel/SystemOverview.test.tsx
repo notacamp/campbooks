@@ -39,10 +39,36 @@ describe("SystemOverview", () => {
 
     expect(await screen.findByText("Decisions")).toBeVisible();
     expect(valueOf("Decisions")).toHaveTextContent(
-      "Answeringqwen3:8b at http://ollama:11434 · OpenAI-compatible",
+      "Answeringqwen3:8b at http://ollama:11434 · OpenAI-compatible · on this instance’s network",
     );
     expect(valueOf("Embeddings")).toHaveTextContent("Not answering");
-    expect(valueOf("Writing")).toHaveTextContent("Not set up");
+    expect(valueOf("Images and scans")).toHaveTextContent("Not set up");
+  });
+
+  it("says when a role is outside the instance's network and gets no mail", async () => {
+    renderWithProviders(<SystemOverview overview={OVERVIEW} />);
+
+    expect(await screen.findByText("Writing")).toBeVisible();
+    expect(valueOf("Writing")).toHaveTextContent(
+      "Not sent any mailopen-mixtral at https://api.example.com · OpenAI-compatible · " +
+        "outside this instance’s network, so mail is not sent to it",
+    );
+  });
+
+  it("says when an outside role was allowed to receive mail", async () => {
+    const allowed = {
+      ...OVERVIEW,
+      ai: OVERVIEW.ai.map((role) =>
+        role.role === "complete" ? { ...role, content_allowed: true } : role,
+      ),
+    };
+    renderWithProviders(<SystemOverview overview={allowed} />);
+
+    expect(await screen.findByText("Writing")).toBeVisible();
+    expect(valueOf("Writing")).toHaveTextContent(
+      "Answeringopen-mixtral at https://api.example.com · OpenAI-compatible · " +
+        "outside this instance’s network, allowed to receive mail",
+    );
     expect(valueOf("Images and scans")).toHaveTextContent("Not set up");
   });
 
