@@ -1,4 +1,205 @@
 {
-  "title": "Assistant",
-  "summary": "Este módulo aún no tiene pantallas."
+  "offer": {
+    "title": "Dile a Scout lo que te importa",
+    "lead": "Tres preguntas rápidas, todas opcionales. Tus respuestas se convierten en reglas que ves antes de guardarlas.",
+    "start": "Empezar",
+    "notNow": "Ahora no"
+  },
+  "flow": {
+    "step": "{{step}} de {{total}}",
+    "next": "Siguiente",
+    "review": "Revisar",
+    "skip": "Omitir",
+    "back": "Atrás",
+    "notNow": "Ahora no",
+    "footer": "Puedes cambiarlo cuando quieras en la memoria de Scout.",
+    "becomes": "Esto se convierte en",
+    "always": {
+      "title": "¿De quién quieres ver siempre el correo?",
+      "lead": "Su correo se queda en tu bandeja de entrada y nunca se archiva. Son las personas a las que más respondes.",
+      "label": "Personas que quieres ver siempre",
+      "noSenders": "Todavía no hay correo para sugerir. Añade una dirección o un dominio abajo.",
+      "count_one": "{{count}} correo",
+      "count_other": "{{count}} correos"
+    },
+    "never": {
+      "title": "¿Qué nunca te necesita?",
+      "lead": "Scout lo guarda y lo sigue ordenando. Solo deja de preguntarte por ello. El correo que parezca sospechoso siempre se muestra.",
+      "label": "Lo que nunca te necesita",
+      "lists": "Boletines y listas de correo",
+      "listsHint": "Correo con la cabecera List-Id",
+      "automatic": "Notificaciones automáticas",
+      "automaticHint": "Correo marcado como enviado automáticamente"
+    },
+    "add": {
+      "label": "Otra persona",
+      "placeholder": "Una dirección o un dominio",
+      "button": "Añadir",
+      "invalid": "Escribe una dirección completa (nombre@example.com) o un dominio (example.com).",
+      "freeMail": "{{domain}} es un proveedor de correo gratuito: una regla para todo él incluiría a gente que no conoces. Añade mejor la dirección de la persona."
+    },
+    "act": {
+      "title": "Cuando Scout está seguro, ¿debe actuar?",
+      "lead": "Se trata de las reglas que Scout propone después de que corrijas lo mismo varias veces. En una bandeja compartida, siempre esperan un sí.",
+      "label": "Cuando Scout está seguro",
+      "askFirst": "Pregúntame antes",
+      "askFirstHint": "Scout propone. Nada cambia hasta que digas que sí.",
+      "actThenTell": "Hazlo y avísame",
+      "actThenTellHint": "En una bandeja solo tuya, Scout activa la regla y te avisa, con Deshacer."
+    },
+    "reviewStep": {
+      "title": "Esto es lo que hará Scout",
+      "rules_one": "{{count}} regla. Se aplica a cada correo nuevo, antes de cualquier IA, y siempre da el mismo resultado.",
+      "rules_other": "{{count}} reglas. Cada una se aplica a cada correo nuevo, antes de cualquier IA, y siempre da el mismo resultado.",
+      "none": "Ninguna regla. Scout sigue ordenando tu correo como hoy.",
+      "where": "Dónde",
+      "yours": "Tu bandeja de entrada",
+      "shared": "Para todos: compartida con otras personas. Desactivada hasta que la actives.",
+      "readOnly": "{{address}}: solo puedes leerla, así que no hay reglas ahí.",
+      "existing": "Aplicar también al correo que ya tienes",
+      "existingHint": "Si no, solo al correo nuevo. Puedes deshacer cualquiera de las dos.",
+      "askFirst": "Cuando Scout propone una regla a partir de tus correcciones, espera tu sí.",
+      "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
+      "save": "Guardar",
+      "saving": "Guardando",
+      "failed": "Scout no ha podido guardarlo todo. Lo guardado aparece en la memoria de Scout; inténtalo de nuevo para el resto."
+    },
+    "done": {
+      "title": "Scout sabe lo que te importa",
+      "lead_one": "{{count}} regla está activa. La encontrarás en la memoria de Scout.",
+      "lead_other": "{{count}} reglas están activas. Las encontrarás en la memoria de Scout.",
+      "leadNone": "No ha cambiado nada. Puedes volver a responder cuando quieras en la memoria de Scout.",
+      "toast_one": "Guardada {{count}} regla y tus respuestas",
+      "toast_other": "Guardadas {{count}} reglas y tus respuestas",
+      "home": "Abrir Inicio",
+      "memory": "Ver la memoria de Scout"
+    }
+  },
+  "rule": {
+    "tag": "Regla",
+    "alwaysFrom": "El correo de {{who}} se queda siempre en tu bandeja de entrada y nunca se archiva.",
+    "neverFrom": "El correo de {{who}} nunca te necesita.",
+    "neverLists": "Los boletines y listas de correo nunca te necesitan.",
+    "neverAutomatic": "Las notificaciones automáticas nunca te necesitan.",
+    "when": "Cuando {{conditions}}: {{actions}}.",
+    "anyoneAt": "cualquiera de {{domain}}",
+    "cond": {
+      "sender_address": "el remitente es {{value}}",
+      "sender_domain": "el dominio del remitente es {{value}}",
+      "subject_contains": "el asunto contiene «{{value}}»",
+      "subject_template": "el asunto dice «{{value}}»",
+      "list_id": "viene de la lista {{value}}",
+      "header": {
+        "list_id": "viene de una lista de correo",
+        "list_unsubscribe": "tiene un enlace para darse de baja",
+        "auto_submitted": "se envió automáticamente",
+        "precedence": "se envió de forma masiva"
+      },
+      "label": "tiene la etiqueta {{value}}",
+      "stream": "está en {{value}}"
+    },
+    "act": {
+      "move_to_stream": "moverlo a {{value}}",
+      "archive": "archivarlo",
+      "add_label": "ponerle la etiqueta {{value}}",
+      "mark_read": "marcarlo como leído",
+      "needs_reply_true": "necesita respuesta",
+      "needs_reply_false": "no necesita respuesta",
+      "asks_action_true": "te pide que hagas algo",
+      "asks_action_false": "no te pide nada",
+      "surface_always": "dejarlo en tu bandeja de entrada y no archivarlo nunca",
+      "surface_never": "nunca te necesita"
+    },
+    "stream": {
+      "primary": "Principal",
+      "updates": "Novedades",
+      "receipts": "Recibos",
+      "newsletters": "Boletines"
+    },
+    "aLabel": "una etiqueta",
+    "noMatches": "Todavía no hay correo. Se aplica a medida que llega.",
+    "matches_one": "Coincide con {{count}} correo",
+    "matches_other": "Coincide con {{count}} correos",
+    "samples": "Correos con los que coincide"
+  },
+  "memory": {
+    "title": "Memoria de Scout",
+    "lead": "Lo que Scout sabe sobre cómo quieres que actúe. Las reglas se aplican primero, a cada correo, sin IA.",
+    "teach": {
+      "title": "Enséñale algo a Scout",
+      "label": "¿Qué debe hacer Scout?",
+      "placeholder": "Por ejemplo: todo lo que venga de mi gestor siempre importa",
+      "privacy": "Solo se envía tu frase, nunca tu correo.",
+      "submit": "Enseñar",
+      "reading": "Leyendo tu frase",
+      "readingLead": "Enviado al modelo de lenguaje: tu frase, las direcciones de tus bandejas y los nombres de tus secciones y etiquetas. Nada de tu correo.",
+      "understood": "Esta es la regla que he entendido",
+      "understoodMany": "Estas son las reglas que he entendido",
+      "youWrote": "Escribiste",
+      "who": "¿A quién te refieres con «{{phrase}}»?",
+      "whoLead": "Solo leo tu frase, así que indícame quién es. Estas son las personas más parecidas de tu correo.",
+      "whoNoMatch": "Nadie de tu correo coincide. Estas son las personas a las que más respondes.",
+      "whoOther": "Otra persona",
+      "where": "En {{inboxes}}",
+      "forEveryone": "Para todos en {{address}}",
+      "readOnly": "Solo puedes leer tus bandejas, así que Scout no puede guardar reglas en ellas.",
+      "existing": "Aplicar también al correo que ya tienes",
+      "save": "Guardar regla",
+      "cancel": "Cancelar",
+      "saved_one": "Regla guardada",
+      "saved_other": "{{count}} reglas guardadas",
+      "runsWithoutAi": "Las reglas guardadas funcionan sin IA. El mismo correo siempre da el mismo resultado.",
+      "closest": "La regla más parecida que Scout puede crear:",
+      "unsupported": {
+        "sends_mail": "Scout no puede enviar, reenviar ni responder correos. Las reglas solo ordenan, etiquetan, archivan y muestran u ocultan.",
+        "deletes_mail": "Scout no puede borrar correos. Las reglas solo ordenan, etiquetan, archivan y muestran u ocultan.",
+        "not_about_mail": "Eso no trata de tu correo, así que Scout no puede convertirlo en una regla.",
+        "too_vague": "Eso no dice qué correo. Indica un remitente, un dominio o palabras del asunto."
+      },
+      "unclear": "Scout no ha podido convertir eso en una regla. Prueba a indicar un remitente, un dominio o palabras del asunto, y qué hacer con ese correo.",
+      "failed": "Scout no ha podido leer tu frase ahora. Inténtalo de nuevo en un momento o crea la regla tú mismo.",
+      "busy": "Son muchas frases en esta hora. Inténtalo más tarde o crea la regla tú mismo.",
+      "refused": {
+        "instruction_empty": "Escribe lo que quieres que Scout haga con tu correo.",
+        "instruction_too_long": "Usa como máximo 300 caracteres: una o dos frases.",
+        "instruction_has_link": "No incluyas enlaces. Di qué correo y qué hacer con él.",
+        "instruction_pasted_mail": "Esto parece pegado de un correo. Di con tus palabras qué correo y qué hacer con él."
+      }
+    },
+    "builder": {
+      "noModel": "Este servidor no tiene un modelo de lenguaje para leer frases, así que crea la regla aquí.",
+      "when": "Cuando",
+      "then": "Entonces",
+      "condition": "Qué correo",
+      "action": "Qué hacer",
+      "value": "Dirección, dominio o palabras",
+      "conditions": {
+        "sender_address": "El remitente es",
+        "sender_domain": "El dominio del remitente es",
+        "subject_contains": "El asunto contiene",
+        "list": "Viene de una lista de correo",
+        "automatic": "Se envió automáticamente"
+      },
+      "actions": {
+        "always": "Dejarlo en mi bandeja de entrada",
+        "never": "Nunca me necesita",
+        "updates": "Moverlo a Novedades",
+        "newsletters": "Moverlo a Boletines",
+        "archive": "Archivarlo"
+      },
+      "show": "Mostrar la regla"
+    },
+    "questions": {
+      "title": "Tus respuestas",
+      "askFirst": "Cuando Scout propone una regla a partir de tus correcciones, espera tu sí.",
+      "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
+      "never": "Todavía no has respondido a las preguntas de Scout.",
+      "again": "Responder de nuevo a las preguntas",
+      "start": "Responder a las preguntas"
+    },
+    "rules": "Tus reglas"
+  },
+  "shortcuts": {
+    "skip": "Omitir esta pregunta"
+  }
 }

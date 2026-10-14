@@ -113,6 +113,7 @@ export function WorkspaceLayout() {
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
   const { t: tNav } = useTranslation("shortcuts");
   const { t: tWorkspaces } = useTranslation("workspaces");
+  const { t: tShell } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { registry } = useShortcuts();
@@ -134,6 +135,8 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const membersPath = `${base}/settings/members`;
   const waysInPath = `${base}/settings/sign-in`;
   const appsPath = `${base}/settings/apps`;
+  const memoryPath = `${base}/settings/memory`;
+  const inMemory = pathname.startsWith(memoryPath);
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const atHome = !inSettings && !inInbox;
@@ -176,7 +179,12 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             onClick={openSwitcher}
           />
           <Spacer />
-          <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
+          <AccountMenu
+            compact
+            waysIn={link(waysInPath)}
+            apps={link(appsPath)}
+            memory={link(memoryPath)}
+          />
         </PhoneHeader>
         <Sidebar>
           <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
@@ -202,10 +210,16 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           />
           <StreamNav workspaceId={workspace.id} current={openStream} />
           <NavItem
+            label={tShell("account.memory")}
+            icon="star"
+            current={inMemory}
+            {...link(memoryPath)}
+          />
+          <NavItem
             label={tNav("nav.settings")}
             icon="settings"
             shortcut="nav.settings"
-            current={inSettings}
+            current={inSettings && !inMemory}
             {...link(membersPath)}
           />
           <SidebarFooter>
@@ -219,7 +233,11 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             >
               {tNav("sheet.open")}
             </Button>
-            <AccountMenu waysIn={link(waysInPath)} apps={link(appsPath)} />
+            <AccountMenu
+              waysIn={link(waysInPath)}
+              apps={link(appsPath)}
+              memory={link(memoryPath)}
+            />
           </SidebarFooter>
         </Sidebar>
         <Outlet />

@@ -1,5 +1,5 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
@@ -55,6 +55,8 @@ const KEYS = [
 
 export interface WhatNeedsYouProps {
   workspaceId: string;
+  /** Under the hero: an offer from another module (Scout's questions). */
+  offer?: ReactNode | undefined;
   /** Pins the clock (stories and tests). */
   now?: Date | undefined;
 }
@@ -73,7 +75,7 @@ interface Row {
  * X is not needed, Z undoes. The rows are the conversations module's
  * records; `attention` only says which, why and by when.
  */
-export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
+export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const { t: typedAttention, i18n } = useTranslation("attention");
   const t = typedAttention as unknown as Translate;
   const { t: typedConversations } = useTranslation("conversations");
@@ -414,6 +416,7 @@ export function WhatNeedsYou({ workspaceId, now }: WhatNeedsYouProps) {
         title={loading ? t("title") : count === 0 ? t("hero.clear") : t("hero.count", { count })}
         subline={count === 0 && !loading ? t("hero.clearSubline") : t("hero.subline")}
       />
+      {offer}
       {loading ? <SkeletonList rows={4} /> : null}
       {groups.map((group) => (
         <QueueGroup

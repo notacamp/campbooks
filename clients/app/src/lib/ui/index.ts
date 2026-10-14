@@ -49,6 +49,11 @@ export {
   type ButtonSize,
   type ButtonVariant,
 } from "./components/Button/Button";
+export {
+  CheckCards,
+  type CheckCardOption,
+  type CheckCardsProps,
+} from "./components/CheckCards/CheckCards";
 export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
 export {
   ChoiceCards,
@@ -168,6 +173,11 @@ export {
   type AccountButtonProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
+export {
+  RulePreview,
+  type RulePreviewProps,
+  type RulePreviewSample,
+} from "./components/RulePreview/RulePreview";
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";
