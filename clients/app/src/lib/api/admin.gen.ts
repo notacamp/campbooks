@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/v1/identity/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** See whether accounts are suspended. */
+        get: operations["identity.admin_list_accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/v1/identity/accounts/{account_id}": {
         parameters: {
             query?: never;
@@ -367,6 +384,24 @@ export interface components {
             suspended_at?: string | null;
             /** @description Its provider ways in, oldest first. */
             ways_in: components["schemas"]["AdminWayIn"][];
+        };
+        /** @description An account's standing, as the People list shows it. */
+        AdminAccountStanding: {
+            /**
+             * Format: uuid
+             * @description The account (the `sub` of its tokens).
+             */
+            id: string;
+            /**
+             * Format: date-time
+             * @description When an administrator suspended it; absent unless suspended.
+             */
+            suspended_at?: string | null;
+        };
+        /** @description The accounts asked about that exist here. */
+        AdminAccountStandings: {
+            /** @description In no particular order. */
+            accounts: components["schemas"]["AdminAccountStanding"][];
         };
         /** @description A connection, as an administrator sees it. */
         AdminConnection: {
@@ -1128,6 +1163,56 @@ export interface operations {
                 };
             };
             /** @description Not an administrator with `workspaces.read` (the same answer as an unknown route). */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.admin_list_accounts": {
+        parameters: {
+            query?: {
+                /** @description Up to 200 account ids (the `sub` of their tokens), comma-separated. */
+                ids?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The accounts asked about that exist here. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminAccountStandings"];
+                };
+            };
+            /** @description `too_many_accounts`: more than 200 ids. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description `admin_reauth_required`: sign in again. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not an administrator with `users.read` (the same answer as an unknown route). */
             404: {
                 headers: {
                     [name: string]: unknown;

@@ -2,6 +2,7 @@
 //! protocol endpoints live in `protocol/`.
 
 pub mod admin_get_account;
+pub mod admin_list_accounts;
 pub mod admin_suspend_account;
 pub mod admin_unsuspend_account;
 pub mod adopt_held_grant;

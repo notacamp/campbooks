@@ -73,6 +73,79 @@
         }
       }
     },
+    "/admin/v1/identity/accounts": {
+      "get": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "See whether accounts are suspended.",
+        "operationId": "identity.admin_list_accounts",
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "query",
+            "description": "Up to 200 account ids (the `sub` of their tokens), comma-separated.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The accounts asked about that exist here.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminAccountStandings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "`too_many_accounts`: more than 200 ids.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `users.read` (the same answer as an unknown route).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "users.read"
+        }
+      }
+    },
     "/admin/v1/identity/accounts/{account_id}": {
       "get": {
         "tags": [
@@ -1524,6 +1597,44 @@
               "$ref": "#/components/schemas/AdminWayIn"
             },
             "description": "Its provider ways in, oldest first."
+          }
+        }
+      },
+      "AdminAccountStanding": {
+        "type": "object",
+        "description": "An account's standing, as the People list shows it.",
+        "required": [
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          },
+          "suspended_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When an administrator suspended it; absent unless suspended."
+          }
+        }
+      },
+      "AdminAccountStandings": {
+        "type": "object",
+        "description": "The accounts asked about that exist here.",
+        "required": [
+          "accounts"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminAccountStanding"
+            },
+            "description": "In no particular order."
           }
         }
       },

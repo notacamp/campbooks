@@ -31,7 +31,8 @@
     "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
     "client_is_public": "This app signs people in and has no secret to rotate.",
     "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name.",
-    "fresh_sign_in_required": "Sign in again first: adding a passkey needs a sign-in from the last five minutes."
+    "fresh_sign_in_required": "Sign in again first: adding a passkey needs a sign-in from the last five minutes.",
+    "too_many_accounts": "Ask about at most {{max}} accounts at a time."
   },
   "notices": {
     "way_in_added": {

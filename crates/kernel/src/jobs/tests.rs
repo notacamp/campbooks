@@ -34,6 +34,10 @@ struct Probe {
     /// Ask Postgres to read this text as a number (an error that quotes it).
     #[serde(default)]
     as_number: Option<String>,
+    /// Fail with a message quoting this text, as a careless handler would
+    /// quote a provider's reply.
+    #[serde(default)]
+    echo: Option<String>,
 }
 
 impl Probe {
@@ -60,6 +64,9 @@ impl Job for Probe {
                 .bind(text)
                 .fetch_one(ctx.pool())
                 .await?;
+        }
+        if let Some(reply) = &self.echo {
+            return Err(JobError::fatal(format!("provider answered 400: {reply}")));
         }
         let attempt = i32::try_from(ctx.attempt()).unwrap_or_default();
         let fail = self.fatal || ctx.attempt() <= self.fail_first;
@@ -981,6 +988,35 @@ async fn a_database_error_leaves_no_content_in_last_error(db: PgPool) {
     let error = job(&db, id).await.last_error.unwrap();
     assert_eq!(error, "database error 22P02");
     assert!(!error.contains("maya"), "{error}");
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_handler_quoting_mail_in_its_error_leaves_no_content_in_last_error(db: PgPool) {
+    let state = state(db.clone()).await;
+    let reply = "{\"error\":\"invalid\",\"echo\":\"Subject: Q4 plan\"} from \
+                 Maya <maya@northwind-studio.example>, see \
+                 https://mail.example.com/v1/messages/Q4-plan?token=abc\n\
+                 Hi Sam,\nthe Q4 plan is attached.";
+    let id = created(
+        enqueue_probe(
+            &state,
+            &Probe {
+                echo: Some(reply.to_owned()),
+                ..Probe::note("echo")
+            },
+            EnqueueOptions::default(),
+        )
+        .await,
+    );
+    Worker::new(state).run_until_idle().await;
+    let error = job(&db, id).await.last_error.unwrap();
+    assert_eq!(
+        error,
+        r#"provider answered 400: {"…":"…","…":"…"} from Maya <[address]>, see https://mail.example.com/… […]"#
+    );
+    for leaked in ["Q4", "maya@", "northwind", "Hi Sam", "attached", "token"] {
+        assert!(!error.contains(leaked), "{leaked} in {error}");
+    }
 }
 
 #[sqlx::test(migrations = "../../migrations")]
