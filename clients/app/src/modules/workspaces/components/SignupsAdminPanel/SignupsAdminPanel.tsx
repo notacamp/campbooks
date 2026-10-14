@@ -10,8 +10,9 @@ type Part = "requests" | "codes";
 
 /**
  * Admin → Signups: who may create an account on this instance. Requests
- * wait for an administrator when signups need approval; codes are the
- * single-use keys administrators hand out when they need a code. The admin
+ * wait for an administrator when signups need approval; codes are the keys
+ * administrators hand out when they need a code, each good for the number
+ * of signups set when it was minted. The admin
  * layout already turned non-administrators away.
  */
 export function SignupsAdminPanel() {

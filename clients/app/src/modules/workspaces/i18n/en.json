@@ -189,6 +189,7 @@
       "noMatch": "No name or email address starts with “{{search}}”.",
       "loadError": "Couldn’t load people",
       "joined": "Joined {{date}}",
+      "suspended": "Suspended",
       "back": "All people"
     },
     "person": {
@@ -242,7 +243,7 @@
     },
     "lead": {
       "requests": "People who asked to create an account on this Campbooks, when it approves new accounts. Approving lets them create their workspace; they find out the next time they open the app.",
-      "codes": "Single-use codes you hand out when this Campbooks asks for a signup code. Each code can be used as many times as you set, then stops working."
+      "codes": "Codes you hand out when this Campbooks asks for a signup code. Each code works for as many signups as you set when you mint it; set 1 for a single person. It stops working once it’s used up, expires or is revoked."
     },
     "more": "Show more",
     "cancel": "Cancel",
