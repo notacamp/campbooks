@@ -593,7 +593,7 @@ async fn sign_in_refusals_one_by_one(db: PgPool) {
     .await;
     assert_eq!(phished.json["code"], "passkey_not_accepted", "{phished:?}");
 
-    // An account an operator disabled: its passkey opens nothing.
+    // An account an administrator suspended: its passkey opens nothing.
     sqlx::query("UPDATE identity.accounts SET disabled_at = now()")
         .execute(&kit.state.db)
         .await
@@ -601,10 +601,7 @@ async fn sign_in_refusals_one_by_one(db: PgPool) {
     let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
     let disabled = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
     assert_eq!(disabled.status, StatusCode::FORBIDDEN, "{disabled:?}");
-    assert_eq!(
-        disabled.json["code"], "passkey_not_accepted",
-        "{disabled:?}"
-    );
+    assert_eq!(disabled.json["code"], "account_suspended", "{disabled:?}");
 
     // Nothing of it reached a session.
     assert_eq!(
