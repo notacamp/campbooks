@@ -138,7 +138,7 @@ async fn a_reply_goes_into_its_thread_and_comes_back_once(db: PgPool) {
     let sent = kit.google.sent();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].thread_id, thread);
-    let parsed = normalize::parse(&sent[0].raw);
+    let parsed = normalize::parse(&sent[0].raw, crate::mail::Receiver::Gmail);
     assert_eq!(
         parsed.rfc_message_id.as_deref(),
         Some(format!("{send_id}@example.com").as_str())

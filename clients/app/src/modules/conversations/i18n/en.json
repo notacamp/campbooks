@@ -124,6 +124,7 @@
       "payment_due": "A payment is due (“{{evidence}}”).",
       "already_paid": "It says it is already paid (“{{evidence}}”).",
       "action_asked": "It asks you to do something (“{{evidence}}”).",
+      "security_alert": "It is a security alert about something of yours (“{{evidence}}”).",
       "conditional_ask": "It asks only if something applies (“{{evidence}}”).",
       "notice": "It is a notice: nothing to do.",
       "request": "It makes a request (“{{evidence}}”).",

@@ -74,6 +74,10 @@ pub fn envelope(parts: MessageParts<'_>) -> Envelope {
         ("List-Unsubscribe", &parts.headers.list_unsubscribe),
         ("Precedence", &parts.headers.precedence),
         ("Auto-Submitted", &parts.headers.auto_submitted),
+        (
+            "Authentication-Results",
+            &parts.headers.authentication_results,
+        ),
     ] {
         if let Some(value) = value {
             headers.insert(name.to_owned(), value.clone());

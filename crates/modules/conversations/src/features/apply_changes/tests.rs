@@ -14,7 +14,7 @@ use crate::{
     testkit::{Kit, contract, fixture},
 };
 
-const FIXTURES: [&str; 9] = [
+const FIXTURES: [&str; 11] = [
     "en",
     "pt-PT",
     "es-ES",
@@ -24,6 +24,8 @@ const FIXTURES: [&str; 9] = [
     "needs",
     "needs-replied",
     "needs-followup",
+    "dependabot",
+    "github-comment",
 ];
 
 async fn setup(kit: &Kit, address: &str) -> (WorkspaceId, InboxId) {
