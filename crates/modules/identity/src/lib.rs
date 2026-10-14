@@ -23,7 +23,7 @@
 //!   (`/.well-known/*`, `/oauth2/*`, `/auth/*`), which serve browsers and
 //!   OAuth clients and are mounted by the server next to the web BFF.
 //!
-//! While another identity provider is configured (Rauthy, until slice S5),
+//! While another identity provider is configured (an outside OIDC issuer),
 //! the issuer does not run and both answer 404.
 
 #![forbid(unsafe_code)]
@@ -66,6 +66,7 @@ pub fn module(deps: Deps) -> Module {
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_get_account::handler))
+                .routes(routes!(features::admin_list_accounts::handler))
                 .routes(routes!(features::admin_suspend_account::handler))
                 .routes(routes!(features::admin_unsuspend_account::handler)),
         ),

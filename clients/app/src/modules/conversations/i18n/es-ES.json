@@ -98,7 +98,8 @@
     "whyAsksAction": "Te pide que hagas algo",
     "whyHasDeadline": "Menciona una fecha",
     "whyUrgent": "Urgente",
-    "whySuspicious": "Sospechosa"
+    "whySuspicious": "Sospechosa",
+    "sortedTaught": "Campbooks la puso en {{stream}}, como le enseñaste"
   },
   "reasons": {
     "signals": {
@@ -139,7 +140,10 @@
     "knn": {
       "neighbours": "Correo parecido se ordenó así antes."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks sigue una regla que le enseñaste para correos como este."
+    }
   },
   "shortcuts": {
     "primary": "Ir a Principal",
@@ -237,7 +241,8 @@
         "rules": "Reglas",
         "model": "Modelo",
         "knn": "Correo parecido",
-        "cascade": "Reglas y luego modelo"
+        "cascade": "Reglas y luego modelo",
+        "taught": "Tu regla"
       },
       "suggestion": "una sugerencia",
       "actsFrom": "actúa desde {{threshold}}",

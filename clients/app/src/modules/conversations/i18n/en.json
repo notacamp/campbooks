@@ -98,7 +98,8 @@
     "whyAsksAction": "Asks you to do something",
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
-    "whySuspicious": "Suspicious"
+    "whySuspicious": "Suspicious",
+    "sortedTaught": "Campbooks put this in {{stream}}, as you taught it"
   },
   "reasons": {
     "signals": {
@@ -139,7 +140,10 @@
     "knn": {
       "neighbours": "Mail like this was sorted this way before."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks follows a rule you taught for mail like this."
+    }
   },
   "shortcuts": {
     "primary": "Go to Primary",
@@ -237,7 +241,8 @@
         "rules": "Rules",
         "model": "Model",
         "knn": "Similar mail",
-        "cascade": "Rules, then model"
+        "cascade": "Rules, then model",
+        "taught": "Your rule"
       },
       "suggestion": "a suggestion",
       "actsFrom": "acts from {{threshold}}",

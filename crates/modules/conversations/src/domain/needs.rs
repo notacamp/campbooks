@@ -167,21 +167,7 @@ pub fn raise(
             answer,
         ));
     }
-    // A taught rule speaks for the member: "never" raises nothing, and its
-    // answer to a question replaces the signals' and the model's.
-    if surfaces_never(answers) {
-        return None;
-    }
-    let taught: Vec<&str> = answers
-        .iter()
-        .filter(|a| a.basis == NeedBasis::Taught)
-        .map(|a| a.question.as_str())
-        .collect();
-    let answers: Vec<Answer> = answers
-        .iter()
-        .filter(|a| a.basis == NeedBasis::Taught || !taught.contains(&a.question.as_str()))
-        .cloned()
-        .collect();
+    let answers = taught_first(answers)?;
     let answers = answers.as_slice();
     let asks = accepted(answers, triage::ASKS_ACTION);
     let raised = if let Some(asks) = asks.filter(|a| a.has_rule(PAYMENT_DUE)) {
@@ -251,6 +237,27 @@ pub fn raise(
     })
 }
 
+/// The answers with a taught rule's speaking for the member: its answer to
+/// a question replaces the signals' and the model's; `None` when it says
+/// this mail never needs anyone.
+fn taught_first(answers: &[Answer]) -> Option<Vec<Answer>> {
+    if surfaces_never(answers) {
+        return None;
+    }
+    let taught: Vec<&str> = answers
+        .iter()
+        .filter(|a| a.basis == NeedBasis::Taught)
+        .map(|a| a.question.as_str())
+        .collect();
+    Some(
+        answers
+            .iter()
+            .filter(|a| a.basis == NeedBasis::Taught || !taught.contains(&a.question.as_str()))
+            .cloned()
+            .collect(),
+    )
+}
+
 /// Whether a taught rule says this mail never needs anyone.
 fn surfaces_never(answers: &[Answer]) -> bool {
     answers.iter().any(|a| {
@@ -282,8 +289,18 @@ pub struct Since {
     pub trashed: bool,
     /// A member's verdict on this message's need.
     pub verdict: Option<NeedVerdict>,
-    /// A taught rule says it is not needed.
-    pub rule: bool,
+    /// What the inbox's taught rules say about it.
+    pub rule: RuleSays,
+}
+
+/// What a taught rule says about a need.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum RuleSays {
+    /// Nothing.
+    #[default]
+    Nothing,
+    /// It is not needed.
+    NotNeeded,
 }
 
 /// A need, settled.
@@ -314,7 +331,10 @@ pub fn settle(mut need: Need, since: Since) -> Settled {
         }
         None => {}
     }
-    if since.rule && need.basis != NeedBasis::Member && need.question != NeedQuestion::Suspicious {
+    if since.rule == RuleSays::NotNeeded
+        && need.basis != NeedBasis::Member
+        && need.question != NeedQuestion::Suspicious
+    {
         return Settled::Cleared(need, ClearCause::Rule);
     }
     if since.trashed {
@@ -496,7 +516,11 @@ async fn since(
         Some(row) => row.verdict_on(need.message)?,
         None => None,
     };
-    let rule = rule_clears(&answers(tx, need.message).await?, need.question);
+    let rule = if rule_clears(&answers(tx, need.message).await?, need.question) {
+        RuleSays::NotNeeded
+    } else {
+        RuleSays::Nothing
+    };
     Ok((
         Since {
             replied,
@@ -826,6 +850,76 @@ mod tests {
 
     fn raised(answers: &[Answer]) -> Option<Need> {
         raise(MessageId::new(), monday(), answers, Policy::CHECK_FLOOR)
+    }
+
+    #[test]
+    fn a_taught_rule_answers_before_the_signals() {
+        // "Needs a reply: no" from a rule beats the signals' yes.
+        assert_eq!(
+            raised(&[
+                answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(true), true),
+                answer(triage::NEEDS_REPLY, NeedBasis::Taught, json!(false), true),
+            ]),
+            None
+        );
+        // "Asks for an action: yes" from a rule raises Do on its own.
+        let need = raised(&[answer(
+            triage::ASKS_ACTION,
+            NeedBasis::Taught,
+            json!(true),
+            true,
+        )])
+        .unwrap();
+        assert_eq!(
+            (need.reason, need.basis),
+            (NeedReason::Do, NeedBasis::Taught)
+        );
+    }
+
+    #[test]
+    fn never_raises_nothing_but_a_warning_still_shows() {
+        let never = answer(SURFACE, NeedBasis::Taught, json!("never"), true);
+        assert_eq!(
+            raised(&[
+                answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
+                never.clone(),
+            ]),
+            None
+        );
+        let warning = raised(&[
+            answer(triage::SUSPICIOUS, NeedBasis::Rules, json!(true), false),
+            never,
+        ])
+        .unwrap();
+        assert_eq!(warning.reason, NeedReason::Review);
+    }
+
+    #[test]
+    fn a_rule_clears_what_it_says_is_not_needed() {
+        let by_rule = Since {
+            rule: RuleSays::NotNeeded,
+            ..Since::default()
+        };
+        assert_eq!(
+            cause(&settle(need(NeedReason::Pay), by_rule)),
+            Some(ClearCause::Rule)
+        );
+        let mut confirmed = need(NeedReason::Reply);
+        confirmed.basis = NeedBasis::Member;
+        assert_eq!(cause(&settle(confirmed, by_rule)), None);
+        assert!(rule_clears(
+            &[answer(
+                triage::NEEDS_REPLY,
+                NeedBasis::Taught,
+                json!(false),
+                true
+            )],
+            NeedQuestion::NeedsReply
+        ));
+        assert!(!rule_clears(
+            &[answer(SURFACE, NeedBasis::Taught, json!("never"), true)],
+            NeedQuestion::Suspicious
+        ));
     }
 
     #[test]

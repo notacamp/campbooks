@@ -108,7 +108,8 @@ async fn done_today_lists_what_left_and_what_was_put_off(db: PgPool) {
     let replied = need(1, Reason::Reply, None);
     let later = need(2, Reason::Pay, None);
     let gone = need(3, Reason::Do, None);
-    for need in [&replied, &later, &gone] {
+    let never = need(4, Reason::Pay, None);
+    for need in [&replied, &later, &gone, &never] {
         kit.need(workspace, need).await;
     }
     let mut cleared = need(1, Reason::Reply, None);
@@ -118,6 +119,10 @@ async fn done_today_lists_what_left_and_what_was_put_off(db: PgPool) {
     superseded.revision = 2;
     kit.cleared(workspace, &superseded, "superseded", None)
         .await;
+    // A taught rule saying "never" is not something the member did today.
+    let mut by_rule = need(4, Reason::Pay, None);
+    by_rule.revision = 2;
+    kit.cleared(workspace, &by_rule, "rule", None).await;
     let open = kit
         .get(&sam, &format!("/api/v1/w/{workspace}/attention"))
         .await;

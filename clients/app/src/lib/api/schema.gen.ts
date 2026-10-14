@@ -690,6 +690,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest rules that do to lookalikes what the member just did. */
+        get: operations["conversations.suggest_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a suggestion down ("Just this one"): it is not offered again for 30
+         *     days, and never after the second time.
+         */
+        post: operations["conversations.dismiss_rule_suggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
         parameters: {
             query?: never;
@@ -956,10 +993,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Preview what a rule would do in an inbox. */
-        get: operations["conversations.preview_rule"];
+        get?: never;
         put?: never;
-        post?: never;
+        /**
+         * Preview what a rule would do in an inbox. A read served by POST: the
+         *     rule's addresses and words stay out of the URL (and so out of access logs).
+         */
+        post: operations["conversations.preview_rule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2326,6 +2366,11 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description The suggestion turned down. */
+        DismissSuggestion: {
+            /** @description Its `key`. */
+            key: string;
+        };
         /** @description A forwarded attachment, as the draft shows it. */
         DraftAttachment: {
             /** @description Its media type, as sent (not trusted). */
@@ -2735,6 +2780,11 @@ export interface components {
             name: string;
         };
         /**
+         * @description How a suggestion picks the mail that looks the same.
+         * @enum {string}
+         */
+        Likeness: "sender" | "list" | "sender_template" | "domain_template";
+        /**
          * @description What the round trip is for.
          * @enum {string}
          */
@@ -2919,6 +2969,11 @@ export interface components {
          */
         NewRuleState: "active" | "proposed";
         /**
+         * @description Why there is nothing to offer.
+         * @enum {string}
+         */
+        NoSuggestion: "suspicious" | "correspondent" | "too_few" | "dismissed" | "not_teachable";
+        /**
          * @description How a member resolves a need.
          * @enum {string}
          */
@@ -2967,6 +3022,13 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
+        /** @description A rule to preview. */
+        PreviewRule: {
+            /** @description What it would do. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description All must hold. */
+            conditions: components["schemas"]["RuleCondition"][];
+        };
         /** @description One conversation a rule would change. */
         PreviewSample: {
             /** @description The conversation. */
@@ -3549,6 +3611,32 @@ export interface components {
          * @enum {string}
          */
         RuleState: "proposed" | "active" | "paused" | "removed";
+        /** @description One rule the member could make. */
+        RuleSuggestion: {
+            /** @description Its actions. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description Its conditions. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description Names it when turning it down. */
+            key: string;
+            /** @description How it picks the mail. */
+            likeness: components["schemas"]["Likeness"];
+            /** @description What it would do now. */
+            preview: components["schemas"]["RulePreview"];
+        };
+        /** @description The rules the member could make from what they just did. */
+        RuleSuggestions: {
+            /**
+             * Format: int32
+             * @description The one to offer first, by index; `None` lets the member choose.
+             */
+            default?: number | null;
+            none?: components["schemas"]["NoSuggestion"] | null;
+            /** @description Other members use the inbox: a rule acts for them too. */
+            shared: boolean;
+            /** @description Broad to narrow; empty when there is nothing to offer. */
+            suggestions: components["schemas"]["RuleSuggestion"][];
+        };
         /** @description A taught rule. */
         RuleView: {
             /** @description What it does. */
@@ -6633,6 +6721,119 @@ export interface operations {
             };
         };
     };
+    "conversations.suggest_rules": {
+        parameters: {
+            query: {
+                /** @description What the member did. */
+                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed";
+                /** @description The stream, for `move_to_stream`. */
+                stream?: components["schemas"]["Stream"];
+                /** @description The label, for `add_label`. */
+                label?: components["schemas"]["LabelId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation acted on. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSuggestions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.dismiss_rule_suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation acted on. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissSuggestion"];
+            };
+        };
+        responses: {
+            /** @description It will not be offered again for now. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "conversations.star": {
         parameters: {
             query?: never;
@@ -7744,12 +7945,7 @@ export interface operations {
     };
     "conversations.preview_rule": {
         parameters: {
-            query: {
-                /** @description The conditions, a JSON array of `RuleCondition`. */
-                conditions: string;
-                /** @description The actions, a JSON array of `RuleAction`. */
-                actions: string;
-            };
+            query?: never;
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -7759,7 +7955,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewRule"];
+            };
+        };
         responses: {
             /** @description What it would do. */
             200: {

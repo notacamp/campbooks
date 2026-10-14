@@ -98,7 +98,8 @@
     "whyAsksAction": "Pede-lhe que faça algo",
     "whyHasDeadline": "Refere uma data",
     "whyUrgent": "Urgente",
-    "whySuspicious": "Suspeita"
+    "whySuspicious": "Suspeita",
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, como lhe ensinou"
   },
   "reasons": {
     "signals": {
@@ -139,7 +140,10 @@
     "knn": {
       "neighbours": "Correio parecido foi arrumado assim antes."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "O Campbooks segue uma regra que ensinou para mensagens como esta."
+    }
   },
   "shortcuts": {
     "primary": "Ir para Principal",
@@ -237,7 +241,8 @@
         "rules": "Regras",
         "model": "Modelo",
         "knn": "Correio semelhante",
-        "cascade": "Regras e depois modelo"
+        "cascade": "Regras e depois modelo",
+        "taught": "A sua regra"
       },
       "suggestion": "uma sugestão",
       "actsFrom": "age a partir de {{threshold}}",

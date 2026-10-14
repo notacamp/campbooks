@@ -3783,6 +3783,219 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions": {
+      "get": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Suggest rules that do to lookalikes what the member just did.",
+        "operationId": "conversations.suggest_rules",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation acted on.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "What the member did.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "What the member just did to the conversation.",
+              "enum": [
+                "move_to_stream",
+                "archive",
+                "mark_read",
+                "add_label",
+                "not_needed"
+              ]
+            }
+          },
+          {
+            "name": "stream",
+            "in": "query",
+            "description": "The stream, for `move_to_stream`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Stream"
+            }
+          },
+          {
+            "name": "label",
+            "in": "query",
+            "description": "The label, for `add_label`.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/LabelId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The suggestions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleSuggestions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:read"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": true,
+          "automation": false,
+          "mutates": false,
+          "records": [
+            "conversations.rule",
+            "conversations.conversation"
+          ],
+          "risk": "low"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Turn a suggestion down (\"Just this one\"): it is not offered again for 30\ndays, and never after the second time.",
+        "operationId": "conversations.dismiss_rule_suggestion",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "description": "The conversation acted on.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ConversationId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DismissSuggestion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "It will not be offered again for now."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such conversation, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
       "post": {
         "tags": [
@@ -5570,11 +5783,11 @@
       }
     },
     "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview": {
-      "get": {
+      "post": {
         "tags": [
           "conversations"
         ],
-        "summary": "Preview what a rule would do in an inbox.",
+        "summary": "Preview what a rule would do in an inbox. A read served by POST: the\nrule's addresses and words stay out of the URL (and so out of access logs).",
         "operationId": "conversations.preview_rule",
         "parameters": [
           {
@@ -5594,26 +5807,18 @@
             "schema": {
               "$ref": "#/components/schemas/InboxId"
             }
-          },
-          {
-            "name": "conditions",
-            "in": "query",
-            "description": "The conditions, a JSON array of `RuleCondition`.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "actions",
-            "in": "query",
-            "description": "The actions, a JSON array of `RuleAction`.",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PreviewRule"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "What it would do.",
@@ -5677,6 +5882,7 @@
           "assistant": true,
           "automation": false,
           "mutates": false,
+          "query_in": "body",
           "records": [
             "conversations.rule"
           ],
@@ -11281,6 +11487,20 @@
           "outbound"
         ]
       },
+      "DismissSuggestion": {
+        "type": "object",
+        "description": "The suggestion turned down.",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "description": "Its `key`."
+          }
+        },
+        "additionalProperties": false
+      },
       "DraftAttachment": {
         "type": "object",
         "description": "A forwarded attachment, as the draft shows it.",
@@ -12189,6 +12409,16 @@
           }
         }
       },
+      "Likeness": {
+        "type": "string",
+        "description": "How a suggestion picks the mail that looks the same.",
+        "enum": [
+          "sender",
+          "list",
+          "sender_template",
+          "domain_template"
+        ]
+      },
       "LinkPurpose": {
         "type": "string",
         "description": "What the round trip is for.",
@@ -12661,6 +12891,17 @@
           "proposed"
         ]
       },
+      "NoSuggestion": {
+        "type": "string",
+        "description": "Why there is nothing to offer.",
+        "enum": [
+          "suspicious",
+          "correspondent",
+          "too_few",
+          "dismissed",
+          "not_teachable"
+        ]
+      },
       "Outcome": {
         "type": "string",
         "description": "How a member resolves a need.",
@@ -12760,6 +13001,31 @@
           "incremental",
           "resync"
         ]
+      },
+      "PreviewRule": {
+        "type": "object",
+        "description": "A rule to preview.",
+        "required": [
+          "conditions",
+          "actions"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "What it would do."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "All must hold."
+          }
+        },
+        "additionalProperties": false
       },
       "PreviewSample": {
         "type": "object",
@@ -14222,6 +14488,86 @@
           "paused",
           "removed"
         ]
+      },
+      "RuleSuggestion": {
+        "type": "object",
+        "description": "One rule the member could make.",
+        "required": [
+          "likeness",
+          "conditions",
+          "actions",
+          "preview",
+          "key"
+        ],
+        "properties": {
+          "actions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleAction"
+            },
+            "description": "Its actions."
+          },
+          "conditions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleCondition"
+            },
+            "description": "Its conditions."
+          },
+          "key": {
+            "type": "string",
+            "description": "Names it when turning it down."
+          },
+          "likeness": {
+            "$ref": "#/components/schemas/Likeness",
+            "description": "How it picks the mail."
+          },
+          "preview": {
+            "$ref": "#/components/schemas/RulePreview",
+            "description": "What it would do now."
+          }
+        }
+      },
+      "RuleSuggestions": {
+        "type": "object",
+        "description": "The rules the member could make from what they just did.",
+        "required": [
+          "suggestions",
+          "shared"
+        ],
+        "properties": {
+          "default": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "The one to offer first, by index; `None` lets the member choose.",
+            "minimum": 0
+          },
+          "none": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NoSuggestion",
+                "description": "Why there is nothing to offer, when there is not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shared": {
+            "type": "boolean",
+            "description": "Other members use the inbox: a rule acts for them too."
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RuleSuggestion"
+            },
+            "description": "Broad to narrow; empty when there is nothing to offer."
+          }
+        }
       },
       "RuleView": {
         "type": "object",

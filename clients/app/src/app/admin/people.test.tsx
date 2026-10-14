@@ -45,6 +45,18 @@ function administrator() {
     },
     [`GET ${ADMIN}/workspaces/users/${ADMIN_ANA.id}`]: { body: ADMIN_ANA_DETAIL },
     [`GET ${ADMIN}/identity/accounts/${ADMIN_ANA.account_id}`]: { body: ADMIN_ANA_ACCOUNT },
+    // Rui's account is suspended; Ana's is not.
+    [`GET ${ADMIN}/identity/accounts`]: (request) => {
+      const ids = new URL(request.url).searchParams.get("ids")?.split(",") ?? [];
+      return {
+        body: {
+          accounts: ids.map((id) => ({
+            id,
+            suspended_at: id === ADMIN_RUI.account_id ? "2026-10-13T10:00:00Z" : null,
+          })),
+        },
+      };
+    },
     [`GET ${ADMIN}/workspaces/users/${ADMIN_RUI.id}`]: { status: 404, body: NOT_FOUND_PROBLEM },
     [`GET ${ADMIN}/workspaces/workspaces`]: {
       body: { workspaces: [ADMIN_DUARTE, ADMIN_OLD_HOUSEHOLD], next: null },
@@ -65,9 +77,17 @@ describe("Admin → People", () => {
     const list = await screen.findByRole("list", { name: "People" });
     expect(within(list).getByText("Rui Matos")).toBeVisible();
     expect(within(list).getByText(/rui@example\.com · Joined .* · 1 workspace$/u)).toBeVisible();
+    // Rui's account is suspended, and the list says so.
+    expect(await within(list).findByText("Suspended")).toBeVisible();
 
     fireEvent.click(screen.getByRole("button", { name: "Show more" }));
     expect(await within(list).findByText("Ana Duarte")).toBeVisible();
+    await waitFor(() => {
+      expect(
+        api.calls.filter((call) => call.route === `GET ${ADMIN}/identity/accounts`),
+      ).toHaveLength(2);
+    });
+    expect(within(list).getAllByText("Suspended")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: "Show more" })).toBeNull();
 
     fireEvent.change(screen.getByRole("searchbox", { name: "Search people" }), {

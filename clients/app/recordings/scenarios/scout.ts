@@ -44,8 +44,15 @@ async function record(page: Page): Promise<void> {
   await page.getByRole("heading", { name: "Whose mail should always reach you?" }).waitFor();
   await caption(page, "One question per view. S skips, Esc is Not now");
   await page.getByRole("checkbox", { name: "Maya Okafor" }).click();
-  await page.getByText(/^Matches \d+ email/u).first().waitFor();
-  await caption(page, "Each answer becomes a rule, with what it matches, counted by the server", 2400);
+  await page
+    .getByText(/^Matches \d+ email/u)
+    .first()
+    .waitFor();
+  await caption(
+    page,
+    "Each answer becomes a rule, with what it matches, counted by the server",
+    2400,
+  );
   await (phone
     ? page.getByRole("button", { name: /^Next/u }).click()
     : page.keyboard.press("Enter"));
@@ -62,9 +69,7 @@ async function record(page: Page): Promise<void> {
   // 3 of 3: ask first, the default; skipped with S.
   await page.getByRole("heading", { name: "When Scout is sure, should it act?" }).waitFor();
   await caption(page, phone ? "Skip keeps Ask me first" : "S skips: Ask me first stays");
-  await (phone
-    ? page.getByRole("button", { name: /^Skip/u }).click()
-    : page.keyboard.press("s"));
+  await (phone ? page.getByRole("button", { name: /^Skip/u }).click() : page.keyboard.press("s"));
 
   // Review: per inbox, then Save with one Undo.
   await page.getByRole("heading", { name: "Here’s what Scout will do" }).waitFor();
@@ -88,7 +93,10 @@ async function record(page: Page): Promise<void> {
   await page.getByText(/Who do you mean by/u).waitFor();
   await caption(page, "A name without an address is a question, never a guess", 2200);
   await page.getByRole("button", { name: /Joana Reis/u }).click();
-  await page.getByText(/^Matches \d+ email/u).first().waitFor();
+  await page
+    .getByText(/^Matches \d+ email/u)
+    .first()
+    .waitFor();
   await caption(page, "The rule it understood, with what it matches. Enter saves", 2400);
   await (phone
     ? page.getByRole("button", { name: /^Save rule/u }).click()

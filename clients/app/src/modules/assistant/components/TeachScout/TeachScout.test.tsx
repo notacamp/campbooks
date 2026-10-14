@@ -47,7 +47,7 @@ describe("TeachScout", () => {
   it("asks who someone is, shows the rule and what it matches, and saves it as the member's words", async () => {
     const api = mockApi({
       [`POST ${W}/assistant/compile`]: { body: ACCOUNTANT },
-      [`GET ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
       [`POST ${W}/inboxes/inbox-own/rules`]: {
         status: 201,
         body: { rule: { id: "rule-1" }, acted_without_asking: false },

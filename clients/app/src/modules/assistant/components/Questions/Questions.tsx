@@ -388,7 +388,13 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           }}
           actions={
             <>
-              <Button type="submit" variant="primary" size="lg" shortcut="scout.next" disabled={busy}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                shortcut="scout.next"
+                disabled={busy}
+              >
                 {busy ? t("flow.reviewStep.saving") : t("flow.reviewStep.save")}
               </Button>
               <Button variant="ghost" size="lg" disabled={busy} onClick={back}>

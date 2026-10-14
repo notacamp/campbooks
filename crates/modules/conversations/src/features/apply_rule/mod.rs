@@ -77,53 +77,8 @@ impl JobHandler for ApplyRules {
         };
         let mut tally = Tally::default();
         let last = match kind {
-            RunKind::Apply => {
-                let acting = rules::acting(tx, rule.inbox).await?;
-                let engine = rule.engine();
-                let mut after = batch.after;
-                let mut last = None;
-                loop {
-                    let page = rules::scan(tx, rule.inbox, &rule.conditions, after, SCAN).await?;
-                    let full = page.len() == usize::try_from(SCAN).unwrap_or(usize::MAX);
-                    for candidate in &page {
-                        last = Some(candidate.id);
-                        if !engine.matches(&candidate.facts()) {
-                            continue;
-                        }
-                        tally.done += 1;
-                        let applied = rules::apply(
-                            tx,
-                            &context,
-                            rule.id,
-                            &acting,
-                            candidate,
-                            Some(batch.run),
-                        )
-                        .await?;
-                        tally.count(applied);
-                        if tally.done >= BATCH {
-                            break;
-                        }
-                    }
-                    if tally.done >= BATCH || !full {
-                        break;
-                    }
-                    after = page.last().map(|c| c.id);
-                }
-                last.filter(|_| tally.done >= BATCH)
-            }
-            RunKind::Revert => {
-                let ids = applications(tx, rule.id, batch.after).await?;
-                for id in &ids {
-                    tally.done += 1;
-                    if rules::revert(tx, &context, &rule, *id).await? {
-                        tally.changed += 1;
-                    }
-                }
-                ids.last()
-                    .copied()
-                    .filter(|_| ids.len() == usize::try_from(BATCH).unwrap_or(0))
-            }
+            RunKind::Apply => apply_batch(tx, &context, &rule, &batch, &mut tally).await?,
+            RunKind::Revert => revert_batch(tx, &context, &rule, &batch, &mut tally).await?,
         };
         progress(tx, batch.run, &tally, last).await?;
         if let Some(after) = last {
@@ -144,6 +99,61 @@ impl JobHandler for ApplyRules {
         rule_runs::announce(tx, &events, &ws, rule.inbox, rule.id, state, view.as_ref()).await?;
         Ok(())
     }
+}
+
+/// Apply `rule` to the next [`BATCH`] conversations it matches after the
+/// batch's position. Returns the position to go on from, if any is left.
+async fn apply_batch(
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    context: &Context<'_>,
+    rule: &rules::Stored,
+    batch: &RunBatch,
+    tally: &mut Tally,
+) -> Result<Option<ConversationId>, JobError> {
+    let acting = rules::acting(tx, rule.inbox).await?;
+    let engine = rule.engine();
+    let mut after = batch.after;
+    loop {
+        let page = rules::scan(tx, rule.inbox, &rule.conditions, after, SCAN).await?;
+        let full = page.len() == usize::try_from(SCAN).unwrap_or(usize::MAX);
+        for candidate in &page {
+            if !engine.matches(&candidate.facts()) {
+                continue;
+            }
+            tally.done += 1;
+            let applied =
+                rules::apply(tx, context, rule.id, &acting, candidate, Some(batch.run)).await?;
+            tally.count(applied);
+            if tally.done >= BATCH {
+                return Ok(Some(candidate.id));
+            }
+        }
+        if !full {
+            return Ok(None);
+        }
+        after = page.last().map(|c| c.id);
+    }
+}
+
+/// Put back the next [`BATCH`] conversations `rule` changed.
+async fn revert_batch(
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    context: &Context<'_>,
+    rule: &rules::Stored,
+    batch: &RunBatch,
+    tally: &mut Tally,
+) -> Result<Option<ConversationId>, JobError> {
+    let ids = applications(tx, rule.id, batch.after).await?;
+    for id in &ids {
+        tally.done += 1;
+        if rules::revert(tx, context, rule, *id).await? {
+            tally.changed += 1;
+        }
+    }
+    Ok(ids
+        .last()
+        .copied()
+        .filter(|_| ids.len() == usize::try_from(BATCH).unwrap_or(0)))
 }
 
 /// What one batch did.

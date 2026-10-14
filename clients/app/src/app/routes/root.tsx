@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import { useShortcut } from "~/lib/shortcuts";
 import { readPref } from "~/lib/storage/prefs";
 import { CommandMenu, ShortcutSheet, Text, ThemeProvider } from "~/lib/ui";
+import { SearchOverlay } from "~/modules/search";
 
 import { SessionGate } from "../session/SessionGate";
 
@@ -21,12 +22,44 @@ export interface RouterContext {
   queryClient: QueryClient;
 }
 
+/** Below this width a floating panel is no use: search opens as a page (48rem, the shell's `md`). */
+const PHONE = "(width < 48rem)";
+
 function RootLayout() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { workspaceId } = useParams({ strict: false });
   const [sheetOpen, setSheetOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [search, setSearch] = useState<{ open: boolean; query: string }>({
+    open: false,
+    query: "",
+  });
+
+  // `/` searches the open workspace: an overlay on a desktop, the page on a phone.
+  const openSearch = (query = "") => {
+    setMenuOpen(false);
+    setSheetOpen(false);
+    if (workspaceId === undefined) {
+      return;
+    }
+    if (typeof globalThis.matchMedia === "function" && globalThis.matchMedia(PHONE).matches) {
+      void navigate({
+        to: "/w/$workspaceId/search",
+        params: { workspaceId },
+        search: query === "" ? {} : { q: query },
+      });
+    } else {
+      setSearch({ open: true, query });
+    }
+  };
+  useShortcut(
+    "search.open",
+    () => {
+      openSearch();
+    },
+    { enabled: workspaceId !== undefined },
+  );
 
   useShortcut("sheet.open", () => {
     setMenuOpen(false);
@@ -57,7 +90,18 @@ function RootLayout() {
         onClose={() => {
           setMenuOpen(false);
         }}
+        onSearch={workspaceId === undefined ? undefined : openSearch}
       />
+      {workspaceId === undefined ? null : (
+        <SearchOverlay
+          workspaceId={workspaceId}
+          open={search.open}
+          initialQuery={search.query}
+          onClose={() => {
+            setSearch({ open: false, query: "" });
+          }}
+        />
+      )}
     </ThemeProvider>
   );
 }

@@ -84,39 +84,43 @@ never start a rule suggestion.
 A rule with `surface: never` SHALL keep a need from being raised for the
 mail it matches, and SHALL clear an open one with cause `rule`. A rule with
 `surface: always` SHALL keep any other rule from archiving, marking read or
-moving the conversation out of `primary`, and SHALL raise a Review need
-("you asked to see mail from …") when nothing else is raised.
+moving the conversation out of `primary`; it raises no need of its own in
+this version.
 
 #### Scenario: Never needs me
 - **WHEN** a bill from billing@hosting.example arrives and a rule says `surface: never` for that sender
 - **THEN** no need is raised for it
 
 #### Scenario: Always show me
-- **WHEN** a message from the accountant arrives that the signals file as a newsletter and a rule says `surface: always` for that sender
-- **THEN** it stays in Primary and has a Review need
+- **WHEN** one rule archives mail from mfiscal.example and a more specific one says `surface: always` for ines@mfiscal.example
+- **THEN** a message from ines@mfiscal.example stays in the inbox, in Primary
 
 ### Requirement: Rule operations
 `POST …/inboxes/{inbox_id}/rules/preview` (`conversations.preview_rule`,
-`conversations:read`, not mutating) SHALL answer, for conditions and actions,
-how many conversations in the inbox the rule would change, up to five of them
-(subject and date), how many it would skip as suspicious or placed by a
-member, and the active rules it would override with how many conversations.
+`conversations:read`, not mutating: a read served by POST so the rule's
+addresses and words stay out of URLs and access logs) SHALL answer, for
+conditions and actions, how many conversations in the inbox the rule
+matches and would change, up to five of them (subject, sender and date,
+newest first), how many it would skip as suspicious or placed by a member,
+and the active rules it would take over from with how many conversations.
 `POST …/inboxes/{inbox_id}/rules` (`conversations.create_rule`,
 `conversations:write`, undo `conversations.remove_rule`) SHALL store a rule
 active or proposed and, when `apply_to_existing` is set for an active rule,
 start a run. `POST …/rules/{rule_id}/confirm` (`conversations.confirm_rule`)
-SHALL make a proposed rule active (with `apply_to_existing`). `PATCH
-…/rules/{rule_id}` (`conversations.update_rule`) SHALL change its conditions,
-actions or pause it. `DELETE …/rules/{rule_id}` (`conversations.remove_rule`)
-SHALL remove it, and with `restore=true` put back what it changed.
-`GET …/rules` (`conversations.list_rules`) and `GET …/rules/{rule_id}`
-(`conversations.get_rule`) SHALL list the rules of the inboxes the caller can
-see with their counts. A rule with the same conditions and an action in the
-same slot as an active one SHALL replace it.
+SHALL make a proposed rule active (with `apply_to_existing`), else answer 409
+`rule_not_proposed`. `PATCH …/rules/{rule_id}` (`conversations.update_rule`)
+SHALL change its conditions or actions, pause it, or let a manager adopt it.
+`DELETE …/rules/{rule_id}` (`conversations.remove_rule`) SHALL remove it, and
+with `restore=true` put back what it changed. `GET …/rules`
+(`conversations.list_rules`, proposed rules first) and
+`GET …/rules/{rule_id}` (`conversations.get_rule`) SHALL list the rules of
+the inboxes the caller can see with their counts, latest run and recent
+exceptions. A rule with the same conditions and an action of the same kind
+as an active one SHALL replace it.
 
 #### Scenario: Preview
 - **WHEN** a member previews moving mail from notifications@github.com to `updates` in an inbox with 1,000 such conversations in Primary, 2 of them suspicious
-- **THEN** the preview counts 998, lists five of them and says 2 are skipped as suspicious
+- **THEN** the preview would change 998, lists five of them and says 2 are skipped as suspicious
 
 #### Scenario: A proposed rule does nothing
 - **WHEN** a rule is created as `proposed`
@@ -130,11 +134,13 @@ same slot as an active one SHALL replace it.
 Previewing, creating and confirming a rule SHALL take the `sender` role on its
 inbox (a `reader` gets 403 `inbox_read_only`). Updating and removing it SHALL
 take its author while they hold `sender`, or a `manager` of the inbox; others
-get 403 `rule_not_yours`. Reading rules SHALL take any role on the inbox; a
-rule in an inbox the caller cannot see SHALL answer 404. A client token SHALL
-only read rules. A rule SHALL act for every member of its inbox. When its
-author no longer holds `sender` on the inbox, the rule SHALL pause until a
-manager adopts or removes it.
+get 403 `rule_not_yours`. A proposed rule MAY be turned down by anyone who may
+teach in its inbox. Reading rules SHALL take any role on the inbox; a rule in
+an inbox the caller cannot see SHALL answer 404. A client token SHALL only
+read and preview rules: creating, confirming, changing or removing one
+answers 403 `rule_needs_member`. A rule SHALL act for every member of its
+inbox. When its author no longer holds `sender` on the inbox, the rule SHALL
+be paused until a manager adopts or removes it.
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -143,6 +149,31 @@ manager adopts or removes it.
 #### Scenario: The author leaves
 - **WHEN** Leo is removed from info@
 - **THEN** his rules there are paused and stop acting on new mail
+
+#### Scenario: An app
+- **WHEN** a client token with `conversations:write` creates a rule
+- **THEN** the response is 403 with code `rule_needs_member`
+
+### Requirement: Rules from evidence ask first
+A rule created with origin `correction` or `suggestion` SHALL be active only
+when the kernel's `MemberPreferences` port says the creating member lets
+Campbooks act without asking and the inbox has no other member; the
+response SHALL then say `acted_without_asking`. Otherwise it SHALL be
+proposed. Until a module installs the port, it SHALL answer "ask first".
+Rules made by hand, from an action or confirmed by a member SHALL not ask the
+port.
+
+#### Scenario: The default
+- **WHEN** a rule is created from corrections and no preferences module is installed
+- **THEN** it is proposed
+
+#### Scenario: Act and tell me
+- **WHEN** the port says Sam lets Campbooks act and Sam's inbox is his alone
+- **THEN** the rule is active and the response says `acted_without_asking`
+
+#### Scenario: A shared inbox
+- **WHEN** the port says Sam lets Campbooks act but Leo also uses the inbox
+- **THEN** the rule is proposed
 
 ### Requirement: Applying a rule to existing mail
 Creating or confirming an active rule with `apply_to_existing` SHALL start
@@ -177,10 +208,11 @@ address. It SHALL declare an upsert of `conversations.rule` within its inbox.
 - **THEN** they receive none of its changes
 
 ### Requirement: Rule suggestions
-`GET …/conversations/{conversation_id}/rule-suggestions?action=…`
+`GET …/conversations/{conversation_id}/rule-suggestions?action=…` (the
+action and a stream or label id only)
 (`conversations.suggest_rules`, `conversations:read`, `sender` role) SHALL,
 after a member's move, archive, label, mark read or Not needed on one
-conversation, answer up to three likenesses from broad to narrow (the
+conversation, answer up to four likenesses from broad to narrow (the
 sender, the List-Id, the sender or domain with the subject words or template),
 each with its conditions, its preview and whether it is the default, or no
 suggestion. The default SHALL be the sender for a machine sender the inbox
@@ -189,13 +221,13 @@ there SHALL be no default, and archive, mark read and Not needed SHALL get no
 suggestion. There SHALL be a suggestion only when the default covers at least
 two other conversations or the message has a List-Id, never for a suspicious
 conversation, and never while the member dismissed it.
-`POST …/rule-suggestions/dismiss` (`conversations.dismiss_rule_suggestion`)
-SHALL hide that likeness and action from that member for 30 days, and for
-good after a second dismissal.
+`POST …/conversations/{conversation_id}/rule-suggestions/dismiss`
+(`conversations.dismiss_rule_suggestion`, with the suggestion's `key`) SHALL
+hide it from that member for 30 days, and for good after a second dismissal.
 
 #### Scenario: The 1,000 notifications
 - **WHEN** Ana moves one GitHub notification to Updates and 1,000 more from notifications@github.com are in Primary
-- **THEN** the suggestion's default is "sender is notifications@github.com" with 1,000, followed by the acme/web List-Id with 612
+- **THEN** the suggestion's default is "sender is notifications@github.com" with 1,000, followed by the acme/web List-Id with 612 and the sender with the subject's template
 
 #### Scenario: A person
 - **WHEN** Ana archives a message from Marta, whom her inbox has written to
@@ -207,10 +239,11 @@ good after a second dismissal.
 
 ### Requirement: Exceptions
 When a member changes back what a rule did to a conversation (moves it to
-another stream, unarchives it, marks it unread, removes the label, or reopens
-a need the rule cleared), the module SHALL mark that application excepted and
-the rule SHALL never change that conversation again. The operation's response
-SHALL carry the rule and how many exceptions it had in the last 30 days.
+another stream, unarchives it, marks it unread or removes the label), the
+module SHALL mark that application excepted and the rule SHALL never change
+that conversation again. The responses of the operations that return the
+conversation (`move_to_stream`, `unarchive`, `mark_unread`) SHALL carry the
+rule and how many exceptions it had in the last 30 days.
 
 #### Scenario: A security alert moved back
 - **WHEN** Ana moves a rule-moved GitHub security alert back to Primary

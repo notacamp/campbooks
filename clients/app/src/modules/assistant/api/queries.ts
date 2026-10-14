@@ -112,11 +112,9 @@ export function usePreviews(
       enabled: rule !== undefined && rule.conditions.length > 0,
       queryFn: async ({ signal }: { signal: AbortSignal }) =>
         unwrap(
-          await api.GET("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview", {
-            params: {
-              path: { workspace_id: workspaceId, inbox_id: inboxId },
-              query: { conditions, actions },
-            },
+          await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview", {
+            params: { path: { workspace_id: workspaceId, inbox_id: inboxId } },
+            body: { conditions: rule?.conditions ?? [], actions: rule?.actions ?? [] },
             signal,
           }),
         ),

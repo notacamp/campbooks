@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM conversations.messages\n                WHERE inbox_id = $1 AND direction = 'outbound'\n                  AND position(('\"' || $2 || '\"') IN lower(recipients::text)) > 0\n           ) AS \"e!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "e!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "47cc2e7a40322b85b3c1a852befcadc7ec753e97ea07bd418348c8358d07ca6d"
+}

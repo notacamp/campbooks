@@ -54,6 +54,11 @@ export {
   type CheckCardOption,
   type CheckCardsProps,
 } from "./components/CheckCards/CheckCards";
+export {
+  Highlight,
+  type HighlightProps,
+  type HighlightSegment,
+} from "./components/Highlight/Highlight";
 export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
 export {
   ChoiceCards,
@@ -99,6 +104,12 @@ export {
   type ItemProps,
 } from "./components/Item/Item";
 export { InlineConfirm, type InlineConfirmProps } from "./components/InlineConfirm/InlineConfirm";
+export {
+  SearchField,
+  type SearchFieldChip,
+  type SearchFieldProps,
+} from "./components/SearchField/SearchField";
+export { Overlay, type OverlayProps } from "./internal/Overlay";
 export { Kbd, KbdHint, type KbdHintProps } from "./components/Kbd/Kbd";
 export { List, ListRow, type ListRowProps } from "./components/List/List";
 export {

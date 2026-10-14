@@ -9,6 +9,7 @@ import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
   FocusPage,
+  IconButton,
   initialsOf,
   NavItem,
   PhoneHeader,
@@ -112,6 +113,7 @@ export function WorkspaceLayout() {
 
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
   const { t: tNav } = useTranslation("shortcuts");
+  const { t: tSearch } = useTranslation("search");
   const { t: tWorkspaces } = useTranslation("workspaces");
   const { t: tShell } = useTranslation();
   const navigate = useNavigate();
@@ -139,9 +141,11 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const inMemory = pathname.startsWith(memoryPath);
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
-  const atHome = !inSettings && !inInbox;
+  const inSearch = pathname.startsWith(`${base}/search`);
+  const atHome = !inSettings && !inInbox && !inSearch;
   const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
+  const searchPath = `${base}/search`;
   const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
     "primary" | "updates" | "receipts" | "newsletters" | undefined;
 
@@ -179,6 +183,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             onClick={openSwitcher}
           />
           <Spacer />
+          <IconButton
+            size="lg"
+            icon="search"
+            label={tSearch("shortcuts.open")}
+            shortcut="search.open"
+            onClick={() => {
+              void navigate({ to: searchPath });
+            }}
+          />
           <AccountMenu
             compact
             waysIn={link(waysInPath)}
@@ -191,6 +204,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           <SearchButton
             onClick={() => {
               registry.run("command.open");
+            }}
+          />
+          <NavItem
+            label={tSearch("shortcuts.open")}
+            icon="search"
+            shortcut="search.open"
+            current={inSearch}
+            onClick={() => {
+              registry.run("search.open");
             }}
           />
           <NavItem

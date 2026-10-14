@@ -16,7 +16,9 @@ import {
   buildIdentityRoutes,
   IDENTITY_SHORTCUTS,
   MailboxStep,
+  SuspendedAccounts,
 } from "~/modules/identity";
+import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
 import {
   buildSystemAdminRoutes,
   buildSystemRoutes,
@@ -66,6 +68,7 @@ export function buildModuleRoutes<
       ...workspaces.workspace,
       ...identity.workspace,
       ...buildConversationsRoutes(workspace),
+      ...buildSearchRoutes(workspace),
       ...buildConnectorsRoutes(workspace),
       ...assistant.workspace,
       // `cargo xtask new-module` inserts above this line.
@@ -84,6 +87,7 @@ export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
     // People and Workspaces show identity's account and connectors' health.
     ...buildWorkspacesAdminRoutes(admin, {
       AccountPanel: AccountAdminPanel,
+      AccountStandings: SuspendedAccounts,
       ConnectionsPanel: WorkspaceConnectionsAdmin,
     }),
   ] as const;
@@ -103,6 +107,7 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...WORKSPACES_SHORTCUTS,
   ...CONVERSATIONS_SHORTCUTS,
   ...COMPOSE_SHORTCUTS,
+  ...SEARCH_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
   ...ASSISTANT_SHORTCUTS,
 ];

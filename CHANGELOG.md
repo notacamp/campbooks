@@ -7,6 +7,7 @@ All notable changes to Campbooks Next are documented here. The format follows
 ## [Unreleased]
 
 ### Security
+
 - **Mail no longer goes to an AI provider outside your network unless you say
   so.** Each AI role's address is checked: a loopback or private address,
   `localhost`, a single-label name such as a compose service (`laya`,
@@ -27,8 +28,37 @@ All notable changes to Campbooks Next are documented here. The format follows
   and `Pragma: no-cache`, so browsers and proxies don't keep them.
 - `pnpm record` refuses any base URL other than `localhost`, `127.0.0.1` or
   `[::1]` unless `--allow-remote` is passed.
+- A failed job's error is cleaned before it is stored and logged: only its
+  first line, at most 500 characters, with quoted text, email addresses,
+  link paths and queries, and long tokens removed. Admin → Jobs shows the
+  cleaned message. Errors already stored are left as they are.
+
+### Removed
+- **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
+  no longer has the `idp`, `idp-init` and `idp-provision` services or the `idp-data`
+  volume, `deploy/idp/` is deleted, and the stack no longer sets
+  `CAMPBOOKS_AUTH__ISSUER`, so a default install signs in through Campbooks' own
+  issuer. **To upgrade:** copy the new `compose.yaml`, then
+  `docker compose up -d --remove-orphans` removes the three old containers (leaving
+  them running breaks nothing, they are just unused; an old compose file kept as it is
+  keeps working on Rauthy). The `idp-data` volume is left for you to delete once you are
+  sure (`docker volume rm <project>_idp-data`). **Accounts that lived in Rauthy are not
+  carried over:** those people sign in again with Google, Microsoft, Zoho or a passkey
+  and get a new Campbooks account. Move the `CAMPBOOKS_IDP_*` sign-in provider settings
+  to `CAMPBOOKS_GOOGLE__*`, `CAMPBOOKS_MICROSOFT__*` and `CAMPBOOKS_ZOHO__*`, put each
+  client secret in `deploy/secrets/<provider>-client-secret` (now mounted into the
+  server at `/run/secrets/campbooks`), and add
+  `${CAMPBOOKS_PUBLIC_URL}/auth/callback/<provider>` to each provider's OAuth app (see
+  `deploy/README.md` -> Built-in sign-in and Upgrading from the Rauthy sign-in).
+  `CAMPBOOKS_IDP_*`, `CAMPBOOKS_BFF__IDP_INTERNAL_URL` and
+  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL` no longer do anything in the shipped stack.
+  Pointing `CAMPBOOKS_AUTH__ISSUER` at an outside OpenID Connect issuer is still
+  possible, but nothing is provisioned for it.
 
 ### Changed
+- Admin → People marks people whose account is suspended, and Admin →
+  Signups → Codes says what a code is: good for the number of signups set
+  when it is minted, until it is used up, expires or is revoked.
 - The event log is no longer kept forever: events older than
   `CAMPBOOKS_EVENTS__RETENTION_DAYS` (default 90) are deleted hourly, except
   events still being delivered, and failed jobs older than
@@ -37,6 +67,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by
@@ -53,6 +84,41 @@ All notable changes to Campbooks Next are documented here. The format follows
   sends it only your sentence and your own addresses and label names, never
   your mail. Without a `complete` role, Scout's memory offers a rule builder
   instead.
+- **Rules you teach, applied to the mail that looks the same.** A taught rule
+  says which mail it is about (the sender, its domain, a mailing list, the
+  subject's template or words, a header, a label or a stream) and what to do
+  (move it to a stream, archive it, label it, mark it read, say whether it
+  needs a reply or an action, or always or never show it). Rules run before
+  the built-in signals and any model, always give the same result for the
+  same mail, and never hide mail that looks suspicious. Creating one applies
+  it to the mail already in the inbox in the background, a hundred
+  conversations at a time, with progress; removing it can put that mail back.
+  Moving one back by hand makes it an exception the rule leaves alone. New
+  operations: `conversations.preview_rule`, `create_rule`, `confirm_rule`,
+  `update_rule`, `remove_rule`, `list_rules`, `get_rule`, `suggest_rules`
+  and `dismiss_rule_suggestion`; new event `conversations.rule_changed`. The
+  screens that use them follow in the next release.
+- `conversations.need_changed` may clear a need with cause `rule`.
+- **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
+  stream's conversations like J and K, Enter opens one, and going past the
+  last row loads more. In an open conversation the arrows scroll it (J and K
+  still go to the next or previous one), and they're never taken from a
+  field, a menu or a dialog. The `?` sheet and the empty reader show "J or ↓".
+  Home's "what needs you" list moves with the arrows too (an open item scrolls).
+- Search in the app. Press `/` anywhere in a workspace for a search panel:
+  instant rows by relevance with the words that matched marked, the filters
+  Campbooks understood (`from:`, `has:attachment`, `is:unread`, dates...)
+  as chips you can remove, ↑ ↓ to move, ↵ to open the conversation in the
+  inbox reader, Ctrl/⌘↵ for all results and Esc to close. ⌘K now ends with
+  "Search conversations for ..." when you have typed something. The results
+  page (`/w/<workspace>/search?q=`) lists the hits newest first, with a
+  "Most relevant" toggle, quick filters for attachments and unread mail, and
+  the reader beside the list on wide screens; J, K, ↵, E, S, U, M and Z work
+  as in the inbox. On phones the top bar has a search button, the page is
+  full screen and the reader is its own screen. Recent searches are kept on
+  this device only, for the signed-in account and workspace (cleared with one button and on sign-out); older mail still being
+  indexed and every error are said plainly. In English, European Portuguese,
+  Spanish and French.
 - Admin → Jobs: administrators with the `jobs.read` permission see the
   background queue by kind (waiting, scheduled, running, running with a lost
   worker, failed) and the jobs that gave up with their last error (monospace,
@@ -81,9 +147,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 - Admin → Signups: administrators with `signups.review` (or `super`) see who asked to
   join an instance that approves new accounts and approve or reject each request
   (a rejection can carry a note only administrators see), and mint, copy once and
-  revoke **single-use signup codes** for instances that ask for a code. A person
-  waiting for approval, approved, or not approved sees that on the create-workspace
-  screen the next time they open the app (they are not emailed yet). Codes are
+  revoke **signup codes** (each good for the number of signups you set) for
+  instances that ask for a code. A person waiting for approval, approved, or not
+  approved sees that on the create-workspace screen the next time they open the
+  app (they are not emailed yet). Codes are
   stored as digests, work for the number of uses and until the day you set, and are
   spent when the workspace is created, so two people cannot share the last use.
   `CAMPBOOKS_SIGNUP__CODES` keeps working as before (reusable codes), and
@@ -512,7 +579,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   (crate, scopes, events, a scoped read slice with tests, schema migration,
   OpenSpec change, client module with its four locale files) and registers it
   in the workspace, the server and the client shell; `cargo xtask new-feature
-  <module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
+<module> <feature>` adds a slice to a module; `cargo xtask scaffold-check`
   (also run in CI) proves their output passes the gates. Optional local git
   hooks (`lefthook install`), Claude Code skills for starting a task,
   developing a feature and adding a module, and a guide to working in
@@ -555,6 +622,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+
 - Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
   audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
   applies to an outside identity provider. Nothing to do: tokens last ten minutes, and

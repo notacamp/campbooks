@@ -277,12 +277,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     }
   };
   const hasRows = selected !== undefined;
-  useShortcut("list.next", () => {
-    move(1);
-  });
-  useShortcut("list.previous", () => {
-    move(-1);
-  });
+  // With an item open the arrows scroll it, as in the reader; J and K still step.
+  const alternates = expandedId === undefined;
+  useShortcut(
+    "list.next",
+    () => {
+      move(1);
+    },
+    { alternates },
+  );
+  useShortcut(
+    "list.previous",
+    () => {
+      move(-1);
+    },
+    { alternates },
+  );
   useShortcut(
     "list.open",
     () => {
@@ -377,7 +387,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         {KEYS.map((id) => {
           const definition = registry.get(id);
           return definition === undefined ? null : (
-            <Line key={id} trailing={<KbdHint shortcut={id} announce />}>
+            <Line key={id} trailing={<KbdHint shortcut={id} announce withAlternates />}>
               {translateLabel(definition.label)}
             </Line>
           );

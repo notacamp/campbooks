@@ -1,0 +1,9 @@
+/* Colour never carries the match alone: marks are also heavier. */
+.mark {
+  padding: 0 var(--space-0-5);
+  margin: 0 calc(var(--space-0-5) * -1);
+  border-radius: var(--radius-xs);
+  background: var(--highlight);
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+}

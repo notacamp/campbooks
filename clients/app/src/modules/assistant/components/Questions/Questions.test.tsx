@@ -63,8 +63,8 @@ function mockEverything() {
     [`PUT ${W}/assistant/profile`]: (_request, body) => ({
       body: { ...(body as object), asked_at: "2026-10-14T10:00:00Z", revision: 1 },
     }),
-    [`GET ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
-    [`GET ${W}/inboxes/inbox-team/rules/preview`]: {
+    [`POST ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
+    [`POST ${W}/inboxes/inbox-team/rules/preview`]: {
       body: { ...PREVIEW, matching: 3, samples: [] },
     },
     [`POST ${W}/inboxes/inbox-own/rules`]: () => {
@@ -125,7 +125,9 @@ describe("Questions", () => {
     expect(
       await screen.findByRole("heading", { name: "Scout knows what you care about" }),
     ).toBeVisible();
-    const created = api.calls.filter((call) => call.route.startsWith("POST"));
+    const created = api.calls.filter(
+      (call) => call.route.startsWith("POST") && call.route.endsWith("/rules"),
+    );
     expect(created.map((call) => call.route)).toEqual([
       `POST ${W}/inboxes/inbox-own/rules`,
       `POST ${W}/inboxes/inbox-own/rules`,
@@ -158,7 +160,9 @@ describe("Questions", () => {
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: /Save/u }));
     await screen.findByRole("heading", { name: "Scout knows what you care about" });
-    expect(api.calls.some((call) => call.route.startsWith("POST"))).toBe(false);
+    expect(
+      api.calls.some((call) => call.route.startsWith("POST") && call.route.endsWith("/rules")),
+    ).toBe(false);
   });
 
   it("Not now (Esc) records only that the questions were put off, then goes Home", async () => {
