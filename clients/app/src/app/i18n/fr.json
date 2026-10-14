@@ -64,9 +64,10 @@
     "back": "Retour à Campbooks",
     "sections": {
       "system": "Système",
+      "jobs": "Tâches",
+      "signups": "Inscriptions",
       "people": "Personnes",
-      "workspaces": "Espaces de travail",
-      "signups": "Inscriptions"
+      "workspaces": "Espaces de travail"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Reconnectez-vous pour continuer",

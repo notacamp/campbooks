@@ -783,6 +783,21 @@ async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgP
         .await
         .assert_problem(StatusCode::NOT_FOUND, "not_found");
 
+    // An operation with a path parameter works behind the BFF's own wildcard
+    // (`/bff/admin/{*path}`): the handler's `id` is not confused with `path`.
+    let dead: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO kernel.jobs (queue, kind, payload, state, attempts, max_attempts, finished_at)
+         VALUES ('default', 'test.dead', '{}', 'failed', 3, 3, now()) RETURNING id",
+    )
+    .fetch_one(&h.db)
+    .await
+    .unwrap();
+    let reply = browser
+        .post(&format!("/bff/admin/v1/system/jobs/{dead}/retry"), "")
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.json()["outcome"], "applied");
+
     // Revoked: gone at once.
     campbooks_admin::cli::revoke(&mut conn, "test-user", &[], chrono::Utc::now())
         .await

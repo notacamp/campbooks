@@ -21,6 +21,8 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 mod deps;
 mod features;
 pub mod scopes;
+#[cfg(test)]
+mod testkit;
 
 pub use deps::{Deps, Facts, IdentityProvider};
 
@@ -70,6 +72,11 @@ pub fn module_with(deps: Deps) -> Module {
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_overview::handler))
+                .routes(routes!(features::admin_jobs::summary))
+                .routes(routes!(features::admin_jobs::failed))
+                .routes(routes!(features::admin_job_actions::retry))
+                .routes(routes!(features::admin_job_actions::discard))
+                .routes(routes!(features::admin_job_actions::retry_kind))
                 .layer(Extension(deps)),
         ),
         background: Background::new(),
