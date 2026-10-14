@@ -21,10 +21,10 @@ import {
   WorkspaceMark,
 } from "~/lib/ui";
 
-import { useCreateWorkspace, type Kind, type Workspace } from "../../api/queries";
+import { useCreateWorkspace, useSignupStatus, type Kind, type Workspace } from "../../api/queries";
 import { ACCENT_FOR_KIND, MAX_NAME_LENGTH } from "../../model";
 
-type Step = "name" | "kind" | "code" | "inviteOnly" | "approval" | "done";
+type Step = "name" | "kind" | "code" | "inviteOnly" | "approval" | "rejected" | "done";
 
 /** What a step after creating the workspace gets (see `afterCreate`). */
 export interface AfterCreateProps {
@@ -75,6 +75,9 @@ export function CreateWorkspace({
   const [codeError, setCodeError] = useState<string | undefined>();
   const [failed, setFailed] = useState(false);
   const [created, setCreated] = useState<Workspace | null>(null);
+  // An approved person has been told so and went on.
+  const [moved, setMoved] = useState(false);
+  const signup = useSignupStatus();
   const focusTarget = useRef<HTMLInputElement & HTMLButtonElement>(null);
 
   // Each view starts with its one control focused.
@@ -116,6 +119,12 @@ export function CreateWorkspace({
             }
             case "signup_requires_approval": {
               setStep("approval");
+              void signup.refetch();
+              break;
+            }
+            case "signup_rejected": {
+              setStep("rejected");
+              void signup.refetch();
               break;
             }
             default: {
@@ -150,7 +159,64 @@ export function CreateWorkspace({
   const mark = <WorkspaceMark mark={initialsOf(finalName)} accent={accent} size="lg" />;
   const busy = create.isPending;
 
-  switch (step) {
+  // Under the `approval` policy the request's standing decides what the
+  // person sees before (and after) they try to create a workspace.
+  const standing =
+    signup.data?.policy === "approval" && signup.data.restricted ? signup.data.request : null;
+  const waiting = step === "approval" || (step === "name" && !moved);
+  const view: Step | "approved" =
+    step === "rejected" || (waiting && standing === "rejected")
+      ? "rejected"
+      : waiting && standing === "approved"
+        ? "approved"
+        : waiting && standing === "pending"
+          ? "approval"
+          : step;
+
+  switch (view) {
+    case "approved": {
+      return (
+        <FocusPage
+          top={top}
+          leading={<Visor state="happy" size="xl" />}
+          title={t("create.approved.title")}
+          lead={t("create.approved.lead")}
+          actions={
+            <Button
+              ref={focusTarget}
+              variant="primary"
+              size="lg"
+              disabled={busy}
+              onClick={() => {
+                setMoved(true);
+                if (step === "approval") {
+                  submit(kind ?? "business");
+                }
+              }}
+            >
+              {busy ? t("create.kind.creating") : t("create.approved.continue")}
+            </Button>
+          }
+        >
+          {failure}
+        </FocusPage>
+      );
+    }
+    case "rejected": {
+      return (
+        <FocusPage
+          top={top}
+          leading={<Visor state="unsure" size="xl" />}
+          title={t("create.rejected.title")}
+          lead={t("create.rejected.lead")}
+          actions={
+            <Button ref={focusTarget} variant="secondary" size="lg" onClick={onSignOut}>
+              {t("create.signOut")}
+            </Button>
+          }
+        />
+      );
+    }
     case "name": {
       return (
         <FocusPage
@@ -339,12 +405,12 @@ export function CreateWorkspace({
               ref={focusTarget}
               variant="secondary"
               size="lg"
-              disabled={busy}
+              disabled={signup.isFetching}
               onClick={() => {
-                submit(kind ?? "business");
+                void signup.refetch();
               }}
             >
-              {t("create.approval.retry")}
+              {signup.isFetching ? t("create.approval.checking") : t("create.approval.retry")}
             </Button>
           }
         >

@@ -70,6 +70,22 @@ describe("the admin section", () => {
     expect(await screen.findByText("Campbooks’ own")).toBeVisible();
   });
 
+  it("offers Signups next to System and opens it", async () => {
+    mockApi({
+      "GET /bff/session": { body: SESSION },
+      "GET /bff/api/v1/workspaces": { body: { workspaces: [DUARTE] } },
+      [OVERVIEW_ROUTE]: { body: OVERVIEW },
+      "GET /bff/admin/v1/workspaces/signup-requests": { body: { requests: [], next: null } },
+    });
+    const { router } = renderApp("/admin/system");
+
+    const [link] = await screen.findAllByRole("link", { name: "Signups" });
+    fireEvent.click(link ?? document.body);
+    expect(await screen.findByRole("heading", { level: 1, name: "Signups" })).toBeVisible();
+    expect(router.state.location.pathname).toBe("/admin/signups");
+    expect(await screen.findByRole("heading", { name: "No requests yet" })).toBeVisible();
+  });
+
   it("asks for a fresh sign-in when the last one is too old, coming back here", async () => {
     signedIn({ status: 401, body: REAUTH_PROBLEM });
     renderApp("/admin/system");

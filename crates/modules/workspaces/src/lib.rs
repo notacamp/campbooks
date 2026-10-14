@@ -19,6 +19,8 @@
 use campbooks_kernel::{Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+#[cfg(test)]
+mod admin_tests;
 mod domain;
 pub mod events;
 mod features;
@@ -73,13 +75,22 @@ pub fn module() -> Module {
                 features::list_invitations::handler,
                 features::invite_member::handler
             ))
-            .routes(routes!(features::list_security_events::handler)),
+            .routes(routes!(features::list_security_events::handler))
+            .routes(routes!(features::get_signup::handler)),
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_list_users::handler))
                 .routes(routes!(features::admin_get_user::handler))
                 .routes(routes!(features::admin_list_workspaces::handler))
-                .routes(routes!(features::admin_get_workspace::handler)),
+                .routes(routes!(features::admin_get_workspace::handler))
+                .routes(routes!(features::admin_list_signup_requests::handler))
+                .routes(routes!(features::admin_approve_signup_request::handler))
+                .routes(routes!(features::admin_reject_signup_request::handler))
+                .routes(routes!(
+                    features::admin_list_signup_codes::handler,
+                    features::admin_mint_signup_code::handler
+                ))
+                .routes(routes!(features::admin_revoke_signup_code::handler)),
         ),
         background: Background::new()
             .publishes::<events::WorkspaceCreated>()

@@ -60,12 +60,22 @@
     "approval": {
       "title": "Votre demande est en attente",
       "lead": "La personne qui gère ce Campbooks approuve les nouveaux comptes. Elle a votre demande ; revenez vérifier plus tard.",
-      "retry": "Vérifier à nouveau"
+      "retry": "Vérifier à nouveau",
+      "checking": "Vérification…"
     },
     "failed": {
       "title": "Impossible de créer l’espace de travail",
       "lead": "Campbooks n’a pas répondu. Rien n’a été créé.",
       "retry": "Réessayer"
+    },
+    "approved": {
+      "title": "Votre demande est approuvée",
+      "lead": "Un administrateur a approuvé votre demande. Vous pouvez créer votre espace de travail.",
+      "continue": "Continuer"
+    },
+    "rejected": {
+      "title": "Votre demande n’a pas été approuvée",
+      "lead": "Les personnes qui gèrent ce Campbooks ont décidé de ne pas vous laisser entrer. Si vous pensez qu’il s’agit d’une erreur, contactez-les."
     }
   },
   "members": {
@@ -221,6 +231,122 @@
       "pendingInvitations": "Invitations en attente",
       "invitationCount_one": "{{count}} invitation",
       "invitationCount_other": "{{count}} invitations"
+    }
+  },
+  "signups": {
+    "title": "Inscriptions",
+    "parts": {
+      "label": "Inscriptions",
+      "requests": "Demandes",
+      "codes": "Codes"
+    },
+    "lead": {
+      "requests": "Les personnes qui ont demandé à créer un compte sur ce Campbooks, lorsqu’il approuve les nouveaux comptes. En approuvant, vous leur permettez de créer leur espace de travail ; elles le sauront à leur prochaine ouverture de l’application.",
+      "codes": "Des codes à usage limité que vous remettez lorsque ce Campbooks demande un code d’inscription. Chaque code peut servir autant de fois que vous l’indiquez, puis cesse de fonctionner."
+    },
+    "more": "Afficher plus",
+    "cancel": "Annuler",
+    "errors": {
+      "generic": "Impossible d’enregistrer. Rien n’a changé. Réessayez."
+    },
+    "loadError": {
+      "title": "Impossible de charger",
+      "lead": "Le serveur n’a pas répondu. Vérifiez votre connexion, puis réessayez.",
+      "retry": "Réessayer"
+    },
+    "requests": {
+      "filter": {
+        "label": "Afficher",
+        "all": "Toutes",
+        "pending": "En attente",
+        "approved": "Approuvées",
+        "rejected": "Non approuvées"
+      },
+      "loading": "Chargement des demandes…",
+      "list": "Demandes d’inscription",
+      "empty": {
+        "all": {
+          "title": "Aucune demande pour l’instant",
+          "lead": "Quand quelqu’un demandera à rejoindre ce Campbooks et que les nouveaux comptes seront soumis à approbation, la demande apparaîtra ici."
+        },
+        "pending": {
+          "title": "Personne n’attend",
+          "lead": "Les nouvelles demandes apparaissent ici dès que quelqu’un demande à rejoindre."
+        },
+        "approved": {
+          "title": "Aucune demande approuvée",
+          "lead": "Les personnes que vous approuvez sont listées ici."
+        },
+        "rejected": {
+          "title": "Aucune demande refusée",
+          "lead": "Les personnes que vous refusez sont listées ici."
+        }
+      },
+      "status": {
+        "pending": "En attente",
+        "approved": "Approuvée",
+        "rejected": "Non approuvée"
+      },
+      "asked": "Demandée le {{date}}",
+      "decided": "décidée le {{date}}",
+      "approve": "Approuver",
+      "reject": "Refuser",
+      "approveLabel": "Approuver {{name}}",
+      "rejectLabel": "Refuser {{name}}",
+      "confirm": {
+        "approve": "Approuver {{name}} ? Cette personne pourra créer son espace de travail à sa prochaine ouverture de Campbooks.",
+        "reject": "Refuser {{name}} ? Elle sera informée que sa demande n’a pas été approuvée. Vous pourrez toujours l’approuver plus tard."
+      },
+      "reason": "Motif (facultatif)",
+      "reasonHint": "Seuls les administrateurs le voient.",
+      "reasonLine": "Motif : {{reason}}"
+    },
+    "codes": {
+      "mint": {
+        "title": "Créer un code",
+        "lead": "Vous ne verrez le code qu’une seule fois, juste après l’avoir créé ; copiez-le avant de quitter cette page.",
+        "label": "Libellé",
+        "placeholder": "Ana, testeuse de la bêta",
+        "uses": "Utilisations",
+        "expires": "Expire le (facultatif)",
+        "submit": "Créer le code",
+        "minting": "Création…",
+        "failed": "Impossible de créer le code. Réessayez.",
+        "errors": {
+          "label": "Indiquez un libellé de 1 à 100 caractères.",
+          "uses": "Les utilisations doivent être un nombre entier de 1 à 100000.",
+          "expires": "Choisissez un jour dans le futur."
+        }
+      },
+      "minted": {
+        "title": "Code pour {{label}}",
+        "lead": "Copiez-le maintenant. Il ne peut plus être affiché ; vous pouvez seulement le révoquer.",
+        "field": "Code d’inscription",
+        "copy": "Copier le code",
+        "copied": "Copié",
+        "copyFailed": "Sélectionnez le code et copiez-le",
+        "done": "Je l’ai copié"
+      },
+      "listTitle": "Codes créés",
+      "list": "Codes d’inscription",
+      "loading": "Chargement des codes…",
+      "empty": {
+        "title": "Aucun code pour l’instant",
+        "lead": "Créez un code ci-dessus et remettez-le à la personne que vous voulez laisser entrer."
+      },
+      "state": {
+        "active": "Actif",
+        "used_up": "Épuisé",
+        "expired": "Expiré",
+        "revoked": "Révoqué"
+      },
+      "usage": "{{uses}} sur {{max}} utilisations",
+      "noExpiry": "Sans expiration",
+      "expiresOn": "Expire le {{date}}",
+      "mintedOn": "Créé le {{date}}",
+      "revoke": "Révoquer",
+      "revokeLabel": "Révoquer {{label}}",
+      "confirmRevoke": "Révoquer « {{label}} » ? Il cesse de fonctionner immédiatement. Les personnes qui l’ont déjà utilisé conservent leurs espaces de travail."
     }
   }
 }

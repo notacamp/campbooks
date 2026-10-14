@@ -13,6 +13,11 @@
     "signup_code_invalid": "This signup code is not valid.",
     "last_owner": "A workspace needs at least one owner. Make someone else an owner first.",
     "invalid_cursor": "This page link is not valid. Start again from the first page.",
-    "query_too_long": "The search can be at most {{max}} characters long."
+    "query_too_long": "The search can be at most {{max}} characters long.",
+    "signup_rejected": "Your request to join was not approved. Contact the instance's administrator if you think this is a mistake.",
+    "invalid_label": "The label must be 1 to {{max}} characters long.",
+    "invalid_max_uses": "The number of uses must be between 1 and {{max}}.",
+    "invalid_expiry": "The expiry must be in the future.",
+    "invalid_reason": "The reason must be at most {{max}} characters long."
   }
 }

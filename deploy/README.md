@@ -32,7 +32,8 @@
 9. Workspaces: the first person to sign in creates the first workspace and
    invites the others from Settings → Members. Who else may create a
    workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by default; `invite_only`,
-   `approval`, `code`). Invitations are not emailed yet: the inviter gets the
+   `approval`, `code`; administrators decide `approval` requests and mint single-use `code`
+   codes in Admin → Signups, see "Administrators"). Invitations are not emailed yet: the inviter gets the
    link once, right after inviting, to send on; it is built from
    `CAMPBOOKS_PUBLIC_URL`, so set that to the address people use. The new
    `workspaces:*` scopes are registered by `idp-provision` on the next `up`;
@@ -530,9 +531,9 @@ An administrator is a person whose account has an **admin profile** (ADR 0015). 
 the **Admin** section of the app (account menu → Admin, or `/admin`): the System
 panel, with the version, uptime, database and migrations, the effective configuration
 (never a secret) and whether each AI role's provider answers; **People**, everyone who has
-signed in, with their workspaces, how they sign in and a **Suspend** action; and
-**Workspaces**, with their members and each connected mailbox's health. Signups and jobs
-follow.
+signed in, with their workspaces, how they sign in and a **Suspend** action;
+**Workspaces**, with their members and each connected mailbox's health; and the
+**Signups** panel (below). Jobs follow.
 
 Profiles exist only through the server's command line, never through the app or the API,
 so becoming an administrator needs shell access to the server. The command connects with
@@ -561,6 +562,15 @@ docker compose exec server campbooks-server admin log             # the audit tr
 Permissions are `super` (everything), `system.read`, `signups.review`, `users.read`,
 `users.suspend`, `workspaces.read`, `jobs.read` and `jobs.retry`; the dashboard shows only to
 `super` for now. Changes apply on the person's next request.
+
+**Signups.** With `CAMPBOOKS_SIGNUP__POLICY=approval`, someone new who tries to create a
+workspace is refused and a request appears in Admin → Signups (permission `signups.review`);
+approve or reject it there. They see the answer the next time they open the app; Campbooks
+does not email them yet. With `CAMPBOOKS_SIGNUP__POLICY=code`, mint codes in the same panel:
+each code is shown once when minted (copy it then), works for the number of uses you set (one
+by default) until the day you pick, and can be revoked. Only a digest of a code is stored.
+Codes in `CAMPBOOKS_SIGNUP__CODES` still work and stay reusable by anyone who has them; prefer
+minted codes, and the setting needs no value when you only use minted ones.
 
 - Every admin request and every command above is recorded (`admin log`).
 - The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks

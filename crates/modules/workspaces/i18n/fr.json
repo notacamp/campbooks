@@ -13,6 +13,11 @@
     "signup_code_invalid": "Ce code d’inscription n’est pas valide.",
     "last_owner": "Un espace de travail doit avoir au moins un propriétaire. Désignez d’abord une autre personne comme propriétaire.",
     "invalid_cursor": "Ce lien de page n’est pas valide. Recommencez à la première page.",
-    "query_too_long": "La recherche peut contenir au maximum {{max}} caractères."
+    "query_too_long": "La recherche peut contenir au maximum {{max}} caractères.",
+    "signup_rejected": "Votre demande d’inscription n’a pas été approuvée. Contactez l’administrateur de l’instance si vous pensez qu’il s’agit d’une erreur.",
+    "invalid_label": "Le libellé doit comporter entre 1 et {{max}} caractères.",
+    "invalid_max_uses": "Le nombre d’utilisations doit être compris entre 1 et {{max}}.",
+    "invalid_expiry": "L’expiration doit être dans le futur.",
+    "invalid_reason": "Le motif ne doit pas dépasser {{max}} caractères."
   }
 }

@@ -65,7 +65,8 @@
     "sections": {
       "system": "Sistema",
       "people": "Pessoas",
-      "workspaces": "Espaços de trabalho"
+      "workspaces": "Espaços de trabalho",
+      "signups": "Registos"
     },
     "menuEntry": "Administração",
     "reauthTitle": "Inicie sessão novamente para continuar",

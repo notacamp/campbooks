@@ -21,6 +21,7 @@ import {
   buildWorkspacesAdminRoutes,
   buildWorkspacesRoutes,
   PEOPLE_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
   WORKSPACES_ADMIN_SECTION,
   WORKSPACES_SHORTCUTS,
 } from "~/modules/workspaces";
@@ -84,6 +85,7 @@ export const ADMIN_SECTIONS = [
   SYSTEM_ADMIN_SECTION,
   PEOPLE_ADMIN_SECTION,
   WORKSPACES_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
 ] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */

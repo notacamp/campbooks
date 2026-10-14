@@ -60,12 +60,22 @@
     "approval": {
       "title": "Your request is waiting",
       "lead": "Someone who runs this Campbooks approves new accounts. Your request is with them; check again later.",
-      "retry": "Check again"
+      "retry": "Check again",
+      "checking": "Checking…"
     },
     "failed": {
       "title": "Couldn’t create the workspace",
       "lead": "Campbooks didn’t answer. Nothing was created.",
       "retry": "Try again"
+    },
+    "approved": {
+      "title": "You’re approved",
+      "lead": "An administrator approved your request. You can create your workspace now.",
+      "continue": "Continue"
+    },
+    "rejected": {
+      "title": "Your request wasn’t approved",
+      "lead": "The people who run this Campbooks decided not to let you in. If you think that’s a mistake, contact them."
     }
   },
   "members": {
@@ -221,6 +231,122 @@
       "pendingInvitations": "Pending invitations",
       "invitationCount_one": "{{count}} invitation",
       "invitationCount_other": "{{count}} invitations"
+    }
+  },
+  "signups": {
+    "title": "Signups",
+    "parts": {
+      "label": "Signups",
+      "requests": "Requests",
+      "codes": "Codes"
+    },
+    "lead": {
+      "requests": "People who asked to create an account on this Campbooks, when it approves new accounts. Approving lets them create their workspace; they find out the next time they open the app.",
+      "codes": "Single-use codes you hand out when this Campbooks asks for a signup code. Each code can be used as many times as you set, then stops working."
+    },
+    "more": "Show more",
+    "cancel": "Cancel",
+    "errors": {
+      "generic": "Couldn’t save that. Nothing changed. Try again."
+    },
+    "loadError": {
+      "title": "Couldn’t load this",
+      "lead": "The server didn’t answer. Check your connection, then try again.",
+      "retry": "Try again"
+    },
+    "requests": {
+      "filter": {
+        "label": "Show",
+        "all": "All",
+        "pending": "Waiting",
+        "approved": "Approved",
+        "rejected": "Not approved"
+      },
+      "loading": "Loading requests…",
+      "list": "Signup requests",
+      "empty": {
+        "all": {
+          "title": "No requests yet",
+          "lead": "When someone asks to join and this Campbooks approves new accounts, they show up here."
+        },
+        "pending": {
+          "title": "Nobody is waiting",
+          "lead": "New requests appear here as soon as someone asks to join."
+        },
+        "approved": {
+          "title": "No approved requests",
+          "lead": "People you approve are listed here."
+        },
+        "rejected": {
+          "title": "No requests turned down",
+          "lead": "People you turn down are listed here."
+        }
+      },
+      "status": {
+        "pending": "Waiting",
+        "approved": "Approved",
+        "rejected": "Not approved"
+      },
+      "asked": "Asked {{date}}",
+      "decided": "decided {{date}}",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approveLabel": "Approve {{name}}",
+      "rejectLabel": "Reject {{name}}",
+      "confirm": {
+        "approve": "Approve {{name}}? They can create their workspace the next time they open Campbooks.",
+        "reject": "Turn {{name}} down? They’ll be told their request wasn’t approved. You can still approve them later."
+      },
+      "reason": "Reason (optional)",
+      "reasonHint": "Only administrators see it.",
+      "reasonLine": "Reason: {{reason}}"
+    },
+    "codes": {
+      "mint": {
+        "title": "Mint a code",
+        "lead": "You’ll see the code once, right after you mint it, so copy it before you leave this page.",
+        "label": "Label",
+        "placeholder": "Ana, beta tester",
+        "uses": "Uses",
+        "expires": "Expires on (optional)",
+        "submit": "Mint code",
+        "minting": "Minting…",
+        "failed": "Couldn’t mint a code. Try again.",
+        "errors": {
+          "label": "Give it a label of 1 to 100 characters.",
+          "uses": "Uses must be a whole number from 1 to 100000.",
+          "expires": "Pick a day in the future."
+        }
+      },
+      "minted": {
+        "title": "Code for {{label}}",
+        "lead": "Copy it now. It can’t be shown again; you can only revoke it.",
+        "field": "Signup code",
+        "copy": "Copy code",
+        "copied": "Copied",
+        "copyFailed": "Select the code and copy it",
+        "done": "I’ve copied it"
+      },
+      "listTitle": "Minted codes",
+      "list": "Signup codes",
+      "loading": "Loading codes…",
+      "empty": {
+        "title": "No codes yet",
+        "lead": "Mint a code above and hand it to the person you want to let in."
+      },
+      "state": {
+        "active": "Active",
+        "used_up": "Used up",
+        "expired": "Expired",
+        "revoked": "Revoked"
+      },
+      "usage": "{{uses}} of {{max}} used",
+      "noExpiry": "No expiry",
+      "expiresOn": "Expires {{date}}",
+      "mintedOn": "Minted {{date}}",
+      "revoke": "Revoke",
+      "revokeLabel": "Revoke {{label}}",
+      "confirmRevoke": "Revoke “{{label}}”? It stops working at once. People who already used it keep their workspaces."
     }
   }
 }

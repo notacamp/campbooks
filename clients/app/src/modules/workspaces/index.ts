@@ -3,6 +3,7 @@
 export {
   buildWorkspacesAdminRoutes,
   PEOPLE_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
   WORKSPACES_ADMIN_SECTION,
 } from "./admin";
 export { useWorkspaces, type Workspace } from "./api/queries";

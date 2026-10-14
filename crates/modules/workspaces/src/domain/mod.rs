@@ -6,5 +6,7 @@ pub mod db;
 pub mod departure;
 pub mod invitation;
 pub mod model;
+pub mod page;
 pub mod security;
+pub mod signup;
 pub mod users;
