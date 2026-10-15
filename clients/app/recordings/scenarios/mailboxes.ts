@@ -22,11 +22,13 @@ import { caption } from "./inbox.ts";
 //   CAMPBOOKS_API_URL=http://127.0.0.1:8291 pnpm --dir clients/app exec vite --port 5281
 //   pnpm --dir clients record mailboxes --base-url http://localhost:5281
 //
-// Sign up with Google (its Gmail connects), open Settings → Mailboxes,
-// connect Zoho Mail, see it need you after Zoho withdraws the grant,
-// reconnect it, disconnect it (Zoho stays a way in), and, with no mailbox
-// left, Home's "Connect your mail" leads back here. Fictional person and
-// mail only; no token is ever shown.
+// Sign up with Google and forget the mailbox from sign-up: Home's "Connect
+// your mail" opens Settings → Mailboxes. Connect Gmail, then Zoho Mail (also
+// as a way to sign in); Zoho withdraws the grant, so it needs you:
+// Reconnect. Disconnect Zoho keeping its history: its inbox reads as kept
+// history and Zoho, a way in only by connecting it, leaves Ways to sign in.
+// Disconnect Gmail deleting its mail: it leaves the inbox. Fictional person
+// and mail only; no token is ever shown.
 
 const fakeZoho = process.env["FAKE_ZOHO_URL"] ?? "http://127.0.0.1:9172";
 
@@ -57,6 +59,27 @@ async function openMailboxes(page: Page, phone: boolean): Promise<void> {
   await page.getByRole("heading", { level: 1, name: "Mailboxes" }).waitFor();
 }
 
+/** Call the API through the BFF from the page, as the app does. */
+async function call<T>(page: Page, method: string, path: string): Promise<T> {
+  return page.evaluate<T>(`fetch(${JSON.stringify(path)}, {
+    method: ${JSON.stringify(method)}, headers: { "x-campbooks-csrf": "1" },
+  }).then((response) => response.status === 204 ? null : response.json())`);
+}
+
+/** Wait until `done` holds, re-checking every second (at most `seconds`). */
+async function until(done: () => Promise<boolean>, seconds = 120): Promise<void> {
+  for (let left = seconds; left > 0 && !(await done()); left -= 1) {
+    await pause(1000);
+  }
+}
+
+/** Open a conversation of the Primary stream by its subject. */
+async function openConversation(page: Page, workspace: string, subject: string): Promise<void> {
+  await page.goto(`/w/${workspace}/inbox/primary`);
+  await page.getByText(subject).first().click();
+  await page.getByRole("heading", { name: subject }).waitFor();
+}
+
 /** Press `key` on desktop, or click `button` on a phone. */
 async function act(page: Page, phone: boolean, key: string, button: RegExp): Promise<void> {
   await (phone ? page.getByRole("button", { name: button }).click() : page.keyboard.press(key));
@@ -64,8 +87,11 @@ async function act(page: Page, phone: boolean, key: string, button: RegExp): Pro
 
 export default async function mailboxes({ page }: ScenarioContext): Promise<void> {
   const phone = isPhone(page);
+  const QUOTE = "Orçamento para a montra de novembro";
+  const Q4 = "Q4 plan: can you review by Friday?";
 
-  // Sign up with Google: an account, a workspace, its Gmail.
+  // Sign up with Google: an account and a workspace. The mailbox from
+  // sign-up is forgotten, so Home offers "Connect your mail".
   await page.goto("/");
   await caption(page, "Sign up with Google");
   await page.getByRole("link", { name: /Continue with Google/u }).click();
@@ -77,118 +103,138 @@ export default async function mailboxes({ page }: ScenarioContext): Promise<void
   await page.keyboard.press("Enter");
   await page.getByRole("radio", { name: "Business" }).click();
   await page.getByRole("button", { name: "Create workspace" }).click();
-  await page.getByRole("heading", { name: /will be connected to this workspace/u }).waitFor();
-  await page.keyboard.press("Enter");
-  await page.getByRole("heading", { name: "Your mail" }).waitFor();
-  await caption(page, "Home: the Gmail from sign-up, syncing — and Manage mailboxes", 2200);
-
-  // Settings → Mailboxes.
-  await openMailboxes(page, phone);
-  await caption(
+  await page.getByRole("button", { name: /Not now/u }).click();
+  await page.getByRole("button", { name: "Don’t connect it" }).click();
+  await page.getByRole("button", { name: "Forget it" }).click();
+  await page.getByRole("heading", { name: "Connect your mail" }).waitFor();
+  await caption(page, "Home: no mailbox yet. “Connect your mail”…", 1800);
+  await page.getByRole("link", { name: /Connect your mail/u }).click();
+  await page.getByRole("heading", { level: 1, name: "Mailboxes" }).waitFor();
+  await caption(page, "…opens Settings → Mailboxes", 1800);
+  const { workspaces } = await call<{ workspaces: { id: string }[] }>(
     page,
-    phone
-      ? "Settings → Mailboxes (the sections are chips on a phone)"
-      : "Settings → Mailboxes: provider, who connected it, and how it's doing",
-    2200,
+    "GET",
+    "/bff/api/v1/workspaces",
   );
+  const workspace = workspaces[0]?.id ?? "";
 
-  // Connect Zoho Mail through the front door, and come back here.
-  if (!phone) {
-    await caption(page, "⇧C jumps to Connect", 1200);
-    await page.keyboard.press("Shift+C");
-    await pause(500);
-    await page.keyboard.press("Tab");
-    await pause(700);
-  }
+  // Connect Gmail, then Zoho Mail, through the front door.
   await page.getByRole("checkbox", { name: "Also use this account to sign in" }).waitFor();
   await caption(
     page,
     "“Also use this account to sign in”: ticked for your own; untick it for support@",
-    2600,
+    2400,
   );
+  if (!phone) {
+    await caption(page, "⇧C jumps to Connect", 1000);
+    await page.keyboard.press("Shift+C");
+    await pause(500);
+  }
+  await page.getByRole("button", { name: /Connect Gmail/u }).click();
+  await allowAll(page, "Google");
+  await page.getByText(/^Gmail .+ is connected$/u).waitFor();
   await page.getByRole("button", { name: /Connect Zoho Mail/u }).click();
   await allowAll(page, "Zoho");
   await page.getByText(/^Zoho Mail .+ is connected$/u).waitFor();
-  await caption(page, "Back on Mailboxes: Zoho Mail is connected and syncing", 2400);
+  await caption(page, "Back on Mailboxes: Gmail and Zoho Mail, syncing, connected by you", 2400);
 
-  // Zoho withdraws the grant: the mailbox needs you.
+  // Zoho withdraws the grant: the mailbox needs you. Reconnect.
   await page.request.post(`${fakeZoho}/fake/expire`);
-  await caption(page, "Meanwhile, the grant is withdrawn at Zoho…", 1400);
-  const { workspaces } = await page.evaluate<{ workspaces: { id: string }[] }>(
-    `fetch("/bff/api/v1/workspaces", { headers: { "x-campbooks-csrf": "1" } }).then((r) => r.json())`,
-  );
-  const workspace = workspaces[0]?.id ?? "";
-  const { connections } = await page.evaluate<{ connections: { id: string; provider: string }[] }>(
-    `fetch("/bff/api/v1/w/${workspace}/connections", { headers: { "x-campbooks-csrf": "1" } }).then((r) => r.json())`,
+  await caption(page, "Meanwhile, the grant is withdrawn at Zoho…", 1200);
+  const { connections } = await call<{ connections: { id: string; provider: string }[] }>(
+    page,
+    "GET",
+    `/bff/api/v1/w/${workspace}/connections`,
   );
   const zoho = connections.find((connection) => connection.provider === "zoho")?.id ?? "";
-  // Ask for a sync now (again, until it has run): it finds the grant gone.
   const needsYou = page.getByText("Needs you to sign in again");
-  for (let attempt = 0; attempt < 60 && !(await needsYou.isVisible()); attempt += 1) {
-    await page.evaluate(
-      `fetch("/bff/api/v1/w/${workspace}/connections/${zoho}/sync", { method: "POST", headers: { "x-campbooks-csrf": "1" } })`,
-    );
-    await pause(3000);
-  }
+  await until(async () => {
+    await call(page, "POST", `/bff/api/v1/w/${workspace}/connections/${zoho}/sync`);
+    return needsYou.isVisible();
+  }, 90);
   await needsYou.waitFor();
   await caption(
     page,
     phone ? "…so it needs you: Reconnect" : "…so it needs you: R reconnects the chosen mailbox",
-    2400,
+    2200,
   );
   await act(page, phone, "r", /^Reconnect /u);
   await allowAll(page, "Zoho");
   await page.getByText(/^Zoho Mail .+ is connected$/u).waitFor();
-  await page.getByText("Needs you to sign in again").waitFor({ state: "detached" });
-  await caption(page, "Reconnected: syncing again", 2000);
+  await caption(page, "Reconnected: syncing again", 1600);
 
-  // Disconnect Zoho Mail, keeping its history: the way in stays.
-  if (!phone) {
-    await caption(page, "J and K choose a mailbox; ⌫ disconnects it", 1600);
-  }
+  // Both mailboxes' mail in the inbox.
+  await page.goto(`/w/${workspace}/inbox/primary`);
+  await page.getByText(QUOTE).first().waitFor({ timeout: 120_000 });
+  await page.getByText(Q4).first().waitFor({ timeout: 120_000 });
+  await caption(page, "The inbox: Zoho Mail’s and Gmail’s mail", 2000);
+
+  // Disconnect Zoho Mail, keeping its history.
+  await openMailboxes(page, phone);
   const zohoRow = page.getByRole("listitem").filter({ hasText: "Zoho Mail ·" });
   if (phone) {
     await zohoRow.getByRole("button", { name: /^Disconnect/u }).click();
   } else {
+    await caption(page, "J and K choose a mailbox; ⌫ disconnects it", 1400);
     await page.keyboard.press("j");
-    await pause(500);
+    await pause(400);
     await page.keyboard.press("Backspace");
   }
-  await page.getByText(/You can still sign in to Campbooks/u).waitFor();
+  await page.getByText(/also stops being a way to sign in/u).waitFor();
   await caption(
     page,
-    "It asks what happens to the mail here (delete is the default); Zoho keeps it either way",
-    3000,
+    "It asks what happens to the mail (delete is the default), says Zoho keeps it, and that this way in goes too",
+    3400,
   );
   await page.getByRole("radio", { name: "Keep its history, read-only" }).click();
-  await caption(page, "This time: keep its history, read-only", 1600);
+  await caption(page, "This time: keep its history, read-only", 1400);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await page.getByText(/is disconnected$/u).waitFor();
-  await caption(page, "Disconnected; its history stays, read-only", 1800);
 
-  // Ways to sign in: Zoho is still one.
+  // Its mail reads as kept history; Zoho is no longer a way in.
+  await until(async () => {
+    const { inboxes } = await call<{ inboxes: { read_only: boolean }[] }>(
+      page,
+      "GET",
+      `/bff/api/v1/w/${workspace}/inboxes`,
+    );
+    return inboxes.some((inbox) => inbox.read_only);
+  }, 60);
+  await openConversation(page, workspace, QUOTE);
+  await page.getByText("Kept as history").waitFor();
+  await caption(page, "Zoho’s mail: kept as history, read-only, nothing to act on", 2600);
+  await until(async () => {
+    const ways = await call<{ items: { provider: string }[] }>(
+      page,
+      "GET",
+      "/bff/api/v1/identity/ways-in",
+    );
+    return !ways.items.some((way) => way.provider === "zoho");
+  }, 60);
   await page.goto(`/w/${workspace}/settings/sign-in`);
   await page.getByRole("heading", { level: 1, name: "Ways to sign in" }).waitFor();
-  await page.getByText("Zoho", { exact: true }).waitFor();
-  await caption(page, "Ways to sign in: Zoho is still a way in", 2400);
+  await caption(page, "Ways to sign in: Zoho went with its mailbox; Google stays", 2400);
 
-  // Disconnect Gmail too, deleting its mail (the default), then Home's
-  // "Connect your mail" leads back here.
+  // Disconnect Gmail, deleting its mail (the default).
   await openMailboxes(page, phone);
   await page
+    .getByRole("listitem")
+    .filter({ hasText: "Gmail ·" })
     .getByRole("button", { name: /^Disconnect/u })
-    .first()
     .click();
   await page.getByRole("radio", { name: "Delete its mail from Campbooks" }).waitFor();
-  await caption(page, "Gmail: delete its mail from Campbooks (the default)", 2200);
+  await caption(page, "Gmail: delete its mail from Campbooks (the default); Gmail keeps it", 2400);
   await page.getByRole("button", { name: "Disconnect", exact: true }).click();
   await page.getByText(/Its mail is leaving Campbooks/u).waitFor();
-  await caption(page, "Its mail leaves Campbooks; it is still in Gmail", 2000);
-  await page.getByText("No mailboxes yet").waitFor();
-  await page.goto(`/w/${workspace}`);
-  await page.getByRole("heading", { name: "Connect your mail" }).waitFor();
-  await caption(page, "No mailbox left: Home offers Connect your mail…", 2000);
-  await page.getByRole("link", { name: /Connect your mail/u }).click();
-  await page.getByRole("heading", { level: 1, name: "Mailboxes" }).waitFor();
-  await caption(page, "…which opens Settings → Mailboxes", 2400);
+  await until(async () => {
+    const { inboxes } = await call<{ inboxes: unknown[] }>(
+      page,
+      "GET",
+      `/bff/api/v1/w/${workspace}/inboxes`,
+    );
+    return inboxes.length === 1;
+  }, 60);
+  await page.goto(`/w/${workspace}/inbox/primary`);
+  await page.getByText(QUOTE).first().waitFor();
+  await caption(page, "The inbox: Gmail’s mail is gone; Zoho’s kept history stays", 2800);
 }
