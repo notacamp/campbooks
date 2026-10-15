@@ -101,8 +101,8 @@ export function useRules(workspaceId: string) {
   });
 }
 
-/** What a rule needs to be made again as it was (Undo after removing it). */
-export interface RuleToMake {
+/** A rule to make. */
+interface RuleToMake {
   inboxId: string;
   conditions: RuleCondition[];
   actions: RuleAction[];
@@ -112,25 +112,6 @@ export interface RuleToMake {
   originText?: string | null | undefined;
   teachingId?: string | null | undefined;
   state?: "active" | "proposed" | undefined;
-}
-
-/**
- * `rule` as a rule to make again: same conditions, actions, origin, words and
- * teaching, waiting for a yes if it was. `applyToExisting` when what it
- * changed was put back too.
- */
-export function remake(rule: RuleView, applyToExisting = false): RuleToMake {
-  return {
-    inboxId: rule.inbox_id,
-    conditions: rule.conditions,
-    actions: rule.actions,
-    fromConversation: rule.from_conversation_id,
-    applyToExisting,
-    origin: rule.origin,
-    originText: rule.origin_text,
-    teachingId: rule.teaching_id,
-    state: rule.state === "proposed" ? "proposed" : "active",
-  };
 }
 
 /** Whether this screen already removed `ruleId`: a stale Undo must not remove it twice. */
@@ -219,8 +200,21 @@ export function useRuleMutations(workspaceId: string) {
       ),
     onSettled: settle,
   });
+  const restore = useMutation({
+    mutationFn: async ({ ruleId, applyToExisting }: { ruleId: string; applyToExisting: boolean }) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/rules/{rule_id}/restore", {
+          params: { path: { workspace_id: workspaceId, rule_id: ruleId } },
+          body: { apply_to_existing: applyToExisting },
+        }),
+      ),
+    onSuccess: (rule) => {
+      queryClient.removeQueries({ queryKey: removedKey(workspaceId, rule.id) });
+    },
+    onSettled: settle,
+  });
   /** Whether `ruleId` was removed from this screen already. */
   const wasRemoved = (ruleId: string) =>
     queryClient.getQueryData<boolean>(removedKey(workspaceId, ruleId)) === true;
-  return { create, remove, confirm, wasRemoved };
+  return { create, remove, confirm, restore, wasRemoved };
 }

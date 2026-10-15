@@ -59,16 +59,13 @@ describe("the rules list", () => {
     expect(meta).toHaveTextContent(/Last acted/u);
   });
 
-  it("removes a rule with Undo, making it again as it was", async () => {
+  it("removes a rule with Undo, bringing the same rule back", async () => {
     const api = mockApi({
       ...people,
       [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },
       [`GET ${W}/inboxes`]: { body: { inboxes: [INBOX] } },
       [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: { body: { ...LEDGER_RULE, state: "removed" } },
-      [`POST ${W}/inboxes/${INBOX.id}/rules`]: {
-        status: 201,
-        body: { rule: LEDGER_RULE, acted_without_asking: false },
-      },
+      [`POST ${W}/rules/${LEDGER_RULE.id}/restore`]: { body: LEDGER_RULE },
     });
     renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
     const mine = await screen.findByRole("list", { name: INBOX.address });
@@ -83,19 +80,12 @@ describe("the rules list", () => {
     ).toBeVisible();
     expect(api.calls.filter((call) => call.route.startsWith("DELETE"))).toHaveLength(1);
 
+    // Undo brings the same rule back, applied again since its mail went back.
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => {
       expect(
-        api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)?.body,
-      ).toEqual({
-        conditions: LEDGER_RULE.conditions,
-        actions: LEDGER_RULE.actions,
-        apply_to_existing: true,
-        from_conversation_id: LEDGER_RULE.from_conversation_id,
-        origin: "action",
-        teaching_id: LEDGER_RULE.teaching_id,
-        state: "active",
-      });
+        api.calls.find((call) => call.route === `POST ${W}/rules/${LEDGER_RULE.id}/restore`)?.body,
+      ).toEqual({ apply_to_existing: true });
     });
   });
 

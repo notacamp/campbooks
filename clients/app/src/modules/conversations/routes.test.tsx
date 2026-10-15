@@ -413,10 +413,7 @@ describe("the inbox", () => {
       [`GET ${W}/rules/${LEDGER_RULE.id}`]: { body: LEDGER_RULE },
       [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },
       [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: { body: { ...LEDGER_RULE, state: "removed" } },
-      [`POST ${W}/inboxes/${INBOX.id}/rules`]: {
-        status: 201,
-        body: { rule: LEDGER_RULE, acted_without_asking: false },
-      },
+      [`POST ${W}/rules/${LEDGER_RULE.id}/restore`]: { body: LEDGER_RULE },
     });
     renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
     const reader = await screen.findByRole("main", { name: "Conversation" });
@@ -432,20 +429,13 @@ describe("the inbox", () => {
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => {
       expect(
-        api.calls.find((call) => call.route === `POST ${W}/inboxes/${INBOX.id}/rules`)?.body,
-      ).toMatchObject({
-        conditions: LEDGER_RULE.conditions,
-        actions: LEDGER_RULE.actions,
-        apply_to_existing: false,
-        origin: "action",
-        teaching_id: LEDGER_RULE.teaching_id,
-        state: "active",
-      });
+        api.calls.find((call) => call.route === `POST ${W}/rules/${LEDGER_RULE.id}/restore`)?.body,
+      ).toEqual({ apply_to_existing: false });
     });
   });
 
   it("offers Stop doing this only to whoever may change the rule", async () => {
-    const marked = {
+    const marked = (mayChange: boolean) => ({
       ...LEDGER_DETAIL,
       conversation: {
         ...LEDGER,
@@ -455,17 +445,15 @@ describe("the inbox", () => {
           actions: LEDGER_RULE.actions,
           conditions: LEDGER_RULE.conditions,
           applied_count: 40,
+          may_change: mayChange,
         },
       },
-    };
+    });
     let mayChange = false;
     const api = inbox({
-      [`GET ${W}/conversations/${LEDGER.id}`]: { body: marked },
-      [`POST ${W}/conversations/${LEDGER.id}/read`]: {
-        body: { ...marked.conversation, unread_count: 0 },
-      },
-      [`GET ${W}/rules/${LEDGER_RULE.id}`]: () => ({
-        body: { ...LEDGER_RULE, may_change: mayChange },
+      [`GET ${W}/conversations/${LEDGER.id}`]: () => ({ body: marked(mayChange) }),
+      [`POST ${W}/conversations/${LEDGER.id}/read`]: () => ({
+        body: { ...marked(mayChange).conversation, unread_count: 0 },
       }),
       [`GET ${W}/rules`]: { body: { rules: [LEDGER_RULE] } },
       [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: { body: { ...LEDGER_RULE, state: "removed" } },

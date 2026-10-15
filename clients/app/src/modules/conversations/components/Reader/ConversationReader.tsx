@@ -20,7 +20,6 @@ import {
 } from "~/lib/ui";
 
 import { useConversation, type ConversationSummary, type Stream } from "../../api/queries";
-import { useRule } from "../../api/rules";
 import {
   avatarKind,
   displayName,
@@ -94,18 +93,14 @@ export function ConversationReader({
   const offering = useTeachOnce()?.offering ?? false;
   const need = conversation?.need ?? undefined;
   const ruleMark = conversation?.rule ?? undefined;
-  // The rule that handled it, to know whether this member may stop it.
-  const markedRule = useRule(workspaceId, ruleMark?.id);
-  const stoppable =
-    markedRule.data !== undefined &&
-    markedRule.data.may_change &&
-    markedRule.data.state !== "removed";
-  /** "Stop doing this": remove the rule that handled it; Undo makes it again. */
+  // Only whoever may change the rule (its author, a manager) may stop it.
+  const stoppable = ruleMark?.may_change === true;
+  /** "Stop doing this": remove the rule that handled it; Undo brings it back. */
   const stopRule = () => {
-    if (markedRule.data === undefined || !stoppable) {
+    if (ruleMark === undefined || !stoppable) {
       return;
     }
-    ruleActions.removeRule(markedRule.data, { restore: false });
+    ruleActions.removeRule(ruleMark, { restore: false });
   };
   const stopButton = stoppable ? (
     <Button variant="ghost" disabled={ruleActions.removing} onClick={stopRule}>

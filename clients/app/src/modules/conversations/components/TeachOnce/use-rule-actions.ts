@@ -2,29 +2,41 @@ import { useTranslation } from "react-i18next";
 
 import { useUndoToast } from "~/lib/ui";
 
-import { remake, useRuleMutations, type RuleView } from "../../api/rules";
+import {
+  useRuleMutations,
+  type RuleAction,
+  type RuleCondition,
+  type RuleView,
+} from "../../api/rules";
 import type { Translate } from "../../model";
 import { ruleSentence } from "../../rules-text";
 
 /** Which toast a removal shows. */
 type RemovalLabel = "stopped" | "declined";
 
+/** What a removal needs to know of a rule: a row's mark is enough. */
+interface RuleRef {
+  id: string;
+  conditions: readonly RuleCondition[];
+  actions: readonly RuleAction[];
+}
+
 /**
  * Removing and keeping rules with the feedback every action gets: a toast
  * once the server said yes (with Undo), a plain error toast when it said no.
- * Undo after a removal makes the rule again as it was (its conditions,
- * actions, origin, words and teaching; applied again when its mail was put
- * back). A stale Undo never removes a rule twice.
+ * Undo after a removal brings the same rule back as it was
+ * (`conversations.restore_rule`, applied again when its mail was put back).
+ * A stale Undo never removes a rule twice.
  */
 export function useRuleActions(workspaceId: string) {
   const { t: typed, i18n } = useTranslation("conversations");
   const t = typed as unknown as Translate;
   const undo = useUndoToast();
-  const { create, remove, confirm, wasRemoved } = useRuleMutations(workspaceId);
+  const { create, remove, confirm, restore: bringBack, wasRemoved } = useRuleMutations(workspaceId);
   const failed = () => {
     undo.notify(t("rules.toast.failed"));
   };
-  const sentence = (rule: RuleView) => ruleSentence(t, i18n.language, rule);
+  const sentence = (rule: RuleRef) => ruleSentence(t, i18n.language, rule);
 
   /** Remove `ruleId` (putting its mail back when `restore`), unless this screen already did. */
   const removeOnce = (ruleId: string, restore: boolean, onSuccess?: () => void) => {
@@ -44,7 +56,7 @@ export function useRuleActions(workspaceId: string) {
 
   /** Remove `rule`; `onDone` once it is gone. */
   const removeRule = (
-    rule: RuleView,
+    rule: RuleRef,
     {
       restore,
       label = "stopped",
@@ -66,7 +78,7 @@ export function useRuleActions(workspaceId: string) {
           undo.push({
             label: t(`rules.toast.${label}`, { rule: sentence(rule) }),
             undo: () => {
-              create.mutate(remake(rule, restore), { onError: failed });
+              bringBack.mutate({ ruleId: rule.id, applyToExisting: restore }, { onError: failed });
             },
           });
         },
@@ -106,6 +118,5 @@ export function useRuleActions(workspaceId: string) {
     removing: remove.isPending,
     keeping: confirm.isPending,
     create,
-    failed,
   };
 }
