@@ -33,7 +33,7 @@ const MOBILE_NAV = [
 ] as const;
 
 export const AppShell: FC = () => (
-  <div className="flex h-screen overflow-hidden bg-ground">
+  <div className="flex h-dvh overflow-hidden bg-ground">
     {/* Desktop sidebar — hidden on mobile */}
     <Sidebar />
 

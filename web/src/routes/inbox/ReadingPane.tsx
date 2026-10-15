@@ -1,5 +1,6 @@
 /**
- * ReadingPane — message detail view shown alongside the list at ≥ 900px.
+ * ReadingPane — message detail view. From lg (1024px) it sits beside the
+ * fixed-width list; below lg it replaces the list and shows a back bar.
  *
  * Pilot scope (stubbed):
  *   - Sender header: Avatar + name
@@ -7,10 +8,10 @@
  *   - Thread body: stubbed placeholder
  *   - Actions: Use Scout's draft (stub) / Reply (stub) / Archive
  *
- * Below 900px the pane is hidden; the row opens a sheet/modal in a later step.
+ * Content is capped at 720px so lines stay readable on wide screens.
  */
 import { type FC } from "react";
-import { X, Send, Reply, Archive } from "lucide-react";
+import { X, Send, Reply, Archive, ChevronLeft } from "lucide-react";
 import { Avatar, Visor, Signal } from "~/lib/ui";
 import type { InboxRow } from "~/modules/inbox/types";
 import { annotationFor, signalPlaceFor } from "~/modules/inbox/hooks";
@@ -18,11 +19,13 @@ import { cn } from "~/lib/utils";
 
 interface ReadingPaneProps {
   row: InboxRow;
+  /** Name of the list the back bar returns to (below lg), e.g. "Everything". */
+  backLabel: string;
   onClose: () => void;
   onArchive: (id: number) => void;
 }
 
-export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) => {
+export const ReadingPane: FC<ReadingPaneProps> = ({ row, backLabel, onClose, onArchive }) => {
   const place = signalPlaceFor(row.verb);
   const annotation = annotationFor(row);
   const avatarKind = row.counterpart_type === "Organization" ? "service" : "person";
@@ -30,11 +33,23 @@ export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) =
   return (
     <div
       data-testid="inbox.reading-pane.root"
-      className={cn(
-        "flex flex-col h-full border-l border-line bg-ground",
-        "overflow-hidden",
-      )}
+      className={cn("flex flex-col h-full bg-ground", "overflow-hidden")}
     >
+      {/* Back bar — single-pane layout (below lg) only */}
+      <button
+        type="button"
+        onClick={onClose}
+        data-testid="inbox.reading-pane.back"
+        className={cn(
+          "lg:hidden flex items-center gap-1 px-3 py-2.5 border-b border-line",
+          "text-[13px] text-t2 font-[500] hover:text-t1",
+          "transition-colors duration-[--cb-dur]",
+        )}
+      >
+        <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
+        {backLabel}
+      </button>
+
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 border-b border-line">
         <Avatar
@@ -55,7 +70,7 @@ export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) =
           onClick={onClose}
           aria-label="Close reading pane"
           className={cn(
-            "shrink-0 w-7 h-7 flex items-center justify-center rounded-cb-1",
+            "shrink-0 w-7 h-7 hidden lg:flex items-center justify-center rounded-cb-1",
             "text-t4 hover:text-t2 hover:bg-surface-1",
             "transition-colors duration-[--cb-dur]",
           )}
@@ -68,7 +83,7 @@ export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) =
       {(row.stand_line || annotation) && (
         <div
           className={cn(
-            "mx-4 mt-3 px-3 py-2.5 rounded-cb-2",
+            "mx-4 mt-3 px-3 py-2.5 rounded-cb-2 max-w-[720px]",
             "bg-surface-1 cb-raised",
           )}
         >
@@ -92,7 +107,7 @@ export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) =
         <div
           data-testid="inbox.reading-pane.body"
           className={cn(
-            "rounded-cb-2 bg-surface-1 cb-raised p-4",
+            "rounded-cb-2 bg-surface-1 cb-raised p-4 max-w-[720px]",
             "text-[13px] text-t3 italic",
           )}
         >
@@ -101,50 +116,52 @@ export const ReadingPane: FC<ReadingPaneProps> = ({ row, onClose, onArchive }) =
       </div>
 
       {/* Actions */}
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-line">
-        <button
-          type="button"
-          aria-label="Use Scout's draft"
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1",
-            "bg-surface-1 border border-line text-[12.5px] text-t2 font-[500]",
-            "hover:bg-surface-2 transition-colors duration-[--cb-dur]",
-          )}
-        >
-          <Visor size={13} state="watching" aria-hidden />
-          Scout&apos;s draft
-        </button>
-        <button
-          type="button"
-          aria-label="Reply (coming soon)"
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1",
-            "bg-surface-1 border border-line text-[12.5px] text-t2 font-[500]",
-            "hover:bg-surface-2 transition-colors duration-[--cb-dur]",
-          )}
-        >
-          <Reply size={13} strokeWidth={1.8} aria-hidden="true" />
-          Reply
-        </button>
-        <button
-          type="button"
-          data-testid="inbox.reading-pane.archive"
-          onClick={() => onArchive(row.id)}
-          aria-label="Archive"
-          className={cn(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1 ml-auto",
-            "text-[12.5px] text-t3 font-[500]",
-            "hover:text-t2 hover:bg-surface-1 transition-colors duration-[--cb-dur]",
-          )}
-        >
-          <Archive size={13} strokeWidth={1.8} aria-hidden="true" />
-          Archive
-        </button>
+      <div className="px-4 py-3 border-t border-line">
+        <div className="flex items-center gap-2 max-w-[720px]">
+          <button
+            type="button"
+            aria-label="Use Scout's draft"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1",
+              "bg-surface-1 border border-line text-[12.5px] text-t2 font-[500]",
+              "hover:bg-surface-2 transition-colors duration-[--cb-dur]",
+            )}
+          >
+            <Visor size={13} state="watching" aria-hidden />
+            Scout&apos;s draft
+          </button>
+          <button
+            type="button"
+            aria-label="Reply (coming soon)"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1",
+              "bg-surface-1 border border-line text-[12.5px] text-t2 font-[500]",
+              "hover:bg-surface-2 transition-colors duration-[--cb-dur]",
+            )}
+          >
+            <Reply size={13} strokeWidth={1.8} aria-hidden="true" />
+            Reply
+          </button>
+          <button
+            type="button"
+            data-testid="inbox.reading-pane.archive"
+            onClick={() => onArchive(row.id)}
+            aria-label="Archive"
+            className={cn(
+              "flex items-center gap-1.5 px-3 py-1.5 rounded-cb-1 ml-auto",
+              "text-[12.5px] text-t3 font-[500]",
+              "hover:text-t2 hover:bg-surface-1 transition-colors duration-[--cb-dur]",
+            )}
+          >
+            <Archive size={13} strokeWidth={1.8} aria-hidden="true" />
+            Archive
+          </button>
 
-        {/* Send icon as visual hint for future compose */}
-        <span aria-hidden="true" className="text-t4 opacity-30">
-          <Send size={12} strokeWidth={1.8} />
-        </span>
+          {/* Send icon as visual hint for future compose */}
+          <span aria-hidden="true" className="text-t4 opacity-30">
+            <Send size={12} strokeWidth={1.8} />
+          </span>
+        </div>
       </div>
     </div>
   );

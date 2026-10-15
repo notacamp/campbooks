@@ -220,6 +220,75 @@ describe("InboxPage", () => {
     expect(await screen.findByTestId("inbox.list.empty")).toBeInTheDocument();
   });
 
+  it("shows the empty pane until a row is opened, and the back bar closes it", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => JSON.parse(makeCollectionResponse([ROW_A, ROW_B])),
+    });
+
+    renderInbox(queryClient);
+    await screen.findByTestId("inbox.list.root");
+
+    expect(screen.getByTestId("inbox.reading-pane.empty")).toBeInTheDocument();
+    expect(screen.getByTestId("inbox.list.pane")).not.toHaveClass("hidden");
+
+    fireEvent.click(screen.getByTestId(`inbox.list.row.${ROW_A.id}`));
+
+    expect(await screen.findByTestId("inbox.reading-pane.root")).toBeInTheDocument();
+    expect(screen.queryByTestId("inbox.reading-pane.empty")).not.toBeInTheDocument();
+    // Below lg the list gives way to the message (lg:flex restores it on desktop)
+    expect(screen.getByTestId("inbox.list.pane")).toHaveClass("hidden", "lg:flex");
+    expect(screen.getByTestId("inbox.reading-pane.back")).toHaveTextContent("Important");
+
+    fireEvent.click(screen.getByTestId("inbox.reading-pane.back"));
+
+    expect(await screen.findByTestId("inbox.reading-pane.empty")).toBeInTheDocument();
+    expect(screen.getByTestId("inbox.list.pane")).not.toHaveClass("hidden");
+  });
+
+  it("reads the open row from openId and reports changes through onOpenChange", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => JSON.parse(makeCollectionResponse([ROW_A, ROW_B])),
+    });
+    const onOpenChange = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <InboxPage openId={String(ROW_A.id)} onOpenChange={onOpenChange} />
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByTestId("inbox.reading-pane.root")).toHaveTextContent(ROW_A.name);
+
+    // Moving between open messages replaces the history entry…
+    fireEvent.keyDown(window, { key: "j" });
+    expect(onOpenChange).toHaveBeenLastCalledWith(String(ROW_B.id), { replace: true });
+
+    // …closing pushes, so Back reopens what you were reading.
+    fireEvent.click(screen.getByTestId("inbox.reading-pane.back"));
+    expect(onOpenChange).toHaveBeenLastCalledWith(null, { replace: false });
+  });
+
+  it("closes a stale openId once the list has loaded without it", async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => JSON.parse(makeCollectionResponse([ROW_A])),
+    });
+    const onOpenChange = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <InboxPage openId="999" onOpenChange={onOpenChange} />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(null, { replace: true }));
+  });
+
   it("shows the error state and retry button on fetch failure", async () => {
     fetchMock.mockRejectedValue(new Error("Network error"));
 

@@ -16,6 +16,11 @@ major, minor, or patch change here.
 
 ## [Unreleased]
 
+### Fixed
+- The new web inbox no longer stretches across the whole screen on desktop. From 1024px wide it's two panes: a fixed 400px list beside the open conversation, or a short "Nothing open" hint with the keyboard shortcuts. Opening or closing a message no longer moves the list, and message text is capped at a readable width on large monitors.
+- Opening a message in the web inbox below 1280px wide (13″ laptops, tablets, phones) no longer leaves a blank screen. Below 1024px the message replaces the list and has a back bar to the list. The open message is part of the URL (`/inbox?open=…`), so the browser's Back button and the phone's back gesture close it.
+- On phones, the Scout bar and bottom tabs no longer slide under the mobile browser toolbar (the app shell now sizes to the visible viewport).
+
 ## [0.43.2] - 2026-09-22
 
 ### Fixed

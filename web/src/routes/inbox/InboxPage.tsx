@@ -6,7 +6,11 @@
  *   - Important / Everything tabs (Important = needs_you == true)
  *   - Infinite-paged list of InboxRows (Avatar, name, time, subject, annotation, unread)
  *   - Archive with in-place Undo (optimistic via TanStack Query)
- *   - Reading pane (≥ 900px split; single-pane on mobile)
+ *   - Two panes from lg (1024px): a fixed 400px list + the reading pane (or
+ *     EmptyPane), so the list never stretches or changes width. Below lg one
+ *     pane at a time: tapping a row replaces the list with the message.
+ *   - The open conversation can be held in the URL (?open=<id>) by the route
+ *     (see InboxRoute) so browser/phone Back closes it.
  *   - "Skim the long tail" stub entry
  *   - Loading skeletons, empty state, error + retry
  *   - Keyboard: j/k navigate, a/e archive, Enter open pane, Esc close
@@ -34,6 +38,7 @@ import { TAB_LABELS } from "~/modules/inbox/types";
 import { InboxRow as InboxRowComponent } from "./InboxRow";
 import { SkeletonRow } from "./SkeletonRow";
 import { ReadingPane } from "./ReadingPane";
+import { EmptyPane } from "./EmptyPane";
 import { UndoDock } from "./UndoDock";
 import { cn } from "~/lib/utils";
 
@@ -48,11 +53,24 @@ interface UndoState {
 
 // ── InboxPage ─────────────────────────────────────────────────────────────────
 
-export const InboxPage: FC = () => {
+interface InboxPageProps {
+  /** Controlled open conversation (the route passes ?open=). */
+  openId?: string | null;
+  /**
+   * Called when the open conversation changes. `replace` is true when moving
+   * between open conversations, so Back returns to the list, not the previous
+   * message. Omit both props to keep the open state local.
+   */
+  onOpenChange?: (id: string | null, opts: { replace: boolean }) => void;
+}
+
+export const InboxPage: FC<InboxPageProps> = ({ openId, onOpenChange }) => {
   const [tab, setTab] = useState<InboxTab>("needing");
   const [q, setQ] = useState("");
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [localOpenId, setLocalOpenId] = useState<string | null>(null);
   const [undoState, setUndoState] = useState<UndoState | null>(null);
+
+  const openKey = onOpenChange ? (openId ?? null) : localOpenId;
 
   const queryClient = useQueryClient();
   const { data, isFetching, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
@@ -71,16 +89,28 @@ export const InboxPage: FC = () => {
 
   // Selected row (for reading pane)
   const selectedRow = useMemo(
-    () => (selectedId != null ? rows.find((r) => r.id === selectedId) : null),
-    [rows, selectedId],
+    () => (openKey != null ? rows.find((r) => String(r.id) === openKey) ?? null : null),
+    [rows, openKey],
+  );
+  const selectedId = selectedRow?.id ?? null;
+
+  const setSelectedId = useCallback(
+    (id: InboxRow["id"] | null, replace = openKey != null && id != null): void => {
+      const next = id == null ? null : String(id);
+      if (next === openKey) return;
+      if (onOpenChange) onOpenChange(next, { replace });
+      else setLocalOpenId(next);
+    },
+    [openKey, onOpenChange],
   );
 
-  // Clear selection if selected row is no longer in the list (e.g. archived)
+  // Close the pane once the list has settled without the open row (archived,
+  // or a stale ?open= link). Replace, so Back doesn't reopen a missing row.
   useEffect(() => {
-    if (selectedId != null && !rows.some((r) => r.id === selectedId)) {
-      setSelectedId(null);
+    if (openKey != null && data && !isFetching && !selectedRow) {
+      setSelectedId(null, true);
     }
-  }, [rows, selectedId]);
+  }, [openKey, data, isFetching, selectedRow, setSelectedId]);
 
   // Keyboard navigation
   const listRef = useRef<HTMLDivElement>(null);
@@ -91,9 +121,9 @@ export const InboxPage: FC = () => {
       if (!row) return;
       setUndoState({ archivedId: id, archivedName: row.name });
       archiveMutation.mutate({ id, kind: "archive" });
-      if (selectedId === id) setSelectedId(null);
+      if (selectedId === id) setSelectedId(null, true);
     },
-    [rows, archiveMutation, selectedId],
+    [rows, archiveMutation, selectedId, setSelectedId],
   );
 
   const handleUndo = useCallback((): void => {
@@ -115,23 +145,24 @@ export const InboxPage: FC = () => {
       )
         return;
 
+      const step = (delta: number): void => {
+        if (rows.length === 0) return;
+        if (selectedId == null) {
+          setSelectedId(rows[0]?.id ?? null);
+          return;
+        }
+        const idx = rows.findIndex((r) => r.id === selectedId);
+        const next = Math.min(Math.max(idx + delta, 0), rows.length - 1);
+        setSelectedId(rows[next]?.id ?? selectedId);
+      };
+
       if (e.key === "j" || e.key === "ArrowDown") {
         e.preventDefault();
-        setSelectedId((prev) => {
-          if (rows.length === 0) return prev;
-          if (prev == null) return rows[0]?.id ?? null;
-          const idx = rows.findIndex((r) => r.id === prev);
-          return rows[Math.min(idx + 1, rows.length - 1)]?.id ?? prev;
-        });
+        step(1);
       }
       if (e.key === "k" || e.key === "ArrowUp") {
         e.preventDefault();
-        setSelectedId((prev) => {
-          if (rows.length === 0) return prev;
-          if (prev == null) return rows[0]?.id ?? null;
-          const idx = rows.findIndex((r) => r.id === prev);
-          return rows[Math.max(idx - 1, 0)]?.id ?? prev;
-        });
+        step(-1);
       }
       if (e.key === "Escape") {
         setSelectedId(null);
@@ -139,7 +170,7 @@ export const InboxPage: FC = () => {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [rows]);
+  }, [rows, selectedId, setSelectedId]);
 
   const isPending = isFetching && !data;
 
@@ -148,8 +179,13 @@ export const InboxPage: FC = () => {
       data-testid="inbox.page.root"
       className="flex flex-col h-full"
     >
-      {/* Search bar */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b border-line shrink-0">
+      {/* Search bar — below lg it steps aside while a conversation is open */}
+      <div
+        className={cn(
+          "items-center gap-2 px-4 py-2 border-b border-line shrink-0 lg:flex",
+          selectedRow ? "hidden" : "flex",
+        )}
+      >
         <Search size={14} strokeWidth={1.8} className="text-t4 shrink-0" aria-hidden="true" />
         <input
           type="search"
@@ -166,7 +202,12 @@ export const InboxPage: FC = () => {
       </div>
 
       {/* Tabs + Skim button */}
-      <div className="flex items-center gap-0 px-4 border-b border-line shrink-0">
+      <div
+        className={cn(
+          "items-center gap-0 px-4 border-b border-line shrink-0 lg:flex",
+          selectedRow ? "hidden" : "flex",
+        )}
+      >
         {(Object.keys(TAB_LABELS) as InboxTab[]).map((t) => (
           <button
             key={t}
@@ -207,15 +248,14 @@ export const InboxPage: FC = () => {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* List pane */}
         <div
+          data-testid="inbox.list.pane"
           className={cn(
-            "flex flex-col min-h-0",
-            // Full width on mobile / narrow; fixed 360px when reading pane is open on desktop
-            selectedRow
-              ? "hidden xl:flex xl:w-[360px] shrink-0"
-              : "flex-1",
-            "border-r border-line",
+            "flex-col min-h-0 flex-1",
+            // lg+: fixed 400px column beside the reading pane, open or not.
+            // Below lg: full width, hidden while a conversation is open.
+            "lg:flex lg:flex-none lg:w-[400px] lg:border-r lg:border-line",
+            selectedRow ? "hidden" : "flex",
           )}
-          style={selectedRow ? { width: "360px" } : undefined}
         >
           {/* Loading */}
           {isPending && (
@@ -286,7 +326,7 @@ export const InboxPage: FC = () => {
                       key={row.id}
                       row={row}
                       selected={selectedId === row.id}
-                      onSelect={setSelectedId}
+                      onSelect={(id) => setSelectedId(id)}
                       onArchive={handleArchive}
                     />
                   ))
@@ -324,19 +364,22 @@ export const InboxPage: FC = () => {
           )}
         </div>
 
-        {/* Reading pane — ≥ 900px only (xl breakpoint ≈ 1280px here; we use min-w check) */}
-        {selectedRow && (
-          <div
-            data-testid="inbox.reading-pane.container"
-            className="flex-1 min-w-0 hidden xl:block"
-          >
+        {/* Reading side — always present from lg; below lg only while open */}
+        <div
+          data-testid="inbox.reading-pane.container"
+          className={cn("flex-1 min-w-0", selectedRow ? "block" : "hidden lg:block")}
+        >
+          {selectedRow ? (
             <ReadingPane
               row={selectedRow}
+              backLabel={TAB_LABELS[tab]}
               onClose={() => setSelectedId(null)}
               onArchive={handleArchive}
             />
-          </div>
-        )}
+          ) : (
+            <EmptyPane />
+          )}
+        </div>
       </div>
     </div>
   );
