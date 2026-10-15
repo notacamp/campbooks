@@ -18,7 +18,9 @@ All notable changes to Campbooks Next are documented here. The format follows
   cuts their access at their next refresh. Refusals land on `/sign-in?error=sign_in_not_allowed`
   (or 403 `sign_in_not_allowed`), in all four languages, and say nothing about whether an
   account exists.
-
+- **TLS library updated to rustls 0.23.46**, which fixes RUSTSEC-2026-0346 to 0349: TLS
+  secrets in `Debug` output, data sent after an ECH rejection, unbounded certificate
+  decompression, and a downgrade to classical key exchange.
 - **Only the member who connected a mailbox can disconnect it.** Workspace owners and
   admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
 - **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
