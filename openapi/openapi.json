@@ -5809,7 +5809,7 @@
         "x-campbooks": {
           "access": {
             "action": "write",
-            "resource": "conversations.rule"
+            "resource": "conversations.inbox"
           },
           "assistant": true,
           "automation": true,

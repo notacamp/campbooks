@@ -811,6 +811,18 @@ mod tests {
         assert_eq!(
             policies,
             [
+                // The needs backfill's dispatcher (conversations): reads ids
+                // and states, and may only start a row (`WITH CHECK`).
+                (
+                    "needs_backfills".to_owned(),
+                    "maintenance_reads_backfills".to_owned(),
+                    "SELECT".to_owned()
+                ),
+                (
+                    "needs_backfills".to_owned(),
+                    "maintenance_starts_backfills".to_owned(),
+                    "UPDATE".to_owned()
+                ),
                 (
                     "sync_due".to_owned(),
                     "maintenance_leases_schedule".to_owned(),

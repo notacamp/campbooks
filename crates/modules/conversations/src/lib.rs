@@ -175,6 +175,10 @@ pub fn module(deps: ConversationsDeps) -> Module {
                 deps.policy.clone(),
                 needs.clone(),
             ))
+            .handler(features::backfill_needs::BackfillNeeds::new(needs.clone()))
+            .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
+                features::backfill_needs::EVERY,
+            )
             .consumer(features::decide_message::DecideMessage::new(
                 model,
                 deps.config.decide_backfill_days,
@@ -287,9 +291,16 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.backfill_needs",
+            "conversations.dispatch_needs_backfills",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
+        assert!(
+            registry
+                .schedule_names()
+                .contains(&"conversations.dispatch_needs_backfills")
+        );
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

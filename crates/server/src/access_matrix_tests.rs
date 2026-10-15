@@ -451,6 +451,32 @@ impl World {
         item
     }
 
+    /// A rule the sender taught the inbox (campbooks-cloud#125).
+    async fn seed_rule(
+        &self,
+        inbox: campbooks_conversations::model::InboxId,
+        sender: UserId,
+    ) -> Uuid {
+        let rule = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO conversations.rules
+                 (id, workspace_id, inbox_id, teaching_id, conditions, actions, specificity,
+                  origin, state, taught_by, confirmed_at)
+             VALUES ($1, $2, $3, $4,
+                     '[{\"field\": \"sender_address\", \"value\": \"news@example.com\"}]',
+                     '[{\"action\": \"archive\"}]', 2, 'action', 'active', $5, now())",
+        )
+        .bind(rule)
+        .bind(self.a.as_uuid())
+        .bind(inbox)
+        .bind(Uuid::now_v7())
+        .bind(sender.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        rule
+    }
+
     /// One record of every other type, and what the inbox holds.
     async fn seed_records(
         &mut self,
@@ -487,24 +513,7 @@ impl World {
         .execute(&db)
         .await
         .unwrap();
-        // A rule the sender taught the inbox (campbooks-cloud#125).
-        let rule = Uuid::now_v7();
-        sqlx::query(
-            "INSERT INTO conversations.rules
-                 (id, workspace_id, inbox_id, teaching_id, conditions, actions, specificity,
-                  origin, state, taught_by, confirmed_at)
-             VALUES ($1, $2, $3, $4,
-                     '[{\"field\": \"sender_address\", \"value\": \"news@example.com\"}]',
-                     '[{\"action\": \"archive\"}]', 2, 'action', 'active', $5, now())",
-        )
-        .bind(rule)
-        .bind(self.a.as_uuid())
-        .bind(inbox)
-        .bind(Uuid::now_v7())
-        .bind(sender.as_uuid())
-        .execute(&db)
-        .await
-        .unwrap();
+        let rule = self.seed_rule(inbox, sender).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations

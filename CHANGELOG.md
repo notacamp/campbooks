@@ -133,6 +133,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **What needs you includes mail from before the upgrade.** Home's "What
+  needs you" only showed mail that arrived after attention shipped. After
+  this upgrade, each inbox's conversations from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) get their
+  needs within a few minutes, in the background, from the answers already
+  stored: no AI call, nothing to run. Replied, archived, spam and trashed
+  mail is handled as for new mail, and mail older than the window stays off
+  Home. Every open need is looked at again too, so Check questions that rest
+  only on unchecked model answers are withdrawn on upgrade.
 - **The decisions model's answers are only used once it gets obvious emails
   right** (campbooks-cloud#128). The default Laya model said "yes" to almost
   every question (needs a reply, has a deadline, looks like phishing), often

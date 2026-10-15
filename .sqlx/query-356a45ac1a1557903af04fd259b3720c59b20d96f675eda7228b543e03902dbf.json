@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.needs_backfills\n                        SET state = 'failed', finished_at = now()\n                      WHERE inbox_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "356a45ac1a1557903af04fd259b3720c59b20d96f675eda7228b543e03902dbf"
+}
