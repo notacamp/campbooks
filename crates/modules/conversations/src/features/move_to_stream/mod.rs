@@ -48,7 +48,7 @@ pub struct MoveToStream {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .automation()
         .assistant()
-        .records(["conversations.conversation", "conversations.correction"])))),
+        .records(["conversations.conversation", "conversations.correction"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -75,7 +75,7 @@ pub async fn handler(
     let id = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = lock_conversation(&mut tx, access, id).await?;
+    let inbox = lock_conversation(&state, &mut tx, access, id).await?;
     let current = sqlx::query!(
         "SELECT stream, stream_source FROM conversations.conversations WHERE id = $1",
         id as ConversationId
@@ -147,7 +147,7 @@ pub async fn handler(
         request(&state.events, &mut tx, &changed, &move_to).await?;
         changed.publish(&state.events, &mut tx).await?;
     }
-    let mut summary = summary(&mut tx, id).await?;
+    let mut summary = summary(&mut tx, access.user, id).await?;
     summary.rule_exception = exception;
     tx.commit().await?;
     Ok(Json(summary))

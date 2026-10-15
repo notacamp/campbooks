@@ -58,6 +58,8 @@ CREATE TABLE conversations.rules (
     created_at timestamptz NOT NULL DEFAULT now(),
     confirmed_at timestamptz,
     removed_at timestamptz,
+    -- The state it had when removed, so Undo can bring it back as it was.
+    removed_from text CHECK (removed_from IN ('proposed', 'active', 'paused')),
     applied_count integer NOT NULL DEFAULT 0,
     last_applied_at timestamptz,
     updated_at timestamptz NOT NULL DEFAULT now()

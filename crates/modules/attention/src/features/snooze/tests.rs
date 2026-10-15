@@ -112,9 +112,9 @@ async fn later_needs_a_future_time_a_member_and_an_item_you_can_see(db: PgPool) 
         StatusCode::NOT_FOUND
     );
     let client = kit.client(workspace, "attention:read attention:write");
+    // A client acting for no member does not see the item at all.
     let denied = kit.post(&client, &uri, tomorrow.clone()).await;
-    assert_eq!(denied.status, StatusCode::FORBIDDEN);
-    assert_eq!(denied.json["code"], "snooze_needs_member");
+    assert_eq!(denied.status, StatusCode::NOT_FOUND);
     let reader = kit.client(workspace, "attention:read");
     assert_eq!(
         kit.post(&reader, &uri, tomorrow).await.status,
@@ -146,4 +146,46 @@ async fn the_sender_writing_again_ends_later_even_without_a_new_need(db: PgPool)
     again.latest = Some(FOLLOW_UP.into());
     kit.need(workspace, &again).await;
     assert_eq!(count(&kit, &sam, workspace).await, 1);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_removed_inbox_takes_its_items_and_their_later_with_it(db: PgPool) {
+    use campbooks_kernel::db::BeginFor as _;
+
+    let kit = Kit::new(db.clone()).await;
+    let workspace = WorkspaceId::new();
+    let (sam, sam_id) = kit.member("sam", workspace);
+    kit.let_see(INBOX, sam_id);
+    kit.need(workspace, &need(1, FIRST)).await;
+    let item = kit.get(&sam, &list_uri(workspace)).await.json["items"][0]["id"]
+        .as_str()
+        .unwrap()
+        .to_owned();
+    kit.post(
+        &sam,
+        &format!("{}/{item}/snooze", list_uri(workspace)),
+        Some(json!({"until": Utc::now() + TimeDelta::days(1)})),
+    )
+    .await;
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    kit.state
+        .events
+        .publish(
+            &mut tx,
+            &crate::events::InboxRemoved {
+                workspace: workspace.to_string(),
+                inbox: INBOX.into(),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    let left: i64 = sqlx::query_scalar(
+        "SELECT (SELECT count(*) FROM attention.items) + (SELECT count(*) FROM attention.snoozes)",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(left, 0);
 }

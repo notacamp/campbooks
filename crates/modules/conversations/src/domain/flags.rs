@@ -64,7 +64,7 @@ pub async fn apply(
     needs: Option<&NeedSettings>,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = lock_conversation(&mut tx, access, id).await?;
+    let inbox = lock_conversation(state, &mut tx, access, id).await?;
     let changed = change(&mut tx, id, flag).await?;
     let undone = match flag {
         Flag::Unarchive => Some(rules::Undone::Archive),
@@ -99,7 +99,7 @@ pub async fn apply(
             .await?;
         }
     }
-    let mut summary = summary(&mut tx, id).await?;
+    let mut summary = summary(&mut tx, access.user, id).await?;
     summary.rule_exception = exception;
     tx.commit().await?;
     Ok(summary)

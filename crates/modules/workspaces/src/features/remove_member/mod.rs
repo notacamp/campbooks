@@ -1,19 +1,27 @@
 //! `DELETE /api/v1/w/{workspace_id}/members/{user_id}` — remove a member.
 //! Owners for anyone; admins for admins and members. A workspace always
-//! keeps an owner.
+//! keeps an owner. `?mail=keep` keeps the mail of the mailboxes they
+//! connected as read-only history; by default it is deleted with their
+//! connections. Their inbox memberships and drafts go either way.
 
 use axum::{extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
+use campbooks_kernel::db::BeginFor as _;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
 };
 
+use serde::Deserialize;
+use utoipa::IntoParams;
+
 use crate::{
     domain::{
-        access::acting_manager,
+        access::{acting_user, authorize, member_resource},
         departure::{Departure, depart},
         model::MemberPath,
     },
+    events::MailChoice,
     scopes::WorkspacesAdmin,
 };
 
@@ -24,10 +32,11 @@ use crate::{
     operation_id = "workspaces.remove_member",
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"]).access("workspaces.member", campbooks_kernel::authz::Action::Delete)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("user_id" = UserId, Path, description = "The member."),
+        RemoveQuery,
     ),
     responses(
         (status = NO_CONTENT, description = "Removed."),
@@ -37,7 +46,9 @@ use crate::{
             removing an owner.", body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such workspace or member.", body = Problem,
             content_type = "application/problem+json"),
-        (status = CONFLICT, description = "`last_owner`: the workspace would have no owner.",
+        (status = CONFLICT, description = "`last_owner`: the workspace would have no owner; \
+            `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have \
+            nobody left to read it (share it first, or delete the mail).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -45,19 +56,55 @@ pub async fn handler(
     State(state): State<AppState>,
     workspace: Workspace<WorkspacesAdmin>,
     extract::Path(path): extract::Path<MemberPath>,
+    extract::Query(query): extract::Query<RemoveQuery>,
 ) -> Result<StatusCode> {
-    execute(&state, &workspace.access, path.user_id).await?;
+    execute(
+        &state,
+        &workspace.access,
+        path.user_id,
+        query.mail.unwrap_or_default(),
+    )
+    .await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// Remove `member` from the workspace of `access`.
-pub async fn execute(state: &AppState, access: &Access, member: UserId) -> Result<()> {
-    let (actor, role) = acting_manager(access)?;
+/// What to do with the departing member's mail.
+#[derive(Debug, Default, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+pub struct RemoveQuery {
+    /// `delete` (the default): the mailboxes they connected are
+    /// disconnected and their mail deleted. `keep`: their mail stays as
+    /// read-only history, no longer synced.
+    #[param(inline)]
+    pub mail: Option<MailChoice>,
+}
+
+/// Remove `member` from the workspace of `access`, deleting or keeping the
+/// mail of the mailboxes they connected as `mail` says.
+pub async fn execute(
+    state: &AppState,
+    access: &Access,
+    member: UserId,
+    mail: MailChoice,
+) -> Result<()> {
+    let (actor, role) = acting_user(access)?;
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &member_resource(member),
+    )
+    .await?;
+    tx.commit().await?;
     let how = if actor == member {
         Departure::Leave
     } else {
-        Departure::RemovedBy(actor, role)
+        Departure::RemovedBy(actor, role, mail)
     };
+    // With `mail=keep`, `depart` refuses (409 `keep_needs_a_reader`) when
+    // an inbox would be left with nobody to read it.
     depart(state, access.workspace, member, how).await
 }
 
@@ -88,10 +135,95 @@ mod tests {
         let payload = kit.last_event_payload(&ws.to_string()).await;
         assert_eq!(payload["user"], cid_id.to_string());
         assert_eq!(payload["removed_by"], kit.user_id("bea").await.to_string());
+        assert_eq!(payload["mail"], "delete");
         assert_eq!(
             kit.security_kinds(&ws.to_string()).await.last().unwrap(),
             "member_removed"
         );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_manager_may_keep_the_departing_members_mail(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        kit.join(&ana, ws, "dee", "member").await;
+        let dee_id = kit.user_id("dee").await;
+        let response = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{dee_id}?mail=keep"))
+            .await;
+        assert_eq!(response.status, StatusCode::NO_CONTENT);
+        let payload = kit.last_event_payload(&ws.to_string()).await;
+        assert_eq!(payload["mail"], "keep");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn keeping_mail_nobody_could_read_is_refused(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        kit.join(&ana, ws, "eli", "member").await;
+        let eli = kit.user_id("eli").await;
+        kit.unread_if_kept.0.lock().unwrap().push(eli);
+        let refused = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli}?mail=keep"))
+            .await;
+        assert_eq!(refused.status, StatusCode::CONFLICT);
+        assert_eq!(refused.json["code"], "keep_needs_a_reader");
+        // Deleting the mail needs no reader.
+        let removed = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli}"))
+            .await;
+        assert_eq!(removed.status, StatusCode::NO_CONTENT);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_member_removed_rejoins_only_once_their_departure_is_handled(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ana = kit.user("ana");
+        let ws = kit.create_workspace(&ana, "Shop").await;
+        let eli = kit.join(&ana, ws, "eli", "member").await;
+        let eli_id = kit.user_id("eli").await;
+        let removed = kit
+            .delete(&ana, &format!("/api/v1/w/{ws}/members/{eli_id}"))
+            .await;
+        assert_eq!(removed.status, StatusCode::NO_CONTENT);
+        // Another module has not handled `member_left` yet (a delivery
+        // still pending, as when its worker is behind).
+        let pending = sqlx::query_scalar::<_, uuid::Uuid>(
+            "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, event_id, unique_key, max_attempts)
+             SELECT 'default', 'other.forget_member', '{}'::jsonb, e.workspace_id, e.id, e.id::text, 5
+               FROM kernel.events e WHERE e.name = 'workspaces.member_left'
+             RETURNING id",
+        )
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        let token = kit.invite(&ana, ws, "eli@example.com", "member").await;
+        let accept = |token: String| {
+            let kit = &kit;
+            let eli = &eli;
+            async move {
+                kit.post(
+                    eli,
+                    "/api/v1/workspaces/invitations/accept",
+                    serde_json::json!({ "token": token }),
+                )
+                .await
+            }
+        };
+        let early = accept(token.clone()).await;
+        assert_eq!(early.status, StatusCode::CONFLICT, "{:?}", early.json);
+        assert_eq!(early.json["code"], "still_leaving");
+        sqlx::query(
+            "UPDATE kernel.jobs SET state = 'succeeded', finished_at = now() WHERE id = $1",
+        )
+        .bind(pending)
+        .execute(&kit.db)
+        .await
+        .unwrap();
+        let back = accept(token).await;
+        assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

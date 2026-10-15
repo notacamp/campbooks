@@ -14,6 +14,7 @@
 
 #![forbid(unsafe_code)]
 
+mod access;
 mod arch;
 mod eval;
 mod events;
@@ -234,25 +235,7 @@ fn run_arch(root: &Path) -> Result<String> {
         .unwrap_or_default();
     violations.extend(arch::check_background(&background));
     if let Ok(registry) = &registry {
-        let published: Vec<arch::EventDecl> = registry
-            .published()
-            .iter()
-            .map(|e| arch::EventDecl {
-                by: e.module.to_owned(),
-                name: e.name.to_owned(),
-                version: e.version,
-            })
-            .collect();
-        let consumed: Vec<arch::EventDecl> = registry
-            .consumers()
-            .iter()
-            .map(|c| arch::EventDecl {
-                by: c.name.to_owned(),
-                name: c.event.to_owned(),
-                version: c.event_version,
-            })
-            .collect();
-        violations.extend(arch::check_events(&published, &consumed));
+        violations.extend(event_violations(registry));
     }
     violations.extend(arch::check_versions(&version, &crates));
 
@@ -278,6 +261,7 @@ fn run_arch(root: &Path) -> Result<String> {
     let owners = operation_owners()?;
     violations.extend(arch::check_operations(&spec, &owners));
     violations.extend(check_admin(root, &spec, &owners)?);
+    violations.extend(check_access(root, &spec, &arch_file, &migration_sql)?);
 
     if violations.is_empty() {
         let modules: Vec<_> = modules.iter().map(String::as_str).collect();
@@ -297,6 +281,92 @@ fn run_arch(root: &Path) -> Result<String> {
         violations.len(),
         list.join("\n")
     )
+}
+
+/// Every consumed event is published, at the version read.
+fn event_violations(registry: &campbooks_kernel::jobs::Registry) -> Vec<String> {
+    let published: Vec<arch::EventDecl> = registry
+        .published()
+        .iter()
+        .map(|e| arch::EventDecl {
+            by: e.module.to_owned(),
+            name: e.name.to_owned(),
+            version: e.version,
+        })
+        .collect();
+    let consumed: Vec<arch::EventDecl> = registry
+        .consumers()
+        .iter()
+        .map(|c| arch::EventDecl {
+            by: c.name.to_owned(),
+            name: c.event.to_owned(),
+            version: c.event_version,
+        })
+        .collect();
+    arch::check_events(&published, &consumed)
+}
+
+/// The rules of ADR 0017: every operation declares a catalogued resource
+/// and action, its handler asks the central check, module code queries
+/// workspace tables only in a workspace transaction, and every published
+/// event has a consumer or a stated reason.
+fn check_access(
+    root: &Path,
+    spec: &serde_json::Value,
+    arch_file: &arch::ArchitectureFile,
+    migrations: &[(String, String)],
+) -> Result<Vec<String>> {
+    let registry = campbooks_server::registry().map_err(|e| anyhow::anyhow!("{e}"))?;
+    let catalogue: std::collections::BTreeMap<String, access::Resource> = registry
+        .resources()
+        .iter()
+        .map(|declared| {
+            let tenancy = serde_json::to_value(declared.tenancy)
+                .ok()
+                .and_then(|v| v.as_str().map(ToOwned::to_owned))
+                .unwrap_or_default();
+            let actions = declared
+                .actions()
+                .iter()
+                .map(|a| a.as_str().to_owned())
+                .collect();
+            (
+                declared.name.to_owned(),
+                access::Resource { tenancy, actions },
+            )
+        })
+        .collect();
+    let mut sources = Vec::new();
+    rust_sources(root, &root.join("crates"), &mut sources)?;
+    let published: BTreeSet<String> = registry
+        .published()
+        .iter()
+        .map(|e| e.name.to_owned())
+        .collect();
+    let consumed: BTreeSet<String> = registry
+        .consumers()
+        .iter()
+        .map(|c| c.event.to_owned())
+        .collect();
+    let tables = access::workspace_tables(migrations);
+    let mut violations = access::check_declarations(spec, &catalogue);
+    violations.extend(access::check_authorize_calls(
+        spec,
+        &catalogue,
+        &sources,
+        &arch_file.access,
+    ));
+    violations.extend(access::check_workspace_queries(
+        &sources,
+        &tables,
+        &arch_file.access,
+    ));
+    violations.extend(access::check_consumers(
+        &published,
+        &consumed,
+        &arch_file.access,
+    ));
+    Ok(violations)
 }
 
 /// The rules of ADR 0015: the admin module serves nothing, the admin

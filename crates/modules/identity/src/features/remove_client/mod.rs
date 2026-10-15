@@ -29,7 +29,7 @@ use crate::{
     operation_id = "identity.remove_client",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Delete)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("client_id" = String, Path, description = "The app."),
@@ -52,7 +52,11 @@ pub async fn handler(
     Path(path): Path<ClientPath>,
 ) -> Result<StatusCode> {
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
-    workspace_clients::require_admin(&workspace.access)?;
+    workspace_clients::require_admin(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Delete,
+    )?;
     let now = issuer.now();
     let mut tx = state.db.begin_for(workspace.id).await?;
     if !workspace_clients::remove(&mut tx, &path.client_id).await? {

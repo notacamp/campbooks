@@ -419,6 +419,7 @@ async fn a_member_leaving_or_a_workspace_going_ends_the_apps_allowed_there(db: P
             &crate::events::MemberLeft {
                 workspace: HOME.to_string(),
                 user: MEMBER_IN_HOME,
+                subject: None,
             },
         )
         .await

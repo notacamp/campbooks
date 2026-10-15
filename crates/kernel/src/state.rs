@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use crate::{
     admin::{AdminAuditPort, AdminProfilesPort, NoAdmins, NoAudit},
     auth::TokenVerifier,
+    authz,
     blobs::BlobStore,
     changes::{ChangeHub, NoContainers, VisibilityPort},
     config::Config,
@@ -21,7 +22,10 @@ use crate::{
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
-    tenancy::{MembershipPort, NoMembership},
+    tenancy::{
+        ClientDirectoryPort, KeptMailPort, MembershipPort, NoClientDirectory, NoKeptMail,
+        NoMembership,
+    },
 };
 
 /// What every handler can reach. Cheap to clone.
@@ -40,6 +44,13 @@ pub struct AppState {
     /// registers the `workspaces` module's implementation; until then nobody
     /// belongs anywhere.
     pub membership: MembershipPort,
+    /// Answers whom a registered client acts for (ADR 0017). The server
+    /// registers the issuer's when it runs in this process; until then every
+    /// client is unregistered.
+    pub clients: ClientDirectoryPort,
+    /// Answers which inboxes keeping a departing member's mail would leave
+    /// unread. The server registers the `conversations` module's.
+    pub kept_mail: KeptMailPort,
     /// Answers which language a user chose, for the
     /// [`Locale`](crate::i18n::Locale) of their requests. The server
     /// registers the `workspaces` module's implementation; until then
@@ -86,6 +97,10 @@ pub struct AppState {
     /// The request and job instruments: from the meter provider installed
     /// when the state is built (the no-op without one).
     pub metrics: Metrics,
+    /// Every module's resource types and facts: what
+    /// [`authz::authorize`] decides with (ADR 0017). Empty (everything
+    /// denied) until the server registers it.
+    pub resources: authz::Catalogue,
     /// Reads admin profiles, for [`Admin`](crate::admin::Admin) handlers.
     /// The server registers the `admin` module's implementation; until then
     /// nobody is an administrator.
@@ -114,6 +129,8 @@ impl AppState {
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
+            clients: Arc::new(NoClientDirectory),
+            kept_mail: Arc::new(NoKeptMail),
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
@@ -125,6 +142,7 @@ impl AppState {
             admin_audit: Arc::new(NoAudit),
             rate_limits: RateLimits::default(),
             signer: Signer::default(),
+            resources: authz::Catalogue::default(),
             mailer: Arc::new(crate::mail::NoMailer),
         }
     }
@@ -142,6 +160,21 @@ impl AppState {
     pub fn with_admin(mut self, profiles: AdminProfilesPort, audit: AdminAuditPort) -> Self {
         self.admin_profiles = profiles;
         self.admin_audit = audit;
+        self
+    }
+
+    /// The same state, resolving whom registered clients act for through
+    /// `clients`.
+    #[must_use]
+    pub fn with_client_directory(mut self, clients: ClientDirectoryPort) -> Self {
+        self.clients = clients;
+        self
+    }
+
+    /// The same state, asking `kept_mail` before a member's mail is kept.
+    #[must_use]
+    pub fn with_kept_mail(mut self, kept_mail: KeptMailPort) -> Self {
+        self.kept_mail = kept_mail;
         self
     }
 
@@ -190,6 +223,13 @@ impl AppState {
         self
     }
 
+    /// The same state, deciding access with `resources` (ADR 0017).
+    #[must_use]
+    pub fn with_resources(mut self, resources: authz::Catalogue) -> Self {
+        self.resources = resources;
+        self
+    }
+
     /// The same state, with the modules' search sources.
     #[must_use]
     pub fn with_search_sources(mut self, sources: SearchSources) -> Self {
@@ -229,6 +269,7 @@ impl AppState {
     /// The same state, publishing to (and running the work of) `registry`.
     #[must_use]
     pub fn with_registry(mut self, registry: Registry) -> Self {
+        self.resources = registry.resources().clone();
         self.events = EventBus::new(Arc::new(registry));
         self
     }

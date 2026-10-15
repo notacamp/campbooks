@@ -18,7 +18,7 @@ use crate::{deps::Deps, domain::held_grants, scopes::IdentityWrite, upstream::Pr
     operation_id = "identity.discard_held_grant",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.held_grant"]).access("identity.held_grant", campbooks_kernel::authz::Action::Delete)))),
     params(("id" = uuid::Uuid, Path, description = "The held grant.")),
     responses(
         (status = NO_CONTENT, description = "Discarded."),
@@ -36,6 +36,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     Path(path): Path<super::HeldGrantPath>,
 ) -> Result<StatusCode> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Delete,
+        "identity.held_grant",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let mut tx = state.db.begin().await?;
     let taken = held_grants::take(&mut tx, &issuer.cipher, path.id, account, issuer.now())

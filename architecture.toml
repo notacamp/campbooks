@@ -13,3 +13,197 @@
 # Every entry must name existing modules and give a non-empty reason.
 
 # (No entries yet.)
+
+# Access rules (ADR 0017, `cargo xtask arch`): the reviewed exceptions.
+[access]
+# Module functions that call `authz` themselves for one resource type: a
+# handler calling one asks the central check about it.
+[[access.helpers]]
+call = "lock_conversation("
+resource = "conversations.conversation"
+
+[[access.helpers]]
+call = "drafts::load("
+resource = "conversations.draft"
+
+[[access.helpers]]
+call = "flags::apply("
+resource = "conversations.conversation"
+
+[[access.helpers]]
+call = "may_teach("
+resource = "conversations.inbox"
+
+[[access.helpers]]
+call = "workspace_clients::require_admin("
+resource = "identity.client"
+
+# Functions that build the reference an `authorize` call is given: a handler
+# calling `authorize` with one names that resource type.
+[[access.references]]
+call = "workspace_resource("
+resource = "workspaces.workspace"
+
+[[access.references]]
+call = "member_resource("
+resource = "workspaces.member"
+
+[[access.references]]
+call = "resources::inbox("
+resource = "conversations.inbox"
+
+[[access.references]]
+call = "resources::rule("
+resource = "conversations.rule"
+
+# Operations whose handler does not call `authz` yet: the web BFF's session
+# and proxy operations act on the cookie's own session, and the proxies run
+# each request through the API, whose operations authorize it; moving them
+# onto the catalogue is the follow-up change of the same issue.
+
+[[access.pending]]
+operation = "bff.logout"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.api_get"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.api_post"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.api_put"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.api_patch"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.api_delete"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.admin_get"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.admin_post"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.admin_put"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.admin_patch"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+[[access.pending]]
+operation = "bff.admin_delete"
+issue = "https://github.com/notacamp/campbooks-cloud/issues/117"
+
+# Transactions without a workspace set, on purpose. Module tables answer
+# nothing to such a transaction unless their own policy admits it.
+[[access.pool_access]]
+path = "crates/modules/identity/"
+reason = "Identity's tables are instance-wide (accounts, ways in, passkeys, sessions, keys): none carries a workspace."
+
+[[access.pool_access]]
+path = "crates/modules/admin/src/cli.rs"
+reason = "The admin CLI writes instance administrators' profiles on the migration login (ADR 0015)."
+
+[[access.pool_access]]
+path = "crates/modules/workspaces/src/domain/db.rs"
+reason = "`begin_as_user`: a user's own rows (their workspaces, their security events) across workspaces, admitted by the `campbooks.user_id` policies."
+
+[[access.pool_access]]
+path = "crates/modules/workspaces/src/features/invitations_port/mod.rs"
+reason = "Whether an address has a pending invitation, before any workspace: admitted by the `campbooks.invitee_email` policy."
+
+[[access.pool_access]]
+path = "crates/modules/connectors/src/domain/schedule.rs"
+reason = "The dispatcher reads and leases the scheduling index across workspaces (ids and times, `FOR SELECT`/`FOR UPDATE` maintenance policies); provider budgets are instance-wide."
+
+[[access.pool_access]]
+path = "crates/modules/connectors/src/zoho/flows.rs"
+reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain transactions."
+
+# Published events nothing consumes yet, and why they exist.
+[[access.unconsumed_events]]
+name = "connectors.connection_added"
+reason = "The change feed (connections list) and automation to come."
+
+[[access.unconsumed_events]]
+name = "connectors.connection_needs_reauth"
+reason = "The change feed (a connection's health) and notifications to come."
+
+[[access.unconsumed_events]]
+name = "conversations.draft_sent"
+reason = "The change feed: the sent draft leaves its author's list."
+
+[[access.unconsumed_events]]
+name = "conversations.rule_changed"
+reason = "The change feed: clients follow a taught rule and its run's progress."
+
+[[access.unconsumed_events]]
+name = "conversations.send_failed"
+reason = "The change feed: the draft shows why it failed; notifications to come."
+
+[[access.unconsumed_events]]
+name = "conversations.inbox_changed"
+reason = "The change feed: a membership ended or the inbox was kept read-only, so open streams ask again who sees it."
+
+[[access.unconsumed_events]]
+name = "identity.account_created"
+reason = "The security log and automation to come."
+
+[[access.unconsumed_events]]
+name = "identity.refresh_reuse_detected"
+reason = "A security signal for notifications to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "identity.signed_in"
+reason = "The security log and way-in notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "identity.way_in_removed"
+reason = "Way-in notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "workspaces.member_joined"
+reason = "The change feed (members list; open streams re-resolve membership)."
+
+[[access.unconsumed_events]]
+name = "workspaces.member_role_changed"
+reason = "The change feed (open streams re-resolve membership and what it shows)."
+
+[[access.unconsumed_events]]
+name = "workspaces.workspace_created"
+reason = "The change feed and automation to come."
+
+[[access.unconsumed_events]]
+name = "workspaces.workspace_updated"
+reason = "The change feed (the workspace's name and accent)."
+
+[[access.unconsumed_events]]
+name = "identity.client_registered"
+reason = "The security log and notices to workspace admins to come."
+
+[[access.unconsumed_events]]
+name = "identity.client_removed"
+reason = "The security log and notices to workspace admins to come."
+
+[[access.unconsumed_events]]
+name = "identity.consent_granted"
+reason = "Way-in and connected-app notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "identity.consent_revoked"
+reason = "Connected-app notices to come (campbooks-cloud#117 batch 3)."
+
+[[access.unconsumed_events]]
+name = "attention.item_changed"
+reason = "The change feed: Home and the inbox's need chips refresh from it."

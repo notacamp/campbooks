@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.needs_backfills\n                  SET after_id = $2, refreshed = refreshed + $3,\n                      state = CASE WHEN $4 THEN 'done' ELSE state END,\n                      finished_at = CASE WHEN $4 THEN now() END\n                WHERE inbox_id = $1\n               RETURNING refreshed",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "refreshed",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs_backfills",
+            "name": "refreshed"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "d78cc0d7fbb0fd3c562456b44d9c0f759586048f8d8de1cb571f912fdfd767ef"
+}

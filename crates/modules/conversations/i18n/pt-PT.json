@@ -23,6 +23,7 @@
     "rule_not_yours": "Só quem ensinou esta regra, ou um gestor da caixa de entrada, a pode alterar.",
     "rule_not_proposed": "Esta regra já não está à espera de um sim.",
     "rule_needs_member": "As regras são ensinadas por um membro da caixa de entrada, não por uma aplicação.",
-    "rule_not_active": "Esta regra está à espera de um sim. Mantenha-a primeiro e depois pode pô-la em pausa."
+    "rule_not_active": "Esta regra está à espera de um sim. Mantenha-a primeiro e depois pode pô-la em pausa.",
+    "rule_not_restorable": "Esta regra já não pode ser reposta. Volte a ensiná-la."
   }
 }

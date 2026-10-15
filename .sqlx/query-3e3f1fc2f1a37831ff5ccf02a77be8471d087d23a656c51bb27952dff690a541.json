@@ -1,0 +1,52 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT inbox_id AS \"inbox: InboxId\", workspace_id AS \"workspace: WorkspaceId\",\n                      after_id AS \"after: ConversationId\"\n                 FROM conversations.needs_backfills\n                WHERE state = 'running'\n                ORDER BY created_at, inbox_id\n                LIMIT $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs_backfills",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "workspace: WorkspaceId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs_backfills",
+            "name": "workspace_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "after: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.needs_backfills",
+            "name": "after_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "3e3f1fc2f1a37831ff5ccf02a77be8471d087d23a656c51bb27952dff690a541"
+}

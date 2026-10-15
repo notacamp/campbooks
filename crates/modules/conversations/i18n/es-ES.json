@@ -23,6 +23,7 @@
     "rule_not_yours": "Solo quien enseñó esta regla, o un gestor de la bandeja de entrada, puede cambiarla.",
     "rule_not_proposed": "Esta regla ya no está esperando un sí.",
     "rule_needs_member": "Las reglas las enseña un miembro de la bandeja de entrada, no una aplicación.",
-    "rule_not_active": "Esta regla está esperando un sí. Mantenla primero y luego podrás pausarla."
+    "rule_not_active": "Esta regla está esperando un sí. Mantenla primero y luego podrás pausarla.",
+    "rule_not_restorable": "Esta regla ya no se puede recuperar. Vuelve a enseñarla."
   }
 }

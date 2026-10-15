@@ -43,7 +43,7 @@ pub struct AcceptInvitation {
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
     // Accepting an invitation is the invitee's own act; not for rules or the assistant.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.invitation", "workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.invitation", "workspaces.member"]).access("workspaces.account", campbooks_kernel::authz::Action::Write)))),
     request_body = AcceptInvitation,
     responses(
         (status = OK, description = "You are a member; the workspace with your role.",
@@ -57,8 +57,9 @@ pub struct AcceptInvitation {
             body = Problem, content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "No such invitation.", body = Problem,
             content_type = "application/problem+json"),
-        (status = CONFLICT, description = "`invitation_used`, `invitation_expired` or \
-            `already_a_member`.", body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "`invitation_used`, `invitation_expired`, \
+            `already_a_member`, or `still_leaving`: you left this workspace moments ago and \
+            that is still being finished; try again in a minute.", body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(
@@ -66,6 +67,13 @@ pub async fn handler(
     Scoped { principal, .. }: Scoped<WorkspacesWrite>,
     extract::Json(input): extract::Json<AcceptInvitation>,
 ) -> Result<Json<WorkspaceView>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        crate::domain::resources::ACCOUNT_RECORD,
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     execute(&state, &principal, input).await.map(Json)
 }
 
@@ -113,6 +121,17 @@ pub async fn execute(
         return Err(Error::Denied(MESSAGES.reason("invitation_email_mismatch")));
     }
     let role: Role = found.role.parse()?;
+    // Back before their departure is handled everywhere (inbox memberships,
+    // clients, grants)? Not yet: those would count for the new membership.
+    let leaving = campbooks_kernel::EventBus::unsettled(
+        &mut tx,
+        <crate::events::MemberLeft as campbooks_kernel::DomainEvent>::NAME,
+        &serde_json::json!({ "user": user }),
+    )
+    .await?;
+    if leaving {
+        return Err(Error::Conflict(MESSAGES.reason("still_leaving")));
+    }
     let joined = sqlx::query!(
         "INSERT INTO workspaces.members (workspace_id, user_id, role) VALUES ($1, $2, $3)
          ON CONFLICT (workspace_id, user_id) DO NOTHING",

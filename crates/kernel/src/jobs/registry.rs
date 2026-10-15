@@ -101,6 +101,9 @@ struct KindSpec {
     run: RunFn,
     /// For event handlers: the event name and version they consume.
     consumes: Option<(&'static str, u16)>,
+    /// For event handlers: whether their event must settle
+    /// ([`DomainEvent::SETTLES`]).
+    settles: bool,
 }
 
 struct ScheduleSpec {
@@ -140,6 +143,7 @@ impl Background {
             max_attempts: J::MAX_ATTEMPTS,
             run: run_fn(run_job::<J>),
             consumes: None,
+            settles: false,
         });
         self
     }
@@ -153,6 +157,7 @@ impl Background {
             max_attempts: H::MAX_ATTEMPTS,
             run: run_fn(run_handler::<H>),
             consumes: Some((H::Event::NAME, H::Event::VERSION)),
+            settles: H::Event::SETTLES,
         });
         self
     }
@@ -177,6 +182,7 @@ impl Background {
                 })
             }),
             consumes: None,
+            settles: false,
         });
         self
     }
@@ -198,6 +204,7 @@ impl Background {
                 })
             }),
             consumes: Some((C::Event::NAME, C::Event::VERSION)),
+            settles: C::Event::SETTLES,
         });
         self
     }
@@ -299,6 +306,9 @@ pub struct ConsumerInfo {
     pub queue: &'static str,
     /// Attempts per delivery.
     pub max_attempts: u32,
+    /// Whether its event must settle ([`DomainEvent::SETTLES`]): a
+    /// delivery that failed for good is kept until an operator acts.
+    pub settles: bool,
 }
 
 /// A registered recurring schedule.
@@ -319,6 +329,11 @@ pub struct Registry {
     consumers: Vec<ConsumerInfo>,
     schedules: Vec<ScheduleInfo>,
     published: Vec<PublishedEvent>,
+    /// Every declared resource type and its facts (ADR 0017), installed in
+    /// the state with the registry.
+    resources: crate::authz::Catalogue,
+    /// The declarations behind [`resources`](Self::resources), by owner.
+    declared: Vec<(&'static str, crate::authz::Resources)>,
 }
 
 impl std::fmt::Debug for Registry {
@@ -330,6 +345,15 @@ impl std::fmt::Debug for Registry {
             .field(
                 "published",
                 &self.published.iter().map(|e| e.name).collect::<Vec<_>>(),
+            )
+            .field("resources", &self.resources)
+            .field(
+                "declared",
+                &self
+                    .declared
+                    .iter()
+                    .map(|(owner, _)| owner)
+                    .collect::<Vec<_>>(),
             )
             .finish()
     }
@@ -389,11 +413,66 @@ impl Registry {
                 errors.extend(registry.add_published(owner, event));
             }
         }
+        for module in modules {
+            errors.extend(registry.add_resources(module.name, &module.resources));
+        }
+        match crate::authz::Catalogue::new(registry.declared.iter().map(|(_, r)| r)) {
+            Ok(resources) => registry.resources = resources,
+            Err(e) => errors.push(e),
+        }
         if errors.is_empty() {
             Ok(registry)
         } else {
             Err(RegistryError(errors))
         }
+    }
+
+    /// The same registry, with the resource types of parts of the server
+    /// that are not modules, each `(owner, resources)` (the change feed,
+    /// the web BFF).
+    ///
+    /// # Errors
+    /// A misnamed or duplicated resource type.
+    pub fn with_resources(
+        mut self,
+        others: &[(&'static str, crate::authz::Resources)],
+    ) -> Result<Self, RegistryError> {
+        let mut errors = Vec::new();
+        for (owner, resources) in others {
+            errors.extend(self.add_resources(owner, resources));
+        }
+        match crate::authz::Catalogue::new(self.declared.iter().map(|(_, r)| r)) {
+            Ok(resources) => self.resources = resources,
+            Err(e) => errors.push(e),
+        }
+        if errors.is_empty() {
+            Ok(self)
+        } else {
+            Err(RegistryError(errors))
+        }
+    }
+
+    fn add_resources(
+        &mut self,
+        owner: &'static str,
+        resources: &crate::authz::Resources,
+    ) -> Vec<String> {
+        let errors = resources
+            .types
+            .iter()
+            .filter_map(|declared| {
+                check_owned_name(owner, declared.name)
+                    .err()
+                    .map(|e| format!("resource type `{}`: {e}", declared.name))
+            })
+            .collect();
+        self.declared.push((owner, resources.clone()));
+        errors
+    }
+
+    /// The access catalogue: every declared resource type (ADR 0017).
+    pub fn resources(&self) -> &crate::authz::Catalogue {
+        &self.resources
     }
 
     fn add_kind(&mut self, owner: &str, kind: &KindSpec) -> Vec<String> {
@@ -454,6 +533,7 @@ impl Registry {
                     event_version: kind.consumes.map_or(0, |(_, version)| version),
                     queue: kind.queue,
                     max_attempts: kind.max_attempts,
+                    settles: kind.settles,
                 });
             }
         }
@@ -541,6 +621,20 @@ impl Registry {
     /// The consumer named `name`.
     pub fn consumer(&self, name: &str) -> Option<ConsumerInfo> {
         self.consumers.iter().find(|c| c.name == name).copied()
+    }
+
+    /// The events that must settle ([`DomainEvent::SETTLES`]) and have a
+    /// consumer.
+    pub fn settling_events(&self) -> Vec<&'static str> {
+        let mut events: Vec<&'static str> = self
+            .consumers
+            .iter()
+            .filter(|c| c.settles)
+            .map(|c| c.event)
+            .collect();
+        events.sort_unstable();
+        events.dedup();
+        events
     }
 
     /// Every consumer, by name.

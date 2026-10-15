@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rules SET origin_text = NULL WHERE inbox_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f4709919602bec4c176a129f92ac1d5cb6a853ca53ff88cc91688038b1fe3b0f"
+}

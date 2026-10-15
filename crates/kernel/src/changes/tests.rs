@@ -59,6 +59,7 @@ async fn state(db: &PgPool) -> AppState {
 
 async fn publish(state: &AppState, workspace: &str, things: &[&str]) {
     let mut tx = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut tx, workspace).await.unwrap();
     state
         .events
         .publish(
@@ -139,6 +140,7 @@ async fn publishing_records_changes_and_one_sequencer(db: PgPool) {
 async fn a_rolled_back_publish_leaves_no_change(db: PgPool) {
     let state = state(&db).await;
     let mut tx = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut tx, "ws-a").await.unwrap();
     state
         .events
         .publish(
@@ -159,6 +161,7 @@ async fn a_rolled_back_publish_leaves_no_change(db: PgPool) {
 async fn events_without_changes_record_nothing(db: PgPool) {
     let state = state(&db).await;
     let mut tx = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut tx, "ws-a").await.unwrap();
     state
         .events
         .publish(
@@ -264,6 +267,7 @@ async fn the_sequencer_waits_for_producers_in_flight(db: PgPool) {
     let state = state(&db).await;
     // A producer that started first and is still open…
     let mut slow = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut slow, "ws-a").await.unwrap();
     state
         .events
         .publish(
@@ -329,6 +333,7 @@ async fn producers_never_wait_for_the_sequencer(db: PgPool) {
 
     // A long producer holds the workspace's shared lock throughout…
     let mut long = state.db.begin().await.unwrap();
+    crate::db::set_workspace(&mut long, "ws-a").await.unwrap();
     state
         .events
         .publish(

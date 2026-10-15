@@ -74,6 +74,20 @@ impl Membership for TestMembership {
         };
         Box::pin(async move { Ok::<_, Error>(access) })
     }
+
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut sqlx::PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+    ) -> campbooks_kernel::tenancy::RoleFuture<'a> {
+        let member = self
+            .members
+            .lock()
+            .ok()
+            .is_some_and(|m| m.iter().any(|((_, w), u)| *w == workspace && *u == user));
+        Box::pin(async move { Ok(member.then_some(Role::Member)) })
+    }
 }
 
 /// The module over a fresh database.
@@ -128,6 +142,14 @@ impl Kit {
         self
     }
 
+    /// The same kit, asking `clients` whom each client token acts for.
+    #[must_use]
+    pub fn with_clients(mut self, clients: campbooks_kernel::tenancy::ClientDirectoryPort) -> Self {
+        self.state = self.state.with_client_directory(clients);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
     /// Apply the recorded batch `recorded` (the fixtures' format) to `inbox`
     /// and run every job it causes.
     pub async fn ingest_value(
@@ -154,6 +176,16 @@ impl Kit {
         let mut claims = self.idp.claims(ALL_SCOPES);
         claims["sub"] = sub.into();
         (self.idp.token(&claims), user)
+    }
+
+    /// `sub` leaves `workspace` (their inbox memberships stay until
+    /// `workspaces.member_left` is handled).
+    pub fn leave(&self, sub: &str, workspace: WorkspaceId) {
+        self.membership
+            .members
+            .lock()
+            .unwrap()
+            .remove(&(sub.to_owned(), workspace));
     }
 
     /// A client token bound to `workspace`.

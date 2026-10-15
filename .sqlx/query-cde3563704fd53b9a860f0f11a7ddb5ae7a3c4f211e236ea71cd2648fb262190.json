@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id AS \"inbox!: InboxId\",\n                  CASE WHEN i.owner = $2 THEN 'manager' ELSE m.role END AS \"role!\"\n             FROM conversations.inboxes i\n             LEFT JOIN conversations.inbox_members m ON m.inbox_id = i.id AND m.user_id = $2\n            WHERE i.id = ANY($1) AND (i.owner = $2 OR m.user_id IS NOT NULL)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "inbox!: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "role!",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "cde3563704fd53b9a860f0f11a7ddb5ae7a3c4f211e236ea71cd2648fb262190"
+}

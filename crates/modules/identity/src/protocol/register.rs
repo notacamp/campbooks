@@ -99,7 +99,7 @@ fn refuse(error: &'static str, description: &'static str) -> Response {
     path = "/oauth2/register",
     tag = "identity",
     operation_id = "identity.register",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.client"]).access("identity.registration", campbooks_kernel::authz::Action::Create)))),
     request_body = RegisterRequest,
     security(()),
     responses(

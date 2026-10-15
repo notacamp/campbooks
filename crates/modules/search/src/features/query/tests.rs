@@ -512,6 +512,9 @@ async fn a_deleted_workspace_is_purged_and_stays_unindexed(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, _) = mailbox(&kit).await;
     let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace.to_string())
+        .await
+        .unwrap();
     kit.state
         .events
         .publish(
@@ -627,6 +630,14 @@ async fn cursors_belong_to_their_caller_and_cannot_be_altered(db: PgPool) {
         .search(&sam, workspace, &format!("{page}&cursor={payload}"))
         .await;
     assert_eq!(unsigned.status, 400);
+    // The same caller's cursor never pages another workspace.
+    let elsewhere = WorkspaceId::new();
+    kit.member("sam", elsewhere);
+    let other = kit
+        .search(&sam, elsewhere, &format!("{page}&cursor={cursor}"))
+        .await;
+    assert_eq!(other.status, 400);
+    assert_eq!(other.json["code"], "cursor_mismatch");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -721,4 +732,59 @@ async fn bench_instant_queries(db: PgPool) {
         times.sort();
         eprintln!("{query}: p50 {:?}, p95 {:?}", times[10], times[18]);
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_removed_inbox_leaves_the_index(db: PgPool) {
+    use campbooks_kernel::db::BeginFor as _;
+
+    let kit = Kit::new(db).await;
+    let workspace = WorkspaceId::new();
+    let (sam, user) = kit.member("sam", workspace);
+    kit.share(workspace, "inbox-sam", &[user]);
+    for (id, inbox) in [("c-gone", "inbox-sam"), ("c-kept", "inbox-other")] {
+        kit.index(
+            workspace,
+            id,
+            Conversation::new(
+                inbox,
+                "Quarterly invoice",
+                vec![Message::new(
+                    &format!("m-{id}"),
+                    "ops@example.com",
+                    "Invoice",
+                    1,
+                )],
+            ),
+        )
+        .await;
+    }
+    assert_eq!(
+        kit.search(&sam, workspace, &q("invoice")).await.json["hits"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    kit.state
+        .events
+        .publish(
+            &mut tx,
+            &crate::events::InboxRemoved {
+                workspace: workspace.to_string(),
+                inbox: "inbox-sam".to_owned(),
+            },
+        )
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+    let left: Vec<String> = sqlx::query_scalar("SELECT container_id FROM search.groups")
+        .fetch_all(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(left, ["inbox-other"]);
+    let found = kit.search(&sam, workspace, &q("invoice")).await;
+    assert_eq!(found.json["hits"], serde_json::json!([]));
 }

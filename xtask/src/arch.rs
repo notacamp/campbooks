@@ -89,6 +89,9 @@ pub struct ArchitectureFile {
     /// Allowed module → module dependencies.
     #[serde(default)]
     pub allow: Vec<Allow>,
+    /// The access rules' reviewed exceptions (ADR 0017).
+    #[serde(default)]
+    pub access: crate::access::AccessFile,
 }
 
 /// Names of the modules (directory names under `crates/modules`).
@@ -633,7 +636,11 @@ fn check_meta(
         }
     }
     for key in meta.keys() {
-        if !REQUIRED_META.contains(&key.as_str()) && key != "undo" && key != "query_in" {
+        if !REQUIRED_META.contains(&key.as_str())
+            && key != "undo"
+            && key != "query_in"
+            && key != "access"
+        {
             violations.push(format!(
                 "OpenAPI operation `{name}`: unknown key `x-campbooks.{key}`"
             ));

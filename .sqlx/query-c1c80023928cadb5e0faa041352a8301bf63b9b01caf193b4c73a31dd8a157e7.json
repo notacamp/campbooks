@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.needs_backfills\n                    SET state = 'done', finished_at = now()\n                  WHERE inbox_id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "c1c80023928cadb5e0faa041352a8301bf63b9b01caf193b4c73a31dd8a157e7"
+}

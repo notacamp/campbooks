@@ -3,6 +3,8 @@
 
 use std::str::FromStr;
 
+pub mod resources;
+
 use campbooks_kernel::{
     AppState, Error, RecordRef, Result, define_id,
     tenancy::{Access, UserId},

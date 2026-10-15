@@ -23,6 +23,7 @@
     "rule_not_yours": "Seule la personne qui a enseigné cette règle, ou un gestionnaire de la boîte de réception, peut la modifier.",
     "rule_not_proposed": "Cette règle n’attend plus de réponse.",
     "rule_needs_member": "Les règles sont enseignées par un membre de la boîte de réception, pas par une application.",
-    "rule_not_active": "Cette règle attend votre accord. Gardez-la d’abord, puis vous pourrez la mettre en pause."
+    "rule_not_active": "Cette règle attend votre accord. Gardez-la d’abord, puis vous pourrez la mettre en pause.",
+    "rule_not_restorable": "Cette règle ne peut plus être rétablie. Enseignez-la à nouveau."
   }
 }

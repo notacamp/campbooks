@@ -22,6 +22,8 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::MESSAGE_RECORD;
 use crate::{
     domain::paths::MessagePath,
     domain::{
@@ -34,6 +36,8 @@ use crate::{
     model::{ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::RecordRef;
+use campbooks_kernel::authz::Action;
 
 /// Longest body returned, in bytes, per part.
 pub const MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
@@ -75,7 +79,7 @@ pub struct MessageBody {
     operation_id = "conversations.get_message_body",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"]).access("conversations.message", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -101,6 +105,14 @@ pub async fn handler(
     let (conversation, message) = (path.conversation_id, path.message_id);
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(MESSAGE_RECORD, &message),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let bodies = sqlx::query_scalar!(
         r#"SELECT bodies FROM conversations.messages

@@ -53,7 +53,7 @@ pub struct ConnectedApps {
     operation_id = "identity.list_consents",
     tag = "identity",
     security(("bearer" = ["identity:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.consent"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.consent"]).access("identity.consent", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The caller's connected apps.", body = ConnectedApps),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -69,6 +69,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<ConnectedApps>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Read,
+        "identity.consent",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let mut items = Vec::new();
     for consent in consents::of_account(&state.db, account).await? {

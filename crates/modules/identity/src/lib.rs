@@ -32,6 +32,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod client_directory;
 mod consent;
 pub mod deps;
 pub mod domain;
@@ -40,11 +41,13 @@ mod features;
 pub mod metadata;
 pub mod protocol;
 mod prune;
+mod resources;
 pub mod scopes;
 pub mod upstream;
 mod web;
 pub mod webauthn;
 
+pub use client_directory::client_directory;
 pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
@@ -86,6 +89,7 @@ pub fn module(deps: Deps) -> Module {
             .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
+        resources: resources::resources(),
     }
 }
 

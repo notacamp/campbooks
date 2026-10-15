@@ -5,6 +5,7 @@
 use axum::{Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, RecordRef, Result, Risk,
+    authz::{self, Action},
     db::BeginFor as _,
     extract,
     tenancy::{Access, Workspace, WorkspaceId},
@@ -15,7 +16,7 @@ use sqlx::{Postgres, Transaction};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{ItemId, ItemRow, ItemView, key, visible_containers},
+    domain::{ItemId, ItemRow, ItemView, key, resources::ITEM_RECORD, visible_containers},
     events::ItemChanged,
     scopes::AttentionWrite,
 };
@@ -49,7 +50,7 @@ const LONGEST: TimeDelta = TimeDelta::days(366);
         .undo("attention.unsnooze")
         .automation()
         .assistant()
-        .records(["attention.item"])))),
+        .records(["attention.item"]).access("attention.item", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("item_id" = ItemId, Path, description = "The item."),
@@ -92,7 +93,7 @@ pub async fn snooze(
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .automation()
         .assistant()
-        .records(["attention.item"])))),
+        .records(["attention.item"]).access("attention.item", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("item_id" = ItemId, Path, description = "The item."),
@@ -124,10 +125,19 @@ async fn change(
     id: ItemId,
     until: Option<DateTime<Utc>>,
 ) -> Result<ItemView> {
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Write,
+        &RecordRef::new(ITEM_RECORD, &id),
+        || Error::Denied(crate::MESSAGES.reason("snooze_needs_member")),
+    )
+    .await?;
     let Some(user) = access.user else {
         return Err(Error::Denied(crate::MESSAGES.reason("snooze_needs_member")));
     };
-    let mut tx = state.db.begin_for(access.workspace).await?;
     let visible = visible_containers(state, &mut tx, access).await?;
     let item = sqlx::query!(
         r#"SELECT container_type, container_id FROM attention.items

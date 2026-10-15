@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            WITH gone AS (\n                DELETE FROM kernel.blob_refs\n                 WHERE workspace_id = $1 AND owner_type = $2 AND owner_id = ANY($3)\n                RETURNING hash\n            ), touched AS (\n                UPDATE kernel.blobs b SET touched_at = now()\n                 WHERE b.workspace_id = $1 AND b.hash IN (SELECT hash FROM gone)\n            )\n            SELECT count(*) AS \"count!\" FROM gone\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "UuidArray"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c88d00f8aa2ef4c40ccc68d824e3c4ab7110f1d6782333d6ee87c0b564896e64"
+}

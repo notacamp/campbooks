@@ -1114,6 +1114,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring back a rule removed in the last 15 minutes, as it was (Undo). */
+        post: operations["conversations.restore_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/search": {
         parameters: {
             query?: never;
@@ -2528,6 +2545,11 @@ export interface components {
             display_name?: string | null;
             /** @description The inbox. */
             id: components["schemas"]["InboxId"];
+            /**
+             * @description Kept as read-only history after its connection was removed: no
+             *     longer synced, nothing can be written or sent from it.
+             */
+            read_only: boolean;
             role?: components["schemas"]["InboxRole"] | null;
             /**
              * Format: int32
@@ -3203,6 +3225,14 @@ export interface components {
             /** @description Done or Not needed. */
             outcome: components["schemas"]["Outcome"];
         };
+        /** @description How to bring a removed rule back. */
+        RestoreRule: {
+            /**
+             * @description Apply it again to the mail already in the inbox (after its mail was
+             *     put back). Default false.
+             */
+            apply_to_existing?: boolean;
+        };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -3330,6 +3360,11 @@ export interface components {
             conditions: components["schemas"]["RuleCondition"][];
             /** @description The rule. */
             id: components["schemas"]["RuleId"];
+            /**
+             * @description Whether the caller may stop it ("Stop doing this"): its author, or a
+             *     manager or owner of its inbox, while the inbox is not kept read-only.
+             */
+            may_change: boolean;
         };
         /**
          * @description Where a taught rule came from.
@@ -5507,7 +5542,14 @@ export interface operations {
     };
     "connectors.disconnect": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the inboxes it fed are deleted, with their
+                 *     messages, conversations, drafts, decisions, search entries and
+                 *     files. `keep`: they stay as read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -5535,7 +5577,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7758,7 +7800,14 @@ export interface operations {
     };
     "workspaces.remove_member": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the mailboxes they connected are
+                 *     disconnected and their mail deleted. `keep`: their mail stays as
+                 *     read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -7804,7 +7853,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `last_owner`: the workspace would have no owner. */
+            /** @description `last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8239,6 +8288,71 @@ export interface operations {
             };
         };
     };
+    "conversations.restore_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreRule"];
+            };
+        };
+        responses: {
+            /** @description The rule, back as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not your rule. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not removed, or was removed too long ago. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "search.query": {
         parameters: {
             query?: {
@@ -8587,7 +8701,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            /** @description `invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute. */
             409: {
                 headers: {
                     [name: string]: unknown;
