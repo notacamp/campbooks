@@ -316,6 +316,7 @@ impl Kit {
             email_verified: true,
             name: None,
             expires_at: None,
+            issued_at: None,
             auth_time: None,
         }
     }
@@ -337,6 +338,7 @@ impl Kit {
             email_verified: true,
             name: None,
             expires_at: None,
+            issued_at: None,
             auth_time: None,
         };
         let access = WorkspaceMembership

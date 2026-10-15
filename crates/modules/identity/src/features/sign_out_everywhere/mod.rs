@@ -1,9 +1,10 @@
 //! `POST /api/v1/identity/sign-out-everywhere` — end every sign-in of the
 //! caller's account: every issuer session, every refresh token of every app
 //! (Campbooks' own and others), and, through `identity.signed_out_everywhere`,
-//! every web session. Access tokens already issued stop at their expiry
-//! (minutes). No recent sign-in is asked for: whoever fears a stolen session
-//! must be able to end it at once.
+//! every web session. The access tokens already issued stop at once: the
+//! account's revocation epoch moves to now (`accounts::revoke_tokens`),
+//! which the API checks on every request. No recent sign-in is asked for:
+//! whoever fears a stolen session must be able to end it at once.
 
 use axum::{Extension, extract::State, http::StatusCode};
 use campbooks_kernel::{AppState, Operation, Problem, Result, Risk, auth::Unbound};
@@ -50,7 +51,12 @@ pub async fn handler(
     let (issuer, account) = super::account(&deps, &principal)?;
     let now = issuer.now();
     let mut tx = state.db.begin().await?;
+    // Held until the commit, so a token exchange minting for this account
+    // either finishes first (and its tokens fall before the epoch) or sees
+    // the epoch.
+    accounts::lock(&mut tx, account).await?;
     let (sessions, families) = sessions::end_all(&mut tx, account, now).await?;
+    accounts::revoke_tokens(&mut tx, account, now).await?;
     accounts::audit(
         &mut tx,
         Some(account),

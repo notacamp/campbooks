@@ -219,6 +219,7 @@ async fn member(state: &AppState, subject: &str, workspace: WorkspaceId) -> Resu
         email_verified: false,
         name: None,
         expires_at: None,
+        issued_at: None,
         auth_time: None,
     };
     state

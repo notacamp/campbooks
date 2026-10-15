@@ -584,14 +584,19 @@ impl Kit {
             .with_invitations(Arc::new(Invited(
                 invited.iter().map(|e| (*e).to_owned()).collect(),
             )))
-            .with_auth(TokenVerifier::in_process(
-                &auth,
-                &issuer.url,
-                Arc::new(LocalKeys {
-                    db: pool,
-                    keys: Arc::clone(&issuer.keys),
-                }),
-            ));
+            .with_auth(
+                TokenVerifier::in_process(
+                    &auth,
+                    &issuer.url,
+                    Arc::new(LocalKeys {
+                        db: pool.clone(),
+                        keys: Arc::clone(&issuer.keys),
+                    }),
+                )
+                // As the server wires it: suspension and sign out
+                // everywhere stop a person's tokens at once.
+                .with_revocation(pool, crate::token_revocation()),
+            );
         let api = testing::app(crate::module(deps.clone()), state.clone());
         let app = crate::protocol::router(state.clone(), deps.clone()).merge(api);
         Self {

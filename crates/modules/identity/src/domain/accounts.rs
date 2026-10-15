@@ -49,6 +49,33 @@ pub struct Profile {
     pub primary_email: Option<String>,
     /// Whether a provider verified it.
     pub primary_email_verified: bool,
+    /// The account's last revocation of its tokens (suspension, sign out
+    /// everywhere), if any: see [`revoke_tokens`].
+    pub tokens_not_before: Option<DateTime<Utc>>,
+}
+
+impl Profile {
+    /// Whether a sign-in made at `auth_time` came before the account's last
+    /// revocation (or at that instant): nothing more is minted for it.
+    pub fn revoked_for(&self, auth_time: DateTime<Utc>) -> bool {
+        self.tokens_not_before
+            .is_some_and(|epoch| auth_time <= epoch)
+    }
+
+    /// The `iat` of an access token minted at `now` for a sign-in made at
+    /// `auth_time`: `now`, except that a sign-in newer than the account's
+    /// last revocation, minted in the revocation's own second, gets the next
+    /// second. The API accepts a token only from the second after the
+    /// revocation (`iat` has whole seconds; an older token minted earlier
+    /// in that second must stay refused), and a person who signs in again
+    /// at once must not be refused.
+    pub fn issued_at(&self, auth_time: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
+        let now = now.timestamp();
+        match self.tokens_not_before {
+            Some(epoch) if auth_time > epoch => now.max(epoch.timestamp() + 1),
+            _ => now,
+        }
+    }
 }
 
 /// The account that `identity` is a way into, if any.
@@ -225,11 +252,61 @@ pub async fn remove(conn: &mut PgConnection, id: Uuid, account: Uuid) -> Result<
 /// What tokens say about account `id`, unless it is gone or disabled.
 pub async fn profile(db: &PgPool, id: Uuid) -> Result<Option<Profile>> {
     Ok(sqlx::query_as(
-        "SELECT id, display_name, primary_email, primary_email_verified
+        "SELECT id, display_name, primary_email, primary_email_verified, tokens_not_before
            FROM identity.accounts WHERE id = $1 AND disabled_at IS NULL",
     )
     .bind(id)
     .fetch_optional(db)
+    .await?)
+}
+
+/// [`profile`] for minting tokens, in the minting transaction: the row is
+/// held (`FOR SHARE`) until it commits, so a suspension or sign out
+/// everywhere either waits for these tokens (and then takes a later epoch,
+/// refusing them) or has committed already (and this sees it).
+pub async fn profile_for_minting(conn: &mut PgConnection, id: Uuid) -> Result<Option<Profile>> {
+    Ok(sqlx::query_as(
+        "SELECT id, display_name, primary_email, primary_email_verified, tokens_not_before
+           FROM identity.accounts WHERE id = $1 AND disabled_at IS NULL FOR SHARE",
+    )
+    .bind(id)
+    .fetch_optional(conn)
+    .await?)
+}
+
+/// Refuse every access token of `account` issued so far, and every token
+/// still to be minted for a sign-in made so far: move its revocation epoch
+/// (`tokens_not_before`) to now. Call it in the transaction that ends the
+/// account's sessions, with the account row locked (`FOR UPDATE`) first: the
+/// epoch is taken after the lock, from the later of `now` and the wall
+/// clock, so an exchange that held the row while minting gets an older
+/// `iat`. The epoch only moves forward. The epoch set.
+pub async fn revoke_tokens(
+    conn: &mut PgConnection,
+    account: Uuid,
+    now: DateTime<Utc>,
+) -> Result<DateTime<Utc>> {
+    let epoch = now.max(Utc::now());
+    let set: Option<DateTime<Utc>> = sqlx::query_scalar(
+        "UPDATE identity.accounts SET tokens_not_before = GREATEST(tokens_not_before, $2)
+          WHERE id = $1
+          RETURNING tokens_not_before",
+    )
+    .bind(account)
+    .bind(epoch)
+    .fetch_optional(conn)
+    .await?;
+    Ok(set.unwrap_or(epoch))
+}
+
+/// Lock `account`'s row for a change of its standing (`FOR UPDATE`);
+/// whether it is suspended, or `None` when there is no such account.
+pub async fn lock(conn: &mut PgConnection, account: Uuid) -> Result<Option<bool>> {
+    Ok(sqlx::query_scalar(
+        "SELECT disabled_at IS NOT NULL FROM identity.accounts WHERE id = $1 FOR UPDATE",
+    )
+    .bind(account)
+    .fetch_optional(conn)
     .await?)
 }
 

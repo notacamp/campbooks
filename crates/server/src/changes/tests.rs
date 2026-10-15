@@ -12,6 +12,7 @@ use axum::{
 };
 use campbooks_kernel::{
     AppState, DomainEvent, RecordRef,
+    auth::{StandingFuture, TokenRevocation, TokenStanding},
     changes::Change,
     config::ChangesConfig,
     jobs::Worker,
@@ -68,6 +69,17 @@ struct Replica {
 
 impl Replica {
     async fn new(db: &PgPool, idp: &TestIdp, tweak: impl FnOnce(&mut ChangesConfig)) -> Self {
+        Self::revocable(db, idp, tweak, None).await
+    }
+
+    /// A replica whose verifier also asks `revocation` about people, as the
+    /// server's in-process issuer does.
+    async fn revocable(
+        db: &PgPool,
+        idp: &TestIdp,
+        tweak: impl FnOnce(&mut ChangesConfig),
+        revocation: Option<campbooks_kernel::auth::TokenRevocationPort>,
+    ) -> Self {
         let mut config = testing::config("postgres://test@localhost/test");
         config.auth = idp.auth_config();
         config.changes.poll_interval_ms = 200;
@@ -84,6 +96,13 @@ impl Replica {
                 .with_registry(crate::registry().expect("valid registrations")),
         )
         .with_client_directory(agents.clone());
+        let state = match revocation {
+            Some(port) => {
+                let auth = state.auth.clone().with_revocation(state.db.clone(), port);
+                state.with_auth(auth)
+            }
+            None => state,
+        };
         let operations::Composed { routes, state, .. } = operations::compose(crate::api(), state);
         let app = routes
             .fallback(|| async { campbooks_kernel::Error::NotFound })
@@ -755,6 +774,66 @@ async fn changes_the_caller_may_not_see_are_skipped_but_advance_the_cursor(db: P
         )
     );
     admin.quiet_for(Duration::from_millis(500)).await;
+}
+
+/// People's standings as a test sets them (absent: in good standing).
+#[derive(Debug, Default)]
+struct Standings(std::sync::Mutex<std::collections::HashMap<String, TokenStanding>>);
+
+impl TokenRevocation for Standings {
+    fn standing<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> StandingFuture<'a> {
+        let standing = self
+            .0
+            .lock()
+            .unwrap()
+            .get(account)
+            .copied()
+            .unwrap_or_default();
+        Box::pin(async move { Ok(Some(standing)) })
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_stream_ends_within_a_heartbeat_when_its_tokens_are_revoked(db: PgPool) {
+    let idp = TestIdp::start().await;
+    let standings = std::sync::Arc::new(Standings::default());
+    let server = Replica::revocable(
+        &db,
+        &idp,
+        |c| c.heartbeat_seconds = 1,
+        Some(standings.clone()),
+    )
+    .await;
+    let world = World { idp, db, server };
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    assert!(feed.next_event().await.is("ready"));
+
+    // Ana signs out everywhere (or is suspended): idle, the stream says
+    // `revoked` at its next heartbeat and ends.
+    standings.0.lock().unwrap().insert(
+        "ana".to_owned(),
+        TokenStanding {
+            suspended: false,
+            tokens_not_before: Some(chrono::Utc::now()),
+        },
+    );
+    // Heartbeat comments keep coming until then: bound the wait.
+    let revoked = tokio::time::timeout(Duration::from_secs(3), feed.next_event())
+        .await
+        .unwrap_or_else(|_| panic!("not revoked within a heartbeat: {}", feed.raw));
+    assert!(revoked.is("revoked"), "{revoked:?}");
+    assert!(feed.next().await.is_none(), "the stream ends");
+    let (status, body) = world
+        .server
+        .subscribe(Some(&ana), &ws, None)
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    assert_eq!(body["code"], "invalid_token");
 }
 
 #[sqlx::test(migrations = "../../migrations")]

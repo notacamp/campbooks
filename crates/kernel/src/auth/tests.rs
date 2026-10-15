@@ -1015,3 +1015,204 @@ async fn a_token_bound_to_one_workspace_never_reaches_account_wide_routes() {
     bound["workspace_id"] = "0192f1a0-0000-7000-8000-000000000001".into();
     assert_eq!(call(bound).await.status, StatusCode::NOT_FOUND);
 }
+
+// --- revocation -------------------------------------------------------------
+
+/// A revocation port the test sets: subject → standing (absent: no such
+/// account). Counts lookups; can fail like a database that is down.
+#[derive(Debug, Default)]
+struct Standings {
+    by_subject: std::sync::Mutex<std::collections::HashMap<String, TokenStanding>>,
+    asked: std::sync::atomic::AtomicUsize,
+    broken: std::sync::atomic::AtomicBool,
+}
+
+impl Standings {
+    fn set(&self, subject: &str, standing: TokenStanding) {
+        self.by_subject
+            .lock()
+            .unwrap()
+            .insert(subject.to_owned(), standing);
+    }
+
+    fn forget(&self, subject: &str) {
+        self.by_subject.lock().unwrap().remove(subject);
+    }
+
+    fn asked(&self) -> usize {
+        self.asked.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}
+
+impl TokenRevocation for Standings {
+    fn standing<'a>(&'a self, _db: &'a sqlx::PgPool, account: &'a str) -> StandingFuture<'a> {
+        self.asked.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let answer = if self.broken.load(std::sync::atomic::Ordering::SeqCst) {
+            Err(Error::internal("the database is down"))
+        } else {
+            Ok(self.by_subject.lock().unwrap().get(account).copied())
+        };
+        Box::pin(async move { answer })
+    }
+}
+
+/// A verifier trusting `idp` that asks `standings` about people.
+fn revocable(idp: &TestIdp, standings: &Arc<Standings>) -> TokenVerifier {
+    let (verifier, _) = verifier(idp);
+    verifier.with_revocation(testing::unreachable_pool(), standings.clone())
+}
+
+/// A person's token issued at `iat` (seconds).
+fn issued_at(idp: &TestIdp, iat: i64) -> String {
+    let mut claims = idp.claims("test:read");
+    claims["iat"] = iat.into();
+    idp.token(&claims)
+}
+
+#[tokio::test]
+async fn the_verifier_reads_iat_into_the_principal() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    let iat = Utc::now().timestamp() - 30;
+    let principal = verifier.verify(&issued_at(&idp, iat)).await.unwrap();
+    assert_eq!(
+        principal.issued_at,
+        chrono::DateTime::from_timestamp(iat, 0)
+    );
+    let mut claims = idp.claims("test:read");
+    claims.as_object_mut().unwrap().remove("iat");
+    let principal = verifier.verify(&idp.token(&claims)).await.unwrap();
+    assert_eq!(principal.issued_at, None);
+}
+
+#[tokio::test]
+async fn a_revoked_persons_token_gets_what_any_invalid_token_gets() {
+    let idp = TestIdp::start().await;
+    let standings = Arc::new(Standings::default());
+    let app = app(revocable(&idp, &standings));
+    let now = Utc::now().timestamp();
+    let token = issued_at(&idp, now);
+    // What a token signed by a stranger gets: the answer to match.
+    let forged = call_with(
+        &app,
+        &TestIdp::start().await.token(&idp.claims("test:read")),
+    )
+    .await;
+    forged.assert_invalid();
+    let assert_refused = |reply: Reply| {
+        reply.assert_invalid();
+        assert_eq!(reply.json, forged.json, "nothing says why");
+        assert_eq!(reply.challenge(), forged.challenge());
+    };
+
+    // No such account.
+    assert_refused(call_with(&app, &token).await);
+    // An account in good standing.
+    standings.set("test-user", TokenStanding::default());
+    assert_eq!(call_with(&app, &token).await.status, StatusCode::OK);
+    // Suspended.
+    standings.set(
+        "test-user",
+        TokenStanding {
+            suspended: true,
+            tokens_not_before: None,
+        },
+    );
+    assert_refused(call_with(&app, &token).await);
+    // Revoked in the second the token was issued, or later: refused.
+    for epoch in [now, now + 5] {
+        standings.set(
+            "test-user",
+            TokenStanding {
+                suspended: false,
+                tokens_not_before: chrono::DateTime::from_timestamp(epoch, 999_000_000),
+            },
+        );
+        assert_refused(call_with(&app, &token).await);
+    }
+    // Revoked in an earlier second: the token is newer and stands.
+    standings.set(
+        "test-user",
+        TokenStanding {
+            suspended: false,
+            tokens_not_before: chrono::DateTime::from_timestamp(now - 1, 999_000_000),
+        },
+    );
+    assert_eq!(call_with(&app, &token).await.status, StatusCode::OK);
+    // A token that says nothing of when it was issued stands for nobody.
+    let mut claims = idp.claims("test:read");
+    claims.as_object_mut().unwrap().remove("iat");
+    assert_refused(call_with(&app, &idp.token(&claims)).await);
+    standings.forget("test-user");
+    assert_refused(call_with(&app, &token).await);
+}
+
+#[tokio::test]
+async fn clients_are_never_looked_up() {
+    let idp = TestIdp::start().await;
+    let standings = Arc::new(Standings::default());
+    let app = app(revocable(&idp, &standings));
+    let mut claims = idp.claims("test:read");
+    claims.as_object_mut().unwrap().remove("sub");
+    claims["azp"] = "acme-sync".into();
+    let reply = call_with(&app, &idp.token(&claims)).await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.json);
+    assert_eq!(reply.json["kind"], "Client");
+    assert_eq!(standings.asked(), 0);
+}
+
+#[tokio::test]
+async fn without_a_revocation_port_nothing_is_looked_up() {
+    let idp = TestIdp::start().await;
+    let (verifier, _) = verifier(&idp);
+    // Even a token without `iat`, as an outside provider may issue.
+    let mut claims = idp.claims("test:read");
+    claims.as_object_mut().unwrap().remove("iat");
+    let principal = verifier.verify(&idp.token(&claims)).await.unwrap();
+    assert!(verifier.still_stands(&principal).await.unwrap());
+    assert_eq!(
+        call_with(&app(verifier), &idp.token(&claims)).await.status,
+        StatusCode::OK
+    );
+}
+
+#[tokio::test]
+async fn a_failing_lookup_fails_closed() {
+    let idp = TestIdp::start().await;
+    let standings = Arc::new(Standings::default());
+    standings.set("test-user", TokenStanding::default());
+    standings
+        .broken
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    let verifier = revocable(&idp, &standings);
+    let token = issued_at(&idp, Utc::now().timestamp());
+    assert!(verifier.verify(&token).await.is_err());
+    let reply = call_with(&app(verifier), &token).await;
+    assert_eq!(
+        reply.status,
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "{}",
+        reply.json
+    );
+}
+
+#[tokio::test]
+async fn still_stands_asks_again() {
+    let idp = TestIdp::start().await;
+    let standings = Arc::new(Standings::default());
+    standings.set("test-user", TokenStanding::default());
+    let verifier = revocable(&idp, &standings);
+    let principal = verifier
+        .verify(&issued_at(&idp, Utc::now().timestamp() - 10))
+        .await
+        .unwrap();
+    assert!(verifier.still_stands(&principal).await.unwrap());
+    standings.set(
+        "test-user",
+        TokenStanding {
+            suspended: false,
+            tokens_not_before: Some(Utc::now()),
+        },
+    );
+    assert!(!verifier.still_stands(&principal).await.unwrap());
+}
