@@ -23,7 +23,7 @@
 //!   (`/.well-known/*`, `/oauth2/*`, `/auth/*`), which serve browsers and
 //!   OAuth clients and are mounted by the server next to the web BFF.
 //!
-//! While another identity provider is configured (Rauthy, until slice S5),
+//! While another identity provider is configured (an outside OIDC issuer),
 //! the issuer does not run and both answer 404.
 
 #![forbid(unsafe_code)]
@@ -32,6 +32,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod client_directory;
 mod consent;
 pub mod deps;
 pub mod domain;
@@ -40,11 +41,13 @@ mod features;
 pub mod metadata;
 pub mod protocol;
 mod prune;
+mod resources;
 pub mod scopes;
 pub mod upstream;
 mod web;
 pub mod webauthn;
 
+pub use client_directory::client_directory;
 pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
@@ -63,20 +66,31 @@ pub fn module(deps: Deps) -> Module {
         name: NAME,
         scopes: scopes::ALL,
         router: router().layer(Extension(deps)),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new()
+                .routes(routes!(features::admin_get_account::handler))
+                .routes(routes!(features::admin_list_accounts::handler))
+                .routes(routes!(features::admin_suspend_account::handler))
+                .routes(routes!(features::admin_unsuspend_account::handler)),
+        ),
         background: Background::new()
             .publishes::<events::AccountCreated>()
             .publishes::<events::SignedIn>()
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::SignedOutEverywhere>()
+            .publishes::<events::AccountSuspended>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
+            .consumer(features::forget_connected_way_in::ForgetConnectedWayIn)
             .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
+        resources: resources::resources(),
     }
 }
 
@@ -89,6 +103,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::sign_out_everywhere::handler))
         .routes(routes!(features::list_consents::handler))
         .routes(routes!(features::revoke_consent::handler))
         .routes(routes!(
@@ -119,9 +134,13 @@ fn passkey_routes() -> OpenApiRouter<AppState> {
 }
 
 #[cfg(test)]
+mod admin_testkit;
+#[cfg(test)]
 mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;
+#[cfg(test)]
+mod suspension_tests;
 #[cfg(test)]
 mod testkit;
 #[cfg(test)]

@@ -11,6 +11,7 @@ import {
   Chip,
   ChipRow,
   FocusPage,
+  IconButton,
   initialsOf,
   NavItem,
   PhoneHeader,
@@ -26,6 +27,7 @@ import {
   WorkspaceMenu,
   WorkspaceSwitcher,
 } from "~/lib/ui";
+import { useAttentionCount } from "~/modules/attention";
 import { StreamNav, streamPath } from "~/modules/conversations";
 import { useWorkspaces, type Workspace } from "~/modules/workspaces";
 
@@ -122,6 +124,7 @@ const SETTINGS_SECTIONS = [
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
   const { t } = useTranslation();
   const { t: tNav } = useTranslation("shortcuts");
+  const { t: tSearch } = useTranslation("search");
   const { t: tWorkspaces } = useTranslation("workspaces");
   const navigate = useNavigate();
   const { pathname } = useLocation();
@@ -146,8 +149,11 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const appsPath = `${base}/settings/apps`;
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
-  const atHome = !inSettings && !inInbox;
+  const inSearch = pathname.startsWith(`${base}/search`);
+  const atHome = !inSettings && !inInbox && !inSearch;
+  const needsYou = useAttentionCount(workspace.id);
   const inboxPath = streamPath(workspace.id, "primary");
+  const searchPath = `${base}/search`;
   const openStream = /\/inbox\/(primary|updates|receipts|newsletters)\b/u.exec(pathname)?.[1] as
     "primary" | "updates" | "receipts" | "newsletters" | undefined;
 
@@ -194,6 +200,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             onClick={openSwitcher}
           />
           <Spacer />
+          <IconButton
+            size="lg"
+            icon="search"
+            label={tSearch("shortcuts.open")}
+            shortcut="search.open"
+            onClick={() => {
+              void navigate({ to: searchPath });
+            }}
+          />
           <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
         </PhoneHeader>
         {inSettings ? (
@@ -221,10 +236,20 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             }}
           />
           <NavItem
+            label={tSearch("shortcuts.open")}
+            icon="search"
+            shortcut="search.open"
+            current={inSearch}
+            onClick={() => {
+              registry.run("search.open");
+            }}
+          />
+          <NavItem
             label={tNav("nav.home")}
             icon="home"
             shortcut="nav.home"
             current={atHome}
+            count={needsYou}
             {...link(base)}
           />
           <NavItem
@@ -272,7 +297,14 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
       <TabBar
         phoneOnly
         items={[
-          { id: "home", label: tNav("nav.home"), icon: "home", current: atHome, ...link(base) },
+          {
+            id: "home",
+            label: tNav("nav.home"),
+            icon: "home",
+            current: atHome,
+            ...(needsYou === undefined ? {} : { badge: needsYou }),
+            ...link(base),
+          },
           {
             id: "inbox",
             label: tNav("nav.inbox"),

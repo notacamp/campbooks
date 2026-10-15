@@ -1,0 +1,49 @@
+{
+  "title": "What needs you",
+  "hero": {
+    "count_one": "{{count}} thing needs you",
+    "count_other": "{{count}} things need you",
+    "subline": "Campbooks reads your mail and keeps here what asks something of you.",
+    "clear": "Nothing needs you",
+    "clearSubline": "Nothing in your mail asks anything of you right now. Campbooks keeps reading."
+  },
+  "groups": {
+    "review": "Review",
+    "reply": "Reply",
+    "decide": "Decide",
+    "do": "Do",
+    "pay": "Pay"
+  },
+  "context": "Done today and keys",
+  "doneTodayTitle": "Done today",
+  "doneTodayEmpty": "Nothing yet today.",
+  "doneToday": {
+    "done": "Done · {{subject}}",
+    "notNeeded": "Not needed · {{subject}}",
+    "replied": "Replied · {{subject}}",
+    "archived": "Archived · {{subject}}",
+    "later": "Later · {{subject}}",
+    "gone": "No longer needed · {{subject}}"
+  },
+  "later": {
+    "title": "Bring it back",
+    "today": "Later today",
+    "tomorrow": "Tomorrow",
+    "monday": "Monday",
+    "toast": "Later · {{name}}, back {{when}}",
+    "button": "Later",
+    "failed": "Could not put {{name}} off: nothing changed. Try again."
+  },
+  "actions": {
+    "reply": "Reply",
+    "open": "Open conversation",
+    "undo": "Undo"
+  },
+  "keyboard": "Keyboard",
+  "error": {
+    "title": "Could not load what needs you",
+    "body": "Campbooks could not reach the server. Nothing was lost.",
+    "retry": "Try again"
+  },
+  "noSubject": "(no subject)"
+}

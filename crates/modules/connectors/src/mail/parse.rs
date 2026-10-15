@@ -4,6 +4,7 @@
 use chrono::{DateTime, Utc};
 use mail_parser::{Address as MimeAddress, HeaderValue, MessageParser, MimeHeaders as _};
 
+use super::Receiver;
 use crate::contract::{Address, Headers};
 
 /// A raw message, parsed.
@@ -43,9 +44,10 @@ pub const MAX_CONTENT_ID_CHARS: usize = 255;
 /// reserved `.invalid` domain: never a real address).
 pub const UNKNOWN_SENDER: &str = "unknown@sender.invalid";
 
-/// Parse `raw` (RFC 5322). Unparseable input yields an empty message from
-/// [`UNKNOWN_SENDER`] rather than an error: Gmail accepted it, so it exists.
-pub fn parse(raw: &[u8]) -> Parsed {
+/// Parse `raw` (RFC 5322), received by `receiver`. Unparseable input yields
+/// an empty message from [`UNKNOWN_SENDER`] rather than an error: the
+/// provider accepted it, so it exists.
+pub fn parse(raw: &[u8], receiver: Receiver) -> Parsed {
     let Some(message) = MessageParser::default().parse(raw) else {
         return Parsed {
             rfc_message_id: None,
@@ -114,6 +116,7 @@ pub fn parse(raw: &[u8]) -> Parsed {
             list_unsubscribe: raw_header(&message, "List-Unsubscribe"),
             precedence: raw_header(&message, "Precedence"),
             auto_submitted: raw_header(&message, "Auto-Submitted"),
+            authentication_results: authentication_results(&message, receiver),
         },
         text: message.body_text(0).map(std::borrow::Cow::into_owned),
         html,
@@ -165,7 +168,10 @@ fn strip_angles(id: &str) -> String {
 
 /// A header's value as sent, unfolded and trimmed.
 fn raw_header(message: &mail_parser::Message<'_>, name: &str) -> Option<String> {
-    let value = message.header_raw(name)?;
+    unfold(message.header_raw(name)?)
+}
+
+fn unfold(value: &str) -> Option<String> {
     let unfolded = value
         .split(['\r', '\n'])
         .map(str::trim)
@@ -173,6 +179,39 @@ fn raw_header(message: &mail_parser::Message<'_>, name: &str) -> Option<String> 
         .collect::<Vec<_>>()
         .join(" ");
     (!unfolded.is_empty()).then_some(unfolded)
+}
+
+/// The receiving provider's own `Authentication-Results`: the topmost one
+/// (each hop adds its own above the others), kept only when its authserv-id
+/// is `receiver`'s. A sender can write any such header into a message, but
+/// not above the one its receiver adds; anything else is no result.
+fn authentication_results(
+    message: &mail_parser::Message<'_>,
+    receiver: Receiver,
+) -> Option<String> {
+    // Every header, in order, raw: one that is not UTF-8 is still the
+    // topmost, and makes the results absent rather than letting the next one
+    // down take its place.
+    let topmost = message.headers().iter().find(|header| {
+        header
+            .name
+            .as_str()
+            .eq_ignore_ascii_case("Authentication-Results")
+    })?;
+    let bytes = message
+        .raw_message()
+        .get(topmost.offset_start as usize..topmost.offset_end as usize)?;
+    let value = unfold(std::str::from_utf8(bytes).ok()?)?;
+    let authserv_id = value
+        .split(';')
+        .next()?
+        .split_whitespace()
+        .next()?
+        .to_ascii_lowercase();
+    receiver
+        .authserv_ids()
+        .contains(&authserv_id.as_str())
+        .then_some(value)
 }
 
 #[cfg(test)]
@@ -215,7 +254,7 @@ mod tests {
             "JVBERi0xLjQK\r\n",
             "--b1--\r\n",
         );
-        let parsed = parse(raw.as_bytes());
+        let parsed = parse(raw.as_bytes(), Receiver::Gmail);
         assert_eq!(
             parsed.from,
             Address {
@@ -279,7 +318,7 @@ mod tests {
             "iVBORw0KGgo=\r\n",
             "--r1--\r\n",
         );
-        let parsed = parse(raw.as_bytes());
+        let parsed = parse(raw.as_bytes(), Receiver::Gmail);
         assert_eq!(parsed.attachments.len(), 1);
         let logo = &parsed.attachments[0];
         assert!(logo.inline);
@@ -289,17 +328,109 @@ mod tests {
             "logo@example.com>",
             &format!("{}@example.com>", "x".repeat(300)),
         );
-        assert_eq!(parse(long.as_bytes()).attachments[0].content_id, None);
+        assert_eq!(
+            parse(long.as_bytes(), Receiver::Gmail).attachments[0].content_id,
+            None
+        );
         assert_eq!(logo.content_type, "image/png");
     }
 
     #[test]
     fn plain_text_only_has_no_html_and_garbage_still_parses() {
-        let parsed = parse(b"From: a@example.com\r\nSubject: Hi\r\n\r\nJust text.\r\n");
+        let parsed = parse(
+            b"From: a@example.com\r\nSubject: Hi\r\n\r\nJust text.\r\n",
+            Receiver::Gmail,
+        );
         assert_eq!(parsed.text.as_deref().map(str::trim), Some("Just text."));
         assert!(parsed.html.is_none());
         assert!(parsed.sent_at.is_none());
-        let empty = parse(b"");
+        let empty = parse(b"", Receiver::Gmail);
         assert_eq!(empty.from.address, UNKNOWN_SENDER);
+    }
+
+    fn with_results(results: &[&str]) -> String {
+        let mut raw = String::new();
+        for value in results {
+            raw.push_str("Authentication-Results: ");
+            raw.push_str(value);
+            raw.push_str("\r\n");
+        }
+        raw.push_str(concat!(
+            "From: GitHub <noreply@github.com>\r\n",
+            "To: sam@example.com\r\n",
+            "Subject: [example-org/demo-shop] Security alert\r\n",
+            "\r\n",
+            "Dependabot found a vulnerability.\r\n",
+        ));
+        raw
+    }
+
+    const GMAIL_PASS: &str = "mx.google.com;\r\n       dkim=pass header.i=@github.com header.s=pf2023;\r\n       \
+                              dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com";
+
+    #[test]
+    fn the_receivers_own_authentication_results_are_kept_unfolded() {
+        let parsed = parse(with_results(&[GMAIL_PASS]).as_bytes(), Receiver::Gmail);
+        assert_eq!(
+            parsed.headers.authentication_results.as_deref(),
+            Some(
+                "mx.google.com; dkim=pass header.i=@github.com header.s=pf2023; \
+                 dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com"
+            )
+        );
+    }
+
+    #[test]
+    fn results_a_sender_wrote_are_not_trusted() {
+        // Another server's results on top: not the receiver's own.
+        let forged_on_top = with_results(&[
+            "mail.attacker.example; dmarc=pass header.from=github.com",
+            GMAIL_PASS,
+        ]);
+        assert_eq!(
+            parse(forged_on_top.as_bytes(), Receiver::Gmail)
+                .headers
+                .authentication_results,
+            None
+        );
+        // Gmail's id read by a Zoho mailbox: written by someone else.
+        assert_eq!(
+            parse(with_results(&[GMAIL_PASS]).as_bytes(), Receiver::Zoho)
+                .headers
+                .authentication_results,
+            None
+        );
+        // No results at all.
+        assert_eq!(
+            parse(with_results(&[]).as_bytes(), Receiver::Gmail)
+                .headers
+                .authentication_results,
+            None
+        );
+    }
+
+    #[test]
+    fn a_zoho_mailbox_trusts_no_results_yet() {
+        // Until a real Zoho message shows which header Zoho adds, a header
+        // naming Zoho's servers may be one the sender wrote.
+        let raw = with_results(&[
+            "mx.zohomail.com; dkim=pass; spf=pass; dmarc=pass header.from=github.com",
+        ]);
+        assert_eq!(
+            parse(raw.as_bytes(), Receiver::Zoho)
+                .headers
+                .authentication_results,
+            None
+        );
+    }
+
+    #[test]
+    fn a_topmost_header_that_is_not_utf8_means_no_results() {
+        let mut raw = b"Authentication-Results: mx.google.com; dmarc=pass \xff\r\n".to_vec();
+        raw.extend_from_slice(with_results(&[GMAIL_PASS]).as_bytes());
+        assert_eq!(
+            parse(&raw, Receiver::Gmail).headers.authentication_results,
+            None
+        );
     }
 }

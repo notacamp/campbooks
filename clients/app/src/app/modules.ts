@@ -4,20 +4,39 @@
 import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
-import { buildConnectorsRoutes, CONNECTORS_SHORTCUTS } from "~/modules/connectors";
+import {
+  buildConnectorsRoutes,
+  CONNECTORS_SHORTCUTS,
+  WorkspaceConnectionsAdmin,
+} from "~/modules/connectors";
 import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
   CONVERSATIONS_SHORTCUTS,
 } from "~/modules/conversations";
 import {
+  AccountAdminPanel,
   buildIdentityRoutes,
   IDENTITY_SHORTCUTS,
   MailboxStep,
+  SuspendedAccounts,
   useMailboxConsent,
 } from "~/modules/identity";
-import { buildSystemAdminRoutes, buildSystemRoutes, SYSTEM_ADMIN_SECTION } from "~/modules/system";
-import { buildWorkspacesRoutes, WORKSPACES_SHORTCUTS } from "~/modules/workspaces";
+import { buildSearchRoutes, SEARCH_SHORTCUTS } from "~/modules/search";
+import {
+  buildSystemAdminRoutes,
+  buildSystemRoutes,
+  JOBS_ADMIN_SECTION,
+  SYSTEM_ADMIN_SECTION,
+} from "~/modules/system";
+import {
+  buildWorkspacesAdminRoutes,
+  buildWorkspacesRoutes,
+  PEOPLE_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
+  WORKSPACES_ADMIN_SECTION,
+  WORKSPACES_SHORTCUTS,
+} from "~/modules/workspaces";
 
 export interface ModuleRouteParents<
   TPublic extends AnyRoute,
@@ -51,6 +70,7 @@ export function buildModuleRoutes<
       ...workspaces.workspace,
       ...identity.workspace,
       ...buildConversationsRoutes(workspace),
+      ...buildSearchRoutes(workspace),
       // `identity` is the front door for connecting a mailbox (as on the server).
       ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
       // `cargo xtask new-module` inserts above this line.
@@ -64,17 +84,32 @@ export function buildModuleRoutes<
  * module contributes its own admin operations.
  */
 export function buildModuleAdminRoutes<TAdmin extends AnyRoute>(admin: TAdmin) {
-  return [...buildSystemAdminRoutes(admin)] as const;
+  return [
+    ...buildSystemAdminRoutes(admin),
+    // People and Workspaces show identity's account and connectors' health.
+    ...buildWorkspacesAdminRoutes(admin, {
+      AccountPanel: AccountAdminPanel,
+      AccountStandings: SuspendedAccounts,
+      ConnectionsPanel: WorkspaceConnectionsAdmin,
+    }),
+  ] as const;
 }
 
 /** The admin sidebar, one entry per module panel (named `admin.sections.<id>`). */
-export const ADMIN_SECTIONS = [SYSTEM_ADMIN_SECTION] as const;
+export const ADMIN_SECTIONS = [
+  SYSTEM_ADMIN_SECTION,
+  PEOPLE_ADMIN_SECTION,
+  WORKSPACES_ADMIN_SECTION,
+  SIGNUPS_ADMIN_SECTION,
+  JOBS_ADMIN_SECTION,
+] as const;
 
 /** Shortcuts modules define for their operations (keyed by operationId, ADR 0013). */
 export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...WORKSPACES_SHORTCUTS,
   ...CONVERSATIONS_SHORTCUTS,
   ...COMPOSE_SHORTCUTS,
+  ...SEARCH_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
   ...CONNECTORS_SHORTCUTS,
 ];

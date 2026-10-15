@@ -20,7 +20,7 @@ use crate::{
 
 const SETTINGS: &str = "/w/ws/settings/sign-in";
 
-fn user(subject: &str) -> TestUser {
+pub(crate) fn user(subject: &str) -> TestUser {
     TestUser {
         subject: subject.to_owned(),
         name: "Sam Rivera".to_owned(),
@@ -37,7 +37,7 @@ async fn count(kit: &Kit, sql: &'static str) -> i64 {
 
 /// Start a `link` to `provider` and follow it to the provider: the
 /// authorization request the browser is sent to.
-async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
+pub(crate) async fn link_to(kit: &Kit, access: &str, provider: Provider) -> String {
     let started = kit
         .start_link(
             access,
@@ -78,6 +78,7 @@ async fn a_person_adds_zoho_as_a_way_in_then_signs_in_with_it(db: PgPool) {
         .map(|w| w["provider"].as_str().unwrap())
         .collect();
     assert_eq!(providers, ["google", "zoho"]);
+    assert_eq!(ways["items"][0]["linked_via"], "sign_up");
     assert_eq!(ways["items"][1]["linked_via"], "link");
     assert_eq!(ways["items"][1]["email"], "zoho-sam@example.com");
     assert_eq!(ways["providers"], json!(["google", "microsoft", "zoho"]));
@@ -386,17 +387,15 @@ async fn a_shared_mailbox_is_connected_without_becoming_a_way_in(db: PgPool) {
         kit.via(Provider::Google, &to_google.location()).await
     };
 
-    // Unticked for the account you signed up with: it still is yours.
+    // Unticked for the account you signed up with: still connected.
     let back = connect(&kit).await;
     assert_eq!(back.location(), "/w/ws?connected=connection-1");
-    assert_eq!(kit.intake.signs_in(), [true]);
 
     // A shared mailbox: connected, never a way in, nothing announced.
     kit.google.set_user(user("support"));
     let back = connect(&kit).await;
-    assert_eq!(back.location(), "/w/ws?connected=connection-1");
+    assert_eq!(back.location(), "/w/ws?connected=connection-2");
     assert_eq!(kit.intake.adopted()[1].2, "support@example.com");
-    assert_eq!(kit.intake.signs_in(), [true, false]);
     let ways = kit.ways_in(&access).await;
     assert_eq!(ways["items"].as_array().unwrap().len(), 1);
     assert_eq!(

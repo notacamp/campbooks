@@ -6,6 +6,7 @@ use campbooks_kernel::{AppState, Result, db::BeginFor as _, tenancy::Access};
 use super::{
     access::lock_conversation,
     conversation::{Changed, ConversationSummary, request, summary},
+    needs::{self, NeedSettings},
 };
 use crate::{
     events::{Change, Origin, RequestedChange},
@@ -51,16 +52,18 @@ impl Flag {
 }
 
 /// Apply `flag` to conversation `id` for `access`; announce it when anything
-/// changed. Returns the conversation afterwards. Applying it twice is a
-/// no-op the second time.
+/// changed, and work out its need again when given `needs` (archiving
+/// clears Reply and Review). Returns the conversation afterwards. Applying
+/// it twice is a no-op the second time.
 pub async fn apply(
     state: &AppState,
     access: &Access,
     id: ConversationId,
     flag: Flag,
+    needs: Option<&NeedSettings>,
 ) -> Result<ConversationSummary> {
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = lock_conversation(&mut tx, access, id).await?;
+    let inbox = lock_conversation(state, &mut tx, access, id).await?;
     let changed = match flag {
         Flag::Read => {
             sqlx::query_scalar!(
@@ -136,6 +139,16 @@ pub async fn apply(
         };
         request(&state.events, &mut tx, &changed, &flag.requested()).await?;
         changed.publish(&state.events, &mut tx).await?;
+        if let Some(needs) = needs {
+            needs::refresh(
+                &mut tx,
+                &state.events,
+                &access.workspace.to_string(),
+                id,
+                needs,
+            )
+            .await?;
+        }
     }
     let summary = summary(&mut tx, id).await?;
     tx.commit().await?;

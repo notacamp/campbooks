@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT DISTINCT container_type, container_id FROM attention.items WHERE workspace_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "container_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_type"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "container_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "attention.items",
+            "name": "container_id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "54bfa70f2d2a8e4bb1438fc2b6c265bcd84726c430574bdb019fac2069b95fc7"
+}

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://campbooks.example.com/contracts/connectors.connection_removed.v1.schema.json",
+  "title": "connectors.connection_removed v1 (event payload)",
+  "description": "Published by the connectors module when a connection is disconnected (by the member who connected it, when that member leaves the workspace, or when the workspace is deleted): its grant is revoked and its streams are gone. `mail` tells the conversations module what becomes of the inboxes it fed: deleted (the default, also when absent) or kept read-only. Ids only. Workspace-scoped.",
+  "type": "object",
+  "required": [
+    "workspace",
+    "connection",
+    "inbox_ids"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "workspace": {
+      "type": "string"
+    },
+    "connection": {
+      "$ref": "#/$defs/uuid"
+    },
+    "inbox_ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/uuid"
+      },
+      "description": "The inboxes the connection's streams fed (minted by the connectors module, owned by conversations)."
+    },
+    "granted_by": {
+      "$ref": "#/$defs/uuid",
+      "description": "The member who had connected it (a user id of the workspaces module)."
+    },
+    "provider": {
+      "enum": [
+        "google",
+        "zoho"
+      ],
+      "description": "Its provider."
+    },
+    "account_subject": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The provider's stable id of the account (OpenID `sub`; opaque, never an address), so the identity module can drop a way in that came only from this connection."
+    },
+    "mail": {
+      "enum": [
+        "delete",
+        "keep"
+      ],
+      "description": "`delete`: delete the inboxes with their messages, conversations, drafts, decisions, search entries, files and memberships. `keep`: keep them read-only, no longer synced, memberships kept. Absent means `delete`."
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

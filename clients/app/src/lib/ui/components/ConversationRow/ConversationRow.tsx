@@ -14,8 +14,9 @@ export interface ConversationRowProps {
   time: string;
   /** ISO timestamp for the <time> element. */
   dateTime?: string | undefined;
-  subject: string;
-  snippet: string;
+  /** Text, or a {@link Highlight} of it when the row is a search hit. */
+  subject: ReactNode;
+  snippet: ReactNode;
   unread?: boolean | undefined;
   starred?: boolean | undefined;
   /** Messages in the conversation; shown from 2. */
@@ -24,12 +25,19 @@ export interface ConversationRowProps {
   attachment?: boolean | undefined;
   /** A line under the snippet: the assistant's suggestion ("Scout suggests Newsletters"). */
   suggestion?: ReactNode | undefined;
+  /** What it needs from you, as {@link Pill}s and {@link Tag}s ("Needs a reply", "Due Thu"). */
+  chips?: ReactNode | undefined;
   /** The conversation open in the reader. */
   current?: boolean | undefined;
   /** The keyboard cursor (J/K) is on it. */
   selected?: boolean | undefined;
   /** Element id, so the list can scroll the cursor into view. */
   id?: string | undefined;
+  /**
+   * An option of a listbox (the search overlay): focus stays in the field,
+   * so the row leaves the tab order and `selected` becomes `aria-selected`.
+   */
+  option?: boolean | undefined;
   onSelect: () => void;
 }
 
@@ -46,9 +54,11 @@ export function ConversationRow({
   count,
   attachment = false,
   suggestion,
+  chips,
   current = false,
   selected = false,
   id,
+  option = false,
   onSelect,
 }: ConversationRowProps) {
   const { t } = useTranslation("ui");
@@ -56,6 +66,9 @@ export function ConversationRow({
     <button
       type="button"
       id={id}
+      role={option ? "option" : undefined}
+      tabIndex={option ? -1 : undefined}
+      aria-selected={option ? selected : undefined}
       className={styles["row"]}
       data-unread={unread || undefined}
       data-selected={selected || undefined}
@@ -87,6 +100,7 @@ export function ConversationRow({
       </span>{" "}
       <span className={styles["subject"]}>{subject}</span>{" "}
       <span className={styles["snippet"]}>{snippet}</span>
+      {chips === undefined ? null : <span className={styles["chips"]}>{chips}</span>}
       {suggestion === undefined ? null : <span className={styles["suggestion"]}>{suggestion}</span>}
     </button>
   );

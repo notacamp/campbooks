@@ -1,9 +1,6 @@
 //! Reading connections, who may see them, and how the API shows them.
 
-use campbooks_kernel::{
-    Result,
-    tenancy::{Access, UserId},
-};
+use campbooks_kernel::{Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
 
@@ -26,19 +23,6 @@ pub struct Connection {
     pub health_reason: Option<String>,
     pub health_changed_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
-    pub grantor_signs_in: bool,
-}
-
-/// Whether the caller of `access` may see a connection granted by
-/// `granted_by`: its grantor, owners and admins, and client tokens of the
-/// workspace.
-pub fn visible(access: &Access, granted_by: UserId) -> bool {
-    match (access.user, access.role) {
-        (None, _) => true,
-        (Some(user), role) => {
-            user == granted_by || role.is_some_and(campbooks_kernel::tenancy::Role::can_manage)
-        }
-    }
 }
 
 /// The connection `id` of the transaction's workspace.
@@ -56,7 +40,7 @@ async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec
     let rows = sqlx::query!(
         r#"SELECT id AS "id: ConnectionId", provider, address, address_verified, display_name,
                   granted_by AS "granted_by: UserId", capabilities, health, health_reason,
-                  health_changed_at, created_at, grantor_signs_in
+                  health_changed_at, created_at
              FROM connectors.connections
             WHERE $1::uuid IS NULL OR id = $1
             ORDER BY created_at, id"#,
@@ -78,7 +62,6 @@ async fn select(conn: &mut PgConnection, id: Option<ConnectionId>) -> Result<Vec
                 health_reason: row.health_reason,
                 health_changed_at: row.health_changed_at,
                 created_at: row.created_at,
-                grantor_signs_in: row.grantor_signs_in,
             })
         })
         .collect()
@@ -129,7 +112,6 @@ pub async fn view(
         health: connection.health,
         health_reason: connection.health_reason,
         health_changed_at: connection.health_changed_at,
-        grantor_signs_in: connection.grantor_signs_in,
         streams,
         created_at: connection.created_at,
     })
@@ -144,27 +126,4 @@ pub fn parse_capabilities(values: &[String]) -> Result<Vec<Capability>> {
     capabilities.sort_unstable();
     capabilities.dedup();
     Ok(capabilities)
-}
-
-#[cfg(test)]
-mod tests {
-    use campbooks_kernel::tenancy::{Role, WorkspaceId};
-
-    use super::*;
-
-    #[test]
-    fn grantor_admins_and_clients_see_a_connection() {
-        let grantor = UserId::new();
-        let other = UserId::new();
-        let access = |user: Option<UserId>, role: Option<Role>| Access {
-            workspace: WorkspaceId::new(),
-            user,
-            role,
-        };
-        assert!(visible(&access(Some(grantor), Some(Role::Member)), grantor));
-        assert!(!visible(&access(Some(other), Some(Role::Member)), grantor));
-        assert!(visible(&access(Some(other), Some(Role::Admin)), grantor));
-        assert!(visible(&access(Some(other), Some(Role::Owner)), grantor));
-        assert!(visible(&access(None, None), grantor));
-    }
 }

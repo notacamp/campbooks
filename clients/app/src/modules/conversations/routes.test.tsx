@@ -110,16 +110,38 @@ describe("the inbox", () => {
     expect(folded.length).toBeGreaterThanOrEqual(2);
     fireEvent.click(within(reader).getByRole("button", { name: /Sam Rivera/u }));
     expect(await within(reader).findByText(/Is the timeline fixed\?/u)).toBeVisible();
-    // The note says what the decide pass thinks, as suggestions, with why.
+    // The note says what the decide pass thinks, as suggestions; how it
+    // decided (the only place with numbers) is folded away.
     const note = within(reader).getByRole("region", { name: "Where things stand" });
     expect(note).toHaveTextContent("it needs a reply and it mentions a date to meet");
-    fireEvent.click(within(note).getByRole("button", { name: "Why?" }));
-    expect(within(note).getByText("Mentions a date: It names a date (“Friday”).")).toBeVisible();
+    expect(note).not.toHaveTextContent("%");
+    fireEvent.click(within(note).getByText("How Campbooks decided"));
+    expect(within(note).getByText("Yes. It names a date (“Friday”).")).toBeVisible();
     await waitFor(() => {
       expect(api.calls.map((call) => call.route)).toContain(
         `POST ${W}/conversations/${Q4.id}/read`,
       );
     });
+  });
+
+  it("shows a kept inbox's mail as read-only history, with nothing to act on", async () => {
+    const api = inbox({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(await within(reader).findByText("Kept as history")).toBeVisible();
+    for (const name of [/^Done/u, /^Reply/u, /^Star/u]) {
+      expect(within(reader).queryByRole("button", { name })).toBeNull();
+    }
+    fireEvent.keyDown(document, { key: "e" });
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/read`,
+    );
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/archive`,
+    );
   });
 
   it("archives with E and takes it back with Z", async () => {

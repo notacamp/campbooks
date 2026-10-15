@@ -13,7 +13,9 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::domain::model::{Capability, ConnectionId, InboxId, Provider, SendId};
+use campbooks_kernel::changes::Audience;
+
+use crate::domain::model::{Capability, ConnectionId, InboxId, MailChoice, Provider, SendId};
 
 /// The record type of a connection in the client change feed.
 pub const CONNECTION_RECORD: &str = "connectors.connection";
@@ -21,6 +23,15 @@ pub const CONNECTION_RECORD: &str = "connectors.connection";
 /// A connection, as the change feed names it (ids only).
 fn connection_record(connection: ConnectionId) -> RecordRef {
     RecordRef::new(CONNECTION_RECORD, &connection)
+}
+
+/// A connection's changes reach the members who may see it over the API:
+/// the member who connected it, owners and admins, and client tokens.
+fn connection_change(change: Change, granted_by: Option<UserId>) -> Change {
+    match granted_by {
+        Some(user) => change.for_audience(Audience::UserAndManagers(user)),
+        None => change.for_audience(Audience::Clients),
+    }
 }
 
 /// How a [`BlobRef`] looks on the wire, for the events catalogue.
@@ -58,7 +69,10 @@ impl DomainEvent for ConnectionAdded {
     }
 
     fn changes(&self) -> Vec<Change> {
-        vec![Change::upsert(connection_record(self.connection))]
+        vec![connection_change(
+            Change::upsert(connection_record(self.connection)),
+            Some(self.granted_by),
+        )]
     }
 }
 
@@ -93,7 +107,10 @@ impl DomainEvent for CapabilityGranted {
     }
 
     fn changes(&self) -> Vec<Change> {
-        vec![Change::upsert(connection_record(self.connection))]
+        vec![connection_change(
+            Change::upsert(connection_record(self.connection)),
+            Some(self.granted_by),
+        )]
     }
 }
 
@@ -140,26 +157,17 @@ impl DomainEvent for ConnectionNeedsReauth {
     }
 
     fn changes(&self) -> Vec<Change> {
-        vec![Change::upsert(connection_record(self.connection))]
+        vec![connection_change(
+            Change::upsert(connection_record(self.connection)),
+            Some(self.granted_by),
+        )]
     }
 }
 
-/// What becomes of a disconnected mailbox's mail in Campbooks. Its mail at
-/// the provider is never touched.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum MailChoice {
-    /// Delete it: messages, bodies, attachments, search index, decisions,
-    /// drafts and inbox memberships (the default).
-    #[default]
-    Delete,
-    /// Keep it as read-only history.
-    Keep,
-}
-
 /// A connection was disconnected: its grant is revoked and its streams are
-/// gone. `mail` says what becomes of the inboxes it fed; their owner (the
-/// conversations module) carries it out.
+/// gone. `mail` says what becomes of the inboxes it fed
+/// (`contracts/connectors.connection_removed.v1.schema.json`): the
+/// conversations module deletes them, or keeps them read-only.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConnectionRemoved {
     /// The workspace.
@@ -168,8 +176,18 @@ pub struct ConnectionRemoved {
     pub connection: ConnectionId,
     /// The inboxes its streams fed.
     pub inbox_ids: Vec<InboxId>,
-    /// Delete their mail or keep it read-only. Absent in events recorded
-    /// before the choice existed, which read as `delete`.
+    /// The member who had connected it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub granted_by: Option<UserId>,
+    /// Its provider.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<Provider>,
+    /// The provider's stable id of the account (the `OpenID` `sub`; opaque, never
+    /// an address), so a way in that came only from this connection can be
+    /// dropped with it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_subject: Option<String>,
+    /// Delete the mail it brought in (the default), or keep it read-only.
     #[serde(default)]
     pub mail: MailChoice,
 }
@@ -183,7 +201,10 @@ impl DomainEvent for ConnectionRemoved {
     }
 
     fn changes(&self) -> Vec<Change> {
-        vec![Change::delete(connection_record(self.connection))]
+        vec![connection_change(
+            Change::delete(connection_record(self.connection)),
+            self.granted_by,
+        )]
     }
 }
 
@@ -283,6 +304,10 @@ pub struct MemberLeft {
     pub workspace: String,
     /// The former member.
     pub user: UserId,
+    /// What becomes of the mail of the connections they made: an owner or
+    /// admin removing them may keep it; otherwise it is deleted.
+    #[serde(default)]
+    pub mail: MailChoice,
 }
 
 impl DomainEvent for MemberLeft {

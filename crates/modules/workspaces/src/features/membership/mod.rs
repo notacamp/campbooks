@@ -8,11 +8,11 @@ use campbooks_kernel::{
     auth::{Principal, PrincipalKind},
     db::BeginFor as _,
     tenancy::{
-        Access, Membership, MembershipFuture, MembershipPort, Role, UserId, WorkspaceId,
-        WorkspaceSummary, WorkspacesFuture,
+        Access, Membership, MembershipFuture, MembershipPort, Role, RoleFuture, UserId,
+        WorkspaceId, WorkspaceSummary, WorkspacesFuture,
     },
 };
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 
 use crate::domain::db::begin_as_user;
 
@@ -111,6 +111,29 @@ impl Membership for WorkspaceMembership {
                     })
                 })
                 .collect()
+        })
+    }
+
+    fn role_held<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+    ) -> RoleFuture<'a> {
+        Box::pin(async move {
+            // `FOR SHARE`: a departure deletes the row, so it waits for the
+            // caller's transaction (and the caller sees it gone after).
+            let role = sqlx::query_scalar!(
+                r#"SELECT m.role FROM workspaces.members m
+                     JOIN workspaces.workspaces w ON w.id = m.workspace_id
+                    WHERE m.workspace_id = $1 AND m.user_id = $2 AND w.deleted_at IS NULL
+                      FOR SHARE OF m"#,
+                workspace as WorkspaceId,
+                user as UserId,
+            )
+            .fetch_optional(conn)
+            .await?;
+            role.map(|role| role.parse::<Role>()).transpose()
         })
     }
 

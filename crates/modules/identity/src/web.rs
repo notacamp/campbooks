@@ -14,6 +14,9 @@
 //!   provider's redirect.
 //! - **Sign-up** (`__Host-campbooks_signup`): ties a pending new account to
 //!   that browser; `Strict`, it is only read by same-origin requests.
+//! - **Browser** (`__Host-campbooks_browser`): ties authorization requests
+//!   to the browser that made them; `Lax`, because they start as top-level
+//!   navigations from the client's site.
 
 use axum::{
     Json,
@@ -27,6 +30,8 @@ pub const SESSION_COOKIE: &str = "__Host-campbooks_auth";
 pub const UPSTREAM_COOKIE: &str = "__Host-campbooks_upstream";
 /// The pending sign-up cookie over `https`.
 pub const SIGN_UP_COOKIE: &str = "__Host-campbooks_signup";
+/// The authorization-request binding cookie over `https`.
+pub const BROWSER_COOKIE: &str = "__Host-campbooks_browser";
 
 /// The header the sign-in screens send on every action (as the web BFF's).
 pub const CSRF_HEADER: &str = "x-campbooks-csrf";

@@ -21,6 +21,8 @@ use utoipa_axum::{router::OpenApiRouter, routes};
 mod deps;
 mod features;
 pub mod scopes;
+#[cfg(test)]
+mod testkit;
 
 pub use deps::{Deps, Facts, IdentityProvider};
 
@@ -31,6 +33,30 @@ pub const NAME: &str = "system";
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module composed with nothing (for catalogues and tests).
+/// The module's part of the access catalogue (ADR 0017).
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
+    use campbooks_kernel::authz::{Action, Grant, Grantee, ResourceType, Tenancy};
+    [
+        ResourceType {
+            grants: &[Grant::new(Grantee::Anyone, &[Action::Read])],
+            ..ResourceType::new(
+                "system.instance",
+                "The instance's health and version: public.",
+                Tenancy::Public,
+            )
+        },
+        ResourceType {
+            grants: &[Grant::new(Grantee::InstanceAdmins, &[Action::Read])],
+            ..ResourceType::new(
+                "system.admin_overview",
+                "The instance's configuration and health as administrators see it (the admin \
+                 API, `Admin<P>`): never workspace content.",
+                Tenancy::Instance,
+            )
+        },
+    ]
+};
+
 pub fn module() -> Module {
     module_with(Deps::default())
 }
@@ -46,9 +72,15 @@ pub fn module_with(deps: Deps) -> Module {
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_overview::handler))
+                .routes(routes!(features::admin_jobs::summary))
+                .routes(routes!(features::admin_jobs::failed))
+                .routes(routes!(features::admin_job_actions::retry))
+                .routes(routes!(features::admin_job_actions::discard))
+                .routes(routes!(features::admin_job_actions::retry_kind))
                 .layer(Extension(deps)),
         ),
         background: Background::new(),
+        resources: campbooks_kernel::authz::Resources::declared(&RESOURCES),
     }
 }
 

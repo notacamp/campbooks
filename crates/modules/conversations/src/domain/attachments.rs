@@ -4,6 +4,7 @@
 //! them.
 
 use axum::http::HeaderValue;
+use campbooks_kernel::text::is_displayable;
 
 /// What every type off the safe list is served as.
 pub const OCTET_STREAM: &str = "application/octet-stream";
@@ -109,21 +110,15 @@ fn essence(content_type: &str) -> String {
         .to_ascii_lowercase()
 }
 
-/// Characters that reorder text (bidirectional overrides, embeddings,
-/// isolates and marks): `invoice\u{202E}fdp.exe` would read as
-/// `invoiceexe.pdf`.
-fn is_bidi_control(c: char) -> bool {
-    matches!(c, '\u{200E}' | '\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}')
-}
-
 /// `name` made safe to offer as a file name: no path separators, control
-/// characters (C0, DEL, C1) or bidirectional controls, no leading dots or
+/// characters (C0, DEL, C1), bidirectional controls or invisible characters,
+/// no leading dots or
 /// surrounding whitespace, at most 150 characters with the extension kept,
 /// and `attachment` when nothing is left.
 pub fn safe_filename(name: &str) -> String {
     let cleaned: String = name
         .chars()
-        .filter(|c| !c.is_control() && !is_bidi_control(*c) && !matches!(c, '/' | '\\'))
+        .filter(|c| is_displayable(*c) && !matches!(c, '/' | '\\'))
         .collect();
     let trimmed = cleaned.trim().trim_start_matches('.').trim();
     if trimmed.is_empty() {

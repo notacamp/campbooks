@@ -18,6 +18,8 @@
     "passkey_already_registered": "This passkey is already a way into Campbooks.",
     "display_name_required": "Say what we should call you.",
     "passkey_name_required": "Give the passkey a name of 1 to 64 characters.",
+    "account_is_admin": "This account is an administrator. Revoke its admin profile with the server's command line first (campbooks-server admin revoke), then suspend it.",
+    "account_suspended": "An administrator of this Campbooks suspended this account. Ask them to unsuspend it.",
     "invalid_target": "This app asked for access to something Campbooks does not serve.",
     "consent_request_not_found": "This request to allow an app expired or was already answered. Start again from the app.",
     "consent_needs_workspace": "Choose the workspace this app may use.",
@@ -28,6 +30,21 @@
     "client_needs_redirect": "A sign-in app needs at least one https or loopback return address.",
     "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
     "client_is_public": "This app signs people in and has no secret to rotate.",
-    "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name."
+    "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name.",
+    "fresh_sign_in_required": "Sign in again first: adding a passkey needs a sign-in from the last five minutes.",
+    "too_many_accounts": "Ask about at most {{max}} accounts at a time.",
+    "client_name_mixed_scripts": "Use one alphabet per word in the app’s name: letters from different alphabets can pass for others."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "A new way to sign in to your Campbooks account",
+      "passkey": "A passkey",
+      "provider": "A {{provider}} account",
+      "added": "{{what}} was added as a way to sign in to your Campbooks account on {{when}}.",
+      "if_you": "If this was you, there is nothing to do.",
+      "if_not": "If it wasn’t you, open Campbooks, go to Settings → Ways to sign in, remove it, and choose Sign out everywhere.",
+      "open": "Open Campbooks",
+      "why": "Campbooks sends this to your account’s addresses whenever a way to sign in is added. It contains no tracking."
+    }
   }
 }

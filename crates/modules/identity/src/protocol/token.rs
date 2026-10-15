@@ -154,7 +154,7 @@ async fn authenticate(
     path = "/oauth2/token",
     tag = "identity",
     operation_id = "identity.token",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Write)))),
     request_body(content = TokenForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(
@@ -359,7 +359,15 @@ async fn client_credentials(
     else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
     };
-    let allowed = client.allowed_scopes.clone().unwrap_or_default();
+    // What it was given, less anything a third party may no longer hold
+    // (the rules can tighten after registration).
+    let allowed: Vec<String> = client
+        .allowed_scopes
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|scope| clients::third_party_may_hold(scope))
+        .collect();
     let scope: Vec<&str> = match requested {
         None => allowed.iter().map(String::as_str).collect(),
         Some(requested) => {
@@ -442,7 +450,7 @@ async fn refused(
     path = "/oauth2/revoke",
     tag = "identity",
     operation_id = "identity.revoke",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Delete)))),
     request_body(content = RevokeForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(

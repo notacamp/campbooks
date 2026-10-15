@@ -42,16 +42,10 @@ restore `ok`.
 - **THEN** the stream's health is `throttled`, it is next due 120 seconds later, and other streams are unaffected
 
 ### Requirement: Disconnecting
-Only the member who granted a connection SHALL be able to disconnect it;
-an owner or admin who can see another member's connection SHALL get 403
-`not_your_connection`. The caller SHALL say what becomes of its mail in
-Campbooks with `mail`: `delete` (the default) or `keep` (read-only
-history). `keep` SHALL be allowed only when the grantor signs in with the
-account (`grantor_signs_in`) or is an owner or admin, and refused otherwise
-with 403 `keep_mail_not_allowed`. The grant SHALL be revoked at the
-provider, credentials, streams and indexes deleted, and
-`connectors.connection_removed` published with the inbox ids and the
-`mail` choice, for the inboxes' owner to carry out. When a member leaves a workspace, the connections they granted
+The grantor, or an owner or admin, SHALL be able to disconnect a
+connection: the grant SHALL be revoked at the provider, credentials, streams
+and indexes deleted, and `connectors.connection_removed` published with the
+inbox ids. When a member leaves a workspace, the connections they granted
 there SHALL be disconnected the same way. When a workspace is being
 deleted, every grant SHALL be revoked and every connection deleted the same
 way at once.
@@ -59,14 +53,6 @@ way at once.
 #### Scenario: Grantor disconnects
 - **WHEN** the grantor disconnects a Google connection
 - **THEN** Google's revoke endpoint is called, the connection is gone, and `connectors.connection_removed` lists its inbox id
-
-#### Scenario: An admin cannot disconnect a member's mailbox
-- **WHEN** an admin disconnects a connection a member granted
-- **THEN** the response is 403 `not_your_connection` and nothing is revoked
-
-#### Scenario: Keeping a shared mailbox's mail
-- **WHEN** a member disconnects a shared mailbox they connected without signing in with it, asking `mail=keep`
-- **THEN** the response is 403 `keep_mail_not_allowed`; with `mail=delete` the event carries `mail` = `delete`
 
 #### Scenario: Grantor leaves the workspace
 - **WHEN** `workspaces.member_left` arrives for a member who granted a connection
@@ -620,3 +606,57 @@ empty and error states, fit 375px, and pass axe in light and dark.
 #### Scenario: A colleague's mailbox needs re-authorisation
 - **WHEN** an owner sees a member's connection with health `needs_reauth`
 - **THEN** the row names the member who must sign in again and offers no Reconnect
+
+### Requirement: Only the member who connected a mailbox disconnects it
+Disconnecting SHALL be allowed only to the member who connected the
+account. Owners and admins see it (and may sync it now), but SHALL get 403
+`disconnect_owner_only`. A client token gets 403 `connection_needs_user`.
+Who may see it stays the grantor, owners and admins, and client tokens.
+
+#### Scenario: An admin disconnects someone's mailbox
+- **WHEN** a workspace admin asks to disconnect a member's connection
+- **THEN** the answer is 403 `disconnect_owner_only` and nothing is removed
+
+### Requirement: The mail of a removed connection is deleted unless kept
+`DELETE …/connections/{id}` SHALL take `mail=delete` (the default) or
+`mail=keep`. `connectors.connection_removed` SHALL carry the choice and the
+member who had connected it
+(`contracts/connectors.connection_removed.v1.schema.json`). When a member
+leaves or is removed, their connections SHALL be removed with the choice
+made by the owner or admin who removed them (`delete` when they left on
+their own).
+
+#### Scenario: Keep on disconnect
+- **WHEN** the grantor disconnects with `mail=keep`
+- **THEN** `connectors.connection_removed` says `"mail": "keep"`
+
+### Requirement: The dispatcher only reads and leases the schedule
+A transaction that sets no workspace SHALL be able to read the scheduling
+index and lease due streams, and nothing else. It SHALL NOT be able to
+insert or delete schedule rows.
+
+#### Scenario: The policies
+- **WHEN** the database's policies are listed
+- **THEN** the only module policies admitting a transaction without a workspace are the schedule's `FOR SELECT` and `FOR UPDATE` ones
+
+### Requirement: The receiving provider's authentication results
+The mail adapters SHALL carry, with each message, the receiving provider's
+own `Authentication-Results` (RFC 8601), unfolded: the topmost such header in
+the message's own order, and only when it is valid UTF-8 and its authserv-id
+is one the provider is known to stamp (Gmail: `mx.google.com`; Zoho Mail:
+none until a real Zoho message has shown which header Zoho adds). Any other
+`Authentication-Results`, including one a sender wrote into the message,
+SHALL be dropped, and a message whose topmost one is not the provider's, or
+is not valid UTF-8, SHALL carry none.
+
+#### Scenario: Gmail's own results
+- **WHEN** a Gmail mailbox receives a message whose topmost `Authentication-Results` is `mx.google.com; dkim=pass …; dmarc=pass … header.from=github.com`
+- **THEN** the message change carries that value
+
+#### Scenario: Results a sender wrote
+- **WHEN** a message's topmost `Authentication-Results` names another server, or a Zoho mailbox receives one naming `mx.google.com` or `mx.zohomail.com`
+- **THEN** the message change carries no authentication results
+
+#### Scenario: A topmost header that is not UTF-8
+- **WHEN** the topmost `Authentication-Results` holds a byte that is not UTF-8, above Gmail's own
+- **THEN** the message change carries no authentication results

@@ -69,10 +69,18 @@ const CEREMONY_LIMIT: Limit = Limit::new("identity.passkey", 30, Duration::from_
 /// Challenges one address may hold at once: a challenge lives five minutes,
 /// so at most this many per five minutes.
 const CHALLENGE_LIMIT: Limit = Limit::new("identity.passkey_challenge", 10, Duration::from_mins(5));
-/// Accounts created with a passkey alone, instance-wide, per hour.
-const SIGN_UP_LIMIT: Limit = Limit::new("identity.passkey_sign_up", 30, Duration::from_hours(1));
+/// Accounts created with a passkey alone from one address, per hour.
+const SIGN_UP_PER_ADDRESS: Limit = Limit::new(
+    "identity.passkey_sign_up_address",
+    5,
+    Duration::from_hours(1),
+);
+/// Accounts created with a passkey alone, instance-wide, per hour: the
+/// ceiling many addresses together reach.
+pub(crate) const SIGN_UP_LIMIT: Limit =
+    Limit::new("identity.passkey_sign_up", 200, Duration::from_hours(1));
 /// The one bucket of [`SIGN_UP_LIMIT`].
-const INSTANCE: &str = "instance";
+pub(crate) const INSTANCE: &str = "instance";
 
 /// Longest request body a ceremony endpoint reads. A credential is a few
 /// kilobytes at most (an RSA-4096 key, a 1023-byte id).
@@ -119,11 +127,12 @@ fn expired() -> Error {
 }
 
 /// The waiting authorization request `request` names, checked before anything
-/// is stored: at most [`MAX_REQUEST_ID`] URL-safe characters, and known and
-/// unexpired. 404 otherwise.
+/// is stored: at most [`MAX_REQUEST_ID`] URL-safe characters, known,
+/// unexpired and this browser's. 404 otherwise.
 async fn waiting_request(
     ctx: &Ctx,
     issuer: &Issuer,
+    headers: &HeaderMap,
     request: Option<String>,
 ) -> Result<Option<String>> {
     let Some(request) = request else {
@@ -135,9 +144,14 @@ async fn waiting_request(
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
     if !well_formed
-        || authorize::load(&ctx.state.db, &request, issuer.now())
-            .await?
-            .is_none()
+        || authorize::load(
+            &ctx.state.db,
+            &request,
+            authorize::browser(issuer, headers).as_deref(),
+            issuer.now(),
+        )
+        .await?
+        .is_none()
     {
         return Err(Error::NotFound);
     }
@@ -231,7 +245,7 @@ pub struct SignInStart {
     path = "/auth/passkey/sign-in/options",
     tag = "identity",
     operation_id = "identity.start_passkey_sign_in",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body = SignInStart,
     security(()),
@@ -261,7 +275,7 @@ pub async fn sign_in_options(
     let rp = rp(issuer)?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let request = waiting_request(&ctx, issuer, body.request).await?;
+    let request = waiting_request(&ctx, issuer, &headers, body.request).await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
@@ -317,7 +331,7 @@ async fn take_ceremony(
     path = "/auth/passkey/sign-in",
     tag = "identity",
     operation_id = "identity.finish_passkey_sign_in",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body(content = AuthenticationCredential,
         description = "`PublicKeyCredential.toJSON()` of the assertion."),
@@ -327,8 +341,9 @@ async fn take_ceremony(
             headers(("set-cookie" = String))),
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, or `passkey_not_accepted` (it did \
-            not verify, or it is no longer a way into any account).",
+        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted` (it did \
+            not verify, or it is no longer a way into any account), or `account_suspended` (it \
+            verified, but an administrator suspended the account).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -379,6 +394,11 @@ pub async fn sign_in(
             },
         )
         .map_err(not_accepted)?;
+    // Only now, with the holder proven, say why the account cannot sign in.
+    if accounts::is_suspended(&mut tx, passkey.account_id).await? {
+        tracing::info!("a suspended account tried to sign in with a passkey");
+        return Err(Error::Denied(MESSAGES.reason("account_suspended")));
+    }
     let reported = i64::from(verified.sign_count);
     if (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count {
         // A counter that does not move forward may mean a cloned
@@ -416,6 +436,7 @@ pub async fn sign_in(
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         ceremony.request_id.as_deref(),
         ceremony.return_to.as_deref().unwrap_or("/"),
         &started.session,
@@ -478,7 +499,7 @@ pub struct SignUpStart {
     path = "/auth/passkey/sign-up/options",
     tag = "identity",
     operation_id = "identity.start_passkey_sign_up",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body = SignUpStart,
     security(()),
@@ -514,7 +535,7 @@ pub async fn sign_up_options(
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("display_name_required")))?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let request = waiting_request(&ctx, issuer, body.request).await?;
+    let request = waiting_request(&ctx, issuer, &headers, body.request).await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
@@ -545,7 +566,7 @@ pub async fn sign_up_options(
     path = "/auth/passkey/sign-up",
     tag = "identity",
     operation_id = "identity.finish_passkey_sign_up",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.passkey", "identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.passkey", "identity.session"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body(content = RegistrationCredential,
         description = "`PublicKeyCredential.toJSON()` of the new passkey."),
@@ -589,8 +610,13 @@ pub async fn sign_up(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
-    // Accounts with no provider are cheap to make: a ceiling for the whole
-    // instance, besides the per-address one.
+    // Accounts with no provider are cheap to make: a few per address, and
+    // a ceiling for the whole instance. The address first, so one address
+    // past its own budget does not spend everyone's.
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &SIGN_UP_PER_ADDRESS, &RateKey::ip(ip))
+        .await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &SIGN_UP_LIMIT, &RateKey::text(INSTANCE))
@@ -604,7 +630,8 @@ pub async fn sign_up(
     };
     let mut tx = ctx.state.db.begin().await?;
     passkeys::create_account(&mut tx, account, &display_name, now).await?;
-    let Some(passkey) = passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, now).await?
+    let Some(passkey) =
+        passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, true, now).await?
     else {
         return Err(Error::Conflict(
             MESSAGES.reason("passkey_already_registered"),
@@ -646,6 +673,7 @@ pub async fn sign_up(
                 method: "passkey".to_owned(),
                 provider: None,
                 via: "sign_up".to_owned(),
+                way_in: Some(passkey),
             },
         )
         .await?;
@@ -654,6 +682,7 @@ pub async fn sign_up(
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         ceremony.request_id.as_deref(),
         ceremony.return_to.as_deref().unwrap_or("/"),
         &started.session,

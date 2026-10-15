@@ -62,11 +62,15 @@
     "opening": "A abrir a administração…",
     "back": "Voltar ao Campbooks",
     "sections": {
-      "system": "Sistema"
+      "system": "Sistema",
+      "jobs": "Tarefas",
+      "signups": "Registos",
+      "people": "Pessoas",
+      "workspaces": "Espaços de trabalho"
     },
     "menuEntry": "Administração",
     "reauthTitle": "Inicie sessão novamente para continuar",
-    "reauthLead": "A administração exige um início de sessão nas últimas 12 horas, para que ninguém use uma sessão antiga para alterar esta instância. Voltará diretamente para aqui.",
+    "reauthLead": "A administração exige um início de sessão na última hora, para que ninguém use uma sessão antiga para alterar esta instância. Voltará diretamente para aqui.",
     "reauthAction": "Iniciar sessão novamente",
     "unreachableTitle": "Não é possível abrir a administração",
     "unreachableLead": "O servidor não respondeu. Verifique a sua ligação e tente novamente."

@@ -180,6 +180,8 @@ fn error_type(error: &Error) -> &'static str {
         Error::Status { status, .. } if *status >= 500 => "status_5xx",
         Error::Status { .. } => "status_4xx",
         Error::InvalidResponse(_) => "invalid_response",
+        Error::ExternalContentRefused { .. } => "external_content_refused",
+        Error::AnswersNotTrusted => "answers_not_trusted",
     }
 }
 
@@ -190,20 +192,8 @@ mod tests {
     #[test]
     fn error_types_are_fixed_words() {
         assert_eq!(error_type(&Error::Config("x".into())), "config");
-        assert_eq!(
-            error_type(&Error::Status {
-                status: 503,
-                body: "the prompt was …".into()
-            }),
-            "status_5xx"
-        );
-        assert_eq!(
-            error_type(&Error::Status {
-                status: 400,
-                body: String::new()
-            }),
-            "status_4xx"
-        );
+        assert_eq!(error_type(&Error::Status { status: 503 }), "status_5xx");
+        assert_eq!(error_type(&Error::Status { status: 400 }), "status_4xx");
         assert_eq!(
             error_type(&Error::InvalidResponse("x".into())),
             "invalid_response"

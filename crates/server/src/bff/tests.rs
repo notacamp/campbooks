@@ -676,6 +676,14 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     let reply = stale.get("/bff/session").await;
     assert_eq!(reply.json()["authenticated"], true);
     assert!(reply.set_cookie(SESSION).is_none());
+    // The browser uses its new id: the rotation reached it.
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    // Past the grace, the old id is a copied cookie (and either copy may be
+    // a thief's): the session ends for both, and its refresh token is
+    // revoked at the identity provider.
     exec(
         &h.db,
         "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
@@ -687,7 +695,304 @@ async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     );
     assert_eq!(
         browser.get("/bff/session").await.json()["authenticated"],
+        false,
+        "the session ended everywhere"
+    );
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1);
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_lost_rotation_gets_another_instead_of_a_sign_out(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    // The response carrying the new id is lost (an aborted fetch, a
+    // reload): the browser keeps the old one.
+    let rotated = browser.get("/bff/session").await;
+    assert!(rotated.set_cookie(SESSION).is_some());
+    let lost = browser.cookie(SESSION).unwrap().to_owned();
+    browser.jar.insert(SESSION.to_owned(), old.clone());
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+
+    // Minutes later the old id still opens the session, with a fresh one.
+    let again = browser.get("/bff/session").await;
+    assert_eq!(again.json()["authenticated"], true, "{}", again.body);
+    let fresh = browser.cookie(SESSION).unwrap().to_owned();
+    assert_ne!(fresh, old);
+    assert_ne!(fresh, lost);
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
         true
+    );
+    assert!(h.idp.revoked_tokens().is_empty(), "nothing revoked");
+
+    // The lost id is retired: a copy of it presented later is a theft.
+    let mut copy = Browser::new(&h.app);
+    copy.jar.insert(SESSION.to_owned(), lost);
+    assert_eq!(
+        copy.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_waking_page_reissues_once_and_stays_signed_in(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    // The rotation's response is lost.
+    assert!(
+        browser
+            .get("/bff/session")
+            .await
+            .set_cookie(SESSION)
+            .is_some()
+    );
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+
+    // The page wakes and fires several requests with the old cookie at once.
+    let mut tabs: Vec<Browser> = (0..4)
+        .map(|_| {
+            let mut tab = Browser::new(&h.app);
+            tab.jar.insert(SESSION.to_owned(), old.clone());
+            tab
+        })
+        .collect();
+    let replies =
+        futures_util::future::join_all(tabs.iter_mut().map(|tab| tab.get("/bff/session"))).await;
+    for reply in &replies {
+        assert_eq!(reply.json()["authenticated"], true, "{}", reply.body);
+    }
+    let fresh: Vec<&Browser> = tabs
+        .iter()
+        .filter(|tab| tab.cookie(SESSION) != Some(old.as_str()))
+        .collect();
+    assert_eq!(fresh.len(), 1, "one reissue");
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        1,
+        "only the lost cookie is retired"
+    );
+    let mut woken = Browser::new(&h.app);
+    woken.jar.insert(
+        SESSION.to_owned(),
+        fresh[0].cookie(SESSION).unwrap().to_owned(),
+    );
+    assert_eq!(
+        woken.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert!(h.idp.revoked_tokens().is_empty());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_reissue_says_why_it_did_not(db: PgPool) {
+    use campbooks_kernel::crypto::hash;
+
+    use super::store::Reissue;
+
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let old = browser.cookie(SESSION).unwrap().to_owned();
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+    )
+    .await;
+    browser.get("/bff/session").await;
+    let id: uuid::Uuid = sqlx::query_scalar("SELECT id FROM bff.sessions")
+        .fetch_one(&h.db)
+        .await
+        .unwrap();
+    let now = chrono::Utc::now();
+    let grace_since = now - super::config::ROTATION_GRACE;
+    let reissue = |previous: &str| {
+        let previous = hash(previous);
+        let db = h.db.clone();
+        async move {
+            store::reissue(&db, id, &previous, &hash("fresh"), now, grace_since)
+                .await
+                .unwrap()
+        }
+    };
+
+    // The successor was presented meanwhile: the old token is a copy.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET token_delivered = true, rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::Delivered);
+    // Another request reissued a moment ago: within the new grace.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET token_delivered = false, rotated_at = now()",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::WithinGrace);
+    // Not this session's previous token at all.
+    assert_eq!(reissue("someone-else").await, Reissue::Gone);
+    // Past the grace, undelivered: reissued.
+    exec(
+        &h.db,
+        "UPDATE bff.sessions SET rotated_at = now() - interval '3 minutes'",
+    )
+    .await;
+    assert_eq!(reissue(&old).await, Reissue::Reissued);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_cookie_rotations_old_still_ends_the_session(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    let first = browser.cookie(SESSION).unwrap().to_owned();
+    // Two rotations while the person keeps using the app: the first token
+    // is past even the previous-token grace.
+    for _ in 0..2 {
+        exec(
+            &h.db,
+            "UPDATE bff.sessions SET rotated_at = now() - interval '2 hours'",
+        )
+        .await;
+        assert_eq!(
+            browser.get("/bff/session").await.json()["authenticated"],
+            true
+        );
+    }
+    assert_ne!(browser.cookie(SESSION).unwrap(), first);
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        1
+    );
+
+    // A copy of the first cookie, presented much later.
+    let mut thief = Browser::new(&h.app);
+    thief.jar.insert(SESSION.to_owned(), first);
+    assert_eq!(
+        thief.get("/bff/session").await.json()["authenticated"],
+        false
+    );
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false,
+        "the session ended for both"
+    );
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(
+        count(&h.db, "SELECT count(*) FROM bff.retired_tokens").await,
+        0,
+        "they go with the session"
+    );
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn sign_ins_are_rate_limited_per_address(db: PgPool) {
+    let h = harness(db).await;
+    let from =
+        |address: [u8; 4]| {
+            let mut request = Request::get("/bff/login").body(Body::empty()).unwrap();
+            request.extensions_mut().insert(axum::extract::ConnectInfo(
+                std::net::SocketAddr::from((address, 50_000)),
+            ));
+            request
+        };
+    for _ in 0..30 {
+        let started = send(&h.app, from([203, 0, 113, 7])).await;
+        assert_eq!(started.status, StatusCode::SEE_OTHER, "{}", started.body);
+    }
+    let limited = send(&h.app, from([203, 0, 113, 7])).await;
+    assert_eq!(
+        limited.status,
+        StatusCode::TOO_MANY_REQUESTS,
+        "{}",
+        limited.body
+    );
+    assert_eq!(limited.json()["code"], "rate_limited");
+    let elsewhere = send(&h.app, from([198, 51, 100, 2])).await;
+    assert_eq!(elsewhere.status, StatusCode::SEE_OTHER);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn signing_out_everywhere_ends_the_persons_web_sessions(db: PgPool) {
+    use campbooks_identity::events::SignedOutEverywhere;
+
+    let h = harness(db).await;
+    let account = uuid::Uuid::now_v7();
+    h.idp.set_user(TestUser {
+        subject: account.to_string(),
+        name: "Ana Lima".to_owned(),
+        email: "ana@example.com".to_owned(),
+    });
+    let mut laptop = Browser::new(&h.app);
+    laptop.sign_in(&h.idp, "/").await;
+    let mut phone = Browser::new(&h.app);
+    phone.sign_in(&h.idp, "/").await;
+    h.idp.set_user(TestUser {
+        subject: "someone-else".to_owned(),
+        name: "Sam".to_owned(),
+        email: "sam@example.com".to_owned(),
+    });
+    let mut other = Browser::new(&h.app);
+    other.sign_in(&h.idp, "/").await;
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 3);
+
+    let state = AppState::new(
+        h.db.clone(),
+        testing::config("postgres://test@localhost/test"),
+    )
+    .with_registry(crate::registry().unwrap());
+    let mut tx = state.db.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &SignedOutEverywhere { account })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    campbooks_kernel::jobs::Worker::new(state)
+        .run_until_idle()
+        .await;
+
+    for browser in [&mut laptop, &mut phone] {
+        assert_eq!(
+            browser.get("/bff/session").await.json()["authenticated"],
+            false
+        );
+    }
+    assert_eq!(
+        other.get("/bff/session").await.json()["authenticated"],
+        true,
+        "nobody else's"
     );
 }
 
@@ -782,6 +1087,21 @@ async fn the_admin_api_is_reached_through_the_bff_by_administrators_only(db: PgP
         .get("/bff/api/v1/system/overview")
         .await
         .assert_problem(StatusCode::NOT_FOUND, "not_found");
+
+    // An operation with a path parameter works behind the BFF's own wildcard
+    // (`/bff/admin/{*path}`): the handler's `id` is not confused with `path`.
+    let dead: uuid::Uuid = sqlx::query_scalar(
+        "INSERT INTO kernel.jobs (queue, kind, payload, state, attempts, max_attempts, finished_at)
+         VALUES ('default', 'test.dead', '{}', 'failed', 3, 3, now()) RETURNING id",
+    )
+    .fetch_one(&h.db)
+    .await
+    .unwrap();
+    let reply = browser
+        .post(&format!("/bff/admin/v1/system/jobs/{dead}/retry"), "")
+        .await;
+    assert_eq!(reply.status, StatusCode::OK, "{}", reply.body);
+    assert_eq!(reply.json()["outcome"], "applied");
 
     // Revoked: gone at once.
     campbooks_admin::cli::revoke(&mut conn, "test-user", &[], chrono::Utc::now())
@@ -981,7 +1301,7 @@ async fn an_expiring_access_token_is_refreshed_and_the_refresh_token_rotates(db:
         .await
         .unwrap();
 
-    // Not due: no refresh (Rauthy would end the session on an early one).
+    // Not due: no refresh (some issuers end the session on an early one).
     browser.get("/bff/api/v1/test/whoami").await;
     assert_eq!(h.idp.refreshes(), 0);
 
@@ -1158,6 +1478,49 @@ async fn backchannel_logout_ends_the_named_sessions(db: PgPool) {
         phone.get("/bff/session").await.json()["authenticated"],
         false
     );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
+    use campbooks_identity::events::AccountSuspended;
+    use campbooks_kernel::jobs::Worker;
+
+    let h = harness(db).await;
+    let (suspended, other) = (uuid::Uuid::now_v7(), uuid::Uuid::now_v7());
+    let mut browsers = Vec::new();
+    for account in [suspended, suspended, other] {
+        h.idp.set_user(TestUser {
+            subject: account.to_string(),
+            ..TestUser::default()
+        });
+        let mut browser = Browser::new(&h.app);
+        browser.sign_in(&h.idp, "/").await;
+        browsers.push(browser);
+    }
+
+    let pool = testing::app_role_pool(&h.db).await;
+    let state = crate::with_ports(
+        AppState::new(
+            pool.clone(),
+            testing::config("postgres://test@localhost/test"),
+        )
+        .with_registry(crate::registry().unwrap()),
+    );
+    let mut tx = pool.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &AccountSuspended { account: suspended })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let stats = Worker::new(state).run_until_idle().await;
+    assert_eq!(stats.succeeded, 1, "{stats:?}");
+
+    let mut signed_in = Vec::new();
+    for browser in &mut browsers {
+        signed_in.push(browser.get("/bff/session").await.json()["authenticated"].clone());
+    }
+    assert_eq!(signed_in, [false, false, true]);
 }
 
 #[sqlx::test(migrations = "../../migrations")]

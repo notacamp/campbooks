@@ -1,5 +1,6 @@
 import { createRoute, type AnyRoute } from "@tanstack/react-router";
 
+import { JobsAdminPanel } from "./components/JobsAdminPanel/JobsAdminPanel";
 import { SystemAdminPanel } from "./components/SystemAdminPanel/SystemAdminPanel";
 
 /**
@@ -12,6 +13,13 @@ export const SYSTEM_ADMIN_SECTION = {
   icon: "settings",
 } as const;
 
+/** The jobs panel's place in the admin navigation (`admin.sections.jobs`). */
+export const JOBS_ADMIN_SECTION = {
+  id: "jobs",
+  to: "/admin/jobs",
+  icon: "clock",
+} as const;
+
 /**
  * The system module's part of the admin section (`/admin/...`): its pages,
  * mounted under the admin layout the app shell provides.
@@ -22,5 +30,10 @@ export function buildSystemAdminRoutes<TParent extends AnyRoute>(parent: TParent
     path: "/system",
     component: SystemAdminPanel,
   });
-  return [system] as const;
+  const jobs = createRoute({
+    getParentRoute: () => parent,
+    path: "/jobs",
+    component: JobsAdminPanel,
+  });
+  return [system, jobs] as const;
 }

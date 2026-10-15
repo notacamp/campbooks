@@ -50,6 +50,11 @@ export {
   type ButtonVariant,
 } from "./components/Button/Button";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox/Checkbox";
+export {
+  Highlight,
+  type HighlightProps,
+  type HighlightSegment,
+} from "./components/Highlight/Highlight";
 export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
 export {
   ChoiceCards,
@@ -61,6 +66,7 @@ export {
   type Command,
   type CommandMenuProps,
 } from "./components/CommandMenu/CommandMenu";
+export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
 export { CopyField, type CopyFieldProps } from "./components/CopyField/CopyField";
 export {
@@ -68,6 +74,11 @@ export {
   type ConversationRowProps,
 } from "./components/ConversationRow/ConversationRow";
 export { Disclosure, type DisclosureProps } from "./components/Disclosure/Disclosure";
+export {
+  HowDecided,
+  type HowDecidedProps,
+  type HowDecidedRow,
+} from "./components/HowDecided/HowDecided";
 export { Dot, type DotProps } from "./components/Dot/Dot";
 export { Fact, FactList, type FactProps, type FactStatus } from "./components/Facts/Facts";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
@@ -89,6 +100,12 @@ export {
   type ItemProps,
 } from "./components/Item/Item";
 export { InlineConfirm, type InlineConfirmProps } from "./components/InlineConfirm/InlineConfirm";
+export {
+  SearchField,
+  type SearchFieldChip,
+  type SearchFieldProps,
+} from "./components/SearchField/SearchField";
+export { Overlay, type OverlayProps } from "./internal/Overlay";
 export { Kbd, KbdHint, type KbdHintProps } from "./components/Kbd/Kbd";
 export { List, ListRow, type ListRowProps } from "./components/List/List";
 export {
@@ -111,6 +128,7 @@ export {
   type NoteChoiceOption,
   type NoteLink,
   type NoteProps,
+  type NoteQuote,
 } from "./components/Note/Note";
 export { Pill, type PillProps } from "./components/Pill/Pill";
 export { ProviderMark, type ProviderMarkProps } from "./components/ProviderMark/ProviderMark";

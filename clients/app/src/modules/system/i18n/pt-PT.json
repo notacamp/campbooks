@@ -114,14 +114,91 @@
       "notConfigured": "Não configurada",
       "answering": "A responder",
       "notAnswering": "Sem resposta",
+      "notSentMail": "Não recebe correio",
       "protocol": {
         "openai": "Compatível com OpenAI",
         "laya": "Laya"
       },
-      "detail": "{{model}} em {{endpoint}} · {{protocol}}"
+      "detail": "{{model}} em {{endpoint}} · {{protocol}}",
+      "where": {
+        "instance": "na rede desta instância",
+        "externalAllowed": "fora da rede desta instância, autorizado a receber correio",
+        "externalRefused": "fora da rede desta instância, por isso não lhe é enviado correio"
+      },
+      "check": {
+        "pending": "A verificar as respostas",
+        "pendingDetail": "as respostas passam a ser usadas quando acertar em emails de teste óbvios",
+        "passed": "acertou {{right}} de {{total}} respostas de teste",
+        "failed": "As respostas falham a verificação",
+        "failedDetail": "acertou apenas {{right}} de {{total}} respostas de teste óbvias, por isso as respostas não são usadas e as regras organizam o correio sozinhas",
+        "unavailable": "Não respondeu à verificação",
+        "unavailableDetail": "as respostas não são usadas até responder"
+      }
     },
     "duration": {
       "lessThanAMinute": "Menos de um minuto"
+    }
+  },
+  "jobs": {
+    "title": "Tarefas",
+    "refresh": "Atualizar",
+    "lead": "O trabalho em segundo plano que esta instância executa e as tarefas que desistiram. O conteúdo de uma tarefa nunca é mostrado aqui: apenas o que correu, quantas vezes e porque parou.",
+    "dismiss": "Dispensar",
+    "loading": "A carregar a fila de tarefas",
+    "cancel": "Cancelar",
+    "loadError": {
+      "title": "Não foi possível carregar a fila de tarefas",
+      "lead": "O servidor não respondeu. Tente novamente daqui a pouco.",
+      "retry": "Tentar novamente"
+    },
+    "queue": {
+      "title": "Fila",
+      "emptyTitle": "Não há nada na fila",
+      "emptyLead": "Neste momento nenhuma tarefa está à espera, a correr ou falhada.",
+      "showFailed": "Ver falhas",
+      "retryAll": "Repetir todas as falhadas",
+      "underAMinute": "menos de um minuto",
+      "counts": "Prontas {{ready}} · Agendadas {{scheduled}} · A correr {{running}} · Falhadas {{failed}}",
+      "oldestWaiting": "a mais antiga espera há {{age}}",
+      "expiredLeases_one": "{{count}} tarefa em execução perdeu o seu processo",
+      "expiredLeases_other": "{{count}} tarefas em execução perderam o seu processo"
+    },
+    "retryAll": {
+      "question_one": "Repetir a {{count}} tarefa {{kind}} falhada? Recomeça desde a primeira tentativa.",
+      "question_other": "Repetir as {{count}} tarefas {{kind}} falhadas? Cada uma recomeça desde a primeira tentativa.",
+      "confirm": "Repetir",
+      "done_one": "{{count}} tarefa {{kind}} voltou à fila.",
+      "done_other": "{{count}} tarefas {{kind}} voltaram à fila.",
+      "more": "Há mais: repita novamente para voltar a pôr as restantes na fila.",
+      "none": "Não havia tarefas {{kind}} falhadas para repetir.",
+      "error": "Não foi possível repetir as tarefas {{kind}}. Tente novamente."
+    },
+    "failed": {
+      "title": "Tarefas falhadas",
+      "filter": "Mostrar",
+      "allKinds": "Todos os tipos",
+      "emptyTitle": "Nenhuma tarefa falhada",
+      "emptyLead": "Todas as tarefas terminaram ou ainda estão a ser tentadas.",
+      "retried": "A tarefa voltou à fila.",
+      "discarded": "A tarefa foi descartada.",
+      "unchanged": "Essa tarefa já não estava falhada, por isso nada mudou.",
+      "superseded": "Já há outra tarefa deste tipo à espera, por isso esta ficou como estava.",
+      "retryError": "Não foi possível repetir a tarefa. Tente novamente.",
+      "discardError": "Não foi possível descartar a tarefa. Tente novamente.",
+      "more": "Mostrar mais",
+      "when": "Falhou em {{when}}",
+      "attempts": "{{attempts}} de {{max}} tentativas",
+      "instanceWide": "toda a instância",
+      "workspace": "espaço de trabalho {{workspace}}",
+      "noError": "Não foi registado nenhum erro.",
+      "error": "Último erro",
+      "copy": "Copiar erro",
+      "copied": "Copiado.",
+      "copyFailed": "Não foi possível copiar. Selecione o texto e copie-o.",
+      "retry": "Repetir",
+      "discard": "Descartar",
+      "discardConfirm": "Descartar",
+      "discardQuestion": "Descartar esta tarefa {{kind}}? É eliminada de vez."
     }
   }
 }

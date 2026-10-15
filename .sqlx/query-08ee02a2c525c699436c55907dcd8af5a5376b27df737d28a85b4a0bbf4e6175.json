@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: ConnectionId\" FROM connectors.connections\n                WHERE granted_by = $1 AND created_at <= $2",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConnectionId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.connections",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "08ee02a2c525c699436c55907dcd8af5a5376b27df737d28a85b4a0bbf4e6175"
+}

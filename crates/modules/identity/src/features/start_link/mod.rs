@@ -93,7 +93,7 @@ pub struct StartedLink {
     operation_id = "identity.start_link",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.link_ticket"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.link_ticket"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Write)))),
     request_body = StartLink,
     responses(
         (status = CREATED, description = "Send the browser to `url`.", body = StartedLink),
@@ -122,6 +122,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     Json(input): Json<StartLink>,
 ) -> Result<(StatusCode, Json<StartedLink>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.provider_identity",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let started = execute(&state, &deps, &principal, input).await?;
     Ok((StatusCode::CREATED, Json(started)))
 }

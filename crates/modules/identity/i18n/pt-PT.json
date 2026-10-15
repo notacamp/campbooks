@@ -18,6 +18,8 @@
     "passkey_already_registered": "Esta chave de acesso já dá acesso ao Campbooks.",
     "display_name_required": "Diga-nos como lhe devemos chamar.",
     "passkey_name_required": "Dê à chave de acesso um nome com 1 a 64 caracteres.",
+    "account_is_admin": "Esta conta é de um administrador. Revogue primeiro o perfil de administrador na linha de comandos do servidor (campbooks-server admin revoke) e depois suspenda-a.",
+    "account_suspended": "Um administrador deste Campbooks suspendeu esta conta. Peça-lhe que levante a suspensão.",
     "invalid_target": "Esta aplicação pediu acesso a algo que o Campbooks não disponibiliza.",
     "consent_request_not_found": "Este pedido para autorizar uma aplicação expirou ou já foi respondido. Recomece a partir da aplicação.",
     "consent_needs_workspace": "Escolha o espaço de trabalho que esta aplicação pode usar.",
@@ -28,6 +30,21 @@
     "client_needs_redirect": "Uma aplicação de início de sessão precisa de pelo menos um endereço de retorno https ou de loopback.",
     "client_scope_not_allowed": "Não é possível dar a permissão {{scope}} a aplicações.",
     "client_is_public": "Esta aplicação inicia sessão de pessoas e não tem segredo para renovar.",
-    "client_name_reserved": "Só as aplicações do próprio Campbooks se podem chamar Campbooks ou Not A Camp. Escolha outro nome."
+    "client_name_reserved": "Só as aplicações do próprio Campbooks se podem chamar Campbooks ou Not A Camp. Escolha outro nome.",
+    "fresh_sign_in_required": "Inicie sessão novamente primeiro: adicionar uma chave de acesso exige um início de sessão nos últimos cinco minutos.",
+    "too_many_accounts": "Pergunte por no máximo {{max}} contas de cada vez.",
+    "client_name_mixed_scripts": "Use um só alfabeto em cada palavra do nome da aplicação: letras de alfabetos diferentes podem passar por outras."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "Uma nova forma de iniciar sessão na sua conta Campbooks",
+      "passkey": "Uma chave de acesso",
+      "provider": "Uma conta {{provider}}",
+      "added": "{{what}} foi adicionada como forma de iniciar sessão na sua conta Campbooks em {{when}}.",
+      "if_you": "Se foi você, não precisa de fazer nada.",
+      "if_not": "Se não foi você, abra o Campbooks, vá a Definições → Formas de iniciar sessão, remova-a e escolha Terminar sessão em todo o lado.",
+      "open": "Abrir o Campbooks",
+      "why": "O Campbooks envia esta mensagem para os endereços da sua conta sempre que é adicionada uma forma de iniciar sessão. Não contém qualquer rastreio."
+    }
   }
 }

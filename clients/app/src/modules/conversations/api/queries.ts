@@ -3,6 +3,7 @@ import {
   keepPreviousData,
   useInfiniteQuery,
   useMutation,
+  useQueries,
   useQuery,
   useQueryClient,
   type InfiniteData,
@@ -18,6 +19,10 @@ type ConversationList = Schema<"ConversationList">;
 export type MessageView = Schema<"MessageView">;
 export type DecisionView = Schema<"DecisionView">;
 export type ReasonView = Schema<"ReasonView">;
+export type NeedView = Schema<"NeedView">;
+
+/** A member's verdict on what a conversation needs (`conversations.resolve_need`, …). */
+export type NeedVerdict = "done" | "not_needed" | "confirm" | "reopen";
 
 /** The built-in streams, in display order. */
 export const STREAMS: readonly Stream[] = ["primary", "updates", "receipts", "newsletters"];
@@ -162,7 +167,14 @@ export function useMessageBody(
 
 /** The conversation-changing operations, by name. */
 export type ConversationAction =
-  "archive" | "unarchive" | "read" | "unread" | "star" | "unstar" | { stream: Stream };
+  | "archive"
+  | "unarchive"
+  | "read"
+  | "unread"
+  | "star"
+  | "unstar"
+  | { stream: Stream }
+  | { need: NeedVerdict };
 
 const PATHS = {
   archive: "/api/v1/w/{workspace_id}/conversations/{conversation_id}/archive",
@@ -176,6 +188,22 @@ const PATHS = {
 /** How an action changes a summary, for the optimistic update. */
 function applied(summary: ConversationSummary, action: ConversationAction): ConversationSummary {
   if (typeof action === "object") {
+    if ("need" in action) {
+      switch (action.need) {
+        case "done":
+        case "not_needed": {
+          return { ...summary, need: null };
+        }
+        case "confirm": {
+          return summary.need === null || summary.need === undefined
+            ? summary
+            : { ...summary, need: { ...summary.need, trust: "sure" } };
+        }
+        case "reopen": {
+          return summary;
+        }
+      }
+    }
     return { ...summary, stream: action.stream, stream_source: "member", suggestion: null };
   }
   switch (action) {
@@ -201,6 +229,107 @@ function applied(summary: ConversationSummary, action: ConversationAction): Conv
 }
 
 type ListData = InfiniteData<ConversationList, string | undefined>;
+
+/**
+ * The need operations: Done, Not needed, Yes to a question, and their undo.
+ * Each names the message the need the member saw comes from (`seen`), so the
+ * server refuses (409 `need_changed`) when the need changed meanwhile.
+ */
+async function needRequest(
+  params: { path: { workspace_id: string; conversation_id: string } },
+  verdict: NeedVerdict,
+  seen: string,
+): Promise<ConversationSummary> {
+  switch (verdict) {
+    case "done":
+    case "not_needed": {
+      return unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve", {
+          params,
+          body: { outcome: verdict, message_id: seen },
+        }),
+      );
+    }
+    case "confirm": {
+      return unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm", {
+          params,
+          body: { message_id: seen },
+        }),
+      );
+    }
+    case "reopen": {
+      return unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen", {
+          params,
+        }),
+      );
+    }
+  }
+}
+
+/**
+ * `conversations.list` with `ids`: these conversations (those you can see),
+ * whatever their stream, with what each needs. For screens that show
+ * another module's references to conversations (Home).
+ */
+export function useConversationsByIds(workspaceId: string, ids: readonly string[]) {
+  const sorted = [...ids].toSorted();
+  return useQuery({
+    queryKey: operationKey("conversations.list", {
+      workspace_id: workspaceId,
+      ids: sorted.join(","),
+    }),
+    enabled: sorted.length > 0,
+    placeholderData: keepPreviousData,
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/w/{workspace_id}/conversations", {
+          params: { path: { workspace_id: workspaceId }, query: { ids: sorted.join(",") } },
+          signal,
+        }),
+      ).conversations,
+  });
+}
+
+/** The longest `ids` list `conversations.list` takes. */
+const IDS_MAX = 100;
+
+/**
+ * Like {@link useConversationsByIds} for any number of ids (asked in batches
+ * of 100): a map of the summaries you can see, by id. For screens that show
+ * another module's hits and act on them (search results).
+ */
+export function useConversationSummaries(
+  workspaceId: string,
+  ids: readonly string[],
+): ReadonlyMap<string, ConversationSummary> {
+  const sorted = [...new Set(ids)].toSorted();
+  const batches: string[][] = [];
+  for (let start = 0; start < sorted.length; start += IDS_MAX) {
+    batches.push(sorted.slice(start, start + IDS_MAX));
+  }
+  return useQueries({
+    queries: batches.map((batch) => ({
+      queryKey: operationKey("conversations.list", {
+        workspace_id: workspaceId,
+        ids: batch.join(","),
+      }),
+      placeholderData: keepPreviousData,
+      queryFn: async ({ signal }: { signal: AbortSignal }) =>
+        unwrap(
+          await api.GET("/api/v1/w/{workspace_id}/conversations", {
+            params: { path: { workspace_id: workspaceId }, query: { ids: batch.join(",") } },
+            signal,
+          }),
+        ).conversations,
+    })),
+    combine: (results) =>
+      new Map(
+        results.flatMap((result) => result.data ?? []).map((summary) => [summary.id, summary]),
+      ),
+  });
+}
 
 /**
  * Put `next` in every cached list it belongs to (its stream, not archived),
@@ -249,6 +378,9 @@ export function useConversationAction(workspaceId: string) {
       action: ConversationAction;
     }) => {
       const params = { path: { workspace_id: workspaceId, conversation_id: conversation.id } };
+      if (typeof action === "object" && "need" in action) {
+        return needRequest(params, action.need, conversation.need?.message_id ?? "");
+      }
       if (typeof action === "object") {
         return unwrap(
           await api.POST("/api/v1/w/{workspace_id}/conversations/{conversation_id}/stream", {

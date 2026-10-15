@@ -6,7 +6,8 @@ use axum::{
     extract::{Path, State},
 };
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result,
+    AppState, Error, Operation, Problem, RecordRef, Result,
+    authz::{self, Action},
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
@@ -16,6 +17,7 @@ use crate::{
         connections,
         model::{ConnectionId, ConnectionPath, ConnectionView},
     },
+    events::CONNECTION_RECORD,
     scopes::ConnectorsRead,
 };
 
@@ -26,7 +28,7 @@ use crate::{
     operation_id = "connectors.get_connection",
     tag = "connectors",
     security(("bearer" = ["connectors:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["connectors.connection"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("connection_id" = ConnectionId, Path, description = "The connection."),
@@ -58,9 +60,17 @@ pub async fn execute(
     id: ConnectionId,
 ) -> Result<ConnectionView> {
     let mut tx = state.db.begin_for(access.workspace).await?;
+    authz::require(
+        state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONNECTION_RECORD, &id),
+        || Error::Forbidden,
+    )
+    .await?;
     let connection = connections::load(&mut tx, id)
         .await?
-        .filter(|c| connections::visible(access, c.granted_by))
         .ok_or(Error::NotFound)?;
     let view = connections::view(&mut tx, connection, access.user).await?;
     tx.commit().await?;

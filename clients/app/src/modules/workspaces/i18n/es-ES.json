@@ -60,12 +60,22 @@
     "approval": {
       "title": "Tu solicitud está pendiente",
       "lead": "Quien gestiona este Campbooks aprueba las cuentas nuevas. Ya tiene tu solicitud; vuelve a comprobarlo más tarde.",
-      "retry": "Volver a comprobar"
+      "retry": "Volver a comprobar",
+      "checking": "Comprobando…"
     },
     "failed": {
       "title": "No se ha podido crear el espacio de trabajo",
       "lead": "Campbooks no ha respondido. No se ha creado nada.",
       "retry": "Reintentar"
+    },
+    "approved": {
+      "title": "Tu solicitud está aprobada",
+      "lead": "Un administrador ha aprobado tu solicitud. Ya puedes crear tu espacio de trabajo.",
+      "continue": "Continuar"
+    },
+    "rejected": {
+      "title": "Tu solicitud no ha sido aprobada",
+      "lead": "Quienes gestionan este Campbooks han decidido no dejarte entrar. Si crees que es un error, ponte en contacto con ellos."
     }
   },
   "members": {
@@ -154,6 +164,190 @@
     "failed": {
       "title": "No se ha podido aceptar la invitación",
       "lead": "Campbooks no ha respondido. No ha cambiado nada."
+    }
+  },
+  "admin": {
+    "open": "Abrir",
+    "openLabel": "Abrir {{name}}",
+    "retry": "Reintentar",
+    "more": "Mostrar más",
+    "loadingMore": "Cargando más…",
+    "loadErrorLead": "El servidor no ha respondido. Comprueba la conexión y vuelve a intentarlo.",
+    "workspaceCount_one": "{{count}} espacio de trabajo",
+    "workspaceCount_other": "{{count}} espacios de trabajo",
+    "memberCount_one": "{{count}} miembro",
+    "memberCount_other": "{{count}} miembros",
+    "deletedOn": "Eliminado el {{date}}",
+    "people": {
+      "title": "Personas",
+      "lead": "Todas las personas que han iniciado sesión en este Campbooks, de la más reciente a la más antigua. Ves quiénes son y dónde están, nunca su correo ni sus documentos.",
+      "search": "Buscar personas",
+      "searchPlaceholder": "Comienzo de un nombre o una dirección de correo",
+      "list": "Personas",
+      "loading": "Cargando personas…",
+      "empty": "Todavía no ha iniciado sesión nadie.",
+      "noMatch": "Ningún nombre ni dirección de correo empieza por «{{search}}».",
+      "loadError": "No se han podido cargar las personas",
+      "joined": "Se unió el {{date}}",
+      "suspended": "Suspendida",
+      "back": "Todas las personas"
+    },
+    "person": {
+      "loading": "Cargando…",
+      "notFound": "Esta persona no está aquí",
+      "notFoundLead": "Nadie con este enlace ha iniciado sesión en este Campbooks.",
+      "loadError": "No se ha podido cargar esta persona",
+      "email": "Dirección de correo",
+      "noEmail": "Ninguna",
+      "firstSignIn": "Primer inicio de sesión",
+      "workspaces": "Espacios de trabajo",
+      "workspacesOf": "Espacios de trabajo de {{name}}",
+      "noWorkspaces": "Todavía no está en ningún espacio de trabajo.",
+      "joined": "Se unió el {{date}}"
+    },
+    "workspaces": {
+      "title": "Espacios de trabajo",
+      "lead": "Todos los espacios de trabajo de este Campbooks, del más reciente al más antiguo, y quién está en cada uno. Nunca lo que contienen.",
+      "search": "Buscar espacios de trabajo",
+      "searchPlaceholder": "Comienzo del nombre de un espacio de trabajo",
+      "list": "Espacios de trabajo",
+      "loading": "Cargando espacios de trabajo…",
+      "empty": "Todavía no hay espacios de trabajo.",
+      "noMatch": "Ningún espacio de trabajo tiene un nombre que empiece por «{{search}}».",
+      "loadError": "No se han podido cargar los espacios de trabajo",
+      "created": "Creado el {{date}}",
+      "back": "Todos los espacios de trabajo"
+    },
+    "workspace": {
+      "loading": "Cargando…",
+      "notFound": "Este espacio de trabajo no está aquí",
+      "notFoundLead": "Ningún espacio de trabajo de este Campbooks tiene este enlace.",
+      "loadError": "No se ha podido cargar este espacio de trabajo",
+      "state": "Estado",
+      "active": "Activo",
+      "purgedLater": "Sus datos se borran definitivamente tras el periodo de espera.",
+      "kind": "Tipo",
+      "created": "Creado",
+      "members": "Miembros",
+      "pendingInvitations": "Invitaciones pendientes",
+      "invitationCount_one": "{{count}} invitación",
+      "invitationCount_other": "{{count}} invitaciones"
+    }
+  },
+  "signups": {
+    "title": "Registros",
+    "parts": {
+      "label": "Registros",
+      "requests": "Solicitudes",
+      "codes": "Códigos"
+    },
+    "lead": {
+      "requests": "Personas que han pedido crear una cuenta en este Campbooks, cuando aprueba las cuentas nuevas. Al aprobar, la persona puede crear su espacio de trabajo; lo sabrá la próxima vez que abra la aplicación.",
+      "codes": "Códigos que entregas cuando este Campbooks pide un código de registro. Cada código sirve para tantos registros como indiques al crearlo; pon 1 para una sola persona. Deja de funcionar cuando se agota, caduca o se revoca."
+    },
+    "more": "Mostrar más",
+    "cancel": "Cancelar",
+    "errors": {
+      "generic": "No se ha podido guardar. No ha cambiado nada. Inténtalo de nuevo."
+    },
+    "loadError": {
+      "title": "No se ha podido cargar",
+      "lead": "El servidor no ha respondido. Comprueba tu conexión e inténtalo de nuevo.",
+      "retry": "Reintentar"
+    },
+    "requests": {
+      "filter": {
+        "label": "Mostrar",
+        "all": "Todas",
+        "pending": "En espera",
+        "approved": "Aprobadas",
+        "rejected": "No aprobadas"
+      },
+      "loading": "Cargando solicitudes…",
+      "list": "Solicitudes de registro",
+      "empty": {
+        "all": {
+          "title": "Aún no hay solicitudes",
+          "lead": "Cuando alguien pida unirse y este Campbooks apruebe las cuentas nuevas, aparecerá aquí."
+        },
+        "pending": {
+          "title": "Nadie está esperando",
+          "lead": "Las solicitudes nuevas aparecen aquí en cuanto alguien pide unirse."
+        },
+        "approved": {
+          "title": "Sin solicitudes aprobadas",
+          "lead": "Las personas que apruebes se muestran aquí."
+        },
+        "rejected": {
+          "title": "Sin solicitudes rechazadas",
+          "lead": "Las personas que rechaces se muestran aquí."
+        }
+      },
+      "status": {
+        "pending": "En espera",
+        "approved": "Aprobada",
+        "rejected": "No aprobada"
+      },
+      "asked": "Solicitada el {{date}}",
+      "decided": "decidida el {{date}}",
+      "approve": "Aprobar",
+      "reject": "Rechazar",
+      "approveLabel": "Aprobar a {{name}}",
+      "rejectLabel": "Rechazar a {{name}}",
+      "confirm": {
+        "approve": "¿Aprobar a {{name}}? Podrá crear su espacio de trabajo la próxima vez que abra Campbooks.",
+        "reject": "¿Rechazar a {{name}}? Se le avisará de que su solicitud no ha sido aprobada. Siempre podrás aprobarla más tarde."
+      },
+      "reason": "Motivo (opcional)",
+      "reasonHint": "Solo lo ven los administradores.",
+      "reasonLine": "Motivo: {{reason}}"
+    },
+    "codes": {
+      "mint": {
+        "title": "Crear un código",
+        "lead": "Verás el código una sola vez, justo después de crearlo; cópialo antes de salir de esta página.",
+        "label": "Etiqueta",
+        "placeholder": "Ana, probadora de la beta",
+        "uses": "Usos",
+        "expires": "Caduca el (opcional)",
+        "submit": "Crear código",
+        "minting": "Creando…",
+        "failed": "No se ha podido crear el código. Inténtalo de nuevo.",
+        "errors": {
+          "label": "Pon una etiqueta de 1 a 100 caracteres.",
+          "uses": "Los usos deben ser un número entero de 1 a 100000.",
+          "expires": "Elige un día futuro."
+        }
+      },
+      "minted": {
+        "title": "Código para {{label}}",
+        "lead": "Cópialo ahora. No se puede volver a mostrar; solo puedes revocarlo.",
+        "field": "Código de registro",
+        "copy": "Copiar código",
+        "copied": "Copiado",
+        "copyFailed": "Selecciona el código y cópialo",
+        "done": "Ya lo he copiado"
+      },
+      "listTitle": "Códigos creados",
+      "list": "Códigos de registro",
+      "loading": "Cargando códigos…",
+      "empty": {
+        "title": "Aún no hay códigos",
+        "lead": "Crea un código arriba y entrégaselo a la persona a la que quieras dejar entrar."
+      },
+      "state": {
+        "active": "Activo",
+        "used_up": "Agotado",
+        "expired": "Caducado",
+        "revoked": "Revocado"
+      },
+      "usage": "{{uses}} de {{max}} usos",
+      "noExpiry": "Sin caducidad",
+      "expiresOn": "Caduca el {{date}}",
+      "mintedOn": "Creado el {{date}}",
+      "revoke": "Revocar",
+      "revokeLabel": "Revocar {{label}}",
+      "confirmRevoke": "¿Revocar «{{label}}»? Deja de funcionar al instante. Las personas que ya lo usaron conservan sus espacios de trabajo."
     }
   }
 }

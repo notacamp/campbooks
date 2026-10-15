@@ -5,6 +5,7 @@
   "loading": "Chargement",
   "kbd": {
     "then": "puis",
+    "or": "ou",
     "shortcut": "Raccourci : {{keys}}"
   },
   "toast": {
@@ -13,9 +14,7 @@
     "redone": "Rétabli : {{label}}"
   },
   "note": {
-    "label": "Où en sont les choses",
-    "why": "Pourquoi ?",
-    "hideWhy": "Masquer le pourquoi"
+    "label": "Où en sont les choses"
   },
   "search": {
     "label": "Rechercher ou demander"
@@ -26,7 +25,8 @@
     "empty": "Rien ne correspond à « {{query}} »",
     "results": "Commandes",
     "ask": "Demander à Campbooks : {{query}}",
-    "askGroup": "Demander"
+    "askGroup": "Demander ou rechercher",
+    "search": "Rechercher des conversations pour « {{query}} »"
   },
   "shortcutSheet": {
     "title": "Raccourcis clavier"
@@ -100,5 +100,13 @@
     "previewOf": "Aperçu de {{name}}",
     "downloadOf": "Télécharger {{name}}",
     "previewTitle": "Aperçu de {{name}}"
+  },
+  "howDecided": {
+    "title": "Comment Campbooks a décidé"
+  },
+  "searchField": {
+    "clear": "Effacer la recherche",
+    "filters": "Filtres de recherche",
+    "remove": "Retirer le filtre : {{filter}}"
   }
 }

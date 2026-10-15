@@ -17,7 +17,7 @@ Tauri. This page is the map; the *why* lives in `docs/adr/`.
                             │              │             │
   External client ──OAuth──►│  Postgres    │  IdP        │  AI providers
   (client_credentials /     │  (+pgvector) │  (OIDC)     │  (OpenAI-compatible,
-   auth code + PKCE)        │  schema per  │  ADR 0004   │   open-weight models,
+   auth code + PKCE)        │  schema per  │  ADR 0014   │   open-weight models,
                             │  module      │             │   ADR 0005)
 ```
 
@@ -73,7 +73,7 @@ clients/                   pnpm workspace
     src/modules/<domain>/  1:1 with crates/modules/<domain>
     src-tauri/             Tauri 2 shell (desktop + iOS + Android); its own Cargo
                            workspace so GUI system deps never enter server CI
-deploy/                    docker compose for self-hosters (server, postgres, IdP, optional AI)
+deploy/                    docker compose for self-hosters (server, postgres, optional AI)
 openspec/                  specs (baseline) and changes (in flight)
 docs/adr/                  numbered architecture decision records
 ```
@@ -177,6 +177,39 @@ pass it, and two tabs can work in two workspaces. Every operation's OpenAPI
 `operation_id` is its catalogue name, `<module>.<verb>[_<noun>]` (ADR 0013). `campbooks-server scopes` prints the
 catalogue the IdP mirrors. Module tests sign their own tokens with
 `kernel::testing::TestIdp`.
+
+### Ownership and access (ADR 0017)
+
+Who may do what is declared once and checked in one place. Each module
+lists its resource types in `Module.resources` (`kernel::authz::ResourceType`),
+and each type declares:
+
+- its tenancy;
+- its owner: the member who created or connected it, the workspace's
+  owners, the account, or nobody;
+- the actions its owner takes: `read`, `write`, `delete`, `send`, `share`,
+  `disconnect`, `create`;
+- its sharing: grants to a workspace role, to a role in its container (an
+  inbox's `reader` < `sender` < `manager`), to client tokens (always an
+  explicit, narrower grant), or to anyone (public types).
+
+The module also implements `ResourceFacts`. It answers, in the caller's
+workspace transaction, whether one instance exists, who owns it, its
+container, the caller's role there, and whether it is kept read-only.
+
+Every handler then asks `authz::require(&state, &mut tx, &access, Action::Write, &resource, || reason)`
+(or `require_type` for lists and creations, `require_account` for a
+person's own records). The kernel answers from the catalogue and the facts.
+It is deny by default: anyone who may not read a resource gets the same
+404 as for one that does not exist, and 403 means "you see it, but may not
+do that". Workspace owners and admins get nothing inside an inbox they are
+not in. Row-level security (above) remains the second layer, now also on
+the kernel's own tables. Every operation declares `x-campbooks.access =
+{resource, action}`. `cargo xtask arch` fails an undeclared operation, a
+handler that never asks, module code querying workspace tables outside a
+workspace transaction, and an event nobody consumes without a stated reason.
+The server's access matrix tests check every resource type × caller ×
+action and every operation × caller.
 
 ### Operations: the catalogue (ADR 0013)
 
@@ -298,7 +331,10 @@ workspace, a delay, a priority, a `unique_key` (at most one unfinished job per
 key) or an `ordering_key` (jobs sharing it run one at a time, in order).
 Recurring work is `.schedule::<J>(every)`; each tick runs once however many
 workers run. A handler returns `JobError::Retry` (backoff with jitter) or
-`JobError::Fatal` (marked failed and kept for inspection). Workers claim jobs
+`JobError::Fatal` (marked failed and kept for inspection, 30 days by
+default: `CAMPBOOKS_JOBS__FAILED_RETENTION_DAYS`; the event log is pruned
+after `CAMPBOOKS_EVENTS__RETENTION_DAYS`, 90 by default, except events still
+being delivered). Workers claim jobs
 fairly across workspaces, lease them while they run, and reclaim jobs whose
 worker died. The design and its trade-offs are ADR 0012.
 
@@ -348,6 +384,18 @@ coarse choice and a fine one). Probabilities pass through a per (question
 type, option count) temperature, from config today and refitted from user
 corrections later. A module acts on an answer only through
 `answer.accept_if(threshold)` and asks the user below it.
+
+**Mail stays on the instance's network unless the operator opts in.** Every
+call that carries content (`chat`, `embed`, `decide`) goes through
+`AiConfig::provider_for_content`: a role whose base URL is off the
+instance's network (anything but a loopback or private address, `localhost`,
+a single-label compose name, or a host in `CAMPBOOKS_AI__INTERNAL_HOSTS`;
+never decided by DNS) is refused with `Error::ExternalContentRefused` unless
+`CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. The health probe sends no
+content and runs for every configured role. Provider error bodies are never
+kept (`Error::Status` holds the code only), and errors that would quote data
+are described by kind through `campbooks_kernel::redact` (a serde error's
+category and position, a Postgres error's SQLSTATE, constraint and table).
 
 The model is one **strategy** among several behind
 `campbooks_ai::decide::strategy::Strategy`, which all return the same
@@ -448,9 +496,10 @@ provider inside the server, on the app's origin: discovery at
 `/.well-known/openid-configuration`, keys at `/oauth2/jwks`, and
 `/oauth2/{authorize,token,revoke,end_session}`; provider round trips and the
 sign-in screens' actions under `/auth/*`. It runs while
-`CAMPBOOKS_AUTH__ISSUER` is unset (Rauthy keeps serving installs that name it
-until it is removed). Its protocol endpoints are mounted beside the BFF, not
-in the operation catalogue. The API's verifier reads its Ed25519 keys
+`CAMPBOOKS_AUTH__ISSUER` is unset or names the app's own origin (an outside
+OIDC issuer, if one is configured, serves the instance and these endpoints
+answer 404). Its protocol endpoints are mounted beside the BFF, not in the
+operation catalogue. The API's verifier reads its Ed25519 keys
 in-process (`kernel::auth::KeySource`), and the BFF reaches its token endpoint
 through its router rather than the network; both are otherwise the same code
 path any outside client and resource server would use. A new person's
@@ -492,7 +541,7 @@ document, `openapi/admin.json`, never merged into `openapi/openapi.json`, so
 them. Each handler takes `kernel::admin::Admin<P>`: a user's bearer token
 with the `admin:access` scope (which the built-in issuer grants to
 first-party clients only) and a profile allowing `P`, else **404** like an
-unknown route; then a sign-in at most 12 hours old (`auth_time`), else 401
+unknown route; then a sign-in at most an hour old (`auth_time`), else 401
 `admin_reauth_required`. The `kernel::admin::audit` middleware records every
 request that passed the profile check. The web app reaches the admin API
 through `/bff/admin/*`, like `/bff/api/*`; its Admin section lives in

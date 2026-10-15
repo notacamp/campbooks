@@ -213,6 +213,23 @@ export interface paths {
         patch: operations["identity.rename_passkey"];
         trace?: never;
     };
+    "/api/v1/identity/sign-out-everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out everywhere. */
+        post: operations["identity.sign_out_everywhere"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/ways-in": {
         parameters: {
             query?: never;
@@ -242,6 +259,23 @@ export interface paths {
         post?: never;
         /** Remove a way in. */
         delete: operations["identity.remove_way_in"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** See where I stand with the signup policy. */
+        get: operations["workspaces.get_signup"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -298,6 +332,57 @@ export interface paths {
         head?: never;
         /** Update a workspace. */
         patch: operations["workspaces.update"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List what needs you. */
+        get: operations["attention.list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Put an item off until later, for yourself. */
+        post: operations["attention.snooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/attention/{item_id}/unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring an item you put off back now. */
+        post: operations["attention.unsnooze"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/w/{workspace_id}/changes": {
@@ -513,6 +598,57 @@ export interface paths {
         get: operations["conversations.get_message_body"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Answer yes to a question Campbooks put (a Review need it was unsure of). */
+        post: operations["conversations.confirm_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/reopen": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take back Done, Not needed or a confirmation: the need is as it was. */
+        post: operations["conversations.reopen_need"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark what a conversation needs as done, or as not needed. */
+        post: operations["conversations.resolve_need"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1105,7 +1241,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1117,7 +1253,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1129,7 +1265,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1141,7 +1277,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1155,7 +1291,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1559,6 +1695,19 @@ export interface components {
              */
             size: number;
         };
+        /** @description The caller's items. */
+        AttentionList: {
+            /**
+             * @description Open items per reason, every reason listed (open lists only; empty
+             *     for cleared).
+             */
+            counts: components["schemas"]["ReasonCount"][];
+            /**
+             * @description Open: by reason (review, reply, decide, do, pay), then overdue, by
+             *     due date, urgent first, oldest first. Cleared: newest first.
+             */
+            items: components["schemas"]["ItemView"][];
+        };
         /** @description `AuthenticatorAttestationResponseJSON`: what the authenticator made. */
         AttestationResponse: {
             /** @description The attestation object (CBOR), base64url. */
@@ -1615,6 +1764,11 @@ export interface components {
          * @enum {string}
          */
         ClientType: "confidential" | "public";
+        /** @description Yes to a question. */
+        Confirm: {
+            /** @description The message the question the member saw comes from. */
+            message_id: components["schemas"]["MessageId"];
+        };
         /** @description An app the caller let in. */
         ConnectedApp: {
             /** @description The app's client id. */
@@ -1685,11 +1839,6 @@ export interface components {
             granted_by: components["schemas"]["UserId"];
             /** @description The caller granted it (only they may reconnect or disconnect it). */
             granted_by_you: boolean;
-            /**
-             * @description Its grantor also signs in with this account: their own mailbox, not
-             *     a shared one. Decides who may keep its mail when disconnecting.
-             */
-            grantor_signs_in: boolean;
             /** @description How it is doing. */
             health: components["schemas"]["Health"];
             /**
@@ -1824,6 +1973,7 @@ export interface components {
              * @description Messages in it.
              */
             message_count: number;
+            need?: components["schemas"]["NeedView"] | null;
             /** @description The start of the newest message's text. */
             snippet: string;
             /** @description Whether any message is starred. */
@@ -1947,6 +2097,12 @@ export interface components {
             reasons: components["schemas"]["ReasonView"][];
             /** @description Who answered. */
             source: components["schemas"]["DecisionSource"];
+            /**
+             * Format: int32
+             * @description The confidence, 0 to 100, from which an answer of this source to
+             *     this question may act; `None` when it never acts (a suggestion).
+             */
+            threshold?: number | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerView"];
         };
@@ -2189,6 +2345,11 @@ export interface components {
             display_name?: string | null;
             /** @description The inbox. */
             id: components["schemas"]["InboxId"];
+            /**
+             * @description Kept as read-only history after its connection was removed: no
+             *     longer synced, nothing can be written or sent from it.
+             */
+            read_only: boolean;
             role?: components["schemas"]["InboxRole"] | null;
             /**
              * Format: int32
@@ -2248,6 +2409,66 @@ export interface components {
             role?: components["schemas"]["Role"];
         };
         /**
+         * Format: uuid
+         * @description ItemId (UUIDv7)
+         */
+        ItemId: string;
+        /**
+         * @description Whether an item still needs someone.
+         * @enum {string}
+         */
+        ItemState: "open" | "cleared";
+        /**
+         * @description An attention item, as the caller sees it. References and facts only: the
+         *     owning module renders who and what.
+         */
+        ItemView: {
+            /** @description The record that raised it. */
+            cause: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When it was cleared.
+             */
+            cleared_at?: string | null;
+            /**
+             * @description Why it was cleared (`replied`, `archived`, `trashed`, `done`,
+             *     `not_needed`), as the producing module said.
+             */
+            cleared_because?: string | null;
+            cleared_by?: components["schemas"]["UserId"] | null;
+            /** @description Who may see it: its container. */
+            container: components["schemas"]["RecordRef"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The item. */
+            id: components["schemas"]["ItemId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description Why. */
+            reason: components["schemas"]["Reason"];
+            /** @description The record it is about. */
+            record: components["schemas"]["RecordRef"];
+            /**
+             * Format: date-time
+             * @description When its cause arrived.
+             */
+            since: string;
+            /**
+             * Format: date-time
+             * @description Until when the caller put it off ("Later"), when they did.
+             */
+            snoozed_until?: string | null;
+            /** @description Open or cleared. */
+            state: components["schemas"]["ItemState"];
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["Trust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
+        };
+        /**
          * @description What a workspace is for.
          * @enum {string}
          */
@@ -2277,12 +2498,6 @@ export interface components {
              */
             logout_url?: string | null;
         };
-        /**
-         * @description What becomes of a disconnected mailbox's mail in Campbooks. Its mail at
-         *     the provider is never touched.
-         * @enum {string}
-         */
-        MailChoice: "delete" | "keep";
         /** @description The members, in the order they joined. */
         MemberList: {
             /** @description The members. */
@@ -2292,7 +2507,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time
@@ -2371,6 +2590,55 @@ export interface components {
             /** @description The stream. */
             stream: components["schemas"]["Stream"];
         };
+        /**
+         * @description Whose answer raised a need.
+         * @enum {string}
+         */
+        NeedBasis: "rules" | "model" | "member";
+        /**
+         * @description The question whose answer raised a need.
+         * @enum {string}
+         */
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious";
+        /**
+         * @description Why a conversation needs its inbox's members (attention).
+         * @enum {string}
+         */
+        NeedReason: "reply" | "do" | "pay" | "review";
+        /**
+         * @description How much Campbooks stands behind a need.
+         * @enum {string}
+         */
+        NeedTrust: "sure" | "check";
+        /** @description A conversation's open need, as lists and the reader show it. */
+        NeedView: {
+            /** @description Whose answer raised it. */
+            basis: components["schemas"]["NeedBasis"];
+            /**
+             * Format: date
+             * @description When it is due.
+             */
+            due_on?: string | null;
+            /** @description The message it comes from. */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Whether the due date has passed. */
+            overdue: boolean;
+            /** @description The question that raised it. */
+            question: components["schemas"]["NeedQuestion"];
+            quote?: components["schemas"]["Quote"] | null;
+            /** @description Why. */
+            reason: components["schemas"]["NeedReason"];
+            /**
+             * @description The rule that decided it (`signals.reply_asked`, …), for the sentence
+             *     the client words it with.
+             * @example signals.reply_asked
+             */
+            rule?: string | null;
+            /** @description `sure`, or `check` for a question to the member. */
+            trust: components["schemas"]["NeedTrust"];
+            /** @description Whether it is for today. */
+            urgent: boolean;
+        };
         /** @description The pending new account, as the new-account screen shows it. */
         NewAccount: {
             /** @description The name it gave. */
@@ -2402,6 +2670,11 @@ export interface components {
             /** @description Recipients, instead of the filled ones. */
             to?: components["schemas"]["Address"][] | null;
         };
+        /**
+         * @description How a member resolves a need.
+         * @enum {string}
+         */
+        Outcome: "done" | "not_needed";
         /** @description The query as understood. */
         ParsedQuery: {
             /** @description The filters applied. */
@@ -2430,6 +2703,11 @@ export interface components {
             last_used_at?: string | null;
             /** @description What its owner calls it. */
             name: string;
+            /**
+             * @description It was made with the account (a passkey-only sign-up), not added
+             *     later: never shown as a new way in.
+             */
+            signed_up_with: boolean;
             /**
              * @description Whether it may sync between devices (a password manager or a
              *     platform account keeps it), as opposed to staying on one device.
@@ -2494,6 +2772,36 @@ export interface components {
             operator: string;
         };
         /**
+         * @description The sender's sentence a need quotes, with who wrote it and when.
+         *     Untrusted mail content: clients show it as quoted plain text only.
+         */
+        Quote: {
+            /** @description Who wrote it. */
+            from: components["schemas"]["Address"];
+            /**
+             * Format: date-time
+             * @description When.
+             */
+            sent_at: string;
+            /** @description The sentence, at most 240 characters. */
+            text: string;
+        };
+        /**
+         * @description Why an item needs someone, in the order Home shows the groups.
+         * @enum {string}
+         */
+        Reason: "review" | "reply" | "decide" | "do" | "pay";
+        /** @description How many open items there are for one reason. */
+        ReasonCount: {
+            /**
+             * Format: int32
+             * @description Open items with it.
+             */
+            count: number;
+            /** @description The reason. */
+            reason: components["schemas"]["Reason"];
+        };
+        /**
          * @description One reason behind an answer: a stable rule id the client translates,
          *     and what it matched.
          */
@@ -2505,6 +2813,11 @@ export interface components {
              * @example signals.list_header
              */
             rule: string;
+            /**
+             * @description The sender's sentence holding the evidence, when it came from the
+             *     text. Untrusted: show it as quoted plain text only.
+             */
+            sentence?: string | null;
         };
         /**
          * @description A pointer to any record of any module.
@@ -2662,6 +2975,22 @@ export interface components {
             /** @description `required`. */
             userVerification: string;
         };
+        /**
+         * @description Where a user's signup request stands.
+         * @enum {string}
+         */
+        RequestStatus: "pending" | "approved" | "rejected";
+        /** @description A member's verdict on a need. */
+        Resolve: {
+            /**
+             * @description The message the need the member saw comes from (`NeedView.message_id`):
+             *     when the open need comes from another one, nothing is recorded (409
+             *     `need_changed`).
+             */
+            message_id: components["schemas"]["MessageId"];
+            /** @description Done or Not needed. */
+            outcome: components["schemas"]["Outcome"];
+        };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -2786,6 +3115,31 @@ export interface components {
         SignedInWith: {
             /** @description Navigate here: the client's redirect URI with a code, or `return_to`. */
             redirect: string;
+        };
+        /**
+         * @description Who may create a workspace when they are not a member of any yet.
+         * @enum {string}
+         */
+        SignupPolicy: "open" | "invite_only" | "approval" | "code";
+        /** @description The caller's standing with the signup policy. */
+        SignupStatus: {
+            /** @description The instance's policy. */
+            policy: components["schemas"]["SignupPolicy"];
+            request?: components["schemas"]["RequestStatus"] | null;
+            /**
+             * @description Whether the policy holds the caller back from creating a workspace:
+             *     `false` for members of a workspace, the instance's first user and
+             *     every user of an `open` instance.
+             */
+            restricted: boolean;
+        };
+        /** @description Until when. */
+        Snooze: {
+            /**
+             * Format: date-time
+             * @description Later than now and less than a year away.
+             */
+            until: string;
         };
         /** @description What to connect. */
         StartConnection: {
@@ -2971,6 +3325,11 @@ export interface components {
             /** @description Always `Bearer`. */
             token_type: string;
         };
+        /**
+         * @description How much the producing module stands behind an item.
+         * @enum {string}
+         */
+        Trust: "sure" | "check";
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -3640,7 +3999,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            /** @description The token lacks `identity:write`, or the sign-in is more than five minutes old (`fresh_sign_in_required`: sign in again at `/bff/login?max_age=0`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -3789,6 +4148,51 @@ export interface operations {
             };
         };
     };
+    "identity.sign_out_everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every session and refresh token of the account ended, this one's included: sign in again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance, or the token is bound to a workspace. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "identity.list_ways_in": {
         parameters: {
             query?: never;
@@ -3884,6 +4288,44 @@ export interface operations {
             };
             /** @description It is the account's last way in (`last_way_in`). */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "workspaces.get_signup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy and the caller's request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SignupStatus"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a user token. */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -4095,6 +4537,190 @@ export interface operations {
                 };
             };
             /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.list": {
+        parameters: {
+            query?: {
+                /** @description `open` (default) or `cleared`. */
+                state?: "open" | "cleared";
+                /**
+                 * @description The caller's offset from UTC, in minutes (-840 to 840; default 0,
+                 *     UTC): where their day starts, for Done today and for what is overdue.
+                 */
+                utc_offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttentionList"];
+                };
+            };
+            /** @description Not a state, or an offset beyond 14 hours (`invalid_offset`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Snooze"];
+            };
+        };
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description A time in the past or more than a year away (`invalid_until`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "attention.unsnooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The item. */
+                item_id: components["schemas"]["ItemId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The item afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`snooze_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such item, or you cannot see it. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -4352,12 +4978,11 @@ export interface operations {
         parameters: {
             query?: {
                 /**
-                 * @description `delete` (the default): its messages, attachments, search index,
-                 *     decisions and drafts leave Campbooks. `keep`: they stay, read-only;
-                 *     only for the grantor's own mailbox, or a grantor who is an owner or
-                 *     admin. The mail at the provider is never touched.
+                 * @description `delete` (the default): the inboxes it fed are deleted, with their
+                 *     messages, conversations, drafts, decisions, search entries and
+                 *     files. `keep`: they stay as read-only history, no longer synced.
                  */
-                mail?: components["schemas"]["MailChoice"];
+                mail?: "delete" | "keep";
             };
             header?: never;
             path: {
@@ -4386,7 +5011,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, a client token (`connection_needs_user`), another member's connection (`not_your_connection`), or `mail=keep` where it is not allowed (`keep_mail_not_allowed`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4480,6 +5105,12 @@ export interface operations {
                 cursor?: string;
                 /** @description Page size, 1 to 100 (default 50). */
                 limit?: number;
+                /**
+                 * @description These conversations only (1 to 100 ids, comma-separated), whatever
+                 *     their stream or whether archived; those you cannot see are left
+                 *     out. Other filters and the cursor are ignored.
+                 */
+                ids?: string;
             };
             header?: never;
             path: {
@@ -4872,6 +5503,215 @@ export interface operations {
             };
             /** @description No such message, or you cannot see it. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.confirm_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Confirm"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No message id. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No question to answer (`no_open_need`), or not the one you saw (`need_changed`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.reopen_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Nothing to bring back (`nothing_to_reopen`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.resolve_need": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolve"];
+            };
+        };
+        responses: {
+            /** @description The conversation afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConversationSummary"];
+                };
+            };
+            /** @description Not an outcome. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox (`inbox_read_only`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -5717,7 +6557,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegisteredClient"];
                 };
             };
-            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -6151,7 +6991,14 @@ export interface operations {
     };
     "workspaces.remove_member": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the mailboxes they connected are
+                 *     disconnected and their mail deleted. `keep`: their mail stays as
+                 *     read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -6197,7 +7044,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `last_owner`: the workspace would have no owner. */
+            /** @description `last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6618,7 +7465,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_code_invalid`). */
+            /** @description Missing scope, a client token, or refused by the signup policy (`signup_invite_only`, `signup_requires_approval`, `signup_rejected`, `signup_code_invalid`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6687,7 +7534,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            /** @description `invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6954,7 +7801,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, or `passkey_not_accepted` (it did not verify, or it is no longer a way into any account). */
+            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), or `account_suspended` (it verified, but an administrator suspended the account). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7207,7 +8054,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestInfo"];
                 };
             };
-            /** @description No such request (or it expired), or another identity provider serves this instance. */
+            /** @description No such request (or it expired, or another browser made it), or another identity provider serves this instance. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -7875,6 +8722,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description `rate_limited`: too many sign-ins started from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `bff_not_configured`, or the identity provider is unreachable. */
             503: {
                 headers: {
@@ -8007,7 +8863,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            /** @description `rate_limited`: too many authorization requests, or metadata-document clients looked up, from this address. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -8067,6 +8923,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "identity.end_session_post": {
@@ -8112,6 +8977,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

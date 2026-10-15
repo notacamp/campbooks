@@ -1,6 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
+import {
+  api,
+  operationKey,
+  unwrap,
+  unwrapEmpty,
+  type OperationQuery,
+  type Schema,
+} from "~/lib/api";
 
 export type Connection = Schema<"ConnectionView">;
 
@@ -22,7 +29,7 @@ export function useConnections(workspaceId: string) {
 }
 
 /** What becomes of a disconnected mailbox's mail in Campbooks. */
-export type MailChoice = Schema<"MailChoice">;
+export type MailChoice = NonNullable<OperationQuery<"connectors.disconnect">["mail"]>;
 
 /**
  * `connectors.disconnect`: stops syncing for good and gives up the grant at

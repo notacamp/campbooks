@@ -60,12 +60,22 @@
     "approval": {
       "title": "O seu pedido está a aguardar",
       "lead": "Quem gere este Campbooks aprova as novas contas. O seu pedido já lhes chegou; volte a verificar mais tarde.",
-      "retry": "Verificar novamente"
+      "retry": "Verificar novamente",
+      "checking": "A verificar…"
     },
     "failed": {
       "title": "Não foi possível criar o espaço de trabalho",
       "lead": "O Campbooks não respondeu. Nada foi criado.",
       "retry": "Tentar novamente"
+    },
+    "approved": {
+      "title": "O seu pedido foi aprovado",
+      "lead": "Um administrador aprovou o seu pedido. Já pode criar o seu espaço de trabalho.",
+      "continue": "Continuar"
+    },
+    "rejected": {
+      "title": "O seu pedido não foi aprovado",
+      "lead": "Quem gere este Campbooks decidiu não o deixar entrar. Se acha que se trata de um engano, contacte essas pessoas."
     }
   },
   "members": {
@@ -154,6 +164,190 @@
     "failed": {
       "title": "Não foi possível aceitar o convite",
       "lead": "O Campbooks não respondeu. Nada mudou."
+    }
+  },
+  "admin": {
+    "open": "Abrir",
+    "openLabel": "Abrir {{name}}",
+    "retry": "Tentar novamente",
+    "more": "Mostrar mais",
+    "loadingMore": "A carregar mais…",
+    "loadErrorLead": "O servidor não respondeu. Verifique a ligação e tente novamente.",
+    "workspaceCount_one": "{{count}} espaço de trabalho",
+    "workspaceCount_other": "{{count}} espaços de trabalho",
+    "memberCount_one": "{{count}} membro",
+    "memberCount_other": "{{count}} membros",
+    "deletedOn": "Eliminado a {{date}}",
+    "people": {
+      "title": "Pessoas",
+      "lead": "Todas as pessoas que iniciaram sessão neste Campbooks, das mais recentes para as mais antigas. Vê quem são e onde estão, nunca o seu correio nem os seus documentos.",
+      "search": "Pesquisar pessoas",
+      "searchPlaceholder": "Início de um nome ou endereço de email",
+      "list": "Pessoas",
+      "loading": "A carregar pessoas…",
+      "empty": "Ainda ninguém iniciou sessão.",
+      "noMatch": "Nenhum nome ou endereço de email começa por “{{search}}”.",
+      "loadError": "Não foi possível carregar as pessoas",
+      "joined": "Entrou a {{date}}",
+      "suspended": "Suspensa",
+      "back": "Todas as pessoas"
+    },
+    "person": {
+      "loading": "A carregar…",
+      "notFound": "Esta pessoa não está aqui",
+      "notFoundLead": "Ninguém com esta ligação iniciou sessão neste Campbooks.",
+      "loadError": "Não foi possível carregar esta pessoa",
+      "email": "Endereço de email",
+      "noEmail": "Nenhum indicado",
+      "firstSignIn": "Primeiro início de sessão",
+      "workspaces": "Espaços de trabalho",
+      "workspacesOf": "Espaços de trabalho de {{name}}",
+      "noWorkspaces": "Ainda não está em nenhum espaço de trabalho.",
+      "joined": "Entrou a {{date}}"
+    },
+    "workspaces": {
+      "title": "Espaços de trabalho",
+      "lead": "Todos os espaços de trabalho deste Campbooks, dos mais recentes para os mais antigos, e quem está em cada um. Nunca o que têm dentro.",
+      "search": "Pesquisar espaços de trabalho",
+      "searchPlaceholder": "Início do nome de um espaço de trabalho",
+      "list": "Espaços de trabalho",
+      "loading": "A carregar espaços de trabalho…",
+      "empty": "Ainda não há espaços de trabalho.",
+      "noMatch": "Nenhum espaço de trabalho tem um nome que comece por “{{search}}”.",
+      "loadError": "Não foi possível carregar os espaços de trabalho",
+      "created": "Criado a {{date}}",
+      "back": "Todos os espaços de trabalho"
+    },
+    "workspace": {
+      "loading": "A carregar…",
+      "notFound": "Este espaço de trabalho não está aqui",
+      "notFoundLead": "Nenhum espaço de trabalho deste Campbooks tem esta ligação.",
+      "loadError": "Não foi possível carregar este espaço de trabalho",
+      "state": "Estado",
+      "active": "Ativo",
+      "purgedLater": "Os dados são apagados definitivamente depois do período de espera.",
+      "kind": "Tipo",
+      "created": "Criado",
+      "members": "Membros",
+      "pendingInvitations": "Convites pendentes",
+      "invitationCount_one": "{{count}} convite",
+      "invitationCount_other": "{{count}} convites"
+    }
+  },
+  "signups": {
+    "title": "Registos",
+    "parts": {
+      "label": "Registos",
+      "requests": "Pedidos",
+      "codes": "Códigos"
+    },
+    "lead": {
+      "requests": "Pessoas que pediram para criar uma conta neste Campbooks, quando este aprova novas contas. Ao aprovar, a pessoa pode criar o seu espaço de trabalho; fica a saber na próxima vez que abrir a aplicação.",
+      "codes": "Códigos que entrega quando este Campbooks pede um código de registo. Cada código serve para o número de registos que definir ao criá-lo; indique 1 para uma só pessoa. Deixa de funcionar quando se esgota, expira ou é revogado."
+    },
+    "more": "Mostrar mais",
+    "cancel": "Cancelar",
+    "errors": {
+      "generic": "Não foi possível guardar. Nada foi alterado. Tente novamente."
+    },
+    "loadError": {
+      "title": "Não foi possível carregar",
+      "lead": "O servidor não respondeu. Verifique a ligação e tente novamente.",
+      "retry": "Tentar novamente"
+    },
+    "requests": {
+      "filter": {
+        "label": "Mostrar",
+        "all": "Todos",
+        "pending": "Em espera",
+        "approved": "Aprovados",
+        "rejected": "Não aprovados"
+      },
+      "loading": "A carregar pedidos…",
+      "list": "Pedidos de registo",
+      "empty": {
+        "all": {
+          "title": "Ainda não há pedidos",
+          "lead": "Quando alguém pedir para aderir e este Campbooks aprovar novas contas, aparece aqui."
+        },
+        "pending": {
+          "title": "Ninguém está à espera",
+          "lead": "Os novos pedidos aparecem aqui assim que alguém pedir para aderir."
+        },
+        "approved": {
+          "title": "Sem pedidos aprovados",
+          "lead": "As pessoas que aprovar são listadas aqui."
+        },
+        "rejected": {
+          "title": "Sem pedidos recusados",
+          "lead": "As pessoas que recusar são listadas aqui."
+        }
+      },
+      "status": {
+        "pending": "Em espera",
+        "approved": "Aprovado",
+        "rejected": "Não aprovado"
+      },
+      "asked": "Pedido em {{date}}",
+      "decided": "decidido em {{date}}",
+      "approve": "Aprovar",
+      "reject": "Recusar",
+      "approveLabel": "Aprovar {{name}}",
+      "rejectLabel": "Recusar {{name}}",
+      "confirm": {
+        "approve": "Aprovar {{name}}? A pessoa pode criar o seu espaço de trabalho na próxima vez que abrir o Campbooks.",
+        "reject": "Recusar {{name}}? A pessoa será informada de que o pedido não foi aprovado. Pode sempre aprová-la mais tarde."
+      },
+      "reason": "Motivo (opcional)",
+      "reasonHint": "Só os administradores o veem.",
+      "reasonLine": "Motivo: {{reason}}"
+    },
+    "codes": {
+      "mint": {
+        "title": "Criar um código",
+        "lead": "Vê o código uma única vez, logo depois de o criar; copie-o antes de sair desta página.",
+        "label": "Etiqueta",
+        "placeholder": "Ana, testadora da versão beta",
+        "uses": "Utilizações",
+        "expires": "Expira em (opcional)",
+        "submit": "Criar código",
+        "minting": "A criar…",
+        "failed": "Não foi possível criar o código. Tente novamente.",
+        "errors": {
+          "label": "Indique uma etiqueta com 1 a 100 caracteres.",
+          "uses": "As utilizações devem ser um número inteiro de 1 a 100000.",
+          "expires": "Escolha um dia no futuro."
+        }
+      },
+      "minted": {
+        "title": "Código para {{label}}",
+        "lead": "Copie-o agora. Não volta a ser mostrado; só o pode revogar.",
+        "field": "Código de registo",
+        "copy": "Copiar código",
+        "copied": "Copiado",
+        "copyFailed": "Selecione o código e copie-o",
+        "done": "Já o copiei"
+      },
+      "listTitle": "Códigos criados",
+      "list": "Códigos de registo",
+      "loading": "A carregar códigos…",
+      "empty": {
+        "title": "Ainda não há códigos",
+        "lead": "Crie um código acima e entregue-o à pessoa que quer deixar entrar."
+      },
+      "state": {
+        "active": "Ativo",
+        "used_up": "Esgotado",
+        "expired": "Expirado",
+        "revoked": "Revogado"
+      },
+      "usage": "{{uses}} de {{max}} utilizações",
+      "noExpiry": "Sem validade",
+      "expiresOn": "Expira em {{date}}",
+      "mintedOn": "Criado em {{date}}",
+      "revoke": "Revogar",
+      "revokeLabel": "Revogar {{label}}",
+      "confirmRevoke": "Revogar «{{label}}»? Deixa de funcionar de imediato. As pessoas que já o usaram mantêm os seus espaços de trabalho."
     }
   }
 }

@@ -34,7 +34,7 @@ pub struct ClientPath {
     operation_id = "identity.rotate_client_secret",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("client_id" = String, Path, description = "The app."),
@@ -59,7 +59,11 @@ pub async fn handler(
     Path(path): Path<ClientPath>,
 ) -> Result<Json<RegisteredClient>> {
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
-    workspace_clients::require_admin(&workspace.access)?;
+    workspace_clients::require_admin(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Write,
+    )?;
     let now = issuer.now();
     step_up::require_recent(&workspace.principal, now)?;
     let mut tx = state.db.begin_for(workspace.id).await?;

@@ -61,7 +61,7 @@ fn metadata(issuer: &Issuer) -> serde_json::Value {
     path = "/.well-known/openid-configuration",
     tag = "identity",
     operation_id = "identity.openid_configuration",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The issuer's metadata.", body = Object),
@@ -78,7 +78,7 @@ pub async fn openid_configuration(State(ctx): State<Ctx>) -> Result<Json<serde_j
     path = "/.well-known/oauth-authorization-server",
     tag = "identity",
     operation_id = "identity.authorization_server_metadata",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The issuer's metadata.", body = Object),
@@ -98,7 +98,7 @@ pub async fn authorization_server_metadata(
     path = "/oauth2/jwks",
     tag = "identity",
     operation_id = "identity.jwks",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.signing_key"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.signing_key"]).access("identity.signing_key", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The JWKS.", body = Object),
@@ -151,7 +151,7 @@ const RESOURCE_METADATA_PATH: &str = "/.well-known/oauth-protected-resource";
     path = "/.well-known/oauth-protected-resource/api",
     tag = "identity",
     operation_id = "identity.protected_resource_metadata",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The API's metadata.", body = Object),
@@ -168,7 +168,7 @@ pub async fn protected_resource(State(ctx): State<Ctx>) -> Result<Json<serde_jso
     path = "/.well-known/oauth-protected-resource",
     tag = "identity",
     operation_id = "identity.protected_resource_metadata_root",
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("identity.discovery", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The API's metadata.", body = Object),

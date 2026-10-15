@@ -15,6 +15,11 @@
 //!   sign-in in the last ten minutes. A loopback or private-use-scheme
 //!   redirect (native apps, many agents) is asked every time: any app on the
 //!   device can claim one (RFC 8252 §8.6).
+//!
+//! A stored request belongs to the browser that made it (the
+//! `__Host-campbooks_browser` cookie): another browser handed its id (a
+//! link someone was sent) finds nothing, so nobody can be made to finish
+//! someone else's sign-in.
 
 use std::time::Duration;
 
@@ -52,6 +57,14 @@ use crate::{
 
 /// How long an authorization request waits for the person to sign in.
 pub const REQUEST_LIFETIME: TimeDelta = TimeDelta::minutes(15);
+
+/// How long a browser keeps the token its authorization requests are bound
+/// to (renewed by each request): longer than a request waits, so the one a
+/// slow sign-in stores again still finds it.
+const BROWSER_LIFETIME: TimeDelta = TimeDelta::days(1);
+
+/// Authorization requests one address may make (each may store a request).
+const AUTHORIZE_LIMIT: Limit = Limit::new("identity.authorize", 60, Duration::from_mins(1));
 
 /// The web client's consent screen.
 pub const CONSENT_PATH: &str = "/consent";
@@ -134,6 +147,20 @@ fn problem(status: StatusCode, code: &'static str) -> Response {
     web::no_store(LocalizableProblem::new(status, MESSAGES.reason(code)).into_response())
 }
 
+/// This browser's binding token (`__Host-campbooks_browser`), when it
+/// sends a well-formed one.
+pub fn browser(issuer: &Issuer, headers: &HeaderMap) -> Option<String> {
+    issuer
+        .cookies
+        .read(headers, web::BROWSER_COOKIE)
+        .filter(|cookie| {
+            cookie.len() == 43
+                && cookie
+                    .bytes()
+                    .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        })
+}
+
 /// Metadata documents one address may make the server look up (each may
 /// be a fetch from the internet).
 const DOCUMENT_LIMIT: Limit = Limit::new("identity.metadata_document", 30, Duration::from_mins(1));
@@ -173,7 +200,7 @@ pub async fn find_client(
     path = "/oauth2/authorize",
     tag = "identity",
     operation_id = "identity.authorize",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request", "identity.authorization_code"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request", "identity.authorization_code"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(AuthorizeQuery),
     security(()),
     responses(
@@ -183,9 +210,9 @@ pub async fn find_client(
         (status = 400, description = "`invalid_client` or `invalid_redirect_uri`: nothing is \
             redirected.", body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "Another identity provider serves this instance."),
-        (status = 429, description = "`rate_limited`: too many metadata-document clients \
-            looked up from this address.", body = campbooks_kernel::Problem,
-            content_type = "application/problem+json"),
+        (status = 429, description = "`rate_limited`: too many authorization requests, or \
+            metadata-document clients looked up, from this address.",
+            body = campbooks_kernel::Problem, content_type = "application/problem+json"),
     ),
 )]
 pub async fn authorize(
@@ -195,6 +222,10 @@ pub async fn authorize(
     Query(query): Query<AuthorizeQuery>,
 ) -> Result<Response> {
     let issuer = ctx.issuer()?;
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &AUTHORIZE_LIMIT, &RateKey::ip(ip))
+        .await?;
     let client = match query.client_id.as_deref() {
         Some(id) => find_client(&ctx, issuer, id, ip).await?,
         None => None,
@@ -209,53 +240,29 @@ pub async fn authorize(
     else {
         return Ok(problem(StatusCode::BAD_REQUEST, "invalid_redirect_uri"));
     };
-    let prompt = query.prompt.as_deref().unwrap_or_default();
-    let mut request = Request {
-        client_id: client.id.clone(),
-        redirect_uri: redirect_uri.to_owned(),
-        scope: String::new(),
-        state: query.state.clone(),
-        nonce: query.nonce.clone(),
-        code_challenge: String::new(),
-        resource: None,
-        consent_due: prompt.split_whitespace().any(|p| p == "consent"),
-        consent_account_id: None,
-    };
     let refuse = |request: &Request, error: &str| {
         see_other(&request.redirect(&issuer.url, &[("error", error)]))
     };
-    if query.response_type.as_deref() != Some("code") || !client.may_use("authorization_code") {
-        return Ok(refuse(&request, "unsupported_response_type"));
+    let (request, error) = checked(issuer, &client, redirect_uri, &query);
+    if let Some(error) = error {
+        return Ok(refuse(&request, error));
     }
-    match (
-        &query.code_challenge,
-        query.code_challenge_method.as_deref(),
-    ) {
-        (Some(challenge), Some("S256")) if is_s256_challenge(challenge) => {
-            challenge.clone_into(&mut request.code_challenge);
-        }
-        _ => return Ok(refuse(&request, "invalid_request")),
-    }
-    let Some(scope) = allowed_scope(issuer, &client, query.scope.as_deref()) else {
-        return Ok(refuse(&request, "invalid_scope"));
-    };
-    request.scope = scope;
-    match query.resource.as_deref() {
-        None => {}
-        Some(resource) if resource == issuer.resource => {
-            request.resource = Some(resource.to_owned());
-        }
-        Some(_) => return Ok(refuse(&request, "invalid_target")),
-    }
-    if !prompt
-        .split_whitespace()
-        .all(|p| matches!(p, "none" | "login" | "consent" | "select_account"))
-    {
-        return Ok(refuse(&request, "invalid_request"));
-    }
+    let prompt = query.prompt.as_deref().unwrap_or_default();
     let force_login = prompt.split_whitespace().any(|p| p == "login");
     let silent = prompt.split_whitespace().any(|p| p == "none");
     let now = issuer.now();
+    let browser = browser(issuer, &headers).unwrap_or_else(random_token);
+    let bound = |response: Response| {
+        web::with_cookie(
+            response,
+            issuer.cookies.set(
+                web::BROWSER_COOKIE,
+                &browser,
+                BROWSER_LIFETIME.num_seconds(),
+                web::SameSite::Lax,
+            ),
+        )
+    };
     let session = match issuer.session_cookie(&headers) {
         Some(token) => sessions::current(&ctx.state.db, &token, now).await?,
         None => None,
@@ -278,14 +285,76 @@ pub async fn authorize(
                 },
             );
         }
-        let location = decide(&ctx.state.db, issuer, &client, request, &session, now).await?;
-        return Ok(see_other(&location));
+        let location = decide(
+            &ctx.state.db,
+            issuer,
+            &client,
+            request,
+            &session,
+            &browser,
+            now,
+        )
+        .await?;
+        return Ok(bound(see_other(&location)));
     }
     if silent {
         return Ok(refuse(&request, "login_required"));
     }
-    let id = store(&ctx.state.db, &request, now).await?;
-    Ok(see_other(&format!("{SIGN_IN_PATH}?request={id}")))
+    let id = store(&ctx.state.db, &request, &browser, now).await?;
+    Ok(bound(see_other(&format!("{SIGN_IN_PATH}?request={id}"))))
+}
+
+/// The request `query` makes of `client`, redirecting to `redirect_uri`
+/// (already checked), and what is wrong with it if anything (the error
+/// sent back to the client).
+fn checked(
+    issuer: &Issuer,
+    client: &Client,
+    redirect_uri: &str,
+    query: &AuthorizeQuery,
+) -> (Request, Option<&'static str>) {
+    let prompt = query.prompt.as_deref().unwrap_or_default();
+    let mut request = Request {
+        client_id: client.id.clone(),
+        redirect_uri: redirect_uri.to_owned(),
+        scope: String::new(),
+        state: query.state.clone(),
+        nonce: query.nonce.clone(),
+        code_challenge: String::new(),
+        resource: None,
+        consent_due: prompt.split_whitespace().any(|p| p == "consent"),
+        consent_account_id: None,
+    };
+    if query.response_type.as_deref() != Some("code") || !client.may_use("authorization_code") {
+        return (request, Some("unsupported_response_type"));
+    }
+    match (
+        &query.code_challenge,
+        query.code_challenge_method.as_deref(),
+    ) {
+        (Some(challenge), Some("S256")) if is_s256_challenge(challenge) => {
+            challenge.clone_into(&mut request.code_challenge);
+        }
+        _ => return (request, Some("invalid_request")),
+    }
+    let Some(scope) = allowed_scope(issuer, client, query.scope.as_deref()) else {
+        return (request, Some("invalid_scope"));
+    };
+    request.scope = scope;
+    match query.resource.as_deref() {
+        None => {}
+        Some(resource) if resource == issuer.resource => {
+            request.resource = Some(resource.to_owned());
+        }
+        Some(_) => return (request, Some("invalid_target")),
+    }
+    if !prompt
+        .split_whitespace()
+        .all(|p| matches!(p, "none" | "login" | "consent" | "select_account"))
+    {
+        return (request, Some("invalid_request"));
+    }
+    (request, None)
 }
 
 /// The requested scopes when `client` may ask for every one (the OIDC
@@ -320,13 +389,19 @@ fn is_s256_challenge(challenge: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
 }
 
-async fn store(db: &PgPool, request: &Request, now: DateTime<Utc>) -> Result<String> {
+/// Store `request` for `browser` (its binding token); its id.
+async fn store(
+    db: &PgPool,
+    request: &Request,
+    browser: &str,
+    now: DateTime<Utc>,
+) -> Result<String> {
     let id = random_token();
     sqlx::query(
         "INSERT INTO identity.authorize_requests
              (id_hash, client_id, redirect_uri, scope, state, nonce, code_challenge, created_at,
-              expires_at, resource, consent_due, consent_account_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+              expires_at, resource, consent_due, consent_account_id, browser_hash)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
     )
     .bind(hash(&id))
     .bind(&request.client_id)
@@ -340,6 +415,7 @@ async fn store(db: &PgPool, request: &Request, now: DateTime<Utc>) -> Result<Str
     .bind(&request.resource)
     .bind(request.consent_due)
     .bind(request.consent_account_id)
+    .bind(hash(browser))
     .execute(db)
     .await?;
     Ok(id)
@@ -348,46 +424,68 @@ async fn store(db: &PgPool, request: &Request, now: DateTime<Utc>) -> Result<Str
 const REQUEST_COLUMNS: &str = "client_id, redirect_uri, scope, state, nonce, code_challenge, \
      resource, consent_due, consent_account_id";
 
-/// The stored authorization request `id`, while it waits.
-pub async fn load(db: &PgPool, id: &str, now: DateTime<Utc>) -> Result<Option<Request>> {
+/// The stored authorization request `id`, while it waits, when `browser`
+/// (the asker's binding token) is the one that made it.
+pub async fn load(
+    db: &PgPool,
+    id: &str,
+    browser: Option<&str>,
+    now: DateTime<Utc>,
+) -> Result<Option<Request>> {
+    let Some(browser) = browser else {
+        return Ok(None);
+    };
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
         "SELECT {REQUEST_COLUMNS}
-           FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2"
+           FROM identity.authorize_requests
+          WHERE id_hash = $1 AND expires_at > $2 AND browser_hash = $3"
     )))
     .bind(hash(id))
     .bind(now)
+    .bind(hash(browser))
     .fetch_optional(db)
     .await?)
 }
 
-/// Take the stored request `id` (single use), while it waits.
+/// Take the stored request `id` (single use), while it waits, when
+/// `browser` is the one that made it.
 pub async fn take(
     conn: &mut sqlx::PgConnection,
     id: &str,
+    browser: Option<&str>,
     now: DateTime<Utc>,
 ) -> Result<Option<Request>> {
+    let Some(browser) = browser else {
+        return Ok(None);
+    };
     Ok(sqlx::query_as(sqlx::AssertSqlSafe(format!(
-        "DELETE FROM identity.authorize_requests WHERE id_hash = $1 AND expires_at > $2
+        "DELETE FROM identity.authorize_requests
+          WHERE id_hash = $1 AND expires_at > $2 AND browser_hash = $3
          RETURNING {REQUEST_COLUMNS}"
     )))
     .bind(hash(id))
     .bind(now)
+    .bind(hash(browser))
     .fetch_optional(conn)
     .await?)
 }
 
-/// Complete the stored request `id` for `session`; where to send the
-/// browser (the client with a code, or the consent screen), or `None` when
-/// the request is gone or expired.
+/// Complete the stored request `id` for `session` in `browser`; where to
+/// send the browser (the client with a code, or the consent screen), or
+/// `None` when the request is gone, expired, or another browser's.
 pub async fn complete_stored(
     db: &PgPool,
     issuer: &Issuer,
     id: &str,
+    browser: Option<&str>,
     session: &Session,
     now: DateTime<Utc>,
 ) -> Result<Option<String>> {
     let mut conn = db.acquire().await?;
-    let Some(request) = take(&mut conn, id, now).await? else {
+    let Some(request) = take(&mut conn, id, browser, now).await? else {
+        return Ok(None);
+    };
+    let Some(browser) = browser else {
         return Ok(None);
     };
     drop(conn);
@@ -397,7 +495,7 @@ pub async fn complete_stored(
             request.redirect(&issuer.url, &[("error", "unauthorized_client")]),
         ));
     };
-    decide(db, issuer, &client, request, session, now)
+    decide(db, issuer, &client, request, session, browser, now)
         .await
         .map(Some)
 }
@@ -457,6 +555,7 @@ async fn decide(
     client: &Client,
     mut request: Request,
     session: &Session,
+    browser: &str,
     now: DateTime<Utc>,
 ) -> Result<String> {
     match decision(db, client, &request, session, now).await? {
@@ -464,13 +563,13 @@ async fn decide(
         Decision::SignInAgain => {
             // The screen will follow the new sign-in.
             request.consent_due = true;
-            let id = store(db, &request, now).await?;
+            let id = store(db, &request, browser, now).await?;
             Ok(format!("{SIGN_IN_PATH}?request={id}&reauth=1"))
         }
         Decision::Consent => {
             request.consent_due = true;
             request.consent_account_id = Some(session.account_id);
-            let id = store(db, &request, now).await?;
+            let id = store(db, &request, browser, now).await?;
             Ok(format!("{CONSENT_PATH}?request={id}"))
         }
     }

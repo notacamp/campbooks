@@ -137,10 +137,15 @@ async fn waiting(
     let session = sessions::current(&ctx.state.db, &token, now)
         .await?
         .ok_or(Error::NotFound)?;
-    let request = authorize::load(&ctx.state.db, id, now)
-        .await?
-        .filter(|r| r.consent_due && r.consent_account_id == Some(session.account_id))
-        .ok_or(Error::NotFound)?;
+    let request = authorize::load(
+        &ctx.state.db,
+        id,
+        authorize::browser(issuer, headers).as_deref(),
+        now,
+    )
+    .await?
+    .filter(|r| r.consent_due && r.consent_account_id == Some(session.account_id))
+    .ok_or(Error::NotFound)?;
     let client = issuer
         .clients
         .find(&ctx.state.db, &request.client_id)
@@ -171,7 +176,7 @@ fn principal_of(account: Uuid) -> Principal {
     path = "/auth/consent/{id}",
     tag = "identity",
     operation_id = "identity.get_consent_request",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     params(("id" = String, Path, description = "The `request` the consent screen was given.")),
     security(()),
     responses(
@@ -288,7 +293,7 @@ pub struct Answered {
     path = "/auth/consent/{id}",
     tag = "identity",
     operation_id = "identity.answer_consent",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent", "identity.authorization_code"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent", "identity.authorization_code"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("id" = String, Path, description = "The `request` the consent screen was given."),
         ("x-campbooks-csrf" = String, Header, description = "Must be `1`."),
@@ -354,10 +359,15 @@ pub async fn answer(
         }
     };
     let mut tx = ctx.state.db.begin().await?;
-    let request = authorize::take(&mut tx, &id, now)
-        .await?
-        .filter(|r| r.consent_due && r.consent_account_id == Some(session.account_id))
-        .ok_or(Error::NotFound)?;
+    let request = authorize::take(
+        &mut tx,
+        &id,
+        authorize::browser(issuer, &headers).as_deref(),
+        now,
+    )
+    .await?
+    .filter(|r| r.consent_due && r.consent_account_id == Some(session.account_id))
+    .ok_or(Error::NotFound)?;
     if answer.decision == Decision::Deny {
         tx.commit().await?;
         let redirect = request.redirect(&issuer.url, &[("error", "access_denied")]);

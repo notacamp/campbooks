@@ -20,9 +20,13 @@ use std::{
     time::Instant,
 };
 
+use campbooks_kernel::text::displayable;
 use regex::Regex;
 use serde::Deserialize;
 
+use super::auth_results;
+use super::inbox::Hints;
+pub use super::inbox::Recipient;
 use crate::{
     Error,
     decide::{
@@ -50,7 +54,11 @@ pub mod triage {
 }
 
 /// The triage questions, worded for a `decide` model. The labels and their
-/// meaning follow `crates/ai/evals/decide/mail-triage/LABELLING.md`.
+/// meaning follow `crates/ai/evals/decide/mail-triage/LABELLING.md`. `noul`
+/// questions are yes/no questions, the form Laya documents; a declarative
+/// statement got the same answer as its negation (campbooks-cloud#128).
+/// Changing a wording changes what the model reads: bump
+/// [`super::inbox::CONTEXT_VERSION`] with it.
 pub fn triage_questions() -> Vec<Question> {
     vec![
         Question::choice(
@@ -81,18 +89,19 @@ pub fn triage_questions() -> Vec<Question> {
         ),
         Question::noul(
             triage::NEEDS_REPLY,
-            "The sender expects a written reply from the recipient.",
+            "Does the sender expect the recipient to write back?",
         ),
         Question::noul(
             triage::ASKS_ACTION,
-            "The sender asks the recipient to do something, such as reply, pay, sign, send, \
-             review, confirm or renew. Marketing calls to action and \"if this wasn't you\" notes \
-             do not count.",
+            "Does the sender ask the recipient to do something, such as pay, sign, send, review, \
+             confirm or renew? Marketing calls to action and \"if this wasn't you\" notes do not \
+             count.",
         ),
         Question::noul(
             triage::HAS_DEADLINE,
-            "The email gives a time by which the recipient must act, or after which something \
-             affecting them lapses. A meeting time alone or a sale ending does not count.",
+            "Does the email give a date or time by which the recipient must act, or after which \
+             something affecting them lapses? A meeting time alone or a sale ending does not \
+             count.",
         ),
         Question::score(
             triage::URGENCY,
@@ -105,8 +114,9 @@ pub fn triage_questions() -> Vec<Question> {
         ),
         Question::noul(
             triage::SUSPICIOUS,
-            "The email is phishing, a scam or an impersonation (a look-alike sender domain, \
-             credentials or payment asked for through a link, an urgent transfer or gift cards).",
+            "Is this email phishing, a scam or an impersonation, such as a look-alike sender \
+             domain, credentials or payment asked for through a link, an urgent transfer or gift \
+             cards?",
         ),
     ]
 }
@@ -155,6 +165,10 @@ pub struct Envelope {
     /// Plain-text body, quoted history included.
     #[serde(default)]
     pub body: String,
+    /// Whose inbox it arrived in, when known: what a `decide` model is told
+    /// about the recipient ([`super::inbox`]).
+    #[serde(default)]
+    pub recipient: Option<Recipient>,
 }
 
 impl fmt::Debug for Party {
@@ -194,11 +208,14 @@ impl Envelope {
             .map(|(_, v)| v.as_str())
     }
 
-    /// The compact state a `decide` model reads (ADR 0009): sender,
-    /// recipients, subject, the bulk headers present, the attachment list and
-    /// the first part of the body.
+    /// The compact state a `decide` model reads (ADR 0009): the triage
+    /// context ([`super::inbox::preamble`]: what Campbooks is, who the
+    /// recipient is, the rules' hints), then the email: sender, recipients,
+    /// subject, the bulk headers present, the attachment list and the first
+    /// part of the body.
     pub fn decision_state(&self) -> DecisionState {
-        let mut out = format!("From: {}\n", party(&self.from));
+        let mut out = super::inbox::preamble(self);
+        let _ = writeln!(out, "From: {}", party(&self.from));
         let to: Vec<String> = self.to.iter().chain(&self.cc).map(party).collect();
         if !to.is_empty() {
             let _ = writeln!(out, "To: {}", to.join(", "));
@@ -220,6 +237,20 @@ impl Envelope {
         out.push('\n');
         out.push_str(&truncate(&self.body, STATE_BODY_CHARS));
         DecisionState::Text(out)
+    }
+
+    /// What the rules saw on the envelope's face, for a model's context:
+    /// list headers (and the `List-Id`), a service sender, automatic
+    /// sending. Hints, not decisions.
+    pub(crate) fn hints(&self) -> Hints {
+        let (auto_reply, automated_sender) = automation(self, &self.subject);
+        Hints {
+            list: bulk_header(self).is_some(),
+            list_id: self.header("list-id").map(str::to_owned),
+            service_sender: AUTOMATED_LOCAL.is_match(local_part(&self.from.address)),
+            automatic: auto_reply.is_some()
+                || automated_sender.is_some_and(|s| s.starts_with("Auto-Submitted")),
+        }
     }
 
     /// The text a k-NN embedder reads: sender, subject, header names,
@@ -479,6 +510,49 @@ static DUE: LazyLock<Regex> = LazyLock::new(|| {
         "en attente de paiement",
     ])
 });
+
+/// A subject that names a security problem: a security alert or advisory,
+/// a vulnerability. Read only in the subject of an authenticated service's
+/// mail (see [`security_alert`]). "Action required" alone is not one: it is
+/// what phishing says ([`ACTION_NOW`]).
+static SECURITY_ALERT: LazyLock<Regex> = LazyLock::new(|| {
+    phrases(&[
+        "security alert",
+        "security advisory",
+        "vulnerability",
+        "vulnerabilities",
+        "vulnerable dependency",
+        "dependabot alert",
+        "alerta de segurança",
+        "aviso de segurança",
+        "vulnerabilidade",
+        "vulnerabilidades",
+        "alerta de seguridad",
+        "aviso de seguridad",
+        "vulnerabilidad",
+        "alerte de sécurité",
+        "avis de sécurité",
+        "vulnérabilité",
+        "vulnérabilités",
+    ])
+});
+
+/// Code hosts and package registries whose authenticated security alerts
+/// are a sure to-do (the alert is about the recipient's code, and the next
+/// step is in the mail), each with the display-name words it signs with.
+/// Kept short on purpose; an authenticated sender not listed here is
+/// answered below the confidence answers act from, so at most a question,
+/// never a to-do.
+const SECURITY_PLATFORMS: [(&str, &[&str]); 8] = [
+    ("github.com", &["github"]),
+    ("gitlab.com", &["gitlab"]),
+    ("bitbucket.org", &["bitbucket"]),
+    ("npmjs.com", &["npm", "npmjs"]),
+    ("pypi.org", &["pypi"]),
+    ("rubygems.org", &["rubygems"]),
+    ("crates.io", &["crates", "cratesio"]),
+    ("snyk.io", &["snyk"]),
+];
 
 static NOTIFICATION: LazyLock<Regex> = LazyLock::new(|| {
     phrases(&[
@@ -1053,6 +1127,7 @@ struct Read {
     paid: Option<String>,
     due: Option<String>,
     notification: Option<String>,
+    security_alert: Option<SecurityAlert>,
     marketing: Option<String>,
     request: Option<String>,
     reply_ask: Option<String>,
@@ -1141,6 +1216,134 @@ fn phishing_tells(
     (phishing, phishing_ask, due)
 }
 
+/// Whether `host` is a plain ASCII domain: no internationalised label
+/// (`xn--`, or Unicode a parser left as is), which can look like another.
+fn plain_domain(host: &str) -> bool {
+    !host.is_empty()
+        && host.is_ascii()
+        && host
+            .split('.')
+            .all(|label| !label.to_ascii_lowercase().starts_with("xn--"))
+}
+
+/// Whether the sender's display name, or one of its words, is one of
+/// `accepted` (letters and digits only, lower-case).
+fn named(from: &Party, accepted: &[&str]) -> bool {
+    let squash = |s: &str| -> String {
+        s.chars()
+            .filter(char::is_ascii_alphanumeric)
+            .map(|c| c.to_ascii_lowercase())
+            .collect()
+    };
+    let name = squash(&from.name);
+    accepted
+        .iter()
+        .any(|token| name == *token || from.name.split_whitespace().any(|w| squash(w) == *token))
+}
+
+/// Whether the sender's display name names its own domain: "GitHub" at
+/// `github.com`, not "GitHub" at `github-alerts.example`. Names and domain
+/// labels compare letters and digits only; the domain must be plain ASCII.
+fn names_own_domain(from: &Party) -> bool {
+    if !plain_domain(domain(&from.address)) {
+        return false;
+    }
+    let host = registrable(domain(&from.address));
+    let label: String = host
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    label.len() >= 3 && named(from, &[label.as_str()])
+}
+
+/// Whether the receiving provider authenticated the sender's domain: its
+/// own `Authentication-Results` (the connector keeps no other), read as RFC
+/// 8601 says ([`auth_results`]), holds exactly one `dmarc` result, `pass`,
+/// whose `header.from` is the From domain; or a `dkim=pass` whose signing
+/// domain (`header.d`, `header.i`) has the From domain's registrable
+/// domain. Absent, malformed or failing results authenticate nothing.
+fn authenticated(env: &Envelope) -> bool {
+    let Some(results) = env
+        .header("authentication-results")
+        .and_then(auth_results::parse)
+    else {
+        return false;
+    };
+    let host = domain(&env.from.address).to_ascii_lowercase();
+    let from = registrable(&host);
+    if !plain_domain(&host) || from.is_empty() {
+        return false;
+    }
+    let dmarc: Vec<_> = results.iter().filter(|r| r.method == "dmarc").collect();
+    let dmarc_pass = match dmarc.as_slice() {
+        [only] => {
+            let headers_from: Vec<_> = only.values("header.from").collect();
+            only.result == "pass"
+                && matches!(headers_from.as_slice(), [d] if d.eq_ignore_ascii_case(&host))
+        }
+        _ => false,
+    };
+    let aligned = |signer: &str| {
+        let signer = signer.rsplit('@').next().unwrap_or_default();
+        plain_domain(signer) && registrable(signer) == from
+    };
+    let dkim_pass = results.iter().any(|r| {
+        let signers: Vec<_> = r.values("header.d").chain(r.values("header.i")).collect();
+        r.method == "dkim"
+            && r.result == "pass"
+            && !signers.is_empty()
+            && signers.into_iter().all(aligned)
+    });
+    dmarc_pass || dkim_pass
+}
+
+/// A security alert about something of the recipient's (a vulnerability in
+/// their code, an advisory on their account).
+#[derive(Debug, Clone)]
+struct SecurityAlert {
+    /// The words that say so.
+    words: String,
+    /// From a listed platform ([`SECURITY_PLATFORMS`]): a sure to-do.
+    platform: bool,
+}
+
+/// A service's security alert, if it is one: only from a service sender
+/// (list or automated address) whose provider authenticated its plain-ASCII
+/// domain and whose display name names that domain, with no phishing tell
+/// and no marketing words.
+fn security_alert(
+    env: &Envelope,
+    subject: &str,
+    service: bool,
+    marketing: Option<&str>,
+    phishing: &[Reason],
+) -> Option<SecurityAlert> {
+    if !service || marketing.is_some() || !phishing.is_empty() || !authenticated(env) {
+        return None;
+    }
+    let host = registrable(domain(&env.from.address));
+    let platform = SECURITY_PLATFORMS
+        .iter()
+        .find(|(domain, _)| *domain == host)
+        .map(|(_, names)| *names);
+    let names_itself = match platform {
+        Some(names) => named(&env.from, names),
+        None => names_own_domain(&env.from),
+    };
+    if !names_itself {
+        return None;
+    }
+    let words = first_match(&SECURITY_ALERT, subject)?;
+    Some(SecurityAlert {
+        words,
+        platform: platform.is_some(),
+    })
+}
+
 /// A "today" cue in the subject or the actionable text, or a window of 24
 /// hours or less.
 fn today(subject: &str, actionable: &str) -> Option<String> {
@@ -1186,6 +1389,14 @@ impl Read {
             .find(|a| a.content_type.eq_ignore_ascii_case("text/calendar"))
             .map(|a| a.name.clone())
             .or_else(|| first_match(&CALENDAR_INVITE, &subject));
+        let marketing = first_match(&MARKETING, &head);
+        let security_alert = security_alert(
+            env,
+            &subject,
+            bulk.is_some() || automated_sender.is_some(),
+            marketing.as_deref(),
+            &phishing,
+        );
         Self {
             bulk,
             auto_reply,
@@ -1197,7 +1408,8 @@ impl Read {
             paid: first_match(&PAID, &head),
             due,
             notification: first_match(&NOTIFICATION, &subject),
-            marketing: first_match(&MARKETING, &head),
+            security_alert,
+            marketing,
             request: first_match(&REQUEST, &actionable),
             reply_ask: first_match(&REPLY_ASK, &actionable),
             question: actionable.contains('?'),
@@ -1252,6 +1464,12 @@ mod conf {
     pub const NOTHING_ASKED: f64 = 0.95;
     pub const MARKETING_NO_DEADLINE: f64 = 0.93;
     pub const NOT_URGENT: f64 = 0.95;
+    /// Not in `mail-triage` v1 yet (no labelled security alerts): priors,
+    /// to be replaced by measured precision once the set has them. A listed
+    /// platform's alert acts; another authenticated sender's stays below
+    /// every operating point the baseline acts from (0.75 and up).
+    pub const SECURITY_ALERT: f64 = 0.9;
+    pub const SECURITY_ALERT_UNLISTED: f64 = 0.6;
     pub const TODAY: f64 = 0.9;
     pub const SUSPICIOUS_CALM: f64 = 0.93;
     pub const DAYS: f64 = 0.92;
@@ -1286,6 +1504,11 @@ fn stream(r: &Read) -> (usize, f64, Vec<Reason>) {
         .notification
         .as_ref()
         .map(|n| Reason::new("signals.notification_words", n));
+    if let Some(alert) = &r.security_alert {
+        let confidence = alert.confidence();
+        let alert = Reason::new("signals.security_alert", &alert.words);
+        return (1, confidence, list.into_iter().chain([alert]).collect());
+    }
     if let Some(list) = list {
         return match (money, notice) {
             (Some(money), _) if r.marketing.is_none() => (2, conf::BULK_RECEIPT, vec![list, money]),
@@ -1351,7 +1574,26 @@ fn needs_reply(r: &Read) -> Ruled {
     ))
 }
 
+impl SecurityAlert {
+    fn confidence(&self) -> f64 {
+        if self.platform {
+            conf::SECURITY_ALERT
+        } else {
+            conf::SECURITY_ALERT_UNLISTED
+        }
+    }
+}
+
 fn asks_action(r: &Read) -> Ruled {
+    // A service telling you something of yours needs fixing is a to-do,
+    // even when it comes through a list.
+    if let Some(alert) = &r.security_alert {
+        return Some((
+            1,
+            alert.confidence(),
+            vec![Reason::new("signals.security_alert", &alert.words)],
+        ));
+    }
     let newsletter = (r.bulk.is_some() || r.unsubscribe.is_some()) && r.money.is_none();
     if newsletter && r.notification.is_none() {
         return Some((
@@ -1492,6 +1734,7 @@ impl EmailSignals {
     pub fn answer(envelope: &Envelope, questions: &[Question]) -> Decisions {
         let started = Instant::now();
         let read = Read::new(envelope);
+        let fresh = new_text(&envelope.body);
         let asks = asks_action(&read);
         let answers = questions
             .iter()
@@ -1514,14 +1757,19 @@ impl EmailSignals {
                     (triage::SUSPICIOUS, QuestionKind::Noul { .. }) => suspicious(&read),
                     _ => None,
                 };
-                ruled.map(|(index, confidence, reasons)| Decided {
-                    answer: local_answer(
-                        q,
-                        peaked(q.option_count(), index, confidence),
-                        "signals",
-                        started,
-                    ),
-                    reasons,
+                ruled.map(|(index, confidence, mut reasons)| {
+                    for reason in &mut reasons {
+                        reason.sentence = quoted_sentence(&fresh, reason);
+                    }
+                    Decided {
+                        answer: local_answer(
+                            q,
+                            peaked(q.option_count(), index, confidence),
+                            "signals",
+                            started,
+                        ),
+                        reasons,
+                    }
                 })
             })
             .collect();
@@ -1530,6 +1778,78 @@ impl EmailSignals {
             remote_calls: 0,
         }
     }
+}
+
+/// Rules whose evidence is a phrase from the message's text, so the
+/// sentence around it is what the sender wrote.
+const QUOTED_RULES: [&str; 10] = [
+    "signals.reply_asked",
+    "signals.request",
+    "signals.question",
+    "signals.payment_due",
+    "signals.action_asked",
+    "signals.deadline",
+    "signals.today",
+    "signals.phishing_phrase",
+    "signals.pressure",
+    "signals.security_alert",
+];
+
+/// Longest quoted sentence, in characters.
+pub const SENTENCE_CHARS: usize = 240;
+
+/// The sentence of `fresh` (the new text, quoted history dropped) holding
+/// `reason`'s evidence, whitespace collapsed and cut at a word past
+/// [`SENTENCE_CHARS`]; `None` for rules that read headers or addresses, or
+/// when the evidence is not in the text (it came from the subject).
+fn quoted_sentence(fresh: &str, reason: &Reason) -> Option<String> {
+    if !QUOTED_RULES.contains(&reason.rule) || reason.evidence.is_empty() {
+        return None;
+    }
+    let needle = reason.evidence.to_lowercase().replace('\u{2019}', "'");
+    let mut start = 0;
+    let mut chars = fresh.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        // A full stop ends a sentence only before a space or the end, so
+        // "€148.00" and "v3.2" stay whole.
+        let next_is_space = chars.peek().is_none_or(|(_, next)| next.is_whitespace());
+        let ends = matches!(c, '!' | '?' | '\n') || (c == '.' && next_is_space);
+        if !ends {
+            continue;
+        }
+        let end = i + c.len_utf8();
+        if let Some(found) = sentence_at(&fresh[start..end], &needle) {
+            return Some(found);
+        }
+        start = end;
+    }
+    sentence_at(&fresh[start..], &needle)
+}
+
+fn sentence_at(candidate: &str, needle: &str) -> Option<String> {
+    // Whitespace collapsed first (so lines do not run together), then what
+    // could reorder or hide text dropped: bidi controls, zero-width and
+    // control characters (`campbooks_kernel::text`).
+    let flat = displayable(&candidate.split_whitespace().collect::<Vec<_>>().join(" "));
+    let normalised = flat.to_lowercase().replace('\u{2019}', "'");
+    if flat.is_empty() || !normalised.contains(needle) {
+        return None;
+    }
+    if flat.chars().count() <= SENTENCE_CHARS {
+        return Some(flat);
+    }
+    let mut cut = String::new();
+    for word in flat.split(' ') {
+        if cut.chars().count() + word.chars().count() + 1 > SENTENCE_CHARS {
+            break;
+        }
+        if !cut.is_empty() {
+            cut.push(' ');
+        }
+        cut.push_str(word);
+    }
+    cut.push('…');
+    Some(cut)
 }
 
 impl Strategy for EmailSignals {
@@ -1582,6 +1902,70 @@ mod tests {
     }
 
     #[test]
+    fn reasons_quote_the_senders_sentence() {
+        let env = mail(
+            "marta@casa-lume.example",
+            "Walkthrough",
+            "Hope the move went well. Could you confirm Thursday\u{2019}s walkthrough? Thanks!\n\n\
+             On Mon, 12 Oct 2026 Ana wrote:\n> Could you send the plan?",
+        );
+        let d = ask(&env, triage::NEEDS_REPLY).unwrap();
+        assert_eq!(
+            d.reasons[0].sentence.as_deref(),
+            Some("Could you confirm Thursday\u{2019}s walkthrough?")
+        );
+    }
+
+    #[test]
+    fn amounts_do_not_split_a_sentence() {
+        let env = mail(
+            "billing@cloudhost.example",
+            "Invoice",
+            "Your invoice CH-20418 for €148.00 is due on 16 October. Thank you.",
+        );
+        let d = ask(&env, triage::ASKS_ACTION).unwrap();
+        assert_eq!(
+            d.reasons[0].sentence.as_deref(),
+            Some("Your invoice CH-20418 for €148.00 is due on 16 October.")
+        );
+    }
+
+    #[test]
+    fn quotes_drop_what_reorders_or_hides_text() {
+        // An RLO inside an IBAN would show its digits reversed.
+        let env = mail(
+            "billing@supplier.example",
+            "Invoice",
+            "Payment due: please pay to IBAN PT50\u{202E}0002 0123\u{200B}4567 by Friday. Thanks.",
+        );
+        let d = ask(&env, triage::ASKS_ACTION).unwrap();
+        let sentence = d.reasons[0].sentence.clone().unwrap();
+        assert!(!sentence.contains('\u{202E}') && !sentence.contains('\u{200B}'));
+        assert!(sentence.contains("PT500002 01234567"), "{sentence}");
+    }
+
+    #[test]
+    fn header_reasons_quote_nothing() {
+        let env = with_header(
+            mail("news@shop.example", "Autumn sale", "Big savings this week."),
+            "List-Unsubscribe",
+            "<mailto:u@shop.example>",
+        );
+        let d = ask(&env, triage::STREAM).unwrap();
+        assert!(d.reasons.iter().all(|r| r.sentence.is_none()));
+    }
+
+    #[test]
+    fn long_sentences_are_cut_at_a_word() {
+        let long = format!("Could you {} confirm?", "please ".repeat(60));
+        let env = mail("jonas@example.com", "Lunch", &long);
+        let d = ask(&env, triage::NEEDS_REPLY).unwrap();
+        let sentence = d.reasons[0].sentence.clone().unwrap();
+        assert!(sentence.chars().count() <= SENTENCE_CHARS + 1);
+        assert!(sentence.ends_with('…'));
+    }
+
+    #[test]
     fn every_pattern_compiles() {
         for re in [
             &QUOTE_MARKER,
@@ -1610,9 +1994,247 @@ mod tests {
             &POLITE_MODAL,
             &PAYMENT_TERMS,
             &ACTION_NOW,
+            &SECURITY_ALERT,
         ] {
             assert!(!re.as_str().is_empty());
         }
+    }
+
+    fn named(mut env: Envelope, name: &str) -> Envelope {
+        env.from.name = name.into();
+        env
+    }
+
+    /// The receiving provider's results for mail signed by `domain`.
+    fn passed(domain: &str) -> String {
+        format!(
+            "mx.google.com; dkim=pass header.i=@{domain} header.s=s1; \
+             spf=pass smtp.mailfrom={domain}; dmarc=pass (p=REJECT dis=NONE) header.from={domain}"
+        )
+    }
+
+    /// A security alert about the recipient's repository: list mail, with
+    /// the receiving provider's `results` (none when `None`).
+    fn alert(name: &str, from: &str, subject: &str, results: Option<&str>) -> Envelope {
+        let env = with_header(
+            named(
+                mail(
+                    from,
+                    subject,
+                    "Dependabot found a high severity vulnerability in a dependency of \
+                     example-org/demo-shop.\n\nReview: https://github.com/example-org/demo-shop/\
+                     security/dependabot/42\nUpgrade to 2.4.1",
+                ),
+                name,
+            ),
+            "List-Id",
+            "<demo-shop.example-org.github.com>",
+        );
+        match results {
+            Some(results) => with_header(env, "Authentication-Results", results),
+            None => env,
+        }
+    }
+
+    const SUBJECT: &str = "[example-org/demo-shop] High severity vulnerability in tiny-template";
+
+    /// The rules' `asks_action` answer when it is the security alert rule's.
+    fn alert_answer(env: &Envelope) -> Option<Decided> {
+        ask(env, triage::ASKS_ACTION)
+            .filter(|d| d.reasons.iter().any(|r| r.rule == "signals.security_alert"))
+    }
+
+    #[test]
+    fn an_authenticated_platform_alert_is_a_to_do() {
+        let env = alert(
+            "GitHub",
+            "notifications@github.com",
+            SUBJECT,
+            Some(&passed("github.com")),
+        );
+        let asks = alert_answer(&env).unwrap();
+        assert_eq!(asks.answer.value, AnswerValue::Noul(true));
+        assert!(asks.answer.confidence.unwrap() >= 0.9);
+        assert!(
+            asks.reasons[0]
+                .sentence
+                .as_deref()
+                .is_some_and(|s| s.starts_with("Dependabot found")),
+            "{asks:?}"
+        );
+        assert_eq!(value(&env, triage::STREAM), Some(choice("updates")));
+        assert_eq!(
+            value(&env, triage::NEEDS_REPLY),
+            Some(AnswerValue::Noul(false))
+        );
+        // A DKIM signature of the same domain is enough without DMARC.
+        let dkim = alert(
+            "GitHub",
+            "noreply@github.com",
+            SUBJECT,
+            Some("mx.zohomail.com; dkim=pass header.d=github.com; spf=pass"),
+        );
+        assert!(alert_answer(&dkim).is_some());
+    }
+
+    #[test]
+    fn every_listed_platform_s_alert_is_a_to_do() {
+        for (name, from) in [
+            ("GitHub", "noreply@github.com"),
+            ("GitLab", "noreply@gitlab.com"),
+            ("Bitbucket", "noreply@bitbucket.org"),
+            ("npm", "support@npmjs.com"),
+            ("PyPI", "noreply@pypi.org"),
+            ("RubyGems", "no-reply@rubygems.org"),
+            ("crates.io", "noreply@crates.io"),
+            ("Snyk", "alerts@snyk.io"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(name, from, SUBJECT, Some(&passed(host)));
+            let asks = alert_answer(&env).unwrap_or_else(|| panic!("{name} <{from}>"));
+            assert!(asks.answer.confidence.unwrap() >= 0.9, "{name} <{from}>");
+        }
+    }
+
+    #[test]
+    fn a_crafted_envelope_sender_cannot_fake_a_pass() {
+        // MAIL FROM:<"a; dmarc=pass header.from=crates.io x"@evil.example>,
+        // echoed by the provider; the real DMARC result is a fail (crates.io
+        // publishes p=none, so the mail is delivered).
+        let results = "mx.google.com; dkim=none; spf=softfail (google.com: domain of \
+             transitioning \"a; dmarc=pass header.from=crates.io x\"@evil.example does not \
+             designate 192.0.2.1 as permitted sender) \
+             smtp.mailfrom=\"a; dmarc=pass header.from=crates.io x\"@evil.example; \
+             dmarc=fail (p=NONE sp=NONE dis=NONE) header.from=crates.io";
+        let env = alert("Crates", "alerts@crates.io", SUBJECT, Some(results));
+        assert!(alert_answer(&env).is_none());
+        // The same with a parenthesis to close the comment early, or a
+        // second, injected dmarc result.
+        for results in [
+            "mx.google.com; spf=softfail (domain of \"a) ; dmarc=pass header.from=crates.io (x\"\
+             @evil.example) smtp.mailfrom=x@evil.example; dmarc=fail header.from=crates.io",
+            "mx.google.com; dmarc=pass header.from=crates.io; dmarc=fail header.from=crates.io",
+            "mx.google.com; dmarc=pass header.from=crates.io header.from=evil.example",
+        ] {
+            let env = alert("Crates", "alerts@crates.io", SUBJECT, Some(results));
+            assert!(alert_answer(&env).is_none(), "{results}");
+        }
+    }
+
+    #[test]
+    fn an_unauthenticated_alert_is_no_to_do() {
+        for results in [
+            None,
+            Some(
+                "mx.google.com; dkim=fail header.i=@github.com; dmarc=fail header.from=github.com",
+            ),
+            Some("mx.google.com; spf=pass smtp.mailfrom=github.com"),
+            // Signed, but by someone else's domain.
+            Some("mx.google.com; dkim=pass header.i=@mailer.example; dmarc=none"),
+        ] {
+            let env = alert("GitHub", "notifications@github.com", SUBJECT, results);
+            assert!(alert_answer(&env).is_none(), "{results:?}");
+        }
+    }
+
+    #[test]
+    fn a_look_alike_with_its_own_signature_is_never_sure() {
+        // Each signs its own mail, names its own domain, and trips no
+        // phishing tell: at most a question.
+        for (name, from) in [
+            ("GitHub Security", "alerts@githubsecurity.example"),
+            ("Githhub", "alerts@githhub.example"),
+            ("GitHub Notify", "alerts@github-notify.example"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(
+                name,
+                from,
+                "Security alert: new sign-in to your account",
+                Some(&passed(host)),
+            );
+            if let Some(asks) = alert_answer(&env) {
+                assert!(asks.answer.confidence.unwrap() < 0.75, "{name} <{from}>");
+            }
+        }
+    }
+
+    #[test]
+    fn an_international_look_alike_domain_is_not_one() {
+        // A Cyrillic "і", as a parser may leave it, and as punycode.
+        for (name, host) in [("Gіthub", "gіthub.com"), ("Github", "xn--gthub-n4a.com")] {
+            let env = alert(
+                name,
+                &format!("alerts@{host}"),
+                SUBJECT,
+                Some(&passed(host)),
+            );
+            assert!(alert_answer(&env).is_none(), "{host}");
+        }
+    }
+
+    #[test]
+    fn the_name_must_be_the_domain_s() {
+        for (name, from) in [
+            ("GitHub", "notifications@github-alerts.example"),
+            ("Security Team", "notifications@github.com"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let env = alert(name, from, SUBJECT, Some(&passed(host)));
+            assert!(alert_answer(&env).is_none(), "{name} <{from}>");
+        }
+    }
+
+    #[test]
+    fn action_required_alone_is_no_security_alert() {
+        let env = alert(
+            "GitHub",
+            "notifications@github.com",
+            "[example-org/demo-shop] Action required: review your settings",
+            Some(&passed("github.com")),
+        );
+        assert!(alert_answer(&env).is_none());
+    }
+
+    #[test]
+    fn action_required_marketing_stays_a_newsletter() {
+        let env = with_header(
+            named(
+                mail(
+                    "news@paperkite.example",
+                    "Action required: claim your discount",
+                    "Your 20% discount expires soon. Shop now.",
+                ),
+                "Paper Kite",
+            ),
+            "List-Unsubscribe",
+            "<https://paperkite.example/u>",
+        );
+        assert_eq!(
+            value(&env, triage::ASKS_ACTION),
+            Some(AnswerValue::Noul(false))
+        );
+        assert_eq!(value(&env, triage::STREAM), Some(choice("newsletters")));
+    }
+
+    #[test]
+    fn a_comment_on_a_watched_issue_asks_nothing() {
+        let env = with_header(
+            named(
+                mail(
+                    "notifications@github.com",
+                    "Re: [example-org/demo-shop] Checkout fails on Safari (Issue #17)",
+                    "Same here on Safari 18. Any idea when this lands?\n\n\
+                     You are receiving this because you are subscribed to this thread.",
+                ),
+                "Octavia Quill",
+            ),
+            "List-Id",
+            "<demo-shop.example-org.github.com>",
+        );
+        let asks = ask(&env, triage::ASKS_ACTION).unwrap();
+        assert_eq!(asks.answer.value, AnswerValue::Noul(false));
+        assert_eq!(asks.reasons[0].rule, "signals.list_mail");
     }
 
     #[test]
@@ -1783,7 +2405,9 @@ mod tests {
         };
         assert!(state.contains("Subject: Fatura"));
         assert!(state.contains("list-id: <news.example>"));
-        assert!(state.chars().count() < 1700);
+        // The body is cut at 1,500 characters; the triage context adds
+        // about 550.
+        assert!(state.chars().count() < 2300);
         assert!(!format!("{env:?}").contains("Fatura"));
     }
 

@@ -159,5 +159,34 @@
     "connect": "Conectar un buzón",
     "reconnect": "Volver a conectar el buzón",
     "disconnect": "Desconectar el buzón"
+  },
+  "admin": {
+    "title": "Cuentas conectadas",
+    "loading": "Cargando las cuentas conectadas…",
+    "loadError": "No se han podido cargar las cuentas conectadas.",
+    "retry": "Reintentar",
+    "none": "No hay ninguna cuenta conectada en este espacio de trabajo.",
+    "health": {
+      "ok": "Sincronizando",
+      "needs_reauth": "El miembro tiene que volver a conectarla",
+      "throttled": "Ralentizada por el proveedor",
+      "failing": "Con fallos"
+    },
+    "since": "desde el {{date}}",
+    "provider": {
+      "google": "Google",
+      "zoho": "Zoho"
+    },
+    "capability": {
+      "messages": "Correo",
+      "calendar": "Calendario",
+      "files": "Archivos",
+      "bank": "Banco"
+    },
+    "lastSynced": "Última sincronización el {{date}}",
+    "neverSynced": "Aún sin sincronizar",
+    "paused": "En pausa",
+    "failures_one": "{{count}} ejecución fallida seguida",
+    "failures_other": "{{count}} ejecuciones fallidas seguidas"
   }
 }

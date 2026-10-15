@@ -10,7 +10,10 @@
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::{AppState, Background, Module};
+use campbooks_kernel::{
+    AppState, Background, Module,
+    authz::{Action, Owner, ResourceType, Resources, Tenancy},
+};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod events;
@@ -20,6 +23,25 @@ pub mod scopes;
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "{{name}}";
 
+/// The record type of a person's own view of the module.
+pub const ACCOUNT_RECORD: &str = "{{name}}.account";
+
+/// The module's part of the access catalogue (ADR 0017).
+// TODO(new-module): declare each resource type the module serves: its
+// tenancy, its owner, the owner's actions and who else may do what (a
+// workspace role, a container role, client tokens). Workspace types need a
+// `ResourceFacts` port: `Resources::new(&RESOURCES, Arc::new(…))`, as in
+// `campbooks-conversations`.
+static RESOURCES: [ResourceType; 1] = [ResourceType {
+    owner: Owner::Account,
+    owner_actions: &[Action::Read],
+    ..ResourceType::new(
+        ACCOUNT_RECORD,
+        "What a signed-in person reads of this module.",
+        Tenancy::Account,
+    )
+}];
+
 /// The `{{name}}` module, ready for the server to mount.
 pub fn module() -> Module {
     Module {
@@ -28,6 +50,7 @@ pub fn module() -> Module {
         router: router(),
         admin_router: None,
         background: Background::new(),
+        resources: Resources::declared(&RESOURCES),
     }
 }
 

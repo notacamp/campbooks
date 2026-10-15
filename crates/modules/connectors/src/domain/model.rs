@@ -103,6 +103,22 @@ impl Capability {
     }
 }
 
+/// What becomes of the mail a connection brought in when it is removed
+/// (the owner's decision, campbooks-cloud#117): deleted with it (the
+/// default), or kept as read-only history. Only the member who connected
+/// it chooses when disconnecting; an owner or admin chooses when removing
+/// that member.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete the inboxes it fed: messages, conversations, drafts,
+    /// decisions, search entries, stored files and memberships.
+    #[default]
+    Delete,
+    /// Keep them read-only: no sync, nothing sent, memberships kept.
+    Keep,
+}
+
 /// How a connection is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -199,9 +215,6 @@ pub struct ConnectionView {
     pub health_reason: Option<String>,
     /// Since when it has had this health.
     pub health_changed_at: DateTime<Utc>,
-    /// Its grantor also signs in with this account: their own mailbox, not
-    /// a shared one. Decides who may keep its mail when disconnecting.
-    pub grantor_signs_in: bool,
     /// Its change streams.
     pub streams: Vec<StreamView>,
     /// When it was connected.

@@ -17,7 +17,9 @@ use serde::{Deserialize, Serialize};
 pub const PRUNE_EVERY: Duration = Duration::from_mins(15);
 
 /// How long a dynamically registered or metadata-document client may go
-/// unused before it is deleted, and how long revoked consents are kept.
+/// unused before it is deleted, how long revoked consents are kept, and
+/// how long a sent notice is remembered (far longer than its delivery
+/// retries).
 const UNUSED_CLIENT: TimeDelta = TimeDelta::days(30);
 
 /// How long revoked or expired families and ended sessions are kept.
@@ -85,12 +87,17 @@ impl Job for Prune {
                 .rows_affected();
         }
         let unused = now - UNUSED_CLIENT;
-        deleted += sqlx::query("DELETE FROM identity.consents WHERE revoked_at <= $1")
-            .bind(unused)
-            .execute(db)
-            .await
-            .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
-            .rows_affected();
+        for sql in [
+            "DELETE FROM identity.consents WHERE revoked_at <= $1",
+            "DELETE FROM identity.notices WHERE sent_at <= $1",
+        ] {
+            deleted += sqlx::query(sql)
+                .bind(unused)
+                .execute(db)
+                .await
+                .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?
+                .rows_affected();
+        }
         let mut tx = crate::domain::clients::begin_as_server(db)
             .await
             .map_err(|e| JobError::retry(format!("pruning identity state: {e}")))?;

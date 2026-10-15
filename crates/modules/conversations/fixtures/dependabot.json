@@ -1,0 +1,26 @@
+{
+  "changes": [
+    {"op": "upsert", "message": {
+      "provider_message_id": "dependabot-1",
+      "thread_key": "thr-dependabot-42",
+      "rfc_message_id": "example-org/demo-shop/security/dependabot/42@github.com",
+      "from": {"name": "GitHub", "address": "notifications@github.com"},
+      "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+      "reply_to": [{"address": "noreply@github.com"}],
+      "subject": "[example-org/demo-shop] High severity vulnerability in tiny-template",
+      "sent_at": "2026-10-13T07:12:00Z",
+      "direction": "inbound",
+      "headers": {
+        "list_id": "example-org/demo-shop <demo-shop.example-org.github.com>",
+        "list_unsubscribe": "<https://github.com/notifications/unsubscribe/EXAMPLE-TOKEN>, <mailto:unsub+EXAMPLE@reply.github.com>",
+        "precedence": "list",
+        "authentication_results": "mx.google.com; dkim=pass header.i=@github.com header.s=pf2023 header.b=EXAMPLE; spf=pass (google.com: domain of noreply@github.com designates 192.0.2.10 as permitted sender) smtp.mailfrom=noreply@github.com; dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com"
+      },
+      "text": "Dependabot found a high severity vulnerability in a dependency of example-org/demo-shop.\n\ntiny-template (npm)\nTemplate injection in tiny-template\nAffected versions: < 2.4.1\nPatched version: 2.4.1\nManifest: package-lock.json\n\nReview: https://github.com/example-org/demo-shop/security/dependabot/42\nDismiss: https://github.com/example-org/demo-shop/security/dependabot/42?dismiss=1\nUpgrade to 2.4.1: https://github.com/example-org/demo-shop/security/dependabot/42?upgrade=2.4.1\n\nYou are receiving this because you are subscribed to security alerts for example-org/demo-shop.\nManage your notification settings: https://github.com/settings/notifications\nUnsubscribe from this repository's alerts: https://github.com/notifications/unsubscribe/EXAMPLE-TOKEN",
+      "html": "<p>Dependabot found a <strong>high severity</strong> vulnerability in a dependency of example-org/demo-shop.</p><p><strong>tiny-template</strong> (npm)<br>Template injection in tiny-template<br>Affected versions: &lt; 2.4.1<br>Patched version: 2.4.1</p><p><a href=\"https://github.com/example-org/demo-shop/security/dependabot/42\">Review</a> · <a href=\"https://github.com/example-org/demo-shop/security/dependabot/42?dismiss=1\">Dismiss</a> · <a href=\"https://github.com/example-org/demo-shop/security/dependabot/42?upgrade=2.4.1\">Upgrade to 2.4.1</a></p><p>You are receiving this because you are subscribed to security alerts for example-org/demo-shop. <a href=\"https://github.com/notifications/unsubscribe/EXAMPLE-TOKEN\">Unsubscribe</a></p>",
+      "mailbox": {"in_inbox": true},
+      "categories": ["updates"],
+      "read": false, "starred": false
+    }}
+  ]
+}

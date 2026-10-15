@@ -121,6 +121,60 @@ export const KeyboardCursor: Story = {
   },
 };
 
+/**
+ * ↓ and ↑ move the cursor like J and K, and Enter opens the row under it.
+ * In the open conversation the arrows are the browser's again (they scroll
+ * the message): J and K step between conversations.
+ */
+export const ArrowKeys: Story = {
+  args: { path: `${PATH}/primary`, api: inbox() },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText(Q4.subject);
+    const row = (id: string) => canvasElement.querySelector(`#conversation-${id}`);
+
+    await userEvent.keyboard("{ArrowDown}{ArrowDown}{ArrowDown}{ArrowUp}");
+    // Q4, the NDA, the Ledger, then back up to the NDA.
+    await expect(row(PRIMARY[1]?.id ?? "")).toHaveAttribute("data-selected", "true");
+
+    await userEvent.keyboard("{ArrowDown}{Enter}");
+    await expect(await canvas.findByTitle("Message from The Weekly Ledger")).toBeVisible();
+
+    await userEvent.keyboard("{ArrowDown}");
+    await expect(row(LEDGER.id)).toHaveAttribute("aria-current", "true");
+  },
+};
+
+/** ↓ past the last row loaded asks for the next page, then moves into it. */
+export const ArrowKeysNextPage: Story = {
+  args: {
+    path: `${PATH}/primary`,
+    api: inbox({
+      [`GET ${W}/conversations`]: (_body, url) =>
+        url.searchParams.get("cursor") === "more"
+          ? { body: { conversations: [INVOICE], next_cursor: null } }
+          : { body: { conversations: PRIMARY, next_cursor: "more" } },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByText(Q4.subject);
+    const row = (id: string) => canvasElement.querySelector(`#conversation-${id}`);
+
+    await userEvent.keyboard("{ArrowDown}".repeat(PRIMARY.length));
+    const last = PRIMARY.at(-1)?.id ?? "";
+    await expect(row(last)).toHaveAttribute("data-selected", "true");
+
+    // Past the last row: the next page loads and the cursor stays put.
+    await userEvent.keyboard("{ArrowDown}");
+    await expect(await canvas.findByText(INVOICE.subject)).toBeVisible();
+    await expect(row(last)).toHaveAttribute("data-selected", "true");
+
+    await userEvent.keyboard("{ArrowDown}");
+    await waitFor(() => expect(row(INVOICE.id)).toHaveAttribute("data-selected", "true"));
+  },
+};
+
 /** A thread: the newest message open in its sandboxed frame, older ones folded. */
 export const Thread: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
@@ -128,6 +182,18 @@ export const Thread: Story = {
     const canvas = within(canvasElement);
     await expect(await canvas.findByTitle("Message from Maya Okafor")).toBeVisible();
     await expect(canvas.getByText("q4-plan-v3.pdf")).toBeVisible();
+  },
+};
+
+/** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
+export const KeptHistory: Story = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({ [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Kept as history")).toBeVisible();
   },
 };
 
@@ -146,9 +212,9 @@ export const SuggestionWithWhy: Story = {
   args: { path: `${PATH}/primary/${LEDGER.id}`, api: inbox() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(await canvas.findByRole("button", { name: "Why?" }));
+    await userEvent.click(await canvas.findByText("How Campbooks decided"));
     await expect(
-      canvas.getByText("Stream: It carries a mailing-list header (List-Unsubscribe)."),
+      canvas.getByText(/It carries a mailing-list header \(List-Unsubscribe\)\./u),
     ).toBeVisible();
   },
 };

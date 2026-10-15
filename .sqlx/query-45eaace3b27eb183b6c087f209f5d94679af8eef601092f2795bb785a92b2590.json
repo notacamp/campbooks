@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE connectors.streams SET interval_seconds = $2 WHERE id = ANY($1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "45eaace3b27eb183b6c087f209f5d94679af8eef601092f2795bb785a92b2590"
+}

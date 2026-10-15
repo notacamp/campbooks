@@ -35,7 +35,7 @@ pub struct WayInPath {
     operation_id = "identity.remove_way_in",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.provider_identity"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.provider_identity"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Delete)))),
     params(("id" = Uuid, Path, description = "The way in.")),
     responses(
         (status = NO_CONTENT, description = "Removed; the sessions signed in with it ended. \
@@ -57,6 +57,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     Path(path): Path<WayInPath>,
 ) -> Result<StatusCode> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Delete,
+        "identity.provider_identity",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let now = issuer.now();
     step_up::require_recent(&principal, now)?;

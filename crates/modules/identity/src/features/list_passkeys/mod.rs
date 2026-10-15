@@ -28,6 +28,9 @@ pub struct PasskeyView {
     pub created_at: DateTime<Utc>,
     /// When it last signed in.
     pub last_used_at: Option<DateTime<Utc>>,
+    /// It was made with the account (a passkey-only sign-up), not added
+    /// later: never shown as a new way in.
+    pub signed_up_with: bool,
 }
 
 impl From<Passkey> for PasskeyView {
@@ -38,6 +41,7 @@ impl From<Passkey> for PasskeyView {
             synced: passkey.backup_eligible,
             created_at: passkey.created_at,
             last_used_at: passkey.last_used_at,
+            signed_up_with: passkey.signed_up_with,
         }
     }
 }
@@ -56,7 +60,7 @@ pub struct Passkeys {
     operation_id = "identity.list_passkeys",
     tag = "identity",
     security(("bearer" = ["identity:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.passkey"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.passkey"]).access("identity.passkey", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The caller's passkeys.", body = Passkeys),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -72,6 +76,13 @@ pub async fn handler(
     Extension(deps): Extension<Deps>,
     Unbound { principal, .. }: Unbound<IdentityRead>,
 ) -> Result<Json<Passkeys>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Read,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (_, account) = super::account(&deps, &principal)?;
     let items = passkeys::list(&state.db, account)
         .await?

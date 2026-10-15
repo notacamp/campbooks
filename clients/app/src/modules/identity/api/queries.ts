@@ -136,6 +136,19 @@ export function useRemoveWayIn() {
 }
 
 /**
+ * `identity.sign_out_everywhere`: ends every sign-in of your account — this
+ * browser's, other devices', every app's. The caller signs this browser out
+ * next.
+ */
+export function useSignOutEverywhere() {
+  return useMutation({
+    mutationFn: async () => {
+      unwrapEmpty(await api.POST("/api/v1/identity/sign-out-everywhere"));
+    },
+  });
+}
+
+/**
  * `identity.start_link`: a single-use URL of the front door for adding a way
  * in, connecting a mailbox or reconnecting one; the browser goes there next.
  */

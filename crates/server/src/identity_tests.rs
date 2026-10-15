@@ -193,8 +193,9 @@ impl Browser {
 }
 
 /// The server with the in-process issuer, a (fake) Google and the web BFF,
-/// and a browser with no cookies.
-async fn world(db: PgPool) -> (Browser, TestIdp) {
+/// and a browser with no cookies; and the issuer (to mint tokens no client
+/// could get).
+async fn world(db: PgPool) -> (Browser, TestIdp, Arc<campbooks_identity::deps::Issuer>) {
     let google = TestIdp::start().await;
     let mut config = testing::config("postgres://test@localhost/test");
     assert!(config.auth.issuer.is_none(), "no other identity provider");
@@ -256,6 +257,7 @@ async fn world(db: PgPool) -> (Browser, TestIdp) {
         panic!("the BFF signs in with the in-process issuer");
     };
     assert!(settings.in_process);
+    let issuer = composition.identity.issuer.clone().unwrap();
     let pool = testing::app_role_pool(&db).await;
     let blobs = BlobStore::memory(&config.blobs, pool.clone());
     let registry = crate::registry_with(&composition).unwrap();
@@ -270,7 +272,49 @@ async fn world(db: PgPool) -> (Browser, TestIdp) {
         cookies: BTreeMap::new(),
     };
 
-    (browser, google)
+    (browser, google, issuer)
+}
+
+/// An access token like `access` (its account, session, client and
+/// sign-in time) with `scope`, bound to `workspace` when given.
+async fn minted_token(
+    db: &PgPool,
+    issuer: &campbooks_identity::deps::Issuer,
+    access: &str,
+    workspace: Option<&str>,
+    scope: &str,
+) -> String {
+    use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+    use campbooks_identity::domain::{accounts, tokens};
+
+    let claims: Value = serde_json::from_slice(
+        &URL_SAFE_NO_PAD
+            .decode(access.split('.').nth(1).unwrap())
+            .unwrap(),
+    )
+    .unwrap();
+    let account: uuid::Uuid = claims["sub"].as_str().unwrap().parse().unwrap();
+    let grant = tokens::Grant {
+        client_id: claims["client_id"].as_str().unwrap().to_owned(),
+        account_id: account,
+        session_id: claims["sid"].as_str().and_then(|s| s.parse().ok()),
+        scope: scope.to_owned(),
+        auth_time: chrono::Utc::now(),
+        resource: format!("{ORIGIN}/api"),
+        workspace: workspace.map(|w| w.parse().unwrap()),
+    };
+    let profile = accounts::profile(db, account).await.unwrap().unwrap();
+    let signer = issuer.keys.signer(db).await.unwrap();
+    tokens::Mint {
+        issuer: &issuer.url,
+        signer: &signer,
+        grant: &grant,
+        profile: &profile,
+        amr: &[],
+        now: chrono::Utc::now(),
+    }
+    .access_token()
+    .unwrap()
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -285,7 +329,7 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
             .with_writer(move || writer.clone())
             .finish(),
     );
-    let (mut browser, google) = world(db).await;
+    let (mut browser, google, _) = world(db).await;
 
     println!("\nSign up with Google through the web app, Campbooks as its own issuer:");
     // The web app sends the browser to sign in; the issuer shows its screen.
@@ -454,7 +498,7 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
             .with_writer(move || writer.clone())
             .finish(),
     );
-    let (mut browser, google) = world(db).await;
+    let (mut browser, google, issuer) = world(db.clone()).await;
     println!("\nAn MCP agent connects to Campbooks (RFC 9728, 7591, 8707), a person allows it:");
     sign_up_through_bff(&mut browser, &google).await;
     let home = create_workspace(&mut browser, "Home").await;
@@ -700,6 +744,143 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
     }
     step("outside a workspace: lists Home only; creating, joining, accounts, apps, admin refused");
 
+    // The same, for a bound token that does hold the scopes (no app may be
+    // granted `identity:*`, so it is minted here): account-wide and
+    // workspace-management routes answer 404, and Work stays out of reach.
+    let bound = minted_token(
+        &db,
+        &issuer,
+        &access,
+        Some(&home),
+        "identity:read identity:write identity:clients connectors:write search:read \
+         conversations:read",
+    )
+    .await;
+    let bound = format!("Bearer {bound}");
+    let none = uuid::Uuid::now_v7();
+    for (method, path, body) in [
+        (Method::GET, "/api/v1/identity/ways-in".to_owned(), None),
+        (
+            Method::DELETE,
+            format!("/api/v1/identity/ways-in/{none}"),
+            None,
+        ),
+        (
+            Method::POST,
+            "/api/v1/identity/links".to_owned(),
+            Some(r#"{"purpose":"link","provider":"google"}"#),
+        ),
+        (Method::GET, "/api/v1/identity/passkeys".to_owned(), None),
+        (
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations".to_owned(),
+            None,
+        ),
+        (
+            Method::DELETE,
+            format!("/api/v1/identity/passkeys/{none}"),
+            None,
+        ),
+        (Method::GET, "/api/v1/identity/consents".to_owned(), None),
+        (
+            Method::DELETE,
+            format!("/api/v1/identity/consents/{none}"),
+            None,
+        ),
+        (Method::GET, "/api/v1/identity/held-grants".to_owned(), None),
+        (
+            Method::POST,
+            "/api/v1/identity/sign-out-everywhere".to_owned(),
+            None,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{home}/identity/clients"),
+            None,
+        ),
+        (
+            Method::POST,
+            format!("/api/v1/w/{home}/identity/clients"),
+            Some(r#"{"name":"Sneaky","type":"confidential","scopes":[]}"#),
+        ),
+        (
+            Method::POST,
+            format!("/api/v1/w/{home}/identity/held-grants/{none}/adopt"),
+            None,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{work}/search?q=invoice"),
+            None,
+        ),
+        (
+            Method::GET,
+            format!("/api/v1/w/{work}/conversations/{none}/messages/{none}/attachments/{none}"),
+            None,
+        ),
+    ] {
+        let mut headers = vec![("authorization", bound.as_str())];
+        if body.is_some() {
+            headers.push(("content-type", "application/json"));
+        }
+        let reply = browser
+            .raw(method.clone(), &path, &headers, body.map(ToOwned::to_owned))
+            .await;
+        assert_eq!(
+            reply.status,
+            StatusCode::NOT_FOUND,
+            "{method} {path}: {}",
+            reply.body
+        );
+    }
+    let searched = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{home}/search?q=invoice"),
+            &[("authorization", bound.as_str())],
+            None,
+        )
+        .await;
+    assert_eq!(searched.status, StatusCode::OK, "{}", searched.body);
+    step(
+        "a bound token holding identity scopes: account and app routes 404, Work 404, Home searchable",
+    );
+
+    // Even an administrator's token, once bound to a workspace, reaches no
+    // admin route; the same token unbound does.
+    let account = {
+        use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+        let payload = access.split('.').nth(1).unwrap();
+        let claims: Value =
+            serde_json::from_slice(&URL_SAFE_NO_PAD.decode(payload).unwrap()).unwrap();
+        claims["sub"].as_str().unwrap().to_owned()
+    };
+    campbooks_admin::cli::grant(
+        &mut db.acquire().await.unwrap(),
+        &account,
+        &[campbooks_kernel::admin::Permission::Super],
+        None,
+        chrono::Utc::now(),
+    )
+    .await
+    .unwrap();
+    for (workspace, expected) in [
+        (Some(home.as_str()), StatusCode::NOT_FOUND),
+        (None, StatusCode::OK),
+    ] {
+        let token = minted_token(&db, &issuer, &access, workspace, "admin:access").await;
+        let reply = browser
+            .raw(
+                Method::GET,
+                "/admin/v1/system/overview",
+                &[("authorization", &format!("Bearer {token}"))],
+                None,
+            )
+            .await;
+        assert_eq!(reply.status, expected, "{workspace:?}: {}", reply.body);
+    }
+    step("an administrator's token bound to Home: admin API 404; unbound: 200");
+
     // A workspace's own server-to-server client.
     let created = browser
         .send(
@@ -744,6 +925,50 @@ async fn an_agent_finds_the_issuer_registers_is_allowed_and_calls_one_workspace(
         assert_eq!(reply.status, expected, "{}", reply.body);
     }
     step("client_credentials -> Work's inboxes 200, Home's 404");
+    // 200, not 403: a bare client sees no inbox, so the composed server's
+    // directory (identity's, not the stub) resolved it to the admin who
+    // registered it (ADR 0017).
+    // Even holding `identity:clients` (no client may register for it; this
+    // token is minted by hand), a client acting for an admin manages no
+    // clients: the handler takes a person's own token only.
+    let manager = campbooks_identity::domain::tokens::client_access_token(
+        &issuer.url,
+        &issuer.keys.signer(&db).await.unwrap(),
+        &sync,
+        "identity:clients conversations:read",
+        work.parse().unwrap(),
+        &format!("{ORIGIN}/api"),
+        chrono::Utc::now(),
+    )
+    .unwrap();
+    let listed = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{work}/identity/clients"),
+            &[("authorization", &format!("Bearer {manager}"))],
+            None,
+        )
+        .await;
+    assert_eq!(listed.status, StatusCode::NOT_FOUND, "{}", listed.body);
+    step("acting for an admin, the client still may not list the workspace's clients: 404");
+    let removed = browser
+        .send(
+            Method::DELETE,
+            &format!("/bff/api/v1/w/{work}/identity/clients/{sync}"),
+            None,
+        )
+        .await;
+    assert_eq!(removed.status, StatusCode::NO_CONTENT, "{}", removed.body);
+    let after = browser
+        .raw(
+            Method::GET,
+            &format!("/api/v1/w/{work}/inboxes"),
+            &[("authorization", &bearer)],
+            None,
+        )
+        .await;
+    assert_eq!(after.status, StatusCode::UNAUTHORIZED, "{}", after.body);
+    step("the admin removes it: its token -> 401");
 
     let text = logs.text();
     for secret in [secret.as_str(), access.as_str(), code.as_str()] {

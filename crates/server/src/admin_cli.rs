@@ -376,12 +376,12 @@ mod tests {
         // `sub`) is taken as it is, with a warning.
         let by_id = Who {
             email: None,
-            account: Some(" rauthy-user-7 ".to_owned()),
+            account: Some(" outside-user-7 ".to_owned()),
         };
         let account = resolve(&mut conn, &by_id).await.unwrap();
         assert_eq!(
             (account.id.as_str(), account.label.as_str()),
-            ("rauthy-user-7", "rauthy-user-7")
+            ("outside-user-7", "outside-user-7")
         );
     }
 }

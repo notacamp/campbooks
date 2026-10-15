@@ -95,20 +95,25 @@ last workspace on this device.
 - **THEN** Members, Mailboxes and Ways to sign in are offered as chips, the open one pressed
 
 ### Requirement: Empty Home
-A workspace's Home SHALL say that nothing needs the user yet and show the
-keyboard shortcuts available on the page. Its mail section SHALL offer the
-person's held mailbox grant when there is one, else name the mailboxes
-connected to the workspace that the person can see with their health and a
-link to Settings → Mailboxes, else offer "Connect your mail", which opens
-Settings → Mailboxes.
+While the user can see no inbox in the workspace, its Home SHALL say that
+nothing needs the user yet and show the keyboard shortcuts available on the
+page; once they can see one, Home SHALL show what needs them instead
+(home-ui). The empty Home's mail section SHALL offer the person's held
+mailbox grant when there is one, else name the mailboxes connected to the
+workspace that the person can see with their health and a link to Settings →
+Mailboxes, else offer "Connect your mail", which opens Settings → Mailboxes.
 
 #### Scenario: New workspace
 - **WHEN** a user with no held mailbox and no connection opens a workspace's Home
 - **THEN** "Nothing needs you yet" is shown and "Connect your mail" opens Settings → Mailboxes
 
 #### Scenario: Mailbox connected
-- **WHEN** `connectors.list_connections` returns a connection for `ana@example.com`
+- **WHEN** `connectors.list_connections` returns a connection for `ana@example.com` and its inbox is not listed yet
 - **THEN** Home says that `ana@example.com` is syncing and links to Settings → Mailboxes
+
+#### Scenario: The inbox is there
+- **WHEN** `conversations.list_inboxes` lists an inbox for the user
+- **THEN** Home shows what needs them instead of "Nothing needs you yet"
 
 ### Requirement: Members and invitations
 Settings → Members SHALL list the workspace's members with their role. For
@@ -237,7 +242,7 @@ with the reason and how to continue.
 ### Requirement: Sign-in errors explained
 The sign-in screen SHALL explain each `error` the identity module sends it
 (`cancelled_at_provider`, `invalid_state`, `provider_unavailable`,
-`login_failed`, `account_disabled`, `way_in_belongs_to_another_account`,
+`login_failed`, `account_suspended`, `way_in_belongs_to_another_account`,
 `signup_invite_only`)
 and any other code generically, each saying what happened and what to do,
 above the ways in when the request is still waiting, or with an action that
@@ -250,6 +255,10 @@ starts again when it is not.
 #### Scenario: State expired
 - **WHEN** `/sign-in?error=invalid_state` loads
 - **THEN** the screen says the sign-in took too long or was opened in another browser, and "Start again" navigates to `/bff/login` with the remembered `return_to`
+
+#### Scenario: Suspended account
+- **WHEN** `/sign-in?error=account_suspended` loads
+- **THEN** the screen says the account is suspended by whoever runs the instance and to ask them to restore it
 
 ### Requirement: New-account screen
 `/sign-in/new?request=<id>` SHALL read `GET /auth/new-account` and show the

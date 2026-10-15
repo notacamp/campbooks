@@ -1,0 +1,126 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id, audience, audience_user\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "seq!",
+        "type_info": "Int8",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "seq"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "event_id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "event_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "record_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "record_type"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "record_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "record_id"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "op",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "op"
+          }
+        }
+      },
+      {
+        "ordinal": 5,
+        "name": "container_type",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "container_type"
+          }
+        }
+      },
+      {
+        "ordinal": 6,
+        "name": "container_id",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "container_id"
+          }
+        }
+      },
+      {
+        "ordinal": 7,
+        "name": "audience",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "audience"
+          }
+        }
+      },
+      {
+        "ordinal": 8,
+        "name": "audience_user",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "kernel.changes",
+            "name": "audience_user"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Int8",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true
+    ]
+  },
+  "hash": "e7b0349642d6705458095022f566e2eb093ae0e081ec6e0144ded06af8b32434"
+}

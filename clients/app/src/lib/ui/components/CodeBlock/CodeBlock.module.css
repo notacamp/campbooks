@@ -1,0 +1,34 @@
+.block {
+  position: relative;
+  min-width: 0;
+}
+
+.code {
+  margin: 0;
+  padding: var(--space-3) var(--space-12) var(--space-3) var(--space-3);
+  border-radius: var(--btn-radius);
+  background: var(--surface-sunken);
+  box-shadow: inset 0 0 0 var(--border-width) var(--border-subtle);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.copy {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-1);
+}
+
+.status {
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+.status:empty {
+  display: none;
+}

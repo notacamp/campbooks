@@ -16,7 +16,7 @@
 //!
 //! Errors at a sign-in callback send the browser back to the sign-in screen with
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
-//! `provider_unavailable`, `login_failed`, `account_disabled`, and
+//! `provider_unavailable`, `login_failed`, `account_suspended`, and
 //! `signup_invite_only` (an invite-only instance, and no pending invitation
 //! for the provider's verified address: nothing is kept).
 
@@ -98,18 +98,23 @@ pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
     path = "/auth/requests/{id}",
     tag = "identity",
     operation_id = "identity.get_sign_in_request",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     params(("id" = String, Path, description = "The `request` the sign-in screen was given.")),
     security(()),
     responses(
         (status = 200, description = "The request.", body = RequestInfo),
-        (status = 404, description = "No such request (or it expired), or another identity \
-            provider serves this instance."),
+        (status = 404, description = "No such request (or it expired, or another browser \
+            made it), or another identity provider serves this instance."),
     ),
 )]
-pub async fn request(State(ctx): State<Ctx>, Path(id): Path<String>) -> Result<Json<RequestInfo>> {
+pub async fn request(
+    State(ctx): State<Ctx>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<RequestInfo>> {
     let issuer = ctx.issuer()?;
-    let request = authorize::load(&ctx.state.db, &id, issuer.now())
+    let browser = authorize::browser(issuer, &headers);
+    let request = authorize::load(&ctx.state.db, &id, browser.as_deref(), issuer.now())
         .await?
         .ok_or(Error::NotFound)?;
     Ok(Json(RequestInfo {
@@ -173,7 +178,7 @@ async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bo
     path = "/auth/start/{provider}",
     tag = "identity",
     operation_id = "identity.start_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         StartQuery,
@@ -323,7 +328,7 @@ pub struct CallbackQuery {
     path = "/auth/callback/{provider}",
     tag = "identity",
     operation_id = "identity.finish_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         CallbackQuery,
@@ -407,7 +412,7 @@ pub async fn callback(
     let Upstreamed { identity, tokens } = signed_in;
     let request = flow.request_id.as_deref();
     let response = match accounts::find(&ctx.state.db, &identity).await? {
-        Some(Linked { disabled: true, .. }) => sign_in_error("account_disabled", request),
+        Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
         // the provider sent along is dropped, not stored.
         Some(linked) => {
@@ -568,6 +573,7 @@ async fn sign_in_known(
     let location = continue_after_sign_in(
         ctx,
         issuer,
+        headers,
         flow.request_id.as_deref(),
         &flow.return_to,
         &started.session,
@@ -711,14 +717,23 @@ async fn signed_in(
 pub(super) async fn continue_after_sign_in(
     ctx: &Ctx,
     issuer: &Issuer,
+    headers: &HeaderMap,
     request: Option<&str>,
     return_to: &str,
     session: &Session,
     now: DateTime<Utc>,
 ) -> Result<String> {
+    let browser = authorize::browser(issuer, headers);
     if let Some(request) = request
-        && let Some(location) =
-            authorize::complete_stored(&ctx.state.db, issuer, request, session, now).await?
+        && let Some(location) = authorize::complete_stored(
+            &ctx.state.db,
+            issuer,
+            request,
+            browser.as_deref(),
+            session,
+            now,
+        )
+        .await?
     {
         return Ok(location);
     }
@@ -743,7 +758,7 @@ pub struct NewAccount {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.get_new_account",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The pending account.", body = NewAccount),
@@ -783,7 +798,7 @@ pub struct Created {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.create_account",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     security(()),
     responses(
@@ -875,6 +890,7 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         pending.request_id.as_deref(),
         &pending.return_to,
         &started.session,

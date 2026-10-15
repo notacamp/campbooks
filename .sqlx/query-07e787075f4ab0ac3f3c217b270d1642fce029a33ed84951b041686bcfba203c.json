@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT m.role FROM workspaces.members m\n                     JOIN workspaces.workspaces w ON w.id = m.workspace_id\n                    WHERE m.workspace_id = $1 AND m.user_id = $2 AND w.deleted_at IS NULL\n                      FOR SHARE OF m",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "role",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.members",
+            "name": "role"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "07e787075f4ab0ac3f3c217b270d1642fce029a33ed84951b041686bcfba203c"
+}

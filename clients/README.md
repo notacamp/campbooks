@@ -28,22 +28,22 @@ pnpm --dir clients dev               # the UI on http://localhost:5173
 ```
 
 The web client only ever calls same-origin `/bff/...` with `credentials: "same-origin"`; it
-never sees a token. `campbooks-server`'s BFF (ADR 0004) signs the browser in through the
-identity provider and keeps the tokens; the browser holds an httpOnly `SameSite=Strict`
+never sees a token. `campbooks-server`'s BFF (ADR 0004) signs the browser in through
+Campbooks' own issuer and keeps the tokens; the browser holds an httpOnly `SameSite=Strict`
 session cookie. The Vite dev server proxies `/bff/*` to the server unchanged (override the
 target with `CAMPBOOKS_API_URL`), so `/bff/api/...` needs a session like in production.
 
-To sign in during development, run the identity provider
-(`docker compose -f deploy/compose.yaml up -d idp-provision`, see `deploy/README.md`) with
-`CAMPBOOKS_PUBLIC_URL=http://localhost:5173` in `deploy/.env`, and start the server with the
-same public URL plus the BFF settings:
+To sign in during development, nothing extra runs: Campbooks is its own identity provider
+(ADR 0014). Start the server with the same public URL as the app plus a secret key, and sign
+in with a passkey, or with Google (a Google OAuth client allowing
+`http://localhost:5173/auth/callback/google`; see `deploy/README.md` → Built-in sign-in):
 
 ```sh
+export CAMPBOOKS_ENV=development      # allows plain http on localhost
 export CAMPBOOKS_PUBLIC_URL=http://localhost:5173
-export CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/
-export CAMPBOOKS_SECRET_KEY="$(openssl rand -base64 32)"   # sessions end when it changes
-export CAMPBOOKS_BFF__CLIENT_SECRET="$(docker compose -f deploy/compose.yaml run --rm --no-deps \
-  server-init cat /secrets/campbooks-web.client-secret)"
+export CAMPBOOKS_SECRET_KEY="$(openssl rand -base64 32)"   # keep it: it opens the stored sign-in keys
+export CAMPBOOKS_GOOGLE__CLIENT_ID=...        # optional
+export CAMPBOOKS_GOOGLE__CLIENT_SECRET=...    # optional
 cargo run -p campbooks-server
 ```
 
@@ -63,6 +63,10 @@ pnpm --dir clients --filter @campbooks/app exec playwright install chromium   # 
 pnpm --dir clients dev                                # the UI on http://localhost:5173
 pnpm --dir clients record first-run                   # [--base-url http://localhost:5173]
 ```
+
+The recorder only records this machine (`localhost`, `127.0.0.1`, `[::1]`) and refuses any
+other `--base-url`, so a recording is never made against a deployed instance and its real
+mail. `--allow-remote` overrides that, for a disposable instance holding demo data only.
 
 This writes `app/recordings/out/<scenario>-375.webm` and `<scenario>-desktop.webm`
 (gitignored). Maintainers upload with `upload-media <file>`; contributors drag the files into

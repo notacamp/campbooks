@@ -62,8 +62,8 @@ impl Default for BffConfig {
             client_secret_file: None,
             idp_internal_url: None,
             scopes: None,
-            // Rauthy's refresh tokens live 48 h: an idle session cannot
-            // outlive its refresh token anyway.
+            // Refresh tokens live 48 h: an idle session cannot outlive its
+            // refresh token anyway.
             idle_timeout_minutes: 48 * 60,
             absolute_timeout_hours: 30 * 24,
             rotate_minutes: 60,
@@ -160,7 +160,7 @@ pub fn settings(
     let timeouts = timeouts(&bff)?;
     let (public_origin, secure_cookies) = public_origin(&config.public_url)?;
     // The issuer runs here unless another identity provider is configured
-    // (Rauthy, until it is removed): then the browser signs in through it.
+    // (an outside OpenID Connect issuer): then the browser signs in through it.
     let external = config
         .auth
         .issuer()
@@ -394,7 +394,7 @@ mod tests {
             assert_eq!(here.issuer, "http://localhost:8080");
             assert_eq!(
                 here.internal_issuer, "http://localhost:8080",
-                "no hop through Rauthy"
+                "no hop through an outside issuer"
             );
             let ClientSecret::Inline(secret) = &here.client_secret else {
                 panic!("a derived secret");

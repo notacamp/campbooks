@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.inboxes SET detached_at = now()\n            WHERE id = $1 AND detached_at IS NULL",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "cba091eb50fc075884a70b4456adfbd528708564177a6ff4f67603312766754b"
+}

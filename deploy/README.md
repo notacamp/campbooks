@@ -1,22 +1,20 @@
 # Self-hosting Campbooks
 
 1. `cp .env.example .env` and set at least `POSTGRES_PASSWORD` and `CAMPBOOKS_PUBLIC_URL`.
-2. `docker compose up -d` starts the server, Postgres (with pgvector) and the identity
-   provider. The server answers both the web app (open `http://localhost:8080/`) and the
-   API (`/api/v1/...`) on port 8080; the identity provider listens on port 8081.
+2. `docker compose up -d` starts the server and Postgres (with pgvector). The server
+   answers both the web app (open `http://localhost:8080/`) and the API (`/api/v1/...`) on
+   port 8080.
 3. Check it: `curl http://localhost:8080/api/v1/system/health` should return `{"status":"ok","database":"ok"}`.
 4. Optional local AI: set `CAMPBOOKS_AI__DECIDE__API_KEY` in `.env`
    (`openssl rand -hex 32`), run `docker compose --profile ai up -d`, then pull the
    `complete` model once: `docker compose exec ollama ollama pull qwen3:8b`. Laya and
    TEI download their models themselves. See "Local AI" below.
-5. Sign-in: the identity provider (Rauthy) starts with everything else, the
-   API trusts its access tokens out of the box (issuer derived from
-   `CAMPBOOKS_IDP_URL`), and the web app signs you in through it. See
-   "Identity provider" and "Web sign-in" below; to use another IdP, edit the
-   `CAMPBOOKS_AUTH__*` and `CAMPBOOKS_BFF__*` lines of the `server` service in
-   `compose.yaml`.
+5. Sign-in: Campbooks is its own identity provider (ADR 0014); nothing runs beside it.
+   Register a Google, Microsoft or Zoho OAuth app (or use passkeys only) as described in
+   "Built-in sign-in" below. Upgrading from a release that shipped Rauthy: see "Upgrading
+   from the Rauthy sign-in".
 6. Upgrades: `docker compose pull && docker compose up -d`; migrations run on startup
-   (the server's and the identity provider's).
+   (the server's).
 7. Background work (maintenance today; mail sync and the AI pass as they land)
    runs inside the same container: the image runs `campbooks-server all`, the
    API plus the job worker. Jobs live in Postgres, so nothing is lost on restart. To run the
@@ -32,13 +30,11 @@
 9. Workspaces: the first person to sign in creates the first workspace and
    invites the others from Settings → Members. Who else may create a
    workspace is `CAMPBOOKS_SIGNUP__POLICY` (`open` by default; `invite_only`,
-   `approval`, `code`). Invitations are not emailed yet: the inviter gets the
+   `approval`, `code`; administrators decide `approval` requests and mint single-use `code`
+   codes in Admin → Signups, see "Administrators"). Invitations are not emailed yet: the inviter gets the
    link once, right after inviting, to send on; it is built from
-   `CAMPBOOKS_PUBLIC_URL`, so set that to the address people use. The new
-   `workspaces:*` scopes are registered by `idp-provision` on the next `up`;
-   sign-in clients provisioned before this release keep their old scope list
-   until you add the scopes to them in the IdP admin UI (or re-provision them,
-   see "Identity provider").
+   `CAMPBOOKS_PUBLIC_URL`, so set that to the address people use. Campbooks'
+   own sign-in knows every scope, so there is nothing to register.
 10. Workspace isolation: every workspace's rows are guarded by Postgres
    row-level security as well as by the queries. The server queries as a
    dedicated login that cannot bypass the policies, and refuses to start if
@@ -191,9 +187,9 @@ Back up these together, at about the same time:
 
 | What | Where | Holds |
 | --- | --- | --- |
-| Postgres | `postgres-data` volume (use `pg_dump`) | Everything except files and the IdP's state |
+| Postgres | `postgres-data` volume (use `pg_dump`) | Everything except files and the instance secret key: accounts, sign-in keys, grants |
 | Files | `blobs-data` volume, or your bucket | Raw messages, attachments, documents |
-| Identity provider | `idp-data` volume | Accounts, sign-in clients and the IdP's encryption key |
+| Instance secret key | `server-secrets` volume | `CAMPBOOKS_SECRET_KEY`, which opens the sign-in keys and stored grants in Postgres |
 
 Restore Postgres and the files from the same point in time. A file that is missing from
 the store while Postgres still lists it cannot be read, so take the database dump first,
@@ -270,151 +266,79 @@ header there unless you want callers to choose which of their requests are trace
 or email addresses, and metrics never carry ids (workspace ids appear on spans only). A
 test in the server enforces this for every release.
 
-## Identity provider
+## Outgoing mail
 
-Sign-in is handled by [Rauthy](https://github.com/sebadob/rauthy), an OpenID Connect /
-OAuth 2.1 server, running beside Campbooks (see `docs/adr/0004-oauth-dedicated-idp-bff.md`).
-It needs no setup: three compose services take care of it.
+Campbooks sends one kind of mail of its own today: when a way to sign in (a provider
+account, a passkey) is added to an account, a notice goes to the account's address and,
+for a new provider account, to that account's address too, in the person's language. It
+names what was added and when, links only to this instance, and carries no images or
+tracking. Without a mail server nothing is sent; the notice is shown in the app (Settings
+→ Ways to sign in highlights what is new) and kept in the account's history either way.
 
-| Service | Runs | Does |
-| --- | --- | --- |
-| `idp-init` | before `idp`, every `up` | Generates the secrets once (first boot), rewrites the config from `.env` |
-| `idp` | always | The IdP. Issuer `${CAMPBOOKS_IDP_URL}/auth/v1/`, data in the `idp-data` volume |
-| `idp-provision` | after `idp` is healthy, every `up` | Registers Campbooks' scopes and clients once, saves the web client's secret for the server, and registers the sign-in providers you configure (see "Sign in with Google, Microsoft or Zoho") |
-
-A fourth one-shot, `server-init`, prepares the `server-secrets` volume for the
-Campbooks server (see "Web sign-in").
-
-### First sign-in to the admin UI
-
-1. Read the generated admin password (it is never written to the logs):
-
-   ```sh
-   docker compose run --rm idp-init cat /app/data/campbooks/initial-admin-password
-   ```
-
-2. Open `http://localhost:8081/auth/v1/admin` (or `${CAMPBOOKS_IDP_URL}/auth/v1/admin`)
-   and sign in as `admin@localhost` (or `CAMPBOOKS_IDP_ADMIN_EMAIL`).
-3. Admin accounts must use a passkey. The admin UI sends you to your account page:
-   open **MFA**, choose **Register New Key**, confirm your password and register a passkey
-   (a platform authenticator or a security key). Then open the admin UI again.
-4. Change the password under **Password** in the account page. The generated one stays in
-   the volume, so treat it as spent once you have changed it.
-
-Passkeys are bound to the IdP's host name. Over plain HTTP they work on `localhost` only;
-anywhere else, serve the IdP over HTTPS (below) before registering passkeys, because
-changing the host name later invalidates them.
-
-### Serving it on a real domain
-
-Put the IdP behind your TLS-terminating reverse proxy (its own host name, e.g.
-`auth.example.com`, proxied to port 8081) and set in `.env`:
+Point the server at any SMTP server that accepts mail from it, over TLS:
 
 ```sh
-CAMPBOOKS_IDP_URL=https://auth.example.com
+CAMPBOOKS_MAIL__SMTP_URL=smtps://user:password@smtp.example.com                      # implicit TLS, port 465
+# CAMPBOOKS_MAIL__SMTP_URL=smtp://user:password@smtp.example.com:587?tls=required    # or STARTTLS
+CAMPBOOKS_MAIL__FROM=Campbooks <no-reply@example.com>
 ```
 
-then `docker compose up -d`. With an `https://` URL the IdP trusts `X-Forwarded-*` headers
-from private networks; narrow that with `CAMPBOOKS_IDP_TRUSTED_PROXIES` if your proxy has a
-fixed address. Clients registered on first boot keep the redirect URIs built from
-`CAMPBOOKS_PUBLIC_URL` at that time; if the app's URL changes, edit `campbooks-web` in the
-admin UI (**Clients**).
-
-Outgoing mail (password resets, invitations) is off until you add Rauthy's `SMTP_*`
-variables to the `idp` service.
-
-### What is in the `idp-data` volume
-
-| Path | What |
-| --- | --- |
-| `secrets.toml` | Encryption key and cluster secrets. Without it the database cannot be read |
-| `config.toml` | Generated from `.env` on every start. Do not edit |
-| `campbooks/api-key` | Admin API key used by `idp-provision` (clients, scopes, client secrets, sign-in providers) |
-| `campbooks/initial-admin-password` | The first admin password |
-| `campbooks/provisioned/<client>` | Markers: the client was set up, never touch it again |
-| `campbooks/provisioned/provider-<name>` | Markers: the sign-in provider's id and a fingerprint of its settings |
-| everything else | Rauthy's embedded database, with a nightly local backup in `state_machine/backups/` |
-
-Back up the whole volume, for example:
-
-```sh
-docker run --rm -v campbooks_idp-data:/data -v "$PWD":/backup busybox:1.37.0-musl \
-  tar czf /backup/idp-data.tgz -C /data .
-```
-
-### Rotating secrets
-
-- **Admin password:** change it in the account page.
-- **Web client secret:** admin UI → **Clients** → `campbooks-web` → generate a new secret, then
-  `docker compose run --rm server-init rm /secrets/campbooks-web.client-secret` and
-  `docker compose up -d`: `idp-provision` saves the new one, and the server reads it again
-  the next time the IdP refuses the old one (no restart).
-- **Admin API key:** admin UI → **API Keys** → `campbooks` → new secret, then write the new
-  token (`campbooks$<secret>`) to `campbooks/api-key` in the volume.
-- **Encryption key:** generate one with `docker compose run --rm --no-deps idp generate-enc-key`,
-  add it to `secrets.toml` *next to* the old one and make it `key_active`
-  (`docker compose run --rm idp-init vi /app/data/secrets.toml`), restart, migrate existing
-  data to it from the admin UI (**Config → Encryption Keys**), and only then remove the old key.
-- **Signing keys (JWKS)** rotate automatically every month; old keys stay published until
-  tokens signed with them expire.
-
-To re-apply Campbooks' default settings to a client, delete it in the admin UI, then
-`docker compose run --rm idp-init rm /app/data/campbooks/provisioned/<client-id>` and
-`docker compose up -d`.
+Set both or neither: one without the other stops the server at startup, naming the
+setting. TLS is required, so the password never crosses the network in clear: plain
+`smtp://`, or `tls=opportunistic` (which anyone on the path can strip), is refused at
+startup. The one exception is a relay on the same machine (`smtp://127.0.0.1:25`,
+`::1` or `localhost`) given no user or password. The URL holds the password, so it is a secret: the server never logs it or
+repeats it in an error, and `CAMPBOOKS_MAIL__SMTP_URL_FILE` reads it from a file instead
+(a Docker secret, for example). Mail is sent by the worker and retried when the server is
+unreachable; a notice is never sent twice.
 
 ## Web sign-in
 
 The server signs browsers in itself (a backend-for-frontend, ADR 0004): open the app, and
-if you are not signed in it sends you to the identity provider and back. The browser only
+if you are not signed in it sends you to Campbooks' own sign-in and back. The browser only
 ever gets one `HttpOnly`, `SameSite=Strict` session cookie; the tokens stay on the server,
-encrypted, in Postgres (schema `bff`). Any account of the identity provider can sign in,
-including the first admin; create more under **Users** in its admin UI.
+encrypted, in Postgres (schema `bff`).
 
-Sessions end after 48 hours unused or 30 days at most, when you sign out, or when your
-identity-provider session ends (back-channel logout). The cookie is `Secure` and
-`__Host-`-prefixed when `CAMPBOOKS_PUBLIC_URL` is `https://`; over plain `http://` (fine on
-`localhost` only) it is neither, and the server logs a warning.
+Sessions end after 48 hours unused or 30 days at most, or when you sign out. The cookie is
+`Secure` and `__Host-`-prefixed when `CAMPBOOKS_PUBLIC_URL` is `https://`; over plain
+`http://` (fine on `localhost` only) it is neither, and the server logs a warning.
 
-| `server-secrets` volume | What |
-| --- | --- |
-| `secret-key` | `CAMPBOOKS_SECRET_KEY`: encrypts the web sessions' tokens and connected accounts' credentials. Generated on first boot |
-| `campbooks-web.client-secret` | Secret of the web app's OIDC client, written by `idp-provision` |
+The `server-secrets` volume holds one file, `secret-key`: `CAMPBOOKS_SECRET_KEY`, which
+encrypts the web sessions' tokens, connected accounts' credentials and the sign-in signing
+keys. It is generated on first boot by `server-init` and mounted read-only into the server
+(through group 10001). Back it up with the database: without it the stored keys and grants
+cannot be opened.
 
-The server mounts this volume read-only (through group 10001); it never sees the
-`idp-data` volume. Both files are regenerated if missing, so the volume needs no backup:
-losing it signs everyone out and asks members to connect their accounts again.
-
-- **Instance secret key:** `docker compose run --rm server-init rm /secrets/secret-key`,
-  then `docker compose up -d && docker compose restart server`. Everyone has to sign in to
-  the web app again, and connected accounts show "needs reauthorisation" until their member
-  connects them again; nothing else is lost. (Without compose, set `CAMPBOOKS_SECRET_KEY` to
-  `openssl rand -base64 32`.)
-- **Back-channel logout** needs an `https://` `CAMPBOOKS_PUBLIC_URL` that the `idp`
-  container can reach: Rauthy only calls https URLs. `idp-provision` registers
-  `${CAMPBOOKS_PUBLIC_URL}/bff/backchannel-logout` for new installs; override it with
-  `CAMPBOOKS_BACKCHANNEL_LOGOUT_URL`. On plain http there is none, and sessions end by
-  sign-out or timeout.
-- **Signing out** of the web app ends its session and revokes its refresh token, then sends
-  you to the identity provider to end that session too (Rauthy asks you to confirm).
+- **Instance secret key:** do not replace it casually; the server refuses to start when it
+  cannot open the stored signing keys (see Built-in sign-in). To start over on purpose,
+  delete the rows of `identity.signing_keys`, then
+  `docker compose run --rm server-init rm /secrets/secret-key` and
+  `docker compose up -d && docker compose restart server`. Everyone has to sign in again,
+  and connected accounts show "needs reauthorisation" until their member connects them
+  again. (Without compose, set `CAMPBOOKS_SECRET_KEY` to `openssl rand -base64 32`.)
 
 Settings (all optional; defaults shown in `.env.example`) are the `CAMPBOOKS_BFF__*` block.
 
 ## Built-in sign-in (Campbooks as its own identity provider)
 
-Campbooks is becoming its own identity provider (ADR 0014): it signs people in with
-Google, Microsoft, Zoho or a passkey and issues every token itself, so the `idp`
-services above will go away. The built-in issuer is already in the server. It runs when
-`CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL` itself) and
-`CAMPBOOKS_SECRET_KEY` is set. The shipped `compose.yaml` still points
-`CAMPBOOKS_AUTH__ISSUER` at Rauthy, so nothing changes for an existing install until the
-switch-over release removes Rauthy.
+Campbooks is its own identity provider (ADR 0014): it signs people in with Google,
+Microsoft, Zoho or a passkey and issues every token itself, with no separate service to
+run. It runs when `CAMPBOOKS_AUTH__ISSUER` is **unset** (or names `CAMPBOOKS_PUBLIC_URL`
+itself) and `CAMPBOOKS_SECRET_KEY` is set; the shipped `compose.yaml` does both.
+
+Pointing `CAMPBOOKS_AUTH__ISSUER` at an outside OpenID Connect issuer is still possible
+for an install that needs one (the API then trusts that issuer's tokens, set
+`CAMPBOOKS_AUTH__JWKS_URL` and `CAMPBOOKS_AUTH__AUDIENCE`, and the web app signs in
+through it with `CAMPBOOKS_BFF__CLIENT_SECRET[_FILE]`), but Campbooks does not provision
+or document any particular issuer, and its own sign-in, ways in, apps and mailbox
+connection are off while you do.
 
 With the built-in issuer:
 
 - The issuer is `CAMPBOOKS_PUBLIC_URL` (no path). Its metadata is at
   `/.well-known/openid-configuration` (and `/.well-known/oauth-authorization-server`), its
   keys at `/oauth2/jwks`, and its endpoints under `/oauth2/*`. The web app signs in through
-  it exactly as through Rauthy, with no client secret to provision.
+  it with no client secret to provision.
 - It signs with Ed25519 keys it generates on first start and rotates every 30 days,
   stored in Postgres (schema `identity`) encrypted with `CAMPBOOKS_SECRET_KEY`. A server
   whose secret key does not open them refuses to start ("CAMPBOOKS_SECRET_KEY does not
@@ -424,6 +348,12 @@ With the built-in issuer:
   so the sign-in cookies are always `Secure`.
 - New accounts follow `CAMPBOOKS_SIGNUP__POLICY`: on `invite_only`, only people whose
   Google address has a pending invitation get an account.
+- **Client secrets are files.** `compose.yaml` mounts `deploy/secrets/` read-only into the
+  server at `/run/secrets/campbooks`: put each provider's secret in a file there
+  (`google-client-secret`, `microsoft-client-secret`, `zoho-client-secret`, readable by uid
+  10001: `sudo chown 10001:10001` and `chmod 0400`; Docker Desktop needs neither) and set
+  `CAMPBOOKS_<PROVIDER>__CLIENT_ID` in `.env` and
+  `CAMPBOOKS_<PROVIDER>__CLIENT_SECRET_FILE=/run/secrets/campbooks/<file>`.
 - **Sign in with Google** uses the same Google OAuth client as connected accounts (below).
   Add the redirect URI `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google` to it, and the
   `profile` scope to its consent screen. A new person's sign-in asks, in the same consent,
@@ -527,10 +457,12 @@ With the built-in issuer:
 ## Administrators
 
 An administrator is a person whose account has an **admin profile** (ADR 0015). They see
-the **Admin** section of the app (account menu → Admin, or `/admin`): today the System
+the **Admin** section of the app (account menu → Admin, or `/admin`): the System
 panel, with the version, uptime, database and migrations, the effective configuration
-(never a secret) and whether each AI role's provider answers. Signups, people, workspaces
-and jobs follow.
+(never a secret) and whether each AI role's provider answers; **People**, everyone who has
+signed in, with their workspaces, how they sign in and a **Suspend** action;
+**Workspaces**, with their members and each connected mailbox's health; and the
+**Signups** panel (below). Jobs follow.
 
 Profiles exist only through the server's command line, never through the app or the API,
 so becoming an administrator needs shell access to the server. The command connects with
@@ -545,8 +477,7 @@ docker compose exec server campbooks-server admin grant --email you@example.com 
 
 It names the account it found and asks before changing anything (`--yes` skips the
 question). `--email` must be a verified address of exactly one account; when two accounts
-share it, or with another identity provider (the shipped `compose.yaml` still uses
-Rauthy), pass `--account <id>` instead: the id is the `sub` that
+share it, or with an outside identity provider, pass `--account <id>` instead: the id is the `sub` that
 `https://<your instance>/bff/session` shows to the signed-in person.
 
 ```sh
@@ -560,11 +491,23 @@ Permissions are `super` (everything), `system.read`, `signups.review`, `users.re
 `users.suspend`, `workspaces.read`, `jobs.read` and `jobs.retry`; the dashboard shows only to
 `super` for now. Changes apply on the person's next request.
 
+**Signups.** With `CAMPBOOKS_SIGNUP__POLICY=approval`, someone new who tries to create a
+workspace is refused and a request appears in Admin → Signups (permission `signups.review`);
+approve or reject it there. They see the answer the next time they open the app; Campbooks
+does not email them yet. With `CAMPBOOKS_SIGNUP__POLICY=code`, mint codes in the same panel:
+each code is shown once when minted (copy it then), works for the number of uses you set (one
+by default) until the day you pick, and can be revoked. Only a digest of a code is stored.
+Codes in `CAMPBOOKS_SIGNUP__CODES` still work and stay reusable by anyone who has them; prefer
+minted codes, and the setting needs no value when you only use minted ones.
+
 - Every admin request and every command above is recorded (`admin log`).
-- The admin API asks for a recent sign-in: more than 12 hours after signing in, the app asks
+- The admin API asks for a recent sign-in: more than an hour after signing in, the app asks
   the administrator to sign in again.
 - Admin views show metadata only (counts, states, providers, addresses people signed in
   with), never messages or documents, and nobody can act as another person.
+- Suspending someone (`users.suspend`) signs them out everywhere at once and stops every
+  sign-in until they are unsuspended; nothing of theirs is deleted. An administrator cannot
+  be suspended from the app: revoke their profile with `admin revoke` first.
 - With another identity provider (`CAMPBOOKS_AUTH__ISSUER`), give the `admin:access` scope
   only to the web app's client, and make sure access tokens carry `auth_time`; without it
   every admin request asks to sign in again. Campbooks' built-in sign-in does both.
@@ -605,173 +548,32 @@ inbox. Campbooks reads and writes each account's mail at its own data centre
 `CAMPBOOKS_CONNECTORS__ZOHO__REQUESTS_PER_MINUTE` per Zoho login. Zoho labels are not
 synced yet.
 
-Connecting needs the built-in sign-in: an install still on Rauthy (`CAMPBOOKS_AUTH__ISSUER`
-set) cannot connect mail until it switches. `connectors.start_connection` answers with the
+Connecting needs the built-in sign-in: an install that sets `CAMPBOOKS_AUTH__ISSUER` to an
+outside issuer cannot connect mail. `connectors.start_connection` answers with the
 built-in sign-in's URL, which comes back to the app with `connected=<connection id>`.
 
-### Developing against the IdP
+### Developing the sign-in locally
 
-The API runs on the host in development (`compose.dev.yaml` only starts Postgres). To get
-the same IdP:
+The API runs on the host in development (`compose.dev.yaml` only starts Postgres), and the
+built-in sign-in needs no extra service: run the server with `CAMPBOOKS_ENV=development`,
+`CAMPBOOKS_SECRET_KEY` (any `openssl rand -base64 32`) and a `CAMPBOOKS_PUBLIC_URL` of where
+you open the app (`http://localhost:8080` for `cargo run`, `http://localhost:5173` for the
+Vite dev server), with `CAMPBOOKS_GOOGLE__CLIENT_ID` and `CAMPBOOKS_GOOGLE__CLIENT_SECRET`
+from a Google OAuth client that allows `${CAMPBOOKS_PUBLIC_URL}/auth/callback/google`, or
+sign in with a passkey. `clients/README.md` has the full recipe.
 
-```sh
-cp deploy/.env.example deploy/.env      # the defaults are fine for this
-docker compose -f deploy/compose.yaml up -d idp-provision
-```
+## Upgrading from the Rauthy sign-in
 
-That starts only `server-init`, `idp-init`, `idp` and `idp-provision`, at
-`http://localhost:8081`. Set `CAMPBOOKS_PUBLIC_URL` in `deploy/.env` to where you open the
-app (`http://localhost:8080` for `cargo run`, `http://localhost:5173` for the Vite dev
-server) before the first `up`: it becomes the web client's redirect URI. Then run the server
-with `CAMPBOOKS_AUTH__ISSUER=http://localhost:8081/auth/v1/`, the same
-`CAMPBOOKS_PUBLIC_URL`, `CAMPBOOKS_SECRET_KEY` (any `openssl rand -base64 32`) and
-`CAMPBOOKS_BFF__CLIENT_SECRET` (read it with
-`docker compose -f deploy/compose.yaml run --rm --no-deps server-init cat /secrets/campbooks-web.client-secret`);
-`clients/README.md` has the full recipe.
+Releases before this one shipped Rauthy (the `idp`, `idp-init` and `idp-provision`
+services and the `idp-data` volume). Copy the new `compose.yaml` over yours and run
+`docker compose up -d --remove-orphans`: the three services are removed and the server
+signs in through Campbooks' own issuer. Nothing else needs doing, and nothing breaks if you
+leave the old services running, but they are no longer used. The `idp-data` volume is
+kept; remove it yourself once you are sure you do not need it
+(`docker volume rm <project>_idp-data`).
 
-## Sign in with Google, Microsoft or Zoho
-
-Besides passkeys and passwords, the identity provider's login page can offer **Google**,
-**Microsoft** and **Zoho**. Each one is optional and appears once you give it a client ID
-and a client secret; `idp-provision` registers it in Rauthy on the next
-`docker compose up -d`. Leave them unset and the login page offers passkey and password
-only.
-
-### 1. The redirect URI
-
-All three send people back to the same address, which you register in each provider's
-console:
-
-```
-${CAMPBOOKS_IDP_URL}/auth/v1/providers/callback
-```
-
-For example `https://auth.example.com/auth/v1/providers/callback`, or
-`http://localhost:8081/auth/v1/providers/callback` on your own machine. Serve the IdP over
-https before you invite anyone (see "Serving it on a real domain"); the providers only
-accept plain http for `localhost`. `idp-provision` prints the exact URI in its log
-(`docker compose logs idp-provision`).
-
-### 2. Create the app in the provider's console
-
-The scopes are `openid email profile` for all three; Campbooks asks for nothing else.
-
-**Google** (Google Cloud console, `console.cloud.google.com`):
-
-1. Pick or create a project. Open **APIs & Services → OAuth consent screen** (Google Auth
-   Platform): app name, support email, audience **External**. Under **Data access** add
-   `openid`, `.../auth/userinfo.email` and `.../auth/userinfo.profile` (non-sensitive, no
-   review needed). Publish the app: while it is in *Testing*, only the listed test users can
-   sign in.
-2. **Clients** (or **Credentials**) → **Create client** → application type **Web
-   application** → **Authorized redirect URIs**: the URI above. No JavaScript origins.
-3. Put the **Client ID** in `.env` as `CAMPBOOKS_IDP_GOOGLE_CLIENT_ID` and the **Client
-   secret** in `secrets/google-client-secret`.
-
-**Microsoft** (Microsoft Entra admin center, `entra.microsoft.com`):
-
-1. **App registrations → New registration**. Supported account types must match
-   `CAMPBOOKS_IDP_MICROSOFT_TENANT`:
-
-   | `CAMPBOOKS_IDP_MICROSOFT_TENANT` | Supported account types |
-   | --- | --- |
-   | `common` (default) | Accounts in any organizational directory and personal Microsoft accounts |
-   | `organizations` | Accounts in any organizational directory (work and school only) |
-   | `consumers` | Personal Microsoft accounts only |
-   | your tenant ID | Accounts in this organizational directory only |
-
-2. Redirect URI: platform **Web**, the URI above.
-3. **Certificates & secrets → New client secret**. Copy its **Value** (not the Secret ID)
-   into `secrets/microsoft-client-secret`. Secrets expire (at most two years): put a
-   reminder in your calendar and rotate it (below) before then.
-4. **API permissions**: the default Microsoft Graph `User.Read` is enough.
-5. Put the **Application (client) ID** from **Overview** in `.env` as
-   `CAMPBOOKS_IDP_MICROSOFT_CLIENT_ID`.
-
-Register a new app rather than reusing an old one: multi-tenant apps created since June 2023
-leave the email out of the sign-in when its domain is not verified by its owner, so nobody
-can sign in as an address they do not own. For an older app, set `removeUnverifiedEmailClaim`
-to `true` in its `authenticationBehaviors` (Microsoft Graph).
-
-**Zoho** (the API console of your data centre: `api-console.zoho.eu` for the EU,
-`api-console.zoho.com` for the US, and so on):
-
-1. **Add client → Server-based Applications**.
-2. Client name, homepage URL (your `CAMPBOOKS_PUBLIC_URL`), **Authorized redirect URIs**:
-   the URI above. **Create**.
-3. Put the **Client ID** in `.env` as `CAMPBOOKS_IDP_ZOHO_CLIENT_ID` and the **Client
-   Secret** in `secrets/zoho-client-secret`. Set `CAMPBOOKS_IDP_ZOHO_ISSUER` to the
-   accounts server of that data centre (default `https://accounts.zoho.eu`; also
-   `https://accounts.zoho.com`, `https://accounts.zoho.in`, `https://accounts.zoho.com.au`,
-   `https://accounts.zoho.jp`, ...).
-
-People whose Zoho account lives in another data centre cannot sign in with Zoho here: Zoho
-expects the sign-in to be finished at their own data centre, which the IdP does not do.
-
-### 3. Put the secret in place and start
-
-Secrets are files in `deploy/secrets/` (ignored by git), mounted read-only into
-`idp-provision`, which runs as uid 10001; never put them in `.env`.
-
-```sh
-cd deploy
-nano secrets/google-client-secret     # paste the secret on one line, save
-sudo chown 10001:10001 secrets/google-client-secret
-sudo chmod 0400 secrets/google-client-secret
-```
-
-(Docker Desktop on macOS or Windows does not need the `chown`.) Set the client ID in
-`.env`, then `docker compose up -d` and check `docker compose logs idp-provision`. Open the
-app: the login page now shows a button per provider (with its name; upload a logo under
-**Providers** in the admin UI if you want one).
-
-**Installs from before sign-in providers existed:** the IdP's `campbooks` API key may not
-manage providers yet, and `idp-provision` stops with a message saying so (everything else is
-already provisioned). Grant it once: admin UI → **API Keys** → `campbooks` → **Auth
-Providers**: read, create, update. Then `docker compose up -d` again.
-
-### Who can get in
-
-Whether someone without an account may create one by signing in with a provider follows
-`CAMPBOOKS_SIGNUP__POLICY`, so a provider never opens an instance you closed:
-
-| `CAMPBOOKS_SIGNUP__POLICY` | Someone new signs in with a provider |
-| --- | --- |
-| `open` | Gets an account and may create a workspace |
-| `code` | Gets an account; creating a workspace needs a signup code |
-| `approval` | Gets an account; asking for a workspace records a request, nobody is let in until it is approved |
-| `invite_only` | Refused. An admin creates their account first (**Users** in the admin UI); once they have set a password or passkey and signed in, they link the provider from their account page |
-
-`CAMPBOOKS_IDP_PROVIDER_SIGNUP=open` lets new people create accounts through a provider even
-on an `invite_only` instance (they still need an invitation to join a workspace);
-`closed` never lets them. The instance's first user may always create a workspace, so on a
-fresh instance sign in yourself before you share the address.
-
-### Accounts and linking
-
-- An account is linked to **one** provider at most. The first sign-in with a provider
-  creates the account (as above) and links it; later sign-ins with that provider land on
-  the same account, even if the email there changes.
-- If an account with the same email already exists (made with a password or passkey, or by
-  another provider), signing in with a provider is refused ("already exists but is not
-  linked"). Sign in the usual way, open your account page
-  (`${CAMPBOOKS_IDP_URL}/auth/v1/account`) and link the provider there; the emails must
-  match. Automatic linking by email is off on purpose: the IdP would link without checking
-  that the provider verified the address.
-- An account linked to Google cannot also sign in with Microsoft or Zoho. To switch, unlink
-  it on the account page (it needs a password or passkey first) and link the other one.
-- Microsoft does not say whether an email is verified, so accounts created through Microsoft
-  start with an unverified email, and accepting a Campbooks invitation needs a verified one.
-  An admin can mark it verified (**Users** → the user → E-Mail verified).
-
-### Changing or removing a provider
-
-- **Rotating a secret:** replace the file, `docker compose up -d`. A provider is configured
-  again whenever its client ID, secret, tenant or issuer, or whether it creates accounts,
-  changes; the log says so. Other edits made under **Providers** in the admin UI are kept
-  until then, and replaced by Campbooks' settings when that happens.
-- **Removing one:** remove its client ID from `.env`. It stays registered (deleting it would
-  strand the accounts linked to it) and the log reminds you; disable or delete it under
-  **Providers** in the admin UI. To have `idp-provision` set it up from scratch again, delete
-  it there and remove its marker:
-  `docker compose run --rm idp-init rm /app/data/campbooks/provisioned/provider-<google|microsoft|zoho>`.
+Accounts that existed in Rauthy are not carried over: people sign in again with Google,
+Microsoft, Zoho or a passkey and get a new Campbooks account. Move the old `CAMPBOOKS_IDP_*`
+provider settings to the `CAMPBOOKS_GOOGLE__*`, `CAMPBOOKS_MICROSOFT__*` and
+`CAMPBOOKS_ZOHO__*` ones (see Built-in sign-in), and add
+`${CAMPBOOKS_PUBLIC_URL}/auth/callback/<provider>` to each provider's OAuth app.

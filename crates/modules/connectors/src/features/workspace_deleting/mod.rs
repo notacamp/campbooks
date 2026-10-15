@@ -11,8 +11,11 @@ use campbooks_kernel::{
 
 use crate::{
     deps::Deps,
-    domain::{model::ConnectionId, removal},
-    events::{MailChoice, WorkspaceDeleting},
+    domain::{
+        model::{ConnectionId, MailChoice},
+        removal,
+    },
+    events::WorkspaceDeleting,
     features::send_message::SEND_OWNER,
 };
 

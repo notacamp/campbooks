@@ -1,3 +1,35 @@
+## ADDED Requirements
+
+### Requirement: A way in that came only from connecting goes with its mailbox
+When a connect creates a way in (`linked_via = connect`) and hands its grant
+over, the identity module SHALL record the connection against that way in,
+and SHALL record every later connection of that way in.
+`identity.forget_connected_way_in`, consuming `connectors.connection_removed`,
+SHALL forget the removed connection and, when that way in has no recorded
+connection left, was linked by connecting, and is not the account's last way
+in (provider accounts and passkeys), SHALL remove it as
+`identity.remove_way_in` does: ending every session signed in with it,
+revoking their refresh tokens, auditing it and publishing
+`identity.way_in_removed`. A way in with connections that were never recorded
+(linked before the record existed), one linked by signing up or by Add, and
+the last way in SHALL stay. Replaying the event SHALL change nothing.
+
+#### Scenario: Its last connection goes
+- **WHEN** a way in a connect created has connections in two workspaces and both are removed
+- **THEN** it stays after the first removal and is gone after the second, with one `identity.way_in_removed`
+
+#### Scenario: Whoever signed in with it is signed out
+- **WHEN** a browser is signed in with that way in when its last connection is removed
+- **THEN** that session has ended
+
+#### Scenario: Other ways in stay
+- **WHEN** the connection of a shared mailbox, of the account the person signed up with, or one never recorded is removed
+- **THEN** the person's ways in are unchanged
+
+#### Scenario: The last way in stays
+- **WHEN** the only way in left is one a connect created and its connection is removed
+- **THEN** it stays
+
 ## MODIFIED Requirements
 
 ### Requirement: Connecting and reconnecting a mailbox through identity

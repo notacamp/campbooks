@@ -114,14 +114,91 @@
       "notConfigured": "Not set up",
       "answering": "Answering",
       "notAnswering": "Not answering",
+      "notSentMail": "Not sent any mail",
       "protocol": {
         "openai": "OpenAI-compatible",
         "laya": "Laya"
       },
-      "detail": "{{model}} at {{endpoint}} · {{protocol}}"
+      "detail": "{{model}} at {{endpoint}} · {{protocol}}",
+      "where": {
+        "instance": "on this instance’s network",
+        "externalAllowed": "outside this instance’s network, allowed to receive mail",
+        "externalRefused": "outside this instance’s network, so mail is not sent to it"
+      },
+      "check": {
+        "pending": "Checking its answers",
+        "pendingDetail": "its answers are used once it gets obvious test emails right",
+        "passed": "got {{right}} of {{total}} test answers right",
+        "failed": "Answers fail the check",
+        "failedDetail": "got only {{right}} of {{total}} obvious test answers right, so its answers are not used and the rules sort mail alone",
+        "unavailable": "Did not answer the check",
+        "unavailableDetail": "its answers are not used until it does"
+      }
     },
     "duration": {
       "lessThanAMinute": "Less than a minute"
+    }
+  },
+  "jobs": {
+    "title": "Jobs",
+    "refresh": "Refresh",
+    "lead": "The background work this instance runs, and the jobs that gave up. A job’s contents are never shown here: only what ran, how often, and why it stopped.",
+    "dismiss": "Dismiss",
+    "loading": "Loading the job queue",
+    "cancel": "Cancel",
+    "loadError": {
+      "title": "Couldn’t load the job queue",
+      "lead": "The server didn’t answer. Try again in a moment.",
+      "retry": "Try again"
+    },
+    "queue": {
+      "title": "Queue",
+      "emptyTitle": "Nothing is queued",
+      "emptyLead": "No job is waiting, running or failed right now.",
+      "showFailed": "Show failures",
+      "retryAll": "Retry all failed",
+      "underAMinute": "under a minute",
+      "counts": "Ready {{ready}} · Scheduled {{scheduled}} · Running {{running}} · Failed {{failed}}",
+      "oldestWaiting": "oldest waiting {{age}}",
+      "expiredLeases_one": "{{count}} running job lost its worker",
+      "expiredLeases_other": "{{count}} running jobs lost their worker"
+    },
+    "retryAll": {
+      "question_one": "Retry the {{count}} failed {{kind}} job? It starts again from its first attempt.",
+      "question_other": "Retry all {{count}} failed {{kind}} jobs? Each starts again from its first attempt.",
+      "confirm": "Retry",
+      "done_one": "{{count}} {{kind}} job is back in the queue.",
+      "done_other": "{{count}} {{kind}} jobs are back in the queue.",
+      "more": "There are more: retry again to requeue the rest.",
+      "none": "No failed {{kind}} jobs were left to retry.",
+      "error": "Couldn’t retry the {{kind}} jobs. Try again."
+    },
+    "failed": {
+      "title": "Failed jobs",
+      "filter": "Show",
+      "allKinds": "All kinds",
+      "emptyTitle": "No failed jobs",
+      "emptyLead": "Every job either finished or is still being tried.",
+      "retried": "The job is back in the queue.",
+      "discarded": "The job was discarded.",
+      "unchanged": "That job was no longer failed, so nothing changed.",
+      "superseded": "Another job of this kind is already waiting, so this one was left as it was.",
+      "retryError": "Couldn’t retry the job. Try again.",
+      "discardError": "Couldn’t discard the job. Try again.",
+      "more": "Show more",
+      "when": "Failed {{when}}",
+      "attempts": "{{attempts}} of {{max}} attempts",
+      "instanceWide": "whole instance",
+      "workspace": "workspace {{workspace}}",
+      "noError": "No error was recorded.",
+      "error": "Last error",
+      "copy": "Copy error",
+      "copied": "Copied.",
+      "copyFailed": "Couldn’t copy. Select the text and copy it.",
+      "retry": "Retry",
+      "discard": "Discard",
+      "discardConfirm": "Discard",
+      "discardQuestion": "Discard this {{kind}} job? It is deleted for good."
     }
   }
 }

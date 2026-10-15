@@ -9,11 +9,12 @@
 use std::time::Duration;
 
 use axum::{Json, extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
-    AppState, Error, Job, JobContext, JobError, Operation, Problem, Result, Risk,
+    AppState, Job, JobContext, JobError, Operation, Problem, Result, Risk,
     db::BeginFor as _,
     jobs::{self, EnqueueOptions},
-    tenancy::{Access, Role, Workspace, WorkspaceId},
+    tenancy::{Access, Workspace, WorkspaceId},
 };
 use chrono::{DateTime, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        access::{acting_user, lock_workspace},
+        access::{acting_user, authorize, lock_workspace, workspace_resource},
         security::{self, SecurityKind},
     },
     events::WorkspaceDeleting,
@@ -48,7 +49,7 @@ pub struct WorkspaceDeletion {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Deletes everything in the workspace after the grace period.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.workspace"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.workspace"]).access("workspaces.workspace", campbooks_kernel::authz::Action::Delete)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = ACCEPTED, description = "Deleted; its records are purged after the grace \
@@ -71,12 +72,17 @@ pub async fn handler(
 
 /// Delete the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDeletion> {
-    let (user, role) = acting_user(access)?;
-    if role != Role::Owner {
-        return Err(Error::Forbidden);
-    }
+    let (user, _) = acting_user(access)?;
     let id = access.workspace;
     let mut tx = state.db.begin_for(id).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &workspace_resource(access),
+    )
+    .await?;
     lock_workspace(&mut tx, id).await?;
     let purge_after = sqlx::query_scalar!(
         r#"UPDATE workspaces.workspaces
@@ -122,8 +128,10 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<WorkspaceDelet
 
 /// Hard-delete a deleted workspace's records once its grace period is over:
 /// its blobs (`BlobStore::purge_workspace`), then the workspace row, and with
-/// it (foreign keys cascade) its members, invitations and security events. Runs in the workspace, so row-level
-/// security applies; a workspace that is gone already is a no-op.
+/// it (foreign keys cascade) its members, invitations and security events,
+/// and the kernel's change feed, event log and finished jobs of the
+/// workspace. Runs in the workspace, so row-level security applies; a
+/// workspace that is gone already is a no-op.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PurgeWorkspace {
     /// The workspace.
@@ -178,9 +186,11 @@ impl Job for PurgeWorkspace {
         )
         .execute(&mut **tx)
         .await?;
-        // Its change feed goes with it.
+        // Its change feed, event log and finished jobs go with it (jobs
+        // still queued, such as other modules' purges, stay to run).
         campbooks_kernel::changes::purge_workspace(tx, &workspace).await?;
-        tracing::info!(workspace = %id, "workspace purged");
+        let (jobs, events) = campbooks_kernel::jobs::purge_workspace(tx, &workspace).await?;
+        tracing::info!(workspace = %id, jobs, events, "workspace purged");
         Ok(())
     }
 }
@@ -275,6 +285,16 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(changes, 0, "its change feed went with it");
+        let history: (i64, i64) = sqlx::query_as(
+            "SELECT (SELECT count(*) FROM kernel.events WHERE workspace_id = $1),
+                    (SELECT count(*) FROM kernel.jobs
+                      WHERE workspace_id = $1 AND kind <> 'workspaces.purge_workspace')",
+        )
+        .bind(ws.to_string())
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+        assert_eq!(history, (0, 0), "its events and finished jobs went with it");
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

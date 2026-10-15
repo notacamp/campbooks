@@ -6,7 +6,7 @@ use campbooks_kernel::tenancy::{Role, WorkspaceId};
 use chrono::TimeDelta;
 use sqlx::PgPool;
 
-use crate::testkit::{Kit, synthetic};
+use crate::testkit::{Kit, assert_contract, synthetic};
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
@@ -18,9 +18,11 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     );
     let ws = WorkspaceId::new();
     let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
+    let ana_id = kit.join(&ana, ws, Role::Member);
     let bea = kit.user("bea");
     kit.join(&bea, ws, Role::Member);
+    let cid = kit.user("cid");
+    kit.join(&cid, ws, Role::Admin);
     let connection = kit.connect(&ana, ws).await;
     kit.run_jobs().await;
     let id = connection["id"].as_str().unwrap();
@@ -31,6 +33,15 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     let client = kit.delete(&kit.client(ws), &uri).await;
     assert_eq!(client.status, StatusCode::FORBIDDEN);
     assert_eq!(client.json["code"], "connection_needs_user");
+    // An admin sees it but only the member who connected it disconnects it.
+    let admin = kit.delete(&cid, &uri).await;
+    assert_eq!(admin.status, StatusCode::FORBIDDEN);
+    assert_eq!(admin.json["code"], "disconnect_owner_only");
+    assert!(
+        kit.payloads(ws, "connectors.connection_removed")
+            .await
+            .is_empty()
+    );
 
     assert_eq!(kit.delete(&ana, &uri).await.status, StatusCode::NO_CONTENT);
     let revoked = kit.google.revoked();
@@ -38,12 +49,15 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
     assert!(revoked[0].starts_with("fake-refresh"));
     let removed = kit.payloads(ws, "connectors.connection_removed").await;
     assert_eq!(removed.len(), 1);
+    assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
+    assert_eq!(removed[0]["mail"], "delete");
+    assert_eq!(removed[0]["granted_by"], ana_id.to_string());
+    assert_eq!(removed[0]["provider"], "google");
+    assert!(removed[0]["account_subject"].is_string());
     assert_eq!(
         removed[0]["inbox_ids"][0],
         connection["streams"][0]["inbox_id"]
     );
-    // Deleting its mail is the default.
-    assert_eq!(removed[0]["mail"], "delete");
     let left: i64 = sqlx::query_scalar!(
         r#"SELECT (SELECT count(*) FROM connectors.connections)
                 + (SELECT count(*) FROM connectors.credentials)
@@ -73,93 +87,29 @@ async fn the_grantor_disconnects_and_the_grant_is_revoked(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn only_the_grantor_disconnects_even_when_an_admin_sees_it(db: PgPool) {
+async fn the_grantor_may_keep_the_mail_read_only(db: PgPool) {
     let kit = Kit::new(db).await;
+    kit.google.seed(
+        &synthetic(1),
+        &["INBOX"],
+        kit.clock.now() - TimeDelta::hours(1),
+    );
     let ws = WorkspaceId::new();
     let ana = kit.user("ana");
     kit.join(&ana, ws, Role::Member);
-    let carl = kit.user("carl");
-    kit.join(&carl, ws, Role::Admin);
     let connection = kit.connect(&ana, ws).await;
+    kit.run_jobs().await;
     let id = connection["id"].as_str().unwrap();
-    let uri = format!("/api/v1/w/{ws}/connections/{id}");
-
-    assert_eq!(kit.get(&carl, &uri).await.status, StatusCode::OK);
-    let refused = kit.delete(&carl, &uri).await;
-    assert_eq!(refused.status, StatusCode::FORBIDDEN);
-    assert_eq!(refused.json["code"], "not_your_connection");
-    assert!(kit.google.revoked().is_empty());
-    assert_eq!(kit.get(&ana, &uri).await.status, StatusCode::OK);
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
-async fn keeping_the_mail_is_for_your_own_mailbox_or_a_manager(db: PgPool) {
-    let kit = Kit::new(db).await;
-    let ws = WorkspaceId::new();
-    let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
-    let carl = kit.user("carl");
-    kit.join(&carl, ws, Role::Admin);
-
-    // Ana's shared mailbox (she doesn't sign in with it): delete only.
-    let shared = kit
-        .adopt_as(&ana, ws, "support-sub", None, false)
-        .await
-        .unwrap();
-    let uri = format!("/api/v1/w/{ws}/connections/{shared}");
-    let view = kit.get(&ana, &uri).await;
-    assert_eq!(view.json["grantor_signs_in"], false);
-    let refused = kit.delete(&ana, &format!("{uri}?mail=keep")).await;
-    assert_eq!(refused.status, StatusCode::FORBIDDEN);
-    assert_eq!(refused.json["code"], "keep_mail_not_allowed");
-    assert_eq!(kit.get(&ana, &uri).await.status, StatusCode::OK);
-
-    // Her own mailbox: she may keep its mail.
-    let own = kit.connect(&ana, ws).await;
-    let own_id = own["id"].as_str().unwrap();
-    assert_eq!(own["grantor_signs_in"], true);
-    let kept = kit
+    let uri = format!("/api/v1/w/{ws}/connections/{id}?mail=keep");
+    assert_eq!(kit.delete(&ana, &uri).await.status, StatusCode::NO_CONTENT);
+    let removed = kit.payloads(ws, "connectors.connection_removed").await;
+    assert_contract("connectors.connection_removed.v1.schema.json", &removed[0]);
+    assert_eq!(removed[0]["mail"], "keep");
+    let bad = kit
         .delete(
             &ana,
-            &format!("/api/v1/w/{ws}/connections/{own_id}?mail=keep"),
+            &format!("/api/v1/w/{ws}/connections/{id}?mail=archive"),
         )
         .await;
-    assert_eq!(kept.status, StatusCode::NO_CONTENT);
-
-    // An admin may keep the mail of a shared mailbox they connected.
-    let carls = kit
-        .adopt_as(&carl, ws, "billing-sub", None, false)
-        .await
-        .unwrap();
-    let kept = kit
-        .delete(
-            &carl,
-            &format!("/api/v1/w/{ws}/connections/{carls}?mail=keep"),
-        )
-        .await;
-    assert_eq!(kept.status, StatusCode::NO_CONTENT);
-
-    let removed = kit.payloads(ws, "connectors.connection_removed").await;
-    let choices: Vec<&str> = removed
-        .iter()
-        .map(|e| e["mail"].as_str().unwrap())
-        .collect();
-    assert_eq!(choices, ["keep", "keep"]);
-}
-
-#[sqlx::test(migrations = "../../../migrations")]
-async fn a_later_grant_never_clears_that_you_sign_in_with_it(db: PgPool) {
-    let kit = Kit::new(db).await;
-    let ws = WorkspaceId::new();
-    let ana = kit.user("ana");
-    kit.join(&ana, ws, Role::Member);
-    let id = kit.adopt_as(&ana, ws, "ana-sub", None, true).await.unwrap();
-    // A reconnect says nothing about signing in (`false`): the mark stays.
-    kit.adopt_as(&ana, ws, "ana-sub", Some(id.clone()), false)
-        .await
-        .unwrap();
-    let view = kit
-        .get(&ana, &format!("/api/v1/w/{ws}/connections/{id}"))
-        .await;
-    assert_eq!(view.json["grantor_signs_in"], true);
+    assert_eq!(bad.status, StatusCode::BAD_REQUEST);
 }

@@ -62,11 +62,15 @@
     "opening": "Opening administration…",
     "back": "Back to Campbooks",
     "sections": {
-      "system": "System"
+      "system": "System",
+      "jobs": "Jobs",
+      "signups": "Signups",
+      "people": "People",
+      "workspaces": "Workspaces"
     },
     "menuEntry": "Administration",
     "reauthTitle": "Sign in again to continue",
-    "reauthLead": "Administration needs a sign-in from the last 12 hours, so nobody can use an old session to change this instance. You’ll come straight back here.",
+    "reauthLead": "Administration needs a sign-in from the last hour, so nobody can use an old session to change this instance. You’ll come straight back here.",
     "reauthAction": "Sign in again",
     "unreachableTitle": "Can’t open administration",
     "unreachableLead": "The server didn’t answer. Check your connection, then try again."

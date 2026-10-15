@@ -15,6 +15,8 @@ pub mod telemetry;
 pub mod web;
 
 #[cfg(test)]
+mod access_matrix_tests;
+#[cfg(test)]
 mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
@@ -73,6 +75,35 @@ pub const SECURITY_HEADERS: [(HeaderName, &str); 3] = [
     (header::REFERRER_POLICY, "strict-origin-when-cross-origin"),
     (header::X_FRAME_OPTIONS, "DENY"),
 ];
+
+/// Path prefixes whose responses carry people's data (the API, the web BFF
+/// and its proxied API, the admin API): never stored by a browser or a shared
+/// cache ([`no_store`]).
+pub const NO_STORE_PREFIXES: [&str; 3] = ["/api/", "/bff/", "/admin/"];
+
+/// `Cache-Control: no-store` and `Pragma: no-cache` on every response under
+/// [`NO_STORE_PREFIXES`], whatever the handler set (a handler's own
+/// `no-store` variant, such as `private, no-store`, is kept). One layer, so
+/// no endpoint can forget it.
+async fn no_store(request: AxumRequest, next: middleware::Next) -> axum::response::Response {
+    let path = request.uri().path();
+    let private = NO_STORE_PREFIXES
+        .iter()
+        .any(|prefix| path.starts_with(prefix) || path == prefix.trim_end_matches('/'));
+    let mut response = next.run(request).await;
+    if private {
+        let headers = response.headers_mut();
+        let stores = headers
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok())
+            .is_none_or(|value| !value.contains("no-store"));
+        if stores {
+            headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+        }
+        headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    }
+    response
+}
 
 /// Name of the OpenAPI security scheme every scoped operation references:
 /// `security(("bearer" = ["<scope>"]))`.
@@ -173,6 +204,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_conversations::module(composition.conversations.clone()),
         campbooks_identity::module(composition.identity.clone()),
         campbooks_admin::module(),
+        campbooks_attention::module(),
         campbooks_search::module(),
         // `cargo xtask new-module` inserts above this line.
     ]
@@ -186,11 +218,13 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// administrator, and keeps the trail of what they do.
 pub fn with_ports(state: AppState) -> AppState {
     state
+        .with_resources(resource_catalogue())
         .with_admin(campbooks_admin::profiles(), campbooks_admin::audit())
         .with_membership(campbooks_workspaces::membership())
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_kept_mail(campbooks_conversations::kept_mail())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
         ]))
@@ -210,6 +244,9 @@ pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppSta
         ));
     match &composition.identity.issuer {
         Some(issuer) => {
+            // Every client token comes from this issuer: a registered client
+            // acts for the member who registered it (ADR 0017).
+            let state = state.with_client_directory(campbooks_identity::client_directory());
             let keys = campbooks_identity::LocalKeys {
                 db: state.db.clone(),
                 keys: Arc::clone(&issuer.keys),
@@ -241,7 +278,21 @@ pub fn registry_with(composition: &Composition) -> Result<Registry, RegistryErro
     Registry::build_with(
         &modules_with(composition),
         &[(bff::OWNER, &bff::background())],
-    )
+    )?
+    .with_resources(&[
+        (changes::OWNER, changes::resources()),
+        (bff::OWNER, bff::resources()),
+    ])
+}
+
+/// The access catalogue (ADR 0017): every resource type the modules, the
+/// change feed and the web BFF declare, with the ports answering their
+/// facts. (A registration error leaves it empty, so everything is denied;
+/// startup reports the error.)
+pub fn resource_catalogue() -> campbooks_kernel::authz::Catalogue {
+    registry()
+        .map(|registry| registry.resources().clone())
+        .unwrap_or_default()
 }
 
 /// Every event the modules publish, with its payload schema: what
@@ -313,6 +364,8 @@ fn security_scheme() -> SecurityScheme {
             workspace. The protocol endpoints (`/.well-known/*`, `/oauth2/*`, `/auth/*`) serve \
             browsers and OAuth clients; they answer 404 while another identity provider serves \
             the instance."),
+        (name = "attention", description = "What needs you: one queue per member of what the \
+            records you may open ask of you (conversations today), with Later per member."),
         (name = "search", description = "One search over the records you may open: \
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
@@ -334,7 +387,7 @@ struct ApiDoc;
             does not exist) unless the caller is a user whose bearer token carries the \
             `admin:access` scope and whose admin profile grants the operation's permission \
             (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last \
-            sign-in (`auth_time`) is more than 12 hours old answers 401 \
+            sign-in (`auth_time`) is more than an hour old answers 401 \
             `admin_reauth_required`. Every request past the profile check is recorded in the \
             audit trail. These operations are not part of the operation catalogue \
             (`/openapi.json`): automation and the assistant cannot call them. Admin profiles \
@@ -547,6 +600,7 @@ fn compose(
             .layer(nosniff)
             .layer(referrer)
             .layer(frame)
+            .layer(middleware::from_fn(no_store))
             .layer(SetRequestIdLayer::new(request_id.clone(), MakeRequestUuid))
             .layer(middleware::from_fn_with_state(metrics, telemetry::observe))
             .layer(PropagateRequestIdLayer::new(request_id))
@@ -601,7 +655,8 @@ mod tests {
                 "automation": false,
                 "assistant": false,
                 "risk": "low",
-                "records": []
+                "records": [],
+                "access": {"resource": "system.instance", "action": "read"}
             })
         );
         assert!(spec["components"]["schemas"]["Problem"].is_object());
@@ -701,6 +756,8 @@ mod tests {
     /// Row-level security can only protect tables that have it: every table
     /// with a `workspace_id` column (and the workspaces themselves) must
     /// enable and force it and carry a policy, so a new module cannot forget.
+    /// The kernel's tables too (the change feed, blobs, the event log and
+    /// the queue): a workspace transaction sees only its own rows there.
     #[sqlx::test(migrations = "../../migrations")]
     async fn every_workspace_owned_table_has_row_level_security(db: sqlx::PgPool) {
         let unprotected = sqlx::query_scalar!(
@@ -709,7 +766,7 @@ mod tests {
               FROM pg_class c
               JOIN pg_namespace n ON n.oid = c.relnamespace
              WHERE c.relkind IN ('r', 'p')
-               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public', 'kernel')
+               AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'public')
                AND (EXISTS (SELECT 1 FROM pg_attribute a
                              WHERE a.attrelid = c.oid AND a.attname = 'workspace_id'
                                AND NOT a.attisdropped)
@@ -725,6 +782,46 @@ mod tests {
         assert!(
             unprotected.is_empty(),
             "no forced row-level security: {unprotected:?}"
+        );
+    }
+
+    /// A transaction that sets no workspace (the scheduler's dispatcher) may
+    /// only read and lease the scheduling index, never insert or delete
+    /// rows of any workspace's: its maintenance policies are `FOR SELECT`
+    /// and `FOR UPDATE`, and no other policy admits a transaction without a
+    /// workspace on a module's table.
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
+        let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+            "SELECT tablename::text, policyname::text, cmd::text, coalesce(qual, '')
+               FROM pg_policies
+              WHERE schemaname NOT IN ('kernel', 'admin', 'pg_catalog')
+              ORDER BY 1, 2",
+        )
+        .fetch_all(&db)
+        .await
+        .unwrap();
+        // Policies admitting a transaction that set no workspace.
+        let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
+        let policies: Vec<(String, String, String)> = rows
+            .into_iter()
+            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .map(|(table, name, cmd, _)| (table, name, cmd))
+            .collect();
+        assert_eq!(
+            policies,
+            [
+                (
+                    "sync_due".to_owned(),
+                    "maintenance_leases_schedule".to_owned(),
+                    "UPDATE".to_owned()
+                ),
+                (
+                    "sync_due".to_owned(),
+                    "maintenance_reads_schedule".to_owned(),
+                    "SELECT".to_owned()
+                ),
+            ]
         );
     }
 
@@ -1134,6 +1231,40 @@ mod tests {
             for (name, value) in &SECURITY_HEADERS {
                 assert_eq!(header(&raw, name), Some(*value), "{name}");
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn api_responses_are_never_stored() {
+        let dir = WebDir::new();
+        let web = web_app(&dir);
+        for (raw, uri) in [
+            (fetch(&app(), "/api/v1/system/version", None).await, "api"),
+            (fetch(&app(), "/api/v1/nope", None).await, "api 404"),
+            (
+                fetch(&web, "/bff/api/v1/system/version", None).await,
+                "bff api",
+            ),
+            (fetch(&web, "/bff/session", None).await, "bff session"),
+            (
+                fetch(&web, "/admin/v1/system/overview", None).await,
+                "admin",
+            ),
+        ] {
+            assert_eq!(
+                header(&raw, &header::CACHE_CONTROL),
+                Some("no-store"),
+                "{uri}"
+            );
+            assert_eq!(header(&raw, &header::PRAGMA), Some("no-cache"), "{uri}");
+        }
+        // The web client's own files keep their caching.
+        for raw in [
+            fetch(&web, "/", HTML).await,
+            fetch(&web, "/assets/x.js", None).await,
+        ] {
+            assert_ne!(header(&raw, &header::CACHE_CONTROL), Some("no-store"));
+            assert_eq!(header(&raw, &header::PRAGMA), None);
         }
     }
 

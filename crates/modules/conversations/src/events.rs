@@ -10,15 +10,18 @@
 //! workspace.
 
 use campbooks_kernel::{
-    DomainEvent, RecordRef, blobs::BlobRef, changes::Change as FeedChange, tenancy::UserId,
+    DomainEvent, RecordRef,
+    blobs::BlobRef,
+    changes::{Audience, Change as FeedChange},
+    tenancy::UserId,
 };
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, NaiveDate, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::model::{
-    BlobPointer, Channel, ConnectionId, ConversationId, DraftId, InboxId, LabelId, MessageId,
-    SendId, Stream,
+    BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, LabelId,
+    MessageId, NeedReason, NeedTrust, SendId, Stream,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -35,6 +38,12 @@ pub const DRAFT_RECORD: &str = "conversations.draft";
 /// `inbox` as the container of a change.
 fn inbox_record(inbox: InboxId) -> RecordRef {
     RecordRef::new(INBOX_RECORD, &inbox)
+}
+
+/// A draft's changes reach its author alone, or the client tokens for one a
+/// client wrote.
+fn draft_audience(author: Option<UserId>) -> Audience {
+    author.map_or(Audience::Clients, Audience::User)
 }
 
 impl MessageFacts {
@@ -208,6 +217,67 @@ impl DomainEvent for ConversationChanged {
     }
 }
 
+/// What a conversation needs, as `need_changed` carries it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedFacts {
+    /// Why.
+    pub reason: NeedReason,
+    /// How much Campbooks stands behind it.
+    pub trust: NeedTrust,
+    /// When it is due, when the message names a date that resolves.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_on: Option<NaiveDate>,
+    /// Whether it is for today.
+    pub urgent: bool,
+}
+
+/// A conversation's need changed: it opened, changed, or was cleared.
+/// Ids, enums and a date only (`contracts/conversations.need_changed.v1.schema.json`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct NeedChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the need.
+    pub inbox: InboxId,
+    /// The conversation.
+    pub conversation: ConversationId,
+    /// The inbound message the need comes from.
+    pub message: MessageId,
+    /// Grows with every change of this conversation's need; apply only
+    /// newer ones (deliveries are not ordered).
+    pub revision: i64,
+    /// When that message was sent.
+    pub sent_at: DateTime<Utc>,
+    /// The need, or `None` once cleared.
+    pub need: Option<NeedFacts>,
+    /// Why it was cleared.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleared_because: Option<ClearCause>,
+    /// The member who cleared it, when one did.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cleared_by: Option<UserId>,
+    /// The conversation's newest inbound message: when it changes, the
+    /// sender wrote again (a member's Later ends) even if the need did not.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_message: Option<MessageId>,
+}
+
+impl DomainEvent for NeedChanged {
+    const NAME: &'static str = "conversations.need_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![
+            FeedChange::upsert(RecordRef::new(CONVERSATION_RECORD, &self.conversation))
+                .within(inbox_record(self.inbox)),
+        ]
+    }
+}
+
 /// A change a member asked for, to be made at the provider too.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -307,6 +377,10 @@ pub struct SendRequested {
     /// The outgoing-message v1 document, a blob of the workspace.
     #[schema(value_type = BlobPointer)]
     pub message: BlobRef,
+    /// The draft's author; `None` for a client token's draft. Its change
+    /// reaches only them (a draft is private).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for SendRequested {
@@ -320,7 +394,8 @@ impl DomainEvent for SendRequested {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox_id)),
+                .within(inbox_record(self.inbox_id))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -338,6 +413,9 @@ pub struct DraftSent {
     /// The conversation it answered, if any.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conversation: Option<ConversationId>,
+    /// The draft's author; `None` for a client token's draft.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for DraftSent {
@@ -351,7 +429,8 @@ impl DomainEvent for DraftSent {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::delete(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox)),
+                .within(inbox_record(self.inbox))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -368,6 +447,9 @@ pub struct SendFailed {
     /// Why (`not_connected`, `needs_reauth`, `rejected`, `too_large`,
     /// `unavailable`, `unknown_outcome`).
     pub reason: String,
+    /// The draft's author; `None` for a client token's draft.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<UserId>,
 }
 
 impl DomainEvent for SendFailed {
@@ -381,7 +463,8 @@ impl DomainEvent for SendFailed {
     fn changes(&self) -> Vec<FeedChange> {
         vec![
             FeedChange::upsert(RecordRef::new(DRAFT_RECORD, &self.draft))
-                .within(inbox_record(self.inbox)),
+                .within(inbox_record(self.inbox))
+                .for_audience(draft_audience(self.author)),
         ]
     }
 }
@@ -495,6 +578,106 @@ impl DomainEvent for CapabilityGranted {
 
 /// The connection-account v1 document, as this module reads it
 /// (`contracts/connection-account.v1.schema.json`).
+/// The inbox changed in a way that may change who sees it, or what they
+/// may do there: a membership ended, its owner left, or it was kept
+/// read-only after its connection was removed. Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InboxChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+}
+
+impl DomainEvent for InboxChanged {
+    const NAME: &'static str = "conversations.inbox_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![FeedChange::upsert(inbox_record(self.inbox)).within(inbox_record(self.inbox))]
+    }
+}
+
+/// The inbox was deleted with everything in it (its connection was removed
+/// and its mail not kept). Ids only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InboxRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox.
+    pub inbox: InboxId,
+}
+
+impl DomainEvent for InboxRemoved {
+    const NAME: &'static str = "conversations.inbox_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        vec![FeedChange::delete(inbox_record(self.inbox)).within(inbox_record(self.inbox))]
+    }
+}
+
+/// What becomes of a removed connection's mail
+/// (`contracts/connectors.connection_removed.v1.schema.json`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete the inboxes it fed (also when the field is absent).
+    #[default]
+    Delete,
+    /// Keep them read-only.
+    Keep,
+}
+
+/// `connectors.connection_removed` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection.
+    pub connection: ConnectionId,
+    /// The inboxes it fed.
+    pub inbox_ids: Vec<InboxId>,
+    /// Delete or keep their mail.
+    #[serde(default)]
+    pub mail: MailChoice,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_left` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberLeft {
+    /// The workspace.
+    pub workspace: String,
+    /// The former member.
+    pub user: UserId,
+}
+
+impl DomainEvent for MemberLeft {
+    const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct AccountDocument {
     /// The format version, 1.

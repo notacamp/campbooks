@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO kernel.changes\n            (workspace_id, event_id, record_type, record_id, op, container_type, container_id,\n             audience, audience_user)\n        SELECT $1, $2, c.record_type, c.record_id, c.op, c.container_type, c.container_id,\n               c.audience, c.audience_user\n          FROM unnest($3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[],\n                      $9::text[])\n               WITH ORDINALITY AS c(record_type, record_id, op, container_type, container_id,\n                                    audience, audience_user, n)\n         ORDER BY c.n\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Uuid",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "a9c94168cb260dfaf9e2ca8f8ab16505015f615c40c8226d6cdc109b0588e41c"
+}

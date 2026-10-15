@@ -12,5 +12,6 @@ export type {
   UseMailboxConsent,
   WayInFate,
 } from "./consent";
+export { WorkspaceConnectionsAdmin } from "./components/WorkspaceConnectionsAdmin/WorkspaceConnectionsAdmin";
 export { buildConnectorsRoutes } from "./routes";
 export { CONNECTORS_SHORTCUTS } from "./shortcuts";

@@ -1,0 +1,32 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO workspaces.users (id, idp_subject, display_name, email, email_verified)\n        VALUES ($1, $2, $3, $4, $5)\n        ON CONFLICT (idp_subject) DO NOTHING\n        RETURNING id AS \"id: UserId\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "53df659a8640678e4a4ea1625ab9ba66bf14fa0235b25486bf5f3c50438b3301"
+}

@@ -77,7 +77,7 @@ const SIGN_IN_ERRORS = [
   "invalid_state",
   "provider_unavailable",
   "login_failed",
-  "account_disabled",
+  "account_suspended",
   "way_in_belongs_to_another_account",
   "signup_invite_only",
 ] as const;
@@ -131,9 +131,24 @@ export function linkResult(search: {
   return search.connected === undefined ? undefined : { kind: "connected" };
 }
 
-/** Signs in again (a fresh sign-in, at most ten minutes old) and comes back to `returnTo`. */
-export function stepUpUrl(returnTo: string): string {
-  return `${loginUrl(safeReturnTo(returnTo))}&max_age=600`;
+/**
+ * Signs in again and comes back to `returnTo`: a sign-in at most ten minutes
+ * old, or, `fresh`, a new one now (adding a passkey asks for one from the
+ * last five minutes).
+ */
+export function stepUpUrl(returnTo: string, { fresh = false }: { fresh?: boolean } = {}): string {
+  return fresh
+    ? loginUrl(safeReturnTo(returnTo), { fresh: true })
+    : `${loginUrl(safeReturnTo(returnTo))}&max_age=600`;
+}
+
+/** How long a new way to sign in stands out on Ways to sign in. */
+const RECENT_DAYS = 7;
+
+/** Whether a way in added at `iso` is recent enough to stand out (as of `now`). */
+export function addedRecently(iso: string, now: Date = new Date()): boolean {
+  const age = now.getTime() - new Date(iso).getTime();
+  return age >= 0 && age < RECENT_DAYS * 24 * 60 * 60 * 1000;
 }
 
 /** Whether `provider` is one this client can show. */

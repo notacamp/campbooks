@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { writeTabValue } from "~/lib/storage/tab";
 
 import {
+  addedRecently,
   isInvitation,
   isReturnAddress,
   linkResult,
@@ -86,6 +87,23 @@ describe("linkResult", () => {
       "/bff/login?return_to=%2Fw%2F1%2Fsettings%2Fsign-in&max_age=600",
     );
     expect(stepUpUrl("https://evil.example.com")).toBe("/bff/login?return_to=%2F&max_age=600");
+  });
+
+  it("signs in anew for a passkey (max_age=0)", () => {
+    expect(stepUpUrl("/w/1/settings/sign-in", { fresh: true })).toBe(
+      "/bff/login?return_to=%2Fw%2F1%2Fsettings%2Fsign-in&max_age=0",
+    );
+  });
+});
+
+describe("addedRecently", () => {
+  const now = new Date("2026-10-14T12:00:00Z");
+
+  it("is true for the last seven days only", () => {
+    expect(addedRecently("2026-10-14T11:00:00Z", now)).toBe(true);
+    expect(addedRecently("2026-10-08T12:00:01Z", now)).toBe(true);
+    expect(addedRecently("2026-10-07T12:00:00Z", now)).toBe(false);
+    expect(addedRecently("2026-10-15T12:00:00Z", now)).toBe(false);
   });
 });
 

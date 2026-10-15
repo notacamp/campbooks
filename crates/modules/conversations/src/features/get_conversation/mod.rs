@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result,
     blobs::BlobRef,
@@ -17,6 +17,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::paths::ConversationPath,
     domain::{
@@ -24,11 +26,14 @@ use crate::{
         attachments::is_raster,
         blobs::read_text,
         conversation::{ConversationSummary, summary},
+        policy::Policy,
         suggestions::{self, DecisionView},
     },
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::RecordRef;
+use campbooks_kernel::authz::Action;
 
 /// Newest messages returned with a conversation.
 pub const MAX_MESSAGES: i64 = 100;
@@ -135,7 +140,7 @@ pub struct Bodies {
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.conversation", "conversations.message"])))),
+        .records(["conversations.conversation", "conversations.message"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -152,12 +157,21 @@ pub struct Bodies {
 )]
 pub async fn handler(
     State(state): State<AppState>,
+    Extension(policy): Extension<Policy>,
     workspace: Workspace<ConversationsRead>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationDetail>> {
     let id = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &id),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let visible = sqlx::query_scalar!(
         "SELECT 1 AS one FROM conversations.conversations WHERE id = $1 AND inbox_id = ANY($2)",
@@ -190,10 +204,13 @@ pub async fn handler(
         .rev()
         .find(|r| r.direction == crate::model::Direction::Inbound.as_str())
         .map(|r| r.id);
-    let decisions = match newest_inbound {
+    let mut decisions = match newest_inbound {
         Some(message) => suggestions::for_message(&mut tx, message).await?,
         None => Vec::new(),
     };
+    for view in &mut decisions {
+        view.threshold = suggestions::threshold(&policy, view);
+    }
     let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
     let mut attachments = attachments_of(&mut tx, &ids).await?;
     tx.commit().await?;
@@ -329,7 +346,8 @@ mod tests {
             kit.get(&client, &unknown).await.status,
             StatusCode::NOT_FOUND
         );
-        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::OK);
+        // A client acting for no member sees no inbox's conversation.
+        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::NOT_FOUND);
         let junk = format!("/api/v1/w/{workspace}/conversations/not-an-id");
         assert_eq!(kit.get(&client, &junk).await.status, StatusCode::NOT_FOUND);
     }

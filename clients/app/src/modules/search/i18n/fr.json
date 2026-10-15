@@ -1,0 +1,126 @@
+{
+  "field": {
+    "label": "Rechercher dans les conversations",
+    "placeholder": "Rechercher dans les conversations"
+  },
+  "overlay": {
+    "label": "Recherche",
+    "results": "Résultats",
+    "hintMove": "Naviguer",
+    "hintOpen": "Ouvrir",
+    "hintAll": "Tous les résultats",
+    "hintClose": "Fermer"
+  },
+  "shortcuts": {
+    "open": "Rechercher dans les conversations"
+  },
+  "row": {
+    "noSubject": "(sans objet)"
+  },
+  "chip": {
+    "attachment": "Avec pièce jointe",
+    "is": {
+      "unread": "Non lus",
+      "read": "Lus",
+      "starred": "Suivis"
+    },
+    "from": "De {{value}}",
+    "to": "À {{value}}",
+    "cc": "Cc {{value}}",
+    "subject": "Objet : {{value}}",
+    "in": "Dans {{value}}",
+    "label": "Libellé : {{value}}",
+    "date": {
+      "before": "Avant le {{value}}",
+      "after": "Après le {{value}}",
+      "older_than": "Plus ancien que {{value}}",
+      "newer_than": "Plus récent que {{value}}"
+    },
+    "other": "{{operator}} : {{value}}"
+  },
+  "warning": {
+    "label": "Ce qui n’a pas été compris",
+    "unknown_operator": "« {{operator}} : » n’est pas un opérateur de recherche, il a donc été cherché comme du texte.",
+    "empty_value": "« {{operator}} : » doit être suivi d’une valeur.",
+    "invalid_value": "La valeur après « {{operator}} : » n’a pas été comprise.",
+    "other": "Une partie de cette recherche n’a pas été comprise."
+  },
+  "recent": {
+    "title": "Recherches récentes",
+    "clear": "Effacer"
+  },
+  "tips": {
+    "title": "Affiner la recherche",
+    "from": {
+      "text": "D’une personne",
+      "example": "from:ana"
+    },
+    "attachment": {
+      "text": "Avec un fichier joint",
+      "example": "has:attachment"
+    },
+    "unread": {
+      "text": "Seulement ce que vous n’avez pas lu",
+      "example": "is:unread"
+    },
+    "phrase": {
+      "text": "Une expression exacte",
+      "example": "\"facture d’octobre\""
+    },
+    "exclude": {
+      "text": "Exclure un mot",
+      "example": "-newsletter"
+    },
+    "date": {
+      "text": "Envoyés après une date",
+      "example": "after:2026-09-01"
+    }
+  },
+  "count_one": "{{count}} résultat",
+  "count_other": "{{count}} résultats",
+  "empty": {
+    "title": "Aucune conversation ne correspond à « {{query}} »",
+    "body": "Essayez avec moins de mots, ou d’autres mots.",
+    "bodyFilters": "Essayez de retirer un filtre ci-dessus, ou d’utiliser moins de mots."
+  },
+  "indexing": {
+    "title": "Indexation des anciens messages en cours",
+    "body": "Des conversations plus anciennes peuvent manquer à ces résultats pour le moment."
+  },
+  "error": {
+    "retry": "Réessayer",
+    "again": "Relancer la recherche",
+    "too_long": {
+      "title": "Cette recherche est trop longue",
+      "body": "Réduisez-la à 512 caractères au plus."
+    },
+    "cursor": {
+      "title": "Ces résultats ne sont plus à jour",
+      "body": "La recherche a changé pendant le chargement de résultats supplémentaires. Relancez-la pour repartir du début."
+    },
+    "busy": {
+      "title": "Trop de recherches d’affilée",
+      "body": "Patientez un instant, puis réessayez."
+    },
+    "other": {
+      "title": "Impossible de lancer la recherche",
+      "body": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu."
+    }
+  },
+  "page": {
+    "title": "Recherche",
+    "list": "Résultats de la recherche",
+    "order": "Ordre",
+    "newest": "Plus récents",
+    "relevance": "Plus pertinents",
+    "quick": "Filtres rapides",
+    "attachmentToggle": "Avec pièce jointe",
+    "unreadToggle": "Non lus",
+    "more": "Plus de résultats",
+    "loadingMore": "Chargement de résultats supplémentaires",
+    "reader": "Conversation",
+    "readerTitle": "Choisissez un résultat",
+    "readerBody": "Choisissez-en un dans la liste, ou utilisez le clavier :",
+    "back": "Retour aux résultats"
+  }
+}

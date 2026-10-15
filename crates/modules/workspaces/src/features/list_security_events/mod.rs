@@ -2,6 +2,7 @@
 //! log, newest first. Owners and admins.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Operation, Problem, Result,
     db::BeginFor as _,
@@ -15,7 +16,7 @@ use utoipa::{IntoParams, ToSchema};
 use crate::MESSAGES;
 
 use crate::{
-    domain::{access::acting_manager, model::SecurityEventId},
+    domain::{access::authorize_type, model::SecurityEventId, resources::SECURITY_EVENT_RECORD},
     scopes::WorkspacesAdmin,
 };
 
@@ -62,7 +63,7 @@ pub struct SecurityEventList {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // The audit log stays out of the assistant's context.
-    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.security_event"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["workspaces.security_event"]).access("workspaces.security_event", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), Page),
     responses(
         (status = OK, description = "The newest events.", body = SecurityEventList),
@@ -86,7 +87,7 @@ pub async fn handler(
 
 /// The newest security events of the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access, page: Page) -> Result<SecurityEventList> {
-    acting_manager(access)?;
+    authorize_type(state, access, Action::Read, SECURITY_EVENT_RECORD)?;
     let limit = page.limit.unwrap_or(50);
     if limit == 0 || limit > MAX_LIMIT {
         return Err(campbooks_kernel::Error::BadRequest(

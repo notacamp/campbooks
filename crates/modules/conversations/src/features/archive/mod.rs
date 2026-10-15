@@ -1,7 +1,7 @@
 //! `POST …/conversations/{conversation_id}/archive` and `/unarchive` — take a
 //! conversation out of the inbox, or put it back.
 
-use axum::{Json, extract::State};
+use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{
     AppState, Operation, Problem, Result, Risk, extract,
     tenancy::{Workspace, WorkspaceId},
@@ -11,7 +11,8 @@ use crate::{
     domain::paths::ConversationPath,
     domain::{
         conversation::ConversationSummary,
-        flags::{Flag, apply},
+        flags::{self, Flag},
+        needs::NeedSettings,
     },
     model::ConversationId,
     scopes::ConversationsWrite,
@@ -28,7 +29,7 @@ use crate::{
         .undo("conversations.unarchive")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -45,11 +46,12 @@ use crate::{
 )]
 pub async fn archive(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Archive)
+    flags::apply(&state, &workspace.access, id, Flag::Archive, Some(&needs))
         .await
         .map(Json)
 }
@@ -65,7 +67,7 @@ pub async fn archive(
         .undo("conversations.archive")
         .automation()
         .assistant()
-        .records(["conversations.conversation"])))),
+        .records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -82,11 +84,12 @@ pub async fn archive(
 )]
 pub async fn unarchive(
     State(state): State<AppState>,
+    Extension(needs): Extension<NeedSettings>,
     workspace: Workspace<ConversationsWrite>,
     extract::Path(path): extract::Path<ConversationPath>,
 ) -> Result<Json<ConversationSummary>> {
     let id = path.conversation_id;
-    apply(&state, &workspace.access, id, Flag::Unarchive)
+    flags::apply(&state, &workspace.access, id, Flag::Unarchive, Some(&needs))
         .await
         .map(Json)
 }

@@ -36,6 +36,10 @@ pub struct Reason {
     pub rule: &'static str,
     /// What matched: a header name, a phrase, an attachment, a count.
     pub evidence: String,
+    /// The sentence of the message's new text that holds the evidence, when
+    /// the evidence came from the text: what the sender actually wrote, for
+    /// quoting. Untrusted content, shown as quoted text only.
+    pub sentence: Option<String>,
 }
 
 impl Reason {
@@ -44,6 +48,7 @@ impl Reason {
         Self {
             rule,
             evidence: evidence.into(),
+            sentence: None,
         }
     }
 }
@@ -114,6 +119,7 @@ pub struct Model {
     name: String,
     gateway: Gateway,
     purpose: &'static str,
+    checked: bool,
 }
 
 impl Model {
@@ -124,7 +130,21 @@ impl Model {
             name: name.into(),
             gateway,
             purpose,
+            checked: false,
         }
+    }
+
+    /// The same strategy, answering only while the role's answers check
+    /// ([`super::check`]) passes, without waiting for one still running:
+    /// otherwise it fails with
+    /// [`Error::AnswersNotTrusted`] before calling the model, and the
+    /// answers it gives carry the check's [`stamp`](super::check::stamp) as
+    /// their `model_version`. The check itself runs elsewhere
+    /// ([`Gateway::keep_answers_checked`]).
+    #[must_use]
+    pub fn checked(mut self) -> Self {
+        self.checked = true;
+        self
     }
 }
 
@@ -142,6 +162,9 @@ impl Strategy for Model {
             if questions.is_empty() {
                 return Ok(Decisions::default());
             }
+            if self.checked && !self.gateway.answers_trusted() {
+                return Err(Error::AnswersNotTrusted);
+            }
             let answers = self
                 .gateway
                 .decide(
@@ -154,9 +177,14 @@ impl Strategy for Model {
                 answers: answers
                     .iter()
                     .map(|answer| {
+                        let mut answer = answer.clone();
+                        if self.checked {
+                            answer.model_version =
+                                Some(super::check::stamp(answer.model_version.as_deref()));
+                        }
                         Some(Decided {
                             reasons: vec![Reason::new("model.decide", answer.model.clone())],
-                            answer: answer.clone(),
+                            answer,
                         })
                     })
                     .collect(),

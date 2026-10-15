@@ -56,6 +56,7 @@
   --font-sans: "Funnel Sans Variable", "Funnel Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display:
     "Funnel Display Variable", "Funnel Display", "Funnel Sans Variable", ui-sans-serif, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
   --text-xs: 0.75rem; /* 12  meta, kbd */
   --text-sm: 0.8125rem; /* 13  secondary UI */
   --text-md: 0.875rem; /* 14  body, rows */
@@ -219,6 +220,10 @@
   --accent-text: light-dark(
     oklch(var(--accent-l-light) var(--accent-c) var(--accent-h)),
     oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h))
+  );
+  --highlight: light-dark(
+    oklch(var(--accent-l-light) var(--accent-c) var(--accent-h) / 0.2),
+    oklch(var(--accent-l-dark) var(--accent-c) var(--accent-h) / 0.32)
   );
   --focus-ring: var(--accent);
 

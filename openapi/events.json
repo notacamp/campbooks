@@ -3,6 +3,35 @@
   "jsonSchemaDialect": "https://spec.openapis.org/oas/3.1/dialect/base",
   "events": [
     {
+      "name": "attention.item_changed",
+      "module": "attention",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "An item opened, changed, cleared, or was snoozed or unsnoozed.",
+        "required": [
+          "workspace",
+          "item",
+          "container"
+        ],
+        "properties": {
+          "container": {
+            "$ref": "#/components/schemas/RecordRef",
+            "description": "Who may see it: its container (`conversations.inbox`)."
+          },
+          "item": {
+            "$ref": "#/components/schemas/ItemId",
+            "description": "The item."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "connectors.capability_granted",
       "module": "connectors",
       "version": 1,
@@ -127,16 +156,34 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. `mail` says what becomes of the inboxes it fed; their owner (the\nconversations module) carries it out.",
+        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. `mail` says what becomes of the inboxes it fed\n(`contracts/connectors.connection_removed.v1.schema.json`): the\nconversations module deletes them, or keeps them read-only.",
         "required": [
           "workspace",
           "connection",
           "inbox_ids"
         ],
         "properties": {
+          "account_subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's stable id of the account (the `OpenID` `sub`; opaque, never\nan address), so a way in that came only from this connection can be\ndropped with it."
+          },
           "connection": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection."
+          },
+          "granted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who had connected it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "inbox_ids": {
             "type": "array",
@@ -147,7 +194,18 @@
           },
           "mail": {
             "$ref": "#/components/schemas/MailChoice",
-            "description": "Delete their mail or keep it read-only. Absent in events recorded\nbefore the choice existed, which read as `delete`."
+            "description": "Delete the mail it brought in (the default), or keep it read-only."
+          },
+          "provider": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Provider",
+                "description": "Its provider."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "type": "string",
@@ -355,6 +413,17 @@
           "draft"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "conversation": {
             "oneOf": [
               {
@@ -370,6 +439,54 @@
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft, now deleted."
           },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.inbox_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a membership ended, its owner left, or it was kept\nread-only after its connection was removed. Ids only.",
+        "required": [
+          "workspace",
+          "inbox"
+        ],
+        "properties": {
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.inbox_removed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "The inbox was deleted with everything in it (its connection was removed\nand its mail not kept). Ids only.",
+        "required": [
+          "workspace",
+          "inbox"
+        ],
+        "properties": {
           "inbox": {
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox."
@@ -412,6 +529,96 @@
       }
     },
     {
+      "name": "conversations.need_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A conversation's need changed: it opened, changed, or was cleared.\nIds, enums and a date only (`contracts/conversations.need_changed.v1.schema.json`).",
+        "required": [
+          "workspace",
+          "inbox",
+          "conversation",
+          "message",
+          "revision",
+          "sent_at"
+        ],
+        "properties": {
+          "cleared_because": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ClearCause",
+                "description": "Why it was cleared."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cleared_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who cleared it, when one did."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation."
+          },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the need."
+          },
+          "latest_message": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageId",
+                "description": "The conversation's newest inbound message: when it changes, the\nsender wrote again (a member's Later ends) even if the need did not."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "$ref": "#/components/schemas/MessageId",
+            "description": "The inbound message the need comes from."
+          },
+          "need": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/NeedFacts",
+                "description": "The need, or `None` once cleared."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "revision": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Grows with every change of this conversation's need; apply only\nnewer ones (deliveries are not ordered)."
+          },
+          "sent_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When that message was sent."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.send_failed",
       "module": "conversations",
       "version": 1,
@@ -426,6 +633,17 @@
           "reason"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "draft": {
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft."
@@ -461,6 +679,17 @@
           "message"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft. Its change\nreaches only them (a draft is private)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "draft": {
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft being sent."
@@ -505,6 +734,26 @@
           "provider": {
             "type": "string",
             "description": "The provider of its first way in."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.account_suspended",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions).",
+        "required": [
+          "account"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
           }
         }
       }
@@ -689,6 +938,26 @@
       }
     },
     {
+      "name": "identity.signed_out_everywhere",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "A person signed out everywhere: every issuer session of the account\nended and every refresh token it held was revoked. The web BFF ends its\nown sessions of the account on it.",
+        "required": [
+          "account"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          }
+        }
+      }
+    },
+    {
       "name": "identity.way_in_added",
       "module": "identity",
       "version": 1,
@@ -721,6 +990,14 @@
           "via": {
             "type": "string",
             "description": "How it was added: `sign_up`, `link`, `connect` or `passkey`."
+          },
+          "way_in": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid",
+            "description": "The provider identity or passkey added (absent from events published\nbefore it was recorded)."
           }
         }
       }
@@ -799,6 +1076,10 @@
           "user"
         ],
         "properties": {
+          "mail": {
+            "$ref": "#/components/schemas/MailChoice",
+            "description": "What becomes of the mail of the mailboxes they connected: deleted\n(always when they leave), or kept read-only when the owner or admin\nremoving them chose so."
+          },
           "removed_by": {
             "oneOf": [
               {
@@ -809,6 +1090,13 @@
                 "type": "null"
               }
             ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their identity subject (an opaque account id), so the issuer can\nremove the clients they registered in the workspace."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
@@ -1036,6 +1324,18 @@
           "email"
         ]
       },
+      "ClearCause": {
+        "type": "string",
+        "description": "Why a need was cleared.",
+        "enum": [
+          "replied",
+          "archived",
+          "trashed",
+          "done",
+          "not_needed",
+          "superseded"
+        ]
+      },
       "ConnectionId": {
         "type": "string",
         "format": "uuid",
@@ -1091,6 +1391,11 @@
         "format": "uuid",
         "description": "InboxId (UUIDv7)"
       },
+      "ItemId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "ItemId (UUIDv7)"
+      },
       "Kind": {
         "type": "string",
         "description": "What a workspace is for.",
@@ -1106,7 +1411,7 @@
       },
       "MailChoice": {
         "type": "string",
-        "description": "What becomes of a disconnected mailbox's mail in Campbooks. Its mail at\nthe provider is never touched.",
+        "description": "What becomes of the mail a connection brought in when it is removed\n(the owner's decision, campbooks-cloud#117): deleted with it (the\ndefault), or kept as read-only history. Only the member who connected\nit chooses when disconnecting; an owner or admin chooses when removing\nthat member.",
         "enum": [
           "delete",
           "keep"
@@ -1189,6 +1494,55 @@
         "format": "uuid",
         "description": "MessageId (UUIDv7)"
       },
+      "NeedFacts": {
+        "type": "object",
+        "description": "What a conversation needs, as `need_changed` carries it.",
+        "required": [
+          "reason",
+          "trust",
+          "urgent"
+        ],
+        "properties": {
+          "due_on": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date",
+            "description": "When it is due, when the message names a date that resolves."
+          },
+          "reason": {
+            "$ref": "#/components/schemas/NeedReason",
+            "description": "Why."
+          },
+          "trust": {
+            "$ref": "#/components/schemas/NeedTrust",
+            "description": "How much Campbooks stands behind it."
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Whether it is for today."
+          }
+        }
+      },
+      "NeedReason": {
+        "type": "string",
+        "description": "Why a conversation needs its inbox's members (attention).",
+        "enum": [
+          "reply",
+          "do",
+          "pay",
+          "review"
+        ]
+      },
+      "NeedTrust": {
+        "type": "string",
+        "description": "How much Campbooks stands behind a need.",
+        "enum": [
+          "sure",
+          "check"
+        ]
+      },
       "Origin": {
         "type": "string",
         "description": "Where a change came from.",
@@ -1204,6 +1558,26 @@
           "google",
           "zoho"
         ]
+      },
+      "RecordRef": {
+        "type": "object",
+        "description": "A pointer to any record of any module.\n\n`type` is `<module>.<record>` (for example `conversations.thread`), the\nsame names operations list in `x-campbooks.records`; `id` is the record's\nid as its module writes it (usually a UUID).\n\n```\nuse campbooks_kernel::records::RecordRef;\n\nlet thread = RecordRef::new(\n    \"conversations.thread\",\n    \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\",\n);\nassert_eq!(thread.module(), Some(\"conversations\"));\nassert_eq!(\n    serde_json::to_value(&thread).unwrap(),\n    serde_json::json!({\"type\": \"conversations.thread\", \"id\": \"0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11\"})\n);\n```",
+        "required": [
+          "type",
+          "id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The record's id within its module.",
+            "example": "0192f0c4-7d4e-7b39-a7f1-3a8f0e2b9c11"
+          },
+          "type": {
+            "type": "string",
+            "description": "The record type, `<module>.<record>`.",
+            "example": "conversations.thread"
+          }
+        }
       },
       "RequestOrigin": {
         "type": "string",

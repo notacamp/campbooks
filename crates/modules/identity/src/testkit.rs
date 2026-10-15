@@ -112,8 +112,6 @@ pub struct FakeIntake {
     adopted: Mutex<Vec<Handed>>,
     /// The issuer of each grant handed over, in order.
     issuers: Mutex<Vec<String>>,
-    /// Whether the person signs in with each grant's account, in order.
-    signs_in: Mutex<Vec<bool>>,
     /// Whether the instance syncs Zoho mailboxes too.
     zoho_mail: std::sync::atomic::AtomicBool,
 }
@@ -126,14 +124,6 @@ pub const ZOHO_MAIL_SCOPES: [&str; 3] = [
 ];
 
 impl FakeIntake {
-    /// Whether the person signs in with each grant's account, in order.
-    pub fn signs_in(&self) -> Vec<bool> {
-        self.signs_in
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .clone()
-    }
-
     /// The issuer of each grant handed over, in order.
     pub fn issuers(&self) -> Vec<String> {
         self.issuers
@@ -173,25 +163,24 @@ impl GrantIntake for FakeIntake {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(grant.issuer.clone());
-        self.signs_in
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push(grant.signs_in);
-        self.adopted
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .push((
-                grant.workspace,
-                grant.subject,
-                grant.address,
-                grant
-                    .refresh_token
-                    .as_ref()
-                    .map(|t| t.expose_secret().to_owned()),
-                grant.scopes,
-                grant.extending,
-            ));
-        Box::pin(async { Ok("connection-1".to_owned()) })
+        let mut adopted = self.adopted.lock().unwrap_or_else(PoisonError::into_inner);
+        // A reconnect lands on its connection; each new one gets the next id.
+        let id = grant.extending.clone().unwrap_or_else(|| {
+            let new = adopted.iter().filter(|handed| handed.5.is_none()).count() + 1;
+            format!("connection-{new}")
+        });
+        adopted.push((
+            grant.workspace,
+            grant.subject,
+            grant.address,
+            grant
+                .refresh_token
+                .as_ref()
+                .map(|t| t.expose_secret().to_owned()),
+            grant.scopes,
+            grant.extending,
+        ));
+        Box::pin(async move { Ok(id) })
     }
 
     fn reconnect_target<'a>(
@@ -428,6 +417,42 @@ fn server_of(idp: &TestIdp) -> Server {
     }
 }
 
+/// The fake providers as the issuer's upstreams.
+fn fakes(
+    google: &TestIdp,
+    microsoft: &TestIdp,
+    zoho: &TestIdp,
+    zoho_eu: &TestIdp,
+    redirect_path: Option<&str>,
+) -> Vec<Upstream> {
+    vec![
+        fake(
+            Provider::Google,
+            google,
+            IssuerRule::Fixed(server_of(google)),
+            redirect_path,
+        ),
+        fake(
+            Provider::Microsoft,
+            microsoft,
+            IssuerRule::Tenant {
+                server: server_of(microsoft),
+                prefix: MICROSOFT_ISSUER_PREFIX.to_owned(),
+                suffix: MICROSOFT_ISSUER_SUFFIX.to_owned(),
+                only: None,
+                except: None,
+            },
+            None,
+        ),
+        fake(
+            Provider::Zoho,
+            zoho,
+            IssuerRule::Servers(vec![server_of(zoho), server_of(zoho_eu)]),
+            None,
+        ),
+    ]
+}
+
 /// The client of `provider`, talking to the fake `idp`, registered with
 /// callback path `redirect_path` (the default when `None`).
 fn fake(
@@ -470,6 +495,8 @@ pub struct Kit {
     pub deps: Deps,
     /// The metadata documents on the (fake) internet.
     pub documents: Arc<FakeDocuments>,
+    /// The mail the instance sent (nothing leaves the process).
+    pub outbox: Arc<campbooks_kernel::mail::Outbox>,
     /// The browser's cookies.
     cookies: Mutex<HashMap<String, String>>,
     /// The address requests come from (none: from inside the process).
@@ -541,35 +568,11 @@ impl Kit {
             // Microsoft sends no `email_verified`.
             "email_verified": null,
         }));
-        issuer.upstreams = vec![
-            fake(
-                Provider::Google,
-                &google,
-                IssuerRule::Fixed(server_of(&google)),
-                redirect_path,
-            ),
-            fake(
-                Provider::Microsoft,
-                &microsoft,
-                IssuerRule::Tenant {
-                    server: server_of(&microsoft),
-                    prefix: MICROSOFT_ISSUER_PREFIX.to_owned(),
-                    suffix: MICROSOFT_ISSUER_SUFFIX.to_owned(),
-                    only: None,
-                    except: None,
-                },
-                None,
-            ),
-            fake(
-                Provider::Zoho,
-                &zoho,
-                IssuerRule::Servers(vec![server_of(&zoho), server_of(&zoho_eu)]),
-                None,
-            ),
-        ];
+        issuer.upstreams = fakes(&google, &microsoft, &zoho, &zoho_eu, redirect_path);
         let documents = Arc::new(FakeDocuments::default());
         issuer.fetcher = documents.clone();
         let intake = Arc::new(FakeIntake::default());
+        let outbox = Arc::new(campbooks_kernel::mail::Outbox::default());
         let issuer = deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
         let mut auth = config.auth.clone();
         auth.audience.clone_from(&issuer.resource);
@@ -580,6 +583,7 @@ impl Kit {
             )
             .with_membership(Arc::new(Everyone))
             .with_grant_intake(intake.clone())
+            .with_mailer(outbox.clone())
             .with_invitations(Arc::new(Invited(
                 invited.iter().map(|e| (*e).to_owned()).collect(),
             )))
@@ -603,6 +607,7 @@ impl Kit {
             intake,
             deps,
             documents,
+            outbox,
             cookies: Mutex::default(),
             peer: Mutex::default(),
         }
@@ -634,6 +639,50 @@ impl Kit {
     pub fn send_from(&self, peer: Option<&str>) {
         *self.peer.lock().unwrap_or_else(PoisonError::into_inner) =
             peer.map(|p| p.parse().unwrap_or_else(|e| panic!("{p}: {e}")));
+    }
+
+    /// An access token like `access` (its account, client, session and
+    /// scopes) but bound to `workspace`, as an app allowed there holds one.
+    /// Minted directly: no app may be granted `identity:*`, so this is the
+    /// only way to see a bound token that has the scope refused for being
+    /// bound.
+    pub async fn bound(&self, access: &str, workspace: uuid::Uuid) -> String {
+        let (_, claims) = Self::decode(access);
+        let text = |name: &str| claims[name].as_str().unwrap_or_default().to_owned();
+        let account: uuid::Uuid = text("sub").parse().unwrap_or_else(|e| panic!("sub: {e}"));
+        let grant = crate::domain::tokens::Grant {
+            client_id: text("client_id"),
+            account_id: account,
+            session_id: text("sid").parse().ok(),
+            scope: text("scope"),
+            auth_time: chrono::DateTime::from_timestamp(
+                claims["auth_time"].as_i64().unwrap_or_default(),
+                0,
+            )
+            .unwrap_or_default(),
+            resource: text("aud"),
+            workspace: Some(workspace),
+        };
+        let issuer = self.deps.issuer.clone().unwrap_or_else(|| panic!("issuer"));
+        let profile = crate::domain::accounts::profile(&self.state.db, account)
+            .await
+            .unwrap_or_else(|e| panic!("profile: {e}"))
+            .unwrap_or_else(|| panic!("no account"));
+        let signer = issuer
+            .keys
+            .signer(&self.state.db)
+            .await
+            .unwrap_or_else(|e| panic!("signer: {e}"));
+        crate::domain::tokens::Mint {
+            issuer: &issuer.url,
+            signer: &signer,
+            grant: &grant,
+            profile: &profile,
+            amr: &[],
+            now: chrono::Utc::now(),
+        }
+        .access_token()
+        .unwrap_or_else(|e| panic!("minting: {e}"))
     }
 
     /// Run every job that is ready (event deliveries included).
@@ -838,12 +887,19 @@ impl Kit {
     /// An access token for the account `access` names whose sign-in is an
     /// hour old (as if the person had signed in long ago).
     pub async fn stale(&self, access: &str) -> String {
+        self.signed_in_ago(access, chrono::TimeDelta::hours(1))
+            .await
+    }
+
+    /// An access token for the account `access` names whose sign-in is
+    /// `ago` old.
+    pub async fn signed_in_ago(&self, access: &str, ago: chrono::TimeDelta) -> String {
         let (_, claims) = Self::decode(access);
         let account: uuid::Uuid = claims["sub"]
             .as_str()
             .and_then(|s| s.parse().ok())
             .unwrap_or_else(|| panic!("sub"));
-        let stale = chrono::Utc::now() - chrono::TimeDelta::hours(1);
+        let stale = chrono::Utc::now() - ago;
         for sql in [
             "UPDATE identity.sessions SET auth_time = $2 WHERE account_id = $1",
             "UPDATE identity.refresh_families SET auth_time = $2 WHERE account_id = $1",

@@ -123,6 +123,7 @@ const ICONS = {
   ],
   unread: [<circle key="c" cx="12" cy="12" r="4" fill="currentColor" />],
   download: [path("M12 4v11M7.5 10.5 12 15l4.5-4.5"), path("M5 19.5h14")],
+  search: [<circle key="c" cx="10.5" cy="10.5" r="6" />, path("m15 15 5 5")],
   preview: [
     path("M2.8 12S6.2 5.5 12 5.5 21.2 12 21.2 12 17.8 18.5 12 18.5 2.8 12 2.8 12Z"),
     <circle key="c" cx="12" cy="12" r="2.8" />,

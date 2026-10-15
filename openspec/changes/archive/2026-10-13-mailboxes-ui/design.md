@@ -98,7 +98,13 @@ mailbox_scopes` non-empty): Microsoft signs in but has no mail adapter.
 
 ## Data ownership, events, scopes
 
-No schema change. Nothing is published or consumed that was not before.
+- Schema `identity`: `link_tickets.adds_way_in` and `upstream_flows.adds_way_in`
+  (migration `20261020140000_identity__connect_without_way_in`), and the
+  new `identity.mailbox_links` (`20261020140100_identity__mailbox_links`).
+- Consumed: `connectors.connection_removed` v1 by
+  `identity.forget_connected_way_in` (reads `workspace` and `connection`).
+  Published as before: `identity.way_in_removed` when a way in goes with it.
+- No other schema changes; the disconnect side is batch 1's.
 
 | Operation | Scope | Used for |
 |---|---|---|
@@ -227,25 +233,67 @@ Three decisions arrived during this change and are built here.
 
 Member departure and workspace deletion publish `mail = delete`.
 
+## After batch 1 of #117 landed (#479)
+
+Batch 1 brought the disconnect backend this change had started: only the
+grantor disconnects (403 `disconnect_owner_only`), `?mail=delete|keep`,
+`connectors.connection_removed` v1 with `granted_by`, `provider`,
+`account_subject` and `mail`, the conversations consumer that deletes or
+freezes the inboxes, and `list_inboxes` `read_only`. This change dropped its
+own versions (and `grantor_signs_in`, which nothing decided from any more)
+and keeps the screen on top of that API, plus:
+
+- **The reader for kept inboxes** (inbox-ui): an inbox listed `read_only`, or
+  one the person only reads, opens with no write action, is never marked
+  read on open, and says "Kept as history". New messages never offer it.
+- **The way in goes with its mailbox** (identity), below.
+- **"You" from the server:** `ConnectionView.granted_by_you`,
+  `MemberView.you`.
+
+### Removing a connect-only way in
+
+The rule (approved #117): a way in that came only from connecting a mailbox
+goes when that mailbox is disconnected, unless another live connection uses
+it or it is the account's last way in. The hard part is "another live
+connection": `identity` cannot see `connectors`' connections, which live in
+per-workspace rows behind row-level security.
+
+*Alternatives considered:*
+
+1. **An identity-owned record of the connections a way in brought
+   (chosen).** `identity.mailbox_links (connection_id, provider_identity_id)`
+   (account data: no workspace column, so the check sees every workspace's), written when a connect hands its grant over and the
+   connectors module accepts it: always when that round trip created the way
+   in, and for every later connection of a way in already tracked. The
+   consumer of `connection_removed` forgets the connection by id and removes
+   the way in when none is left. A way in linked before the table existed is
+   never tracked, so it is never removed by mistake while an unknown
+   connection still uses it. Data stays in `identity`'s schema; the event's
+   connection id is all it needs.
+2. **Ask `connectors` through a kernel port** ("does any connection of
+   provider X, account S remain?"). A cross-workspace read of `connectors`'
+   rows: either a privileged connection that skips row-level security or a
+   new owner-less query path, both against the data-access rules #117
+   tightened. Rejected.
+3. **Match by `provider` + `account_subject` from the event and count
+   nothing.** Removes the way in on the first disconnect even while another
+   workspace's connection still uses it. Rejected.
+
 ## Risks
 
 - **Mail after Disconnect.** Until #117's purge consumes `mail = delete`,
   a deleted mailbox's conversations stay. The contract (`mail` on the
   operation and the event) is what the two pieces agree on.
-- **A way in that came only from a connect** goes with its connection
-  (approved #117 decision, overriding #68's first position). The
-  confirmation says so from `identity.list_ways_in` (`linked_via =
-  connect`, not the last way in counting passkeys); `identity` removes it
-  on `connectors.connection_removed` once that event carries `provider`,
-  `account_subject` and `granted_by` (batch 1 of #117). The page cannot see
-  whether another of the person's connections uses the same account (then
-  the way in stays), so in that rare case it says the way in goes when it
-  stays.
-- **`grantor_signs_in` can go stale.** It is set when a grant arrives and
-  never cleared, so removing the way in afterwards (Ways to sign in) leaves
-  it `true`. Nothing decides access from it any more (keeping the history
-  is the grantor's choice, batch 1's rule). Better: compute it from the
-  live ways in on read; until then, treat it as a hint.
+- **What the confirmation says about the way in** comes from
+  `identity.list_ways_in` (`linked_via = connect`, not the last way in
+  counting passkeys). It cannot see whether another of the person's
+  connections uses the same account, nor whether the way in is tracked (one
+  linked before `mailbox_links` existed stays), so in those cases it says
+  the way in goes when it stays: the safe side of wrong.
+- **`grantor_signs_in` was dropped.** A first version stored whether the
+  grantor signed in with the account, to limit who could keep the mail. It
+  went stale as soon as a way in was removed, and batch 1's rule (the
+  grantor always chooses) made it unnecessary.
 - **Who "you" are** comes from the server (`ConnectionView.granted_by_you`,
   `MemberView.you`), never from matching emails, which a person without an
   address (or two sharing one) would get wrong.

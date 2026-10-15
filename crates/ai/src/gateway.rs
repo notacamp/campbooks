@@ -21,8 +21,6 @@ use crate::{
 pub const DEFAULT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Default whole-request timeout. Local CPU inference is slow; keep it generous.
 pub const DEFAULT_REQUEST_TIMEOUT: Duration = Duration::from_mins(2);
-/// Longest error body kept in [`Error::Status`].
-const MAX_ERROR_BODY: usize = 2048;
 
 /// How `decide` retries a provider that is down, restarting or busy.
 ///
@@ -227,8 +225,12 @@ pub struct ChatResponse {
 impl ChatResponse {
     /// Parse structured (`decide`) output.
     pub fn json<T: DeserializeOwned>(&self) -> Result<T, Error> {
-        serde_json::from_str(&self.content)
-            .map_err(|e| Error::InvalidResponse(format!("content is not the expected JSON: {e}")))
+        serde_json::from_str(&self.content).map_err(|e| {
+            Error::InvalidResponse(format!(
+                "content is not the expected JSON: {}",
+                campbooks_kernel::redact::json(&e)
+            ))
+        })
     }
 }
 
@@ -301,6 +303,9 @@ pub struct Gateway {
     instruments: Instruments,
     /// Recent reachability probes ([`Gateway::health`]).
     pub(crate) probes: crate::health::Probes,
+    /// The `decide` role's last answers check
+    /// ([`Gateway::answers_check`]).
+    pub(crate) checks: crate::decide::check::Checks,
 }
 
 impl Gateway {
@@ -318,6 +323,11 @@ impl Gateway {
         let http = Client::builder()
             .connect_timeout(connect_timeout)
             .timeout(request_timeout)
+            // Never follow a redirect: an endpoint on the instance's network
+            // answering 307 to an outside host would otherwise have us POST
+            // the mail there, past the external-content check. A 3xx is an
+            // `Error::Status` like any other non-success answer.
+            .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("campbooks/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self {
@@ -326,6 +336,7 @@ impl Gateway {
             retry: RetryPolicy::default(),
             instruments: Instruments::new(),
             probes: crate::health::Probes::default(),
+            checks: crate::decide::check::Checks::default(),
         })
     }
 
@@ -346,9 +357,11 @@ impl Gateway {
         &self.config
     }
 
-    /// Run a chat completion with the provider configured for `role`.
+    /// Run a chat completion with the provider configured for `role`. A
+    /// provider off the instance's network gets nothing unless the role
+    /// opted in ([`Error::ExternalContentRefused`]).
     pub async fn chat(&self, role: Role, request: ChatRequest) -> Result<ChatResponse, Error> {
-        let provider = self.config.provider(role)?;
+        let provider = self.config.provider_for_content(role)?;
         let call = Call::start(&self.instruments, "chat", role, provider);
         let result = self
             .chat_with(role, provider, request)
@@ -393,7 +406,7 @@ impl Gateway {
         if inputs.is_empty() {
             return Ok(Vec::new());
         }
-        let provider = self.config.provider(Role::Embed)?;
+        let provider = self.config.provider_for_content(Role::Embed)?;
         let call = Call::start(&self.instruments, "embeddings", Role::Embed, provider);
         let result = self
             .embed_with(provider, inputs)
@@ -439,7 +452,7 @@ impl Gateway {
         state: &DecisionState,
         questions: &[Question],
     ) -> Result<Answers, Error> {
-        let provider = self.config.provider(Role::Decide)?;
+        let provider = self.config.provider_for_content(Role::Decide)?;
         decide::validate(state, questions)?;
         if questions.is_empty() {
             return Ok(Answers::default());
@@ -601,24 +614,20 @@ async fn send<T: DeserializeOwned>(request: RequestBuilder) -> Result<T, Error> 
     read(request.send().await?).await
 }
 
+/// The answer as `T`. A non-success status keeps only its code: the body of
+/// a provider's error can echo the request (and so the mail in it), so it
+/// is read to free the connection and dropped.
 async fn read<T: DeserializeOwned>(response: reqwest::Response) -> Result<T, Error> {
     let status = response.status();
     if !status.is_success() {
-        let mut body = response.text().await.unwrap_or_default();
-        if body.len() > MAX_ERROR_BODY {
-            let cut = (0..=MAX_ERROR_BODY)
-                .rev()
-                .find(|i| body.is_char_boundary(*i))
-                .unwrap_or(0);
-            body.truncate(cut);
-        }
+        drop(response.bytes().await);
         return Err(Error::Status {
             status: status.as_u16(),
-            body,
         });
     }
     let bytes = response.bytes().await?;
-    serde_json::from_slice(&bytes).map_err(|e| Error::InvalidResponse(e.to_string()))
+    serde_json::from_slice(&bytes)
+        .map_err(|e| Error::InvalidResponse(campbooks_kernel::redact::json(&e)))
 }
 
 #[cfg(test)]

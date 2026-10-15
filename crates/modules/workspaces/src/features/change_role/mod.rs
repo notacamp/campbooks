@@ -3,6 +3,7 @@
 //! workspace always keeps an owner.
 
 use axum::{Json, extract::State};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
@@ -14,7 +15,7 @@ use utoipa::ToSchema;
 
 use crate::{
     domain::{
-        access::{acting_manager, keep_an_owner, lock_workspace, role_of},
+        access::{acting_user, authorize, keep_an_owner, lock_workspace, member_resource, role_of},
         model::{MemberPath, MemberView},
         security::{self, SecurityKind},
     },
@@ -39,7 +40,7 @@ pub struct ChangeRole {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Changes someone's permissions: never on a rule or the assistant's initiative.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.member"]).access("workspaces.member", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("user_id" = UserId, Path, description = "The member."),
@@ -77,9 +78,17 @@ pub async fn execute(
     member: UserId,
     input: ChangeRole,
 ) -> Result<MemberView> {
-    let (actor, actor_role) = acting_manager(access)?;
+    let (actor, actor_role) = acting_user(access)?;
     let id = access.workspace;
     let mut tx = state.db.begin_for(id).await?;
+    authorize(
+        state,
+        &mut tx,
+        access,
+        Action::Write,
+        &member_resource(member),
+    )
+    .await?;
     lock_workspace(&mut tx, id).await?;
     let from = role_of(&mut tx, id, member).await?.ok_or(Error::NotFound)?;
     let to = input.role;

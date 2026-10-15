@@ -49,6 +49,8 @@ pub fn config(database_url: &str) -> Config {
         signup: SignupConfig::default(),
         blobs: BlobsConfig::default(),
         changes: ChangesConfig::default(),
+        mail: crate::mail::MailConfig::default(),
+        events: crate::config::EventsConfig::default(),
         telemetry: TelemetryConfig::default(),
         trusted_proxies: crate::rate_limit::TrustedProxies::default(),
     }
@@ -181,8 +183,17 @@ pub fn unreachable_pool() -> PgPool {
 
 /// A module's routes as a plain router over `state`, behind the
 /// [`localize`](crate::i18n::localize) layer (so problems answer in the
-/// request's locale, as in the server).
+/// request's locale, as in the server). When `state` has no access
+/// catalogue yet, the module's own resource types are installed.
 pub fn app(module: Module, state: AppState) -> Router {
+    let state = if state.resources.is_empty() {
+        match crate::authz::Catalogue::new([&module.resources]) {
+            Ok(resources) => state.with_resources(resources),
+            Err(_) => state,
+        }
+    } else {
+        state
+    };
     let router: Router<AppState> = module.router.into();
     router
         .route_layer(axum::middleware::from_fn_with_state(

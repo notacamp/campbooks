@@ -45,6 +45,7 @@ use crate::{
         conversation::{Changed, recount},
         decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
         decisions::Recorded,
+        needs::{self, NeedSettings},
         policy::Policy,
         redact,
     },
@@ -81,13 +82,18 @@ pub const BATCH_RECORD: &str = "conversations.change_batch";
 pub struct ApplyChanges {
     rules: Arc<dyn Strategy>,
     policy: Policy,
+    needs: NeedSettings,
 }
 
 impl ApplyChanges {
     /// A handler sorting with `rules`, acting on their answers as `policy`
-    /// allows.
-    pub fn new(rules: Arc<dyn Strategy>, policy: Policy) -> Self {
-        Self { rules, policy }
+    /// allows, and raising needs as `needs` says.
+    pub fn new(rules: Arc<dyn Strategy>, policy: Policy, needs: NeedSettings) -> Self {
+        Self {
+            rules,
+            policy,
+            needs,
+        }
     }
 }
 
@@ -107,6 +113,23 @@ impl JobHandler for ApplyChanges {
             .ok_or_else(|| JobError::fatal("apply_changes enqueued outside a workspace"))?;
         let state = ctx.state().clone();
         let ws = workspace.to_string();
+
+        if closed(&state, workspace, payload.inbox).await? {
+            // Deleted with its connection, or kept read-only: nothing syncs
+            // into it any more. The batch is let go.
+            let tx = ctx.tx().await?;
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox is closed");
+            return Ok(());
+        }
 
         let (bytes, cut) = read_bytes(&state.blobs, &ws, &payload.batch, MAX_BATCH_BYTES).await?;
         if cut {
@@ -133,12 +156,36 @@ impl JobHandler for ApplyChanges {
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
+        // Asked again in the transaction that writes, holding the inbox
+        // `FOR SHARE` until it commits: a disconnect deleting or freezing it
+        // waits for this batch, or this batch sees it is closed.
+        let open = sqlx::query_scalar!(
+            r#"SELECT detached_at IS NULL AS "open!" FROM conversations.inboxes
+                WHERE id = $1 FOR SHARE"#,
+            batch.inbox as InboxId
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if open != Some(true) {
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox closed meanwhile");
+            return Ok(());
+        }
         let mut apply = Apply {
             state: &state,
             events: &events,
             workspace,
             ws: &ws,
             policy: &self.policy,
+            needs: &self.needs,
             inbox: batch.inbox,
             touched: BTreeMap::new(),
             new_in: BTreeSet::new(),
@@ -206,6 +253,25 @@ async fn survey(
     .await?;
     tx.commit().await?;
     Ok(known.into_iter().collect())
+}
+
+/// Whether `inbox` was deleted with its connection or kept read-only.
+async fn closed(
+    state: &AppState,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+) -> Result<bool, JobError> {
+    let mut tx = state.db.begin_for(workspace).await?;
+    let closed = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)
+               OR EXISTS (SELECT 1 FROM conversations.inboxes
+                           WHERE id = $1 AND detached_at IS NOT NULL) AS "closed!""#,
+        inbox as InboxId
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(closed)
 }
 
 /// What step 2 found out about a new message.
@@ -309,6 +375,7 @@ struct Apply<'a> {
     workspace: WorkspaceId,
     ws: &'a str,
     policy: &'a Policy,
+    needs: &'a NeedSettings,
     inbox: InboxId,
     /// Conversations whose existing messages changed or went: what changed
     /// and which messages, announced at the end.
@@ -757,6 +824,12 @@ impl Apply<'_> {
                 recount(tx, *conversation).await?;
             }
         }
+        let refresh: BTreeSet<ConversationId> = self
+            .new_in
+            .iter()
+            .chain(self.touched.keys())
+            .copied()
+            .collect();
         for (conversation, (changes, provider_ids)) in self.touched {
             Changed {
                 workspace: self.ws.to_owned(),
@@ -768,6 +841,11 @@ impl Apply<'_> {
             }
             .publish(self.events, tx)
             .await?;
+        }
+        // What each conversation needs now, once its counts and state are
+        // current (a conversation that is gone changes nothing).
+        for conversation in refresh {
+            needs::refresh(tx, self.events, self.ws, conversation, self.needs).await?;
         }
         Ok(())
     }

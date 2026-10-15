@@ -32,13 +32,14 @@ pub enum ReadError {
     /// The provider refused or failed.
     #[error(transparent)]
     Provider(#[from] ProviderError),
-    /// The database failed.
-    #[error("database: {0}")]
+    /// The database failed. Shown by kind only: a database error's message
+    /// can quote the row it failed on.
+    #[error("{}", campbooks_kernel::redact::sqlx(.0))]
     Database(#[from] sqlx::Error),
     /// The blob store failed.
     #[error("blob store: {0}")]
     Blob(#[from] BlobError),
-    /// Stored data did not decode.
+    /// Stored data did not decode: what and where, never the data.
     #[error("{0}")]
     Corrupt(String),
     /// A query of the module failed.
@@ -101,6 +102,35 @@ pub enum IndexOp {
     },
 }
 
+/// The provider that received a message: whose `Authentication-Results`
+/// header is trusted (its authserv-id), and no one else's.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Receiver {
+    /// Gmail (`mx.google.com`).
+    Gmail,
+    /// Zoho Mail, in any of its data centres.
+    Zoho,
+}
+
+impl Receiver {
+    /// The authserv-ids the provider stamps its own results with. An id not
+    /// listed here is not trusted, so an unknown one reads as no result at
+    /// all.
+    ///
+    /// Zoho trusts none yet: nobody has seen which `Authentication-Results`
+    /// (if any, rather than only `ARC-Authentication-Results`) Zoho adds on
+    /// top of a received message, and if it adds none, a header naming its
+    /// servers would be one the sender wrote. TODO(campbooks-cloud#132):
+    /// list Zoho's ids once a recorded Zoho message shows them, with a test
+    /// over that recording.
+    pub const fn authserv_ids(self) -> &'static [&'static str] {
+        match self {
+            Self::Gmail => &["mx.google.com"],
+            Self::Zoho => &[],
+        }
+    }
+}
+
 /// A fetched message, as [`store_message`] stores it.
 #[derive(Debug, Clone)]
 pub struct Fetched {
@@ -117,6 +147,8 @@ pub struct Fetched {
     pub raw: Vec<u8>,
     /// Its state, in the contract's terms.
     pub flags: Flags,
+    /// The provider that received it.
+    pub receiver: Receiver,
 }
 
 /// Store a fetched message's blobs (its raw bytes, bodies, attachments and
@@ -128,7 +160,7 @@ pub async fn store_message(
     fetched: Fetched,
     generation: i32,
 ) -> Result<(NormalizedMessage, IndexOp), ReadError> {
-    let parsed = parse::parse(&fetched.raw);
+    let parsed = parse::parse(&fetched.raw, fetched.receiver);
     let mut blobs = Vec::new();
     let raw_blob = store.put(workspace, fetched.raw, "message/rfc822").await?;
     blobs.push(raw_blob.clone());
@@ -191,8 +223,12 @@ pub async fn store_message(
         read: flags.read,
         starred: flags.starred,
     };
-    let document_bytes = serde_json::to_vec(&message)
-        .map_err(|e| ReadError::Corrupt(format!("encoding a message document: {e}")))?;
+    let document_bytes = serde_json::to_vec(&message).map_err(|e| {
+        ReadError::Corrupt(format!(
+            "encoding a message document: {}",
+            campbooks_kernel::redact::json(&e)
+        ))
+    })?;
     let document = store
         .put(workspace, document_bytes, "application/json")
         .await?;
@@ -232,8 +268,12 @@ pub async fn document(
     while let Some(chunk) = stream.next().await {
         bytes.extend_from_slice(&chunk?);
     }
-    serde_json::from_slice(&bytes)
-        .map_err(|e| ReadError::Corrupt(format!("a stored message document: {e}")))
+    serde_json::from_slice(&bytes).map_err(|e| {
+        ReadError::Corrupt(format!(
+            "a stored message document: {}",
+            campbooks_kernel::redact::json(&e)
+        ))
+    })
 }
 
 /// An index row's document reference.
@@ -245,4 +285,38 @@ pub fn document_ref(hash: &str, size: i64) -> Result<BlobRef, ReadError> {
         size: u64::try_from(size).unwrap_or(0),
         content_type: "application/json".to_owned(),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use campbooks_kernel::{blobs::BlobStore, config::BlobsConfig, tenancy::WorkspaceId};
+    use sqlx::PgPool;
+
+    use super::*;
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_corrupt_document_is_reported_without_its_content(db: PgPool) {
+        let store = BlobStore::memory(&BlobsConfig::default(), db);
+        let workspace = WorkspaceId::new().to_string();
+        // A message document with mail where a flag belongs: serde's own
+        // message quotes it.
+        let corrupt = br#"{"read": "Q4 plan from maya@northwind-studio.example"}"#;
+        let raw = serde_json::from_slice::<NormalizedMessage>(corrupt).unwrap_err();
+        assert!(raw.to_string().contains("maya@"), "{raw}");
+        let blob = store
+            .put(&workspace, corrupt.as_slice(), "application/json")
+            .await
+            .unwrap();
+        let err = document(&store, &workspace, &blob).await.unwrap_err();
+        // What sync jobs store in `last_error` and log.
+        for shown in [err.to_string(), format!("{err:?}")] {
+            assert!(!shown.contains("maya"), "{shown}");
+            assert!(!shown.contains("Q4"), "{shown}");
+        }
+        assert!(
+            err.to_string()
+                .starts_with("a stored message document: Data error at line 1"),
+            "{err}"
+        );
+    }
 }

@@ -1,5 +1,6 @@
 {
   "errors": {
+    "ai_external_content_refused": "The AI provider for the {{role}} role is outside this instance’s network, and this instance does not send it mail. An administrator can allow it.",
     "ai_role_not_configured": "This instance has no AI model set up for the {{role}} role. An administrator can configure one."
   }
 }

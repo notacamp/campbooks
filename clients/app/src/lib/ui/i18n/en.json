@@ -5,6 +5,7 @@
   "loading": "Loading",
   "kbd": {
     "then": "then",
+    "or": "or",
     "shortcut": "Shortcut: {{keys}}"
   },
   "toast": {
@@ -13,9 +14,7 @@
     "redone": "Redone: {{label}}"
   },
   "note": {
-    "label": "Where things stand",
-    "why": "Why?",
-    "hideWhy": "Hide why"
+    "label": "Where things stand"
   },
   "search": {
     "label": "Search or ask"
@@ -26,7 +25,8 @@
     "empty": "Nothing matches “{{query}}”",
     "results": "Commands",
     "ask": "Ask Campbooks: {{query}}",
-    "askGroup": "Ask"
+    "askGroup": "Ask or search",
+    "search": "Search conversations for “{{query}}”"
   },
   "shortcutSheet": {
     "title": "Keyboard shortcuts"
@@ -100,5 +100,13 @@
     "previewOf": "Preview {{name}}",
     "downloadOf": "Download {{name}}",
     "previewTitle": "Preview of {{name}}"
+  },
+  "howDecided": {
+    "title": "How Campbooks decided"
+  },
+  "searchField": {
+    "clear": "Clear search",
+    "filters": "Search filters",
+    "remove": "Remove filter: {{filter}}"
   }
 }

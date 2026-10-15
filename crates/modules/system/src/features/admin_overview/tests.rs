@@ -1,94 +1,32 @@
-use std::{
-    collections::HashMap,
-    sync::{Arc, Mutex},
-};
-
-use axum::{
-    Router,
-    body::Body,
-    http::{Request, StatusCode, header},
-};
-use campbooks_ai::{AiConfig, Gateway, ProviderConfig, Role};
-use campbooks_kernel::{
-    Error,
-    admin::{
-        ACCESS_SCOPE, AdminAction, AdminAudit, AdminProfiles, AuditFuture, PermissionSet,
-        ProfilesFuture,
-    },
-    testing::{self, TestIdp, TestResponse},
-};
-use chrono::Utc;
-use serde_json::json;
+use axum::http::{Method, StatusCode};
+use campbooks_ai::{AiConfig, ExternalContent, Gateway, ProviderConfig, Role};
+use campbooks_kernel::testing::TestResponse;
+use serde_json::{Value, json};
 use sqlx::PgPool;
 use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
 
 use crate::{Deps, Facts, IdentityProvider};
 
-/// Accounts and their permission names, in memory.
-#[derive(Debug, Default)]
-struct Profiles(HashMap<&'static str, Vec<&'static str>>);
-
-impl AdminProfiles for Profiles {
-    fn permissions_of<'a>(&'a self, _db: &'a PgPool, account: &'a str) -> ProfilesFuture<'a> {
-        let names = self.0.get(account).cloned().unwrap_or_default();
-        Box::pin(async move { Ok(PermissionSet::from_names(names)) })
-    }
-}
-
-#[derive(Debug, Default)]
-struct Trail(Mutex<Vec<AdminAction>>);
-
-impl AdminAudit for Trail {
-    fn record<'a>(&'a self, _db: &'a PgPool, action: &'a AdminAction) -> AuditFuture<'a> {
-        self.0.lock().unwrap().push(action.clone());
-        Box::pin(async { Ok::<(), Error>(()) })
-    }
-}
-
-struct World {
-    idp: TestIdp,
-    app: Router,
-    trail: Arc<Trail>,
-}
-
-async fn world(db: PgPool, deps: Deps) -> World {
-    let idp = TestIdp::start().await;
-    let trail = Arc::new(Trail::default());
-    let profiles = Profiles(HashMap::from([
-        ("ada", vec!["super"]),
-        ("ops", vec!["jobs.read"]),
-    ]));
-    let pool = testing::app_role_pool(&db).await;
-    let mut state = idp
-        .state(pool)
-        .with_admin(Arc::new(profiles), trail.clone());
-    let config = Arc::make_mut(&mut state.config);
-    config.database_url = "postgres://app:db-password@db.example.com/campbooks".into();
-    config.signup.codes = Some("signup-code-1".into());
-    let app = testing::admin_app(crate::module_with(deps), state);
-    World { idp, app, trail }
-}
+use crate::testkit::{World, world};
 
 impl World {
     async fn overview(&self, sub: &str, auth_age_seconds: i64, language: &str) -> TestResponse {
-        let mut claims = self.idp.claims(ACCESS_SCOPE);
-        claims["sub"] = json!(sub);
-        claims["auth_time"] = json!(Utc::now().timestamp() - auth_age_seconds);
-        let request = Request::get("/admin/v1/system/overview")
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", self.idp.token(&claims)),
-            )
-            .header(header::ACCEPT_LANGUAGE, language)
-            .body(Body::empty())
-            .unwrap();
-        testing::send(&self.app, request).await
+        self.send(
+            Method::GET,
+            "/admin/v1/system/overview",
+            sub,
+            auth_age_seconds,
+            language,
+            None,
+        )
+        .await
     }
 }
 
 fn gateway(roles: impl IntoIterator<Item = (Role, ProviderConfig)>) -> Gateway {
     Gateway::new(AiConfig {
         roles: roles.into_iter().collect(),
+        ..AiConfig::default()
     })
     .unwrap()
 }
@@ -104,11 +42,24 @@ async fn a_super_admin_sees_the_system_without_secrets(db: PgPool) {
         .uri()
         .replace("http://", "http://user:url-password@");
     let deps = Deps {
-        ai: Some(gateway([(
-            Role::Decide,
-            ProviderConfig::new(format!("{base}/v1").parse().unwrap(), "qwen3:8b")
-                .with_api_key("sk-ai-secret"),
-        )])),
+        ai: Some(gateway([
+            (
+                Role::Decide,
+                ProviderConfig::new(format!("{base}/v1").parse().unwrap(), "qwen3:8b")
+                    .with_api_key("sk-ai-secret"),
+            ),
+            // Off the instance's network (a documentation address): opted in…
+            (
+                Role::Embed,
+                ProviderConfig::new("http://203.0.113.7/v1".parse().unwrap(), "e")
+                    .with_external_content(ExternalContent::Allow),
+            ),
+            // …and not.
+            (
+                Role::Complete,
+                ProviderConfig::new("http://203.0.113.7/v1".parse().unwrap(), "c"),
+            ),
+        ])),
         facts: Facts {
             identity_provider: IdentityProvider::BuiltIn,
             sign_in_providers: vec!["google".into()],
@@ -136,7 +87,18 @@ async fn a_super_admin_sees_the_system_without_secrets(db: PgPool) {
     assert_eq!(ai[0]["endpoint"], provider.uri());
     assert_eq!(ai[0]["protocol"], "openai");
     assert_eq!(ai[0]["reachable"], true);
-    assert_eq!(ai[1]["configured"], false);
+    assert_eq!(ai[0]["location"], "instance");
+    assert_eq!(ai[0]["content_allowed"], true);
+    assert_eq!(
+        (&ai[1]["location"], &ai[1]["content_allowed"]),
+        (&json!("external"), &json!(true))
+    );
+    assert_eq!(
+        (&ai[2]["location"], &ai[2]["content_allowed"]),
+        (&json!("external"), &json!(false))
+    );
+    assert_eq!(ai[3]["configured"], false);
+    assert_eq!(ai[3]["location"], Value::Null);
 
     let text = body.to_string();
     for secret in [

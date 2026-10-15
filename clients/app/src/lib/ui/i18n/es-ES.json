@@ -5,6 +5,7 @@
   "loading": "Cargando",
   "kbd": {
     "then": "después",
+    "or": "o",
     "shortcut": "Atajo: {{keys}}"
   },
   "toast": {
@@ -13,9 +14,7 @@
     "redone": "Rehecho: {{label}}"
   },
   "note": {
-    "label": "Cómo están las cosas",
-    "why": "¿Por qué?",
-    "hideWhy": "Ocultar el porqué"
+    "label": "Cómo están las cosas"
   },
   "search": {
     "label": "Buscar o preguntar"
@@ -26,7 +25,8 @@
     "empty": "Nada coincide con «{{query}}»",
     "results": "Comandos",
     "ask": "Preguntar a Campbooks: {{query}}",
-    "askGroup": "Preguntar"
+    "askGroup": "Preguntar o buscar",
+    "search": "Buscar conversaciones con “{{query}}”"
   },
   "shortcutSheet": {
     "title": "Atajos de teclado"
@@ -100,5 +100,13 @@
     "previewOf": "Vista previa de {{name}}",
     "downloadOf": "Descargar {{name}}",
     "previewTitle": "Vista previa de {{name}}"
+  },
+  "howDecided": {
+    "title": "Cómo decidió Campbooks"
+  },
+  "searchField": {
+    "clear": "Borrar la búsqueda",
+    "filters": "Filtros de la búsqueda",
+    "remove": "Quitar el filtro: {{filter}}"
   }
 }

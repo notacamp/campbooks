@@ -42,10 +42,13 @@ This change adds **Settings → Mailboxes** and connects Home to it:
 - **identity** (server): `identity.list_ways_in` also lists the providers a
   mailbox can be connected from (`mailbox_providers`); `identity.start_link`
   takes `sign_in` for a connect (migration `identity__connect_without_way_in`).
-- **kernel**: `ProviderGrant.signs_in`.
-- **connectors** (server): `ConnectionView.grantor_signs_in` (migration
-  `connectors__grantor_signs_in`); `connectors.disconnect` is grantor-only
-  and takes `mail=delete|keep`, published on `connectors.connection_removed`.
+- **identity** (server, continued): `identity.forget_connected_way_in`
+  consumes `connectors.connection_removed` and removes a way in that came
+  only from connecting that mailbox (migration `identity__mailbox_links`).
+- **connectors** (server): `ConnectionView.granted_by_you`. The disconnect
+  backend (grantor only, `mail=delete|keep`) is batch 1's of #117 (#479).
+- **workspaces** (server): `MemberView.you`.
+- **conversations** (client): kept inboxes read as history.
 - **clients/app**:
   - `connectors`: the Mailboxes page, the disconnect mutation, Home's
     mailboxes section linking to the page;
@@ -68,11 +71,8 @@ mailbox) through its `index.ts`; `identity` already imports `connectors`.
 - Calendar, files or bank capabilities: the page connects mail only.
 - Microsoft mailboxes: there is no Microsoft mail adapter yet; the page
   offers only what the server lists.
-- Carrying out the purge of a disconnected mailbox's mail: the conversations
-  module's, in batch 1 of campbooks-cloud#117; this change defines the
-  contract (`mail` on the operation and the event).
-- Removing a way in that came only from a connect when its connection goes
-  (campbooks-cloud#117).
+- The disconnect backend, the event contract and the purge or freeze of the
+  mail: batch 1 of campbooks-cloud#117 (#479), which this change builds on.
 - Undo for Disconnect: the grant is revoked at the provider, so only a new
   consent brings it back.
 - Choosing which of a Zoho account's several mailboxes sync; per-stream

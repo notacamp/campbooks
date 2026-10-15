@@ -114,14 +114,91 @@
       "notConfigured": "Sin configurar",
       "answering": "Responde",
       "notAnswering": "No responde",
+      "notSentMail": "No recibe correo",
       "protocol": {
         "openai": "Compatible con OpenAI",
         "laya": "Laya"
       },
-      "detail": "{{model}} en {{endpoint}} · {{protocol}}"
+      "detail": "{{model}} en {{endpoint}} · {{protocol}}",
+      "where": {
+        "instance": "en la red de esta instancia",
+        "externalAllowed": "fuera de la red de esta instancia, autorizado a recibir correo",
+        "externalRefused": "fuera de la red de esta instancia, así que no se le envía correo"
+      },
+      "check": {
+        "pending": "Comprobando sus respuestas",
+        "pendingDetail": "sus respuestas se usarán cuando acierte con correos de prueba evidentes",
+        "passed": "acertó {{right}} de {{total}} respuestas de prueba",
+        "failed": "Sus respuestas no superan la comprobación",
+        "failedDetail": "solo acertó {{right}} de {{total}} respuestas de prueba evidentes, así que sus respuestas no se usan y las reglas ordenan el correo por sí solas",
+        "unavailable": "No respondió a la comprobación",
+        "unavailableDetail": "sus respuestas no se usan hasta que responda"
+      }
     },
     "duration": {
       "lessThanAMinute": "Menos de un minuto"
+    }
+  },
+  "jobs": {
+    "title": "Trabajos",
+    "refresh": "Actualizar",
+    "lead": "El trabajo en segundo plano que ejecuta esta instancia y los trabajos que se rindieron. Aquí nunca se muestra el contenido de un trabajo: solo qué se ejecutó, cuántas veces y por qué se detuvo.",
+    "dismiss": "Descartar aviso",
+    "loading": "Cargando la cola de trabajos",
+    "cancel": "Cancelar",
+    "loadError": {
+      "title": "No se pudo cargar la cola de trabajos",
+      "lead": "El servidor no respondió. Inténtalo de nuevo en un momento.",
+      "retry": "Reintentar"
+    },
+    "queue": {
+      "title": "Cola",
+      "emptyTitle": "No hay nada en la cola",
+      "emptyLead": "Ahora mismo ningún trabajo está esperando, en ejecución ni fallido.",
+      "showFailed": "Ver fallos",
+      "retryAll": "Reintentar todos los fallidos",
+      "underAMinute": "menos de un minuto",
+      "counts": "Listos {{ready}} · Programados {{scheduled}} · En ejecución {{running}} · Fallidos {{failed}}",
+      "oldestWaiting": "el más antiguo espera {{age}}",
+      "expiredLeases_one": "{{count}} trabajo en ejecución perdió su proceso",
+      "expiredLeases_other": "{{count}} trabajos en ejecución perdieron su proceso"
+    },
+    "retryAll": {
+      "question_one": "¿Reintentar el {{count}} trabajo {{kind}} fallido? Empieza de nuevo desde el primer intento.",
+      "question_other": "¿Reintentar los {{count}} trabajos {{kind}} fallidos? Cada uno empieza de nuevo desde el primer intento.",
+      "confirm": "Reintentar",
+      "done_one": "{{count}} trabajo {{kind}} ha vuelto a la cola.",
+      "done_other": "{{count}} trabajos {{kind}} han vuelto a la cola.",
+      "more": "Hay más: vuelve a reintentar para encolar el resto.",
+      "none": "No quedaban trabajos {{kind}} fallidos que reintentar.",
+      "error": "No se pudieron reintentar los trabajos {{kind}}. Inténtalo de nuevo."
+    },
+    "failed": {
+      "title": "Trabajos fallidos",
+      "filter": "Mostrar",
+      "allKinds": "Todos los tipos",
+      "emptyTitle": "No hay trabajos fallidos",
+      "emptyLead": "Todos los trabajos terminaron o se siguen intentando.",
+      "retried": "El trabajo ha vuelto a la cola.",
+      "discarded": "El trabajo se descartó.",
+      "unchanged": "Ese trabajo ya no estaba fallido, así que no cambió nada.",
+      "superseded": "Ya hay otro trabajo de este tipo esperando, así que este se dejó como estaba.",
+      "retryError": "No se pudo reintentar el trabajo. Inténtalo de nuevo.",
+      "discardError": "No se pudo descartar el trabajo. Inténtalo de nuevo.",
+      "more": "Mostrar más",
+      "when": "Falló el {{when}}",
+      "attempts": "{{attempts}} de {{max}} intentos",
+      "instanceWide": "toda la instancia",
+      "workspace": "espacio de trabajo {{workspace}}",
+      "noError": "No se registró ningún error.",
+      "error": "Último error",
+      "copy": "Copiar error",
+      "copied": "Copiado.",
+      "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo.",
+      "retry": "Reintentar",
+      "discard": "Descartar",
+      "discardConfirm": "Descartar",
+      "discardQuestion": "¿Descartar este trabajo {{kind}}? Se elimina para siempre."
     }
   }
 }

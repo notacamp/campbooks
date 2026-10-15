@@ -2,20 +2,20 @@
 //! connection with its credentials, streams, index and batch holds.
 
 use campbooks_kernel::{
-    AppState, Result, blobs::BlobOwner, db::BeginFor as _, tenancy::WorkspaceId,
+    AppState, Result,
+    blobs::BlobOwner,
+    db::BeginFor as _,
+    tenancy::{UserId, WorkspaceId},
 };
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::{
     credentials,
-    model::{ConnectionId, InboxId, Provider},
+    model::{ConnectionId, InboxId, MailChoice, Provider},
     schedule,
 };
-use crate::{
-    deps::Deps,
-    events::{ConnectionRemoved, MailChoice},
-};
+use crate::{deps::Deps, events::ConnectionRemoved};
 
 /// The blob owner type of a connection (its account document).
 pub const CONNECTION_OWNER: &str = "connectors.connection";
@@ -83,7 +83,9 @@ pub async fn revoke(state: &AppState, deps: &Deps, workspace: WorkspaceId, id: C
 }
 
 /// Delete connection `id` and everything it holds, in `tx`, and publish
-/// [`ConnectionRemoved`]. Returns `false` if it was gone already.
+/// [`ConnectionRemoved`] with `mail`: the conversations module then deletes
+/// the inboxes it fed, or keeps them read-only. Returns `false` if it was
+/// gone already.
 pub async fn delete(
     tx: &mut Transaction<'_, Postgres>,
     state: &AppState,
@@ -92,6 +94,23 @@ pub async fn delete(
     mail: MailChoice,
 ) -> Result<bool> {
     let workspace_key = workspace.to_string();
+    // Lock the connection and its streams first: a sync writing to a stream
+    // holds it (its rows reference the stream), so this waits for it and then
+    // sees every index row and batch it wrote; a later sync finds the stream
+    // gone. Reading first and deleting later could miss their files.
+    let removed = sqlx::query!(
+        r#"SELECT granted_by AS "granted_by: UserId", provider, account_subject
+             FROM connectors.connections WHERE id = $1 FOR UPDATE"#,
+        id as ConnectionId
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    sqlx::query_scalar!(
+        "SELECT id FROM connectors.streams WHERE connection_id = $1 ORDER BY id FOR UPDATE",
+        id as ConnectionId
+    )
+    .fetch_all(&mut **tx)
+    .await?;
     let inbox_ids = sqlx::query_scalar!(
         r#"SELECT inbox_id AS "inbox_id!: InboxId" FROM connectors.streams
             WHERE connection_id = $1 AND inbox_id IS NOT NULL ORDER BY inbox_id"#,
@@ -147,6 +166,11 @@ pub async fn delete(
                 workspace: workspace_key,
                 connection: id,
                 inbox_ids,
+                granted_by: removed.as_ref().map(|r| r.granted_by),
+                provider: removed
+                    .as_ref()
+                    .and_then(|r| Provider::parse(&r.provider).ok()),
+                account_subject: removed.map(|r| r.account_subject),
                 mail,
             },
         )

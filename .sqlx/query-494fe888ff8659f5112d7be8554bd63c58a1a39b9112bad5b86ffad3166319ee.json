@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE workspaces.signup_codes\n              SET uses = uses + 1\n            WHERE digest = $1\n              AND revoked_at IS NULL\n              AND uses < max_uses\n              AND (expires_at IS NULL OR expires_at > now())\n        RETURNING id AS \"id: SignupCodeId\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: SignupCodeId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "workspaces.signup_codes",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Bytea"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "494fe888ff8659f5112d7be8554bd63c58a1a39b9112bad5b86ffad3166319ee"
+}

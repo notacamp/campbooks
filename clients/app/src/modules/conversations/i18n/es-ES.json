@@ -51,7 +51,11 @@
     "older_one": "{{count}} mensaje anterior",
     "older_other": "{{count}} mensajes anteriores",
     "showOlder": "Mostrar",
-    "attachments": "Adjuntos"
+    "attachments": "Adjuntos",
+    "kept": {
+      "title": "Conservado como historial",
+      "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
+    }
   },
   "actions": {
     "star": "Destacar",
@@ -78,13 +82,11 @@
   "scout": {
     "label": "Cómo está la cosa",
     "suggestion": "Sugiere {{stream}}",
-    "suggestionSure": "Sugiere {{stream}}, con un {{confidence}} % de seguridad",
     "suggestionNote": "Campbooks cree que esto va en {{stream}}. Es una sugerencia: nada se mueve hasta que tú lo digas.",
     "prompt": "¿Moverla?",
     "accept": "Mover a {{stream}}",
     "keep": "Dejar en {{stream}}",
     "sortedRule": "Ordenada en {{stream}} por una regla",
-    "sortedRuleSure": "Ordenada en {{stream}} por una regla, con un {{confidence}} % de seguridad",
     "sortedModel": "Ordenada en {{stream}} por Campbooks",
     "sortedMember": "La pusiste tú en {{stream}}",
     "sortedDefault": "En {{stream}}: nada la ha movido",
@@ -125,6 +127,7 @@
       "payment_due": "Hay un pago pendiente («{{evidence}}»).",
       "already_paid": "Dice que ya está pagado («{{evidence}}»).",
       "action_asked": "Te pide que hagas algo («{{evidence}}»).",
+      "security_alert": "Es una alerta de seguridad sobre algo tuyo («{{evidence}}»).",
       "conditional_ask": "Solo pide algo si procede («{{evidence}}»).",
       "notice": "Es un aviso: no hay nada que hacer.",
       "request": "Hace una petición («{{evidence}}»).",
@@ -154,7 +157,8 @@
     "replyAll": "Responder a todos",
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes",
-    "nextAttachment": "Siguiente adjunto"
+    "nextAttachment": "Siguiente adjunto",
+    "notNeeded": "No hace falta (o es seguro)"
   },
   "compose": {
     "title": {
@@ -203,5 +207,62 @@
       "newMessage": "Mensaje nuevo"
     },
     "tooLate": "Ya es tarde para deshacer: se ha enviado."
+  },
+  "needs": {
+    "line": {
+      "reply": "{{name}} espera tu respuesta",
+      "question": "{{name}} te ha hecho una pregunta",
+      "do": "{{name}} te ha pedido que hagas algo",
+      "pay": "{{name}} ha enviado una factura para pagar",
+      "warning": "Esto puede ser phishing. No uses sus enlaces.",
+      "checkReply": "¿{{name}} necesita respuesta?",
+      "checkDo": "¿{{name}} te ha pedido que hagas algo?"
+    },
+    "chip": {
+      "reply": "Necesita respuesta",
+      "do": "Por hacer",
+      "pay": "Pagar",
+      "review": "Revisar",
+      "suspicious": "Parece sospechoso",
+      "check": "Confirmar"
+    },
+    "due": {
+      "today": "Vence hoy",
+      "tomorrow": "Vence mañana",
+      "on": "Vence el {{date}}",
+      "overdue": "Vencido · vencía el {{date}}"
+    },
+    "how": {
+      "yes": "Sí.",
+      "no": "No.",
+      "urgency0": "Sin prisa.",
+      "urgency1": "En los próximos días.",
+      "urgency2": "Hoy.",
+      "source": {
+        "rules": "Reglas",
+        "model": "Modelo",
+        "knn": "Correo parecido",
+        "cascade": "Reglas y luego modelo"
+      },
+      "suggestion": "una sugerencia",
+      "actsFrom": "actúa desde {{threshold}}",
+      "footnote": "Las reglas responden a partir de lo que el correo muestra a simple vista. Una respuesta solo actúa desde la confianza que su evaluación garantiza; por debajo es una sugerencia."
+    },
+    "actions": {
+      "done": "Hecho",
+      "notNeeded": "No hace falta",
+      "safe": "Es seguro",
+      "yes": "Sí",
+      "no": "No",
+      "questionPrompt": "Campbooks no está seguro."
+    },
+    "toast": {
+      "done": "Hecho · {{name}}",
+      "notNeeded": "No hace falta · {{name}}. Campbooks aprenderá de esto",
+      "safe": "Marcado como seguro · {{name}}. Campbooks aprenderá de esto",
+      "confirmed": "Gracias · {{name}} sigue en tu lista",
+      "failed": "No se ha podido cambiar {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
+      "changed": "{{name}} ha cambiado mientras lo mirabas: vuelve a mirarlo."
+    }
   }
 }

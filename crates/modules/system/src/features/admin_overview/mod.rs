@@ -86,6 +86,17 @@ pub enum AiProtocol {
     Laya,
 }
 
+/// Where an AI role's endpoint is, as far as mail content is concerned.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AiLocation {
+    /// On the instance's own network (loopback or private address, a
+    /// compose service name, `localhost`, or `CAMPBOOKS_AI__INTERNAL_HOSTS`).
+    Instance,
+    /// Anywhere else: gets mail content only when the role opts in.
+    External,
+}
+
 /// One AI role, without a secret: the provider is shown as scheme, host
 /// and port only, and keys never.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -101,9 +112,73 @@ pub struct AiRoleStatus {
     pub endpoint: Option<String>,
     /// The protocol it speaks.
     pub protocol: Option<AiProtocol>,
+    /// Whether its endpoint is on the instance's network.
+    pub location: Option<AiLocation>,
+    /// Whether it may receive mail content: on the instance's network, or
+    /// opted in with `CAMPBOOKS_AI__<ROLE>__EXTERNAL_CONTENT=allow`. When
+    /// `false`, nothing calls it with content (the decide pass leaves
+    /// sorting to rules); only the reachability probe runs.
+    pub content_allowed: Option<bool>,
     /// Whether the provider answered a probe within 3 seconds (probes are
     /// reused for a minute); `null` when not configured.
     pub reachable: Option<bool>,
+    /// The `decide` role's answers check: whether the model gets obvious
+    /// fictional emails right. `null` for the other roles, and when the
+    /// role is not configured or may not receive mail.
+    pub answers_check: Option<AiAnswersCheck>,
+}
+
+/// How the `decide` model did on its answers check (eight fictional emails
+/// whose answers are not in doubt). While it does not pass, the model's
+/// answers are not used: the inbox is sorted by the rules alone.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct AiAnswersCheck {
+    /// Where the check stands.
+    pub state: AiAnswersCheckState,
+    /// Expected answers the model got right, once a check finished.
+    pub right: Option<u32>,
+    /// Expected answers asked, once a check finished.
+    pub total: Option<u32>,
+    /// When the last check finished.
+    pub checked_at: Option<DateTime<Utc>>,
+}
+
+/// Where the answers check stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AiAnswersCheckState {
+    /// No check has finished since the server started.
+    Pending,
+    /// The model got at least 90% right: its answers are used.
+    Passed,
+    /// It got fewer right: its answers are not used.
+    Failed,
+    /// The provider did not answer the check: its answers are not used.
+    Unavailable,
+}
+
+impl From<campbooks_ai::decide::check::AnswersCheck> for AiAnswersCheck {
+    fn from(check: campbooks_ai::decide::check::AnswersCheck) -> Self {
+        use campbooks_ai::decide::check::{AnswersCheck, CheckOutcome};
+        match check {
+            AnswersCheck::Pending => Self {
+                state: AiAnswersCheckState::Pending,
+                right: None,
+                total: None,
+                checked_at: None,
+            },
+            AnswersCheck::Done(report) => Self {
+                state: match report.outcome {
+                    CheckOutcome::Passed => AiAnswersCheckState::Passed,
+                    CheckOutcome::Failed => AiAnswersCheckState::Failed,
+                    CheckOutcome::Unavailable => AiAnswersCheckState::Unavailable,
+                },
+                right: Some(report.right),
+                total: Some(report.total),
+                checked_at: Some(report.checked_at),
+            },
+        }
+    }
 }
 
 impl From<campbooks_ai::RoleHealth> for AiRoleStatus {
@@ -122,7 +197,13 @@ impl From<campbooks_ai::RoleHealth> for AiRoleStatus {
                 campbooks_ai::Protocol::OpenAi => AiProtocol::Openai,
                 campbooks_ai::Protocol::Laya => AiProtocol::Laya,
             }),
+            location: health.location.map(|location| match location {
+                campbooks_ai::Location::Instance => AiLocation::Instance,
+                campbooks_ai::Location::External => AiLocation::External,
+            }),
+            content_allowed: health.content_allowed,
             reachable: health.reachable,
+            answers_check: health.answers_check.map(AiAnswersCheck::from),
         }
     }
 }
@@ -138,7 +219,7 @@ impl From<campbooks_ai::RoleHealth> for AiRoleStatus {
     responses(
         (status = OK, description = "The overview.", body = AdminOverview),
         (status = UNAUTHORIZED, description = "`admin_reauth_required`: sign in again (the last \
-            sign-in is more than 12 hours old).", body = campbooks_kernel::Problem,
+            sign-in is more than an hour old).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = NOT_FOUND, description = "Not an administrator with `system.read` (the same \
             answer as an unknown route).", body = campbooks_kernel::Problem,

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversations.needs\n           SET verdict = $2, verdict_message_id = message_id, verdict_by = $3,\n               verdict_correction_id = $4, updated_at = now()\n         WHERE conversation_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "b152f2fb550d267cffc04844cb66aff3535c078764500e9410956964555bfb48"
+}

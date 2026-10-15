@@ -2,12 +2,10 @@
 //! owner. A user with no workspace yet is subject to the instance's signup
 //! policy (`CAMPBOOKS_SIGNUP__POLICY`).
 
-use aws_lc_rs::{constant_time, digest};
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     auth::{Principal, Scoped},
-    config::SignupPolicy,
     db::BeginFor as _,
     extract,
     tenancy::{Role, UserId, WorkspaceId},
@@ -16,13 +14,11 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::MESSAGES;
-
 use crate::{
     domain::{
-        db::begin_as_user,
         model::{Accent, Kind, WorkspaceView, workspace_name},
         security::{self, SecurityKind},
+        signup::{self, Admission},
         users::ensure_user,
     },
     events::{MemberJoined, WorkspaceCreated},
@@ -54,7 +50,7 @@ pub struct CreateWorkspace {
     operation_id = "workspaces.create",
     tag = "workspaces",
     security(("bearer" = ["workspaces:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace", "workspaces.member"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["workspaces.workspace", "workspaces.member"]).access("workspaces.account", campbooks_kernel::authz::Action::Write)))),
     request_body = CreateWorkspace,
     responses(
         (status = CREATED, description = "Created; you are its owner.", body = WorkspaceView),
@@ -64,7 +60,7 @@ pub struct CreateWorkspace {
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "Missing scope, a client token, or refused by the \
             signup policy (`signup_invite_only`, `signup_requires_approval`, \
-            `signup_code_invalid`).", body = Problem, content_type = "application/problem+json"),
+            `signup_rejected`, `signup_code_invalid`).", body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn handler(
@@ -72,6 +68,13 @@ pub async fn handler(
     Scoped { principal, .. }: Scoped<WorkspacesWrite>,
     extract::Json(input): extract::Json<CreateWorkspace>,
 ) -> Result<(StatusCode, Json<WorkspaceView>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        crate::domain::resources::ACCOUNT_RECORD,
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let view = execute(&state, &principal, input).await?;
     Ok((StatusCode::CREATED, Json(view)))
 }
@@ -89,10 +92,17 @@ pub async fn execute(
     let name = workspace_name(&input.name)?;
     let accent = input.accent.unwrap_or(input.kind.default_accent());
     let user = ensure_user(&state.db, principal).await?;
-    check_signup(state, user, input.signup_code.as_deref()).await?;
+    let admission = signup::admit(state, user, input.signup_code.as_deref()).await?;
 
     let id = WorkspaceId::new();
     let mut tx = state.db.begin_for(id).await?;
+    // A minted code is spent in this transaction: if anything below fails
+    // the use is given back, and two attempts at its last use cannot both
+    // succeed.
+    let redeemed = match &admission {
+        Admission::Admitted => None,
+        Admission::Redeem(digest) => Some(signup::redeem(&mut tx, digest).await?),
+    };
     let created_at = sqlx::query_scalar!(
         r#"INSERT INTO workspaces.workspaces (id, name, kind, accent)
            VALUES ($1, $2, $3, $4)
@@ -119,6 +129,16 @@ pub async fn execute(
         serde_json::json!({ "kind": input.kind }),
     )
     .await?;
+    if let Some(code) = redeemed {
+        security::record(
+            &mut tx,
+            Some(id),
+            Some(user),
+            SecurityKind::SignupCodeRedeemed,
+            serde_json::json!({ "code_id": code }),
+        )
+        .await?;
+    }
     let workspace = id.to_string();
     state
         .events
@@ -155,86 +175,13 @@ pub async fn execute(
     })
 }
 
-/// Apply the signup policy to `user` creating a workspace.
-async fn check_signup(state: &AppState, user: UserId, code: Option<&str>) -> Result<()> {
-    let signup = &state.config.signup;
-    if signup.policy == SignupPolicy::Open {
-        return Ok(());
-    }
-    let mut tx = begin_as_user(&state.db, user).await?;
-    let (is_member, is_first_user) = sqlx::query!(
-        r#"
-        SELECT EXISTS (
-                   SELECT 1 FROM workspaces.members m
-                     JOIN workspaces.workspaces w ON w.id = m.workspace_id
-                    WHERE m.user_id = $1 AND w.deleted_at IS NULL
-               ) AS "is_member!",
-               coalesce((SELECT u.id = $1 FROM workspaces.users u
-                          ORDER BY u.created_at, u.id LIMIT 1), false) AS "is_first_user!"
-        "#,
-        user as UserId,
-    )
-    .fetch_one(&mut *tx)
-    .await
-    .map(|row| (row.is_member, row.is_first_user))?;
-    // Members may create more workspaces; the instance's first user
-    // bootstraps it under any policy.
-    if is_member || is_first_user {
-        return Ok(());
-    }
-    match signup.policy {
-        SignupPolicy::Open => Ok(()),
-        SignupPolicy::InviteOnly => Err(Error::Denied(MESSAGES.reason("signup_invite_only"))),
-        SignupPolicy::Approval => {
-            security::record(
-                &mut tx,
-                None,
-                Some(user),
-                SecurityKind::SignupRequested,
-                serde_json::json!({}),
-            )
-            .await?;
-            tx.commit().await?;
-            Err(Error::Denied(MESSAGES.reason("signup_requires_approval")))
-        }
-        SignupPolicy::Code => {
-            if code.is_some_and(|code| matches_any(code, &signup.codes())) {
-                Ok(())
-            } else {
-                Err(Error::Denied(MESSAGES.reason("signup_code_invalid")))
-            }
-        }
-    }
-}
-
-/// Whether `code` equals one of `codes`, comparing digests in constant time
-/// and checking every code.
-fn matches_any(code: &str, codes: &[&str]) -> bool {
-    let given = digest::digest(&digest::SHA256, code.trim().as_bytes());
-    codes.iter().fold(false, |found, candidate| {
-        let expected = digest::digest(&digest::SHA256, candidate.as_bytes());
-        constant_time::verify_slices_are_equal(given.as_ref(), expected.as_ref()).is_ok() | found
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
     use campbooks_kernel::config::SignupPolicy;
     use sqlx::PgPool;
 
-    use super::matches_any;
     use crate::testkit::Kit;
-
-    #[test]
-    fn codes_match_exactly() {
-        let codes = ["alpha", "beta"];
-        assert!(matches_any("beta", &codes));
-        assert!(matches_any(" alpha ", &codes));
-        assert!(!matches_any("gamma", &codes));
-        assert!(!matches_any("alph", &codes));
-        assert!(!matches_any("", &[]));
-    }
 
     #[sqlx::test(migrations = "../../../migrations")]
     async fn creates_with_the_creator_as_owner_and_publishes(db: PgPool) {

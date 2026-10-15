@@ -28,7 +28,6 @@
 
 use axum::Extension;
 use campbooks_kernel::{Background, Module, i18n::Catalogue};
-use utoipa::OpenApi as _;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod config;
@@ -53,8 +52,8 @@ mod zoho;
 pub use deps::{CREDENTIALS_PURPOSE, Deps};
 pub use domain::intake::grant_intake;
 pub use domain::model::{
-    AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, Phase, Provider,
-    StreamId, StreamView,
+    AuthorizationId, Capability, ConnectionId, ConnectionView, Health, InboxId, MailChoice, Phase,
+    Provider, StreamId, StreamView,
 };
 pub use google::{Endpoints, Google};
 pub use provider::ClientSecret;
@@ -68,17 +67,11 @@ pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The connectors module, composed with `deps`, ready for the server to
 /// mount.
-/// Schemas the routes name only in query parameters, which utoipa does not
-/// collect on its own.
-#[derive(utoipa::OpenApi)]
-#[openapi(components(schemas(events::MailChoice)))]
-struct QuerySchemas;
-
 pub fn module(deps: Deps) -> Module {
     Module {
         name: NAME,
         scopes: scopes::ALL,
-        router: OpenApiRouter::with_openapi(QuerySchemas::openapi())
+        router: OpenApiRouter::new()
             .routes(routes!(features::list_connections::handler))
             .routes(routes!(features::start_connection::handler))
             .routes(routes!(
@@ -87,7 +80,9 @@ pub fn module(deps: Deps) -> Module {
             ))
             .routes(routes!(features::sync_now::handler))
             .layer(Extension(deps.clone())),
-        admin_router: None,
+        admin_router: Some(
+            OpenApiRouter::new().routes(routes!(features::admin_list_connections::handler)),
+        ),
         background: Background::new()
             .publishes::<events::ConnectionAdded>()
             .publishes::<events::CapabilityGranted>()
@@ -106,6 +101,7 @@ pub fn module(deps: Deps) -> Module {
             .consumer(features::workspace_deleting::RevokeWorkspaceGrants::new(
                 deps,
             )),
+        resources: domain::resources::resources(),
     }
 }
 

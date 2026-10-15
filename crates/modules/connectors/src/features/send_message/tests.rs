@@ -83,6 +83,9 @@ async fn publish(
     message: campbooks_kernel::blobs::BlobRef,
 ) {
     let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &ws.to_string())
+        .await
+        .unwrap();
     kit.state
         .events
         .publish(
@@ -138,7 +141,7 @@ async fn a_reply_goes_into_its_thread_and_comes_back_once(db: PgPool) {
     let sent = kit.google.sent();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].thread_id, thread);
-    let parsed = normalize::parse(&sent[0].raw);
+    let parsed = normalize::parse(&sent[0].raw, crate::mail::Receiver::Gmail);
     assert_eq!(
         parsed.rfc_message_id.as_deref(),
         Some(format!("{send_id}@example.com").as_str())
