@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.id AS \"id: ConversationId\" FROM conversations.conversations c\n                WHERE c.inbox_id = $1\n                  AND ($2::uuid IS NULL OR c.id > $2)\n                  AND (c.last_message_at >= $3\n                       OR EXISTS (SELECT 1 FROM conversations.needs n\n                                   WHERE n.conversation_id = c.id AND n.state = 'open'))\n                ORDER BY c.id\n                LIMIT $4",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a10b3aeebb4ec768d7878a1aac064aec907b332a7b60b75f1b7a293d525926a5"
+}
