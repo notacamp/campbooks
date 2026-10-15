@@ -87,6 +87,15 @@ impl BeginFor for PgPool {
     }
 }
 
+/// A savepoint inside `tx`: work that can be undone on its own (commit to
+/// keep it, roll back or drop to undo it) without undoing the rest of `tx`.
+/// It runs in `tx`, so it keeps `tx`'s workspace setting and locks.
+pub async fn savepoint<'t>(
+    tx: &'t mut Transaction<'_, Postgres>,
+) -> Result<Transaction<'t, Postgres>, sqlx::Error> {
+    (**tx).begin().await
+}
+
 /// The transaction-local Postgres setting that lets an administrator's
 /// transaction read across workspaces, on the tables whose module added an
 /// admin-read policy (metadata only, never content; ADR 0015). Only the

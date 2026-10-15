@@ -510,9 +510,44 @@ async fn since(
     ))
 }
 
+/// A conversation whose need can change.
+struct LiveConversation {
+    workspace_id: sqlx::types::Uuid,
+    inbox: InboxId,
+    archived: bool,
+    trashed: bool,
+}
+
+/// Conversation `id`, unless it is gone or in a kept, read-only inbox (its
+/// connection removed): that is history, and nothing in it changes what it
+/// needs.
+async fn live_conversation(
+    tx: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+) -> Result<Option<LiveConversation>> {
+    let row = sqlx::query!(
+        r#"SELECT c.workspace_id, c.inbox_id AS "inbox: InboxId",
+                  c.archived_at IS NOT NULL AS "archived!", c.trashed,
+                  i.detached_at IS NOT NULL AS "detached!"
+             FROM conversations.conversations c
+             JOIN conversations.inboxes i ON i.id = c.inbox_id
+            WHERE c.id = $1"#,
+        id as ConversationId,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(row.filter(|r| !r.detached).map(|r| LiveConversation {
+        workspace_id: r.workspace_id,
+        inbox: r.inbox,
+        archived: r.archived,
+        trashed: r.trashed,
+    }))
+}
+
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
-/// gone, or has no inbound message, changes nothing.
+/// gone, has no inbound message, or is in a kept read-only inbox
+/// (`detached_at`) changes nothing.
 pub async fn refresh(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -520,15 +555,7 @@ pub async fn refresh(
     id: ConversationId,
     settings: &NeedSettings,
 ) -> Result<()> {
-    let Some(conversation) = sqlx::query!(
-        r#"SELECT workspace_id, inbox_id AS "inbox: InboxId", archived_at IS NOT NULL AS "archived!",
-                  trashed
-             FROM conversations.conversations WHERE id = $1"#,
-        id as ConversationId,
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    else {
+    let Some(conversation) = live_conversation(tx, id).await? else {
         return Ok(());
     };
     let conversation_state = (conversation.archived, conversation.trashed);
