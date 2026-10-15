@@ -8,6 +8,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 
 use crate::{
+    domain::model::MailChoice,
     events::{MemberLeft, WorkspaceDeleting},
     testkit::Kit,
 };
@@ -30,7 +31,7 @@ async fn a_departing_members_connections_are_revoked(db: PgPool) {
     let bea_id = kit.join(&bea, ws, Role::Member);
 
     let mut tx = kit.state.db.begin_for(ws).await.unwrap();
-    for user in [bea_id, ana_id] {
+    for (user, mail) in [(bea_id, MailChoice::Delete), (ana_id, MailChoice::Keep)] {
         kit.state
             .events
             .publish(
@@ -38,6 +39,7 @@ async fn a_departing_members_connections_are_revoked(db: PgPool) {
                 &MemberLeft {
                     workspace: ws.to_string(),
                     user,
+                    mail,
                 },
             )
             .await
@@ -47,12 +49,11 @@ async fn a_departing_members_connections_are_revoked(db: PgPool) {
     kit.run_jobs().await;
     assert_eq!(connections(&kit).await, 0);
     assert_eq!(kit.google.revoked().len(), 1);
-    assert_eq!(
-        kit.payloads(ws, "connectors.connection_removed")
-            .await
-            .len(),
-        1
-    );
+    let removed = kit.payloads(ws, "connectors.connection_removed").await;
+    assert_eq!(removed.len(), 1);
+    // The manager who removed Ana kept her mail; the choice travels on.
+    assert_eq!(removed[0]["mail"], "keep");
+    assert_eq!(removed[0]["granted_by"], ana_id.to_string());
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

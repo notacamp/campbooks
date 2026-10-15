@@ -16,18 +16,17 @@ use serde::Deserialize;
 use serde_json::json;
 use utoipa::ToSchema;
 
+use crate::domain::resources;
 use crate::{
     domain::{
         access::visible_inboxes,
-        drafts::{
-            self, DraftView, MAX_REFERENCES, StoredAttachment, check_limits, decode,
-            require_sender, tidy,
-        },
+        drafts::{self, DraftView, MAX_REFERENCES, StoredAttachment, check_limits, decode, tidy},
     },
     events::DRAFT_RECORD,
     model::{Address, AttachmentId, ConversationId, DraftId, DraftKind, InboxId, MessageId},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
 
 /// A message to start.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
@@ -71,7 +70,7 @@ pub struct NewDraft {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.delete_draft")
         .assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.inbox", campbooks_kernel::authz::Action::Send)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = NewDraft,
     responses(
@@ -111,7 +110,14 @@ pub async fn handler(
             fill(&mut tx, access, kind, message).await?
         }
     };
-    require_sender(&mut tx, access, filled.inbox).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Send,
+        &resources::inbox(filled.inbox),
+    )
+    .await?;
 
     let [to, cc, bcc] = tidy([
         body.to.unwrap_or(filled.to),
@@ -160,7 +166,9 @@ pub async fn handler(
             .attach(&mut tx, &ws, &attachment.blob, &owner)
             .await?;
     }
-    let draft = drafts::load(&mut tx, access, id, false).await?.view()?;
+    let draft = drafts::load(&state, &mut tx, access, id, false, Action::Read)
+        .await?
+        .view()?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(draft)))
 }

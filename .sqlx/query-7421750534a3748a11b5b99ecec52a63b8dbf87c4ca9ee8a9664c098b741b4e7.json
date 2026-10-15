@@ -1,0 +1,26 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT coalesce(bool_or(times >= 2\n                                       OR dismissed_at > now() - make_interval(days => $4)),\n                               false) AS \"hidden!\"\n                 FROM conversations.rule_dismissals\n                WHERE inbox_id = $1 AND user_id = $2 AND suggestion_key = ANY($3)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "hidden!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "TextArray",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "7421750534a3748a11b5b99ecec52a63b8dbf87c4ca9ee8a9664c098b741b4e7"
+}

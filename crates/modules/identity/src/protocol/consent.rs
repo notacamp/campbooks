@@ -176,7 +176,7 @@ fn principal_of(account: Uuid) -> Principal {
     path = "/auth/consent/{id}",
     tag = "identity",
     operation_id = "identity.get_consent_request",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     params(("id" = String, Path, description = "The `request` the consent screen was given.")),
     security(()),
     responses(
@@ -293,7 +293,7 @@ pub struct Answered {
     path = "/auth/consent/{id}",
     tag = "identity",
     operation_id = "identity.answer_consent",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent", "identity.authorization_code"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent", "identity.authorization_code"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("id" = String, Path, description = "The `request` the consent screen was given."),
         ("x-campbooks-csrf" = String, Header, description = "Must be `1`."),

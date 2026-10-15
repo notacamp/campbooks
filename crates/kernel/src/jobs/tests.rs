@@ -136,6 +136,36 @@ impl EventHandler for CountB {
     }
 }
 
+/// An event something waits on (`SETTLES`), whose one consumer always
+/// fails.
+#[derive(Debug, Clone, Serialize, Deserialize, utoipa::ToSchema)]
+struct Departed {
+    who: String,
+}
+
+impl DomainEvent for Departed {
+    const NAME: &'static str = "test.departed";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+    const SETTLES: bool = true;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+struct ForgetFails;
+
+impl EventHandler for ForgetFails {
+    type Event = Departed;
+    const NAME: &'static str = "test.forget_fails";
+    const QUEUE: &'static str = "events";
+
+    async fn handle(_ctx: &mut JobContext, _event: Event<Departed>) -> Result<(), JobError> {
+        Err(JobError::fatal("cannot forget"))
+    }
+}
+
 fn module(background: Background) -> Module {
     Module {
         name: "test",
@@ -143,6 +173,7 @@ fn module(background: Background) -> Module {
         router: OpenApiRouter::new(),
         admin_router: None,
         background,
+        resources: crate::authz::Resources::default(),
     }
 }
 
@@ -151,6 +182,7 @@ fn background() -> Background {
         .job::<Probe>()
         .on_event::<CountA>()
         .on_event::<CountB>()
+        .on_event::<ForgetFails>()
 }
 
 /// State over `db` with the test module registered and `tweak` applied to
@@ -190,6 +222,9 @@ fn created(enqueued: Enqueued) -> JobId {
 
 async fn publish(state: &AppState, event: &Pinged) -> EventId {
     let mut tx = state.db.begin().await.unwrap();
+    if let Some(workspace) = crate::DomainEvent::workspace(event) {
+        crate::db::set_workspace(&mut tx, workspace).await.unwrap();
+    }
     let id = state.events.publish(&mut tx, event).await.unwrap();
     tx.commit().await.unwrap();
     id
@@ -246,6 +281,7 @@ async fn publish_is_transactional(db: PgPool) {
     };
 
     let mut tx = db.begin().await.unwrap();
+    crate::db::set_workspace(&mut tx, "ws-1").await.unwrap();
     state.events.publish(&mut tx, &event).await.unwrap();
     tx.rollback().await.unwrap();
     assert_eq!(count(&db, "SELECT count(*) FROM kernel.events").await, 0);
@@ -1266,9 +1302,11 @@ fn registry_collects_kernel_and_module_work() {
             "kernel.sweep_blobs",
             "test.count_a",
             "test.count_b",
+            "test.forget_fails",
             "test.probe"
         ]
     );
+    assert_eq!(registry.settling_events(), ["test.departed"]);
     assert_eq!(
         registry.schedule_names(),
         [
@@ -1431,6 +1469,115 @@ fn errors_are_truncated() {
     let long = "x".repeat(MAX_ERROR_LEN + 10);
     assert_eq!(truncate_error(&long).chars().count(), MAX_ERROR_LEN + 1);
     assert_eq!(truncate_error("short"), "short");
+}
+
+// --- workspace isolation of the kernel's tables (campbooks-cloud#117) ---------
+
+/// An event of workspace `workspace`, with one change for the feed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Touched {
+    workspace: String,
+}
+
+impl DomainEvent for Touched {
+    const NAME: &'static str = "test.touched";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<crate::changes::Change> {
+        vec![crate::changes::Change::upsert(crate::RecordRef::new(
+            "test.thing",
+            "t-1",
+        ))]
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_workspace_transaction_sees_and_writes_only_its_kernel_rows(db: PgPool) {
+    use crate::{db::BeginFor as _, tenancy::WorkspaceId};
+
+    let pool = crate::testing::app_role_pool(&db).await;
+    let state = crate::testing::state(pool.clone());
+    let (ana, bea) = (WorkspaceId::new(), WorkspaceId::new());
+    for workspace in [ana, bea] {
+        let mut tx = pool.begin_for(workspace).await.unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Touched {
+                    workspace: workspace.to_string(),
+                },
+            )
+            .await
+            .unwrap();
+        crate::jobs::enqueue(
+            &mut tx,
+            &Probe::default(),
+            EnqueueOptions::for_workspace(workspace.to_string()),
+        )
+        .await
+        .unwrap();
+        tx.commit().await.unwrap();
+    }
+
+    // In Ana's transaction, the event log, the queue and the feed show
+    // Ana's rows only.
+    let mut tx = pool.begin_for(ana).await.unwrap();
+    for (table, sql) in [
+        ("events", "SELECT DISTINCT workspace_id FROM kernel.events"),
+        ("jobs", "SELECT DISTINCT workspace_id FROM kernel.jobs"),
+        (
+            "changes",
+            "SELECT DISTINCT workspace_id FROM kernel.changes",
+        ),
+    ] {
+        let workspaces: Vec<Option<String>> =
+            sqlx::query_scalar(sql).fetch_all(&mut *tx).await.unwrap();
+        assert!(
+            workspaces
+                .iter()
+                .all(|w| w.as_deref().is_none_or(|w| w == ana.to_string())),
+            "{table}: {workspaces:?}"
+        );
+        assert!(!workspaces.is_empty(), "{table}");
+    }
+    // Publishing Bea's event from Ana's transaction is refused.
+    let refused = state
+        .events
+        .publish(
+            &mut tx,
+            &Touched {
+                workspace: bea.to_string(),
+            },
+        )
+        .await;
+    assert!(
+        matches!(refused, Err(sqlx::Error::InvalidArgument(_))),
+        "{refused:?}"
+    );
+    tx.rollback().await.unwrap();
+    // And row-level security refuses a forged row even without the check.
+    let mut tx = pool.begin_for(ana).await.unwrap();
+    let forged = sqlx::query(
+        "INSERT INTO kernel.changes (workspace_id, event_id, record_type, record_id, op)
+         VALUES ($1, kernel.uuid_v7(), 'test.thing', 't-2', 'upsert')",
+    )
+    .bind(bea.to_string())
+    .execute(&mut *tx)
+    .await;
+    assert!(forged.is_err(), "{forged:?}");
+    tx.rollback().await.unwrap();
+
+    // The kernel's own machinery (no workspace set) sees both.
+    let both: i64 = sqlx::query_scalar("SELECT count(DISTINCT workspace_id) FROM kernel.changes")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert_eq!(both, 2);
 }
 
 // --- administration ----------------------------------------------------------
@@ -1794,4 +1941,49 @@ mod administration {
             1
         );
     }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_failed_delivery_of_an_event_that_must_settle_is_never_pruned(db: PgPool) {
+    let state = state(db.clone()).await;
+    let mut tx = state.db.begin().await.unwrap();
+    state
+        .events
+        .publish(&mut tx, &Departed { who: "sam".into() })
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let worker = Worker::new(state.clone());
+    worker.run_until_idle().await;
+    // Long past both retentions.
+    sqlx::query(
+        "UPDATE kernel.jobs SET finished_at = now() - interval '400 days'
+          WHERE kind = 'test.forget_fails'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
+    sqlx::query("UPDATE kernel.events SET occurred_at = now() - interval '400 days'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let mut tx = db.begin().await.unwrap();
+    enqueue(&mut tx, &PruneJobs, EnqueueOptions::default())
+        .await
+        .unwrap();
+    enqueue(&mut tx, &PruneEvents, EnqueueOptions::default())
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    worker.run_until_idle().await;
+
+    let mut conn = db.acquire().await.unwrap();
+    let unsettled = crate::EventBus::unsettled(
+        &mut conn,
+        "test.departed",
+        &serde_json::json!({ "who": "sam" }),
+    )
+    .await
+    .unwrap();
+    assert!(unsettled, "still waiting for an operator");
 }

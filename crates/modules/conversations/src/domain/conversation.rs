@@ -1,7 +1,7 @@
 //! A conversation's derived state (counts, flags) and how features read it
 //! and announce its changes.
 
-use campbooks_kernel::{Error, EventBus, Result};
+use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
@@ -126,7 +126,11 @@ fn count(n: i32) -> u32 {
 }
 
 /// The summary of conversation `id` (already checked visible).
-pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<ConversationSummary> {
+pub async fn summary(
+    conn: &mut PgConnection,
+    user: Option<UserId>,
+    id: ConversationId,
+) -> Result<ConversationSummary> {
     let row = sqlx::query_as!(
         SummaryRow,
         r#"
@@ -154,7 +158,7 @@ pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<Conv
     let mut summary = [ConversationSummary::try_from(row)?];
     suggestions::attach(conn, &mut summary).await?;
     needs::attach(conn, &mut summary).await?;
-    rules::attach(conn, &mut summary).await?;
+    rules::attach(conn, user, &mut summary).await?;
     let [summary] = summary;
     Ok(summary)
 }

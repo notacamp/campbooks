@@ -117,7 +117,7 @@ pub struct LoginQuery {
     path = "/bff/login",
     tag = "bff",
     operation_id = "bff.login",
-    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction"]).access("bff.login", campbooks_kernel::authz::Action::Write)))),
     params(LoginQuery),
     security(()),
     responses(
@@ -262,7 +262,7 @@ pub struct CallbackQuery {
     path = "/bff/callback",
     tag = "bff",
     operation_id = "bff.callback",
-    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction", "bff.session"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.login_transaction", "bff.session"]).access("bff.login", campbooks_kernel::authz::Action::Write)))),
     params(CallbackQuery),
     security(()),
     responses(
@@ -456,7 +456,7 @@ pub struct SessionUser {
     path = "/bff/session",
     tag = "bff",
     operation_id = "bff.session",
-    extensions(("x-campbooks" = json!(Operation::query().records(["bff.session"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["bff.session"]).access("bff.session", campbooks_kernel::authz::Action::Read)))),
     security((), ("session" = [])),
     responses(
         (status = 200, description = "The session, or `authenticated: false`.", body = SessionInfo),
@@ -517,7 +517,7 @@ pub struct LogoutResponse {
     path = "/bff/logout",
     tag = "bff",
     operation_id = "bff.logout",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"]).access("bff.session", campbooks_kernel::authz::Action::Delete)))),
     security(("session" = [])),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     responses(
@@ -570,7 +570,7 @@ pub struct BackchannelLogout {
     path = "/bff/backchannel-logout",
     tag = "bff",
     operation_id = "bff.backchannel_logout",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["bff.session"]).access("bff.login", campbooks_kernel::authz::Action::Delete)))),
     security(()),
     request_body(content = BackchannelLogout, content_type = "application/x-www-form-urlencoded"),
     responses(
@@ -658,35 +658,35 @@ api_operation!(
     api_get,
     get,
     "bff.api_get",
-    (Operation::query()),
+    (Operation::query().access("bff.proxy", campbooks_kernel::authz::Action::Read)),
     "Read from the API as the signed-in user."
 );
 api_operation!(
     api_post,
     post,
     "bff.api_post",
-    (Operation::command(Risk::Low)),
+    (Operation::command(Risk::Low).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "POST to the API as the signed-in user."
 );
 api_operation!(
     api_put,
     put,
     "bff.api_put",
-    (Operation::command(Risk::Low)),
+    (Operation::command(Risk::Low).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "PUT to the API as the signed-in user."
 );
 api_operation!(
     api_patch,
     patch,
     "bff.api_patch",
-    (Operation::command(Risk::Low)),
+    (Operation::command(Risk::Low).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "PATCH the API as the signed-in user."
 );
 api_operation!(
     api_delete,
     delete,
     "bff.api_delete",
-    (Operation::command(Risk::Low)),
+    (Operation::command(Risk::Low).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "DELETE in the API as the signed-in user."
 );
 
@@ -736,35 +736,35 @@ admin_operation!(
     admin_get,
     get,
     "bff.admin_get",
-    (Operation::query()),
+    (Operation::query().access("bff.proxy", campbooks_kernel::authz::Action::Read)),
     "Read from the admin API as the signed-in administrator."
 );
 admin_operation!(
     admin_post,
     post,
     "bff.admin_post",
-    (Operation::command(Risk::High)),
+    (Operation::command(Risk::High).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "POST to the admin API as the signed-in administrator."
 );
 admin_operation!(
     admin_put,
     put,
     "bff.admin_put",
-    (Operation::command(Risk::High)),
+    (Operation::command(Risk::High).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "PUT to the admin API as the signed-in administrator."
 );
 admin_operation!(
     admin_patch,
     patch,
     "bff.admin_patch",
-    (Operation::command(Risk::High)),
+    (Operation::command(Risk::High).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "PATCH the admin API as the signed-in administrator."
 );
 admin_operation!(
     admin_delete,
     delete,
     "bff.admin_delete",
-    (Operation::command(Risk::High)),
+    (Operation::command(Risk::High).access("bff.proxy", campbooks_kernel::authz::Action::Write)),
     "DELETE in the admin API as the signed-in administrator."
 );
 

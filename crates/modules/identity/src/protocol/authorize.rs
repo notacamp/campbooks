@@ -200,7 +200,7 @@ pub async fn find_client(
     path = "/oauth2/authorize",
     tag = "identity",
     operation_id = "identity.authorize",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request", "identity.authorization_code"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request", "identity.authorization_code"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(AuthorizeQuery),
     security(()),
     responses(

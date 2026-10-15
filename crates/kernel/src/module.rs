@@ -7,7 +7,7 @@
 
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::{auth::ScopeInfo, jobs::Background, state::AppState};
+use crate::{auth::ScopeInfo, authz::Resources, jobs::Background, state::AppState};
 
 /// A domain module, as handed to the server.
 pub struct Module {
@@ -29,6 +29,10 @@ pub struct Module {
     /// `<name>.<…>`. The server builds the
     /// [`Registry`](crate::jobs::Registry) from these.
     pub background: Background,
+    /// The module's resource types (owner, actions, sharing) and the port
+    /// answering their facts: its part of the one access catalogue
+    /// (ADR 0017, [`crate::authz`]).
+    pub resources: Resources,
 }
 
 impl std::fmt::Debug for Module {
@@ -38,6 +42,7 @@ impl std::fmt::Debug for Module {
             .field("scopes", &self.scopes)
             .field("admin", &self.admin_router.is_some())
             .field("background", &self.background)
+            .field("resources", &self.resources)
             .finish_non_exhaustive()
     }
 }

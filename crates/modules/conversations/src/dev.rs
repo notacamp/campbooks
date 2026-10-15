@@ -31,13 +31,20 @@ pub async fn create_inbox(
     members: &[(UserId, InboxRole)],
 ) -> Result<InboxId> {
     let id = InboxId::new();
+    // Its first manager owns it, as the member whose connection feeds one does.
+    let owner = members
+        .iter()
+        .find(|(_, role)| *role == InboxRole::Manager)
+        .map(|(user, _)| *user.as_uuid());
     let mut tx = state.db.begin_for(workspace).await?;
     sqlx::query!(
-        "INSERT INTO conversations.inboxes (id, workspace_id, channel, address) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO conversations.inboxes (id, workspace_id, channel, address, owner)
+         VALUES ($1, $2, $3, $4, $5)",
         id as InboxId,
         workspace.as_uuid(),
         Channel::Email.as_str(),
         address.to_lowercase(),
+        owner,
     )
     .execute(&mut *tx)
     .await?;

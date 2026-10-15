@@ -7,6 +7,7 @@
 
 pub mod admin;
 pub mod auth;
+pub mod authz;
 pub mod blobs;
 pub mod changes;
 pub mod clock;

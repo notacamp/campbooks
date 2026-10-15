@@ -156,16 +156,34 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. What becomes of the inboxes it fed is their owner's call.",
+        "description": "A connection was disconnected: its grant is revoked and its streams are\ngone. `mail` says what becomes of the inboxes it fed\n(`contracts/connectors.connection_removed.v1.schema.json`): the\nconversations module deletes them, or keeps them read-only.",
         "required": [
           "workspace",
           "connection",
           "inbox_ids"
         ],
         "properties": {
+          "account_subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's stable id of the account (the `OpenID` `sub`; opaque, never\nan address), so a way in that came only from this connection can be\ndropped with it."
+          },
           "connection": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection."
+          },
+          "granted_by": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The member who had connected it."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "inbox_ids": {
             "type": "array",
@@ -173,6 +191,21 @@
               "$ref": "#/components/schemas/InboxId"
             },
             "description": "The inboxes its streams fed."
+          },
+          "mail": {
+            "$ref": "#/components/schemas/MailChoice",
+            "description": "Delete the mail it brought in (the default), or keep it read-only."
+          },
+          "provider": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Provider",
+                "description": "Its provider."
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "workspace": {
             "type": "string",
@@ -380,6 +413,17 @@
           "draft"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "conversation": {
             "oneOf": [
               {
@@ -395,6 +439,54 @@
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft, now deleted."
           },
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.inbox_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "The connection-account v1 document, as this module reads it\n(`contracts/connection-account.v1.schema.json`).\nThe inbox changed in a way that may change who sees it, or what they\nmay do there: a membership ended, its owner left, or it was kept\nread-only after its connection was removed. Ids only.",
+        "required": [
+          "workspace",
+          "inbox"
+        ],
+        "properties": {
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "conversations.inbox_removed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "The inbox was deleted with everything in it (its connection was removed\nand its mail not kept). Ids only.",
+        "required": [
+          "workspace",
+          "inbox"
+        ],
+        "properties": {
           "inbox": {
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox."
@@ -586,6 +678,17 @@
           "reason"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "draft": {
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft."
@@ -621,6 +724,17 @@
           "message"
         ],
         "properties": {
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/UserId",
+                "description": "The draft's author; `None` for a client token's draft. Its change\nreaches only them (a draft is private)."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "draft": {
             "$ref": "#/components/schemas/DraftId",
             "description": "The draft being sent."
@@ -1007,6 +1121,10 @@
           "user"
         ],
         "properties": {
+          "mail": {
+            "$ref": "#/components/schemas/MailChoice",
+            "description": "What becomes of the mail of the mailboxes they connected: deleted\n(always when they leave), or kept read-only when the owner or admin\nremoving them chose so."
+          },
           "removed_by": {
             "oneOf": [
               {
@@ -1017,6 +1135,13 @@
                 "type": "null"
               }
             ]
+          },
+          "subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Their identity subject (an opaque account id), so the issuer can\nremove the clients they registered in the workspace."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",
@@ -1329,6 +1454,14 @@
         "type": "string",
         "format": "uuid",
         "description": "LabelId (UUIDv7)"
+      },
+      "MailChoice": {
+        "type": "string",
+        "description": "What becomes of the mail a connection brought in when it is removed\n(the owner's decision, campbooks-cloud#117): deleted with it (the\ndefault), or kept as read-only history. Only the member who connected\nit chooses when disconnecting; an owner or admin chooses when removing\nthat member.",
+        "enum": [
+          "delete",
+          "keep"
+        ]
       },
       "MessageFacts": {
         "type": "object",

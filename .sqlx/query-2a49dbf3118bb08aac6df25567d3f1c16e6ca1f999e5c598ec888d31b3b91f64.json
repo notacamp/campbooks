@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT i.id AS \"id: InboxId\" FROM conversations.inboxes i\n                    WHERE i.detached_at IS NULL\n                      AND (i.owner = $1\n                           OR (i.owner IS NULL AND EXISTS (\n                                 SELECT 1 FROM conversations.inbox_members me\n                                  WHERE me.inbox_id = i.id AND me.user_id = $1)))\n                    ORDER BY i.id\n                      FOR SHARE OF i",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2a49dbf3118bb08aac6df25567d3f1c16e6ca1f999e5c598ec888d31b3b91f64"
+}

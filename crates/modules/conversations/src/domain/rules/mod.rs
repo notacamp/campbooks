@@ -295,13 +295,16 @@ pub struct Stored {
     pub last_applied_at: Option<DateTime<Utc>>,
     /// Whether its author still may change its inbox (else it is paused).
     pub author_may_act: bool,
+    /// Whether its inbox is kept read-only (its connection was removed): no
+    /// rule acts there any more.
+    pub inbox_detached: bool,
 }
 
 impl Stored {
     /// The state the rule is in: an active rule whose author can no longer
-    /// change the inbox is paused.
+    /// change the inbox, or whose inbox is kept read-only, is paused.
     pub fn effective_state(&self) -> RuleState {
-        if self.state == RuleState::Active && !self.author_may_act {
+        if self.state == RuleState::Active && (!self.author_may_act || self.inbox_detached) {
             RuleState::Paused
         } else {
             self.state
@@ -339,6 +342,7 @@ struct RuleRow {
     applied_count: i32,
     last_applied_at: Option<DateTime<Utc>>,
     author_may_act: bool,
+    inbox_detached: bool,
 }
 
 impl TryFrom<RuleRow> for Stored {
@@ -362,6 +366,7 @@ impl TryFrom<RuleRow> for Stored {
             applied_count: row.applied_count,
             last_applied_at: row.last_applied_at,
             author_may_act: row.author_may_act,
+            inbox_detached: row.inbox_detached,
         })
     }
 }
@@ -383,11 +388,13 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
                r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
-               (r.taught_by IS NULL OR EXISTS (
+               (r.taught_by IS NULL OR i.owner = r.taught_by OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
-                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!"
+                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
+          JOIN conversations.inboxes i ON i.id = r.inbox_id
          WHERE r.id = $1
         "#,
         id as RuleId,
@@ -407,11 +414,13 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
                r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
-               (r.taught_by IS NULL OR EXISTS (
+               (r.taught_by IS NULL OR i.owner = r.taught_by OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
-                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!"
+                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
+          JOIN conversations.inboxes i ON i.id = r.inbox_id
          WHERE r.inbox_id = ANY($1) AND r.state <> 'removed'
          ORDER BY r.created_at DESC, r.id DESC
         "#,
@@ -467,9 +476,13 @@ pub async fn roles_of(
     let Some(user) = user else {
         return Ok(std::collections::HashMap::new());
     };
+    // The inbox's owner changes its rules as a manager does.
     let rows = sqlx::query!(
-        r#"SELECT inbox_id AS "inbox: InboxId", role FROM conversations.inbox_members
-            WHERE inbox_id = ANY($1) AND user_id = $2"#,
+        r#"SELECT i.id AS "inbox!: InboxId",
+                  CASE WHEN i.owner = $2 THEN 'manager' ELSE m.role END AS "role!"
+             FROM conversations.inboxes i
+             LEFT JOIN conversations.inbox_members m ON m.inbox_id = i.id AND m.user_id = $2
+            WHERE i.id = ANY($1) AND (i.owner = $2 OR m.user_id IS NOT NULL)"#,
         inboxes as &[InboxId],
         user.as_uuid(),
     )
@@ -480,22 +493,15 @@ pub async fn roles_of(
         .collect()
 }
 
-/// The caller's role in `inbox`; `None` for a client token or a non-member.
+/// The caller's role in `inbox` (its owner counts as a manager); `None` for a
+/// non-member.
 pub async fn role_in(
     conn: &mut PgConnection,
     inbox: InboxId,
     user: Option<UserId>,
 ) -> Result<Option<InboxRole>> {
     let Some(user) = user else { return Ok(None) };
-    sqlx::query_scalar!(
-        "SELECT role FROM conversations.inbox_members WHERE inbox_id = $1 AND user_id = $2",
-        inbox as InboxId,
-        user.as_uuid(),
-    )
-    .fetch_optional(conn)
-    .await?
-    .map(|r| r.parse::<InboxRole>())
-    .transpose()
+    Ok(roles_of(conn, &[inbox], Some(user)).await?.remove(&inbox))
 }
 
 /// Whether `role` may change a rule taught by `author`: its author while a

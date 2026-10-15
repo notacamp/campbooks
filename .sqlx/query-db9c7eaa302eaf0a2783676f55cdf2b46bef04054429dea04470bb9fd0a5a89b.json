@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_applications SET before = '{}'::jsonb\n                WHERE rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "db9c7eaa302eaf0a2783676f55cdf2b46bef04054429dea04470bb9fd0a5a89b"
+}

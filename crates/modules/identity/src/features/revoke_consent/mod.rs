@@ -32,7 +32,7 @@ pub struct ConsentPath {
     operation_id = "identity.revoke_consent",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.consent"]).access("identity.consent", campbooks_kernel::authz::Action::Delete)))),
     params(("id" = Uuid, Path, description = "The consent.")),
     responses(
         (status = NO_CONTENT, description = "Revoked; the app's tokens stop working."),
@@ -50,6 +50,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     Path(path): Path<ConsentPath>,
 ) -> Result<StatusCode> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Delete,
+        "identity.consent",
+        || Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let now = issuer.now();
     let mut tx = state.db.begin().await?;

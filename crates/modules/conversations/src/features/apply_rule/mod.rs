@@ -68,9 +68,12 @@ impl JobHandler for ApplyRules {
         let Some(rule) = rules::find_any(tx, run.rule).await? else {
             return end(tx, batch.run, RunState::Cancelled).await;
         };
-        // A rule applies only while active and its author may change the
-        // inbox; putting mail back goes on whatever the rule's state.
-        if kind == RunKind::Apply && rule.effective_state() != RuleState::Active {
+        // Nothing changes in an inbox kept read-only. A rule applies only
+        // while active and its author may change the inbox; putting mail back
+        // goes on whatever the rule's state.
+        if rule.inbox_detached
+            || (kind == RunKind::Apply && rule.effective_state() != RuleState::Active)
+        {
             return end(tx, batch.run, RunState::Cancelled).await;
         }
         let context = Context {

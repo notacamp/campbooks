@@ -811,16 +811,21 @@ batch or a new rule.
 - **THEN** the old rule is removed without putting mail back and the new one is active
 
 ### Requirement: Who may teach
-Previewing, creating and confirming a rule SHALL take the `sender` role on its
-inbox (a `reader` gets 403 `inbox_read_only`). Updating and removing it SHALL
-take its author while they hold `sender`, or a `manager` of the inbox; others
-get 403 `rule_not_yours`. A proposed rule MAY be turned down by anyone who may
-teach in its inbox. Reading rules SHALL take any role on the inbox; a rule in
-an inbox the caller cannot see SHALL answer 404. A client token SHALL only
-read and preview rules: creating, confirming, changing or removing one
+Rules SHALL be the access catalogue's `conversations.rule`, inside their
+inbox. Previewing, creating and confirming a rule, and asking for or
+dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (its
+owner, a `sender` or a `manager`; a `reader`, or anyone in an inbox kept
+read-only, gets 403 `inbox_read_only`). Updating, removing and restoring it
+SHALL also take its author, or a `manager` or the owner of the inbox; other
+writers get 403 `rule_not_yours`. A proposed rule MAY be turned down by anyone
+who may teach in its inbox. Reading rules SHALL take any role on the inbox; a
+rule in an inbox the caller cannot see SHALL answer 404. A client token, even
+one a member registered (which arrives as that member), SHALL only read and
+preview rules: creating, confirming, changing, removing or restoring one
 answers 403 `rule_needs_member`. A rule SHALL act for every member of its
-inbox. When its author no longer holds `sender` on the inbox, the rule SHALL
-be paused until a manager adopts or removes it.
+inbox. When its author no longer may write in the inbox, or the inbox is kept
+read-only, the rule SHALL be paused (and its running runs stop) until a
+manager adopts or removes it.
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -831,8 +836,12 @@ be paused until a manager adopts or removes it.
 - **THEN** his rules there are paused and stop acting on new mail
 
 #### Scenario: An app
-- **WHEN** a client token with `conversations:write` creates a rule
+- **WHEN** a client token with `conversations:write`, registered by Sam, creates a rule
 - **THEN** the response is 403 with code `rule_needs_member`
+
+#### Scenario: Kept read-only
+- **WHEN** the connection feeding an inbox is removed with its mail kept while a rule's run is going
+- **THEN** the run is cancelled, the rule reads as paused, and creating a rule there answers 403 `inbox_read_only`
 
 ### Requirement: Rules from evidence ask first
 A rule created with origin `correction` or `suggestion` SHALL be active only
@@ -907,6 +916,8 @@ conversation, and never while the member dismissed it.
 `POST …/conversations/{conversation_id}/rule-suggestions/dismiss`
 (`conversations.dismiss_rule_suggestion`, with the suggestion's `key`) SHALL
 hide it from that member for 30 days, and for good after a second dismissal.
+With no default, a dismissal of any likeness offered SHALL hide the
+suggestion.
 
 #### Scenario: The 1,000 notifications
 - **WHEN** Ana moves one GitHub notification to Updates and 1,000 more from notifications@github.com are in Primary
@@ -944,21 +955,86 @@ apply run.
 - **THEN** the rule is removed and the 998 are back in Primary, except one Leo has since starred and moved himself
 
 ### Requirement: Rules in summaries
-A conversation summary SHALL carry `rule` (its id, the action it took, and
-how many conversations it has changed) when a rule placed or changed the
-conversation and no member changed it back.
+A conversation summary SHALL carry `rule` (its id, the action it took, how
+many conversations it has changed, and whether the caller may change it)
+when a rule placed or changed the conversation and no member changed it
+back. Conversation lists and reads SHALL follow `conversations.rule` changes.
 
 #### Scenario: Placed by a rule
 - **WHEN** a member lists Updates after a rule moved a new notification there
 - **THEN** its summary names the rule and its count
 
+### Requirement: Restoring a removed rule
+`POST …/rules/{rule_id}/restore` (`conversations.restore_rule`) SHALL bring
+a rule removed in the last 15 minutes back in the state it had (Undo),
+cancelling the run putting its mail back and, with `apply_to_existing`,
+applying it again; it SHALL replace an active rule with the same conditions
+and kind as creating one does. Otherwise the response SHALL be 409
+`rule_not_restorable`.
+
+#### Scenario: Undo of Undo all
+- **WHEN** Ana removes a rule with `restore=true` and restores it a minute later with `apply_to_existing`
+- **THEN** the same rule is active again and its mail is moved again
+
+#### Scenario: Too late
+- **WHEN** a rule was removed an hour ago
+- **THEN** restoring it answers 409 `rule_not_restorable`
+
 ### Requirement: Purging rules
 Removing an inbox's mail and purging a workspace SHALL delete its rules,
-runs, applications and dismissals.
+runs, applications and dismissals. Keeping an inbox read-only SHALL cancel
+its rules' runs and drop what only served acting again: the members' words
+(`origin_text`), what each rule changed (`before`) and the dismissed
+suggestions. A member leaving SHALL drop the suggestions they dismissed.
 
 #### Scenario: Disconnecting with the mail deleted
 - **WHEN** the inbox's connection is removed and its mail deleted
 - **THEN** its rules are gone too
+
+### Requirement: A removed connection's mail is deleted or kept read-only
+On `connectors.connection_removed` with `mail=delete` (or none), the
+module SHALL delete each inbox the connection fed: its messages and
+attachments, conversations, labels, decisions, corrections, drafts and
+memberships. It SHALL also let go of every file they held (the sweep
+deletes them), remember the inbox as removed so no late batch or replayed
+grant brings it back, and publish `conversations.inbox_removed`. With
+`mail=keep` it SHALL mark each inbox read-only: no batch is applied to it,
+nothing is written or sent from it (its scheduled sends go back to drafts,
+and a send is released only while its author may still send it), and its
+members keep reading; authors may still delete their drafts. A batch being
+applied when the connection goes SHALL either finish before the inbox is
+deleted or frozen, or be dropped. It SHALL
+then publish `conversations.inbox_changed`, and the inbox list SHALL show
+it as `read_only`.
+
+#### Scenario: Delete
+- **WHEN** a connection is removed with its mail deleted
+- **THEN** no row of its inbox remains, no file reference remains, and its members get 404 for its conversations
+
+#### Scenario: Keep
+- **WHEN** a connection is removed with its mail kept
+- **THEN** its members still read its conversations, archiving answers 403 `inbox_read_only`, and new batches are dropped
+
+### Requirement: A departed member keeps nothing
+On `workspaces.member_left`, the module SHALL delete the member's inbox
+memberships and drafts, and stop them owning any inbox. A member who
+comes back SHALL have no access to any inbox until given it again.
+
+#### Scenario: Back in the workspace
+- **WHEN** a member who left is invited back
+- **THEN** they see no inbox and none of their old drafts
+
+### Requirement: Inbox access follows the catalogue
+An inbox SHALL be owned by the member whose connection feeds it. Members
+see it by role: `reader` reads; `sender` also writes and sends; `manager`
+also shares. Workspace owners and admins SHALL get nothing inside an inbox
+they are not a member of. A draft SHALL be its author's alone: they read
+and delete it while they read its inbox, and write and send it while they
+may send from it.
+
+#### Scenario: A colleague's draft
+- **WHEN** the inbox's manager asks for a draft another member wrote
+- **THEN** the answer is 404
 
 ### Requirement: Spam and trash need nothing
 A message in spam or the trash SHALL never raise a need: a conversation's

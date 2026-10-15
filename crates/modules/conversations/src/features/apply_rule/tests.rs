@@ -147,3 +147,33 @@ async fn mail_under_review_is_never_hidden_on_arrival(db: PgPool) {
     // The twin with neither: the rule does archive it.
     assert!(!in_inbox(1).await);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn no_rule_acts_in_an_inbox_kept_read_only(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 5).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let created = kit.post(&sam, &rules, Some(move_github())).await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    // The connection goes, the mail is kept: before the run's first batch.
+    sqlx::query("UPDATE conversations.inboxes SET detached_at = now() WHERE id = $1")
+        .bind(inbox.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+    assert!(streams(&kit).await.iter().all(|(_, s, _)| s == "primary"));
+    let state: String = sqlx::query_scalar("SELECT state FROM conversations.rule_runs")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(state, "cancelled");
+    // It reads as paused, and nothing new is taught there.
+    let got = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+        .await;
+    assert_eq!(got.json["state"], "paused");
+    let refused = kit.post(&sam, &rules, Some(move_github())).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["code"], "inbox_read_only");
+}

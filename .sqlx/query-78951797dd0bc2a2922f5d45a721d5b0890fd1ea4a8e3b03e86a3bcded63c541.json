@@ -1,0 +1,36 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT removed_from,\n                  (state = 'removed' AND removed_at > now() - make_interval(mins => $2))\n                      AS \"restorable!\"\n             FROM conversations.rules WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "removed_from",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rules",
+            "name": "removed_from"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "restorable!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int4"
+      ]
+    },
+    "nullable": [
+      true,
+      null
+    ]
+  },
+  "hash": "78951797dd0bc2a2922f5d45a721d5b0890fd1ea4a8e3b03e86a3bcded63c541"
+}

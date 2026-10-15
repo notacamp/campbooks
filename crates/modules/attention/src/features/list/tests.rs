@@ -88,11 +88,12 @@ async fn someone_who_cannot_see_the_inbox_sees_nothing(db: PgPool) {
         .get(&eve, &format!("/api/v1/w/{workspace}/attention"))
         .await;
     assert!(list.json["items"].as_array().unwrap().is_empty());
+    // A client acting for no member has no attention list (ADR 0017).
     let client = kit.client(workspace, "attention:read");
-    let all = kit
+    let refused = kit
         .get(&client, &format!("/api/v1/w/{workspace}/attention"))
         .await;
-    assert_eq!(all.json["items"].as_array().unwrap().len(), 1);
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
     let anonymous = kit
         .get("", &format!("/api/v1/w/{workspace}/attention"))
         .await;

@@ -73,7 +73,7 @@ pub struct AttentionList {
     operation_id = "attention.list",
     tag = "attention",
     security(("bearer" = ["attention:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["attention.item"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["attention.item"]).access("attention.item", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "The caller's items.", body = AttentionList),
@@ -96,6 +96,13 @@ pub async fn handler(
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_offset")));
     }
     let access = &workspace.access;
+    campbooks_kernel::authz::require_type(
+        &state,
+        access,
+        campbooks_kernel::authz::Action::Read,
+        crate::domain::resources::ITEM_RECORD,
+        || Error::Forbidden,
+    )?;
     let now = Utc::now();
     let offset = TimeDelta::minutes(i64::from(query.utc_offset));
     // The caller's own today.

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use axum::http::StatusCode;
 use campbooks_kernel::{
     preferences::{MemberPreferences, PreferenceFuture},
-    tenancy::{UserId, WorkspaceId},
+    tenancy::{ClientActor, ClientDirectory, ClientsFuture, UserId, WorkspaceId},
 };
 use serde_json::{Value, json};
 use sqlx::{PgConnection, PgPool};
@@ -385,17 +385,33 @@ async fn who_may_teach_and_change_rules(db: PgPool) {
     assert_eq!(refused.json["code"], "rule_not_yours");
     assert_eq!(kit.delete(&sam, &one).await.status, StatusCode::OK);
 
-    // A client token reads rules but cannot make one, even with write access.
+    // A client Sam registered arrives as Sam: it reads rules, but cannot
+    // make one, even with write access. Rules are taught by members.
+    let kit = kit.with_clients(Arc::new(ActsFor("sam")));
     let client = kit.client(workspace, "conversations:read conversations:write");
-    assert_eq!(
-        kit.get(&client, &format!("/api/v1/w/{workspace}/rules"))
-            .await
-            .status,
-        StatusCode::OK
-    );
+    let listed = kit
+        .get(&client, &format!("/api/v1/w/{workspace}/rules"))
+        .await;
+    assert_eq!(listed.status, StatusCode::OK, "{:?}", listed.json);
     let refused = kit.post(&client, &rules, Some(move_github())).await;
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.json["code"], "rule_needs_member");
+}
+
+/// A client directory where every client acts for one member.
+#[derive(Debug)]
+struct ActsFor(&'static str);
+
+impl ClientDirectory for ActsFor {
+    fn acting_for<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _client_id: &'a str,
+        _workspace: WorkspaceId,
+    ) -> ClientsFuture<'a> {
+        let subject = self.0.to_owned();
+        Box::pin(async move { Ok(ClientActor::ActsFor(subject)) })
+    }
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -788,7 +804,7 @@ async fn a_reader_previews_confirms_and_changes_nothing(db: PgPool) {
         )
         .await;
     assert_eq!(update.status, StatusCode::FORBIDDEN);
-    assert_eq!(update.json["code"], "rule_not_yours");
+    assert_eq!(update.json["code"], "inbox_read_only");
     // Pausing a proposed rule never makes it act without a yes.
     let paused = kit
         .patch(
@@ -1048,4 +1064,132 @@ async fn undo_all_still_works_after_the_rule_moves_mail_elsewhere(db: PgPool) {
             "{id}"
         );
     }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn an_inbox_owner_teaches_without_a_membership(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    sqlx::query("UPDATE conversations.inboxes SET owner = $2 WHERE id = $1")
+        .bind(inbox.as_uuid())
+        .bind(sam_id.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM conversations.inbox_members WHERE user_id = $1")
+        .bind(sam_id.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    assert_eq!(created.json["rule"]["may_change"], true);
+    assert_eq!(created.json["rule"]["state"], "active");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_removed_rule_comes_back_as_it_was_within_the_undo_window(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.run_jobs().await;
+    // Undo all: removed, its mail put back.
+    kit.delete(
+        &sam,
+        &format!("/api/v1/w/{workspace}/rules/{rule}?restore=true"),
+    )
+    .await;
+    kit.run_jobs().await;
+    assert!(streams(&kit).await.iter().all(|(_, s, _)| s == "primary"));
+    let restore = format!("/api/v1/w/{workspace}/rules/{rule}/restore");
+    // Only who may remove it brings it back.
+    let refused = kit.post(&leo, &restore, Some(json!({}))).await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN);
+    assert_eq!(refused.json["code"], "rule_not_yours");
+    // Undo of Undo all: the same rule, active again, applied again.
+    let back = kit
+        .post(&sam, &restore, Some(json!({"apply_to_existing": true})))
+        .await;
+    assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
+    assert_eq!(back.json["id"], rule.as_str());
+    assert_eq!(back.json["state"], "active");
+    assert_eq!(back.json["run"]["kind"], "apply");
+    kit.run_jobs().await;
+    let moved = streams(&kit).await;
+    assert!(
+        moved
+            .iter()
+            .filter(|(id, ..)| id.starts_with("gh-"))
+            .all(|(_, s, _)| s == "updates")
+    );
+    // Not removed: nothing to bring back.
+    let again = kit.post(&sam, &restore, Some(json!({}))).await;
+    assert_eq!(again.status, StatusCode::CONFLICT);
+    assert_eq!(again.json["code"], "rule_not_restorable");
+    // Removed too long ago: taught again instead.
+    kit.delete(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+        .await;
+    sqlx::query(
+        "UPDATE conversations.rules SET removed_at = now() - interval '1 hour' WHERE id = $1::uuid",
+    )
+    .bind(&rule)
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    let late = kit.post(&sam, &restore, Some(json!({}))).await;
+    assert_eq!(late.status, StatusCode::CONFLICT);
+    assert_eq!(late.json["code"], "rule_not_restorable");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn rows_say_who_may_stop_the_rule_that_moved_them(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    let (ana, ana_id) = kit.member("ana", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    kit.add_to_inbox(inbox, ana_id, InboxRole::Reader).await;
+    kit.post(
+        &leo,
+        &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+        Some(move_github()),
+    )
+    .await;
+    kit.run_jobs().await;
+    let marks = |token: String| {
+        let kit = &kit;
+        async move {
+            let list = kit
+                .get(
+                    &token,
+                    &format!("/api/v1/w/{workspace}/conversations?stream=updates"),
+                )
+                .await;
+            list.json["conversations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["rule"]["may_change"].as_bool().unwrap())
+                .collect::<Vec<_>>()
+        }
+    };
+    // Its author and a manager may; a reader may not.
+    assert_eq!(marks(leo).await, [true, true]);
+    assert_eq!(marks(sam).await, [true, true]);
+    assert_eq!(marks(ana).await, [false, false]);
 }

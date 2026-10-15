@@ -58,7 +58,7 @@ pub struct EndSession {
     path = "/oauth2/end_session",
     tag = "identity",
     operation_id = "identity.end_session",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.session"]).access("identity.session", campbooks_kernel::authz::Action::Delete)))),
     params(EndSession),
     security(()),
     responses(
@@ -85,7 +85,7 @@ pub async fn end_session(
     path = "/oauth2/end_session",
     tag = "identity",
     operation_id = "identity.end_session_post",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"]).access("identity.session", campbooks_kernel::authz::Action::Delete)))),
     request_body(content = EndSession, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(

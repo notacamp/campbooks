@@ -11,6 +11,8 @@ pub(crate) mod tests;
 use axum::{Json, extract::State, http::StatusCode};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
+    auth::{Principal, PrincipalKind},
+    authz::Action,
     db::BeginFor as _,
     extract,
     tenancy::{Access, UserId, Workspace, WorkspaceId},
@@ -23,12 +25,12 @@ use utoipa::{IntoParams, ToSchema};
 use crate::{
     domain::{
         access::visible_inboxes,
+        resources,
         rule_runs::{self, RunView, SCAN},
         rules::{self, NewRule, RuleAction, RuleCondition, Stored},
     },
-    model::{
-        ConversationId, InboxId, InboxRole, RuleId, RuleOrigin, RuleState, RunKind, TeachingId,
-    },
+    events::RULE_RECORD,
+    model::{ConversationId, InboxId, RuleId, RuleOrigin, RuleState, RunKind, TeachingId},
     scopes::{ConversationsRead, ConversationsWrite},
 };
 
@@ -162,44 +164,53 @@ async fn views(
 }
 
 /// 404 unless the caller sees `inbox`; 403 `inbox_read_only` unless they may
-/// tidy it (a sender or above, or a client token).
-async fn may_teach(conn: &mut PgConnection, access: &Access, inbox: InboxId) -> Result<()> {
-    if !visible_inboxes(conn, access).await?.contains(&inbox) {
-        return Err(Error::NotFound);
-    }
-    if access.user.is_some()
-        && !matches!(
-            rules::role_in(conn, inbox, access.user).await?,
-            Some(InboxRole::Sender | InboxRole::Manager)
-        )
-    {
-        return Err(Error::Denied(crate::MESSAGES.reason("inbox_read_only")));
-    }
-    Ok(())
+/// write in it (its owner, a sender or a manager) and it is not kept
+/// read-only: the catalogue's `write` on the inbox.
+pub(crate) async fn may_teach(
+    state: &AppState,
+    conn: &mut PgConnection,
+    access: &Access,
+    inbox: InboxId,
+) -> Result<()> {
+    resources::authorize(state, conn, access, Action::Write, &resources::inbox(inbox)).await
 }
 
 /// 403 `rule_needs_member` for a client token: rules are taught by members.
-fn member_only(access: &Access) -> Result<()> {
-    if access.user.is_none() {
+/// A client a member registered arrives as that member, so the principal's
+/// kind decides, not whether a user is attached.
+pub(crate) fn member_only(principal: &Principal) -> Result<()> {
+    if principal.kind == PrincipalKind::Client {
         return Err(Error::Denied(crate::MESSAGES.reason("rule_needs_member")));
     }
     Ok(())
 }
 
-/// Rule `id` if the caller sees its inbox, else 404.
-async fn visible_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -> Result<Stored> {
-    let rule = rules::find(conn, id).await?.ok_or(Error::NotFound)?;
-    if !visible_inboxes(conn, access).await?.contains(&rule.inbox) {
-        return Err(Error::NotFound);
-    }
-    Ok(rule)
+/// Rule `id` (not removed) if the caller may read it (any role in its
+/// inbox), else 404.
+async fn visible_rule(
+    state: &AppState,
+    conn: &mut PgConnection,
+    access: &Access,
+    id: RuleId,
+) -> Result<Stored> {
+    resources::authorize(state, conn, access, Action::Read, &resources::rule(id)).await?;
+    rules::find(conn, id).await?.ok_or(Error::NotFound)
 }
 
 /// Rule `id` if the caller may change it: 404 when they cannot see it, 403
-/// `rule_not_yours` when they are not its author (a sender) or a manager.
-async fn changeable_rule(conn: &mut PgConnection, access: &Access, id: RuleId) -> Result<Stored> {
-    let rule = visible_rule(conn, access, id).await?;
-    member_only(access)?;
+/// `rule_needs_member` for a client, `inbox_read_only` when they may not
+/// write in its inbox (or it is kept read-only), `rule_not_yours` when they
+/// are neither its author nor a manager.
+async fn changeable_rule(
+    state: &AppState,
+    conn: &mut PgConnection,
+    workspace: (&Principal, &Access),
+    id: RuleId,
+) -> Result<Stored> {
+    let (principal, access) = workspace;
+    let rule = visible_rule(state, conn, access, id).await?;
+    may_teach(state, conn, access, rule.inbox).await?;
+    member_only(principal)?;
     let inbox_role = rules::role_in(conn, rule.inbox, access.user).await?;
     if !rules::may_change(inbox_role, access.user, rule.taught_by) {
         return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
@@ -273,7 +284,7 @@ pub struct RulePreview {
     operation_id = "conversations.preview_rule",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::body_query().assistant().records(["conversations.rule"])))),
+    extensions(("x-campbooks" = json!(Operation::body_query().assistant().records(["conversations.rule"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("inbox_id" = InboxId, Path, description = "The inbox."),
@@ -301,7 +312,7 @@ pub async fn preview(
     rules::validate(&conditions, &actions)?;
     let access = &workspace.access;
     let mut tx = begin_read(&state, access.workspace).await?;
-    may_teach(&mut tx, access, path.inbox_id).await?;
+    may_teach(&state, &mut tx, access, path.inbox_id).await?;
     let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
     let preview =
         compute_preview(&mut tx, path.inbox_id, (&conditions, &actions), deadline).await?;
@@ -548,7 +559,7 @@ pub struct CreatedRule {
         .undo("conversations.remove_rule")
         .automation()
         .assistant()
-        .records(["conversations.rule", "conversations.conversation"])))),
+        .records(["conversations.rule", "conversations.conversation"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("inbox_id" = InboxId, Path, description = "The inbox."),
@@ -582,9 +593,9 @@ pub async fn create(
         return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
     }
     let access = &workspace.access;
-    member_only(access)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    may_teach(&mut tx, access, path.inbox_id).await?;
+    may_teach(&state, &mut tx, access, path.inbox_id).await?;
+    member_only(&workspace.principal)?;
     let created = create_in(&mut tx, &state, access, path.inbox_id, &body).await?;
     tx.commit().await?;
     Ok((StatusCode::CREATED, Json(created)))
@@ -720,7 +731,8 @@ async fn retire(
 ) -> Result<()> {
     sqlx::query!(
         r#"UPDATE conversations.rules
-              SET state = 'removed', removed_at = now(), updated_at = now()
+              SET state = 'removed', removed_from = state, removed_at = now(),
+                  updated_at = now()
             WHERE id = $1"#,
         rule as RuleId,
     )
@@ -766,7 +778,7 @@ pub struct ConfirmRule {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.remove_rule")
         .assistant()
-        .records(["conversations.rule", "conversations.conversation"])))),
+        .records(["conversations.rule", "conversations.conversation"]).access("conversations.rule", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("rule_id" = RuleId, Path, description = "The rule."),
@@ -792,9 +804,9 @@ pub async fn confirm(
 ) -> Result<Json<RuleView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let rule = visible_rule(&mut tx, access, path.rule_id).await?;
-    member_only(access)?;
-    may_teach(&mut tx, access, rule.inbox).await?;
+    let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
+    may_teach(&state, &mut tx, access, rule.inbox).await?;
+    member_only(&workspace.principal)?;
     if rule.state != RuleState::Proposed {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
@@ -868,7 +880,7 @@ pub struct UpdateRule {
     security(("bearer" = ["conversations:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.rule"])))),
+        .records(["conversations.rule"]).access("conversations.rule", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("rule_id" = RuleId, Path, description = "The rule."),
@@ -894,7 +906,13 @@ pub async fn update(
 ) -> Result<Json<RuleView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let rule = changeable_rule(&mut tx, access, path.rule_id).await?;
+    let rule = changeable_rule(
+        &state,
+        &mut tx,
+        (&workspace.principal, access),
+        path.rule_id,
+    )
+    .await?;
     if body.paused.is_some() && rule.state == RuleState::Proposed {
         // A proposed rule acts only once someone says yes (`confirm_rule`).
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_active")));
@@ -970,7 +988,7 @@ pub struct RemoveQuery {
     security(("bearer" = ["conversations:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .assistant()
-        .records(["conversations.rule", "conversations.conversation"])))),
+        .records(["conversations.rule", "conversations.conversation"]).access("conversations.rule", campbooks_kernel::authz::Action::Delete)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("rule_id" = RuleId, Path, description = "The rule."),
@@ -996,17 +1014,26 @@ pub async fn remove(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     // A proposed rule can be turned down by anyone who may teach there.
-    let rule = match visible_rule(&mut tx, access, path.rule_id).await? {
-        r if r.state == RuleState::Proposed => {
-            member_only(access)?;
-            may_teach(&mut tx, access, r.inbox).await?;
-            r
-        }
-        _ => changeable_rule(&mut tx, access, path.rule_id).await?,
-    };
+    // Any other is removed by its author or a manager (the catalogue's
+    // `delete` on the rule), in a kept read-only inbox too.
+    let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
+    if rule.state == RuleState::Proposed {
+        may_teach(&state, &mut tx, access, rule.inbox).await?;
+    } else {
+        campbooks_kernel::authz::require(
+            &state,
+            &mut tx,
+            access,
+            Action::Delete,
+            &resources::rule(rule.id),
+            || Error::Denied(crate::MESSAGES.reason("rule_not_yours")),
+        )
+        .await?;
+    }
+    member_only(&workspace.principal)?;
     sqlx::query!(
         r#"UPDATE conversations.rules
-              SET state = 'removed', removed_at = now(), updated_at = now()
+              SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()
             WHERE id = $1"#,
         rule.id as RuleId,
     )
@@ -1041,6 +1068,149 @@ pub async fn remove(
     Ok(Json(view))
 }
 
+// --- Restore -----------------------------------------------------------------
+
+/// How long after a removal Undo may bring a rule back, in minutes.
+pub const RESTORE_MINUTES: i32 = 15;
+
+/// How to bring a removed rule back.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
+#[serde(deny_unknown_fields)]
+pub struct RestoreRule {
+    /// Apply it again to the mail already in the inbox (after its mail was
+    /// put back). Default false.
+    #[serde(default)]
+    pub apply_to_existing: bool,
+}
+
+/// Bring back a rule removed in the last 15 minutes, as it was (Undo).
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/rules/{rule_id}/restore",
+    operation_id = "conversations.restore_rule",
+    tag = "conversations",
+    security(("bearer" = ["conversations:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
+        .undo("conversations.remove_rule")
+        .assistant()
+        .records(["conversations.rule", "conversations.conversation"])
+        .access("conversations.rule", campbooks_kernel::authz::Action::Write)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("rule_id" = RuleId, Path, description = "The rule."),
+    ),
+    request_body = RestoreRule,
+    responses(
+        (status = OK, description = "The rule, back as it was.", body = RuleView),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or not your rule.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It is not removed, or was removed too long ago.",
+            body = Problem, content_type = "application/problem+json"),
+    )
+)]
+pub async fn restore(
+    State(state): State<AppState>,
+    workspace: Workspace<ConversationsWrite>,
+    extract::Path(path): extract::Path<RulePath>,
+    extract::Json(body): extract::Json<RestoreRule>,
+) -> Result<Json<RuleView>> {
+    let access = &workspace.access;
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &resources::rule(path.rule_id),
+    )
+    .await?;
+    let found = sqlx::query!(
+        r#"SELECT removed_from,
+                  (state = 'removed' AND removed_at > now() - make_interval(mins => $2))
+                      AS "restorable!"
+             FROM conversations.rules WHERE id = $1 FOR UPDATE"#,
+        path.rule_id as RuleId,
+        RESTORE_MINUTES,
+    )
+    .fetch_optional(&mut *tx)
+    .await?
+    .ok_or(Error::NotFound)?;
+    let back: RuleState = found.removed_from.as_deref().unwrap_or("active").parse()?;
+    let rule = rules::find_any(&mut tx, path.rule_id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    // Who may remove it may bring it back.
+    may_teach(&state, &mut tx, access, rule.inbox).await?;
+    member_only(&workspace.principal)?;
+    if back != RuleState::Proposed
+        && !rules::may_change(
+            rules::role_in(&mut tx, rule.inbox, access.user).await?,
+            access.user,
+            rule.taught_by,
+        )
+    {
+        return Err(Error::Denied(crate::MESSAGES.reason("rule_not_yours")));
+    }
+    if !found.restorable {
+        return Err(Error::Conflict(
+            crate::MESSAGES.reason("rule_not_restorable"),
+        ));
+    }
+    // The run putting its mail back stops where it is.
+    sqlx::query!(
+        r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
+            WHERE rule_id = $1 AND state = 'running'"#,
+        rule.id as RuleId,
+    )
+    .execute(&mut *tx)
+    .await?;
+    if back == RuleState::Active {
+        replace(
+            &mut tx,
+            &state,
+            access,
+            rule.inbox,
+            (&rule.conditions, &rule.actions),
+            Some(rule.id),
+        )
+        .await?;
+    }
+    sqlx::query!(
+        r#"UPDATE conversations.rules
+              SET state = $2, removed_at = NULL, removed_from = NULL, updated_at = now()
+            WHERE id = $1"#,
+        rule.id as RuleId,
+        back.as_str(),
+    )
+    .execute(&mut *tx)
+    .await?;
+    let rule = rules::find(&mut tx, rule.id)
+        .await?
+        .ok_or(Error::NotFound)?;
+    let ws = access.workspace.to_string();
+    if back == RuleState::Active && body.apply_to_existing {
+        rule_runs::start(&mut tx, &state.events, &ws, &rule, RunKind::Apply).await?;
+    } else {
+        rule_runs::announce(
+            &mut tx,
+            &state.events,
+            &ws,
+            rule.inbox,
+            rule.id,
+            rule.effective_state(),
+            None,
+        )
+        .await?;
+    }
+    let view = view(&mut tx, access, &rule).await?;
+    tx.commit().await?;
+    Ok(Json(view))
+}
+
 // --- Read --------------------------------------------------------------------
 
 /// Which rules to list.
@@ -1065,7 +1235,7 @@ pub struct RuleList {
     operation_id = "conversations.list_rules",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"]).access("conversations.rule", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListRulesQuery),
     responses(
         (status = OK, description = "The rules.", body = RuleList),
@@ -1083,6 +1253,7 @@ pub async fn list(
     extract::Query(query): extract::Query<ListRulesQuery>,
 ) -> Result<Json<RuleList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, RULE_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
     if let Some(inbox) = query.inbox {
@@ -1106,7 +1277,7 @@ pub async fn list(
     operation_id = "conversations.get_rule",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule"]).access("conversations.rule", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("rule_id" = RuleId, Path, description = "The rule."),
@@ -1130,15 +1301,17 @@ pub async fn get(
     let mut tx = state.db.begin_for(access.workspace).await?;
     // A removed rule stays readable, so the run putting its mail back can be
     // followed.
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &resources::rule(path.rule_id),
+    )
+    .await?;
     let rule = rules::find_any(&mut tx, path.rule_id)
         .await?
         .ok_or(Error::NotFound)?;
-    if !visible_inboxes(&mut tx, access)
-        .await?
-        .contains(&rule.inbox)
-    {
-        return Err(Error::NotFound);
-    }
     let view = view(&mut tx, access, &rule).await?;
     tx.commit().await?;
     Ok(Json(view))

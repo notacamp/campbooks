@@ -33,6 +33,30 @@ pub const NAME: &str = "system";
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
 /// The system module composed with nothing (for catalogues and tests).
+/// The module's part of the access catalogue (ADR 0017).
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 2] = {
+    use campbooks_kernel::authz::{Action, Grant, Grantee, ResourceType, Tenancy};
+    [
+        ResourceType {
+            grants: &[Grant::new(Grantee::Anyone, &[Action::Read])],
+            ..ResourceType::new(
+                "system.instance",
+                "The instance's health and version: public.",
+                Tenancy::Public,
+            )
+        },
+        ResourceType {
+            grants: &[Grant::new(Grantee::InstanceAdmins, &[Action::Read])],
+            ..ResourceType::new(
+                "system.admin_overview",
+                "The instance's configuration and health as administrators see it (the admin \
+                 API, `Admin<P>`): never workspace content.",
+                Tenancy::Instance,
+            )
+        },
+    ]
+};
+
 pub fn module() -> Module {
     module_with(Deps::default())
 }
@@ -56,6 +80,7 @@ pub fn module_with(deps: Deps) -> Module {
                 .layer(Extension(deps)),
         ),
         background: Background::new(),
+        resources: campbooks_kernel::authz::Resources::declared(&RESOURCES),
     }
 }
 
