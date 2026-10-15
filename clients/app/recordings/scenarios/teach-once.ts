@@ -5,15 +5,18 @@ import { pause, type ScenarioContext } from "../context.ts";
 import { caption, signedIn } from "./inbox.ts";
 
 // Teach once (campbooks-cloud#125) on the real stack, as `inbox.ts` runs it,
-// with the fake Google's mailbox holding 24 more Design Notes digests:
+// with the fake Google's mailbox holding 600 more Design Notes digests, so the
+// rule's run takes long enough to watch:
 //
-//   pnpm --dir clients fake-google --port 9071 --lookalikes 24
+//   pnpm --dir clients fake-google --port 9071 --lookalikes 600
 //   (the server, worker and Vite as in inbox.ts)
 //   INBOX_BASE_URL=http://localhost:5181 pnpm --dir clients record teach-once --base-url http://localhost:5181
 //
 // Moving one digest to Newsletters offers to move every one like it, and
-// new ones too; accepting makes a rule whose run moves them. Fictional mail
-// and person only.
+// new ones too; accepting makes a rule whose run moves them, with progress.
+// Undo all puts them back; Undo brings the rule back; rows say what it did,
+// and the rule can be stopped from any of them. Fictional mail and person
+// only.
 
 function isPhone(page: Page): boolean {
   return (page.viewportSize()?.width ?? 1440) < 768;
@@ -56,10 +59,26 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
   await (phone
     ? offer.getByRole("button", { name: /Move all/u }).click()
     : page.keyboard.press("1"));
+  // The run counts, then works through them: a bar says how far.
+  await page
+    .getByRole("dialog", { name: /^Moving [\d,]+ to Newsletters/u })
+    .waitFor({ timeout: 120_000 });
+  await caption(page, "It works in the background, and says how far it has got", 2400);
   await page
     .getByRole("dialog", { name: /New ones will go there too/u })
-    .waitFor({ timeout: 60_000 });
-  await caption(page, "A rule moved them in the background, and will move new ones", 2600);
+    .waitFor({ timeout: 180_000 });
+  await caption(page, "Done: a rule moved them, and will move new ones", 2200);
+
+  await caption(page, "Changed your mind? Undo all puts every one back", 1800);
+  await page.getByRole("button", { name: "Undo all" }).click();
+  await page
+    .getByRole("dialog", { name: /back\. The rule is removed\./u })
+    .waitFor({ timeout: 180_000 });
+  await caption(page, "Every one is back in Primary, and the rule is gone", 2400);
+
+  await caption(page, "Undo (Z) brings the same rule back, and applies it again", 2000);
+  await page.keyboard.press("z");
+  await pause(1500);
 
   await page.goto(`/w/${workspace}/inbox/newsletters`);
   await page.getByRole("heading", { level: 1, name: "Newsletters" }).waitFor();
