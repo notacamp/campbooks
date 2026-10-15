@@ -82,6 +82,10 @@
       "suspended": {
         "title": "This account is suspended.",
         "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
+      },
+      "not_allowed": {
+        "title": "This Campbooks isn’t open to this address.",
+        "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
       }
     }
   },
@@ -117,6 +121,10 @@
     "account_suspended": {
       "title": "This account is suspended.",
       "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
+    },
+    "sign_in_not_allowed": {
+      "title": "This Campbooks isn’t open to this address.",
+      "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
     }
   },
   "newAccount": {
@@ -280,6 +288,10 @@
       "unknown": {
         "title": "Something went wrong.",
         "lead": "Nothing changed. Try again."
+      },
+      "sign_in_not_allowed": {
+        "title": "This Campbooks isn’t open to this address.",
+        "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
       }
     },
     "new": "New",

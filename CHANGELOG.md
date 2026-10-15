@@ -8,6 +8,17 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **An allow-list for who may sign in (`CAMPBOOKS_SIGNUP__ALLOWED`).** A comma-separated
+  list of addresses and domains (a domain matches `*@domain` exactly, not subdomains).
+  Unset or empty changes nothing. When set, only listed people can sign in or create an
+  account, existing accounts included, and an invitation does not bypass it. It is checked
+  at the provider sign-in (the provider-verified address), when a new account is created,
+  when a way in is added, at passkey sign-in (the account needs a listed, verified address;
+  a passkey cannot create an account) and at every token exchange, so removing someone
+  cuts their access at their next refresh. Refusals land on `/sign-in?error=sign_in_not_allowed`
+  (or 403 `sign_in_not_allowed`), in all four languages, and say nothing about whether an
+  account exists.
+
 - **Only the member who connected a mailbox can disconnect it.** Workspace owners and
   admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
 - **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
