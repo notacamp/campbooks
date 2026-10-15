@@ -735,12 +735,10 @@ impl DomainEvent for RuleChanged {
     }
 
     fn changes(&self) -> Vec<FeedChange> {
+        // An upsert even once removed: a removed rule stays readable (and
+        // its revert run followed) until it is purged with its inbox, so
+        // clients refetch it rather than forget it.
         let record = RecordRef::new(RULE_RECORD, &self.rule);
-        let change = if self.state == RuleState::Removed {
-            FeedChange::delete(record)
-        } else {
-            FeedChange::upsert(record)
-        };
-        vec![change.within(inbox_record(self.inbox))]
+        vec![FeedChange::upsert(record).within(inbox_record(self.inbox))]
     }
 }
