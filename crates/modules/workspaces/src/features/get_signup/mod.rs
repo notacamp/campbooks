@@ -41,7 +41,7 @@ pub struct SignupStatus {
     operation_id = "workspaces.get_signup",
     tag = "workspaces",
     security(("bearer" = ["workspaces:read"])),
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    extensions(("x-campbooks" = json!(Operation::query().access("workspaces.account", campbooks_kernel::authz::Action::Read)))),
     responses(
         (status = OK, description = "The policy and the caller's request.", body = SignupStatus),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
@@ -54,6 +54,13 @@ pub async fn handler(
     State(state): State<AppState>,
     Scoped { principal, .. }: Scoped<WorkspacesRead>,
 ) -> Result<Json<SignupStatus>> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Read,
+        crate::domain::resources::ACCOUNT_RECORD,
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     execute(&state, &principal).await.map(Json)
 }
 

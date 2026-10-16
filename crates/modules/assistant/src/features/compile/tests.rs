@@ -267,8 +267,8 @@ async fn no_model_means_the_builder(db: PgPool) {
             json!({ "text": "newsletters never need me" }),
         )
         .await;
-    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(response.json["code"], "ai_role_not_configured");
+    assert_eq!(response.status, StatusCode::CONFLICT);
+    assert_eq!(response.json["code"], "compile_unavailable");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -290,8 +290,8 @@ async fn an_external_model_without_the_opt_in_gets_nothing(db: PgPool) {
             json!({ "text": "newsletters never need me" }),
         )
         .await;
-    assert_eq!(response.status, StatusCode::SERVICE_UNAVAILABLE);
-    assert_eq!(response.json["code"], "ai_external_content_refused");
+    assert_eq!(response.status, StatusCode::CONFLICT);
+    assert_eq!(response.json["code"], "compile_unavailable");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

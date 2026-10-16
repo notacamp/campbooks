@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.rule_dismissals WHERE user_id = $1 AND dismissed_at <= $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2da881e12fc27f0808ac77416eb955c9fc0ed9b38acf4da06f8a82af72f9259f"
+}

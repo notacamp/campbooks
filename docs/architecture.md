@@ -178,6 +178,39 @@ pass it, and two tabs can work in two workspaces. Every operation's OpenAPI
 catalogue the IdP mirrors. Module tests sign their own tokens with
 `kernel::testing::TestIdp`.
 
+### Ownership and access (ADR 0017)
+
+Who may do what is declared once and checked in one place. Each module
+lists its resource types in `Module.resources` (`kernel::authz::ResourceType`),
+and each type declares:
+
+- its tenancy;
+- its owner: the member who created or connected it, the workspace's
+  owners, the account, or nobody;
+- the actions its owner takes: `read`, `write`, `delete`, `send`, `share`,
+  `disconnect`, `create`;
+- its sharing: grants to a workspace role, to a role in its container (an
+  inbox's `reader` < `sender` < `manager`), to client tokens (always an
+  explicit, narrower grant), or to anyone (public types).
+
+The module also implements `ResourceFacts`. It answers, in the caller's
+workspace transaction, whether one instance exists, who owns it, its
+container, the caller's role there, and whether it is kept read-only.
+
+Every handler then asks `authz::require(&state, &mut tx, &access, Action::Write, &resource, || reason)`
+(or `require_type` for lists and creations, `require_account` for a
+person's own records). The kernel answers from the catalogue and the facts.
+It is deny by default: anyone who may not read a resource gets the same
+404 as for one that does not exist, and 403 means "you see it, but may not
+do that". Workspace owners and admins get nothing inside an inbox they are
+not in. Row-level security (above) remains the second layer, now also on
+the kernel's own tables. Every operation declares `x-campbooks.access =
+{resource, action}`. `cargo xtask arch` fails an undeclared operation, a
+handler that never asks, module code querying workspace tables outside a
+workspace transaction, and an event nobody consumes without a stated reason.
+The server's access matrix tests check every resource type × caller ×
+action and every operation × caller.
+
 ### Operations: the catalogue (ADR 0013)
 
 The generated OpenAPI document is the one list of what Campbooks can do.
@@ -508,7 +541,7 @@ document, `openapi/admin.json`, never merged into `openapi/openapi.json`, so
 them. Each handler takes `kernel::admin::Admin<P>`: a user's bearer token
 with the `admin:access` scope (which the built-in issuer grants to
 first-party clients only) and a profile allowing `P`, else **404** like an
-unknown route; then a sign-in at most 12 hours old (`auth_time`), else 401
+unknown route; then a sign-in at most an hour old (`auth_time`), else 401
 `admin_reauth_required`. The `kernel::admin::audit` middleware records every
 request that passed the profile check. The web app reaches the admin API
 through `/bff/admin/*`, like `/bff/api/*`; its Admin section lives in

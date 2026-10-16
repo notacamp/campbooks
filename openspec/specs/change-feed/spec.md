@@ -85,7 +85,12 @@ current head, after which the stream continues from it.
 The stream SHALL send a heartbeat at a configured interval while idle, and
 SHALL end cleanly with a `closing` frame after a configured maximum
 connection time, never later than the caller's access token expires, so the
-client reconnects with its cursor and is authorized again.
+client reconnects with its cursor and is authorized again. Whenever the
+stream resolves the caller's membership again (at least once a heartbeat
+interval, busy or idle), it SHALL also ask whether the caller's token still
+stands (the API's token-revocation check); when it no longer does (the
+account was suspended or signed out everywhere), the stream SHALL send
+`revoked` and end, and reconnecting with that token SHALL answer 401.
 
 #### Scenario: Idle stream
 - **WHEN** no change is recorded for longer than the heartbeat interval
@@ -94,6 +99,10 @@ client reconnects with its cursor and is authorized again.
 #### Scenario: Token about to expire
 - **WHEN** the caller's access token expires before the maximum connection time
 - **THEN** the stream sends `closing` and ends no later than the expiry
+
+#### Scenario: The caller's tokens are revoked
+- **WHEN** the account of a person following a workspace's changes is suspended or signs out everywhere while the stream is open
+- **THEN** within one heartbeat interval the stream sends `revoked` and ends, and opening it again with the same token answers 401
 
 ### Requirement: Access filtering
 The stream SHALL deliver a change only if the caller holds a scope of at
@@ -154,3 +163,32 @@ the workspace on `reset`, and stop on `revoked` or 404.
 #### Scenario: Member list refreshes
 - **WHEN** the app has `workspaces.list_members` cached and a `workspaces.member` change arrives
 - **THEN** that query is invalidated and refetched, and unrelated queries are not
+
+### Requirement: Access is asked again on every page
+An open stream SHALL decide container visibility afresh for every page of
+changes it reads, never from an earlier page. It SHALL resolve the caller's
+membership before showing a page that changes who belongs to the
+workspace. When a container whose changes it has shown is no longer
+visible, it SHALL send `reset` with reason `access_changed` (the client
+drops what it cached and refetches) and show nothing more from that
+container. Every heartbeat SHALL ask again too.
+
+#### Scenario: Taken out of an inbox
+- **WHEN** a member following the feed is removed from an inbox and new mail arrives in it
+- **THEN** they receive `reset` (`access_changed`) and no id of the new mail
+
+#### Scenario: Removed from the workspace
+- **WHEN** a member following the feed is removed from the workspace
+- **THEN** the stream sends `revoked` and ends, without the change that removed them
+
+### Requirement: Private records reach their audience only
+A change MAY name an audience: one user, one user and the workspace's
+owners, admins and client tokens, or client tokens only. A stream SHALL show
+such a change only to that audience. Draft changes SHALL reach only their
+author (or client tokens, for a draft a client wrote). Connection changes
+SHALL reach only the member who connected it, owners, admins and client
+tokens.
+
+#### Scenario: Another member's draft
+- **WHEN** a sender of an inbox sends a draft
+- **THEN** the inbox's other members and the workspace's admins do not receive its change

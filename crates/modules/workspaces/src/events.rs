@@ -91,11 +91,33 @@ pub struct MemberLeft {
     pub user: UserId,
     /// Who removed them; `None` when they left.
     pub removed_by: Option<UserId>,
+    /// What becomes of the mail of the mailboxes they connected: deleted
+    /// (always when they leave), or kept read-only when the owner or admin
+    /// removing them chose so.
+    #[serde(default)]
+    pub mail: MailChoice,
+    /// Their identity subject (an opaque account id), so the issuer can
+    /// remove the clients they registered in the workspace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+}
+
+/// What becomes of a departing member's mail (campbooks-cloud#117).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete it with their connections (the default).
+    #[default]
+    Delete,
+    /// Keep it as read-only history for the workspace.
+    Keep,
 }
 
 impl DomainEvent for MemberLeft {
     const NAME: &'static str = "workspaces.member_left";
     const VERSION: u16 = 1;
+    /// Rejoining waits for every module to have handled the departure.
+    const SETTLES: bool = true;
 
     fn workspace(&self) -> Option<&str> {
         Some(&self.workspace)

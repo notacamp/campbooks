@@ -36,6 +36,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -70,6 +74,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -104,6 +112,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -138,6 +150,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.discovery"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -203,6 +219,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.consent"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -275,6 +295,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.consent"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -342,6 +366,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -414,6 +442,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -521,6 +553,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -588,6 +624,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -673,6 +713,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -712,7 +756,7 @@
             }
           },
           "403": {
-            "description": "The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`).",
+            "description": "The token lacks `identity:write`, or the sign-in is more than five minutes old (`fresh_sign_in_required`: sign in again at `/bff/login?max_age=0`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -750,6 +794,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -832,6 +880,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -929,6 +981,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.passkey"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -936,6 +992,71 @@
             "identity.passkey"
           ],
           "risk": "low"
+        }
+      }
+    },
+    "/api/v1/identity/sign-out-everywhere": {
+      "post": {
+        "tags": [
+          "identity"
+        ],
+        "summary": "Sign out everywhere.",
+        "operationId": "identity.sign_out_everywhere",
+        "responses": {
+          "204": {
+            "description": "Every session and refresh token of the account ended, this one's included: sign in again."
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The token lacks `identity:write`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Another identity provider serves this instance, or the token is bound to a workspace.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "identity:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
+          "assistant": false,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "identity.session",
+            "identity.refresh_family"
+          ],
+          "risk": "high"
         }
       }
     },
@@ -996,6 +1117,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1078,6 +1203,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.provider_identity"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1135,6 +1264,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.account"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1176,6 +1309,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "system.instance"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1207,6 +1344,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "system.instance"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1283,6 +1424,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.workspace"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1359,6 +1504,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.workspace"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1455,6 +1604,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.workspace"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1544,6 +1697,16 @@
               }
             }
           },
+          "409": {
+            "description": "No language model may read sentences here (`compile_unavailable`): build the rule by hand.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many sentences this hour.",
             "content": {
@@ -1555,7 +1718,7 @@
             }
           },
           "503": {
-            "description": "No language model may read sentences here (`ai_role_not_configured`, `ai_external_content_refused`), or it failed (`compile_failed`).",
+            "description": "The language model failed (`compile_failed`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -1573,6 +1736,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.profile"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1651,6 +1818,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "assistant.profile"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -1747,6 +1918,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "assistant.profile"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -1859,6 +2034,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "attention.item"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -1966,6 +2145,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "attention.item"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2054,6 +2237,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "attention.item"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2164,6 +2351,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "changes.feed"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -2240,6 +2431,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -2348,6 +2543,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "connectors.connection"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -2435,6 +2634,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -2468,6 +2671,20 @@
             "schema": {
               "$ref": "#/components/schemas/ConnectionId"
             }
+          },
+          {
+            "name": "mail",
+            "in": "query",
+            "description": "`delete` (the default): the inboxes it fed are deleted, with their\nmessages, conversations, drafts, decisions, search entries and\nfiles. `keep`: they stay as read-only history, no longer synced.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What becomes of the mail a connection brought in when it is removed\n(the owner's decision, campbooks-cloud#117): deleted with it (the\ndefault), or kept as read-only history. Only the member who connected\nit chooses when disconnecting; an owner or admin chooses when removing\nthat member.",
+              "enum": [
+                "delete",
+                "keep"
+              ]
+            }
           }
         ],
         "responses": {
@@ -2485,7 +2702,7 @@
             }
           },
           "403": {
-            "description": "Missing scope, or a client token (`connection_needs_user`).",
+            "description": "Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -2513,6 +2730,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "disconnect",
+            "resource": "connectors.connection"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -2610,6 +2831,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "connectors.connection"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -2754,11 +2979,16 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
           "records": [
-            "conversations.conversation"
+            "conversations.conversation",
+            "conversations.rule"
           ],
           "risk": "low"
         }
@@ -2841,12 +3071,17 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
           "records": [
             "conversations.conversation",
-            "conversations.message"
+            "conversations.message",
+            "conversations.rule"
           ],
           "risk": "low"
         }
@@ -2929,6 +3164,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3037,6 +3276,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3128,6 +3371,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3244,6 +3491,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.attachment"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -3349,6 +3600,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.message"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -3466,6 +3721,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3565,6 +3824,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3683,6 +3946,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -3772,6 +4039,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -3895,6 +4166,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -3986,6 +4261,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -4073,6 +4352,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -4181,6 +4464,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -4269,6 +4556,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -4357,6 +4648,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -4445,6 +4740,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -4533,6 +4832,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4629,6 +4932,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -4717,6 +5024,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -4805,6 +5116,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -4920,6 +5235,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -5017,6 +5336,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -5134,6 +5457,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "send",
+            "resource": "conversations.draft"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -5213,6 +5540,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.client"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -5261,7 +5592,7 @@
             }
           },
           "400": {
-            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.",
+            "description": "A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5309,6 +5640,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "identity.client"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5389,6 +5724,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.client"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5486,6 +5825,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.client"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5585,6 +5928,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.held_grant"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -5663,6 +6010,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -5770,6 +6121,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": true,
           "mutates": true,
@@ -5879,6 +6234,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -5958,6 +6317,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.invitation"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -6064,6 +6427,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.invitation"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6142,6 +6509,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -6220,6 +6591,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.member"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -6254,6 +6629,20 @@
             "required": true,
             "schema": {
               "$ref": "#/components/schemas/UserId"
+            }
+          },
+          {
+            "name": "mail",
+            "in": "query",
+            "description": "`delete` (the default): the mailboxes they connected are\ndisconnected and their mail deleted. `keep`: their mail stays as\nread-only history, no longer synced.",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "What becomes of a departing member's mail (campbooks-cloud#117).",
+              "enum": [
+                "delete",
+                "keep"
+              ]
             }
           }
         ],
@@ -6292,7 +6681,7 @@
             }
           },
           "409": {
-            "description": "`last_owner`: the workspace would have no owner.",
+            "description": "`last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6310,6 +6699,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6425,6 +6818,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6506,6 +6903,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "workspaces.member"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -6593,6 +6994,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.rule"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -6608,7 +7013,7 @@
         "tags": [
           "conversations"
         ],
-        "summary": "Read one taught rule.",
+        "summary": "Read one taught rule (a removed one too, with the run putting its mail\nback).",
         "operationId": "conversations.get_rule",
         "parameters": [
           {
@@ -6632,7 +7037,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The rule.",
+            "description": "The rule, removed or not.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6680,6 +7085,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.rule"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -6774,6 +7183,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "conversations.rule"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -6880,6 +7293,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.rule"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -6987,6 +7404,225 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule",
+            "conversations.conversation"
+          ],
+          "risk": "low",
+          "undo": "conversations.remove_rule"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/decline": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Turn down a proposed rule (\"No\"): like confirming it, anyone who may\nteach in its inbox may, since it does not act yet. Undo with\n`conversations.restore_rule`.",
+        "operationId": "conversations.decline_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rule, turned down (removed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is not waiting for a yes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low",
+          "undo": "conversations.restore_rule"
+        }
+      }
+    },
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/restore": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Bring back a rule removed in the last 15 minutes, as it was (Undo).",
+        "operationId": "conversations.restore_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RestoreRule"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "The rule, back as it was.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or not your rule.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is not removed, or was removed too long ago.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.rule"
+          },
           "assistant": true,
           "automation": false,
           "mutates": true,
@@ -7148,6 +7784,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "search.result"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -7247,6 +7887,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.security_event"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7355,6 +7999,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.inbox"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -7442,6 +8090,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "conversations.conversation"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -7499,6 +8151,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "workspaces.account"
+          },
           "assistant": true,
           "automation": false,
           "mutates": false,
@@ -7574,6 +8230,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.account"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -7654,7 +8314,7 @@
             }
           },
           "409": {
-            "description": "`invitation_used`, `invitation_expired` or `already_a_member`.",
+            "description": "`invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7672,6 +8332,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "workspaces.account"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -7780,6 +8444,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7829,6 +8497,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -7923,6 +8595,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -7960,6 +8636,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -8005,7 +8685,7 @@
             }
           },
           "403": {
-            "description": "`csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept).",
+            "description": "`csrf_check_failed`, `signup_invite_only` (this instance takes invited people only; nothing was kept), or `sign_in_not_allowed` (the address is not on the instance's allow-list; nothing was kept).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8032,6 +8712,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8102,7 +8786,7 @@
             }
           },
           "403": {
-            "description": "`csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), or `account_suspended` (it verified, but an administrator suspended the account).",
+            "description": "`csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), `account_suspended` (it verified, but an administrator suspended the account), or `sign_in_not_allowed` (it verified, but the account has no address on the instance's allow-list).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8139,6 +8823,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8233,6 +8921,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8301,7 +8993,7 @@
             }
           },
           "403": {
-            "description": "`csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`.",
+            "description": "`csrf_check_failed`, `passkey_not_accepted`, `signup_invite_only`, or `sign_in_not_allowed`.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8338,6 +9030,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8407,7 +9103,7 @@
             }
           },
           "403": {
-            "description": "`csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address).",
+            "description": "`csrf_check_failed`, `signup_invite_only` (this instance takes invited people only, and a passkey proves no address), or `sign_in_not_allowed` (the instance has an allow-list, which a passkey cannot meet).",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -8434,6 +9130,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8474,13 +9174,17 @@
             }
           },
           "404": {
-            "description": "No such request (or it expired), or another identity provider serves this instance."
+            "description": "No such request (or it expired, or another browser made it), or another identity provider serves this instance."
           }
         },
         "security": [
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -8580,6 +9284,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -8596,7 +9304,7 @@
           "bff"
         ],
         "summary": "Read from the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_get",
         "parameters": [
           {
@@ -8650,6 +9358,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -8662,7 +9374,7 @@
           "bff"
         ],
         "summary": "PUT to the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_put",
         "parameters": [
           {
@@ -8716,6 +9428,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8728,7 +9444,7 @@
           "bff"
         ],
         "summary": "POST to the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_post",
         "parameters": [
           {
@@ -8782,6 +9498,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8794,7 +9514,7 @@
           "bff"
         ],
         "summary": "DELETE in the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_delete",
         "parameters": [
           {
@@ -8848,6 +9568,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8860,7 +9584,7 @@
           "bff"
         ],
         "summary": "PATCH the admin API as the signed-in administrator.",
-        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 12 hours\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
+        "description": " `/bff/admin/<path>` is `/admin/<path>` (the admin API, ADR 0015) with\n the session's access token attached, exactly like `/bff/api/*`. Its\n answers are the admin API's own: 404 for anyone who is not an\n administrator with the operation's permission, 401\n `admin_reauth_required` when the last sign-in is more than 1 hour\n old (sign in again at `/bff/login?max_age=0`). Without a live session\n the answer is 401 `session_required`. POST, PUT, PATCH and DELETE\n need the `X-Campbooks-CSRF: 1` header from the app's origin.",
         "operationId": "bff.admin_patch",
         "parameters": [
           {
@@ -8914,6 +9638,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -8982,6 +9710,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9048,6 +9780,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9114,6 +9850,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9180,6 +9920,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9246,6 +9990,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.proxy"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9301,6 +10049,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9408,6 +10160,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9481,6 +10237,16 @@
               }
             }
           },
+          "429": {
+            "description": "`rate_limited`: too many sign-ins started from this address.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "503": {
             "description": "`bff_not_configured`, or the identity provider is unreachable.",
             "content": {
@@ -9496,6 +10262,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "bff.login"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9570,6 +10340,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "bff.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9607,6 +10381,10 @@
           }
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "bff.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9751,7 +10529,7 @@
             "description": "Another identity provider serves this instance."
           },
           "429": {
-            "description": "`rate_limited`: too many metadata-document clients looked up from this address.",
+            "description": "`rate_limited`: too many authorization requests, or metadata-document clients looked up, from this address.",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -9765,6 +10543,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.sign_in"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9847,12 +10629,26 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -9904,12 +10700,26 @@
           },
           "404": {
             "description": "Another identity provider serves this instance."
+          },
+          "429": {
+            "description": "`rate_limited`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.session"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -9946,6 +10756,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "read",
+            "resource": "identity.signing_key"
+          },
           "assistant": false,
           "automation": false,
           "mutates": false,
@@ -10005,6 +10819,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "create",
+            "resource": "identity.registration"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -10047,6 +10865,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "delete",
+            "resource": "identity.token"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -10109,6 +10931,10 @@
           {}
         ],
         "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "identity.token"
+          },
           "assistant": false,
           "automation": false,
           "mutates": true,
@@ -10734,6 +11560,7 @@
           "address",
           "address_verified",
           "granted_by",
+          "granted_by_you",
           "capabilities",
           "health",
           "health_changed_at",
@@ -10771,6 +11598,10 @@
           "granted_by": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member who granted it."
+          },
+          "granted_by_you": {
+            "type": "boolean",
+            "description": "The caller granted it (only they may reconnect or disconnect it)."
           },
           "health": {
             "$ref": "#/components/schemas/Health",
@@ -12121,7 +12952,8 @@
           "channel",
           "address",
           "unread_count",
-          "shared"
+          "shared",
+          "read_only"
         ],
         "properties": {
           "address": {
@@ -12143,6 +12975,10 @@
           "id": {
             "$ref": "#/components/schemas/InboxId",
             "description": "The inbox."
+          },
+          "read_only": {
+            "type": "boolean",
+            "description": "Kept as read-only history after its connection was removed: no\nlonger synced, nothing can be written or sent from it."
           },
           "role": {
             "oneOf": [
@@ -12463,7 +13299,8 @@
         "required": [
           "user_id",
           "role",
-          "joined_at"
+          "joined_at",
+          "you"
         ],
         "properties": {
           "display_name": {
@@ -12478,7 +13315,7 @@
               "string",
               "null"
             ],
-            "description": "Their email address, as their identity provider gives it."
+            "description": "Their email address, as their identity provider gives it, when it\nverified it (an unverified address is never shown: anyone can claim\none)."
           },
           "joined_at": {
             "type": "string",
@@ -12492,6 +13329,10 @@
           "user_id": {
             "$ref": "#/components/schemas/UserId",
             "description": "The user."
+          },
+          "you": {
+            "type": "boolean",
+            "description": "It is the caller (by user id, never by email)."
           }
         }
       },
@@ -12946,7 +13787,8 @@
           "id",
           "name",
           "synced",
-          "created_at"
+          "created_at",
+          "signed_up_with"
         ],
         "properties": {
           "created_at": {
@@ -12970,6 +13812,10 @@
           "name": {
             "type": "string",
             "description": "What its owner calls it."
+          },
+          "signed_up_with": {
+            "type": "boolean",
+            "description": "It was made with the account (a passkey-only sign-up), not added\nlater: never shown as a new way in."
           },
           "synced": {
             "type": "boolean",
@@ -13955,6 +14801,17 @@
         },
         "additionalProperties": false
       },
+      "RestoreRule": {
+        "type": "object",
+        "description": "How to bring a removed rule back.",
+        "properties": {
+          "apply_to_existing": {
+            "type": "boolean",
+            "description": "Apply it again to the mail already in the inbox (after its mail was\nput back). Default false."
+          }
+        },
+        "additionalProperties": false
+      },
       "RevokeForm": {
         "type": "object",
         "description": "A revocation request (`application/x-www-form-urlencoded`).",
@@ -14346,7 +15203,8 @@
           "id",
           "actions",
           "conditions",
-          "applied_count"
+          "applied_count",
+          "may_change"
         ],
         "properties": {
           "actions": {
@@ -14372,6 +15230,10 @@
           "id": {
             "$ref": "#/components/schemas/RuleId",
             "description": "The rule."
+          },
+          "may_change": {
+            "type": "boolean",
+            "description": "Whether the caller may stop it (\"Stop doing this\"): its author while a\nsender, or a manager of its inbox, while the inbox is not kept read-only."
           }
         }
       },
@@ -14431,9 +15293,14 @@
           "samples",
           "skipped_suspicious",
           "skipped_member",
-          "overrides"
+          "overrides",
+          "complete"
         ],
         "properties": {
+          "complete": {
+            "type": "boolean",
+            "description": "Whether every conversation of the inbox was looked at; when false the\ncounts are \"at least\" (a very large inbox)."
+          },
           "matching": {
             "type": "integer",
             "format": "int32",
@@ -14729,6 +15596,7 @@
           "kind",
           "state",
           "total",
+          "counted",
           "done",
           "changed",
           "skipped_suspicious",
@@ -14741,6 +15609,10 @@
             "format": "int32",
             "description": "Changed so far.",
             "minimum": 0
+          },
+          "counted": {
+            "type": "boolean",
+            "description": "Whether `total` is final; while false the run is still counting."
           },
           "done": {
             "type": "integer",
@@ -14788,7 +15660,7 @@
           "total": {
             "type": "integer",
             "format": "int32",
-            "description": "Conversations it looks at.",
+            "description": "Conversations it matches (or will put back).",
             "minimum": 0
           }
         }
@@ -15209,6 +16081,13 @@
               "null"
             ],
             "description": "Same-origin path to come back to (default `/`), with `linked=`,\n`connected=` or `link_error=` added."
+          },
+          "sign_in": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "For `connect`: also sign in with the account (default `true`).\n`false` for a shared mailbox (support@): it is connected, never\nadded as a way in. Ignored by the other purposes."
           },
           "workspace_id": {
             "oneOf": [
@@ -15723,9 +16602,18 @@
           "kind",
           "provider",
           "linked_via",
-          "linked_at"
+          "linked_at",
+          "mailboxes",
+          "connections"
         ],
         "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The connections among them that are known (the connectors module's\nids), to tell which mailbox a way in came with."
+          },
           "email": {
             "type": [
               "string",
@@ -15759,6 +16647,12 @@
             "type": "string",
             "description": "`sign_up`, `link` or `connect`."
           },
+          "mailboxes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "For a way in a connect created: how many workspaces its mailbox is\nconnected in. It goes when the last of them is disconnected (unless\nit is the last way in). 0 for any other way in.",
+            "minimum": 0
+          },
           "provider": {
             "type": "string",
             "description": "`google`, `microsoft` or `zoho`."
@@ -15770,7 +16664,8 @@
         "description": "The caller's ways in.",
         "required": [
           "items",
-          "providers"
+          "providers",
+          "mailbox_providers"
         ],
         "properties": {
           "items": {
@@ -15779,6 +16674,13 @@
               "$ref": "#/components/schemas/WayIn"
             },
             "description": "Oldest first."
+          },
+          "mailbox_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers a mailbox can be connected from (`identity.start_link`\nwith `connect`): offered, and with a mail adapter. Same order."
           },
           "providers": {
             "type": "array",

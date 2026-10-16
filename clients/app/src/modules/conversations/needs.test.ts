@@ -34,6 +34,19 @@ describe("needs in words", () => {
     expect(needSentence(t, need(PHISH), "x")).toBe("needs.line.warning");
   });
 
+  it("says a need comes from a rule, never that the sender asked", () => {
+    expect(
+      needSentence(
+        t,
+        { ...need(MARTA), basis: "taught", reason: "do", question: "asks_action" },
+        "Marta Ferreira",
+      ),
+    ).toBe('needs.line.taughtDo{"name":"Marta Ferreira"}');
+    expect(needSentence(t, { ...need(MARTA), basis: "taught" }, "Marta Ferreira")).toBe(
+      'needs.line.taughtReply{"name":"Marta Ferreira"}',
+    );
+  });
+
   it("names a warning's sender by address, not by its display name", () => {
     expect(needSender(need(PHISH), PHISH)).toBe("it-support@at3lier-sol.example");
     expect(needSender(need(MARTA), MARTA)).toBe("Marta Ferreira");

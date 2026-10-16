@@ -9,11 +9,14 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::domain::resources;
+use crate::events::INBOX_RECORD;
 use crate::{
     domain::access::visible_inboxes,
     model::{Channel, InboxId, InboxRole},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
 
 /// An inbox.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -34,6 +37,9 @@ pub struct InboxView {
     /// Whether someone other than the caller holds a role on it (for a
     /// client token: more than one member). Never says who.
     pub shared: bool,
+    /// Kept as read-only history after its connection was removed: no
+    /// longer synced, nothing can be written or sent from it.
+    pub read_only: bool,
 }
 
 /// The inboxes, by address.
@@ -50,7 +56,7 @@ pub struct InboxList {
     operation_id = "conversations.list_inboxes",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"]).access("conversations.inbox", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The inboxes.", body = InboxList),
@@ -67,11 +73,13 @@ pub async fn handler(
     workspace: Workspace<ConversationsRead>,
 ) -> Result<Json<InboxList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, INBOX_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let visible = visible_inboxes(&mut tx, access).await?;
     let rows = sqlx::query!(
         r#"
         SELECT i.id AS "id: InboxId", i.channel, i.address, i.display_name,
+               i.detached_at IS NOT NULL AS "read_only!",
                (SELECT m.role FROM conversations.inbox_members m
                  WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,
                (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c
@@ -101,6 +109,7 @@ pub async fn handler(
                 role: row.role.as_deref().map(str::parse).transpose()?,
                 unread_count: u32::try_from(row.unread_count).unwrap_or_default(),
                 shared: row.shared,
+                read_only: row.read_only,
             })
         })
         .collect::<Result<_>>()?;
@@ -116,7 +125,7 @@ mod tests {
     use crate::{model::InboxRole, testkit::Kit};
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn users_see_their_inboxes_and_clients_see_all(db: PgPool) {
+    async fn users_see_their_inboxes_and_bare_clients_none(db: PgPool) {
         let kit = Kit::new(db).await;
         let (workspace, _, sam) = kit.sams_inbox().await;
         let (ana, ana_id) = kit.member("ana", workspace);
@@ -141,10 +150,10 @@ mod tests {
             "office@example.com"
         );
 
+        // A client acting for no member gets no inbox (ADR 0017): a client
+        // a member registered arrives as that member instead.
         let client = kit.client(workspace, "conversations:read");
-        let all = kit.get(&client, &uri).await;
-        assert_eq!(all.json["inboxes"].as_array().unwrap().len(), 2);
-        assert!(all.json["inboxes"][0]["role"].is_null());
+        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::FORBIDDEN);
 
         let elsewhere = format!("/api/v1/w/{}/inboxes", WorkspaceId::new());
         assert_eq!(

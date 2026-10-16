@@ -127,6 +127,9 @@ pub struct Config {
     #[serde(default)]
     pub changes: ChangesConfig,
 
+    /// The instance's own mail (`CAMPBOOKS_MAIL__*`); none by default.
+    #[serde(default)]
+    pub mail: crate::mail::MailConfig,
     /// The event log (`CAMPBOOKS_EVENTS__*`).
     #[serde(default)]
     pub events: EventsConfig,
@@ -214,7 +217,9 @@ impl Config {
                  (letters, digits, underscores)"
             ));
         }
+        self.signup.allow_list()?;
         self.changes.check()?;
+        self.mail.check()?;
         self.events.check()?;
         self.telemetry.check()
     }
@@ -403,8 +408,9 @@ pub enum SignupPolicy {
     Code,
 }
 
-/// Signup settings (`CAMPBOOKS_SIGNUP__*`). They apply only to a user with no
-/// workspace creating one; the instance's first user is always allowed.
+/// Signup settings (`CAMPBOOKS_SIGNUP__*`). The policy applies only to a user
+/// with no workspace creating one (the instance's first user is always
+/// allowed); `allowed` applies to every sign-in.
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(default)]
 pub struct SignupConfig {
@@ -416,9 +422,19 @@ pub struct SignupConfig {
     /// the legacy path: administrators mint single-use codes in the admin
     /// section, which need no setting.
     pub codes: Option<SecretString>,
+    /// `CAMPBOOKS_SIGNUP__ALLOWED`: comma-separated addresses and domains
+    /// allowed to sign in or create an account at all (see [`AllowList`]).
+    /// Unset or empty means no restriction.
+    pub allowed: Option<String>,
 }
 
 impl SignupConfig {
+    /// The parsed allow-list ([`AllowList::default`], which lets everyone
+    /// in, when unset or blank).
+    pub fn allow_list(&self) -> Result<AllowList, String> {
+        AllowList::parse(self.allowed.as_deref().unwrap_or_default())
+    }
+
     /// The configured codes, trimmed, without empty entries.
     pub fn codes(&self) -> Vec<&str> {
         self.codes
@@ -433,6 +449,107 @@ impl SignupConfig {
             })
             .unwrap_or_default()
     }
+}
+
+/// Who may sign in at all (`CAMPBOOKS_SIGNUP__ALLOWED`): a comma-separated
+/// list where an entry with an `@` is one exact address and any other entry
+/// is a domain matching `*@domain` exactly (no subdomains). Case-insensitive;
+/// entries are trimmed and empty ones ignored. No entries means no
+/// restriction. It applies on top of [`SignupPolicy`] and invitations never
+/// bypass it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AllowList {
+    addresses: Vec<String>,
+    domains: Vec<String>,
+}
+
+impl AllowList {
+    /// Parse `value`; the error names the offending entry's position, not
+    /// its text.
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let mut list = Self::default();
+        for (n, entry) in value
+            .split(',')
+            .map(str::trim)
+            .enumerate()
+            .filter(|(_, e)| !e.is_empty())
+        {
+            let entry = entry.to_lowercase();
+            let bad = |what: &str| {
+                format!(
+                    "CAMPBOOKS_SIGNUP__ALLOWED entry {} is not {what} \
+                     (write one address or one domain per entry)",
+                    n + 1
+                )
+            };
+            if let Some((local, domain)) = entry.split_once('@') {
+                if local.is_empty()
+                    || local.chars().any(|c| c.is_whitespace() || c == '@')
+                    || !is_domain(domain)
+                {
+                    return Err(bad("an address"));
+                }
+                list.addresses.push(entry);
+            } else {
+                if !is_domain(&entry) {
+                    return Err(bad("a domain"));
+                }
+                list.domains.push(entry);
+            }
+        }
+        Ok(list)
+    }
+
+    /// Whether any entry is set, so the list restricts anyone.
+    pub fn is_restricted(&self) -> bool {
+        !self.addresses.is_empty() || !self.domains.is_empty()
+    }
+
+    /// How many entries it holds (for counts in logs, never the values).
+    pub fn len(&self) -> usize {
+        self.addresses.len() + self.domains.len()
+    }
+
+    /// Whether it holds no entries.
+    pub fn is_empty(&self) -> bool {
+        !self.is_restricted()
+    }
+
+    /// Whether `email` may get in. An unrestricted list lets everyone in
+    /// (even no address); a restricted one only a matching address.
+    pub fn permits(&self, email: Option<&str>) -> bool {
+        if !self.is_restricted() {
+            return true;
+        }
+        let Some(email) = email.map(|e| e.trim().to_lowercase()) else {
+            return false;
+        };
+        if self.addresses.contains(&email) {
+            return true;
+        }
+        match email.rsplit_once('@') {
+            Some((local, domain)) if !local.is_empty() => self.domains.iter().any(|d| d == domain),
+            _ => false,
+        }
+    }
+}
+
+/// A plausible DNS name: dot-separated labels of letters, digits and inner
+/// hyphens, at least two labels.
+fn is_domain(value: &str) -> bool {
+    let mut labels = 0;
+    for label in value.split('.') {
+        labels += 1;
+        if label.is_empty()
+            || label.len() > 63
+            || label.starts_with('-')
+            || label.ends_with('-')
+            || !label.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        {
+            return false;
+        }
+    }
+    labels >= 2
 }
 
 fn is_identifier(value: &str) -> bool {
@@ -1302,6 +1419,59 @@ mod tests {
         assert_eq!(config.signup.codes(), ["alpha", "beta"]);
         assert!(config.check().is_ok());
         assert!(!format!("{config:?}").contains("alpha"));
+    }
+
+    #[test]
+    fn the_allow_list_matches_addresses_and_whole_domains_only() {
+        let list = AllowList::parse(" Ana@Example.com, ,example.org ,").unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.permits(Some("ana@example.com")));
+        assert!(list.permits(Some(" ANA@EXAMPLE.COM ")));
+        assert!(!list.permits(Some("bob@example.com")));
+        assert!(list.permits(Some("anyone@example.org")));
+        assert!(list.permits(Some("ANYONE@Example.Org")));
+        assert!(!list.permits(Some("anyone@sub.example.org")));
+        assert!(!list.permits(Some("anyone@notexample.org")));
+        assert!(!list.permits(Some("example.org")));
+        assert!(!list.permits(Some("@example.org")));
+        assert!(!list.permits(None));
+    }
+
+    #[test]
+    fn an_empty_allow_list_restricts_nobody() {
+        for value in ["", "  ", " , ,"] {
+            let list = AllowList::parse(value).unwrap();
+            assert!(!list.is_restricted());
+            assert!(list.permits(Some("anyone@example.com")));
+            assert!(list.permits(None));
+        }
+        assert!(SignupConfig::default().allow_list().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_malformed_allow_list_stops_startup_without_echoing_it() {
+        for value in [
+            "ana@",
+            "@example.com",
+            "a@b@example.com",
+            "localhost",
+            "example..com",
+            "-x.example.com",
+            "exa mple.com",
+            "*.example.com",
+            "ana@example",
+        ] {
+            let err = AllowList::parse(value).unwrap_err();
+            assert!(err.contains("CAMPBOOKS_SIGNUP__ALLOWED"), "{value}: {err}");
+            assert!(!err.contains(value), "{value}: {err}");
+        }
+        let figment =
+            figment(&[("database_url", "postgres://localhost/x")]).merge(Serialized::default(
+                "signup",
+                serde_json::json!({ "allowed": "ok.example.com, nope" }),
+            ));
+        let config = Config::from_figment(&figment).unwrap();
+        assert!(config.check().unwrap_err().contains("entry 2"));
     }
 
     #[test]

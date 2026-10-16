@@ -9,16 +9,18 @@ use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
 use utoipa::ToSchema;
 
-use super::rules::{self, Stored};
+use super::rules::Stored;
 use crate::{
     events::{RuleChanged, RunFacts},
     model::{InboxId, RuleId, RuleRunId, RuleState, RunKind, RunState},
 };
 
-/// Conversations changed per batch (one transaction each).
+/// Most conversations changed per batch (one transaction each).
 pub const BATCH: i64 = 100;
-/// Conversations looked at per batch while counting or applying.
+/// Most conversations an applying batch looks at.
 pub const SCAN: i64 = 500;
+/// Most conversations a counting batch looks at.
+pub const COUNT_WINDOW: i64 = 5_000;
 
 /// A run, as clients show its progress.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -29,8 +31,10 @@ pub struct RunView {
     pub kind: RunKind,
     /// Where it is.
     pub state: RunState,
-    /// Conversations it looks at.
+    /// Conversations it matches (or will put back).
     pub total: u32,
+    /// Whether `total` is final; while false the run is still counting.
+    pub counted: bool,
     /// Looked at so far.
     pub done: u32,
     /// Changed so far.
@@ -49,10 +53,47 @@ fn count(n: i32) -> u32 {
     u32::try_from(n).unwrap_or_default()
 }
 
+/// The newest run of each of `rules` that has had one.
+pub async fn latest_of(
+    conn: &mut PgConnection,
+    rules: &[RuleId],
+) -> Result<std::collections::HashMap<RuleId, RunView>> {
+    let rows = sqlx::query!(
+        r#"SELECT DISTINCT ON (rule_id) rule_id AS "rule: RuleId", id AS "id: RuleRunId", kind,
+                  state, total, counted, done, changed, skipped_suspicious, skipped_member,
+                  started_at, finished_at
+             FROM conversations.rule_runs WHERE rule_id = ANY($1)
+            ORDER BY rule_id, started_at DESC, id DESC"#,
+        rules as &[RuleId],
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter()
+        .map(|r| {
+            Ok((
+                r.rule,
+                RunView {
+                    id: r.id,
+                    kind: r.kind.parse()?,
+                    state: r.state.parse()?,
+                    total: count(r.total),
+                    counted: r.counted,
+                    done: count(r.done),
+                    changed: count(r.changed),
+                    skipped_suspicious: count(r.skipped_suspicious),
+                    skipped_member: count(r.skipped_member),
+                    started_at: r.started_at,
+                    finished_at: r.finished_at,
+                },
+            ))
+        })
+        .collect()
+}
+
 /// The newest run of `rule`, if it has had one.
 pub async fn latest(conn: &mut PgConnection, rule: RuleId) -> Result<Option<RunView>> {
     let row = sqlx::query!(
-        r#"SELECT id AS "id: RuleRunId", kind, state, total, done, changed, skipped_suspicious,
+        r#"SELECT id AS "id: RuleRunId", kind, state, total, counted, done, changed, skipped_suspicious,
                   skipped_member, started_at, finished_at
              FROM conversations.rule_runs WHERE rule_id = $1
             ORDER BY started_at DESC, id DESC LIMIT 1"#,
@@ -66,6 +107,7 @@ pub async fn latest(conn: &mut PgConnection, rule: RuleId) -> Result<Option<RunV
             kind: r.kind.parse()?,
             state: r.state.parse()?,
             total: count(r.total),
+            counted: r.counted,
             done: count(r.done),
             changed: count(r.changed),
             skipped_suspicious: count(r.skipped_suspicious),
@@ -75,22 +117,6 @@ pub async fn latest(conn: &mut PgConnection, rule: RuleId) -> Result<Option<RunV
         })
     })
     .transpose()
-}
-
-/// How many conversations of `rule`'s inbox it matches now.
-pub async fn matching(conn: &mut PgConnection, rule: &Stored) -> Result<u32> {
-    let engine = rule.engine();
-    let mut after = None;
-    let mut n = 0_u32;
-    loop {
-        let page = rules::scan(conn, rule.inbox, &rule.conditions, after, SCAN).await?;
-        n += u32::try_from(page.iter().filter(|c| engine.matches(&c.facts())).count())
-            .unwrap_or_default();
-        if page.len() < usize::try_from(SCAN).unwrap_or(usize::MAX) {
-            return Ok(n);
-        }
-        after = page.last().map(|c| c.id);
-    }
 }
 
 /// Start a `kind` run of `rule` (cancelling one still running), enqueue its
@@ -109,12 +135,11 @@ pub async fn start(
     )
     .execute(&mut **tx)
     .await?;
+    // An apply run counts in its own first batches, never here; a revert's
+    // total is the applications to put back.
     let total = match kind {
-        RunKind::Apply => {
-            rules::fill_templates(tx, rule.inbox).await?;
-            matching(tx, rule).await?
-        }
-        RunKind::Revert => u32::try_from(
+        RunKind::Apply => None,
+        RunKind::Revert => Some(
             sqlx::query_scalar!(
                 r#"SELECT count(*)::int AS "n!" FROM conversations.rule_applications
                     WHERE rule_id = $1 AND reverted_at IS NULL AND excepted_at IS NULL"#,
@@ -122,23 +147,25 @@ pub async fn start(
             )
             .fetch_one(&mut **tx)
             .await?,
-        )
-        .unwrap_or_default(),
+        ),
     };
     let id = RuleRunId::new();
     sqlx::query!(
-        r#"INSERT INTO conversations.rule_runs (id, workspace_id, rule_id, kind, state, total)
-           SELECT $1, workspace_id, id, $3, 'running', $4 FROM conversations.rules WHERE id = $2"#,
+        r#"INSERT INTO conversations.rule_runs
+               (id, workspace_id, rule_id, kind, state, total, counted)
+           SELECT $1, workspace_id, id, $3, 'running', coalesce($4, 0), $4 IS NOT NULL
+             FROM conversations.rules WHERE id = $2"#,
         id as RuleRunId,
         rule.id as RuleId,
         kind.as_str(),
-        i32::try_from(total).unwrap_or(i32::MAX),
+        total,
     )
     .execute(&mut **tx)
     .await?;
     let batch = RunBatch {
         run: id,
         after: None,
+        counting: kind == RunKind::Apply,
     };
     campbooks_kernel::jobs::enqueue_to::<crate::features::apply_rule::ApplyRules>(
         tx,
@@ -191,21 +218,44 @@ pub async fn announce(
     Ok(())
 }
 
-/// One batch of a run: the conversations after `after`.
+/// One batch of a run: the conversations after `after`, counted or changed.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RunBatch {
     /// The run.
     pub run: RuleRunId,
     /// The last conversation of the previous batch; `None` for the first.
     pub after: Option<crate::model::ConversationId>,
+    /// Counting the conversations the rule matches, before changing them.
+    #[serde(default)]
+    pub counting: bool,
 }
 
 impl RunBatch {
     /// One pending job per batch, behind interactive work.
     pub fn options(&self, workspace: &str) -> EnqueueOptions {
         let after = self.after.map_or_else(|| "^".to_owned(), |a| a.to_string());
+        let phase = if self.counting { "count" } else { "apply" };
         EnqueueOptions::for_workspace(workspace.to_owned())
-            .unique(format!("conversations.apply_rule:{}:{after}", self.run))
+            .unique(format!(
+                "conversations.apply_rule:{}:{phase}:{after}",
+                self.run
+            ))
             .priority(-5)
     }
+}
+
+/// Lock `rule`'s running runs, before anything touches the rule row.
+///
+/// Every path that locks a rule's runs and its row takes the runs first: a
+/// batch holds its run row and then counts on the rule row, so taking them
+/// the other way round (remove, restore, replace) would deadlock against it.
+pub async fn lock_running(conn: &mut sqlx::PgConnection, rule: RuleId) -> Result<()> {
+    sqlx::query!(
+        r#"SELECT id FROM conversations.rule_runs
+            WHERE rule_id = $1 AND state = 'running' ORDER BY id FOR UPDATE"#,
+        rule as RuleId,
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(())
 }

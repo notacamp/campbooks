@@ -58,14 +58,15 @@ pub struct RegisteredClient {
     operation_id = "identity.register_client",
     tag = "identity",
     security(("bearer" = ["identity:clients"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.client"]).access("identity.client", campbooks_kernel::authz::Action::Create)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = RegisterClient,
     responses(
         (status = CREATED, description = "Registered; a confidential app's secret is shown this \
             once.", body = RegisteredClient),
         (status = BAD_REQUEST, description = "A bad name, `client_name_reserved` (it reads as \
-            Campbooks), `client_scope_not_allowed` or `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
+            Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), \
+            `client_scope_not_allowed` or `client_needs_redirect`.", body = Problem, content_type = "application/problem+json"),
         (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
             content_type = "application/problem+json"),
         (status = FORBIDDEN, description = "The token lacks `identity:clients`, the caller is not \
@@ -82,7 +83,11 @@ pub async fn handler(
     JsonBody(body): JsonBody<RegisterClient>,
 ) -> Result<(StatusCode, Json<RegisteredClient>)> {
     let (issuer, account) = super::account(&deps, &workspace.principal)?;
-    workspace_clients::require_admin(&workspace.access)?;
+    workspace_clients::require_admin(
+        &state,
+        &workspace.access,
+        campbooks_kernel::authz::Action::Create,
+    )?;
     let now = issuer.now();
     step_up::require_recent(&workspace.principal, now)?;
     let name = client_names::clean(&body.name);
@@ -95,6 +100,11 @@ pub async fn handler(
     }
     if client_names::impersonates_campbooks(&name) {
         return Err(Error::BadRequest(MESSAGES.reason("client_name_reserved")));
+    }
+    if client_names::mixes_scripts(&name) {
+        return Err(Error::BadRequest(
+            MESSAGES.reason("client_name_mixed_scripts"),
+        ));
     }
     let name = name.as_str();
     let mut scopes: Vec<String> = Vec::new();

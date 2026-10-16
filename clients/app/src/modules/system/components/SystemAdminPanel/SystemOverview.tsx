@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-import { Fact, FactList, Heading, Text } from "~/lib/ui";
+import { Fact, FactList, type FactStatus, Heading, Text } from "~/lib/ui";
 
 import type { AdminOverview, AiRoleStatus } from "../../api/admin";
 
@@ -180,18 +181,76 @@ function AiRoleFact({ role }: { role: AiRoleStatus }) {
         ? ""
         : t(`admin.ai.protocol.${role.protocol}`),
   });
-  const status = refused ? "off" : reachable ? "ok" : "problem";
+  const check = refused ? undefined : answersCheck(role, t);
+  const status = roleStatus(refused, reachable, check?.trusted);
+  const facts = [detail, where, check?.detail].filter((part) => part !== undefined);
   return (
-    <Fact
-      label={label}
-      status={status}
-      detail={where === undefined ? detail : `${detail} · ${where}`}
-    >
+    <Fact label={label} status={status} detail={facts.join(" · ")}>
       {refused
         ? t("admin.ai.notSentMail")
         : reachable
-          ? t("admin.ai.answering")
+          ? (check?.headline ?? t("admin.ai.answering"))
           : t("admin.ai.notAnswering")}
     </Fact>
   );
+}
+
+/**
+ * A role's dot: off when it gets no mail or its answers are still being
+ * checked (not used yet), a problem when it does not answer or failed its
+ * answers check, ok otherwise.
+ */
+function roleStatus(
+  refused: boolean,
+  reachable: boolean,
+  trusted: boolean | undefined | null,
+): FactStatus {
+  if (refused || trusted === null) {
+    return "off";
+  }
+  if (!reachable || trusted === false) {
+    return "problem";
+  }
+  return "ok";
+}
+
+/**
+ * The decide role's answers check in words: whether the model got obvious
+ * fictional emails right, and so whether its answers are used.
+ */
+function answersCheck(
+  role: AiRoleStatus,
+  t: TFunction<"system">,
+): { headline: string; detail: string; trusted: boolean | null } | undefined {
+  const check = role.answers_check;
+  if (check === undefined || check === null) {
+    return undefined;
+  }
+  const counts = { right: check.right ?? 0, total: check.total ?? 0 };
+  switch (check.state) {
+    case "pending":
+      return {
+        headline: t("admin.ai.check.pending"),
+        detail: t("admin.ai.check.pendingDetail"),
+        trusted: null,
+      };
+    case "passed":
+      return {
+        headline: t("admin.ai.answering"),
+        detail: t("admin.ai.check.passed", counts),
+        trusted: true,
+      };
+    case "failed":
+      return {
+        headline: t("admin.ai.check.failed"),
+        detail: t("admin.ai.check.failedDetail", counts),
+        trusted: false,
+      };
+    case "unavailable":
+      return {
+        headline: t("admin.ai.check.unavailable"),
+        detail: t("admin.ai.check.unavailableDetail"),
+        trusted: false,
+      };
+  }
 }

@@ -46,6 +46,7 @@ pub fn module(deps: AssistantDeps) -> Module {
         scopes: scopes::ALL,
         router: router().layer(axum::Extension(features::compile::Compiler::new(deps.ai))),
         admin_router: None,
+        resources: domain::resources::resources(),
         background: Background::new()
             .on_event::<features::purge::ScheduleWorkspacePurge>()
             .on_event::<features::purge::ForgetMember>()

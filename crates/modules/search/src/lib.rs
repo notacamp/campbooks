@@ -34,6 +34,32 @@ pub const NAME: &str = "search";
 /// The module's messages (`i18n/<locale>.json`): the reasons of its errors.
 pub static MESSAGES: Catalogue = campbooks_kernel::catalogue!(NAME);
 
+/// The record type of a search result.
+pub const RESULT_RECORD: &str = "search.result";
+
+/// The module's part of the access catalogue (ADR 0017): a result is shown
+/// only from the containers the caller may read (asked from the visibility
+/// port at query time) and of record types they hold a read scope for.
+static RESOURCES: [campbooks_kernel::authz::ResourceType; 1] = {
+    use campbooks_kernel::{
+        authz::{Action, Grant, Grantee, ResourceType, Tenancy},
+        tenancy::Role,
+    };
+    [ResourceType {
+        grants: &[
+            Grant::new(Grantee::WorkspaceRole(Role::Member), &[Action::Read]),
+            Grant::new(Grantee::Clients, &[Action::Read]),
+        ],
+        ..ResourceType::new(
+            RESULT_RECORD,
+            "A search hit. Any member or client token may search; results come only from the \
+             containers (inboxes) they may read, checked at query time, so a workspace admin \
+             finds nothing in an inbox they are not a member of.",
+            Tenancy::Workspace,
+        )
+    }]
+};
+
 /// The `search` module, ready for the server to mount.
 pub fn module() -> Module {
     Module {
@@ -45,9 +71,11 @@ pub fn module() -> Module {
             .on_event::<features::refresh::OnMessageReceived>()
             .on_event::<features::refresh::OnMessageSent>()
             .on_event::<features::refresh::OnConversationChanged>()
+            .on_event::<features::refresh::OnInboxRemoved>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>()
             .job::<features::backfill::Backfill>(),
+        resources: campbooks_kernel::authz::Resources::declared(&RESOURCES),
     }
 }
 

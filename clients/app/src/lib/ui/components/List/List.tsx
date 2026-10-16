@@ -26,12 +26,28 @@ export interface ListRowProps {
   children?: ReactNode | undefined;
   /** Dimmed: something no longer active (an expired invitation). */
   muted?: boolean | undefined;
+  /** The row the page's keys act on (J/K choose it): highlighted, and `aria-current`. */
+  selected?: boolean | undefined;
 }
 
 /** One row of a {@link List}. */
-export function ListRow({ leading, title, badge, meta, trailing, children, muted }: ListRowProps) {
+export function ListRow({
+  leading,
+  title,
+  badge,
+  meta,
+  trailing,
+  children,
+  muted,
+  selected,
+}: ListRowProps) {
   return (
-    <li className={styles["row"]} data-muted={muted === true || undefined}>
+    <li
+      className={styles["row"]}
+      data-muted={muted === true || undefined}
+      data-selected={selected === true || undefined}
+      aria-current={selected === true ? "true" : undefined}
+    >
       <div className={styles["main"]}>
         {leading}
         <div className={styles["text"]}>

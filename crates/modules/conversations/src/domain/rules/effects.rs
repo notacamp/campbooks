@@ -86,20 +86,23 @@ pub async fn place(conn: &mut PgConnection, id: ConversationId, stream: Stream) 
 }
 
 /// Put conversation `id` back in `stream` placed by `source`, if a rule
-/// still holds it there. Returns whether it moved.
+/// still holds it in `moved_to` (the stream the rule put it in; another
+/// rule's later placement is left alone). Returns whether it moved.
 pub async fn unplace(
     conn: &mut PgConnection,
     id: ConversationId,
-    stream: Stream,
-    source: &str,
+    back: (Stream, &str),
+    moved_to: Stream,
 ) -> Result<bool> {
+    let (stream, source) = back;
     let moved = sqlx::query!(
         r#"UPDATE conversations.conversations
               SET stream = $2, stream_source = $3, updated_at = now()
-            WHERE id = $1 AND stream_source = 'taught'"#,
+            WHERE id = $1 AND stream_source = 'taught' AND stream = $4"#,
         id as ConversationId,
         stream.as_str(),
         source,
+        moved_to.as_str(),
     )
     .execute(conn)
     .await?
@@ -243,7 +246,9 @@ pub async fn store_decision(
 }
 
 /// Record that `rule` changed conversation `id` (in `run`, or as mail
-/// arrived), keeping what it was before the first time, and count it.
+/// arrived), and count it unless it already held it changed. A
+/// conversation it changed again keeps what it was before the first time,
+/// adds what the rule did since and where it last moved it.
 pub async fn record(
     conn: &mut PgConnection,
     workspace: Uuid,
@@ -252,6 +257,18 @@ pub async fn record(
     before: &super::Before,
 ) -> Result<()> {
     let (id, run) = at;
+    // Counted once per conversation it holds changed: not again when it
+    // changes one it already holds (a new message in it), again after a
+    // revert put it back.
+    let holds = sqlx::query_scalar!(
+        r#"SELECT reverted_at IS NULL AS "holds!" FROM conversations.rule_applications
+            WHERE rule_id = $1 AND conversation_id = $2 FOR UPDATE"#,
+        rule as RuleId,
+        id as ConversationId,
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    .unwrap_or(false);
     sqlx::query!(
         r#"
         INSERT INTO conversations.rule_applications
@@ -261,7 +278,31 @@ pub async fn record(
            SET applied_at = now(), reverted_at = NULL,
                run_id = coalesce(EXCLUDED.run_id, conversations.rule_applications.run_id),
                before = CASE WHEN conversations.rule_applications.reverted_at IS NULL
-                             THEN conversations.rule_applications.before
+                             THEN conversations.rule_applications.before || jsonb_strip_nulls(
+                                 jsonb_build_object(
+                                     'stream', coalesce(
+                                         conversations.rule_applications.before -> 'stream',
+                                         EXCLUDED.before -> 'stream'),
+                                     'moved_to', coalesce(
+                                         EXCLUDED.before -> 'moved_to',
+                                         conversations.rule_applications.before -> 'moved_to'),
+                                     'archived',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'archived')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'archived')::boolean,
+                                                     false),
+                                     'read',
+                                         coalesce((conversations.rule_applications.before
+                                                   ->> 'read')::boolean, false)
+                                         OR coalesce((EXCLUDED.before ->> 'read')::boolean, false),
+                                     'labels', (SELECT jsonb_agg(DISTINCT l) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'labels',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'labels', '[]'::jsonb)) l),
+                                     'answered', (SELECT jsonb_agg(DISTINCT q) FROM jsonb_array_elements(
+                                         coalesce(conversations.rule_applications.before -> 'answered',
+                                                  '[]'::jsonb)
+                                         || coalesce(EXCLUDED.before -> 'answered', '[]'::jsonb)) q)))
                              ELSE EXCLUDED.before END
         "#,
         rule as RuleId,
@@ -274,9 +315,11 @@ pub async fn record(
     .await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
-              SET applied_count = applied_count + 1, last_applied_at = now(), updated_at = now()
+              SET applied_count = applied_count + CASE WHEN $2 THEN 0 ELSE 1 END,
+                  last_applied_at = now(), updated_at = now()
             WHERE id = $1"#,
         rule as RuleId,
+        holds,
     )
     .execute(conn)
     .await?;

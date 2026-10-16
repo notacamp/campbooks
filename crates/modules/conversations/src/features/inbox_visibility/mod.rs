@@ -1,7 +1,9 @@
 //! The change feed's `Visibility` port for this module's containers: a
 //! conversation or message change lives within its inbox, and a member sees
-//! it only if they are a member of that inbox (a client token bound to the
-//! workspace sees every inbox, as it does over the API). The same rule lists
+//! it only if they are a member (or the owner) of that inbox: the access
+//! catalogue's `read` on the inbox (`domain::resources`). A client token
+//! arrives as the member who registered it (`tenancy::resolve_access`);
+//! any other client sees no inbox. The same rule lists
 //! the inboxes a caller may search. Registered by the server with
 //! `AppState::with_visibility`.
 
@@ -27,6 +29,12 @@ pub fn visibility() -> VisibilityPort {
 pub struct InboxVisibility;
 
 impl Visibility for InboxVisibility {
+    /// A membership ending, an owner leaving, an inbox kept read-only or
+    /// deleted are announced as changes of the inbox record.
+    fn access_records(&self) -> &'static [&'static str] {
+        &[INBOX_RECORD]
+    }
+
     fn container_visible<'a>(
         &'a self,
         db: &'a PgPool,
@@ -46,22 +54,17 @@ impl Visibility for InboxVisibility {
                 Some(user) => {
                     sqlx::query_scalar!(
                         r#"SELECT EXISTS (SELECT 1 FROM conversations.inbox_members
-                                           WHERE inbox_id = $1 AND user_id = $2) AS "visible!""#,
+                                           WHERE inbox_id = $1 AND user_id = $2)
+                               OR EXISTS (SELECT 1 FROM conversations.inboxes
+                                           WHERE id = $1 AND owner = $2) AS "visible!""#,
                         inbox as InboxId,
                         user.as_uuid(),
                     )
                     .fetch_one(&mut *tx)
                     .await?
                 }
-                None => {
-                    sqlx::query_scalar!(
-                        r#"SELECT EXISTS (SELECT 1 FROM conversations.inboxes
-                                           WHERE id = $1) AS "visible!""#,
-                        inbox as InboxId,
-                    )
-                    .fetch_one(&mut *tx)
-                    .await?
-                }
+                // A client acting for nobody sees no inbox.
+                None => false,
             };
             tx.commit().await?;
             Ok(visible)
@@ -106,7 +109,7 @@ mod tests {
     use campbooks_kernel::changes::Visibility as _;
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn inbox_members_and_clients_see_changes_inside_an_inbox(db: PgPool) {
+    async fn inbox_members_see_changes_inside_an_inbox_and_bare_clients_do_not(db: PgPool) {
         let kit = Kit::new(db).await;
         let workspace = WorkspaceId::new();
         let sam = UserId::new();
@@ -128,7 +131,7 @@ mod tests {
         };
         assert!(visible(access(Some(sam)), container.clone()).await);
         assert!(!visible(access(Some(UserId::new())), container.clone()).await);
-        assert!(visible(access(None), container.clone()).await);
+        assert!(!visible(access(None), container.clone()).await);
         assert!(!visible(access(None), RecordRef::new(INBOX_RECORD, &InboxId::new())).await);
         assert!(
             !visible(
@@ -173,9 +176,9 @@ mod tests {
         let mut sams = vec![first.to_string(), second.to_string()];
         sams.sort();
         assert_eq!(list(Some(sam)).await, sams);
-        let mut all = vec![first.to_string(), second.to_string(), other.to_string()];
-        all.sort();
-        assert_eq!(list(None).await, all);
+        // A client acting for nobody lists none (`other` is nobody's).
+        let _ = other;
+        assert_eq!(list(None).await, Vec::<String>::new());
         let pool = kit.state.db.clone();
         let access = Access {
             workspace,

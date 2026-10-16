@@ -27,6 +27,8 @@ use futures_util::StreamExt as _;
 use serde::Deserialize;
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::features::apply_changes::ATTACHMENT_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -38,6 +40,8 @@ use crate::{
     model::{AttachmentId, ConversationId, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::RecordRef;
+use campbooks_kernel::authz::Action;
 
 /// The policy of every attachment response: if a browser ever shows one as
 /// a document, it has an opaque origin, runs nothing, loads nothing, cannot
@@ -73,7 +77,7 @@ pub struct AttachmentQuery {
     operation_id = "conversations.get_attachment",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["conversations.message"]).access("conversations.attachment", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -100,6 +104,14 @@ pub async fn handler(
 ) -> Result<Response> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(ATTACHMENT_RECORD, &path.attachment),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let row = sqlx::query!(
         r#"SELECT a.filename, a.content_type, a.blob

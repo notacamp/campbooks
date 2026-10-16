@@ -186,6 +186,31 @@ impl RateLimits {
     }
 }
 
+impl RateLimits {
+    /// Use up `key`'s whole budget under `limit` for a window, as if it had
+    /// been hit `max` times (tests of what happens past a large limit).
+    ///
+    /// # Panics
+    /// If the database refuses the write.
+    #[cfg(any(test, feature = "test-util"))]
+    pub async fn exhaust(&self, db: &PgPool, limit: &Limit, key: &RateKey) {
+        let Some(key) = &key.0 else {
+            return;
+        };
+        sqlx::query(
+            "INSERT INTO kernel.rate_limits (bucket, hits, resets_at)
+             VALUES ($1, $2, now() + make_interval(secs => $3))
+             ON CONFLICT (bucket) DO UPDATE SET hits = $2, resets_at = EXCLUDED.resets_at",
+        )
+        .bind(self.bucket(limit, key))
+        .bind(i32::try_from(limit.max).unwrap_or(i32::MAX))
+        .bind(limit.window.as_secs_f64())
+        .execute(db)
+        .await
+        .unwrap_or_else(|e| panic!("exhausting a rate limit: {e}"));
+    }
+}
+
 /// The address of the caller: the socket peer, or, when the peer is a
 /// trusted proxy, the right-most readable `X-Forwarded-For` address that is
 /// not a trusted proxy (the peer when there is none).

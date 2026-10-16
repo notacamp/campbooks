@@ -628,5 +628,6 @@ pub fn fetched(
         label_ids: raw.meta.label_ids,
         internal_date,
         raw: raw.raw,
+        receiver: mail::Receiver::Gmail,
     }
 }

@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE kernel.idempotency\n           SET state = 'completed', response_status = $3, response_content_type = $4,\n               response_location = $5, response_body = $6, containers = $7\n         WHERE principal = $1 AND key = $2 AND state = 'pending'\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Int2",
+        "Text",
+        "Text",
+        "Bytea",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "82972c885410a6301733393dad3b6b2d73a0bd93305a24f07ee001ee3628c551"
+}

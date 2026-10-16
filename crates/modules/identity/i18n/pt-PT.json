@@ -9,6 +9,7 @@
     "held_grant_not_found": "Não há nenhuma caixa de correio à espera de ser ligada.",
     "invalid_id_token_hint": "Este pedido para terminar sessão não foi assinado pelo Campbooks para esta aplicação; nada foi terminado.",
     "signup_invite_only": "Este Campbooks só aceita pessoas convidadas. Peça a alguém que convide este endereço e inicie sessão novamente.",
+    "sign_in_not_allowed": "Este Campbooks só deixa entrar as pessoas que o seu proprietário aprovou, e este endereço não é uma delas. Nada foi guardado.",
     "step_up_required": "Inicie sessão novamente primeiro: para alterar a forma como inicia sessão, é preciso ter iniciado sessão nos últimos dez minutos.",
     "last_way_in": "Esta é a única forma de iniciar sessão, por isso não pode ser removida. Adicione outra primeiro.",
     "link_incomplete": "Indique o fornecedor, o espaço de trabalho ou a caixa de correio a que isto se refere.",
@@ -31,6 +32,20 @@
     "client_scope_not_allowed": "Não é possível dar a permissão {{scope}} a aplicações.",
     "client_is_public": "Esta aplicação inicia sessão de pessoas e não tem segredo para renovar.",
     "client_name_reserved": "Só as aplicações do próprio Campbooks se podem chamar Campbooks ou Not A Camp. Escolha outro nome.",
-    "too_many_accounts": "Pergunte por no máximo {{max}} contas de cada vez."
+    "fresh_sign_in_required": "Inicie sessão novamente primeiro: adicionar uma chave de acesso exige um início de sessão nos últimos cinco minutos.",
+    "too_many_accounts": "Pergunte por no máximo {{max}} contas de cada vez.",
+    "client_name_mixed_scripts": "Use um só alfabeto em cada palavra do nome da aplicação: letras de alfabetos diferentes podem passar por outras."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "Uma nova forma de iniciar sessão na sua conta Campbooks",
+      "passkey": "Uma chave de acesso",
+      "provider": "Uma conta {{provider}}",
+      "added": "{{what}} foi adicionada como forma de iniciar sessão na sua conta Campbooks em {{when}}.",
+      "if_you": "Se foi você, não precisa de fazer nada.",
+      "if_not": "Se não foi você, abra o Campbooks, vá a Definições → Formas de iniciar sessão, remova-a e escolha Terminar sessão em todo o lado.",
+      "open": "Abrir o Campbooks",
+      "why": "O Campbooks envia esta mensagem para os endereços da sua conta sempre que é adicionada uma forma de iniciar sessão. Não contém qualquer rastreio."
+    }
   }
 }

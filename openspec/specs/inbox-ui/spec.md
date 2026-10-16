@@ -72,16 +72,27 @@ hidden.
 - **THEN** the reader shows no Reply, Reply all or Forward
 
 ### Requirement: Separate screens on phones
-From 64rem the list and the reader SHALL show side by side; below it they
-SHALL be separate screens, the reader with "Back to <stream>" (Esc), and
-below 48rem the reader's Done (and Reply) SHALL float above the tab bar.
-Every screen SHALL exist in en, pt-PT, es-ES and fr, show loading, empty and
-error states (including no mailbox and a conversation that is gone), fit
-375px without horizontal scrolling and pass axe in light and dark.
+From 64rem the list and the reader SHALL show side by side at every width,
+the reader taking the width the sidebar and the list leave and never wrapping
+under the list; below 64rem they SHALL be separate screens, the reader with
+"Back to <stream>" (Esc), and below 48rem the reader's Done (and Reply) SHALL
+float above the tab bar. Every screen SHALL exist in en, pt-PT, es-ES and fr,
+show loading, empty and error states (including no mailbox and a conversation
+that is gone), fit 375px without horizontal scrolling and pass axe in light
+and dark. No content (a long sender address, subject, URL or word) SHALL make
+a screen wider than the viewport at any width; long unbroken text wraps.
 
 #### Scenario: Opening a conversation on a phone
 - **WHEN** the user taps a conversation at 375px
 - **THEN** the reader replaces the list, and Back returns to the stream
+
+#### Scenario: A narrow desktop window
+- **WHEN** a conversation is open at 1100px wide
+- **THEN** the reader sits beside the list, its top level with the list's, and the page is no wider than the window
+
+#### Scenario: Long unbroken text
+- **WHEN** an open conversation's subject and sender have no spaces or hyphens and are longer than the reader is wide
+- **THEN** the text wraps inside the reader and the page does not scroll sideways, at 375px, 1100px and 1440px
 
 ### Requirement: Attachments
 Each open message SHALL list its attachments, except inline images shown in
@@ -154,3 +165,16 @@ sheet SHALL show both bindings ("J or ↓").
 #### Scenario: Arrows in a menu
 - **WHEN** focus is in a menu, a field or a dialog and the user presses ↓
 - **THEN** the list cursor does not move and the control handles the key
+
+### Requirement: Kept inboxes are read as history
+An inbox `conversations.list_inboxes` lists as `read_only` (its mailbox was
+disconnected and its mail kept), or one the person only reads, SHALL open in
+the reader with no action that writes: no Done, star, read or unread, move,
+reply, reply all or forward, no assistant choices, and opening it SHALL NOT
+mark it read. Until the inbox is known (its list loading or failed), the
+reader SHALL offer no write action either. A kept inbox SHALL say so ("Kept as history", naming its
+address). New messages SHALL never offer a read-only inbox to send from.
+
+#### Scenario: A kept conversation
+- **WHEN** the person opens a conversation of an inbox listed with `read_only: true`
+- **THEN** "Kept as history" is shown, no write action is offered, E does nothing, and nothing is marked read

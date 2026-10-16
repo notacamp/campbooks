@@ -15,7 +15,14 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
-use crate::{domain::access::visible_inboxes, model::InboxId, scopes::ConversationsRead};
+use campbooks_kernel::authz::Action;
+
+use crate::{
+    domain::{access::visible_inboxes, resources},
+    events::INBOX_RECORD,
+    model::InboxId,
+    scopes::ConversationsRead,
+};
 
 /// Most senders in one answer.
 pub const MAX_LIMIT: u32 = 10;
@@ -65,7 +72,7 @@ pub struct SenderList {
     operation_id = "conversations.list_senders",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"]).access("conversations.inbox", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), SendersQuery),
     responses(
         (status = OK, description = "The senders.", body = SenderList),
@@ -84,6 +91,7 @@ pub async fn handler(
     workspace: Workspace<ConversationsRead>,
     extract::Query(query): extract::Query<SendersQuery>,
 ) -> Result<Json<SenderList>> {
+    resources::authorize_type(&state, &workspace.access, Action::Read, INBOX_RECORD)?;
     let limit = query.limit.unwrap_or(MAX_LIMIT);
     let words = match query.q.as_deref() {
         None => None,

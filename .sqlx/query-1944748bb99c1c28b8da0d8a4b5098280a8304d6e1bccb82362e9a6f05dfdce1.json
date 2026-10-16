@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE bff.sessions SET token_delivered = true WHERE id = $1 AND token_hash = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bytea"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "1944748bb99c1c28b8da0d8a4b5098280a8304d6e1bccb82362e9a6f05dfdce1"
+}

@@ -9,6 +9,7 @@
     "held_grant_not_found": "Aucune boîte mail n’attend d’être connectée.",
     "invalid_id_token_hint": "Cette demande de déconnexion n’est pas signée par Campbooks pour cette application ; rien n’a été fermé.",
     "signup_invite_only": "Ce Campbooks n’accueille que les personnes invitées. Demandez à quelqu’un d’inviter cette adresse, puis reconnectez-vous.",
+    "sign_in_not_allowed": "Ce Campbooks n’accepte que les personnes approuvées par son propriétaire, et cette adresse n’en fait pas partie. Rien n’a été conservé.",
     "step_up_required": "Reconnectez-vous d’abord : pour changer votre façon de vous connecter, il faut vous être connecté dans les dix dernières minutes.",
     "last_way_in": "C’est votre seul moyen de connexion : il ne peut pas être retiré. Ajoutez-en d’abord un autre.",
     "link_incomplete": "Précisez le fournisseur, l’espace de travail ou la boîte mail concernés.",
@@ -31,6 +32,20 @@
     "client_scope_not_allowed": "Impossible de donner l’autorisation {{scope}} à des applications.",
     "client_is_public": "Cette application connecte des personnes et n’a pas de secret à renouveler.",
     "client_name_reserved": "Seules les applications de Campbooks peuvent s’appeler Campbooks ou Not A Camp. Choisissez un autre nom.",
-    "too_many_accounts": "Demandez au plus {{max}} comptes à la fois."
+    "fresh_sign_in_required": "Reconnectez-vous d’abord : ajouter une clé d’accès demande une connexion de moins de cinq minutes.",
+    "too_many_accounts": "Demandez au plus {{max}} comptes à la fois.",
+    "client_name_mixed_scripts": "Utilisez un seul alphabet par mot dans le nom de l’application : des lettres d’alphabets différents peuvent se faire passer pour d’autres."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "Un nouveau moyen de vous connecter à votre compte Campbooks",
+      "passkey": "Une clé d’accès",
+      "provider": "Un compte {{provider}}",
+      "added": "{{what}} a été ajouté(e) comme moyen de vous connecter à votre compte Campbooks le {{when}}.",
+      "if_you": "Si c’était vous, il n’y a rien à faire.",
+      "if_not": "Si ce n’était pas vous, ouvrez Campbooks, allez dans Paramètres → Moyens de connexion, supprimez-le et choisissez Se déconnecter partout.",
+      "open": "Ouvrir Campbooks",
+      "why": "Campbooks envoie ce message aux adresses de votre compte chaque fois qu’un moyen de connexion est ajouté. Il ne contient aucun pistage."
+    }
   }
 }

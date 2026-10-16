@@ -213,6 +213,23 @@ export interface paths {
         patch: operations["identity.rename_passkey"];
         trace?: never;
     };
+    "/api/v1/identity/sign-out-everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign out everywhere. */
+        post: operations["identity.sign_out_everywhere"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/identity/ways-in": {
         parameters: {
             query?: never;
@@ -1117,7 +1134,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read one taught rule. */
+        /**
+         * Read one taught rule (a removed one too, with the run putting its mail
+         *     back).
+         */
         get: operations["conversations.get_rule"];
         put?: never;
         post?: never;
@@ -1140,6 +1160,44 @@ export interface paths {
         put?: never;
         /** Say yes to a proposed rule. */
         post: operations["conversations.confirm_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn down a proposed rule ("No"): like confirming it, anyone who may
+         *     teach in its inbox may, since it does not act yet. Undo with
+         *     `conversations.restore_rule`.
+         */
+        post: operations["conversations.decline_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring back a rule removed in the last 15 minutes, as it was (Undo). */
+        post: operations["conversations.restore_rule"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1420,7 +1478,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1432,7 +1490,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1444,7 +1502,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1456,7 +1514,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -1470,7 +1528,7 @@ export interface paths {
          *      the session's access token attached, exactly like `/bff/api/*`. Its
          *      answers are the admin API's own: 404 for anyone who is not an
          *      administrator with the operation's permission, 401
-         *      `admin_reauth_required` when the last sign-in is more than 12 hours
+         *      `admin_reauth_required` when the last sign-in is more than 1 hour
          *      old (sign in again at `/bff/login?max_age=0`). Without a live session
          *      the answer is 401 `session_required`. POST, PUT, PATCH and DELETE
          *      need the `X-Campbooks-CSRF: 1` header from the app's origin.
@@ -2061,6 +2119,8 @@ export interface components {
             display_name?: string | null;
             /** @description The member who granted it. */
             granted_by: components["schemas"]["UserId"];
+            /** @description The caller granted it (only they may reconnect or disconnect it). */
+            granted_by_you: boolean;
             /** @description How it is doing. */
             health: components["schemas"]["Health"];
             /**
@@ -2634,6 +2694,11 @@ export interface components {
             display_name?: string | null;
             /** @description The inbox. */
             id: components["schemas"]["InboxId"];
+            /**
+             * @description Kept as read-only history after its connection was removed: no
+             *     longer synced, nothing can be written or sent from it.
+             */
+            read_only: boolean;
             role?: components["schemas"]["InboxRole"] | null;
             /**
              * @description Whether someone other than the caller holds a role on it (for a
@@ -2806,7 +2871,11 @@ export interface components {
         MemberView: {
             /** @description Their name, as their identity provider gives it. */
             display_name?: string | null;
-            /** @description Their email address, as their identity provider gives it. */
+            /**
+             * @description Their email address, as their identity provider gives it, when it
+             *     verified it (an unverified address is never shown: anyone can claim
+             *     one).
+             */
             email?: string | null;
             /**
              * Format: date-time
@@ -2817,6 +2886,8 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
+            /** @description It is the caller (by user id, never by email). */
+            you: boolean;
         };
         /** @description A message's bodies. */
         MessageBody: {
@@ -3006,6 +3077,11 @@ export interface components {
             last_used_at?: string | null;
             /** @description What its owner calls it. */
             name: string;
+            /**
+             * @description It was made with the account (a passkey-only sign-up), not added
+             *     later: never shown as a new way in.
+             */
+            signed_up_with: boolean;
             /**
              * @description Whether it may sync between devices (a password manager or a
              *     platform account keeps it), as opposed to staying on one device.
@@ -3427,6 +3503,14 @@ export interface components {
             /** @description Done or Not needed. */
             outcome: components["schemas"]["Outcome"];
         };
+        /** @description How to bring a removed rule back. */
+        RestoreRule: {
+            /**
+             * @description Apply it again to the mail already in the inbox (after its mail was
+             *     put back). Default false.
+             */
+            apply_to_existing?: boolean;
+        };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -3554,6 +3638,11 @@ export interface components {
             conditions: components["schemas"]["RuleCondition"][];
             /** @description The rule. */
             id: components["schemas"]["RuleId"];
+            /**
+             * @description Whether the caller may stop it ("Stop doing this"): its author while a
+             *     sender, or a manager of its inbox, while the inbox is not kept read-only.
+             */
+            may_change: boolean;
         };
         /**
          * @description Where a taught rule came from.
@@ -3576,6 +3665,11 @@ export interface components {
         };
         /** @description What a rule would do to the inbox's mail now. */
         RulePreview: {
+            /**
+             * @description Whether every conversation of the inbox was looked at; when false the
+             *     counts are "at least" (a very large inbox).
+             */
+            complete: boolean;
             /**
              * Format: int32
              * @description Conversations it matches.
@@ -3705,6 +3799,8 @@ export interface components {
              * @description Changed so far.
              */
             changed: number;
+            /** @description Whether `total` is final; while false the run is still counting. */
+            counted: boolean;
             /**
              * Format: int32
              * @description Looked at so far.
@@ -3738,7 +3834,7 @@ export interface components {
             state: components["schemas"]["RunState"];
             /**
              * Format: int32
-             * @description Conversations it looks at.
+             * @description Conversations it matches (or will put back).
              */
             total: number;
         };
@@ -3928,6 +4024,12 @@ export interface components {
              *     `connected=` or `link_error=` added.
              */
             return_to?: string | null;
+            /**
+             * @description For `connect`: also sign in with the account (default `true`).
+             *     `false` for a shared mailbox (support@): it is connected, never
+             *     added as a way in. Ignored by the other purposes.
+             */
+            sign_in?: boolean | null;
             workspace_id?: components["schemas"]["WorkspaceId"] | null;
         };
         /** @description A started consent. */
@@ -4165,6 +4267,11 @@ export interface components {
         /** @description A provider account the caller signs in with. */
         WayIn: {
             /**
+             * @description The connections among them that are known (the connectors module's
+             *     ids), to tell which mailbox a way in came with.
+             */
+            connections: string[];
+            /**
              * @description The address the provider gave when it was added (shown, never used
              *     to find an account).
              */
@@ -4188,6 +4295,13 @@ export interface components {
             linked_at: string;
             /** @description `sign_up`, `link` or `connect`. */
             linked_via: string;
+            /**
+             * Format: int32
+             * @description For a way in a connect created: how many workspaces its mailbox is
+             *     connected in. It goes when the last of them is disconnected (unless
+             *     it is the last way in). 0 for any other way in.
+             */
+            mailboxes: number;
             /** @description `google`, `microsoft` or `zoho`. */
             provider: string;
         };
@@ -4195,6 +4309,11 @@ export interface components {
         WaysIn: {
             /** @description Oldest first. */
             items: components["schemas"]["WayIn"][];
+            /**
+             * @description The providers a mailbox can be connected from (`identity.start_link`
+             *     with `connect`): offered, and with a mail adapter. Same order.
+             */
+            mailbox_providers: string[];
             /** @description The providers this instance offers, in display order. */
             providers: string[];
         };
@@ -4805,7 +4924,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description The token lacks `identity:write`, or the sign-in is more than ten minutes old (`step_up_required`). */
+            /** @description The token lacks `identity:write`, or the sign-in is more than five minutes old (`fresh_sign_in_required`: sign in again at `/bff/login?max_age=0`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4944,6 +5063,51 @@ export interface operations {
                 };
             };
             /** @description Not the caller's passkey, or gone. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "identity.sign_out_everywhere": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Every session and refresh token of the account ended, this one's included: sign in again. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The token lacks `identity:write`. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Another identity provider serves this instance, or the token is bound to a workspace. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -5369,6 +5533,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description No language model may read sentences here (`compile_unavailable`): build the rule by hand. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description Too many sentences this hour. */
             429: {
                 headers: {
@@ -5378,7 +5551,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description No language model may read sentences here (`ai_role_not_configured`, `ai_external_content_refused`), or it failed (`compile_failed`). */
+            /** @description The language model failed (`compile_failed`). */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -5931,7 +6104,14 @@ export interface operations {
     };
     "connectors.disconnect": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the inboxes it fed are deleted, with their
+                 *     messages, conversations, drafts, decisions, search entries and
+                 *     files. `keep`: they stay as read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -5959,7 +6139,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Missing scope, or a client token (`connection_needs_user`). */
+            /** @description Missing scope, a client token (`connection_needs_user`), or someone other than the member who connected it (`disconnect_owner_only`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7618,7 +7798,7 @@ export interface operations {
                     "application/json": components["schemas"]["RegisteredClient"];
                 };
             };
-            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_scope_not_allowed` or `client_needs_redirect`. */
+            /** @description A bad name, `client_name_reserved` (it reads as Campbooks), `client_name_mixed_scripts` (a word mixes alphabets), `client_scope_not_allowed` or `client_needs_redirect`. */
             400: {
                 headers: {
                     [name: string]: unknown;
@@ -8232,7 +8412,14 @@ export interface operations {
     };
     "workspaces.remove_member": {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description `delete` (the default): the mailboxes they connected are
+                 *     disconnected and their mail deleted. `keep`: their mail stays as
+                 *     read-only history, no longer synced.
+                 */
+                mail?: "delete" | "keep";
+            };
             header?: never;
             path: {
                 /** @description The workspace. */
@@ -8278,7 +8465,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `last_owner`: the workspace would have no owner. */
+            /** @description `last_owner`: the workspace would have no owner; `keep_needs_a_reader`: with `mail=keep`, an inbox the member connected would have nobody left to read it (share it first, or delete the mail). */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8487,7 +8674,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The rule. */
+            /** @description The rule, removed or not. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -8703,6 +8890,132 @@ export interface operations {
                 };
             };
             /** @description It is not waiting for a yes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.decline_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule, turned down (removed). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not waiting for a yes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.restore_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreRule"];
+            };
+        };
+        responses: {
+            /** @description The rule, back as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not your rule. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not removed, or was removed too long ago. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9129,7 +9442,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `invitation_used`, `invitation_expired` or `already_a_member`. */
+            /** @description `invitation_used`, `invitation_expired`, `already_a_member`, or `still_leaving`: you left this workspace moments ago and that is still being finished; try again in a minute. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -9333,7 +9646,7 @@ export interface operations {
                     "application/json": components["schemas"]["Created"];
                 };
             };
-            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept). */
+            /** @description `csrf_check_failed`, `signup_invite_only` (this instance takes invited people only; nothing was kept), or `sign_in_not_allowed` (the address is not on the instance's allow-list; nothing was kept). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9396,7 +9709,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), or `account_suspended` (it verified, but an administrator suspended the account). */
+            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), `account_suspended` (it verified, but an administrator suspended the account), or `sign_in_not_allowed` (it verified, but the account has no address on the instance's allow-list). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9530,7 +9843,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`. */
+            /** @description `csrf_check_failed`, `passkey_not_accepted`, `signup_invite_only`, or `sign_in_not_allowed`. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9601,7 +9914,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address). */
+            /** @description `csrf_check_failed`, `signup_invite_only` (this instance takes invited people only, and a passkey proves no address), or `sign_in_not_allowed` (the instance has an allow-list, which a passkey cannot meet). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9649,7 +9962,7 @@ export interface operations {
                     "application/json": components["schemas"]["RequestInfo"];
                 };
             };
-            /** @description No such request (or it expired), or another identity provider serves this instance. */
+            /** @description No such request (or it expired, or another browser made it), or another identity provider serves this instance. */
             404: {
                 headers: {
                     [name: string]: unknown;
@@ -10317,6 +10630,15 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
+            /** @description `rate_limited`: too many sign-ins started from this address. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
             /** @description `bff_not_configured`, or the identity provider is unreachable. */
             503: {
                 headers: {
@@ -10449,7 +10771,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description `rate_limited`: too many metadata-document clients looked up from this address. */
+            /** @description `rate_limited`: too many authorization requests, or metadata-document clients looked up, from this address. */
             429: {
                 headers: {
                     [name: string]: unknown;
@@ -10509,6 +10831,15 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     "identity.end_session_post": {
@@ -10554,6 +10885,15 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description `rate_limited`. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
             };
         };
     };

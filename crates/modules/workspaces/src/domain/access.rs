@@ -1,12 +1,50 @@
 //! Who may do what inside a workspace.
 
 use campbooks_kernel::{
-    Error, Result,
+    AppState, Error, RecordRef, Result,
+    authz::{self, Action},
     tenancy::{Access, Role, UserId, WorkspaceId},
 };
 use sqlx::PgConnection;
 
-use crate::MESSAGES;
+use crate::{
+    MESSAGES,
+    events::{MEMBER_RECORD, WORKSPACE_RECORD},
+};
+
+/// Ask the access catalogue (ADR 0017) whether `access` may take `action`
+/// on `resource`: 404 when they may not see it, 403 when they may see it
+/// but not do that.
+pub async fn authorize(
+    state: &AppState,
+    conn: &mut PgConnection,
+    access: &Access,
+    action: Action,
+    resource: &RecordRef,
+) -> Result<()> {
+    authz::require(state, conn, access, action, resource, || Error::Forbidden).await
+}
+
+/// [`authorize`] for resources of a type before one is named (lists,
+/// creating one).
+pub fn authorize_type(
+    state: &AppState,
+    access: &Access,
+    action: Action,
+    resource_type: &str,
+) -> Result<()> {
+    authz::require_type(state, access, action, resource_type, || Error::Forbidden)
+}
+
+/// The workspace of `access`, as a resource.
+pub fn workspace_resource(access: &Access) -> RecordRef {
+    RecordRef::new(WORKSPACE_RECORD, &access.workspace)
+}
+
+/// Member `user`, as a resource.
+pub fn member_resource(user: UserId) -> RecordRef {
+    RecordRef::new(MEMBER_RECORD, &user)
+}
 
 /// The user acting through `access`, with their role. Client tokens act
 /// through their scopes only and cannot take role-gated actions: 403.
@@ -14,16 +52,6 @@ pub fn acting_user(access: &Access) -> Result<(UserId, Role)> {
     match (access.user, access.role) {
         (Some(user), Some(role)) => Ok((user, role)),
         _ => Err(Error::Forbidden),
-    }
-}
-
-/// [`acting_user`], who must be an owner or an admin.
-pub fn acting_manager(access: &Access) -> Result<(UserId, Role)> {
-    let (user, role) = acting_user(access)?;
-    if role.can_manage() {
-        Ok((user, role))
-    } else {
-        Err(Error::Forbidden)
     }
 }
 

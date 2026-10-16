@@ -1,0 +1,93 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT i.id AS \"id: InboxId\", i.channel, i.address, i.display_name,\n               i.detached_at IS NOT NULL AS \"read_only!\",\n               (SELECT m.role FROM conversations.inbox_members m\n                 WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,\n               (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c\n                 WHERE c.inbox_id = i.id AND c.archived_at IS NULL AND NOT c.trashed)\n                 AS \"unread_count!\",\n               (SELECT count(*) FROM conversations.inbox_members o\n                 WHERE o.inbox_id = i.id AND ($2::uuid IS NULL OR o.user_id <> $2))\n                 > CASE WHEN $2::uuid IS NULL THEN 1 ELSE 0 END AS \"shared!\"\n          FROM conversations.inboxes i\n         WHERE i.id = ANY($1)\n         ORDER BY i.address\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "channel",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "channel"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "address",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "address"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "display_name",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.inboxes",
+            "name": "display_name"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "read_only!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 5,
+        "name": "role",
+        "type_info": "Text",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 6,
+        "name": "unread_count!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 7,
+        "name": "shared!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "c762571e8884d0ade117c776601d8631793ab9a9a369a51f3da5d642d44194c4"
+}

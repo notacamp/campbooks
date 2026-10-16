@@ -79,10 +79,33 @@ pub struct WayInAdded {
     pub provider: Option<String>,
     /// How it was added: `sign_up`, `link`, `connect` or `passkey`.
     pub via: String,
+    /// The provider identity or passkey added (absent from events published
+    /// before it was recorded).
+    #[serde(default)]
+    pub way_in: Option<Uuid>,
 }
 
 impl DomainEvent for WayInAdded {
     const NAME: &'static str = "identity.way_in_added";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// A person signed out everywhere: every issuer session of the account
+/// ended and every refresh token it held was revoked. The web BFF ends its
+/// own sessions of the account on it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct SignedOutEverywhere {
+    /// The account (the `sub` of its tokens).
+    pub account: Uuid,
+}
+
+impl DomainEvent for SignedOutEverywhere {
+    const NAME: &'static str = "identity.signed_out_everywhere";
     const VERSION: u16 = 1;
     const WORKSPACE_SCOPED: bool = false;
 
@@ -228,10 +251,69 @@ pub struct MemberLeft {
     pub workspace: String,
     /// The former member (the workspaces module's user id).
     pub user: Uuid,
+    /// Their account (the subject), when the event names it.
+    #[serde(default)]
+    pub subject: Option<String>,
 }
 
 impl DomainEvent for MemberLeft {
     const NAME: &'static str = "workspaces.member_left";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.connection_removed` v1, as this module reads it
+/// (`contracts/connectors.connection_removed.v1.schema.json`): the
+/// workspace, provider and account of the mailbox that went, whose way in
+/// may go with it. Events recorded before the account was named carry
+/// none, and change nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionRemoved {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (the connectors module's id).
+    pub connection: String,
+    /// Its provider.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
+}
+
+impl DomainEvent for ConnectionRemoved {
+    const NAME: &'static str = "connectors.connection_removed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `connectors.connection_added` v1, as this module reads it: which
+/// connection a grant became, so the mailbox record of the way in it came
+/// with can be named even if the round trip that handed it over died.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ConnectionAdded {
+    /// The workspace.
+    pub workspace: String,
+    /// The connection (the connectors module's id).
+    pub connection: String,
+    /// Its provider.
+    pub provider: String,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
+    /// The grantor's account here (the token subject it was handed over for).
+    #[serde(default)]
+    pub grantor_subject: Option<String>,
+}
+
+impl DomainEvent for ConnectionAdded {
+    const NAME: &'static str = "connectors.connection_added";
     const VERSION: u16 = 1;
 
     fn workspace(&self) -> Option<&str> {

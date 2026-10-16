@@ -238,11 +238,16 @@ impl Registration {
                 .map(ToOwned::to_owned)
                 .collect(),
         };
-        // A stranger's name, cleaned; never Campbooks' own (then its host).
+        // A stranger's name, cleaned; never Campbooks' own, nor a word
+        // mixing scripts (then its host).
         let name = self
             .client_name
             .map(|name| client_names::clean(&name))
-            .filter(|name| !name.is_empty() && !client_names::impersonates_campbooks(name))
+            .filter(|name| {
+                !name.is_empty()
+                    && !client_names::impersonates_campbooks(name)
+                    && !client_names::mixes_scripts(name)
+            })
             .unwrap_or_else(|| client_names::clean(fallback_name));
         Ok(Described {
             name,

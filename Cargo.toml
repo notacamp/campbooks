@@ -67,6 +67,15 @@ toml = "1.1.8"
 # provider core crates are already in the graph through `url` -> `idna`.
 icu_plurals = "2.3.0"
 icu_locale_core = "2.3.0"
+# Compatibility decomposition (NFKD) for look-alike app names (identity);
+# already in the graph through url -> idna.
+icu_normalizer = "2.3.0"
+# Unicode general categories (marks of every script) for look-alike app
+# names (identity); already in the graph through url -> idna.
+icu_properties = "2.3.0"
+# UTS #39 confusables skeletons and mixed-script detection for look-alike app
+# names (identity).
+unicode-security = "0.1.2"
 
 # Errors, observability, misc
 thiserror = "2.0.21"
@@ -90,6 +99,9 @@ log = "0.4.34"
 uuid = { version = "1.28.0", features = ["v7", "serde"] }
 chrono = { version = "0.4.45", default-features = false, features = ["clock", "serde", "std"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
+# The instance's own mail (security notices): SMTP over rustls (aws-lc-rs,
+# platform roots: both already in the graph), no native-tls, no logging.
+lettre = { version = "0.11.23", default-features = false, features = ["smtp-transport", "hostname", "builder", "tokio1", "tokio1-rustls", "aws-lc-rs", "rustls-platform-verifier"] }
 # JWT access-token validation. aws-lc-rs is the crypto backend rustls already
 # uses; no PEM support needed (keys come from the IdP's JWKS).
 jsonwebtoken = { version = "11.1.0", default-features = false, features = ["aws_lc_rs"] }

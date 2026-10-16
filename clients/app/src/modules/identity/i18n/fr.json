@@ -82,6 +82,10 @@
       "suspended": {
         "title": "Ce compte est suspendu.",
         "lead": "La personne qui gère ce Campbooks l’a suspendu. Demandez-lui de le rétablir."
+      },
+      "not_allowed": {
+        "title": "Ce Campbooks n’est pas ouvert à cette adresse.",
+        "lead": "Seules les personnes approuvées par son propriétaire peuvent se connecter ici, et rien n’a été conservé. Essayez une autre adresse ou contactez la personne qui gère ce Campbooks."
       }
     }
   },
@@ -117,6 +121,10 @@
     "account_suspended": {
       "title": "Ce compte est suspendu.",
       "lead": "La personne qui gère ce Campbooks l’a suspendu. Demandez-lui de le rétablir."
+    },
+    "sign_in_not_allowed": {
+      "title": "Ce Campbooks n’est pas ouvert à cette adresse.",
+      "lead": "Seules les personnes approuvées par son propriétaire peuvent se connecter ici, et rien n’a été conservé. Essayez une autre adresse ou contactez la personne qui gère ce Campbooks."
     }
   },
   "newAccount": {
@@ -192,7 +200,8 @@
     "confirmForget": "Oublier {{address}} ? Campbooks supprime l’autorisation que Google lui a donnée. Vous pourrez toujours vous connecter avec ce compte.",
     "confirm": "L’oublier",
     "cancel": "La garder",
-    "forgetFailed": "Impossible de l’oublier. Réessayez."
+    "forgetFailed": "Impossible de l’oublier. Réessayez.",
+    "other": "Relier une autre boîte mail"
   },
   "waysIn": {
     "title": "Moyens de connexion",
@@ -267,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "L’accès aux mails n’a pas été autorisé.",
-        "lead": "Vous pouvez vous connecter avec ce compte, mais sa boîte mail n’est pas connectée. Réessayez en autorisant l’accès aux mails."
+        "lead": "Rien n’a été connecté, et ce compte n’a pas été ajouté comme moyen de connexion. Réessayez en autorisant l’accès aux mails."
       },
       "account_mismatch": {
         "title": "C’est un autre compte.",
@@ -280,7 +289,24 @@
       "unknown": {
         "title": "Un problème est survenu.",
         "lead": "Rien n’a changé. Réessayez."
+      },
+      "sign_in_not_allowed": {
+        "title": "Ce Campbooks n’est pas ouvert à cette adresse.",
+        "lead": "Seules les personnes approuvées par son propriétaire peuvent se connecter ici, et rien n’a été conservé. Essayez une autre adresse ou contactez la personne qui gère ce Campbooks."
       }
+    },
+    "new": "Ajout récent",
+    "recent": {
+      "title": "Un moyen de connexion a été ajouté cette semaine",
+      "lead": "Il est marqué « Ajout récent » ci-dessous. Si ce n’est pas vous qui l’avez ajouté, supprimez-le, puis déconnectez-vous partout."
+    },
+    "everywhere": {
+      "title": "Se déconnecter partout",
+      "lead": "Met fin à toutes les connexions à votre compte : ce navigateur, vos autres appareils et toutes les applications que vous avez autorisées. À faire si vous perdez un appareil ou voyez un moyen de connexion que vous n’avez pas ajouté.",
+      "action": "Se déconnecter partout",
+      "confirm": "Oui, me déconnecter partout",
+      "confirmLead": "Vous déconnecter de Campbooks sur tous vos appareils et dans toutes les applications, ce navigateur compris ? Vous vous reconnecterez ensuite ici.",
+      "failed": "Impossible de vous déconnecter partout. Rien n’a changé ; réessayez."
     }
   },
   "passkeySignUp": {
@@ -379,7 +405,8 @@
         "title": "Impossible d’ajouter une clé d’accès.",
         "lead": "Rien n’a été ajouté. Réessayez."
       }
-    }
+    },
+    "freshSignIn": "Par sécurité, ajouter une clé d’accès demande une connexion de moins de cinq minutes. Reconnectez-vous ; vous reviendrez directement ici."
   },
   "admin": {
     "title": "Compte",

@@ -197,6 +197,7 @@ impl SendMessage {
                     label_ids: tokens,
                     internal_date: now,
                     raw,
+                    receiver: crate::mail::Receiver::Zoho,
                 })
             }
             (_, Err(err)) => {

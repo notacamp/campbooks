@@ -18,7 +18,11 @@
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
 //! `provider_unavailable`, `login_failed`, `account_suspended`, and
 //! `signup_invite_only` (an invite-only instance, and no pending invitation
-//! for the provider's verified address: nothing is kept).
+//! for the provider's verified address: nothing is kept), and
+//! `sign_in_not_allowed` (`CAMPBOOKS_SIGNUP__ALLOWED` is set and the
+//! provider's verified address is not on it: asked first, for known
+//! accounts and new ones alike, so it says nothing about accounts; nothing
+//! is kept).
 
 use std::time::Duration;
 
@@ -98,25 +102,31 @@ pub(super) fn providers(issuer: &Issuer) -> Vec<String> {
     path = "/auth/requests/{id}",
     tag = "identity",
     operation_id = "identity.get_sign_in_request",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.authorize_request"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     params(("id" = String, Path, description = "The `request` the sign-in screen was given.")),
     security(()),
     responses(
         (status = 200, description = "The request.", body = RequestInfo),
-        (status = 404, description = "No such request (or it expired), or another identity \
-            provider serves this instance."),
+        (status = 404, description = "No such request (or it expired, or another browser \
+            made it), or another identity provider serves this instance."),
     ),
 )]
-pub async fn request(State(ctx): State<Ctx>, Path(id): Path<String>) -> Result<Json<RequestInfo>> {
+pub async fn request(
+    State(ctx): State<Ctx>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<RequestInfo>> {
     let issuer = ctx.issuer()?;
-    let request = authorize::load(&ctx.state.db, &id, issuer.now())
+    let browser = authorize::browser(issuer, &headers);
+    let request = authorize::load(&ctx.state.db, &id, browser.as_deref(), issuer.now())
         .await?
         .ok_or(Error::NotFound)?;
     Ok(Json(RequestInfo {
         client_id: request.client_id,
         providers: providers(issuer),
         passkey_sign_up: passkey::relying_party(issuer).is_some()
-            && passkey::signup_allows_passkey(&ctx),
+            && passkey::signup_allows_passkey(&ctx)
+            && !ctx.allow_list()?.is_restricted(),
     }))
 }
 
@@ -173,7 +183,7 @@ async fn may_create_account(ctx: &Ctx, identity: &ProviderIdentity) -> Result<bo
     path = "/auth/start/{provider}",
     tag = "identity",
     operation_id = "identity.start_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         StartQuery,
@@ -323,7 +333,7 @@ pub struct CallbackQuery {
     path = "/auth/callback/{provider}",
     tag = "identity",
     operation_id = "identity.finish_sign_in",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.upstream_flow", "identity.session", "identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(
         ("provider" = String, Path, description = "`google`, `microsoft` or `zoho`."),
         CallbackQuery,
@@ -406,6 +416,19 @@ pub async fn callback(
     }
     let Upstreamed { identity, tokens } = signed_in;
     let request = flow.request_id.as_deref();
+    // The allow-list comes first, whether or not an account exists, so the
+    // answer says nothing about accounts. Nothing is kept.
+    if !ctx.permits_identity(&identity)? {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+        tracing::info!(
+            provider = provider.as_str(),
+            "refused a sign-in the allow-list does not let in"
+        );
+        return Ok(with_cookie(
+            sign_in_error("sign_in_not_allowed", request),
+            clear_flow,
+        ));
+    }
     let response = match accounts::find(&ctx.state.db, &identity).await? {
         Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
@@ -568,6 +591,7 @@ async fn sign_in_known(
     let location = continue_after_sign_in(
         ctx,
         issuer,
+        headers,
         flow.request_id.as_deref(),
         &flow.return_to,
         &started.session,
@@ -711,14 +735,23 @@ async fn signed_in(
 pub(super) async fn continue_after_sign_in(
     ctx: &Ctx,
     issuer: &Issuer,
+    headers: &HeaderMap,
     request: Option<&str>,
     return_to: &str,
     session: &Session,
     now: DateTime<Utc>,
 ) -> Result<String> {
+    let browser = authorize::browser(issuer, headers);
     if let Some(request) = request
-        && let Some(location) =
-            authorize::complete_stored(&ctx.state.db, issuer, request, session, now).await?
+        && let Some(location) = authorize::complete_stored(
+            &ctx.state.db,
+            issuer,
+            request,
+            browser.as_deref(),
+            session,
+            now,
+        )
+        .await?
     {
         return Ok(location);
     }
@@ -743,7 +776,7 @@ pub struct NewAccount {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.get_new_account",
-    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["identity.pending_sign_up"]).access("identity.sign_in", campbooks_kernel::authz::Action::Read)))),
     security(()),
     responses(
         (status = 200, description = "The pending account.", body = NewAccount),
@@ -783,14 +816,15 @@ pub struct Created {
     path = "/auth/new-account",
     tag = "identity",
     operation_id = "identity.create_account",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.session", "identity.held_grant"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     security(()),
     responses(
         (status = 201, description = "Created and signed in.", body = Created,
             headers(("set-cookie" = String))),
-        (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
-            instance takes invited people only; nothing was kept).", body = campbooks_kernel::Problem,
+        (status = 403, description = "`csrf_check_failed`, `signup_invite_only` (this \
+            instance takes invited people only; nothing was kept), or `sign_in_not_allowed` \
+            (the address is not on the instance's allow-list; nothing was kept).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "Nothing pending for this browser."),
         (status = 409, description = "`sign_up_expired`, or `way_in_belongs_to_another_account` \
@@ -812,6 +846,11 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let pending = upstream::take_sign_up(&mut tx, &issuer.cipher, &token, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("sign_up_expired")))?;
+    if !ctx.permits_identity(&pending.identity)? {
+        // The allow-list may have been tightened since the round trip.
+        tx.commit().await?;
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
+    }
     if !may_create_account(&ctx, &pending.identity).await? {
         // The pending sign-up (and its tokens) is gone with this commit.
         tx.commit().await?;
@@ -875,6 +914,7 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         pending.request_id.as_deref(),
         &pending.return_to,
         &started.session,

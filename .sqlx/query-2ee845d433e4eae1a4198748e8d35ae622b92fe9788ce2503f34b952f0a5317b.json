@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO conversations.inbox_members (workspace_id, inbox_id, user_id, role)\n            SELECT $1, i.id, $3, $4 FROM conversations.inboxes i\n             WHERE i.id = $2 AND i.detached_at IS NULL\n            ON CONFLICT DO NOTHING\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2ee845d433e4eae1a4198748e8d35ae622b92fe9788ce2503f34b952f0a5317b"
+}

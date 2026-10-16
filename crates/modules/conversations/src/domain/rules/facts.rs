@@ -1,7 +1,10 @@
 //! What the engine and the runs read about a conversation: the facts of its
 //! newest inbound message, found with a prefilter an index can serve.
 
-use campbooks_ai::decide::{signals::email::subject_template, taught::Facts};
+use campbooks_ai::decide::{
+    signals::email::subject_template,
+    taught::{Facts, normalise_list_id},
+};
 use campbooks_kernel::{Error, Result};
 use chrono::{DateTime, Utc};
 use sqlx::PgConnection;
@@ -37,7 +40,8 @@ pub struct Candidate {
     pub subject_template: Option<String>,
     /// Its headers subset.
     pub headers: Headers,
-    /// It looks suspicious, or has an open Review need.
+    /// One of its messages looks suspicious (not only the newest), or it
+    /// has an open Review need.
     pub suspicious: bool,
     /// When the newest inbound message was sent.
     pub sent_at: DateTime<Utc>,
@@ -67,6 +71,8 @@ impl Candidate {
 struct Prefilter {
     sender: Option<String>,
     domain: Option<String>,
+    /// `domain` escaped for `LIKE`.
+    domain_like: Option<String>,
     list: Option<String>,
     template: Option<String>,
 }
@@ -77,12 +83,13 @@ impl Prefilter {
         for c in conditions {
             match c {
                 RuleCondition::SenderAddress(v) => p.sender = Some(v.trim().to_lowercase()),
-                RuleCondition::SenderDomain(v) => p.domain = Some(v.trim().to_lowercase()),
-                RuleCondition::ListId(v) => {
-                    let v = v.trim().to_lowercase();
-                    let v = v.trim_start_matches('<').trim_end_matches('>').to_owned();
-                    p.list = Some(v);
+                RuleCondition::SenderDomain(v) => {
+                    p.domain = Some(v.trim().to_lowercase());
+                    p.domain_like = Some(like_escape(&v.trim().to_lowercase()));
                 }
+                // The engine compares the id inside the brackets; the stored
+                // header holds it, whatever is around it.
+                RuleCondition::ListId(v) => p.list = Some(like_escape(&normalise_list_id(v))),
                 RuleCondition::SubjectTemplate(v) => p.template = Some(v.trim().to_owned()),
                 _ => {}
             }
@@ -111,6 +118,12 @@ impl TryFrom<CandidateRow> for Candidate {
     type Error = Error;
 
     fn try_from(r: CandidateRow) -> Result<Self> {
+        // `''` means "no template"; NULL means not worked out yet.
+        let template = match r.subject_template {
+            None => subject_template(&r.subject),
+            Some(t) if t.is_empty() => None,
+            Some(t) => Some(t),
+        };
         Ok(Self {
             id: r.id,
             message: r.message,
@@ -121,7 +134,7 @@ impl TryFrom<CandidateRow> for Candidate {
             labels: r.labels,
             sender_address: r.sender_address,
             subject: r.subject,
-            subject_template: r.subject_template.filter(|t| !t.is_empty()),
+            subject_template: template,
             headers: serde_json::from_value(r.headers).unwrap_or_default(),
             suspicious: r.suspicious,
             sent_at: r.sent_at,
@@ -129,25 +142,69 @@ impl TryFrom<CandidateRow> for Candidate {
     }
 }
 
-/// Up to `limit` conversations of `inbox` after `after` (by id) whose newest
-/// inbound message passes `conditions`' prefilter, with their facts, and the
-/// last conversation id looked at (the next cursor).
+/// `value` escaped for a `LIKE` pattern with `ESCAPE '\'`.
+fn like_escape(value: &str) -> String {
+    value
+        .replace('\\', "\\\\")
+        .replace('%', "\\%")
+        .replace('_', "\\_")
+}
+
+/// One window of an inbox's conversations, in id order.
+#[derive(Debug)]
+pub struct Window {
+    /// The conversations in it that pass the prefilter, with their facts.
+    pub candidates: Vec<Candidate>,
+    /// Where the next window starts; `None` at the end of the inbox.
+    pub next: Option<ConversationId>,
+    /// How many conversations it looked at.
+    pub examined: usize,
+}
+
+/// The next `size` conversations of `inbox` after `after` (by id): those
+/// whose newest inbound message passes `conditions`' prefilter, with their
+/// facts. Looks at `size` conversations at most, however few match.
 pub async fn scan(
     conn: &mut PgConnection,
     inbox: InboxId,
     conditions: &[RuleCondition],
     after: Option<ConversationId>,
-    limit: i64,
-) -> Result<Vec<Candidate>> {
-    scan_rows(conn, inbox, &Prefilter::of(conditions), after, limit).await
+    size: i64,
+) -> Result<Window> {
+    let ids = sqlx::query_scalar!(
+        r#"SELECT id AS "id: ConversationId" FROM conversations.conversations
+            WHERE inbox_id = $1 AND ($2::uuid IS NULL OR id > $2)
+            ORDER BY id LIMIT $3"#,
+        inbox as InboxId,
+        after.map(|a| *a.as_uuid()),
+        size,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let examined = ids.len();
+    let next = ids
+        .last()
+        .copied()
+        .filter(|_| i64::try_from(examined).unwrap_or(i64::MAX) >= size);
+    if ids.is_empty() {
+        return Ok(Window {
+            candidates: Vec::new(),
+            next,
+            examined,
+        });
+    }
+    let candidates = rows(conn, &ids, &Prefilter::of(conditions)).await?;
+    Ok(Window {
+        candidates,
+        next,
+        examined,
+    })
 }
 
-async fn scan_rows(
+async fn rows(
     conn: &mut PgConnection,
-    inbox: InboxId,
+    ids: &[ConversationId],
     p: &Prefilter,
-    after: Option<ConversationId>,
-    limit: i64,
 ) -> Result<Vec<Candidate>> {
     let rows = sqlx::query_as!(
         CandidateRow,
@@ -161,11 +218,11 @@ async fn scan_rows(
                m.sender_address AS "sender_address!", m.subject AS "subject!",
                m.subject_template, m.headers AS "headers!",
                (EXISTS (SELECT 1 FROM conversations.decisions d
-                         WHERE d.message_id = m.id AND d.question = 'suspicious'
+                         WHERE d.conversation_id = c.id AND d.question = 'suspicious'
                            AND d.value = 'true'::jsonb)
                 OR EXISTS (SELECT 1 FROM conversations.needs n
                             WHERE n.conversation_id = c.id AND n.state = 'open'
-                              AND n.question = 'suspicious')) AS "suspicious!",
+                              AND n.reason = 'review')) AS "suspicious!",
                m.sent_at AS "sent_at!"
           FROM conversations.conversations c
           CROSS JOIN LATERAL (
@@ -174,67 +231,74 @@ async fn scan_rows(
                WHERE conversation_id = c.id AND direction = 'inbound'
                ORDER BY sent_at DESC, id DESC LIMIT 1
           ) m
-         WHERE c.inbox_id = $1 AND NOT c.trashed
-           AND ($2::uuid IS NULL OR c.id > $2)
-           AND ($3::text IS NULL OR m.sender_address = $3)
-           AND ($4::text IS NULL OR split_part(m.sender_address, '@', 2) = $4
-                OR split_part(m.sender_address, '@', 2) LIKE '%.' || $4)
-           AND ($5::text IS NULL OR lower(m.headers ->> 'list_id') LIKE '%' || $5 || '%')
-           AND ($6::text IS NULL OR m.subject_template = $6)
+         WHERE c.id = ANY($1) AND NOT c.trashed
+           AND ($2::text IS NULL OR m.sender_address = $2)
+           AND ($3::text IS NULL OR split_part(m.sender_address, '@', 2) = $3
+                OR split_part(m.sender_address, '@', 2) LIKE '%.' || $4 ESCAPE '\')
+           AND ($5::text IS NULL OR lower(m.headers ->> 'list_id') LIKE '%' || $5 || '%' ESCAPE '\')
+           AND ($6::text IS NULL OR m.subject_template = $6 OR m.subject_template IS NULL)
          ORDER BY c.id
-         LIMIT $7
         "#,
-        inbox as InboxId,
-        after.map(|a| *a.as_uuid()),
+        ids as &[ConversationId],
         p.sender,
         p.domain,
+        p.domain_like,
         p.list,
         p.template,
-        limit,
     )
     .fetch_all(conn)
     .await?;
     rows.into_iter().map(Candidate::try_from).collect()
 }
 
-/// Messages whose subject template is filled per call of [`fill_templates`].
-const TEMPLATE_PAGE: i64 = 1_000;
+/// Messages whose subject template one [`fill_templates`] call works out.
+pub const TEMPLATE_PAGE: i64 = 1_000;
 
-/// Work out the subject template of `inbox`'s inbound messages stored
-/// before templates existed (`NULL`; `''` means "none"), so template
-/// conditions match them. Cheap once done: only `NULL` rows are read.
-pub async fn fill_templates(conn: &mut PgConnection, inbox: InboxId) -> Result<()> {
-    loop {
-        let rows = sqlx::query!(
-            r#"SELECT id AS "id: MessageId", subject FROM conversations.messages
-                WHERE inbox_id = $1 AND direction = 'inbound' AND subject_template IS NULL
-                LIMIT $2"#,
-            inbox as InboxId,
-            TEMPLATE_PAGE,
-        )
-        .fetch_all(&mut *conn)
-        .await?;
-        if rows.is_empty() {
-            return Ok(());
-        }
-        let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
-        let templates: Vec<String> = rows
-            .iter()
-            .map(|r| subject_template(&r.subject).unwrap_or_default())
-            .collect();
-        sqlx::query!(
-            r#"UPDATE conversations.messages m SET subject_template = t.template
-                 FROM unnest($1::uuid[], $2::text[]) AS t(id, template)
-                WHERE m.id = t.id"#,
-            &ids as &[MessageId],
-            &templates,
-        )
-        .execute(&mut *conn)
-        .await?;
-        if i64::try_from(rows.len()).unwrap_or(0) < TEMPLATE_PAGE {
-            return Ok(());
-        }
+/// Work out the subject template of up to [`TEMPLATE_PAGE`] of `inbox`'s
+/// inbound messages stored before templates existed (`NULL`; `''` means
+/// "none"). Returns how many it did: fewer than a page means none is left.
+/// Rules match such messages anyway (their template is worked out when they
+/// are read); this only lets the template index serve them.
+pub async fn fill_templates(conn: &mut PgConnection, inbox: InboxId) -> Result<usize> {
+    let rows = sqlx::query!(
+        r#"SELECT id AS "id: MessageId", subject FROM conversations.messages
+            WHERE inbox_id = $1 AND direction = 'inbound' AND subject_template IS NULL
+            LIMIT $2"#,
+        inbox as InboxId,
+        TEMPLATE_PAGE,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    if rows.is_empty() {
+        return Ok(0);
     }
+    let ids: Vec<MessageId> = rows.iter().map(|r| r.id).collect();
+    let templates: Vec<String> = rows
+        .iter()
+        .map(|r| subject_template(&r.subject).unwrap_or_default())
+        .collect();
+    sqlx::query!(
+        r#"UPDATE conversations.messages m SET subject_template = t.template
+             FROM unnest($1::uuid[], $2::text[]) AS t(id, template)
+            WHERE m.id = t.id"#,
+        &ids as &[MessageId],
+        &templates,
+    )
+    .execute(conn)
+    .await?;
+    Ok(rows.len())
+}
+
+/// Whether `inbox` still has inbound messages without a worked-out template.
+pub async fn templates_missing(conn: &mut PgConnection, inbox: InboxId) -> Result<bool> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM conversations.messages
+                           WHERE inbox_id = $1 AND direction = 'inbound'
+                             AND subject_template IS NULL) AS "e!""#,
+        inbox as InboxId,
+    )
+    .fetch_one(conn)
+    .await?)
 }
 
 /// The facts of conversation `id` (its newest inbound message), if it has
@@ -252,11 +316,11 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
                m.sender_address AS "sender_address!", m.subject AS "subject!",
                m.subject_template, m.headers AS "headers!",
                (EXISTS (SELECT 1 FROM conversations.decisions d
-                         WHERE d.message_id = m.id AND d.question = 'suspicious'
+                         WHERE d.conversation_id = c.id AND d.question = 'suspicious'
                            AND d.value = 'true'::jsonb)
                 OR EXISTS (SELECT 1 FROM conversations.needs n
                             WHERE n.conversation_id = c.id AND n.state = 'open'
-                              AND n.question = 'suspicious')) AS "suspicious!",
+                              AND n.reason = 'review')) AS "suspicious!",
                m.sent_at AS "sent_at!"
           FROM conversations.conversations c
           CROSS JOIN LATERAL (
@@ -274,17 +338,25 @@ pub async fn candidate(conn: &mut PgConnection, id: ConversationId) -> Result<Op
     row.map(Candidate::try_from).transpose()
 }
 
-/// Whether `inbox` ever wrote to `address`: they correspond, so mail from
-/// them is never hidden by a suggested rule.
+/// Sent messages [`corresponds`] looks through, newest first.
+pub const CORRESPONDENCE_WINDOW: i64 = 5_000;
+
+/// Whether `inbox` wrote to `address` in its last [`CORRESPONDENCE_WINDOW`]
+/// sent messages: they correspond, so mail from them is never hidden by a
+/// suggested rule. Served by `messages_outbound_idx`.
 pub async fn corresponds(conn: &mut PgConnection, inbox: InboxId, address: &str) -> Result<bool> {
     Ok(sqlx::query_scalar!(
         r#"SELECT EXISTS (
-               SELECT 1 FROM conversations.messages
-                WHERE inbox_id = $1 AND direction = 'outbound'
-                  AND position(('"' || $2 || '"') IN lower(recipients::text)) > 0
+               SELECT 1 FROM (
+                   SELECT recipients FROM conversations.messages
+                    WHERE inbox_id = $1 AND direction = 'outbound'
+                    ORDER BY sent_at DESC LIMIT $3
+               ) sent
+                WHERE position(('"' || $2 || '"') IN lower(sent.recipients::text)) > 0
            ) AS "e!""#,
         inbox as InboxId,
         address.to_lowercase(),
+        CORRESPONDENCE_WINDOW,
     )
     .fetch_one(conn)
     .await?)

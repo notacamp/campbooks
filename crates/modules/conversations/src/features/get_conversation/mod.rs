@@ -17,6 +17,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::paths::ConversationPath,
     domain::{
@@ -30,6 +32,8 @@ use crate::{
     model::{Address, AttachmentId, ConversationId, Direction, InboxId, MessageId},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::RecordRef;
+use campbooks_kernel::authz::Action;
 
 /// Newest messages returned with a conversation.
 pub const MAX_MESSAGES: i64 = 100;
@@ -136,7 +140,7 @@ pub struct Bodies {
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.conversation", "conversations.message"])))),
+        .records(["conversations.conversation", "conversations.message", "conversations.rule"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -160,6 +164,14 @@ pub async fn handler(
     let id = path.conversation_id;
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
+    resources::authorize(
+        &state,
+        &mut tx,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &id),
+    )
+    .await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let visible = sqlx::query_scalar!(
         "SELECT 1 AS one FROM conversations.conversations WHERE id = $1 AND inbox_id = ANY($2)",
@@ -171,7 +183,7 @@ pub async fn handler(
     if visible.is_none() {
         return Err(Error::NotFound);
     }
-    let conversation = summary(&mut tx, id).await?;
+    let conversation = summary(&mut tx, access.user, id).await?;
     let mut rows = sqlx::query!(
         r#"
         SELECT id AS "id: MessageId", direction, sender, recipients, subject, sent_at, read,
@@ -334,7 +346,8 @@ mod tests {
             kit.get(&client, &unknown).await.status,
             StatusCode::NOT_FOUND
         );
-        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::OK);
+        // A client acting for no member sees no inbox's conversation.
+        assert_eq!(kit.get(&client, &uri).await.status, StatusCode::NOT_FOUND);
         let junk = format!("/api/v1/w/{workspace}/conversations/not-an-id");
         assert_eq!(kit.get(&client, &junk).await.status, StatusCode::NOT_FOUND);
     }

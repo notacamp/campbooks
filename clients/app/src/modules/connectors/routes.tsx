@@ -1,12 +1,76 @@
-import { createRoute, type AnyRoute } from "@tanstack/react-router";
+import {
+  createRoute,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearch,
+  type AnyRoute,
+} from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 
-import { ConnectorsHome } from "./components/ConnectorsHome/ConnectorsHome";
+import { useWorkspaces } from "~/modules/workspaces";
 
-export function buildConnectorsRoutes<TParent extends AnyRoute>(parent: TParent) {
-  const home = createRoute({
+import { MailboxesPage } from "./components/MailboxesPage/MailboxesPage";
+import type { UseMailboxConsent } from "./consent";
+import { mailboxResult } from "./model";
+
+/** What the front door comes back to Mailboxes with. */
+interface MailboxesSearch {
+  connected?: string;
+  link_error?: string;
+}
+
+const text = (value: unknown) => (typeof value === "string" && value !== "" ? value : undefined);
+
+function validateMailboxesSearch(search: Record<string, unknown>): MailboxesSearch {
+  const connected = text(search["connected"]);
+  const linkError = text(search["link_error"]);
+  return {
+    ...(connected === undefined ? {} : { connected }),
+    ...(linkError === undefined ? {} : { link_error: linkError }),
+  };
+}
+
+export interface ConnectorsRouteOptions {
+  /** The front door: `identity`'s `useMailboxConsent`, handed over by the app shell. */
+  useConsent: UseMailboxConsent;
+}
+
+/**
+ * Settings → Mailboxes, inside a workspace. The result the front door came
+ * back with is read once, then cleared from the address bar (a reload
+ * shows the list).
+ */
+export function buildConnectorsRoutes<TParent extends AnyRoute>(
+  parent: TParent,
+  { useConsent }: ConnectorsRouteOptions,
+) {
+  function MailboxesRoute() {
+    const { workspaceId } = useParams({ strict: false });
+    const search: MailboxesSearch = useSearch({ strict: false });
+    const { pathname } = useLocation();
+    const navigate = useNavigate();
+    const workspaces = useWorkspaces();
+    const consent = useConsent({ workspaceId: workspaceId ?? "", returnTo: pathname });
+    const [result] = useState(() => mailboxResult(search));
+    const hasResult = Object.keys(search).length > 0;
+    useEffect(() => {
+      if (hasResult) {
+        void navigate({ to: pathname, search: {}, replace: true });
+      }
+    }, [hasResult, navigate, pathname]);
+    const workspace = workspaces.data?.find((candidate) => candidate.id === workspaceId);
+    // The workspace layout only renders its pages for a workspace in the list.
+    return workspace === undefined ? null : (
+      <MailboxesPage workspace={workspace} consent={consent} result={result} />
+    );
+  }
+
+  const mailboxes = createRoute({
     getParentRoute: () => parent,
-    path: "/connectors",
-    component: ConnectorsHome,
+    path: "/settings/mailboxes",
+    validateSearch: validateMailboxesSearch,
+    component: MailboxesRoute,
   });
-  return [home] as const;
+  return [mailboxes] as const;
 }

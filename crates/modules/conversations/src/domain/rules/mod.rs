@@ -18,7 +18,10 @@ mod effects;
 mod exceptions;
 mod facts;
 
-use campbooks_ai::decide::taught::{self, Surface, TaughtRule};
+use campbooks_ai::decide::{
+    signals::email::{TEMPLATE_MAX_CHARS, subject_words},
+    taught::{self, Surface, TaughtRule},
+};
 use campbooks_kernel::{Error, Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -28,8 +31,10 @@ use utoipa::ToSchema;
 
 pub use apply::{Applied, Before, Context, acting_on, apply, revert};
 pub use arrival::{Arrival, on_arrival};
-pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exceptions};
-pub use facts::{Candidate, candidate, corresponds, fill_templates, scan};
+pub use exceptions::{RuleException, RuleMark, Undone, attach, except, recent_exceptions_of};
+pub use facts::{
+    Candidate, TEMPLATE_PAGE, candidate, corresponds, fill_templates, scan, templates_missing,
+};
 
 use crate::model::{
     ConversationId, InboxId, InboxRole, LabelId, RuleId, RuleOrigin, RuleState, Stream, TeachingId,
@@ -189,11 +194,99 @@ pub fn engine_parts(
     )
 }
 
-/// Check a rule's shape: 400 `invalid_rule` with what is wrong.
+/// Longest value a condition may hold, in characters (an address is at
+/// most 320).
+pub const MAX_VALUE_CHARS: usize = 320;
+
+/// Check a rule's shape: 400 `invalid_rule` when it is not one.
 pub fn validate(conditions: &[RuleCondition], actions: &[RuleAction]) -> Result<()> {
+    let invalid = || Error::BadRequest(crate::MESSAGES.reason("invalid_rule"));
+    let too_long = conditions.iter().any(|c| match c {
+        RuleCondition::SenderAddress(v)
+        | RuleCondition::SenderDomain(v)
+        | RuleCondition::ListId(v)
+        | RuleCondition::SubjectContains(v) => v.chars().count() > MAX_VALUE_CHARS,
+        // No stored template is longer: a longer one could never match.
+        RuleCondition::SubjectTemplate(v) => v.chars().count() > TEMPLATE_MAX_CHARS,
+        RuleCondition::Header(h) => h
+            .value
+            .as_ref()
+            .is_some_and(|v| v.chars().count() > MAX_VALUE_CHARS),
+        RuleCondition::Label(_) | RuleCondition::Stream(_) => false,
+    });
+    if too_long {
+        return Err(invalid());
+    }
     let (c, a) = engine_parts(conditions, actions);
-    TaughtRule::validate(&c, &a)
-        .map_err(|_| Error::BadRequest(crate::MESSAGES.reason("invalid_rule")))
+    TaughtRule::validate(&c, &a).map_err(|_| invalid())
+}
+
+/// `conditions` as stored and compared, so the same rule is always written
+/// the same way: trimmed; addresses, domains and templates lower-cased; list
+/// ids as the engine compares them (no angle brackets); subject words as the
+/// engine reads them (lower-cased, accents dropped, one space apart); and
+/// sorted, without repeats.
+pub fn normalise(conditions: &[RuleCondition]) -> Vec<RuleCondition> {
+    let lower = |v: &str| v.trim().to_lowercase();
+    let mut normal: Vec<RuleCondition> = conditions
+        .iter()
+        .map(|c| match c {
+            RuleCondition::SenderAddress(v) => RuleCondition::SenderAddress(lower(v)),
+            RuleCondition::SenderDomain(v) => RuleCondition::SenderDomain(lower(v)),
+            RuleCondition::ListId(v) => RuleCondition::ListId(taught::normalise_list_id(v)),
+            RuleCondition::SubjectTemplate(v) => RuleCondition::SubjectTemplate(lower(v)),
+            RuleCondition::SubjectContains(v) => {
+                RuleCondition::SubjectContains(subject_words(v).join(" "))
+            }
+            RuleCondition::Header(h) => RuleCondition::Header(HeaderCondition {
+                name: h.name,
+                value: h.value.as_ref().map(|v| v.trim().to_owned()),
+            }),
+            other => other.clone(),
+        })
+        .collect();
+    // Compared as JSON: one order, whatever order they came in.
+    normal.sort_by_cached_key(|c| serde_json::to_string(c).unwrap_or_default());
+    normal.dedup();
+    normal
+}
+
+/// 400 `invalid_rule` unless every label the rule names (in a condition or
+/// an `add_label`) is one of `inbox`'s.
+pub async fn labels_of_inbox(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+) -> Result<()> {
+    let mut named: Vec<LabelId> = conditions
+        .iter()
+        .filter_map(|c| match c {
+            RuleCondition::Label(label) => Some(*label),
+            _ => None,
+        })
+        .chain(actions.iter().filter_map(|a| match a {
+            RuleAction::AddLabel { label } => Some(*label),
+            _ => None,
+        }))
+        .collect();
+    named.sort_unstable();
+    named.dedup();
+    if named.is_empty() {
+        return Ok(());
+    }
+    let found = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM conversations.labels
+            WHERE inbox_id = $1 AND id = ANY($2)"#,
+        inbox as InboxId,
+        &named as &[LabelId],
+    )
+    .fetch_one(conn)
+    .await?;
+    if usize::try_from(found).unwrap_or_default() != named.len() {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
+    }
+    Ok(())
 }
 
 /// The sum of the conditions' weights.
@@ -240,13 +333,16 @@ pub struct Stored {
     pub last_applied_at: Option<DateTime<Utc>>,
     /// Whether its author still may change its inbox (else it is paused).
     pub author_may_act: bool,
+    /// Whether its inbox is kept read-only (its connection was removed): no
+    /// rule acts there any more.
+    pub inbox_detached: bool,
 }
 
 impl Stored {
     /// The state the rule is in: an active rule whose author can no longer
-    /// change the inbox is paused.
+    /// change the inbox, or whose inbox is kept read-only, is paused.
     pub fn effective_state(&self) -> RuleState {
-        if self.state == RuleState::Active && !self.author_may_act {
+        if self.state == RuleState::Active && (!self.author_may_act || self.inbox_detached) {
             RuleState::Paused
         } else {
             self.state
@@ -284,6 +380,7 @@ struct RuleRow {
     applied_count: i32,
     last_applied_at: Option<DateTime<Utc>>,
     author_may_act: bool,
+    inbox_detached: bool,
 }
 
 impl TryFrom<RuleRow> for Stored {
@@ -307,8 +404,23 @@ impl TryFrom<RuleRow> for Stored {
             applied_count: row.applied_count,
             last_applied_at: row.last_applied_at,
             author_may_act: row.author_may_act,
+            inbox_detached: row.inbox_detached,
         })
     }
+}
+
+/// Lock rule `id`'s row (after its runs: `rule_runs::lock_running`) and
+/// return its state as it is now, so a check on it holds until the
+/// transaction ends.
+pub async fn lock_state(conn: &mut PgConnection, id: RuleId) -> Result<Option<RuleState>> {
+    sqlx::query_scalar!(
+        "SELECT state FROM conversations.rules WHERE id = $1 FOR UPDATE",
+        id as RuleId,
+    )
+    .fetch_optional(conn)
+    .await?
+    .map(|state| state.parse())
+    .transpose()
 }
 
 /// Rule `id`, if it exists in the transaction's workspace (not removed).
@@ -327,12 +439,19 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
                r.teaching_id AS "teaching_id: TeachingId", r.conditions, r.actions, r.origin,
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
-               r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
+               r.created_at, r.confirmed_at,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
+               r.last_applied_at,
                (r.taught_by IS NULL OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
-                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!"
+                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
+          JOIN conversations.inboxes i ON i.id = r.inbox_id
          WHERE r.id = $1
         "#,
         id as RuleId,
@@ -351,12 +470,19 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
                r.teaching_id AS "teaching_id: TeachingId", r.conditions, r.actions, r.origin,
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
-               r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
+               r.created_at, r.confirmed_at,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
+               r.last_applied_at,
                (r.taught_by IS NULL OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
-                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!"
+                      AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
+               i.detached_at IS NOT NULL AS "inbox_detached!"
           FROM conversations.rules r
+          JOIN conversations.inboxes i ON i.id = r.inbox_id
          WHERE r.inbox_id = ANY($1) AND r.state <> 'removed'
          ORDER BY r.created_at DESC, r.id DESC
         "#,
@@ -387,22 +513,55 @@ pub async fn is_shared(conn: &mut PgConnection, inbox: InboxId) -> Result<bool> 
     .await?)
 }
 
-/// The caller's role in `inbox`; `None` for a client token or a non-member.
+/// The inboxes among `inboxes` used by more than one member.
+pub async fn shared_of(
+    conn: &mut PgConnection,
+    inboxes: &[InboxId],
+) -> Result<std::collections::HashSet<InboxId>> {
+    Ok(sqlx::query_scalar!(
+        r#"SELECT inbox_id AS "inbox: InboxId" FROM conversations.inbox_members
+            WHERE inbox_id = ANY($1) GROUP BY inbox_id HAVING count(*) > 1"#,
+        inboxes as &[InboxId],
+    )
+    .fetch_all(conn)
+    .await?
+    .into_iter()
+    .collect())
+}
+
+/// `user`'s role in each of `inboxes` they belong to.
+pub async fn roles_of(
+    conn: &mut PgConnection,
+    inboxes: &[InboxId],
+    user: Option<UserId>,
+) -> Result<std::collections::HashMap<InboxId, InboxRole>> {
+    let Some(user) = user else {
+        return Ok(std::collections::HashMap::new());
+    };
+    // Membership alone, as the catalogue's `conversations.rule` reads it.
+    let rows = sqlx::query!(
+        r#"SELECT inbox_id AS "inbox!: InboxId", role AS "role!"
+             FROM conversations.inbox_members
+            WHERE inbox_id = ANY($1) AND user_id = $2"#,
+        inboxes as &[InboxId],
+        user.as_uuid(),
+    )
+    .fetch_all(conn)
+    .await?;
+    rows.into_iter()
+        .map(|r| Ok((r.inbox, r.role.parse::<InboxRole>()?)))
+        .collect()
+}
+
+/// The caller's role in `inbox`; `None` for a non-member (an owner without a
+/// membership row too).
 pub async fn role_in(
     conn: &mut PgConnection,
     inbox: InboxId,
     user: Option<UserId>,
 ) -> Result<Option<InboxRole>> {
     let Some(user) = user else { return Ok(None) };
-    sqlx::query_scalar!(
-        "SELECT role FROM conversations.inbox_members WHERE inbox_id = $1 AND user_id = $2",
-        inbox as InboxId,
-        user.as_uuid(),
-    )
-    .fetch_optional(conn)
-    .await?
-    .map(|r| r.parse::<InboxRole>())
-    .transpose()
+    Ok(roles_of(conn, &[inbox], Some(user)).await?.remove(&inbox))
 }
 
 /// Whether `role` may change a rule taught by `author`: its author while a
@@ -437,39 +596,69 @@ pub struct NewRule<'a> {
     pub from_conversation: Option<ConversationId>,
 }
 
-/// Store a rule, replacing an active one with the same conditions and an
-/// action of the same kind (without putting its mail back). Returns its id.
+/// The active rules of `inbox`, other than `this`, that a rule with
+/// `conditions` (normalised) and `actions` would replace: the same conditions
+/// and an action of the same kind (labels add up, so they replace nothing).
+/// With their authors.
+pub async fn replaced(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+    this: Option<RuleId>,
+) -> Result<Vec<(RuleId, Option<UserId>)>> {
+    let kinds: Vec<String> = actions
+        .iter()
+        .filter(|a| !matches!(a, RuleAction::AddLabel { .. }))
+        .filter_map(|a| serde_json::to_value(a).ok())
+        .filter_map(|v| {
+            v.get("action")
+                .and_then(|k| k.as_str())
+                .map(ToOwned::to_owned)
+        })
+        .collect();
+    // Their running runs first, then the rules: the lock order every path
+    // keeps (`rule_runs::lock_running`).
+    sqlx::query!(
+        r#"SELECT u.id FROM conversations.rule_runs u
+            WHERE u.state = 'running' AND u.rule_id IN (
+                  SELECT id FROM conversations.rules
+                   WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
+                     AND id IS DISTINCT FROM $3)
+            ORDER BY u.id FOR UPDATE OF u"#,
+        inbox as InboxId,
+        json!(conditions),
+        this as Option<RuleId>,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
+    let rows = sqlx::query!(
+        r#"SELECT id AS "id: RuleId", taught_by FROM conversations.rules
+            WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
+              AND id IS DISTINCT FROM $4
+              AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a
+                           WHERE a ->> 'action' = ANY($3))
+            ORDER BY id FOR UPDATE"#,
+        inbox as InboxId,
+        json!(conditions),
+        &kinds,
+        this as Option<RuleId>,
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.id, r.taught_by.map(UserId::from_uuid)))
+        .collect())
+}
+
+/// Store a rule (its conditions normalised by the caller). Returns its id.
 pub async fn insert(
     conn: &mut PgConnection,
     workspace: sqlx::types::Uuid,
     new: &NewRule<'_>,
 ) -> Result<RuleId> {
     let id = RuleId::new();
-    let conditions = json!(new.conditions);
-    if new.state == RuleState::Active {
-        let kinds: Vec<String> = new
-            .actions
-            .iter()
-            .filter(|a| !matches!(a, RuleAction::AddLabel { .. }))
-            .filter_map(|a| serde_json::to_value(a).ok())
-            .filter_map(|v| {
-                v.get("action")
-                    .and_then(|k| k.as_str())
-                    .map(ToOwned::to_owned)
-            })
-            .collect();
-        sqlx::query!(
-            r#"UPDATE conversations.rules SET state = 'removed', removed_at = now(), updated_at = now()
-                WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
-                  AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a
-                               WHERE a ->> 'action' = ANY($3))"#,
-            new.inbox as InboxId,
-            conditions,
-            &kinds,
-        )
-        .execute(&mut *conn)
-        .await?;
-    }
     sqlx::query!(
         r#"
         INSERT INTO conversations.rules
@@ -482,7 +671,7 @@ pub async fn insert(
         workspace,
         new.inbox as InboxId,
         new.teaching as TeachingId,
-        conditions,
+        json!(new.conditions),
         json!(new.actions),
         specificity(new.conditions),
         new.origin.as_str(),

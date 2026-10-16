@@ -5,17 +5,19 @@
 //! token only those client tokens wrote. Writing or sending one takes the
 //! `sender` role or above on its inbox.
 
-use campbooks_kernel::{Error, Result, blobs::BlobRef, tenancy::Access};
+use campbooks_kernel::{
+    AppState, Error, RecordRef, Result, authz::Action, blobs::BlobRef, tenancy::Access,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
-    domain::redact,
+    domain::{redact, resources},
+    events::DRAFT_RECORD,
     model::{
-        Address, AttachmentId, ConversationId, DraftId, DraftKind, DraftState, InboxId, InboxRole,
-        MessageId,
+        Address, AttachmentId, ConversationId, DraftId, DraftKind, DraftState, InboxId, MessageId,
     },
 };
 
@@ -256,45 +258,27 @@ pub async fn find(
     Ok(row)
 }
 
-/// Draft `id`, if `access` may see it and still send from its inbox: 404
-/// when they cannot see it (or no longer belong to its inbox), 403
-/// `inbox_read_only` when they only read the inbox.
+/// Draft `id`, if `access` may take `action` on it (the access catalogue,
+/// `domain::resources`): 404 when they cannot see it (another author's, or
+/// they no longer belong to its inbox), 403 `inbox_read_only` when they
+/// may see it but not do that (a reader writing or sending, a kept inbox).
 pub async fn load(
+    state: &AppState,
     conn: &mut PgConnection,
     access: &Access,
     id: DraftId,
     lock: bool,
+    action: Action,
 ) -> Result<DraftRow> {
-    let row = find(conn, access, id, lock).await?.ok_or(Error::NotFound)?;
-    require_sender(conn, access, row.inbox_id).await?;
-    Ok(row)
-}
-
-/// `access` may send from `inbox`: a user needs the `sender` or `manager`
-/// role (a `reader` gets 403 `inbox_read_only`, a non-member 404); a client
-/// token acts through its scope.
-pub async fn require_sender(
-    conn: &mut PgConnection,
-    access: &Access,
-    inbox: InboxId,
-) -> Result<()> {
-    let Some(user) = access.user else {
-        return Ok(());
-    };
-    let role = sqlx::query_scalar!(
-        "SELECT role FROM conversations.inbox_members WHERE inbox_id = $1 AND user_id = $2",
-        inbox as InboxId,
-        user.as_uuid(),
+    resources::authorize(
+        state,
+        conn,
+        access,
+        action,
+        &RecordRef::new(DRAFT_RECORD, &id),
     )
-    .fetch_optional(conn)
-    .await?
-    .map(|role| role.parse::<InboxRole>())
-    .transpose()?;
-    match role {
-        None => Err(Error::NotFound),
-        Some(InboxRole::Reader) => Err(Error::Denied(crate::MESSAGES.reason("inbox_read_only"))),
-        Some(InboxRole::Sender | InboxRole::Manager) => Ok(()),
-    }
+    .await?;
+    find(conn, access, id, lock).await?.ok_or(Error::NotFound)
 }
 
 /// Whether `address` looks like one mail can be sent to: one `@`, a local

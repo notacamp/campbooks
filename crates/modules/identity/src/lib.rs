@@ -32,6 +32,7 @@ use axum::Extension;
 use campbooks_kernel::{AppState, Background, Module, i18n::Catalogue};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
+mod client_directory;
 mod consent;
 pub mod deps;
 pub mod domain;
@@ -40,15 +41,19 @@ mod features;
 pub mod metadata;
 pub mod protocol;
 mod prune;
+mod resources;
 pub mod scopes;
+mod token_revocation;
 pub mod upstream;
 mod web;
 pub mod webauthn;
 
+pub use client_directory::client_directory;
 pub use consent::consent_door;
 pub use deps::Deps;
 pub use domain::keys::LocalKeys;
 pub use prune::{PRUNE_EVERY, Prune};
+pub use token_revocation::token_revocation;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "identity";
@@ -76,14 +81,19 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::RefreshReuseDetected>()
             .publishes::<events::WayInAdded>()
             .publishes::<events::WayInRemoved>()
+            .publishes::<events::SignedOutEverywhere>()
             .publishes::<events::AccountSuspended>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
+            .consumer(features::forget_connected_way_in::ForgetConnectedWayIn)
+            .consumer(features::name_connected_mailbox::NameConnectedMailbox)
             .consumer(features::member_left::RevokeDepartedConsents)
+            .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)
             .schedule::<Prune>(PRUNE_EVERY),
+        resources: resources::resources(),
     }
 }
 
@@ -96,6 +106,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(features::list_ways_in::handler))
         .routes(routes!(features::remove_way_in::handler))
         .routes(routes!(features::start_link::handler))
+        .routes(routes!(features::sign_out_everywhere::handler))
         .routes(routes!(features::list_consents::handler))
         .routes(routes!(features::revoke_consent::handler))
         .routes(routes!(
@@ -128,9 +139,13 @@ fn passkey_routes() -> OpenApiRouter<AppState> {
 #[cfg(test)]
 mod admin_testkit;
 #[cfg(test)]
+mod allow_list_tests;
+#[cfg(test)]
 mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;
+#[cfg(test)]
+mod revocation_tests;
 #[cfg(test)]
 mod suspension_tests;
 #[cfg(test)]

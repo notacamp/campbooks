@@ -18,9 +18,11 @@
 //!
 //! [`strategy`] puts other ways of answering the same questions behind one
 //! interface: deterministic [`signals`], [`knn`] over the workspace's own
-//! corrections, the model, and cascades of them.
+//! corrections, the model, and cascades of them. [`check`] grades the model
+//! on obvious fictional emails, so a model that answers nonsense is not used.
 
 mod calibration;
+pub mod check;
 pub mod knn;
 pub(crate) mod laya;
 pub(crate) mod openai;

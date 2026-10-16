@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: ConversationId\" FROM conversations.conversations\n            WHERE inbox_id = $1 AND ($2::uuid IS NULL OR id > $2)\n            ORDER BY id LIMIT $3",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "200ceef2680d5e76c07cd555bd4d26e7a6f7693bd1e47b89634c9b533a777e16"
+}

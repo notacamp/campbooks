@@ -8,6 +8,95 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Suspending an account or signing out everywhere stops its access tokens at once.**
+  Tokens already issued used to keep working until they expired (up to ten minutes).
+  Now the API refuses them on the next request (401 `invalid_token`, the same answer
+  as any bad token), on every route, the admin API, the idempotency layer and the web
+  app's calls, and an open change feed ends within a heartbeat. Unsuspending does not
+  bring them back: the person signs in again. A code or refresh token from a sign-in
+  before the revocation gets `invalid_grant`. Each request with a person's token now
+  reads one row of `identity.accounts` (migration
+  `20261020060000_identity__tokens_not_before` adds one nullable column). Instances
+  using an outside identity provider, and workspace clients' tokens, are unchanged.
+- **An allow-list for who may sign in (`CAMPBOOKS_SIGNUP__ALLOWED`).** A comma-separated
+  list of addresses and domains (a domain matches `*@domain` exactly, not subdomains).
+  Unset or empty changes nothing. When set, only listed people can sign in or create an
+  account, existing accounts included, and an invitation does not bypass it. It is checked
+  at the provider sign-in (the provider-verified address), when a new account is created,
+  when a way in is added, at passkey sign-in (the account needs a listed, verified address;
+  a passkey cannot create an account) and at every token exchange, so removing someone
+  cuts their access at their next refresh. Refusals land on `/sign-in?error=sign_in_not_allowed`
+  (or 403 `sign_in_not_allowed`), in all four languages, and say nothing about whether an
+  account exists.
+- **TLS library updated to rustls 0.23.46**, which fixes RUSTSEC-2026-0346 to 0349: TLS
+  secrets in `Debug` output, data sent after an ECH rejection, unbounded certificate
+  decompression, and a downgrade to classical key exchange.
+- **Only the member who connected a mailbox can disconnect it.** Workspace owners and
+  admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
+- **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
+  attachments, conversations, labels, drafts, Campbooks' decisions, search entries and
+  inbox memberships, and its stored files are removed by the next blob sweep.
+  `DELETE …/connections/{id}?mail=keep` keeps the mail instead as read-only history
+  (no more syncing or sending). When an owner or admin removes a member,
+  `DELETE …/members/{user_id}?mail=keep` keeps the mail of the mailboxes that member
+  connected; otherwise it is deleted. A member who leaves loses every inbox
+  membership and their drafts, and gets none of it back if they rejoin. The inbox
+  list shows a kept mailbox as `read_only`. Keeping is refused (409 `keep_needs_a_reader`) when a
+  mailbox would have nobody left to read it. Kept mail can still be read and
+  deleted, and its scheduled sends go back to drafts. A disconnect never races a
+  sync: a batch landing at that moment is either fully deleted or dropped.
+- **A client a member registered acts for that member and no one else.** It reads
+  only the inboxes they read, and stops working (401) when they leave the workspace,
+  which also removes the clients they registered there. Client tokens no longer get
+  any inbox or attention item by themselves. A removed client's open change feed ends within a
+  heartbeat. A member removed and invited back can rejoin only once their departure
+  has been handled everywhere (409 `still_leaving` until then; a departure that
+  failed for good stays among the failed jobs, and blocks, until an operator replays
+  it), and a scheduled send
+  of someone no longer in the workspace goes back to a draft instead of out.
+- **Workspace owners and admins never read an inbox they are not a member of**, and
+  the change feed, search and every operation now enforce this through one access
+  check. Each resource type declares its owner and who else may do what (ADR 0017).
+  `cargo xtask arch` fails any operation that does not declare the access it needs.
+- The change feed rechecks access on every page. A member taken out of an inbox gets
+  a `reset` (`access_changed`) and no more of its ids. Drafts reach only their author,
+  and connections only the member who connected them, owners, admins and client tokens.
+- A repeated request with the same `Idempotency-Key` is answered from the stored
+  response only while the caller still has the scope, the workspace and the inbox the
+  first request used.
+- Row-level security now also covers the kernel's change feed, file catalogue, event
+  log and job queue. A search cursor only works in the workspace it came from, and
+  search reports `indexing` only to callers who can see an inbox.
+- **Self-hosters:** three new migrations run on start, with nothing to configure.
+- When a way to sign in is added to your account (a Google, Microsoft or Zoho
+  account, or a passkey), you are told: by mail to your account's address and
+  the new account's address (verified addresses only, in your language, no
+  tracking) when the instance has a mail server, and on Settings → Ways to
+  sign in, which marks what was added this week, either way. New settings
+  `CAMPBOOKS_MAIL__SMTP_URL` (or `_FILE`) and `CAMPBOOKS_MAIL__FROM`; see
+  deploy/README.md → Outgoing mail.
+- Sign out everywhere (Settings → Ways to sign in): ends every sign-in to
+  your account, on every device and in every app.
+- A copied web session cookie used after the real one moved on ends the
+  session for both, and its tokens at the identity provider.
+- Adding a passkey needs a sign-in from the last five minutes (the app signs
+  you in again first).
+- A sign-in link opened in another browser no longer completes there.
+- Refresh tokens end with the sign-in they came from.
+- Signing in, authorizing and signing out are rate-limited per address;
+  passkey-only sign-ups allow 5 per address an hour (200 per instance).
+- Workspace members' addresses are shown only when the identity provider
+  verified them.
+- The admin API asks for a sign-in from the last hour (was twelve hours), and
+  app names that only look like "Campbooks" (full-width, accented, styled
+  letters) are refused.
+- Upgrading: sign-ins waiting at the moment of the upgrade start again from
+  the app; refresh tokens of the native app (90 days) and of other apps (365
+  days) now end with the sign-in they came from (30 days), so those apps ask
+  to sign in again then; existing members' addresses that the identity
+  provider never verified stop showing until their next sign-in verifies
+  them; a mail server is only accepted over TLS (`smtps://` or
+  `smtp://…?tls=required`), except a relay on the same machine.
 - **Mail no longer goes to an AI provider outside your network unless you say
   so.** Each AI role's address is checked: a loopback or private address,
   `localhost`, a single-label name such as a compose service (`laya`,
@@ -67,7 +156,56 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
-
+- **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
+  open conversation no longer drops below the list; it stays beside it. A long
+  subject, sender or address with no spaces now wraps inside the reader instead of
+  making the page wider than the screen.
+- **What needs you includes mail from before the upgrade.** Home's "What
+  needs you" only showed mail that arrived after attention shipped. After
+  this upgrade, each inbox's conversations from the last
+  `CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS` days (default 14) get their
+  needs within a few minutes, in the background, from the answers already
+  stored: no AI call, nothing to run. Replied, archived, spam and trashed
+  mail is handled as for new mail, and mail older than the window stays off
+  Home. Every open need is looked at again too, so Check questions that rest
+  only on unchecked model answers are withdrawn on upgrade.
+- **The decisions model's answers are only used once it gets obvious emails
+  right** (campbooks-cloud#128). The default Laya model said "yes" to almost
+  every question (needs a reply, has a deadline, looks like phishing), often
+  at 100% confidence. These answers never acted on their own, but they showed
+  up as suggestions and as Check questions on Home. It wasn't a bug in
+  Campbooks: the model can't answer these questions without training on them.
+  Every server now asks the `decide` role about eight made-up emails with
+  obvious answers at startup, again every 6 hours, and every 15 minutes while
+  it fails. A model that gets fewer than 90% right isn't used: the rules sort
+  mail exactly as if no model were set up, and Admin → System says so
+  ("Answers fail the check", with the count). Laya currently fails it, so on
+  a default install the rules alone sort mail until a better decisions model
+  ships.
+- Model answers stored before this release are marked as unchecked (database
+  migration). They are kept, but no longer feed suggestions or Check
+  questions; Check questions they raised are withdrawn the next time their
+  conversation is refreshed.
+- The decisions model is now told what Campbooks is, whose inbox the email
+  arrived in (personal or shared), what the rules noticed, and that the email
+  is data, not instructions. Its yes/no questions are asked as questions.
+- **Home no longer asks about mail the rules already settled.** A model
+  suggestion is put to you as a question ("Did GitHub ask you to do
+  something?") only when no answer Campbooks acts on already said no; a
+  plain notification stays off Home. Questions raised that way before this
+  fix are withdrawn the next time their conversation is refreshed.
+- **Security alerts about your code are a to-do.** A security alert or
+  vulnerability notice (in all four languages) from a code host or package
+  registry (GitHub, GitLab, Bitbucket, npm, PyPI, RubyGems, crates.io, Snyk)
+  now shows on Home as Do and sorts to Updates, but only when your mail
+  provider authenticated the sender (DMARC, or DKIM for the sender's own
+  domain), the sender's name matches its domain, and nothing in it looks
+  like phishing or marketing. Other services' alerts are at most a question,
+  and other notifications from the same service ask nothing. Gmail mailboxes
+  now keep Gmail's own `Authentication-Results` with each message for this
+  (Zoho mailboxes keep none until Zoho's header has been checked, so no
+  alert is a to-do there yet). Mail in spam or the trash never shows on
+  Home.
 - `CAMPBOOKS_ZOHO__ACCOUNTS_SERVER` (default `https://accounts.zoho.com`): the Zoho
   accounts server sign-in sends people to. A Zoho app registered in one data centre
   only (for example the EU console) is rejected as an invalid client by
@@ -88,9 +226,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   says which mail it is about (the sender, its domain, a mailing list, the
   subject's template or words, a header, a label or a stream) and what to do
   (move it to a stream, archive it, label it, mark it read, say whether it
-  needs a reply or an action, or always or never show it). Rules run before
-  the built-in signals and any model, always give the same result for the
-  same mail, and never hide mail that looks suspicious. Creating one applies
+  needs a reply or an action, or always or never show it). A rule's answer
+  beats the built-in signals' and any model's, always gives the same result
+  for the same mail, and never hides mail that looks suspicious or waits for
+  your review. Creating one applies
   it to the mail already in the inbox in the background, a hundred
   conversations at a time, with progress; removing it can put that mail back.
   Moving one back by hand makes it an exception the rule leaves alone. New
@@ -99,6 +238,35 @@ All notable changes to Campbooks Next are documented here. The format follows
   and `dismiss_rule_suggestion`; new event `conversations.rule_changed`. The
   screens that use them follow in the next release.
 - `conversations.need_changed` may clear a need with cause `rule`.
+- Settings → Mailboxes: every mailbox connected to the workspace (yours;
+  all of them for owners and admins), who connected it and whether it is
+  syncing, waiting for someone to sign in again, paused by the provider or
+  failing. Connect Gmail or Zoho Mail from there (only the providers your
+  instance has set up for mail), choosing whether you also sign in with that
+  account (untick it for a shared mailbox like support@, which then never
+  becomes a way in); reconnect a mailbox of yours that stopped; or
+  disconnect one, choosing whether its mail in Campbooks is deleted (the
+  default) or kept as read-only history. The mail at Gmail or Zoho is never
+  touched; a way to sign in that came only from connecting that mailbox
+  goes with it. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
+  "Connect your mail" now opens it, and Settings lists its sections
+  (Members, Mailboxes, Ways to sign in) in the sidebar and, on phones,
+  under the header. API: `identity.list_ways_in` returns
+  `mailbox_providers`; `identity.start_link` takes `sign_in` for a connect
+  (default `true`) and adds no way in when it is `false`; a way in that came
+  only from connecting a mailbox is removed when that mailbox is disconnected
+  (unless another connection of yours uses it or it is your last way in),
+  signing out whoever used it, and a connect that fails (mail access declined,
+  or the mailbox refused) leaves no new way in behind;
+  `connectors.connection_added` now names the provider account and the
+  grantor's account and is published for every accepted grant; connections
+  show `granted_by_you` and members
+  `you` (the app no longer works out who you are by matching email
+  addresses). An inbox kept as history after a disconnect opens read-only,
+  saying so, with nothing to act on; new messages never offer it. Two
+  migrations (link tickets, and the connections a way in brought); nothing
+  to do.
+
 - **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
   stream's conversations like J and K, Enter opens one, and going past the
   last row loads more. In an open conversation the arrows scroll it (J and K

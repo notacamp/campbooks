@@ -28,6 +28,15 @@ pub trait Visibility: std::fmt::Debug + Send + Sync + 'static {
         container: &'a RecordRef,
     ) -> VisibilityFuture<'a>;
 
+    /// Record types whose changes may change who sees inside a container
+    /// (a membership of an inbox). An open change stream that reads one asks
+    /// again about every container it has shown, and tells the client to
+    /// drop its cache when one went out of sight. Streams also ask again on
+    /// every page and heartbeat, so this only makes the switch immediate.
+    fn access_records(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     /// Every container of `container_type` the caller with `access` may see
     /// records inside, for queries that span them all (search). None by
     /// default: a port that cannot list fails closed.

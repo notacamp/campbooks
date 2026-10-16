@@ -1,4 +1,7 @@
-//! The module's own language: a member's proactivity.
+//! The module's own language: a member's proactivity, and its part of the
+//! access catalogue.
+
+pub mod resources;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

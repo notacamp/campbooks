@@ -240,6 +240,26 @@ fn validation() {
         ),
         Ok(())
     );
+    for suffix in ["co.uk", "com.br", "com"] {
+        assert_eq!(
+            ok(
+                vec![
+                    Condition::SenderDomain(suffix.into()),
+                    Condition::SubjectTemplate("weekly report #".into())
+                ],
+                vec![Action::Archive]
+            ),
+            Err(Invalid::Value),
+            "{suffix}"
+        );
+    }
+    assert_eq!(
+        ok(
+            vec![Condition::SenderDomain("hotmail.co.uk".into())],
+            vec![Action::Archive]
+        ),
+        Err(Invalid::FreeMailDomain)
+    );
     assert_eq!(
         ok(
             vec![Condition::Stream("updates".into())],

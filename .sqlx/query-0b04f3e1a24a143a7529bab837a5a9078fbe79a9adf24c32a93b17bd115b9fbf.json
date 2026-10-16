@@ -1,0 +1,64 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: DraftId\", inbox_id AS \"inbox: InboxId\",\n                      conversation_id AS \"conversation: ConversationId\",\n                      author AS \"author: UserId\"\n                 FROM conversations.drafts\n                WHERE send_id = $1 AND state IN ('sending', 'failed')\n                  FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: DraftId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "conversation: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "conversation_id"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "author: UserId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.drafts",
+            "name": "author"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      true
+    ]
+  },
+  "hash": "0b04f3e1a24a143a7529bab837a5a9078fbe79a9adf24c32a93b17bd115b9fbf"
+}

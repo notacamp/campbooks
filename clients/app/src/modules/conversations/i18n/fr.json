@@ -51,7 +51,11 @@
     "older_one": "{{count}} message plus ancien",
     "older_other": "{{count}} messages plus anciens",
     "showOlder": "Afficher",
-    "attachments": "Pièces jointes"
+    "attachments": "Pièces jointes",
+    "kept": {
+      "title": "Gardée comme historique",
+      "lead": "{{address}} a été déconnectée et ses e-mails sont gardés ici, en lecture seule : rien de nouveau n’arrive, et rien ne peut être envoyé ni modifié depuis cette boîte."
+    }
   },
   "actions": {
     "star": "Suivre",
@@ -99,7 +103,7 @@
     "whyHasDeadline": "Mentionne une date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspect",
-    "sortedTaught": "Campbooks l’a rangée dans {{stream}}, comme vous le lui avez appris"
+    "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
   },
   "reasons": {
     "signals": {
@@ -124,6 +128,7 @@
       "payment_due": "Un paiement est attendu (« {{evidence}} »).",
       "already_paid": "Il dit que c’est déjà payé (« {{evidence}} »).",
       "action_asked": "Il vous demande de faire quelque chose (« {{evidence}} »).",
+      "security_alert": "C’est une alerte de sécurité sur quelque chose qui vous concerne (« {{evidence}} »).",
       "conditional_ask": "Il ne demande quelque chose que si c’est le cas (« {{evidence}} »).",
       "notice": "C’est un avis : rien à faire.",
       "request": "Il fait une demande (« {{evidence}} »).",
@@ -142,7 +147,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "Campbooks suit une règle que vous lui avez apprise pour les e-mails comme celui-ci."
+      "rule": "Campbooks suit une règle enseignée pour les e-mails comme celui-ci."
     }
   },
   "shortcuts": {
@@ -215,7 +220,9 @@
       "pay": "{{name}} a envoyé une facture à payer",
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
-      "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?"
+      "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
+      "taughtReply": "{{name}} : à répondre, selon une règle",
+      "taughtDo": "{{name}} : à faire, selon une règle"
     },
     "chip": {
       "reply": "À répondre",
@@ -242,7 +249,7 @@
         "model": "Modèle",
         "knn": "Courriers similaires",
         "cascade": "Règles puis modèle",
-        "taught": "Votre règle"
+        "taught": "Une règle"
       },
       "suggestion": "une suggestion",
       "actsFrom": "agit à partir de {{threshold}}",

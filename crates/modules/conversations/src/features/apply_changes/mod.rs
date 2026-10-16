@@ -98,6 +98,35 @@ impl ApplyChanges {
     }
 }
 
+/// The batch `payload` points at, checked: within the size limit, parsing,
+/// of the supported version and for the payload's inbox.
+async fn read_batch(
+    state: &AppState,
+    ws: &str,
+    payload: &ApplyChangesPayload,
+) -> Result<MessageChangeBatch, JobError> {
+    let (bytes, cut) = read_bytes(&state.blobs, ws, &payload.batch, MAX_BATCH_BYTES).await?;
+    if cut {
+        return Err(JobError::fatal("the change batch is larger than the limit"));
+    }
+    let batch: MessageChangeBatch = serde_json::from_slice(&bytes).map_err(|e| {
+        JobError::fatal(format!(
+            "the change batch does not parse: {}",
+            redact::json(&e)
+        ))
+    })?;
+    if batch.version != BATCH_VERSION {
+        return Err(JobError::fatal(format!(
+            "change batch version {} is not supported (expected {BATCH_VERSION})",
+            batch.version
+        )));
+    }
+    if batch.inbox != payload.inbox {
+        return Err(JobError::fatal("the change batch names another inbox"));
+    }
+    Ok(batch)
+}
+
 impl JobHandler for ApplyChanges {
     type Payload = ApplyChangesPayload;
     const NAME: &'static str = "conversations.apply_changes";
@@ -115,31 +144,53 @@ impl JobHandler for ApplyChanges {
         let state = ctx.state().clone();
         let ws = workspace.to_string();
 
-        let (bytes, cut) = read_bytes(&state.blobs, &ws, &payload.batch, MAX_BATCH_BYTES).await?;
-        if cut {
-            return Err(JobError::fatal("the change batch is larger than the limit"));
+        if closed(&state, workspace, payload.inbox).await? {
+            // Deleted with its connection, or kept read-only: nothing syncs
+            // into it any more. The batch is let go.
+            let tx = ctx.tx().await?;
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox is closed");
+            return Ok(());
         }
-        let batch: MessageChangeBatch = serde_json::from_slice(&bytes).map_err(|e| {
-            JobError::fatal(format!(
-                "the change batch does not parse: {}",
-                redact::json(&e)
-            ))
-        })?;
-        if batch.version != BATCH_VERSION {
-            return Err(JobError::fatal(format!(
-                "change batch version {} is not supported (expected {BATCH_VERSION})",
-                batch.version
-            )));
-        }
-        if batch.inbox != payload.inbox {
-            return Err(JobError::fatal("the change batch names another inbox"));
-        }
+
+        let batch = read_batch(&state, &ws, &payload).await?;
 
         let known = survey(&state, workspace, &batch).await?;
         let prepared = self.prepare(&state, &ws, &batch, known).await?;
 
         let events = state.events.clone();
         let tx = ctx.tx().await?;
+        // Asked again in the transaction that writes, holding the inbox
+        // `FOR SHARE` until it commits: a disconnect deleting or freezing it
+        // waits for this batch, or this batch sees it is closed.
+        let open = sqlx::query_scalar!(
+            r#"SELECT detached_at IS NULL AS "open!" FROM conversations.inboxes
+                WHERE id = $1 FOR SHARE"#,
+            batch.inbox as InboxId
+        )
+        .fetch_optional(&mut **tx)
+        .await?;
+        if open != Some(true) {
+            state
+                .blobs
+                .detach(
+                    tx,
+                    &ws,
+                    &payload.batch.hash,
+                    &BlobOwner::new(BATCH_RECORD, payload.inbox),
+                )
+                .await?;
+            tracing::info!(inbox = %payload.inbox, "change batch dropped: the inbox closed meanwhile");
+            return Ok(());
+        }
         let mut apply = Apply {
             state: &state,
             events: &events,
@@ -165,6 +216,11 @@ impl JobHandler for ApplyChanges {
             }
         }
         apply.finish(tx).await?;
+        // Mail stored before subject templates existed gets them in the
+        // background, a page at a time.
+        if rules::templates_missing(tx, batch.inbox).await? {
+            crate::features::fill_templates::enqueue(tx, &ws, batch.inbox).await?;
+        }
         // Applied: the batch is no longer needed (the sweep removes it once
         // nothing else holds it).
         state
@@ -215,6 +271,25 @@ async fn survey(
     .await?;
     tx.commit().await?;
     Ok(known.into_iter().collect())
+}
+
+/// Whether `inbox` was deleted with its connection or kept read-only.
+async fn closed(
+    state: &AppState,
+    workspace: WorkspaceId,
+    inbox: InboxId,
+) -> Result<bool, JobError> {
+    let mut tx = state.db.begin_for(workspace).await?;
+    let closed = sqlx::query_scalar!(
+        r#"SELECT EXISTS (SELECT 1 FROM conversations.removed_inboxes WHERE inbox_id = $1)
+               OR EXISTS (SELECT 1 FROM conversations.inboxes
+                           WHERE id = $1 AND detached_at IS NOT NULL) AS "closed!""#,
+        inbox as InboxId
+    )
+    .fetch_one(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok(closed)
 }
 
 /// What step 2 found out about a new message.
@@ -566,33 +641,45 @@ impl Apply<'_> {
         if all.is_empty() {
             return Ok(Outcome::default());
         }
-        let (acting, stream, labels) = match found {
+        let (acting, stream, labels, under_review) = match found {
             Some(conversation) => {
                 let acting = rules::acting_on(tx, all, conversation).await?;
                 let row = sqlx::query!(
                     r#"SELECT c.stream,
                               coalesce((SELECT array_agg(cl.label_id::text)
                                           FROM conversations.conversation_labels cl
-                                         WHERE cl.conversation_id = c.id), '{}') AS "labels!"
+                                         WHERE cl.conversation_id = c.id), '{}') AS "labels!",
+                              (EXISTS (SELECT 1 FROM conversations.needs n
+                                        WHERE n.conversation_id = c.id AND n.state = 'open'
+                                          AND n.reason = 'review')
+                               OR EXISTS (SELECT 1 FROM conversations.decisions d
+                                           WHERE d.conversation_id = c.id
+                                             AND d.question = 'suspicious'
+                                             AND d.value = 'true'::jsonb)) AS "under_review!"
                          FROM conversations.conversations c WHERE c.id = $1"#,
                     conversation as ConversationId,
                 )
                 .fetch_one(&mut **tx)
                 .await?;
-                (acting, row.stream, row.labels)
+                (acting, row.stream, row.labels, row.under_review)
             }
             None => (
                 all.to_vec(),
                 Stream::Primary.as_str().to_owned(),
                 Vec::new(),
+                false,
             ),
         };
         let questions = triage_questions();
-        let suspicious = questions.iter().zip(&prepared.answers).any(|(q, a)| {
-            q.id == triage::SUSPICIOUS
-                && a.as_ref()
-                    .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
-        });
+        // Suspicious mail, a conversation with an earlier suspicious
+        // message, or one with an open Review need, is never hidden by a
+        // rule (archiving would clear the Review).
+        let suspicious = under_review
+            || questions.iter().zip(&prepared.answers).any(|(q, a)| {
+                q.id == triage::SUSPICIOUS
+                    && a.as_ref()
+                        .is_some_and(|d| d.answer.value == AnswerValue::Noul(true))
+            });
         let sender = message.from.address.to_lowercase();
         let facts = Facts {
             sender_address: &sender,

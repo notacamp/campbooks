@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT nullif(current_setting($1, true), '')",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "nullif",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "a1f106f41162f230970e4777f4cfda58667648b12eb2bf84564f61ba44c33d6a"
+}

@@ -4,12 +4,13 @@
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
 //! - **Raised** ([`raise`], pure) from the decide pass's answers about the
-//!   newest inbound message: `pay`, `reply` or `do` from answers the policy
+//!   newest inbound message that is not in spam or the trash: `pay`, `reply` or `do` from answers the policy
 //!   let act; `review` for a suspicious message (a warning) or, when a model
 //!   answers, for a suggestion put to the member as a question.
 //! - **Settled** ([`settle`], pure) against what happened since: a reply
-//!   clears Reply and Do, an archive clears Reply and Review, the trash
-//!   clears everything, and a member's verdict (Done, Not needed, a confirmed
+//!   clears Reply and Do, an archive clears Reply and Review, the trash or
+//!   spam (the conversation's, or the need's own message's) clears
+//!   everything, and a member's verdict (Done, Not needed, a confirmed
 //!   question) wins.
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did.
@@ -129,12 +130,23 @@ pub struct Need {
     pub urgent: bool,
 }
 
-/// The first answer to `question` that is true and acted.
+/// The answer to `question` the policy let act, when it says yes: the
+/// rules' answer when they acted, else the model's. An acted "no" from the
+/// rules wins over a model's acted "yes".
 fn accepted<'a>(answers: &'a [Answer], question: &str) -> Option<&'a Answer> {
     answers
         .iter()
-        .filter(|a| a.question == question && a.acted && a.is_true())
+        .filter(|a| a.question == question && a.acted)
         .min_by_key(|a| a.basis != NeedBasis::Rules)
+        .filter(|a| a.is_true())
+}
+
+/// Whether an answer the policy let act says "no" to `question`: the
+/// question is settled, and no suggestion reopens it.
+fn settled_no(answers: &[Answer], question: &str) -> bool {
+    answers
+        .iter()
+        .any(|a| a.question == question && a.acted && !a.is_true())
 }
 
 /// The need the answers about `message` (sent on `sent_on`) raise, if any.
@@ -195,12 +207,15 @@ pub fn raise(
             asks,
         ))
     } else {
-        // A model suggestion the policy does not accept, put as a question.
+        // A model suggestion the policy does not accept, put as a question,
+        // unless an answer that acted already said no: the rules were sure
+        // (a notification asks nothing of you), so there is nothing to ask.
         [
             (triage::NEEDS_REPLY, NeedQuestion::NeedsReply),
             (triage::ASKS_ACTION, NeedQuestion::AsksAction),
         ]
         .into_iter()
+        .filter(|(id, _)| !settled_no(answers, id))
         .find_map(|(id, question)| {
             answers
                 .iter()
@@ -285,7 +300,8 @@ pub struct Since {
     pub replied: bool,
     /// The conversation is archived.
     pub archived: bool,
-    /// Every message is in the trash or spam, or the message is gone.
+    /// Every message is in the trash or spam, or the message is gone or in
+    /// spam or the trash itself.
     pub trashed: bool,
     /// A member's verdict on this message's need.
     pub verdict: Option<NeedVerdict>,
@@ -409,12 +425,15 @@ async fn current(conn: &mut PgConnection, conversation: ConversationId) -> Resul
     .await?)
 }
 
-/// The answers stored about `message`.
+/// The answers stored about `message`. A model's answer counts only when it
+/// was given while the model passed its answers check
+/// (`campbooks_ai::decide::check::STAMP`): the rest are kept, never read.
 async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answer>> {
     let rows = sqlx::query!(
         r#"
         SELECT id AS "id: DecisionId", question, source, value, confidence, acted, reasons
-          FROM conversations.decisions WHERE message_id = $1
+          FROM conversations.decisions
+         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')
         "#,
         message as MessageId,
     )
@@ -440,18 +459,31 @@ async fn answers(conn: &mut PgConnection, message: MessageId) -> Result<Vec<Answ
         .collect()
 }
 
-/// The need the conversation has now, before settling: what its newest
-/// inbound message raises when that is recent (or is the one the stored need
-/// already comes from), else the stored need while it is open.
+/// The need a conversation has now, before settling.
+struct Candidate {
+    /// What its newest inbound message raises when that is recent (or is
+    /// the one the stored need already comes from), else the stored need
+    /// while it is open.
+    need: Option<Need>,
+    /// Its newest inbound message.
+    latest: Option<MessageId>,
+    /// The stored open need's own message, read again, raises nothing now
+    /// (its answers no longer support it, e.g. a question the rules had
+    /// already settled), and no member confirmed it: it is withdrawn.
+    withdrawn: bool,
+}
+
+/// The need conversation `id` has now, before settling.
 async fn candidate(
     tx: &mut Transaction<'_, Postgres>,
     id: ConversationId,
     row: Option<&Row>,
     settings: &NeedSettings,
-) -> Result<(Option<Need>, Option<MessageId>)> {
+) -> Result<Candidate> {
     let newest = sqlx::query!(
         r#"SELECT id AS "id: MessageId", sent_at FROM conversations.messages
             WHERE conversation_id = $1 AND direction = 'inbound'
+              AND NOT in_spam AND NOT in_trash
             ORDER BY sent_at DESC, id DESC LIMIT 1"#,
         id as ConversationId,
     )
@@ -462,10 +494,11 @@ async fn candidate(
     // the one the stored need already comes from); else an open need stays
     // as it is, settled against what happened since.
     let mut raised = None;
+    let mut reread = false;
     if let Some(newest) = &newest {
         let recent = newest.sent_at >= Utc::now() - settings.window;
-        let same = row.is_some_and(|r| r.message_id == newest.id);
-        if recent || same {
+        reread = row.is_some_and(|r| r.message_id == newest.id);
+        if recent || reread {
             let answers = answers(tx, newest.id).await?;
             raised = raise(
                 newest.id,
@@ -475,12 +508,23 @@ async fn candidate(
             );
         }
     }
-    let need = match (raised, row) {
-        (Some(need), _) => Some(need),
-        (None, Some(row)) if row.state == "open" => Some(row.need()?),
-        (None, _) => None,
+    let open = row.filter(|r| r.state == "open");
+    let withdrawn = match open {
+        Some(row) if reread && raised.is_none() => {
+            row.verdict_on(row.message_id)? != Some(NeedVerdict::Confirmed)
+        }
+        _ => false,
     };
-    Ok((need, newest.map(|n| n.id)))
+    let need = match (raised, open) {
+        (Some(need), _) => Some(need),
+        (None, Some(row)) => Some(row.need()?),
+        (None, None) => None,
+    };
+    Ok(Candidate {
+        need,
+        latest: newest.map(|n| n.id),
+        withdrawn,
+    })
 }
 
 /// What happened in conversation `id` since `need`'s message, given whether
@@ -493,8 +537,10 @@ async fn since(
     row: Option<&Row>,
     need: &Need,
 ) -> Result<(Since, Option<DateTime<Utc>>)> {
+    // A message in spam or the trash needs nothing, as one that is gone.
     let sent = sqlx::query_scalar!(
-        "SELECT sent_at FROM conversations.messages WHERE id = $1",
+        "SELECT sent_at FROM conversations.messages
+          WHERE id = $1 AND NOT in_spam AND NOT in_trash",
         need.message as MessageId,
     )
     .fetch_optional(&mut **tx)
@@ -533,9 +579,44 @@ async fn since(
     ))
 }
 
+/// A conversation whose need can change.
+struct LiveConversation {
+    workspace_id: sqlx::types::Uuid,
+    inbox: InboxId,
+    archived: bool,
+    trashed: bool,
+}
+
+/// Conversation `id`, unless it is gone or in a kept, read-only inbox (its
+/// connection removed): that is history, and nothing in it changes what it
+/// needs.
+async fn live_conversation(
+    tx: &mut Transaction<'_, Postgres>,
+    id: ConversationId,
+) -> Result<Option<LiveConversation>> {
+    let row = sqlx::query!(
+        r#"SELECT c.workspace_id, c.inbox_id AS "inbox: InboxId",
+                  c.archived_at IS NOT NULL AS "archived!", c.trashed,
+                  i.detached_at IS NOT NULL AS "detached!"
+             FROM conversations.conversations c
+             JOIN conversations.inboxes i ON i.id = c.inbox_id
+            WHERE c.id = $1"#,
+        id as ConversationId,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
+    Ok(row.filter(|r| !r.detached).map(|r| LiveConversation {
+        workspace_id: r.workspace_id,
+        inbox: r.inbox,
+        archived: r.archived,
+        trashed: r.trashed,
+    }))
+}
+
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
-/// gone, or has no inbound message, changes nothing.
+/// gone, has no inbound message, or is in a kept read-only inbox
+/// (`detached_at`) changes nothing.
 pub async fn refresh(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -543,26 +624,26 @@ pub async fn refresh(
     id: ConversationId,
     settings: &NeedSettings,
 ) -> Result<()> {
-    let Some(conversation) = sqlx::query!(
-        r#"SELECT workspace_id, inbox_id AS "inbox: InboxId", archived_at IS NOT NULL AS "archived!",
-                  trashed
-             FROM conversations.conversations WHERE id = $1"#,
-        id as ConversationId,
-    )
-    .fetch_optional(&mut **tx)
-    .await?
-    else {
+    let Some(conversation) = live_conversation(tx, id).await? else {
         return Ok(());
     };
     let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
-    let (need, latest) = candidate(tx, id, row.as_ref(), settings).await?;
+    let Candidate {
+        need,
+        latest,
+        withdrawn,
+    } = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
         return Ok(());
     };
 
     let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
-    let settled = settle(need, since);
+    let settled = match settle(need, since) {
+        // Its own message no longer raises it: cleared as replaced.
+        Settled::Open(need) if withdrawn => Settled::Cleared(need, ClearCause::Superseded),
+        settled => settled,
+    };
 
     let (need, cause) = match &settled {
         Settled::Open(need) => (need, None),
@@ -1007,8 +1088,9 @@ mod tests {
 
     #[test]
     fn a_confident_model_suggestion_is_a_question() {
+        // The rules said no, below the confidence they act from: unsure.
         let need = raised(&[
-            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), false),
             answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
         ])
         .unwrap();
@@ -1019,6 +1101,111 @@ mod tests {
         let mut unsure = answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false);
         unsure.confidence = Some(0.6);
         assert_eq!(raised(&[unsure]), None);
+    }
+
+    fn confident(mut a: Answer, confidence: f64) -> Answer {
+        a.confidence = Some(confidence);
+        a
+    }
+
+    /// A code host's notification as stored in production: the rules sure
+    /// it asks nothing (list mail, a service sender, no date) and acted; the
+    /// model, unmeasured so never acting, says it asks for an action.
+    fn notification_answers() -> Vec<Answer> {
+        vec![
+            with_reason(
+                confident(
+                    answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(false), true),
+                    0.97,
+                ),
+                "signals.list_mail",
+                "",
+                None,
+            ),
+            confident(
+                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
+                0.875,
+            ),
+            with_reason(
+                confident(
+                    answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
+                    0.99,
+                ),
+                "signals.service_sender",
+                "",
+                None,
+            ),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(false), false),
+            confident(
+                answer(triage::HAS_DEADLINE, NeedBasis::Rules, json!(false), true),
+                0.95,
+            ),
+            confident(
+                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), false),
+                0.976,
+            ),
+        ]
+    }
+
+    #[test]
+    fn a_suggestion_against_a_settled_answer_is_no_question() {
+        assert_eq!(raised(&notification_answers()), None);
+    }
+
+    #[test]
+    fn a_model_suggestion_alone_is_still_a_question() {
+        let need = raised(&[confident(
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
+            0.875,
+        )])
+        .unwrap();
+        assert_eq!(
+            (need.reason, need.trust, need.question),
+            (
+                NeedReason::Review,
+                NeedTrust::Check,
+                NeedQuestion::AsksAction
+            )
+        );
+    }
+
+    #[test]
+    fn an_acted_rules_yes_is_a_sure_do() {
+        let mut answers = notification_answers();
+        answers[0] = with_reason(
+            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
+            "signals.security_alert",
+            "vulnerability",
+            None,
+        );
+        let need = raised(&answers).unwrap();
+        assert_eq!(
+            (need.reason, need.trust, need.basis),
+            (NeedReason::Do, NeedTrust::Sure, NeedBasis::Rules)
+        );
+        // The model's deadline is a suggestion: no due date.
+        assert_eq!(need.due_on, None);
+    }
+
+    #[test]
+    fn the_rules_acted_no_beats_an_acted_model_yes() {
+        // Were a model answer ever to act, the rules' acted answer still
+        // wins for the same question.
+        let need = raised(&[
+            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
+            answer(triage::HAS_DEADLINE, NeedBasis::Rules, json!(false), true),
+            with_reason(
+                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+                DEADLINE,
+                "Friday",
+                None,
+            ),
+            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+        ])
+        .unwrap();
+        assert_eq!(need.reason, NeedReason::Do);
+        assert_eq!(need.due_on, None);
     }
 
     fn need(reason: NeedReason) -> Need {

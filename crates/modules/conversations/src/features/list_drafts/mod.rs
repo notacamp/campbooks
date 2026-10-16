@@ -12,6 +12,8 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::DRAFT_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -21,6 +23,7 @@ use crate::{
     model::{ConversationId, DraftId, InboxId},
     scopes::ConversationsSend,
 };
+use campbooks_kernel::authz::Action;
 
 /// Most drafts listed.
 pub const MAX_DRAFTS: i64 = 50;
@@ -49,7 +52,7 @@ pub struct DraftList {
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         DraftFilter,
@@ -70,6 +73,7 @@ pub async fn list(
     extract::Query(filter): extract::Query<DraftFilter>,
 ) -> Result<Json<DraftList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, DRAFT_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let ids = sqlx::query_scalar!(
@@ -103,7 +107,7 @@ pub async fn list(
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.draft"])))),
+        .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("draft_id" = DraftId, Path, description = "The draft."),
@@ -125,7 +129,7 @@ pub async fn get(
 ) -> Result<Json<DraftView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let draft = drafts::load(&mut tx, access, path.draft_id, false)
+    let draft = drafts::load(&state, &mut tx, access, path.draft_id, false, Action::Read)
         .await?
         .view()?;
     tx.commit().await?;

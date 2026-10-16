@@ -20,11 +20,11 @@ const SCREEN: [(&str, &str); 3] = [
     ("content-type", "application/json"),
 ];
 
-fn device() -> Authenticator {
+pub(crate) fn device() -> Authenticator {
     Authenticator::new(ORIGIN, "localhost")
 }
 
-async fn count(kit: &Kit, sql: &'static str) -> i64 {
+pub(crate) async fn count(kit: &Kit, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql)
         .fetch_one(&kit.state.db)
         .await
@@ -32,14 +32,14 @@ async fn count(kit: &Kit, sql: &'static str) -> i64 {
 }
 
 /// A sign-in screen action: POST `body` as JSON with the CSRF header.
-async fn screen(kit: &Kit, path: &str, body: &Value) -> Response {
+pub(crate) async fn screen(kit: &Kit, path: &str, body: &Value) -> Response {
     kit.request(Method::POST, path, &SCREEN, Some(body.to_string()))
         .await
 }
 
 /// The web client's authorization request: the sign-in screen's `request`
 /// and the PKCE verifier.
-async fn waiting_request(kit: &Kit) -> (String, String) {
+pub(crate) async fn waiting_request(kit: &Kit) -> (String, String) {
     let (url, verifier) = Kit::web_authorize();
     let to_sign_in = kit.get(&url).await;
     (to_sign_in.location_query()["request"].clone(), verifier)
@@ -47,7 +47,11 @@ async fn waiting_request(kit: &Kit) -> (String, String) {
 
 /// Create an account with a passkey alone, from the sign-in screen: the
 /// `redirect` the screen is told to follow.
-async fn sign_up_with_passkey(kit: &Kit, device: &mut Authenticator, request: &str) -> String {
+pub(crate) async fn sign_up_with_passkey(
+    kit: &Kit,
+    device: &mut Authenticator,
+    request: &str,
+) -> String {
     let options = screen(
         kit,
         "/auth/passkey/sign-up/options",
@@ -62,7 +66,7 @@ async fn sign_up_with_passkey(kit: &Kit, device: &mut Authenticator, request: &s
 }
 
 /// Sign in with the device's passkey `index` from the sign-in screen.
-async fn sign_in_with_passkey(
+pub(crate) async fn sign_in_with_passkey(
     kit: &Kit,
     device: &mut Authenticator,
     index: usize,
@@ -80,14 +84,19 @@ async fn sign_in_with_passkey(
 }
 
 /// Redeem the code in `redirect`: the token response.
-async fn redeem(kit: &Kit, redirect: &str, verifier: &str) -> Value {
+pub(crate) async fn redeem(kit: &Kit, redirect: &str, verifier: &str) -> Value {
     let tokens = kit.redeem(&query(redirect)["code"], verifier).await;
     assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
     tokens.json
 }
 
 /// Add a passkey to the account `access` belongs to: the API's answer.
-async fn add_passkey(kit: &Kit, access: &str, device: &mut Authenticator, alg: Alg) -> Response {
+pub(crate) async fn add_passkey(
+    kit: &Kit,
+    access: &str,
+    device: &mut Authenticator,
+    alg: Alg,
+) -> Response {
     let options = kit
         .api(
             Method::POST,
@@ -130,6 +139,25 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
     assert!(id.get("email").is_none(), "a passkey proves no address");
     let (_, access) = Kit::decode(tokens["access_token"].as_str().unwrap());
     assert_eq!(access["email_verified"], false);
+    // The sign-up's passkey is listed as the one the account was made with
+    // (the app never calls it a new way in), and a later one is not.
+    let token = tokens["access_token"].as_str().unwrap().to_owned();
+    let listed = kit
+        .api(Method::GET, "/api/v1/identity/passkeys", &token)
+        .await;
+    assert_eq!(
+        listed.json["items"][0]["signed_up_with"], true,
+        "{listed:?}"
+    );
+    // Its ways in are the passkeys alone: there is no provider way in to
+    // flag (a provider sign-up's says `linked_via: sign_up`), so the
+    // passkeys list is where the app reads it.
+    let ways = kit.ways_in(&token).await;
+    assert_eq!(ways["items"], json!([]), "{ways}");
+    let mut laptop = Authenticator::new(ORIGIN, "localhost");
+    let added = add_passkey(&kit, &token, &mut laptop, Alg::Ed25519).await;
+    assert_eq!(added.status, StatusCode::CREATED, "{added:?}");
+    assert_eq!(added.json["signed_up_with"], false);
     assert_eq!(
         count(
             &kit,
@@ -144,7 +172,8 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
             "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_added'"
         )
         .await,
-        1
+        2,
+        "the sign-up's passkey and the one added after"
     );
 
     // Another browser, the same passkey: the same account.
@@ -168,11 +197,12 @@ async fn a_new_person_signs_up_with_a_passkey_alone_and_signs_in_with_it(db: PgP
             .any(|c| c.to_str().unwrap().starts_with("campbooks_webauthn=;")),
         "the ceremony cookie is cleared"
     );
-    let last_used: Option<chrono::DateTime<chrono::Utc>> =
-        sqlx::query_scalar("SELECT last_used_at FROM identity.passkeys")
-            .fetch_one(&kit.state.db)
-            .await
-            .unwrap();
+    let last_used: Option<chrono::DateTime<chrono::Utc>> = sqlx::query_scalar(
+        "SELECT last_used_at FROM identity.passkeys WHERE added_via = 'sign_up'",
+    )
+    .fetch_one(&kit.state.db)
+    .await
+    .unwrap();
     assert!(last_used.is_some());
 }
 
@@ -292,20 +322,36 @@ async fn adding_or_removing_a_passkey_needs_a_recent_sign_in(db: PgPool) {
         .unwrap()
         .to_owned();
     let stale = kit.stale(&access).await;
-    for (method, path) in [
+    for (method, path, code) in [
         (
             Method::POST,
             "/api/v1/identity/passkeys/registrations".to_owned(),
+            "fresh_sign_in_required",
         ),
         (
             Method::DELETE,
             format!("/api/v1/identity/passkeys/{passkey}"),
+            "step_up_required",
         ),
     ] {
         let refused = kit.api(method, &path, &stale).await;
         assert_eq!(refused.status, StatusCode::FORBIDDEN, "{path}: {refused:?}");
-        assert_eq!(refused.json["code"], "step_up_required", "{path}");
+        assert_eq!(refused.json["code"], code, "{path}");
     }
+    // Adding a passkey asks for a sign-in from the last five minutes: one
+    // seven minutes old still removes a passkey, but adds none.
+    let recent = kit
+        .signed_in_ago(&access, chrono::TimeDelta::minutes(7))
+        .await;
+    let refused = kit
+        .api(
+            Method::POST,
+            "/api/v1/identity/passkeys/registrations",
+            &recent,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{refused:?}");
+    assert_eq!(refused.json["code"], "fresh_sign_in_required");
     let refused = kit
         .api_json(
             Method::POST,
@@ -560,6 +606,16 @@ async fn sign_in_refusals_one_by_one(db: PgPool) {
     )
     .await;
     assert_eq!(phished.json["code"], "passkey_not_accepted", "{phished:?}");
+
+    // An account an administrator suspended: its passkey opens nothing.
+    sqlx::query("UPDATE identity.accounts SET disabled_at = now()")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let options = screen(&kit, "/auth/passkey/sign-in/options", &json!({})).await;
+    let disabled = screen(&kit, "/auth/passkey/sign-in", &device.get(&options.json, 0)).await;
+    assert_eq!(disabled.status, StatusCode::FORBIDDEN, "{disabled:?}");
+    assert_eq!(disabled.json["code"], "account_suspended", "{disabled:?}");
 
     // Nothing of it reached a session.
     assert_eq!(
@@ -897,36 +953,53 @@ async fn waiting_registrations_are_capped_per_account(db: PgPool) {
     assert_eq!(capped.json["code"], "rate_limited");
 }
 
-#[sqlx::test(migrations = "../../../migrations")]
-async fn passkey_only_accounts_are_capped_instance_wide(db: PgPool) {
-    let kit = Kit::new(db).await;
-    for _ in 0..30 {
-        kit.new_browser();
-        let mut device = device();
-        let options = screen(
-            &kit,
-            "/auth/passkey/sign-up/options",
-            &json!({ "display_name": "Ana" }),
-        )
-        .await;
-        let made = device.create(&options.json, Alg::Ed25519);
-        let created = screen(&kit, "/auth/passkey/sign-up", &made).await;
-        assert_eq!(created.status, StatusCode::CREATED, "{created:?}");
-    }
+/// Create an account with a passkey alone in a new browser: the status.
+async fn passkey_sign_up(kit: &Kit) -> StatusCode {
     kit.new_browser();
     let mut device = device();
     let options = screen(
-        &kit,
+        kit,
         "/auth/passkey/sign-up/options",
         &json!({ "display_name": "Ana" }),
     )
     .await;
+    assert_eq!(options.status, StatusCode::OK, "{options:?}");
     let made = device.create(&options.json, Alg::Ed25519);
-    let capped = screen(&kit, "/auth/passkey/sign-up", &made).await;
-    assert_eq!(capped.status, StatusCode::TOO_MANY_REQUESTS, "{capped:?}");
+    screen(kit, "/auth/passkey/sign-up", &made).await.status
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn passkey_only_accounts_are_capped_per_address_and_instance_wide(db: PgPool) {
+    use campbooks_kernel::rate_limit::RateKey;
+
+    use crate::protocol::passkey::{INSTANCE, SIGN_UP_LIMIT};
+
+    let kit = Kit::new(db).await;
+    kit.send_from(Some("203.0.113.7:50000"));
+    for _ in 0..5 {
+        assert_eq!(passkey_sign_up(&kit).await, StatusCode::CREATED);
+    }
+    assert_eq!(
+        passkey_sign_up(&kit).await,
+        StatusCode::TOO_MANY_REQUESTS,
+        "five per address an hour"
+    );
+    kit.send_from(Some("198.51.100.2:50000"));
+    assert_eq!(
+        passkey_sign_up(&kit).await,
+        StatusCode::CREATED,
+        "another address has its own budget"
+    );
+    // Many addresses together reach the instance's ceiling.
+    kit.state
+        .rate_limits
+        .exhaust(&kit.state.db, &SIGN_UP_LIMIT, &RateKey::text(INSTANCE))
+        .await;
+    kit.send_from(Some("192.0.2.9:50000"));
+    assert_eq!(passkey_sign_up(&kit).await, StatusCode::TOO_MANY_REQUESTS);
     assert_eq!(
         count(&kit, "SELECT count(*) FROM identity.accounts").await,
-        30
+        6
     );
 }
 

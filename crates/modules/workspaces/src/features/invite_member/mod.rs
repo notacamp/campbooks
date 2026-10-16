@@ -8,6 +8,7 @@
 //! replaces the invitation and returns a fresh link.
 
 use axum::{Json, extract::State, http::StatusCode};
+use campbooks_kernel::authz::Action;
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     db::BeginFor as _,
@@ -22,9 +23,10 @@ use crate::MESSAGES;
 
 use crate::{
     domain::{
-        access::{acting_manager, lock_workspace},
+        access::{acting_user, authorize_type, lock_workspace},
         invitation::{self, InvitationView, VALIDITY},
         model::InvitationId,
+        resources::INVITATION_RECORD,
         security::{self, SecurityKind},
     },
     scopes::WorkspacesAdmin,
@@ -86,7 +88,7 @@ fn accept_url(public_url: &str, token: &str) -> String {
     tag = "workspaces",
     security(("bearer" = ["workspaces:admin"])),
     // Emails another person and grants access once accepted.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["workspaces.invitation"]).access("workspaces.invitation", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = InviteMember,
     responses(
@@ -123,7 +125,8 @@ pub async fn handler(
 
 /// Invite `input.email` to the workspace of `access`.
 pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> Result<Issued> {
-    let (actor, _) = acting_manager(access)?;
+    let (actor, _) = acting_user(access)?;
+    authorize_type(state, access, Action::Write, INVITATION_RECORD)?;
     if input.role == Role::Owner {
         return Err(Error::BadRequest(MESSAGES.reason("invalid_role")));
     }
@@ -135,7 +138,7 @@ pub async fn execute(state: &AppState, access: &Access, input: InviteMember) -> 
         r#"SELECT EXISTS (
                SELECT 1 FROM workspaces.members m
                  JOIN workspaces.users u ON u.id = m.user_id
-                WHERE m.workspace_id = $1 AND lower(u.email) = $2
+                WHERE m.workspace_id = $1 AND lower(u.email) = $2 AND u.email_verified
            ) AS "exists!""#,
         id as WorkspaceId,
         email,

@@ -24,12 +24,12 @@ use axum::{
     http::request::Parts,
 };
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use sqlx::{PgConnection, PgPool};
 use utoipa::ToSchema;
 
 use crate::{
     AppState, Error,
-    auth::{Principal, PrincipalKind, ScopeName, Scoped},
+    auth::{AuthFailure, Principal, PrincipalKind, ScopeName, Scoped},
 };
 
 crate::define_id!(
@@ -128,6 +128,9 @@ pub struct WorkspaceSummary {
 pub type WorkspacesFuture<'a> =
     Pin<Box<dyn Future<Output = Result<Vec<WorkspaceSummary>, Error>> + Send + 'a>>;
 
+/// A future returned by [`Membership::role_held`].
+pub type RoleFuture<'a> = Pin<Box<dyn Future<Output = Result<Option<Role>, Error>> + Send + 'a>>;
+
 /// The port that answers "may this principal work in this workspace?".
 /// Implemented by the `workspaces` module; the server registers it with
 /// [`AppState::with_membership`].
@@ -148,6 +151,20 @@ pub trait Membership: std::fmt::Debug + Send + Sync + 'static {
     /// asks which workspace an app may use).
     fn workspaces_of<'a>(&'a self, _db: &'a PgPool, _subject: &'a str) -> WorkspacesFuture<'a> {
         Box::pin(async { Ok(Vec::new()) })
+    }
+
+    /// The role of `user` in `workspace`, read in `conn` (a transaction
+    /// working in that workspace) and held there until it ends: removing
+    /// them waits for it. `None` when they are not a member. For work done
+    /// later on a member's behalf (a scheduled send), which must stop once
+    /// they are gone.
+    fn role_held<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _user: UserId,
+    ) -> RoleFuture<'a> {
+        Box::pin(async { Ok(None) })
     }
 
     /// Record types (`<module>.<record>`) whose changes may change who
@@ -175,6 +192,136 @@ impl Membership for NoMembership {
 
 /// Shared handle to the registered [`Membership`] port.
 pub type MembershipPort = Arc<dyn Membership>;
+
+/// A future returned by a [`KeptMail`] port.
+pub type KeptMailFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Vec<crate::RecordRef>, Error>> + Send + 'a>>;
+
+/// The port that answers, as a member is removed with their mail kept:
+/// which containers (inboxes) would be left with nobody to read them.
+/// Implemented by the module that owns them; until then, none.
+pub trait KeptMail: std::fmt::Debug + Send + Sync + 'static {
+    /// The containers `user`'s departure would leave unread if their mail
+    /// were kept, when `others` are the members who stay. Asked in `conn`,
+    /// the departure's own transaction, which holds what the answer rests
+    /// on until it ends.
+    fn unread_if_kept<'a>(
+        &'a self,
+        conn: &'a mut PgConnection,
+        workspace: WorkspaceId,
+        user: UserId,
+        others: &'a [UserId],
+    ) -> KeptMailFuture<'a>;
+}
+
+/// The port before a module provides one.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoKeptMail;
+
+impl KeptMail for NoKeptMail {
+    fn unread_if_kept<'a>(
+        &'a self,
+        _conn: &'a mut PgConnection,
+        _workspace: WorkspaceId,
+        _user: UserId,
+        _others: &'a [UserId],
+    ) -> KeptMailFuture<'a> {
+        Box::pin(async { Ok(Vec::new()) })
+    }
+}
+
+/// Shared handle to the registered [`KeptMail`] port.
+pub type KeptMailPort = Arc<dyn KeptMail>;
+
+/// Whom a client token acts for (ADR 0017): a client a member registered in
+/// their workspace acts as that member, within their memberships (never
+/// more), re-resolved on every request.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ClientActor {
+    /// A client the instance does not register (another identity
+    /// provider's): it acts through its own, narrower catalogue grants.
+    Unregistered,
+    /// A registered client acting for the person with this subject.
+    ActsFor(String),
+    /// A registered client that no longer exists, or acts for nobody: its
+    /// tokens are refused (401).
+    Revoked,
+}
+
+/// A future returned by a [`ClientDirectory`].
+pub type ClientsFuture<'a> = Pin<Box<dyn Future<Output = Result<ClientActor, Error>> + Send + 'a>>;
+
+/// The port that answers "whom does this client act for?". Implemented by
+/// the issuer (the `identity` module) when it runs in this process.
+pub trait ClientDirectory: std::fmt::Debug + Send + Sync + 'static {
+    /// Whom `client_id`, bound to `workspace`, acts for.
+    fn acting_for<'a>(
+        &'a self,
+        db: &'a PgPool,
+        client_id: &'a str,
+        workspace: WorkspaceId,
+    ) -> ClientsFuture<'a>;
+}
+
+/// The port before the issuer provides one: every client is unregistered.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoClientDirectory;
+
+impl ClientDirectory for NoClientDirectory {
+    fn acting_for<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _client_id: &'a str,
+        _workspace: WorkspaceId,
+    ) -> ClientsFuture<'a> {
+        Box::pin(async { Ok(ClientActor::Unregistered) })
+    }
+}
+
+/// Shared handle to the registered [`ClientDirectory`].
+pub type ClientDirectoryPort = Arc<dyn ClientDirectory>;
+
+/// What `principal` may do in `workspace`, as every entry point resolves it
+/// (the [`Workspace`] extractor, idempotent replays, the change feed): a
+/// user's membership; a client token's binding, then, for a client a member
+/// registered, that member's membership (401 once they are gone or the
+/// client is removed). `None` when the caller may not see the workspace.
+///
+/// # Errors
+/// [`Error::Unauthorized`] for a revoked client; the ports' errors.
+pub async fn resolve_access(
+    membership: &dyn Membership,
+    clients: &dyn ClientDirectory,
+    db: &PgPool,
+    principal: &Principal,
+    workspace: WorkspaceId,
+) -> Result<Option<Access>, Error> {
+    if !may_reach(principal, workspace) {
+        return Ok(None);
+    }
+    let access = if principal.kind == PrincipalKind::Client {
+        let client = principal.client_id.as_deref().unwrap_or(&principal.subject);
+        match clients.acting_for(db, client, workspace).await? {
+            ClientActor::Unregistered => membership.resolve(db, principal, workspace).await?,
+            ClientActor::ActsFor(subject) => {
+                let creator = Principal {
+                    subject,
+                    kind: PrincipalKind::User,
+                    workspace: None,
+                    ..principal.clone()
+                };
+                match membership.resolve(db, &creator, workspace).await? {
+                    Some(access) => Some(access),
+                    None => return Err(Error::Unauthorized(AuthFailure::InvalidToken)),
+                }
+            }
+            ClientActor::Revoked => return Err(Error::Unauthorized(AuthFailure::InvalidToken)),
+        }
+    } else {
+        membership.resolve(db, principal, workspace).await?
+    };
+    Ok(access.filter(|access| access.workspace == workspace))
+}
 
 /// Requires a valid token granting scope `S` (exactly like [`Scoped<S>`])
 /// whose caller may work in the workspace named by the `{workspace_id}` path
@@ -230,15 +377,15 @@ impl<S: ScopeName> FromRequestParts<AppState> for Workspace<S> {
                 ))
             })?;
         let id: WorkspaceId = raw.parse().map_err(|_| Error::NotFound)?;
-        if !may_reach(&principal, id) {
-            return Err(Error::NotFound);
-        }
-        let access = state
-            .membership
-            .resolve(&state.db, &principal, id)
-            .await?
-            .filter(|access| access.workspace == id)
-            .ok_or(Error::NotFound)?;
+        let access = resolve_access(
+            state.membership.as_ref(),
+            state.clients.as_ref(),
+            &state.db,
+            &principal,
+            id,
+        )
+        .await?
+        .ok_or(Error::NotFound)?;
         tracing::Span::current().record(
             crate::telemetry::field::WORKSPACE_ID,
             tracing::field::display(id),
@@ -291,6 +438,7 @@ mod tests {
             email_verified: false,
             name: None,
             expires_at: None,
+            issued_at: None,
             auth_time: None,
         }
     }

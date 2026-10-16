@@ -42,6 +42,12 @@ export const OVERVIEW: AdminOverview = {
       location: "instance",
       content_allowed: true,
       reachable: true,
+      answers_check: {
+        state: "passed",
+        right: 33,
+        total: 33,
+        checked_at: "2026-10-14T06:00:00Z",
+      },
     },
     {
       role: "embed",
@@ -189,6 +195,7 @@ export const ADMIN_DUARTE_DETAIL: AdminWorkspaceDetail = {
       email: "ana@example.com",
       role: "owner",
       joined_at: "2026-09-01T09:00:00Z",
+      you: false,
     },
     {
       user_id: ADMIN_RUI.id,
@@ -196,6 +203,7 @@ export const ADMIN_DUARTE_DETAIL: AdminWorkspaceDetail = {
       email: "rui@example.com",
       role: "member",
       joined_at: "2026-09-10T09:00:00Z",
+      you: false,
     },
   ],
   pending_invitations: 1,

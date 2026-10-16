@@ -66,6 +66,11 @@ pub struct StartLink {
     /// The connection, for `reconnect`.
     #[serde(default)]
     pub connection_id: Option<String>,
+    /// For `connect`: also sign in with the account (default `true`).
+    /// `false` for a shared mailbox (support@): it is connected, never
+    /// added as a way in. Ignored by the other purposes.
+    #[serde(default)]
+    pub sign_in: Option<bool>,
     /// Same-origin path to come back to (default `/`), with `linked=`,
     /// `connected=` or `link_error=` added.
     #[serde(default)]
@@ -88,7 +93,7 @@ pub struct StartedLink {
     operation_id = "identity.start_link",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.link_ticket"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.link_ticket"]).access("identity.provider_identity", campbooks_kernel::authz::Action::Write)))),
     request_body = StartLink,
     responses(
         (status = CREATED, description = "Send the browser to `url`.", body = StartedLink),
@@ -117,6 +122,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     Json(input): Json<StartLink>,
 ) -> Result<(StatusCode, Json<StartedLink>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.provider_identity",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let started = execute(&state, &deps, &principal, input).await?;
     Ok((StatusCode::CREATED, Json(started)))
 }
@@ -151,6 +163,7 @@ pub async fn execute(
                 expected_subject: None,
                 login_hint: None,
                 return_to,
+                adds_way_in: true,
             }
         }
         LinkPurpose::Connect => {
@@ -174,6 +187,7 @@ pub async fn execute(
                 expected_subject: None,
                 login_hint: None,
                 return_to,
+                adds_way_in: input.sign_in.unwrap_or(true),
             }
         }
         LinkPurpose::Reconnect => {
@@ -197,6 +211,7 @@ pub async fn execute(
                 expected_subject: Some(target.account_subject),
                 login_hint: Some(target.address),
                 return_to,
+                adds_way_in: false,
             }
         }
     };

@@ -8,11 +8,14 @@ import { isTauri } from "~/lib/platform";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
+  ChipLink,
+  ChipRow,
   FocusPage,
   IconButton,
   initialsOf,
   NavItem,
   PhoneHeader,
+  PhoneSubnav,
   SearchButton,
   Shell,
   Sidebar,
@@ -111,11 +114,19 @@ export function WorkspaceLayout() {
   return <WorkspaceFrame workspace={workspace} all={workspaces.data ?? []} />;
 }
 
+/** Settings' sections, in order: where each lives under `/w/$workspaceId/settings`. */
+const SETTINGS_SECTIONS = [
+  { id: "members", path: "members" },
+  { id: "mailboxes", path: "mailboxes" },
+  { id: "waysIn", path: "sign-in" },
+  { id: "memory", path: "memory" },
+] as const;
+
 function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspace[] }) {
+  const { t } = useTranslation();
   const { t: tNav } = useTranslation("shortcuts");
   const { t: tSearch } = useTranslation("search");
   const { t: tWorkspaces } = useTranslation("workspaces");
-  const { t: tShell } = useTranslation();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { registry } = useShortcuts();
@@ -137,8 +148,6 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const membersPath = `${base}/settings/members`;
   const waysInPath = `${base}/settings/sign-in`;
   const appsPath = `${base}/settings/apps`;
-  const memoryPath = `${base}/settings/memory`;
-  const inMemory = pathname.startsWith(memoryPath);
   const inSettings = pathname.startsWith(`${base}/settings`);
   const inInbox = pathname.startsWith(`${base}/inbox`);
   const inSearch = pathname.startsWith(`${base}/search`);
@@ -170,6 +179,15 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
   const openSwitcher = () => {
     setSwitching(true);
   };
+  const sections = SETTINGS_SECTIONS.map((section) => {
+    const href = `${base}/settings/${section.path}`;
+    return {
+      ...section,
+      href,
+      label: t(`settings.${section.id}`),
+      current: pathname === href || pathname.startsWith(`${href}/`),
+    };
+  });
 
   return (
     <>
@@ -192,13 +210,19 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
               void navigate({ to: searchPath });
             }}
           />
-          <AccountMenu
-            compact
-            waysIn={link(waysInPath)}
-            apps={link(appsPath)}
-            memory={link(memoryPath)}
-          />
+          <AccountMenu compact waysIn={link(waysInPath)} apps={link(appsPath)} />
         </PhoneHeader>
+        {inSettings ? (
+          <PhoneSubnav label={tNav("nav.settings")}>
+            <ChipRow label={t("settings.sections")}>
+              {sections.map((section) => (
+                <ChipLink key={section.id} current={section.current} {...link(section.href)}>
+                  {section.label}
+                </ChipLink>
+              ))}
+            </ChipRow>
+          </PhoneSubnav>
+        ) : null}
         <Sidebar>
           <WorkspaceSwitcher mark={mark} name={workspace.name} kind={kind} onClick={openSwitcher} />
           <SearchButton
@@ -232,18 +256,23 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           />
           <StreamNav workspaceId={workspace.id} current={openStream} />
           <NavItem
-            label={tShell("account.memory")}
-            icon="star"
-            current={inMemory}
-            {...link(memoryPath)}
-          />
-          <NavItem
             label={tNav("nav.settings")}
             icon="settings"
             shortcut="nav.settings"
-            current={inSettings && !inMemory}
+            current={inSettings && !sections.some((section) => section.current)}
             {...link(membersPath)}
           />
+          {inSettings
+            ? sections.map((section) => (
+                <NavItem
+                  key={section.id}
+                  sub
+                  label={section.label}
+                  current={section.current}
+                  {...link(section.href)}
+                />
+              ))
+            : null}
           <SidebarFooter>
             <Button
               variant="ghost"
@@ -255,11 +284,7 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
             >
               {tNav("sheet.open")}
             </Button>
-            <AccountMenu
-              waysIn={link(waysInPath)}
-              apps={link(appsPath)}
-              memory={link(memoryPath)}
-            />
+            <AccountMenu waysIn={link(waysInPath)} apps={link(appsPath)} />
           </SidebarFooter>
         </Sidebar>
         <Outlet />

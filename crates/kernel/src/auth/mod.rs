@@ -26,6 +26,7 @@
 mod challenge;
 mod jwks;
 mod oidc;
+mod revocation;
 mod scoped;
 mod verifier;
 
@@ -36,6 +37,7 @@ use serde::{Deserialize, Serialize};
 pub use challenge::challenge_with_resource_metadata;
 pub use jwks::{KeySource, KeySourceFuture};
 pub use oidc::{BACKCHANNEL_LOGOUT_EVENT, IdToken, LogoutToken};
+pub use revocation::{StandingFuture, TokenRevocation, TokenRevocationPort, TokenStanding};
 pub(crate) use scoped::bearer_token;
 pub use scoped::{Scoped, Unbound};
 pub use verifier::TokenVerifier;
@@ -163,6 +165,12 @@ pub struct Principal {
     /// authenticated in-process without a token. Long-lived responses (the
     /// change feed) end by then, so the caller is authorized again.
     pub expires_at: Option<chrono::DateTime<chrono::Utc>>,
+    /// When the access token was issued (`iat`, whole seconds); `None` for
+    /// a principal authenticated in-process without a token, or a token
+    /// without `iat`. A person's token issued before their account's last
+    /// revocation (suspension, sign out everywhere) no longer stands
+    /// ([`TokenRevocation`]).
+    pub issued_at: Option<chrono::DateTime<chrono::Utc>>,
     /// When the user last authenticated (`auth_time`), when the token says.
     /// Operations that change how someone signs in ask for a recent one
     /// (step-up), and admin operations require one
@@ -220,7 +228,7 @@ pub enum AuthFailure {
     ExpiredToken,
     /// The token is valid, but the person signed in too long ago for an
     /// admin operation ([`Admin`](crate::admin::Admin)): sign in again
-    /// (RFC 9470 step-up, `max_age` 12 hours).
+    /// (RFC 9470 step-up, `max_age` 1 hour).
     AdminReauthRequired,
 }
 
@@ -242,8 +250,10 @@ impl AuthFailure {
         match self {
             Self::NotConfigured | Self::MissingToken => "Bearer",
             Self::InvalidToken | Self::ExpiredToken => r#"Bearer error="invalid_token""#,
+            // RFC 9470: `max_age` is `admin::REAUTH_AFTER` in seconds (the
+            // `admin` module's tests hold the two together).
             Self::AdminReauthRequired => {
-                r#"Bearer error="insufficient_user_authentication", max_age=43200"#
+                r#"Bearer error="insufficient_user_authentication", max_age=3600"#
             }
         }
     }

@@ -76,6 +76,28 @@ pub async fn except(
     }))
 }
 
+/// How many exceptions each of `rules` had in the last [`EXCEPTION_DAYS`]
+/// (those with none are left out).
+pub async fn recent_exceptions_of(
+    conn: &mut PgConnection,
+    rules: &[RuleId],
+) -> Result<std::collections::HashMap<RuleId, u32>> {
+    let rows = sqlx::query!(
+        r#"SELECT rule_id AS "rule: RuleId", count(*)::int AS "n!"
+             FROM conversations.rule_applications
+            WHERE rule_id = ANY($1) AND excepted_at > now() - make_interval(days => $2)
+            GROUP BY rule_id"#,
+        rules as &[RuleId],
+        i32::try_from(EXCEPTION_DAYS).unwrap_or(30),
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(|r| (r.rule, u32::try_from(r.n).unwrap_or_default()))
+        .collect())
+}
+
 /// How many exceptions `rule` had in the last [`EXCEPTION_DAYS`].
 pub async fn recent_exceptions(conn: &mut PgConnection, rule: RuleId) -> Result<u32> {
     let n = sqlx::query_scalar!(
@@ -100,11 +122,18 @@ pub struct RuleMark {
     pub conditions: Vec<RuleCondition>,
     /// How many conversations it has changed.
     pub applied_count: u32,
+    /// Whether the caller may stop it ("Stop doing this"): its author while a
+    /// sender, or a manager of its inbox, while the inbox is not kept read-only.
+    pub may_change: bool,
 }
 
-/// Fill in each summary's [`RuleMark`]: the newest rule that changed it and
-/// that no member changed back.
-pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummary]) -> Result<()> {
+/// Fill in each summary's [`RuleMark`] for `user`: the newest rule that
+/// changed it and that no member changed back.
+pub async fn attach(
+    conn: &mut PgConnection,
+    user: Option<UserId>,
+    summaries: &mut [ConversationSummary],
+) -> Result<()> {
     let ids: Vec<ConversationId> = summaries.iter().map(|s| s.id).collect();
     if ids.is_empty() {
         return Ok(());
@@ -113,14 +142,26 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
         r#"
         SELECT DISTINCT ON (a.conversation_id)
                a.conversation_id AS "conversation: ConversationId", r.id AS "rule: RuleId",
-               r.actions, r.conditions, r.applied_count
+               r.actions, r.conditions,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
+               (i.detached_at IS NULL AND $2::uuid IS NOT NULL
+                AND EXISTS (
+                    SELECT 1 FROM conversations.inbox_members m
+                     WHERE m.inbox_id = r.inbox_id AND m.user_id = $2
+                       AND (m.role = 'manager' OR (m.role = 'sender' AND r.taught_by = $2))))
+                   AS "may_change!"
           FROM conversations.rule_applications a
           JOIN conversations.rules r ON r.id = a.rule_id
+          JOIN conversations.inboxes i ON i.id = r.inbox_id
          WHERE a.conversation_id = ANY($1) AND a.reverted_at IS NULL AND a.excepted_at IS NULL
            AND r.state <> 'removed'
          ORDER BY a.conversation_id, a.applied_at DESC
         "#,
         &ids as &[ConversationId],
+        user.map(|u| *u.as_uuid()),
     )
     .fetch_all(conn)
     .await?;
@@ -133,6 +174,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
             actions: serde_json::from_value(row.actions).unwrap_or_default(),
             conditions: serde_json::from_value(row.conditions).unwrap_or_default(),
             applied_count: u32::try_from(row.applied_count).unwrap_or_default(),
+            may_change: row.may_change,
         });
     }
     Ok(())

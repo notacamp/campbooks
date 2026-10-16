@@ -186,6 +186,7 @@ async fn admin_operations_stay_out_of_the_catalogue(db: PgPool) {
                     email_verified: false,
                     name: None,
                     expires_at: None,
+                    issued_at: None,
                     auth_time: Some(Utc::now()),
                 },
                 "system.admin_overview",

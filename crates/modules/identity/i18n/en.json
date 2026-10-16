@@ -9,6 +9,7 @@
     "held_grant_not_found": "There is no mailbox waiting to be connected.",
     "invalid_id_token_hint": "This sign-out request is not signed by Campbooks for this app; nothing was ended.",
     "signup_invite_only": "This Campbooks takes invited people only. Ask someone to invite this address, then sign in again.",
+    "sign_in_not_allowed": "This Campbooks only lets in people its owner has approved, and this address isn’t one of them. Nothing was kept.",
     "step_up_required": "Sign in again first: changing how you sign in needs a sign-in from the last ten minutes.",
     "last_way_in": "This is the only way you can sign in, so it can't be removed. Add another way first.",
     "link_incomplete": "Say which provider, workspace or mailbox this is for.",
@@ -31,6 +32,20 @@
     "client_scope_not_allowed": "Apps can't be given the {{scope}} permission.",
     "client_is_public": "This app signs people in and has no secret to rotate.",
     "client_name_reserved": "Only Campbooks’ own apps may be called Campbooks or Not A Camp. Choose another name.",
-    "too_many_accounts": "Ask about at most {{max}} accounts at a time."
+    "fresh_sign_in_required": "Sign in again first: adding a passkey needs a sign-in from the last five minutes.",
+    "too_many_accounts": "Ask about at most {{max}} accounts at a time.",
+    "client_name_mixed_scripts": "Use one alphabet per word in the app’s name: letters from different alphabets can pass for others."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "A new way to sign in to your Campbooks account",
+      "passkey": "A passkey",
+      "provider": "A {{provider}} account",
+      "added": "{{what}} was added as a way to sign in to your Campbooks account on {{when}}.",
+      "if_you": "If this was you, there is nothing to do.",
+      "if_not": "If it wasn’t you, open Campbooks, go to Settings → Ways to sign in, remove it, and choose Sign out everywhere.",
+      "open": "Open Campbooks",
+      "why": "Campbooks sends this to your account’s addresses whenever a way to sign in is added. It contains no tracking."
+    }
   }
 }

@@ -82,6 +82,10 @@
       "suspended": {
         "title": "Esta cuenta está suspendida.",
         "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
+      },
+      "not_allowed": {
+        "title": "Este Campbooks no está abierto a esta dirección.",
+        "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
       }
     }
   },
@@ -117,6 +121,10 @@
     "account_suspended": {
       "title": "Esta cuenta está suspendida.",
       "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
+    },
+    "sign_in_not_allowed": {
+      "title": "Este Campbooks no está abierto a esta dirección.",
+      "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
     }
   },
   "newAccount": {
@@ -192,7 +200,8 @@
     "confirmForget": "¿Olvidar {{address}}? Campbooks borra el permiso que le dio Google. Podrás seguir iniciando sesión con esta cuenta.",
     "confirm": "Olvidarlo",
     "cancel": "Conservarlo",
-    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo."
+    "forgetFailed": "No se ha podido olvidar. Vuelve a intentarlo.",
+    "other": "Conectar otro buzón"
   },
   "waysIn": {
     "title": "Formas de iniciar sesión",
@@ -267,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "No se ha permitido el acceso al correo.",
-        "lead": "Ya puedes iniciar sesión con esa cuenta, pero su buzón no se ha conectado. Inténtalo de nuevo y permite el acceso al correo."
+        "lead": "No se ha conectado nada y esa cuenta no se ha añadido como forma de iniciar sesión. Inténtalo de nuevo y permite el acceso al correo."
       },
       "account_mismatch": {
         "title": "Esa es otra cuenta.",
@@ -280,7 +289,24 @@
       "unknown": {
         "title": "Algo ha salido mal.",
         "lead": "No ha cambiado nada. Inténtalo de nuevo."
+      },
+      "sign_in_not_allowed": {
+        "title": "Este Campbooks no está abierto a esta dirección.",
+        "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
       }
+    },
+    "new": "Nueva",
+    "recent": {
+      "title": "Se añadió una forma de iniciar sesión esta semana",
+      "lead": "Está marcada como Nueva abajo. Si no la añadiste tú, elimínala y después cierra sesión en todas partes."
+    },
+    "everywhere": {
+      "title": "Cerrar sesión en todas partes",
+      "lead": "Cierra todas las sesiones de tu cuenta: este navegador, tus otros dispositivos y todas las aplicaciones que autorizaste. Hazlo si pierdes un dispositivo o ves una forma de iniciar sesión que no añadiste.",
+      "action": "Cerrar sesión en todas partes",
+      "confirm": "Sí, cerrar en todas partes",
+      "confirmLead": "¿Cerrar sesión en Campbooks en todos los dispositivos y aplicaciones, incluido este navegador? Después volverás a iniciar sesión aquí.",
+      "failed": "No se pudo cerrar sesión en todas partes. No cambió nada; inténtalo de nuevo."
     }
   },
   "passkeySignUp": {
@@ -379,7 +405,8 @@
         "title": "No se ha podido añadir una llave de acceso.",
         "lead": "No se ha añadido nada. Inténtalo de nuevo."
       }
-    }
+    },
+    "freshSignIn": "Por seguridad, añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos. Vuelve a iniciar sesión; volverás aquí enseguida."
   },
   "admin": {
     "title": "Cuenta",

@@ -526,3 +526,142 @@ longer one is left out), so that the body's `cid:` images can be resolved.
 #### Scenario: An inline logo
 - **WHEN** a message's HTML part shows `cid:logo@example.com` and a `multipart/related` part has `Content-ID: <logo@example.com>`
 - **THEN** the upsert's attachment for that part has `content_id` `logo@example.com` and `inline` true
+
+### Requirement: Mailboxes screen
+Settings SHALL have a Mailboxes page listing the workspace's connections the
+person may see (`connectors.list_connections`), each with its provider, its
+address, who connected it ("you", from the server's `granted_by_you`, never
+by matching an email, or the member's name) and its health in
+plain words: `ok` "Syncing", `needs_reauth` "Needs you to sign in again"
+(or the grantor's name), `throttled` "Paused by <provider> for a few
+minutes", `failing` "Not syncing — we'll keep trying". The page SHALL offer:
+
+- Connect for each of the server's `mailbox_providers`, through
+  `identity.start_link` with `connect` and this page as `return_to`, asking
+  "Also use this account to sign in" (ticked by default, untick it for a
+  shared mailbox), passed as `sign_in`;
+- Reconnect, on the person's own connections that need re-authorisation,
+  through `identity.start_link` with `reconnect`;
+- Disconnect (`connectors.disconnect`), only on the person's own
+  connections, behind an inline confirmation saying that syncing stops and
+  access is given up at the provider, asking what becomes of its mail in
+  Campbooks ("Delete its mail from Campbooks", the default, or "Keep its
+  history, read-only"), that the mail stays at the provider either way, and
+  what becomes of the way in: that it goes too only when `identity.list_ways_in`
+  records this very connection as the only mailbox of a way in a connect
+  created and it is not the last way in, and otherwise that how the person
+  signs in does not change (never decided from an address), and nothing
+  until the ways in and passkeys are known. Its cancel SHALL read "Don't
+  disconnect". A disconnect that fails SHALL be said as a failure, never
+  shown as done; one that finds nothing (404) SHALL be said by the page, as
+  the row leaves with the list's next answer; focus
+  SHALL return to Disconnect when the confirmation closes and the row stays,
+  and move to the result once it is gone;
+- "Sign in again" (a fresh sign-in, back to this page) when starting is
+  refused with `step_up_required`.
+
+Back from the front door, the page SHALL say once that the mailbox is
+connected (`connected=`) or explain the refusal (`link_error=`) for every
+code the front door and the grant intake return, with a generic message for
+any other, and SHALL clear the query. Keys: ⇧C focuses Connect, J and K
+choose a mailbox, R reconnects it and ⌫ asks to disconnect it, each shown on
+its button. The page SHALL be in en, pt-PT, es-ES and fr, show loading,
+empty and error states, fit 375px, and pass axe in light and dark.
+
+#### Scenario: Connect Zoho Mail
+- **WHEN** the server lists `google` and `zoho` as mailbox providers and the person presses "Connect Zoho Mail"
+- **THEN** `identity.start_link` is called with `connect`, `zoho`, the workspace and this page as `return_to`, and the browser goes to the URL it returns
+
+#### Scenario: Back connected
+- **WHEN** the page opens with `?connected=<id>` and the list has that connection
+- **THEN** a status says the mailbox is connected, the list shows it as Syncing, and the address bar loses the query
+
+#### Scenario: Refusal explained
+- **WHEN** the page opens with `?link_error=account_connected_by_another_member`
+- **THEN** an alert explains that another member already connected that mailbox here
+
+#### Scenario: Last sign-in too old
+- **WHEN** starting a connect is refused with 403 `step_up_required`
+- **THEN** "Sign in again first" is shown, and its button signs in again with `max_age=600` and comes back to the page
+
+#### Scenario: Disconnect deletes the mail by default
+- **WHEN** the person disconnects their own mailbox and confirms without changing the choice
+- **THEN** `connectors.disconnect` is called with `mail=delete` and the row is gone
+
+#### Scenario: The way in goes with a connect-only mailbox
+- **WHEN** the person opens the disconnect confirmation of a connection that `identity.list_ways_in` records as the only mailbox of a way in a connect created, and they have another way in
+- **THEN** the confirmation says it also stops being a way to sign in
+
+#### Scenario: A disconnect that finds nothing
+- **WHEN** `connectors.disconnect` answers 404 and the list no longer has the connection
+- **THEN** the row goes, an alert on the page says the mailbox was not found, and nothing says it is disconnected
+
+#### Scenario: Keep the history
+- **WHEN** the person chooses "Keep its history, read-only" and confirms
+- **THEN** `connectors.disconnect` is called with `mail=keep`
+
+#### Scenario: A colleague's mailbox
+- **WHEN** an owner sees a member's connection
+- **THEN** the row offers no Disconnect
+
+#### Scenario: A shared mailbox
+- **WHEN** a member opens the disconnect confirmation of a mailbox they connected without signing in with it
+- **THEN** both choices are offered, and the confirmation says how they sign in does not change
+
+#### Scenario: A colleague's mailbox needs re-authorisation
+- **WHEN** an owner sees a member's connection with health `needs_reauth`
+- **THEN** the row names the member who must sign in again and offers no Reconnect
+
+### Requirement: Only the member who connected a mailbox disconnects it
+Disconnecting SHALL be allowed only to the member who connected the
+account. Owners and admins see it (and may sync it now), but SHALL get 403
+`disconnect_owner_only`. A client token gets 403 `connection_needs_user`.
+Who may see it stays the grantor, owners and admins, and client tokens.
+
+#### Scenario: An admin disconnects someone's mailbox
+- **WHEN** a workspace admin asks to disconnect a member's connection
+- **THEN** the answer is 403 `disconnect_owner_only` and nothing is removed
+
+### Requirement: The mail of a removed connection is deleted unless kept
+`DELETE …/connections/{id}` SHALL take `mail=delete` (the default) or
+`mail=keep`. `connectors.connection_removed` SHALL carry the choice and the
+member who had connected it
+(`contracts/connectors.connection_removed.v1.schema.json`). When a member
+leaves or is removed, their connections SHALL be removed with the choice
+made by the owner or admin who removed them (`delete` when they left on
+their own).
+
+#### Scenario: Keep on disconnect
+- **WHEN** the grantor disconnects with `mail=keep`
+- **THEN** `connectors.connection_removed` says `"mail": "keep"`
+
+### Requirement: The dispatcher only reads and leases the schedule
+A transaction that sets no workspace SHALL be able to read the scheduling
+index and lease due streams, and nothing else. It SHALL NOT be able to
+insert or delete schedule rows.
+
+#### Scenario: The policies
+- **WHEN** the database's policies are listed
+- **THEN** the only module policies admitting a transaction without a workspace are the schedule's `FOR SELECT` and `FOR UPDATE` ones
+
+### Requirement: The receiving provider's authentication results
+The mail adapters SHALL carry, with each message, the receiving provider's
+own `Authentication-Results` (RFC 8601), unfolded: the topmost such header in
+the message's own order, and only when it is valid UTF-8 and its authserv-id
+is one the provider is known to stamp (Gmail: `mx.google.com`; Zoho Mail:
+none until a real Zoho message has shown which header Zoho adds). Any other
+`Authentication-Results`, including one a sender wrote into the message,
+SHALL be dropped, and a message whose topmost one is not the provider's, or
+is not valid UTF-8, SHALL carry none.
+
+#### Scenario: Gmail's own results
+- **WHEN** a Gmail mailbox receives a message whose topmost `Authentication-Results` is `mx.google.com; dkim=pass …; dmarc=pass … header.from=github.com`
+- **THEN** the message change carries that value
+
+#### Scenario: Results a sender wrote
+- **WHEN** a message's topmost `Authentication-Results` names another server, or a Zoho mailbox receives one naming `mx.google.com` or `mx.zohomail.com`
+- **THEN** the message change carries no authentication results
+
+#### Scenario: A topmost header that is not UTF-8
+- **WHEN** the topmost `Authentication-Results` holds a byte that is not UTF-8, above Gmail's own
+- **THEN** the message change carries no authentication results

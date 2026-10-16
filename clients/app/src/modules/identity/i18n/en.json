@@ -82,6 +82,10 @@
       "suspended": {
         "title": "This account is suspended.",
         "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
+      },
+      "not_allowed": {
+        "title": "This Campbooks isn’t open to this address.",
+        "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
       }
     }
   },
@@ -117,6 +121,10 @@
     "account_suspended": {
       "title": "This account is suspended.",
       "lead": "Whoever runs this Campbooks suspended it. Ask them to restore it."
+    },
+    "sign_in_not_allowed": {
+      "title": "This Campbooks isn’t open to this address.",
+      "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
     }
   },
   "newAccount": {
@@ -192,7 +200,8 @@
     "confirmForget": "Forget {{address}}? Campbooks deletes the permission Google gave it. You can still sign in with this account.",
     "confirm": "Forget it",
     "cancel": "Keep it",
-    "forgetFailed": "Couldn’t forget it. Try again."
+    "forgetFailed": "Couldn’t forget it. Try again.",
+    "other": "Connect a different mailbox"
   },
   "waysIn": {
     "title": "Ways to sign in",
@@ -267,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "Mail access wasn’t allowed.",
-        "lead": "You can sign in with that account now, but its mailbox isn’t connected. Try again and allow mail access."
+        "lead": "Nothing was connected, and that account wasn’t added as a way to sign in. Try again and allow mail access."
       },
       "account_mismatch": {
         "title": "That’s a different account.",
@@ -280,7 +289,24 @@
       "unknown": {
         "title": "Something went wrong.",
         "lead": "Nothing changed. Try again."
+      },
+      "sign_in_not_allowed": {
+        "title": "This Campbooks isn’t open to this address.",
+        "lead": "Only people its owner approved can sign in here, and nothing was kept. Try another address, or ask whoever runs this Campbooks."
       }
+    },
+    "new": "New",
+    "recent": {
+      "title": "A way to sign in was added this week",
+      "lead": "It’s marked New below. If you didn’t add it, remove it, then sign out everywhere."
+    },
+    "everywhere": {
+      "title": "Sign out everywhere",
+      "lead": "Ends every sign-in to your account: this browser, your other devices and every app you allowed. Do it if you lose a device or see a way to sign in you didn’t add.",
+      "action": "Sign out everywhere",
+      "confirm": "Yes, sign out everywhere",
+      "confirmLead": "Sign out of Campbooks on every device and in every app, this browser included? You’ll sign in again here next.",
+      "failed": "Couldn’t sign out everywhere. Nothing changed; try again."
     }
   },
   "passkeySignUp": {
@@ -379,7 +405,8 @@
         "title": "Couldn’t add a passkey.",
         "lead": "Nothing was added. Try again."
       }
-    }
+    },
+    "freshSignIn": "For your security, adding a passkey needs a sign-in from the last five minutes. Sign in again; it takes you straight back here."
   },
   "admin": {
     "title": "Account",

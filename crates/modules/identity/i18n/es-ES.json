@@ -9,6 +9,7 @@
     "held_grant_not_found": "No hay ningún buzón esperando a que lo conectes.",
     "invalid_id_token_hint": "Esta solicitud de cierre de sesión no está firmada por Campbooks para esta aplicación; no se ha cerrado nada.",
     "signup_invite_only": "Este Campbooks solo acepta a personas invitadas. Pide a alguien que invite esta dirección y vuelve a iniciar sesión.",
+    "sign_in_not_allowed": "Este Campbooks solo deja entrar a las personas que su propietario ha aprobado, y esta dirección no es una de ellas. No se ha guardado nada.",
     "step_up_required": "Vuelve a iniciar sesión primero: para cambiar cómo inicias sesión hace falta haber iniciado sesión en los últimos diez minutos.",
     "last_way_in": "Es la única forma de iniciar sesión, así que no se puede quitar. Añade otra primero.",
     "link_incomplete": "Indica el proveedor, el espacio de trabajo o el buzón al que se refiere.",
@@ -31,6 +32,20 @@
     "client_scope_not_allowed": "No se puede dar el permiso {{scope}} a aplicaciones.",
     "client_is_public": "Esta aplicación inicia sesión de personas y no tiene secreto que renovar.",
     "client_name_reserved": "Solo las aplicaciones del propio Campbooks pueden llamarse Campbooks o Not A Camp. Elige otro nombre.",
-    "too_many_accounts": "Pregunta por un máximo de {{max}} cuentas a la vez."
+    "fresh_sign_in_required": "Vuelve a iniciar sesión primero: añadir una llave de acceso requiere haber iniciado sesión en los últimos cinco minutos.",
+    "too_many_accounts": "Pregunta por un máximo de {{max}} cuentas a la vez.",
+    "client_name_mixed_scripts": "Usa un solo alfabeto en cada palabra del nombre de la aplicación: las letras de alfabetos distintos pueden pasar por otras."
+  },
+  "notices": {
+    "way_in_added": {
+      "subject": "Una nueva forma de iniciar sesión en tu cuenta de Campbooks",
+      "passkey": "Una llave de acceso",
+      "provider": "Una cuenta de {{provider}}",
+      "added": "{{what}} se añadió como forma de iniciar sesión en tu cuenta de Campbooks el {{when}}.",
+      "if_you": "Si fuiste tú, no tienes que hacer nada.",
+      "if_not": "Si no fuiste tú, abre Campbooks, ve a Ajustes → Formas de iniciar sesión, elimínala y elige Cerrar sesión en todas partes.",
+      "open": "Abrir Campbooks",
+      "why": "Campbooks envía este mensaje a las direcciones de tu cuenta cada vez que se añade una forma de iniciar sesión. No contiene ningún rastreo."
+    }
   }
 }

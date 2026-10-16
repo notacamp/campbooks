@@ -42,16 +42,14 @@
     "signOut": "Cerrar sesión",
     "signingOut": "Cerrando sesión…",
     "waysIn": "Formas de iniciar sesión",
-    "apps": "Aplicaciones e integraciones",
-    "memory": "Memoria de Scout"
+    "apps": "Aplicaciones e integraciones"
   },
   "home": {
     "title": "Aún no hay nada que te necesite",
     "subline": "Cuando Campbooks tenga algo para ti, aparecerá aquí.",
     "connectTitle": "Conecta tu correo",
-    "connectLead": "Campbooks leerá tu correo y traerá a esta página lo que te necesita. Conectar un buzón desde aquí todavía se está construyendo.",
+    "connectLead": "Campbooks lee tu correo y trae a esta página lo que te necesita. Conecta un buzón para empezar.",
     "connect": "Conectar tu correo",
-    "soon": "Próximamente",
     "context": "Primeros pasos",
     "start": "Primeros pasos",
     "invite": "Invita a las personas con las que trabajas",
@@ -72,9 +70,16 @@
     },
     "menuEntry": "Administración",
     "reauthTitle": "Vuelve a iniciar sesión para continuar",
-    "reauthLead": "La administración requiere haber iniciado sesión en las últimas 12 horas, para que nadie pueda usar una sesión antigua para cambiar esta instancia. Volverás aquí directamente.",
+    "reauthLead": "La administración requiere haber iniciado sesión en la última hora, para que nadie pueda usar una sesión antigua para cambiar esta instancia. Volverás aquí directamente.",
     "reauthAction": "Volver a iniciar sesión",
     "unreachableTitle": "No se puede abrir la administración",
     "unreachableLead": "El servidor no ha respondido. Comprueba tu conexión e inténtalo de nuevo."
+  },
+  "settings": {
+    "sections": "Secciones de los ajustes",
+    "members": "Miembros",
+    "mailboxes": "Buzones",
+    "waysIn": "Formas de iniciar sesión",
+    "memory": "Memoria de Scout"
   }
 }

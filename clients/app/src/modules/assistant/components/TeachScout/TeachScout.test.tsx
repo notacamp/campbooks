@@ -102,7 +102,7 @@ describe("TeachScout", () => {
   });
 
   it("offers the rule builder when no language model may read sentences here", async () => {
-    mockApi({ [`POST ${W}/assistant/compile`]: problem(503, "ai_role_not_configured") });
+    mockApi({ [`POST ${W}/assistant/compile`]: problem(409, "compile_unavailable") });
     renderWithProviders(<TeachScout workspaceId={WS} />);
 
     teach();

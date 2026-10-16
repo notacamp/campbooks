@@ -92,6 +92,13 @@ describe("findConflicts", () => {
     expect(findConflicts([define("a", "1", "focus"), define("b", "1", "item")])).toEqual([]);
     expect(findConflicts([define("a", "1", "focus"), define("b", "1")])).toHaveLength(1);
   });
+
+  it("keeps a settings page's keys apart from the reader's, but not from global or list ones", () => {
+    expect(findConflicts([define("a", "r", "settings"), define("b", "r", "item")])).toEqual([]);
+    expect(findConflicts([define("a", "j", "settings"), define("b", "j", "list")])).toHaveLength(1);
+    expect(findConflicts([define("a", "r", "settings"), define("b", "r", "focus")])).toEqual([]);
+    expect(findConflicts([define("a", "c", "settings"), define("b", "c")])).toHaveLength(1);
+  });
 });
 
 describe("ShortcutRegistry", () => {

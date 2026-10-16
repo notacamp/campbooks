@@ -17,6 +17,7 @@ produce or accept against the file.
 | `conversations.send_requested.v1.schema.json` | `conversations` | `connectors` | The event announcing a send once its undo window ends (ids and the outgoing message blob) |
 | `conversations.need_changed.v1.schema.json` | `conversations` | `attention` | What a conversation needs from its inbox's members, opened, changed or cleared (ids, enums and a date only) |
 | `connectors.send_completed.v1.schema.json` | `connectors` | `conversations` | The event telling how a send ended: sent (with the provider's id) or failed (with a reason) |
+| `connectors.connection_removed.v1.schema.json` | `connectors` | `conversations` | The event announcing a disconnected connection, with the inboxes it fed and whether their mail is deleted or kept read-only |
 
 Rules:
 

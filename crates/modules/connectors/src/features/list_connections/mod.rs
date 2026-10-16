@@ -4,7 +4,8 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Operation, Problem, Result,
+    AppState, Error, Operation, Problem, Result,
+    authz::{self, Action},
     db::BeginFor as _,
     tenancy::{Access, Workspace, WorkspaceId},
 };
@@ -12,7 +13,8 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::{
-    domain::{connections, model::ConnectionView},
+    domain::{connections, model::ConnectionView, resources},
+    events::CONNECTION_RECORD,
     scopes::ConnectorsRead,
 };
 
@@ -30,7 +32,7 @@ pub struct ConnectionList {
     operation_id = "connectors.list_connections",
     tag = "connectors",
     security(("bearer" = ["connectors:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["connectors.connection"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["connectors.connection"]).access("connectors.connection", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The connections you may see.", body = ConnectionList),
@@ -51,11 +53,14 @@ pub async fn handler(
 
 /// The connections `access` may see.
 pub async fn execute(state: &AppState, access: &Access) -> Result<ConnectionList> {
+    authz::require_type(state, access, Action::Read, CONNECTION_RECORD, || {
+        Error::Forbidden
+    })?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut views = Vec::new();
     for connection in connections::list(&mut tx).await? {
-        if connections::visible(access, connection.granted_by) {
-            views.push(connections::view(&mut tx, connection).await?);
+        if resources::visible(&state.resources, access, connection.granted_by) {
+            views.push(connections::view(&mut tx, connection, access.user).await?);
         }
     }
     tx.commit().await?;

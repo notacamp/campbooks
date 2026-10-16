@@ -14,6 +14,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgConnection;
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::{
         access::visible_inboxes,
@@ -23,6 +25,7 @@ use crate::{
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
 
 /// Page size when none is asked for.
 pub const DEFAULT_LIMIT: u32 = 50;
@@ -66,7 +69,7 @@ pub struct ConversationList {
     operation_id = "conversations.list",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation", "conversations.rule"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "A page of conversations.", body = ConversationList),
@@ -96,6 +99,7 @@ pub async fn handler(
     let ids = query.ids.as_deref().map(parse_ids).transpose()?;
     let after = query.cursor.as_deref().map(decode_cursor).transpose()?;
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, CONVERSATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
     if let Some(ids) = ids {
@@ -106,8 +110,7 @@ pub async fn handler(
             .collect::<Result<Vec<_>>>()?;
         suggestions::attach(&mut tx, &mut conversations).await?;
         needs::attach(&mut tx, &mut conversations).await?;
-        rules::attach(&mut tx, &mut conversations).await?;
-        rules::attach(&mut tx, &mut conversations).await?;
+        rules::attach(&mut tx, access.user, &mut conversations).await?;
         tx.commit().await?;
         return Ok(Json(ConversationList {
             conversations,
@@ -127,7 +130,7 @@ pub async fn handler(
         .collect::<Result<Vec<_>>>()?;
     suggestions::attach(&mut tx, &mut conversations).await?;
     needs::attach(&mut tx, &mut conversations).await?;
-    rules::attach(&mut tx, &mut conversations).await?;
+    rules::attach(&mut tx, access.user, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);

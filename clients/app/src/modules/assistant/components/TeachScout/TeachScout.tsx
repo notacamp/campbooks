@@ -41,7 +41,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
   const [manual, setManual] = useState(false);
 
   const code = compile.isError ? problemCode(compile.error) : undefined;
-  const noModel = code === "ai_role_not_configured" || code === "ai_external_content_refused";
+  const noModel = code === "compile_unavailable";
   const reset = () => {
     setResult(undefined);
     compile.reset();

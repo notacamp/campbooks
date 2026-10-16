@@ -18,7 +18,8 @@ use campbooks_ai::decide::{
     taught::is_free_mail,
 };
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Error, Operation, Problem, RecordRef, Result, Risk,
+    authz::Action,
     db::BeginFor as _,
     extract,
     tenancy::{Access, Workspace, WorkspaceId},
@@ -29,12 +30,13 @@ use utoipa::{IntoParams, ToSchema};
 
 use crate::{
     domain::{
-        access::visible_inboxes,
         paths::ConversationPath,
+        resources,
         rules::{self, Candidate, RuleAction, RuleCondition, SurfaceWhen},
     },
-    features::rules::{RulePreview, compute_preview},
-    model::{ConversationId, InboxId, InboxRole, LabelId, Stream},
+    events::CONVERSATION_RECORD,
+    features::rules::{PREVIEW_DEADLINE, RulePreview, compute_preview, may_teach},
+    model::{ConversationId, InboxId, LabelId, Stream},
     scopes::{ConversationsRead, ConversationsWrite},
 };
 
@@ -148,7 +150,7 @@ impl RuleSuggestions {
     operation_id = "conversations.suggest_rules",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule", "conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.rule", "conversations.conversation"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation acted on."),
@@ -171,38 +173,38 @@ pub async fn suggest(
     extract::Query(query): extract::Query<SuggestQuery>,
 ) -> Result<Json<RuleSuggestions>> {
     let access = &workspace.access;
-    let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = teachable_inbox(&mut tx, access, path.conversation_id).await?;
+    let mut tx = crate::features::rules::begin_read(&state, access.workspace).await?;
+    let inbox = teachable_inbox(&state, &mut tx, access, path.conversation_id).await?;
     let out = suggestions(&mut tx, access, inbox, path.conversation_id, query).await?;
     tx.commit().await?;
     Ok(Json(out))
 }
 
 /// The conversation's inbox if the caller may teach there: 404 when they
-/// cannot see it, 403 `inbox_read_only` when they only read it.
+/// cannot see the conversation, 403 `inbox_read_only` when they only read its
+/// inbox or it is kept read-only (the catalogue's `write` on the inbox).
 async fn teachable_inbox(
+    state: &AppState,
     conn: &mut PgConnection,
     access: &Access,
     id: ConversationId,
 ) -> Result<InboxId> {
-    let visible = visible_inboxes(conn, access).await?;
+    resources::authorize(
+        state,
+        conn,
+        access,
+        Action::Read,
+        &RecordRef::new(CONVERSATION_RECORD, &id),
+    )
+    .await?;
     let inbox = sqlx::query_scalar!(
-        r#"SELECT inbox_id AS "inbox: InboxId" FROM conversations.conversations
-            WHERE id = $1 AND inbox_id = ANY($2)"#,
+        r#"SELECT inbox_id AS "inbox: InboxId" FROM conversations.conversations WHERE id = $1"#,
         id as ConversationId,
-        &visible as &[InboxId],
     )
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(Error::NotFound)?;
-    if access.user.is_some()
-        && !matches!(
-            rules::role_in(conn, inbox, access.user).await?,
-            Some(InboxRole::Sender | InboxRole::Manager)
-        )
-    {
-        return Err(Error::Denied(crate::MESSAGES.reason("inbox_read_only")));
-    }
+    may_teach(state, conn, access, inbox).await?;
     Ok(inbox)
 }
 
@@ -213,8 +215,9 @@ async fn suggestions(
     id: ConversationId,
     query: SuggestQuery,
 ) -> Result<RuleSuggestions> {
+    // One deadline for every likeness's preview together.
+    let deadline = std::time::Instant::now() + PREVIEW_DEADLINE;
     let shared = rules::is_shared(conn, inbox).await?;
-    rules::fill_templates(conn, inbox).await?;
     let Some(candidate) = rules::candidate(conn, id).await? else {
         return Ok(RuleSuggestions::nothing(NoSuggestion::NotTeachable, shared));
     };
@@ -237,8 +240,9 @@ async fn suggestions(
         if rules::validate(&conditions, &actions).is_err() {
             continue;
         }
-        let preview = compute_preview(conn, inbox, &conditions, &actions).await?;
-        if preview.matching == 0 {
+        let preview = compute_preview(conn, inbox, (&conditions, &actions), deadline).await?;
+        // A likeness that would change nothing is no choice at all.
+        if preview.would_change == 0 {
             continue;
         }
         let key = suggestion_key(likeness, &conditions, &actions);
@@ -276,19 +280,26 @@ async fn suggestions(
     if !offered {
         return Ok(RuleSuggestions::nothing(NoSuggestion::TooFew, shared));
     }
-    if let (Some(user), Some(first)) = (access.user, default.and_then(|i| out.get(i))) {
+    // The default's key; with no default, every likeness offered, since
+    // "Just this one" turns all of them down.
+    let keys: Vec<String> = match default.and_then(|i| out.get(i)) {
+        Some(first) => vec![first.key.clone()],
+        None => out.iter().map(|s| s.key.clone()).collect(),
+    };
+    if let Some(user) = access.user {
         let dismissed = sqlx::query_scalar!(
-            r#"SELECT (times >= 2 OR dismissed_at > now() - make_interval(days => $4)) AS "hidden!"
+            r#"SELECT coalesce(bool_or(times >= 2
+                                       OR dismissed_at > now() - make_interval(days => $4)),
+                               false) AS "hidden!"
                  FROM conversations.rule_dismissals
-                WHERE inbox_id = $1 AND user_id = $2 AND suggestion_key = $3"#,
+                WHERE inbox_id = $1 AND user_id = $2 AND suggestion_key = ANY($3)"#,
             inbox as InboxId,
             user.as_uuid(),
-            first.key,
+            &keys,
             DISMISS_DAYS,
         )
-        .fetch_optional(&mut *conn)
-        .await?
-        .unwrap_or(false);
+        .fetch_one(&mut *conn)
+        .await?;
         if dismissed {
             return Ok(RuleSuggestions::nothing(NoSuggestion::Dismissed, shared));
         }
@@ -319,7 +330,8 @@ async fn actions_for(
             .map(|label| vec![RuleAction::AddLabel { label }]),
         TaughtAction::NotNeeded => {
             let need = sqlx::query!(
-                "SELECT reason, question FROM conversations.needs WHERE conversation_id = $1",
+                "SELECT reason, question FROM conversations.needs
+                  WHERE conversation_id = $1 AND verdict = 'not_needed'",
                 id as ConversationId,
             )
             .fetch_optional(conn)
@@ -430,7 +442,7 @@ pub struct DismissSuggestion {
     tag = "conversations",
     security(("bearer" = ["conversations:write"])),
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
-        .records(["conversations.rule"])))),
+        .records(["conversations.rule"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation acted on."),
@@ -454,7 +466,7 @@ pub async fn dismiss(
 ) -> Result<StatusCode> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    let inbox = teachable_inbox(&mut tx, access, path.conversation_id).await?;
+    let inbox = teachable_inbox(&state, &mut tx, access, path.conversation_id).await?;
     if let Some(user) = access.user {
         sqlx::query!(
             r#"INSERT INTO conversations.rule_dismissals

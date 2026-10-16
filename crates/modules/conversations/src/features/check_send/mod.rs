@@ -5,7 +5,7 @@
 //! send it recorded well before this; this covers an intent it never got.
 //! A late outcome still wins (`conversations.record_send`).
 
-use campbooks_kernel::{JobContext, JobError, JobHandler};
+use campbooks_kernel::{JobContext, JobError, JobHandler, tenancy::UserId};
 use chrono::TimeDelta;
 use serde::{Deserialize, Serialize};
 
@@ -43,12 +43,12 @@ impl JobHandler for CheckSend {
         let events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
         let reason = "unknown_outcome";
-        let stuck = sqlx::query_scalar!(
+        let stuck = sqlx::query!(
             r#"UPDATE conversations.drafts
                   SET state = $3, failure_reason = $4, send_at = NULL,
                       version = version + 1, updated_at = now()
                 WHERE id = $1 AND send_id = $2 AND state = 'sending'
-            RETURNING inbox_id AS "inbox: InboxId""#,
+            RETURNING inbox_id AS "inbox: InboxId", author AS "author: UserId""#,
             payload.draft as DraftId,
             payload.send_id as SendId,
             DraftState::Failed.as_str(),
@@ -56,15 +56,16 @@ impl JobHandler for CheckSend {
         )
         .fetch_optional(&mut **tx)
         .await?;
-        if let Some(inbox) = stuck {
+        if let Some(stuck) = stuck {
             events
                 .publish(
                     tx,
                     &SendFailed {
                         workspace,
-                        inbox,
+                        inbox: stuck.inbox,
                         draft: payload.draft,
                         reason: reason.to_owned(),
+                        author: stuck.author,
                     },
                 )
                 .await?;

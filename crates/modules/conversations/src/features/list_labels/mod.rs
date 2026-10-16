@@ -10,8 +10,11 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use campbooks_kernel::authz::Action;
+
 use crate::{
-    domain::access::visible_inboxes,
+    domain::{access::visible_inboxes, resources},
+    events::INBOX_RECORD,
     model::{InboxId, LabelId},
     scopes::ConversationsRead,
 };
@@ -42,7 +45,7 @@ pub struct LabelList {
     operation_id = "conversations.list_labels",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.inbox"]).access("conversations.inbox", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "The labels.", body = LabelList),
@@ -59,6 +62,7 @@ pub async fn handler(
     workspace: Workspace<ConversationsRead>,
 ) -> Result<Json<LabelList>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, INBOX_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
     let labels = sqlx::query_as!(

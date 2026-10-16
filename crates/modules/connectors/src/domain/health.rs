@@ -34,6 +34,19 @@ pub async fn set(
     Ok(changed > 0)
 }
 
+/// Lock `connection` for a sync's writes, before any of its streams: the
+/// order removal takes too (connection, then streams), so a sync and a
+/// disconnect never wait on each other in a cycle.
+pub async fn lock(conn: &mut PgConnection, connection: ConnectionId) -> Result<()> {
+    sqlx::query_scalar!(
+        "SELECT id FROM connectors.connections WHERE id = $1 FOR NO KEY UPDATE",
+        connection as ConnectionId
+    )
+    .fetch_optional(conn)
+    .await?;
+    Ok(())
+}
+
 /// The grant stopped working: `needs_reauth`, every stream paused and off
 /// the schedule, and [`ConnectionNeedsReauth`] published once.
 pub async fn needs_reauth(
@@ -46,7 +59,7 @@ pub async fn needs_reauth(
     now: DateTime<Utc>,
 ) -> Result<()> {
     let already = sqlx::query_scalar!(
-        "SELECT health = 'needs_reauth' AS \"already!\" FROM connectors.connections WHERE id = $1",
+        "SELECT health = 'needs_reauth' AS \"already!\" FROM connectors.connections WHERE id = $1 FOR NO KEY UPDATE",
         connection as ConnectionId
     )
     .fetch_optional(&mut **tx)

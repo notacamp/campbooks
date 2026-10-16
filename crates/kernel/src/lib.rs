@@ -7,6 +7,7 @@
 
 pub mod admin;
 pub mod auth;
+pub mod authz;
 pub mod blobs;
 pub mod changes;
 pub mod clock;
@@ -21,6 +22,7 @@ pub mod i18n;
 pub mod idempotency;
 pub mod ids;
 pub mod jobs;
+pub mod mail;
 pub mod module;
 pub mod operations;
 pub mod preferences;

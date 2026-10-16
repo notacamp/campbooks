@@ -117,16 +117,20 @@ never re-sort a conversation, and a member's move SHALL stick.
 
 ### Requirement: The decide pass records suggestions
 Every answer of every strategy SHALL be stored in `decisions` with its
-question, source, value, options, probabilities, confidence, model, latency,
-reasons, whether it acted, and the envelope version. The rules SHALL be the
+question, source, value, options, probabilities, confidence, model, model
+version, latency, reasons, whether it acted, and the envelope version
+(`1 + CONTEXT_VERSION` of the triage context). The rules SHALL be the
 shared email signals and the questions the shared triage questions of
 `campbooks_ai::decide`; this module SHALL hold no rules of its own. The model pass
 (`conversations.decide_message`, role `decide`) SHALL ask the six questions
 (`stream`, `needs_reply`, `asks_action`, `has_deadline`, `urgency`,
-`suspicious`) in one call per inbound message, only when the `decide` role is
-configured, only for messages sent within
+`suspicious`) in one call per inbound message, telling the model whose inbox
+the message is in, only when the `decide` role is configured and has passed
+its answers check, only for messages sent within
 `CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS` (default 14), and once per
-message. Answers the policy accepts SHALL be marked `acted`; no model answer
+message. When the role has not passed its answers check, the pass SHALL do
+exactly what it does with no `decide` role: store nothing, fail no job.
+Answers the policy accepts SHALL be marked `acted`; no model answer
 SHALL be accepted by the shipped policy. Provider
 failures SHALL be retried, recording only the kind of failure.
 
@@ -141,6 +145,14 @@ failures SHALL be retried, recording only the kind of failure.
 #### Scenario: A replayed delivery
 - **WHEN** `message_received` is delivered again to `conversations.decide_message`
 - **THEN** the model is not asked again
+
+#### Scenario: A model that failed its answers check
+- **WHEN** the decide role's last answers check failed and a batch of mail arrives
+- **THEN** the model is not called, and the decisions, streams and needs are the same as with no `decide` role
+
+#### Scenario: The recipient
+- **WHEN** a message arrives in Sam's inbox, which only Sam reads
+- **THEN** the model reads "The recipient is sam@example.com, who reads this personal inbox."
 
 ### Requirement: Reading conversations
 `GET /api/v1/w/{workspace_id}/inboxes` (`conversations.list_inboxes`) SHALL
@@ -280,13 +292,15 @@ them SHALL be listed with zero.
 
 ### Requirement: Suggestions with their reasons
 A conversation summary SHALL carry `suggestion` when the newest stream answer
-on record for it (the model's before the rules' for the same message) did
+on record for it (the model's before the rules' for the same message; a
+model's answer only when its `model_version` starts with `checked:`) did
 not act, names another stream than the conversation's, and no member placed
 the conversation; the suggestion SHALL carry the stream, its source, its
 confidence (0 to 100, when known) and its stored reasons. A conversation's
 detail SHALL carry `decisions`: for each question, the answer about its newest
-inbound message, with its source, confidence, reasons and whether it acted.
-Neither SHALL change where a conversation is.
+inbound message, with its source, confidence, reasons and whether it acted,
+read the same way. Model answers without that stamp SHALL be kept and never
+read. Neither SHALL change where a conversation is.
 
 #### Scenario: The shipped policy
 - **WHEN** the rules answer `newsletters` for a message under `Policy::baseline`
@@ -295,6 +309,10 @@ Neither SHALL change where a conversation is.
 #### Scenario: A member moved it
 - **WHEN** a member moves that conversation to `newsletters`
 - **THEN** the summary the move returns has no suggestion
+
+#### Scenario: Model answers from before the answers check
+- **WHEN** a message's model answers carry `model_version` `laya-0.3.21-unchecked`
+- **THEN** its detail lists the rules' answers, and the model's answers stay stored
 
 ### Requirement: Sending scope and roles
 The `conversations` module SHALL declare the scope `conversations:send`, and
@@ -440,14 +458,17 @@ newest inbound message sent within
 policy and the conversation's state. A `sure` need SHALL come only from
 answers the policy accepts: `pay` when `asks_action` is accepted with the
 `payment_due` reason, else `reply` when `needs_reply` is accepted, else `do`
-when `asks_action` is accepted. A `suspicious` answer of true SHALL raise a
-`review` need instead of any other. When the `decide` role is configured, a
-model answer of true for `needs_reply` or `asks_action` that the policy does
-not accept, with a confidence of at least 0.8, where no `sure` need exists
-SHALL raise a `review` need with trust `check`. The need SHALL carry the due
-date resolved from an accepted `has_deadline` answer, and `urgent` when an
-accepted `urgency` answer is "today". Messages from the conversation's own
-inbox SHALL never raise one.
+when `asks_action` is accepted. When answers of more than one source to the
+same question were accepted, the rules' answer SHALL be the one used. A
+`suspicious` answer of true SHALL raise a `review` need instead of any other.
+When the `decide` role is configured, a model answer of true for
+`needs_reply` or `asks_action` that the policy does not accept, with a
+confidence of at least 0.8, where no `sure` need exists and no accepted
+answer to the same question is false, SHALL raise a `review` need with trust
+`check`. Only model answers whose `model_version` starts with `checked:`
+SHALL count. The need SHALL carry the due date resolved from an accepted
+`has_deadline` answer, and `urgent` when an accepted `urgency` answer is
+"today". Messages from the conversation's own inbox SHALL never raise one.
 
 #### Scenario: A question from a person
 - **WHEN** Marta writes "Could you confirm Thursday's walkthrough? The builders need to know by Wednesday." and the rules accept `needs_reply` and `has_deadline`
@@ -469,14 +490,28 @@ inbox SHALL never raise one.
 - **WHEN** no `decide` role is configured
 - **THEN** no need has trust `check`
 
+#### Scenario: The rules already settled it
+- **WHEN** the rules accept `asks_action` false, `needs_reply` false and `has_deadline` false for a code host's notification, and the model answers `asks_action` true with confidence 0.875 and `has_deadline` true with 0.976
+- **THEN** no need is raised
+
+#### Scenario: Only the model says yes
+- **WHEN** the rules give no accepted answer to `asks_action` and the model answers it true with confidence 0.875
+- **THEN** the need is `review` with trust `check`
+
+#### Scenario: Unchecked model answers
+- **WHEN** a message's only `needs_reply` true is a model answer marked `laya-0.3.21-unchecked`
+- **THEN** reading it raises no `check` need, and an open `check` need it raised before is withdrawn as `superseded` on the next refresh
+
 ### Requirement: Clearing a need
 A need SHALL be cleared, with its cause, when: a message is sent from the
 inbox in the conversation after the message that raised it (`replied`; clears
 `reply` and `do`), the conversation is archived (`archived`; clears `reply` and
 `review`), every message is in the trash or spam or removed (`trashed`; clears
 any), or a member resolves it. A new inbound message SHALL derive the need
-again from that message (`superseded` for the old one). Changes SHALL come
-from the provider or from members alike.
+again from that message (`superseded` for the old one). When the open need's
+own message, read again, raises no need and no member confirmed it, the need
+SHALL be cleared as `superseded`. Changes SHALL come from the provider or
+from members alike.
 
 #### Scenario: Replied from the phone
 - **WHEN** Ana replies to Marta from Gmail on her phone and the sent message reaches the conversation
@@ -489,6 +524,10 @@ from the provider or from members alike.
 #### Scenario: Done in a shared inbox
 - **WHEN** Ana chooses Done on a need in an inbox she shares with Leo
 - **THEN** the need is cleared for both of them
+
+#### Scenario: A question raised against a settled answer
+- **WHEN** a conversation has an open `check` need whose message's accepted answers say it asks nothing, and the conversation's need is refreshed
+- **THEN** the need is cleared with cause `superseded`, announced once, and not shown under Done today
 
 ### Requirement: Need changes are published
 Every change to a need SHALL publish `conversations.need_changed` v1
@@ -579,6 +618,7 @@ others out.
 #### Scenario: Home asks for its rows
 - **WHEN** the client lists three conversation ids, one of them in an inbox the caller cannot see
 - **THEN** two summaries are returned, each with its `need`
+
 ### Requirement: Conversations as a search source
 The module SHALL implement the kernel's `SearchSource` port for the group
 type `conversations.conversation`: a conversation's container (its inbox),
@@ -612,3 +652,508 @@ SHALL list nothing for other container types.
 #### Scenario: A member's inboxes
 - **WHEN** the port lists `conversations.inbox` containers for a member of two of a workspace's three inboxes
 - **THEN** it returns those two
+
+### Requirement: Taught rules
+The module SHALL store taught rules: deterministic condition → action pairs
+for one inbox, with one to four conditions that must all hold and one to four
+actions, at most one per slot (`stream`, `archive`, `read`, `needs_reply`,
+`asks_action`, `surface`; `add_label` is additive). Conditions SHALL be
+`sender_address is`, `sender_domain is` (never a free-mail domain on its
+own), `list_id is`, `subject_template is`, `subject_contains` (whole words,
+case- and accent-insensitive), `header is|present` (a stored header),
+`label has` and `stream is`. Actions SHALL be `move_to_stream`, `archive`,
+`add_label`, `mark_read`, `needs_reply` true or false, `asks_action` true or
+false and `surface` always or never. A rule SHALL record its origin
+(`action`, `onboarding`, `instruction`, `correction`, `suggestion`), the
+member's words for an instruction, its author, and its state (`proposed`,
+`active`, `paused`, `removed`). Taught rules are member data: the built-in
+email signals stay the module's only rules of its own.
+
+#### Scenario: A rule from a move
+- **WHEN** Ana creates a rule with `sender_address is notifications@github.com` and `move_to_stream updates`
+- **THEN** it is stored active for her inbox with origin `action` and Ana as its author
+
+#### Scenario: A free-mail domain alone
+- **WHEN** a rule's only condition is `sender_domain is gmail.com`
+- **THEN** the response is 400 with code `invalid_rule` and nothing is stored
+
+#### Scenario: Two actions in one slot
+- **WHEN** a rule asks to move to `updates` and to `receipts`
+- **THEN** the response is 400 with code `invalid_rule`
+
+### Requirement: Subject templates
+Every message SHALL keep a subject template: the subject lower-cased,
+without `Re:`/`Fwd:` prefixes in the four locales, with dates and digit runs
+replaced by `#`, tokens of six or more characters mixing letters and digits
+replaced by `*`, spaces collapsed and at most 120 characters, or none when
+fewer than two literal words remain. Existing messages SHALL be backfilled.
+
+#### Scenario: An order notice
+- **WHEN** a message's subject is "Re: Your order #48213 has shipped"
+- **THEN** its template is "your order # has shipped"
+
+#### Scenario: Nothing to keep
+- **WHEN** a subject is "Invoice 2026-10-03"
+- **THEN** it has no template
+
+### Requirement: Rules run first and always the same
+For each new inbound message, the module SHALL evaluate the inbox's active
+rules after the built-in signals and before placing the conversation. Per
+slot, the matching rule with the highest specificity (template, List-Id or
+header 3; subject words or sender address 2; domain, label or stream 1;
+summed) SHALL win, then the latest confirmed, then the lowest id. A rule's
+answers to `stream`, `needs_reply` and `asks_action` SHALL be stored in
+`decisions` with source `taught`, the rule as the reason and `acted = true`,
+and SHALL override the signals' answers to the same question; the model pass
+SHALL never override them. Its `archive`, `mark_read` and `add_label`
+actions SHALL apply to the new message. A stream placed by a rule SHALL have
+stream source `taught`, which a member's move overrides and nothing else
+does. The same message and the same rules SHALL always give the same outcome.
+
+#### Scenario: A new notification
+- **WHEN** a message from notifications@github.com arrives and an active rule moves that sender's mail to `updates`
+- **THEN** the new conversation is in `updates` with stream source `taught`, and the stream decision has source `taught` and acted
+
+#### Scenario: The more specific rule
+- **WHEN** one rule moves mail from shop.example to `receipts` and another moves "your order # has shipped" from shop.example to `updates`
+- **THEN** a shipping notice from shop.example goes to `updates` and an invoice from it goes to `receipts`
+
+#### Scenario: A rule beats the signals
+- **WHEN** the signals answer `needs_reply` true at 0.95 and an active rule answers it false for that sender
+- **THEN** no reply need is raised
+
+### Requirement: Suspicious mail is never hidden by a rule
+When a message has a true `suspicious` answer from any source, or its
+conversation has an open Review need of any kind (a warning or a question to
+the member), rules SHALL NOT archive it, mark it
+read, move it out of `primary`, answer a need question false, or apply
+`surface: never`; the Review need SHALL stay. Such a conversation SHALL
+never start a rule suggestion.
+
+#### Scenario: A look-alike sender
+- **WHEN** a phishing message claims to be from notifications@github.com and the rules answer `suspicious` true
+- **THEN** the archive and move rules for that sender leave it in Primary with its Review need
+
+### Requirement: Surfacing
+A rule with `surface: never` SHALL keep a need from being raised for the
+mail it matches, and SHALL clear an open one with cause `rule`. A rule with
+`surface: always` SHALL keep any other rule from archiving, marking read or
+moving the conversation out of `primary`; it raises no need of its own in
+this version.
+
+#### Scenario: Never needs me
+- **WHEN** a bill from billing@hosting.example arrives and a rule says `surface: never` for that sender
+- **THEN** no need is raised for it
+
+#### Scenario: Always show me
+- **WHEN** one rule archives mail from mfiscal.example and a more specific one says `surface: always` for ines@mfiscal.example
+- **THEN** a message from ines@mfiscal.example stays in the inbox, in Primary
+
+### Requirement: Rule operations
+`POST …/inboxes/{inbox_id}/rules/preview` (`conversations.preview_rule`,
+`conversations:read`, not mutating: a read served by POST so the rule's
+addresses and words stay out of URLs and access logs) SHALL answer, for
+conditions and actions, how many conversations in the inbox the rule
+matches and would change, up to five of them (subject, sender and date,
+newest first), how many it would skip as suspicious or placed by a member,
+and the active rules it would take over from with how many conversations.
+`POST …/inboxes/{inbox_id}/rules` (`conversations.create_rule`,
+`conversations:write`, undo `conversations.remove_rule`) SHALL store a rule
+active or proposed and, when `apply_to_existing` is set for an active rule,
+start a run. `POST …/rules/{rule_id}/confirm` (`conversations.confirm_rule`)
+SHALL make a proposed rule active (with `apply_to_existing`), else answer 409
+`rule_not_proposed`. `PATCH …/rules/{rule_id}` (`conversations.update_rule`)
+SHALL change its conditions or actions, pause it, or let a manager adopt it.
+`DELETE …/rules/{rule_id}` (`conversations.remove_rule`) SHALL remove it, and
+with `restore=true` put back what it changed. `GET …/rules`
+(`conversations.list_rules`, proposed rules first, removed ones left out) and
+`GET …/rules/{rule_id}` (`conversations.get_rule`, a removed one too, so the
+run putting its mail back can be followed) SHALL answer the rules of the
+inboxes the caller can see with their counts, latest run and recent
+exceptions. Conditions SHALL be stored normalised (trimmed; addresses, domains, list ids
+and templates lower-cased) and a value SHALL be at most 320 characters. A
+rule with the same conditions and an action of the same kind as an active
+one SHALL replace it, cancelling its runs and announcing it removed, only
+when the caller may change that rule; otherwise the response SHALL be 403
+`rule_not_yours` and nothing changes. A proposed rule SHALL not be paused or
+resumed (409 `rule_not_active`): only `confirm_rule` makes it act.
+`from_conversation_id` SHALL name a conversation of the rule's inbox.
+
+#### Scenario: Someone else's rule
+- **WHEN** Ines, a sender of info@, creates a rule with the same conditions as Leo's, written " Notifications@GitHub.com "
+- **THEN** the response is 403 `rule_not_yours` and Leo's rule stays active; a manager doing the same replaces it
+
+#### Scenario: Preview
+- **WHEN** a member previews moving mail from notifications@github.com to `updates` in an inbox with 1,000 such conversations in Primary, 2 of them suspicious
+- **THEN** the preview would change 998, lists five of them and says 2 are skipped as suspicious
+
+### Requirement: Previews and suggestions only read
+A preview and a suggestion SHALL run in a read-only transaction whose
+statements give up after five seconds, and SHALL look at no more than 20,000
+conversations, saying `complete: false` when they stopped before the end of
+the inbox. Their samples SHALL never show a suspicious conversation (it is
+still counted). Messages stored before subject templates existed SHALL match
+template conditions all the same (their template is worked out as they are
+read), and `conversations.fill_templates` SHALL store those templates in the
+background, a thousand messages per job, enqueued by the inbox's next change
+batch or a new rule.
+
+#### Scenario: A huge inbox
+- **WHEN** a member previews a rule in an inbox of 300,000 conversations
+- **THEN** the answer comes from the first 20,000 with `complete: false`, and nothing is written
+
+#### Scenario: A proposed rule does nothing
+- **WHEN** a rule is created as `proposed`
+- **THEN** new mail it matches is not changed until a member confirms it
+
+#### Scenario: Replacing
+- **WHEN** a member creates a rule moving notifications@github.com to `newsletters` while one moves it to `updates`
+- **THEN** the old rule is removed without putting mail back and the new one is active
+
+### Requirement: Who may teach
+Rules SHALL be the access catalogue's `conversations.rule`, inside their
+inbox. Previewing, creating and confirming a rule, and asking for or
+dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (a
+`sender` or a `manager`; a `reader`, an owner without a membership, or anyone
+in an inbox kept read-only, gets 403 `inbox_read_only`). A proposed rule does
+not act yet: confirming it and turning it down (`POST …/rules/{rule_id}/decline`,
+`conversations.decline_rule`) SHALL take the same `write` on the inbox, and
+confirming SHALL keep its author (the confirmer becomes it only when it had
+none). Updating, removing and restoring an active rule SHALL take its author
+while a `sender`, or a `manager` of the inbox; other writers get 403
+`rule_not_yours`. Reading rules SHALL take any role on the inbox; a
+rule in an inbox the caller cannot see SHALL answer 404. A client token, even
+one a member registered (which arrives as that member), SHALL only read and
+preview rules: creating, confirming, changing, removing or restoring one
+answers 403 `rule_needs_member`. A rule SHALL act for every member of its
+inbox. When its author no longer may write in the inbox, or the inbox is kept
+read-only, the rule SHALL be paused (and its running runs stop) until a
+manager adopts or removes it.
+
+#### Scenario: Leo's rule in a shared inbox
+- **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
+- **THEN** the response is 403 `rule_not_yours`, and Ana's manager colleague can remove it
+
+#### Scenario: The author leaves
+- **WHEN** Leo is removed from info@
+- **THEN** his rules there are paused and stop acting on new mail
+
+#### Scenario: An app
+- **WHEN** a client token with `conversations:write`, registered by Sam, creates a rule
+- **THEN** the response is 403 with code `rule_needs_member`
+
+#### Scenario: Kept read-only
+- **WHEN** the connection feeding an inbox is removed with its mail kept while a rule's run is going
+- **THEN** the run is cancelled, the rule reads as paused, and creating a rule there answers 403 `inbox_read_only`
+
+### Requirement: Rules from evidence ask first
+A rule created with origin `correction` or `suggestion` SHALL be active only
+when the kernel's `MemberPreferences` port says the creating member lets
+Campbooks act without asking and the inbox has no other member; the
+response SHALL then say `acted_without_asking`. Otherwise it SHALL be
+proposed. Until a module installs the port, it SHALL answer "ask first".
+Rules made by hand, from an action or confirmed by a member SHALL not ask the
+port.
+
+#### Scenario: The default
+- **WHEN** a rule is created from corrections and no preferences module is installed
+- **THEN** it is proposed
+
+#### Scenario: Act and tell me
+- **WHEN** the port says Sam lets Campbooks act and Sam's inbox is his alone
+- **THEN** the rule is active and the response says `acted_without_asking`
+
+#### Scenario: A shared inbox
+- **WHEN** the port says Sam lets Campbooks act but Leo also uses the inbox
+- **THEN** the rule is proposed
+
+### Requirement: Applying a rule to existing mail
+Creating or confirming an active rule with `apply_to_existing` SHALL start
+an apply run, `conversations.apply_rule`, that first counts the conversations
+it matches in the background (5,000 looked at per job; the request counts
+nothing, and the run says `counted: false` until done), then changes them,
+each job looking at 500 conversations at most and changing 100 at most, in
+one transaction,
+skipping suspicious conversations, conversations a member placed or changed
+back, and those already so, recording each change with what it was before.
+The run SHALL be resumable from its stored position and SHALL never change a
+conversation twice for one rule. It SHALL re-check before each batch that
+the rule is active and its author may change the inbox, and stop otherwise.
+Each change SHALL publish `conversations.conversation_changed` and
+`conversations.changes_requested` as the operations do; each batch SHALL
+publish `conversations.rule_changed` with the run's total and done.
+
+#### Scenario: Moving 1,000
+- **WHEN** a rule moving notifications@github.com to `updates` is created with `apply_to_existing` and 1,000 lookalikes sit in Primary
+- **THEN** the run counts 1,000, ten batches move them, `rule_changed` reports 100, 200, … 1,000 done, and the connector receives a move for each
+
+#### Scenario: A crash halfway
+- **WHEN** the worker stops after 340 conversations and the job is retried
+- **THEN** the run continues from the 341st and no application is recorded twice
+
+### Requirement: Rule events
+Every change to a rule or its run SHALL publish `conversations.rule_changed`
+v1 carrying the
+workspace, inbox and rule ids, the rule's state, and the current run's kind,
+state, total and done; never its conditions, the member's words or any
+address. It SHALL declare an upsert of `conversations.rule` within its inbox, a removed rule included (it stays
+readable while its mail is put back).
+
+#### Scenario: Someone outside the inbox
+- **WHEN** a rule in info@ is applied and a member who is not in info@ follows the change feed
+- **THEN** they receive none of its changes
+
+### Requirement: Rule suggestions
+`GET …/conversations/{conversation_id}/rule-suggestions?action=…` (the
+action and a stream or label id only)
+(`conversations.suggest_rules`, `conversations:read`, `sender` role) SHALL,
+after a member's move, archive, label, mark read or Not needed on one
+conversation, answer up to four likenesses from broad to narrow (the
+sender, the List-Id, the sender or domain with the subject words or template),
+each with its conditions, its preview and whether it is the default, or no
+suggestion. The default SHALL be the sender for a machine sender the inbox
+never wrote to, else the List-Id, else the template. For a correspondent
+there SHALL be no default, and archive, mark read and Not needed SHALL get no
+suggestion. There SHALL be a suggestion only when the default covers at least
+two other conversations or the message has a List-Id, never for a suspicious
+conversation, and never while the member dismissed it.
+`POST …/conversations/{conversation_id}/rule-suggestions/dismiss`
+(`conversations.dismiss_rule_suggestion`, with the suggestion's `key`) SHALL
+hide it from that member for 30 days, and for good after a second dismissal.
+With no default, a dismissal of any likeness offered SHALL hide the
+suggestion.
+
+#### Scenario: The 1,000 notifications
+- **WHEN** Ana moves one GitHub notification to Updates and 1,000 more from notifications@github.com are in Primary
+- **THEN** the suggestion's default is "sender is notifications@github.com" with 1,000, followed by the acme/web List-Id with 612 and the sender with the subject's template
+
+#### Scenario: A person
+- **WHEN** Ana archives a message from Marta, whom her inbox has written to
+- **THEN** there is no suggestion
+
+#### Scenario: Just this one
+- **WHEN** Ana dismisses the suggestion and moves another GitHub notification the next day
+- **THEN** there is no suggestion
+
+### Requirement: Exceptions
+When a member changes back what a rule did to a conversation (moves it to
+another stream, unarchives it, marks it unread or removes the label), the
+module SHALL mark that application excepted and the rule SHALL never change
+that conversation again. The responses of the operations that return the
+conversation (`move_to_stream`, `unarchive`, `mark_unread`) SHALL carry the
+rule and how many exceptions it had in the last 30 days.
+
+#### Scenario: A security alert moved back
+- **WHEN** Ana moves a rule-moved GitHub security alert back to Primary
+- **THEN** the response names the rule with one recent exception, and the next message in that conversation stays in Primary
+
+### Requirement: Undoing a rule
+`conversations.remove_rule` with `restore=true` SHALL cancel any apply run
+of the rule and start a revert run that puts every changed conversation back
+as it was before, except those excepted or changed since (by a member, or
+moved on by another rule), with the same batching, progress and events as an
+apply run. Every path that locks a rule's runs and the rule SHALL take the
+runs first, as a run's batch does, so undoing never deadlocks against a
+batch.
+
+#### Scenario: Undo all
+- **WHEN** Ana presses Z right after 998 conversations were moved
+- **THEN** the rule is removed and the 998 are back in Primary, except one Leo has since starred and moved himself
+
+### Requirement: Rules in summaries
+A conversation summary SHALL carry `rule` (its id, the action it took, how
+many conversations it holds changed (not counting those put back or changed
+back), and whether the caller may change it)
+when a rule placed or changed the conversation and no member changed it
+back. Conversation lists and reads SHALL follow `conversations.rule` changes.
+
+#### Scenario: Placed by a rule
+- **WHEN** a member lists Updates after a rule moved a new notification there
+- **THEN** its summary names the rule and its count
+
+### Requirement: Restoring a removed rule
+`POST …/rules/{rule_id}/restore` (`conversations.restore_rule`) SHALL bring
+a rule removed in the last 15 minutes back in the state it had (Undo),
+cancelling the run putting its mail back and, with `apply_to_existing`,
+applying it again; it SHALL replace an active rule with the same conditions
+and kind as creating one does. Otherwise the response SHALL be 409
+`rule_not_restorable`.
+
+#### Scenario: Undo of Undo all
+- **WHEN** Ana removes a rule with `restore=true` and restores it a minute later with `apply_to_existing`
+- **THEN** the same rule is active again and its mail is moved again
+
+#### Scenario: Too late
+- **WHEN** a rule was removed an hour ago
+- **THEN** restoring it answers 409 `rule_not_restorable`
+
+### Requirement: Purging rules
+Removing an inbox's mail and purging a workspace SHALL delete its rules,
+runs, applications and dismissals. Keeping an inbox read-only SHALL cancel
+its rules' runs and drop what only served acting again: the members' words
+(`origin_text`), what each rule changed (`before`) and the dismissed
+suggestions. A member leaving SHALL drop the suggestions they dismissed.
+
+#### Scenario: Disconnecting with the mail deleted
+- **WHEN** the inbox's connection is removed and its mail deleted
+- **THEN** its rules are gone too
+
+### Requirement: A removed connection's mail is deleted or kept read-only
+On `connectors.connection_removed` with `mail=delete` (or none), the
+module SHALL delete each inbox the connection fed: its messages and
+attachments, conversations, labels, decisions, corrections, drafts and
+memberships. It SHALL also let go of every file they held (the sweep
+deletes them), remember the inbox as removed so no late batch or replayed
+grant brings it back, and publish `conversations.inbox_removed`. With
+`mail=keep` it SHALL mark each inbox read-only: no batch is applied to it,
+nothing is written or sent from it (its scheduled sends go back to drafts,
+and a send is released only while its author may still send it), and its
+members keep reading; authors may still delete their drafts. A batch being
+applied when the connection goes SHALL either finish before the inbox is
+deleted or frozen, or be dropped. It SHALL
+then publish `conversations.inbox_changed`, and the inbox list SHALL show
+it as `read_only`.
+
+#### Scenario: Delete
+- **WHEN** a connection is removed with its mail deleted
+- **THEN** no row of its inbox remains, no file reference remains, and its members get 404 for its conversations
+
+#### Scenario: Keep
+- **WHEN** a connection is removed with its mail kept
+- **THEN** its members still read its conversations, archiving answers 403 `inbox_read_only`, and new batches are dropped
+
+### Requirement: A departed member keeps nothing
+On `workspaces.member_left`, the module SHALL delete the member's inbox
+memberships and drafts, and stop them owning any inbox. A member who
+comes back SHALL have no access to any inbox until given it again.
+
+#### Scenario: Back in the workspace
+- **WHEN** a member who left is invited back
+- **THEN** they see no inbox and none of their old drafts
+
+### Requirement: Inbox access follows the catalogue
+An inbox SHALL be owned by the member whose connection feeds it. Members
+see it by role: `reader` reads; `sender` also writes and sends; `manager`
+also shares. Workspace owners and admins SHALL get nothing inside an inbox
+they are not a member of. A draft SHALL be its author's alone: they read
+and delete it while they read its inbox, and write and send it while they
+may send from it.
+
+#### Scenario: A colleague's draft
+- **WHEN** the inbox's manager asks for a draft another member wrote
+- **THEN** the answer is 404
+
+### Requirement: Spam and trash need nothing
+A message in spam or the trash SHALL never raise a need: a conversation's
+need SHALL come from its newest inbound message that is in neither, and a
+need whose own message moves to spam or the trash SHALL be cleared as
+`trashed`.
+
+#### Scenario: The lease goes to the trash
+- **WHEN** the message Pedro's `do` need comes from is moved to the trash, while his later message stays
+- **THEN** the need is cleared with cause `trashed`
+
+#### Scenario: A question in spam
+- **WHEN** a question lands in spam inside a conversation whose need comes from an earlier message
+- **THEN** the need still comes from the earlier message
+
+### Requirement: Security alerts are a to-do
+The email signals SHALL answer `asks_action` true with the reason
+`signals.security_alert`, and `stream` `updates`, for a message whose subject
+names a security problem (a security alert or advisory, a vulnerability, in
+English, European Portuguese, Spanish and French; "action required" alone is
+not one) only when all of these hold: the sender is a service (list mail or
+an automated address); its domain is plain ASCII (no internationalised
+label) and its display name names that domain; the receiving provider's own
+authentication results, read as RFC 8601 says (comments and quoted strings
+are not results), hold exactly one `dmarc` result, `pass`, whose own
+`header.from` is the From domain, or a `dkim=pass` whose own signing domain
+has the From domain's registrable domain; the message has no
+phishing tell and carries no marketing words. It SHALL take precedence over
+the list-mail "no action" answer. A sure `do` need from a security alert
+SHALL require an authenticated sender on the listed code hosts and package
+registries (`github.com`, `gitlab.com`, `bitbucket.org`, `npmjs.com`,
+`pypi.org`, `rubygems.org`, `crates.io`, `snyk.io`), signing with the
+platform's own name (`npm` for `npmjs.com`, `crates.io` for `crates.io`); for any other
+authenticated sender the answer SHALL stay below every confidence the policy
+acts from, so it raises at most a question. Anything that offers a message's
+own links as the action on its need SHALL offer them only for a message
+whose sender is authenticated this way and that is not suspicious.
+
+#### Scenario: A dependency vulnerability
+- **WHEN** "GitHub" `<notifications@github.com>` sends list mail titled "[example-org/demo-shop] High severity vulnerability in tiny-template" with Review, Dismiss and Upgrade links, the receiving provider reports `dkim=pass` and `dmarc=pass` for `github.com`, and the model also answers `asks_action` true with 0.875
+- **THEN** the conversation is sorted to Updates and has a `sure` `do` need with basis `rules`
+
+#### Scenario: The same alert, not authenticated
+- **WHEN** the same alert arrives with no authentication results from the receiving provider, or with `dmarc=fail`
+- **THEN** no `do` need is raised
+
+#### Scenario: A crafted envelope sender
+- **WHEN** a message from "Crates" `<alerts@crates.io>` fails DMARC, and its envelope sender `"a; dmarc=pass header.from=crates.io x"@evil.example` is echoed in the provider's results
+- **THEN** `asks_action` is not answered by `signals.security_alert`
+
+#### Scenario: A look-alike that signs its own mail
+- **WHEN** "GitHub Security" `<alerts@githubsecurity.example>`, with `dkim=pass` and `dmarc=pass` for its own domain, sends "Security alert: new sign-in to your account"
+- **THEN** no `sure` need is raised
+
+#### Scenario: An internationalised look-alike
+- **WHEN** the sender's domain spells "github" with a Cyrillic letter, or as `xn--` punycode
+- **THEN** `asks_action` is not answered by `signals.security_alert`
+
+#### Scenario: Action required alone
+- **WHEN** an authenticated GitHub notification's subject says "Action required: review your settings" and names no security problem
+- **THEN** `asks_action` is not answered by `signals.security_alert`
+
+#### Scenario: A comment on a watched issue
+- **WHEN** the same code host sends a notification of a comment on an issue the member watches
+- **THEN** no need is raised
+
+#### Scenario: Marketing that says action required
+- **WHEN** a newsletter's subject is "Action required: claim your discount"
+- **THEN** `asks_action` is false and the stream is Newsletters
+
+### Requirement: Needs for mail stored before attention
+When the module is upgraded to a version with needs, every inbox that
+existed SHALL have its needs worked out once, without any manual step: each
+conversation whose last message was sent within
+`CAMPBOOKS_CONVERSATIONS__NEEDS_WINDOW_DAYS`, and each conversation with an
+open need, SHALL be refreshed as live mail is, from the messages and
+decisions already stored, in the conversation's workspace, a page at a time.
+No AI role and no rules strategy SHALL be asked. Each change SHALL publish
+`conversations.need_changed` as for live mail, and running it again SHALL
+change nothing. A conversation whose need cannot be worked out SHALL be
+skipped without undoing the others, and an inbox whose page keeps failing
+SHALL be recorded as failed at its cursor, never left running. An inbox kept
+read-only after its connection was removed SHALL be left as it is.
+
+#### Scenario: Mail stored before the upgrade
+- **WHEN** an inbox holds a question from Marta answered by the rules before the upgrade, and the upgraded server starts
+- **THEN** within minutes the conversation has its `reply` need, published as `conversations.need_changed`, and no model or rules call is made
+
+#### Scenario: Old mail
+- **WHEN** an inbox holds a question sent 40 days before the upgrade
+- **THEN** no need is raised for it
+
+#### Scenario: Already handled
+- **WHEN** before the upgrade a member replied to one conversation, archived another that asked for a reply, and trashed a bill
+- **THEN** none of them gets a need, and an archived request keeps its `do` need
+
+#### Scenario: Twice
+- **WHEN** the backfill runs again over the same inboxes
+- **THEN** no need changes and no event is published
+
+#### Scenario: Another workspace
+- **WHEN** one workspace's inboxes are backfilled
+- **THEN** no other workspace's needs or events change
+
+#### Scenario: A kept read-only inbox
+- **WHEN** an inbox's connection was removed and its mail kept read-only before the backfill runs
+- **THEN** none of its needs changes and no event is published for it
+
+#### Scenario: One conversation that cannot be worked out
+- **WHEN** one conversation's stored answers no longer decode
+- **THEN** it is skipped, the inbox's other conversations get their needs, and the inbox's backfill finishes
+
+#### Scenario: A question its answers no longer support
+- **WHEN** an inbox has an open `check` need whose message's accepted answers say it asks nothing
+- **THEN** the backfill clears it with cause `superseded`

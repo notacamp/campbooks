@@ -22,6 +22,8 @@ use campbooks_ai::{Gateway, Role};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     auth::Principal,
+    authz::Action,
+    db::BeginFor as _,
     extract,
     operations::{Caller, Invocation, InvokeError, invoke},
     rate_limit::{Limit, RateKey},
@@ -38,7 +40,7 @@ use self::{
     prompt::{ModelInput, ModelOutput, STREAMS},
     validate::{Context, InboxFacts, LabelFacts},
 };
-use crate::scopes::AssistantWrite;
+use crate::{domain::resources, scopes::AssistantWrite};
 
 /// Compiles per member per hour.
 const LIMIT: Limit = Limit::new("assistant.compile", 20, Duration::from_hours(1));
@@ -65,13 +67,18 @@ impl Compiler {
 
     /// The gateway, if its `complete` role is configured and may receive
     /// the member's words; otherwise the gateway's own reason.
+    /// 409 `compile_unavailable` (no model may read sentences here: the
+    /// member builds the rule by hand), never the gateway's own words.
     fn gateway(&self) -> Result<&Gateway> {
-        let gateway = self
-            .ai
+        self.ai
             .as_ref()
-            .ok_or(campbooks_ai::Error::RoleNotConfigured(Role::Complete))?;
-        gateway.config().provider_for_content(Role::Complete)?;
-        Ok(gateway)
+            .filter(|gateway| {
+                gateway
+                    .config()
+                    .provider_for_content(Role::Complete)
+                    .is_ok()
+            })
+            .ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("compile_unavailable")))
     }
 }
 
@@ -84,7 +91,7 @@ impl Compiler {
     security(("bearer" = ["assistant:write"])),
     // A command: it saves nothing, but it spends the member's hourly
     // allowance and a model call, so it is never replayed or prefetched.
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["assistant.profile"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["assistant.profile"]).access("assistant.profile", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = CompileRequest,
     responses(
@@ -99,7 +106,9 @@ impl Compiler {
             body = Problem, content_type = "application/problem+json"),
         (status = TOO_MANY_REQUESTS, description = "Too many sentences this hour.", body = Problem,
             content_type = "application/problem+json"),
-        (status = SERVICE_UNAVAILABLE, description = "No language model may read sentences here (`ai_role_not_configured`, `ai_external_content_refused`), or it failed (`compile_failed`).",
+        (status = CONFLICT, description = "No language model may read sentences here (`compile_unavailable`): build the rule by hand.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`compile_failed`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -110,10 +119,13 @@ pub async fn handler(
     extract::Json(body): extract::Json<CompileRequest>,
 ) -> Result<Json<CompileResult>> {
     let started = Instant::now();
-    let user = workspace
-        .access
-        .user
-        .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("profile_needs_member")))?;
+    let user = {
+        let mut tx = state.db.begin_for(workspace.id).await?;
+        let user =
+            resources::require_own(&state, &mut tx, &workspace.access, Action::Write).await?;
+        tx.commit().await?;
+        user
+    };
     let sentence = words::own_words(&body.text).map_err(|refusal| {
         Error::BadRequest(
             crate::MESSAGES
@@ -191,6 +203,7 @@ fn error_kind(error: &campbooks_ai::Error) -> &'static str {
         campbooks_ai::Error::Status { .. } => "status",
         campbooks_ai::Error::InvalidResponse(_) => "invalid_response",
         campbooks_ai::Error::InvalidQuestion(_) | campbooks_ai::Error::Config(_) => "config",
+        campbooks_ai::Error::AnswersNotTrusted => "answers_not_trusted",
     }
 }
 

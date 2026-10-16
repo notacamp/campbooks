@@ -1,0 +1,25 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS (\n               SELECT 1 FROM (\n                   SELECT recipients FROM conversations.messages\n                    WHERE inbox_id = $1 AND direction = 'outbound'\n                    ORDER BY sent_at DESC LIMIT $3\n               ) sent\n                WHERE position(('\"' || $2 || '\"') IN lower(sent.recipients::text)) > 0\n           ) AS \"e!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "e!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "c8e3ae196a94e9fdea2f22e1b3a547fee585d7137832d69dff6e429aabed007c"
+}

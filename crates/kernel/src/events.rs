@@ -72,6 +72,11 @@ pub trait DomainEvent: Serialize + DeserializeOwned + Send + Sync + 'static {
     /// or is instance-wide. Listed in `openapi/events.json`; keep
     /// [`workspace`](Self::workspace) consistent with it.
     const WORKSPACE_SCOPED: bool = true;
+    /// Whether something waits for every consumer to have acted on an event
+    /// of this type ([`EventBus::unsettled`]): a delivery that fails for
+    /// good is then kept, with the event, until an operator replays or
+    /// discards it, instead of being pruned after the failed-job retention.
+    const SETTLES: bool = false;
 
     /// The workspace this event belongs to, or `None` for instance-wide
     /// events. Its deliveries run with that workspace set
@@ -191,11 +196,20 @@ impl EventBus {
     /// Append `event` to the log and enqueue one delivery per registered
     /// consumer, inside `tx`. Nothing is visible until `tx` commits, and
     /// nothing remains if it rolls back.
+    ///
+    /// # Errors
+    /// [`sqlx::Error::InvalidArgument`] when the event belongs to a workspace
+    /// and `tx` does not work in that one
+    /// ([`begin_for`](crate::db::BeginFor::begin_for), a job's
+    /// [`tx`](crate::JobContext::tx)): a change is announced in the workspace
+    /// it was made in, never across, and never from a transaction that set
+    /// none (row-level security on the event log refuses the first too).
     pub async fn publish<E: DomainEvent>(
         &self,
         tx: &mut Transaction<'_, Postgres>,
         event: &E,
     ) -> Result<EventId, sqlx::Error> {
+        check_workspace(tx, E::NAME, event.workspace()).await?;
         let payload = serde_json::to_value(event).map_err(|e| sqlx::Error::Encode(e.into()))?;
         let consumers = self.registry.consumers_of(E::NAME);
         let kinds: Vec<&str> = consumers.iter().map(|c| c.name).collect();
@@ -254,6 +268,31 @@ impl EventBus {
         Ok(id)
     }
 
+    /// Whether an event `name` of the transaction's workspace whose payload
+    /// contains `matching` (`@>`) has a delivery that has not succeeded yet
+    /// (pending, running, or failed for good): its consumers have not all
+    /// acted on it. Row-level security limits it to `conn`'s workspace.
+    ///
+    /// # Errors
+    /// The database's.
+    pub async fn unsettled(
+        conn: &mut sqlx::PgConnection,
+        name: &str,
+        matching: &serde_json::Value,
+    ) -> Result<bool, sqlx::Error> {
+        sqlx::query_scalar!(
+            r#"SELECT EXISTS (
+                   SELECT 1 FROM kernel.events e
+                     JOIN kernel.jobs j ON j.event_id = e.id
+                    WHERE e.name = $1 AND e.payload @> $2 AND j.state <> 'succeeded'
+               ) AS "unsettled!""#,
+            name,
+            matching,
+        )
+        .fetch_one(conn)
+        .await
+    }
+
     /// Re-enqueue deliveries of the logged events of `consumer`'s event type
     /// to that consumer, from `from` on. Events that already have an
     /// unfinished delivery to it are skipped. Returns how many were enqueued.
@@ -301,6 +340,34 @@ impl EventBus {
         tx.commit().await?;
         tracing::info!(consumer, enqueued, "events replayed");
         Ok(enqueued)
+    }
+}
+
+/// Refuse to publish `event` (of workspace `workspace`) in a transaction set
+/// to another workspace, or to none.
+async fn check_workspace(
+    tx: &mut Transaction<'_, Postgres>,
+    event: &str,
+    workspace: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    let Some(workspace) = workspace else {
+        return Ok(());
+    };
+    let current = sqlx::query_scalar!(
+        "SELECT nullif(current_setting($1, true), '')",
+        crate::db::WORKSPACE_SETTING
+    )
+    .fetch_one(&mut **tx)
+    .await?;
+    match current {
+        Some(current) if current == workspace => Ok(()),
+        Some(_) => Err(sqlx::Error::InvalidArgument(format!(
+            "event `{event}` belongs to another workspace than the transaction publishing it"
+        ))),
+        None => Err(sqlx::Error::InvalidArgument(format!(
+            "event `{event}` belongs to a workspace; publish it in a transaction working \
+             there (`begin_for`, a job's `tx()`)"
+        ))),
     }
 }
 

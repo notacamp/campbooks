@@ -154,7 +154,7 @@ async fn authenticate(
     path = "/oauth2/token",
     tag = "identity",
     operation_id = "identity.token",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.authorization_code", "identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Write)))),
     request_body(content = TokenForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(
@@ -269,7 +269,7 @@ async fn respond(
     ctx: &Ctx,
     issuer: &Issuer,
     client: &Client,
-    tx: sqlx::Transaction<'static, sqlx::Postgres>,
+    mut tx: sqlx::Transaction<'static, sqlx::Postgres>,
     exchanged: Issued,
     now: chrono::DateTime<chrono::Utc>,
 ) -> Result<Response> {
@@ -293,9 +293,30 @@ async fn respond(
     {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     }
-    let Some(profile) = accounts::profile(&ctx.state.db, grant.account_id).await? else {
+    // The allow-list is judged again at every exchange, so tightening it cuts
+    // access at the next refresh (the transaction rolls back, nothing more
+    // is minted).
+    let allow = ctx.allow_list()?;
+    if !accounts::is_allowed(
+        &mut *ctx.state.db.acquire().await?,
+        &allow,
+        grant.account_id,
+    )
+    .await?
+    {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
+    // Read under a share lock until the commit: a suspension or sign out
+    // everywhere committing now is either seen here or waits, and then
+    // takes an epoch later than these tokens.
+    let Some(profile) = accounts::profile_for_minting(&mut tx, grant.account_id).await? else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     };
+    // A sign-in from before the account's last revocation mints nothing
+    // more, whatever code or refresh token it still holds.
+    if profile.revoked_for(grant.auth_time) {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
     tx.commit().await?;
     if !client.is_first_party() {
         clients::touch(&ctx.state.db, &client.id, now).await?;
@@ -359,7 +380,15 @@ async fn client_credentials(
     else {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "unauthorized_client"));
     };
-    let allowed = client.allowed_scopes.clone().unwrap_or_default();
+    // What it was given, less anything a third party may no longer hold
+    // (the rules can tighten after registration).
+    let allowed: Vec<String> = client
+        .allowed_scopes
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|scope| clients::third_party_may_hold(scope))
+        .collect();
     let scope: Vec<&str> = match requested {
         None => allowed.iter().map(String::as_str).collect(),
         Some(requested) => {
@@ -442,7 +471,7 @@ async fn refused(
     path = "/oauth2/revoke",
     tag = "identity",
     operation_id = "identity.revoke",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.refresh_token"]).access("identity.token", campbooks_kernel::authz::Action::Delete)))),
     request_body(content = RevokeForm, content_type = "application/x-www-form-urlencoded"),
     security(()),
     responses(

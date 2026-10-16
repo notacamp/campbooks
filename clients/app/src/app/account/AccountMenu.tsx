@@ -36,15 +36,13 @@ export interface AccountMenuProps {
   waysIn?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
   /** Settings → Apps and integrations, as an in-app link. */
   apps?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
-  /** Settings → Scout's memory, as an in-app link. */
-  memory?: { href: string; onClick: (event: MouseEvent<HTMLElement>) => void } | undefined;
 }
 
 /**
  * Who is signed in, their theme, density and language, how they sign in, the
  * apps they let in, and Sign out.
  */
-export function AccountMenu({ compact = false, waysIn, apps, memory }: AccountMenuProps) {
+export function AccountMenu({ compact = false, waysIn, apps }: AccountMenuProps) {
   const { t, i18n } = useTranslation();
   const session = useSession();
   const theme = useTheme();
@@ -147,21 +145,6 @@ export function AccountMenu({ compact = false, waysIn, apps, memory }: AccountMe
                 }}
               >
                 {t("account.apps")}
-              </ButtonLink>
-            </PopoverSection>
-          )}
-          {memory === undefined ? null : (
-            <PopoverSection>
-              <ButtonLink
-                variant="ghost"
-                icon="star"
-                href={memory.href}
-                onClick={(event) => {
-                  memory.onClick(event);
-                  close();
-                }}
-              >
-                {t("account.memory")}
               </ButtonLink>
             </PopoverSection>
           )}

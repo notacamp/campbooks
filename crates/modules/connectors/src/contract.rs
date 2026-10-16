@@ -131,6 +131,11 @@ pub struct Headers {
     pub precedence: Option<String>,
     /// `Auto-Submitted`.
     pub auto_submitted: Option<String>,
+    /// The receiving provider's own `Authentication-Results` (RFC 8601):
+    /// the topmost one, kept only when its authserv-id is the provider's
+    /// (`mail::Receiver`), so a sender cannot forge it. `None` otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authentication_results: Option<String>,
 }
 
 /// An attachment, stored as a blob.

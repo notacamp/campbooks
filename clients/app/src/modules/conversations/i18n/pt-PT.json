@@ -51,7 +51,11 @@
     "older_one": "{{count}} mensagem anterior",
     "older_other": "{{count}} mensagens anteriores",
     "showOlder": "Mostrar",
-    "attachments": "Anexos"
+    "attachments": "Anexos",
+    "kept": {
+      "title": "Mantida como histórico",
+      "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
+    }
   },
   "actions": {
     "star": "Marcar com estrela",
@@ -99,7 +103,7 @@
     "whyHasDeadline": "Refere uma data",
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
-    "sortedTaught": "O Campbooks pô-la em {{stream}}, como lhe ensinou"
+    "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
   },
   "reasons": {
     "signals": {
@@ -124,6 +128,7 @@
       "payment_due": "Há um pagamento a fazer («{{evidence}}»).",
       "already_paid": "Diz que já está pago («{{evidence}}»).",
       "action_asked": "Pede-lhe que faça algo («{{evidence}}»).",
+      "security_alert": "É um alerta de segurança sobre algo seu («{{evidence}}»).",
       "conditional_ask": "Só pede algo se se aplicar («{{evidence}}»).",
       "notice": "É um aviso: não há nada a fazer.",
       "request": "Faz um pedido («{{evidence}}»).",
@@ -142,7 +147,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "O Campbooks segue uma regra que ensinou para mensagens como esta."
+      "rule": "O Campbooks segue uma regra ensinada para mensagens como esta."
     }
   },
   "shortcuts": {
@@ -215,7 +220,9 @@
       "pay": "{{name}} enviou uma fatura para pagar",
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
-      "checkDo": "{{name}} pediu-lhe para fazer algo?"
+      "checkDo": "{{name}} pediu-lhe para fazer algo?",
+      "taughtReply": "{{name}}: responder, por uma regra",
+      "taughtDo": "{{name}}: a fazer, por uma regra"
     },
     "chip": {
       "reply": "Precisa de resposta",
@@ -242,7 +249,7 @@
         "model": "Modelo",
         "knn": "Correio semelhante",
         "cascade": "Regras e depois modelo",
-        "taught": "A sua regra"
+        "taught": "Uma regra"
       },
       "suggestion": "uma sugestão",
       "actsFrom": "age a partir de {{threshold}}",

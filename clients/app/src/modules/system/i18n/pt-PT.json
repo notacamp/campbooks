@@ -124,6 +124,15 @@
         "instance": "na rede desta instância",
         "externalAllowed": "fora da rede desta instância, autorizado a receber correio",
         "externalRefused": "fora da rede desta instância, por isso não lhe é enviado correio"
+      },
+      "check": {
+        "pending": "A verificar as respostas",
+        "pendingDetail": "as respostas passam a ser usadas quando acertar em emails de teste óbvios",
+        "passed": "acertou {{right}} de {{total}} respostas de teste",
+        "failed": "As respostas falham a verificação",
+        "failedDetail": "acertou apenas {{right}} de {{total}} respostas de teste óbvias, por isso as respostas não são usadas e as regras organizam o correio sozinhas",
+        "unavailable": "Não respondeu à verificação",
+        "unavailableDetail": "as respostas não são usadas até responder"
       }
     },
     "duration": {

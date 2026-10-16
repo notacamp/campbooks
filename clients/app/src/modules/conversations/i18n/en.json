@@ -51,7 +51,11 @@
     "older_one": "{{count}} older message",
     "older_other": "{{count}} older messages",
     "showOlder": "Show",
-    "attachments": "Attachments"
+    "attachments": "Attachments",
+    "kept": {
+      "title": "Kept as history",
+      "lead": "{{address}} was disconnected and its mail kept here, read-only: nothing new arrives, and nothing can be sent or changed from it."
+    }
   },
   "actions": {
     "star": "Star",
@@ -99,7 +103,7 @@
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
-    "sortedTaught": "Campbooks put this in {{stream}}, as you taught it"
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
     "signals": {
@@ -124,6 +128,7 @@
       "payment_due": "A payment is due (“{{evidence}}”).",
       "already_paid": "It says it is already paid (“{{evidence}}”).",
       "action_asked": "It asks you to do something (“{{evidence}}”).",
+      "security_alert": "It is a security alert about something of yours (“{{evidence}}”).",
       "conditional_ask": "It asks only if something applies (“{{evidence}}”).",
       "notice": "It is a notice: nothing to do.",
       "request": "It makes a request (“{{evidence}}”).",
@@ -142,7 +147,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "Campbooks follows a rule you taught for mail like this."
+      "rule": "Campbooks follows a rule taught for mail like this."
     }
   },
   "shortcuts": {
@@ -215,7 +220,9 @@
       "pay": "{{name}} sent a bill to pay",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
-      "checkDo": "Did {{name}} ask you to do something?"
+      "checkDo": "Did {{name}} ask you to do something?",
+      "taughtReply": "{{name}}: a reply, by a rule",
+      "taughtDo": "{{name}}: to do, by a rule"
     },
     "chip": {
       "reply": "Needs a reply",
@@ -242,7 +249,7 @@
         "model": "Model",
         "knn": "Similar mail",
         "cascade": "Rules, then model",
-        "taught": "Your rule"
+        "taught": "A rule"
       },
       "suggestion": "a suggestion",
       "actsFrom": "acts from {{threshold}}",

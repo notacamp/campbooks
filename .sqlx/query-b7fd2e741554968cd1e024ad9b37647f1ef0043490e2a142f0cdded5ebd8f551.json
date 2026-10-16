@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT idp_subject FROM workspaces.users WHERE id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "idp_subject",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "workspaces.users",
+            "name": "idp_subject"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "b7fd2e741554968cd1e024ad9b37647f1ef0043490e2a142f0cdded5ebd8f551"
+}

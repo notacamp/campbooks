@@ -376,3 +376,46 @@ async fn the_sender_writing_again_is_announced_even_without_a_new_need(db: PgPoo
         kit.message_of("needs-7").await.as_str()
     );
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn spam_and_trash_need_nothing(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, inbox, sam) = sams_needs(&kit).await;
+    // Pedro writes again about the lease (asking nothing new).
+    kit.ingest(workspace, inbox, "needs-followup").await;
+    let fixtures: Value = serde_json::from_str(&fixture("needs")).unwrap();
+    let changes = fixtures["changes"].as_array().unwrap();
+    // His first message, the one the need comes from, goes to the trash;
+    // a stranger's question lands in spam inside Marta's conversation.
+    let mut pedro = changes[1].clone();
+    pedro["message"]["mailbox"] = json!({"in_inbox": false, "in_trash": true});
+    let mut spam = changes[4].clone();
+    spam["message"]["provider_message_id"] = json!("needs-spam");
+    spam["message"]["thread_key"] = json!("thr-walkthrough");
+    spam["message"]["rfc_message_id"] = json!("needs-spam@needs.example");
+    spam["message"]["sent_at"] = json!("2026-10-12T18:00:00Z");
+    spam["message"]["mailbox"] = json!({"in_inbox": false, "in_spam": true});
+    let recorded = json!({"changes": [pedro, spam]});
+    let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+        .await
+        .unwrap();
+    dev::submit(&kit.state, workspace, &batch).await.unwrap();
+    kit.run_jobs().await;
+
+    // The lease's need goes with its message.
+    let lease = summary(&kit, &sam, workspace, "needs-2").await;
+    assert_eq!(lease["need"], Value::Null, "{lease}");
+    let events = kit.events("conversations.need_changed").await;
+    let pedro = kit.conversation_of("needs-2").await;
+    let last = events
+        .iter()
+        .rfind(|e| e["conversation"] == pedro.as_str())
+        .unwrap();
+    assert_eq!(last["cleared_because"], "trashed");
+    // Marta's need still comes from her message, not from the spam.
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(
+        marta["need"]["message_id"],
+        kit.message_of("needs-1").await.as_str()
+    );
+}

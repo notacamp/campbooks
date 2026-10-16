@@ -5,6 +5,7 @@
     "instruction_empty": "Escreva o que quer que o Scout faça com o seu correio.",
     "instruction_too_long": "Use no máximo {{max}} caracteres: uma ou duas frases.",
     "instruction_has_link": "Não inclua ligações. Diga que correio e o que fazer com ele.",
-    "instruction_pasted_mail": "Isto parece colado de um email. Diga por palavras suas que correio e o que fazer com ele."
+    "instruction_pasted_mail": "Isto parece colado de um email. Diga por palavras suas que correio e o que fazer com ele.",
+    "compile_unavailable": "Este servidor não tem um modelo de linguagem que possa ler frases. Crie a regra à mão."
   }
 }

@@ -11,11 +11,14 @@ use campbooks_kernel::{
 use serde::{Deserialize, Serialize};
 use utoipa::{IntoParams, ToSchema};
 
+use crate::domain::resources;
+use crate::events::CONVERSATION_RECORD;
 use crate::{
     domain::access::visible_inboxes,
     model::{InboxId, Stream},
     scopes::ConversationsRead,
 };
+use campbooks_kernel::authz::Action;
 
 /// Which inbox.
 #[derive(Debug, Clone, Copy, Default, Deserialize, IntoParams)]
@@ -50,7 +53,7 @@ pub struct StreamCounts {
     operation_id = "conversations.list_streams",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"])))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), StreamsQuery),
     responses(
         (status = OK, description = "The streams.", body = StreamCounts),
@@ -68,6 +71,7 @@ pub async fn handler(
     extract::Query(query): extract::Query<StreamsQuery>,
 ) -> Result<Json<StreamCounts>> {
     let access = &workspace.access;
+    resources::authorize_type(&state, access, Action::Read, CONVERSATION_RECORD)?;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let mut inboxes = visible_inboxes(&mut tx, access).await?;
     if let Some(inbox) = query.inbox {

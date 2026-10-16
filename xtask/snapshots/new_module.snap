@@ -37,7 +37,10 @@ workspace = true
 
 #![forbid(unsafe_code)]
 
-use campbooks_kernel::{AppState, Background, Module};
+use campbooks_kernel::{
+    AppState, Background, Module,
+    authz::{Action, Owner, ResourceType, Resources, Tenancy},
+};
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 pub mod events;
@@ -47,6 +50,25 @@ pub mod scopes;
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "demo_notes";
 
+/// The record type of a person's own view of the module.
+pub const ACCOUNT_RECORD: &str = "demo_notes.account";
+
+/// The module's part of the access catalogue (ADR 0017).
+// TODO(new-module): declare each resource type the module serves: its
+// tenancy, its owner, the owner's actions and who else may do what (a
+// workspace role, a container role, client tokens). Workspace types need a
+// `ResourceFacts` port: `Resources::new(&RESOURCES, Arc::new(…))`, as in
+// `campbooks-conversations`.
+static RESOURCES: [ResourceType; 1] = [ResourceType {
+    owner: Owner::Account,
+    owner_actions: &[Action::Read],
+    ..ResourceType::new(
+        ACCOUNT_RECORD,
+        "What a signed-in person reads of this module.",
+        Tenancy::Account,
+    )
+}];
+
 /// The `demo_notes` module, ready for the server to mount.
 pub fn module() -> Module {
     Module {
@@ -55,6 +77,7 @@ pub fn module() -> Module {
         router: router(),
         admin_router: None,
         background: Background::new(),
+        resources: Resources::declared(&RESOURCES),
     }
 }
 
@@ -390,8 +413,12 @@ export function DemoNotesHome() {
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
 
-use axum::Json;
-use campbooks_kernel::{Operation, Problem, auth::Scoped};
+use axum::{Json, extract::State};
+use campbooks_kernel::{
+    AppState, Error, Operation, Problem,
+    auth::Scoped,
+    authz::{self, Action},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -417,8 +444,9 @@ pub struct OverviewResponse {
     // (`.records(["demo_notes.<record>"])`), and opt in `.automation()` /
     // `.assistant()` if rules or the assistant may call it. A write starts
     // from `Operation::command(Risk::Low | Risk::High)` and names its
-    // inverse with `.undo("demo_notes.<verb>")`.
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    // inverse with `.undo("demo_notes.<verb>")`. `.access` names the resource
+    // type (in the module's `RESOURCES`) and the action (ADR 0017).
+    extensions(("x-campbooks" = json!(Operation::query().access("demo_notes.account", Action::Read)))),
     responses(
         (status = OK, description = "The answer for the caller.", body = OverviewResponse),
         (status = UNAUTHORIZED, description = "No valid access token.",
@@ -428,16 +456,22 @@ pub struct OverviewResponse {
     )
 )]
 pub async fn handler(
+    State(state): State<AppState>,
     Scoped { principal, .. }: Scoped<DemoNotesRead>,
-) -> Json<OverviewResponse> {
-    // To read this module's tables, also take `State(state): State<AppState>`,
-    // query `state.db` with `sqlx::query!` (then refresh the offline cache:
-    // `cargo sqlx prepare --workspace -- --all-targets`), return
-    // `campbooks_kernel::Result<Json<_>>`, and answer `Error::NotFound` for a
-    // record the principal may not see, never 403.
-    Json(OverviewResponse {
+) -> campbooks_kernel::Result<Json<OverviewResponse>> {
+    // Ask the access catalogue first (ADR 0017). A workspace route takes
+    // `Workspace<S>`, opens `state.db.begin_for(workspace.id)` and asks
+    // `authz::require(&state, &mut tx, &workspace.access, action, &record, …)`;
+    // whoever may not read a record gets 404, never 403. To read this
+    // module's tables, query in that transaction with `sqlx::query!` (then
+    // refresh the offline cache:
+    // `cargo sqlx prepare --workspace -- --all-targets`).
+    authz::require_account(&state, &principal, Action::Read, "demo_notes.account", || {
+        Error::Forbidden
+    })?;
+    Ok(Json(OverviewResponse {
         subject: principal.subject,
-    })
+    }))
 }
 
 #[cfg(test)]
@@ -496,8 +530,12 @@ mod tests {
 //! types, queries and tests; anything another feature of this module needs
 //! too moves to `domain/`.
 
-use axum::Json;
-use campbooks_kernel::{Operation, Problem, auth::Scoped};
+use axum::{Json, extract::State};
+use campbooks_kernel::{
+    AppState, Error, Operation, Problem,
+    auth::Scoped,
+    authz::{self, Action},
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
@@ -523,8 +561,9 @@ pub struct ListItemsResponse {
     // (`.records(["demo_notes.<record>"])`), and opt in `.automation()` /
     // `.assistant()` if rules or the assistant may call it. A write starts
     // from `Operation::command(Risk::Low | Risk::High)` and names its
-    // inverse with `.undo("demo_notes.<verb>")`.
-    extensions(("x-campbooks" = json!(Operation::query()))),
+    // inverse with `.undo("demo_notes.<verb>")`. `.access` names the resource
+    // type (in the module's `RESOURCES`) and the action (ADR 0017).
+    extensions(("x-campbooks" = json!(Operation::query().access("demo_notes.account", Action::Read)))),
     responses(
         (status = OK, description = "The answer for the caller.", body = ListItemsResponse),
         (status = UNAUTHORIZED, description = "No valid access token.",
@@ -534,16 +573,22 @@ pub struct ListItemsResponse {
     )
 )]
 pub async fn handler(
+    State(state): State<AppState>,
     Scoped { principal, .. }: Scoped<DemoNotesRead>,
-) -> Json<ListItemsResponse> {
-    // To read this module's tables, also take `State(state): State<AppState>`,
-    // query `state.db` with `sqlx::query!` (then refresh the offline cache:
-    // `cargo sqlx prepare --workspace -- --all-targets`), return
-    // `campbooks_kernel::Result<Json<_>>`, and answer `Error::NotFound` for a
-    // record the principal may not see, never 403.
-    Json(ListItemsResponse {
+) -> campbooks_kernel::Result<Json<ListItemsResponse>> {
+    // Ask the access catalogue first (ADR 0017). A workspace route takes
+    // `Workspace<S>`, opens `state.db.begin_for(workspace.id)` and asks
+    // `authz::require(&state, &mut tx, &workspace.access, action, &record, …)`;
+    // whoever may not read a record gets 404, never 403. To read this
+    // module's tables, query in that transaction with `sqlx::query!` (then
+    // refresh the offline cache:
+    // `cargo sqlx prepare --workspace -- --all-targets`).
+    authz::require_account(&state, &principal, Action::Read, "demo_notes.account", || {
+        Error::Forbidden
+    })?;
+    Ok(Json(ListItemsResponse {
         subject: principal.subject,
-    })
+    }))
 }
 
 #[cfg(test)]

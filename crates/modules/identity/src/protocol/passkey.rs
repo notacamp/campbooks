@@ -69,10 +69,18 @@ const CEREMONY_LIMIT: Limit = Limit::new("identity.passkey", 30, Duration::from_
 /// Challenges one address may hold at once: a challenge lives five minutes,
 /// so at most this many per five minutes.
 const CHALLENGE_LIMIT: Limit = Limit::new("identity.passkey_challenge", 10, Duration::from_mins(5));
-/// Accounts created with a passkey alone, instance-wide, per hour.
-const SIGN_UP_LIMIT: Limit = Limit::new("identity.passkey_sign_up", 30, Duration::from_hours(1));
+/// Accounts created with a passkey alone from one address, per hour.
+const SIGN_UP_PER_ADDRESS: Limit = Limit::new(
+    "identity.passkey_sign_up_address",
+    5,
+    Duration::from_hours(1),
+);
+/// Accounts created with a passkey alone, instance-wide, per hour: the
+/// ceiling many addresses together reach.
+pub(crate) const SIGN_UP_LIMIT: Limit =
+    Limit::new("identity.passkey_sign_up", 200, Duration::from_hours(1));
 /// The one bucket of [`SIGN_UP_LIMIT`].
-const INSTANCE: &str = "instance";
+pub(crate) const INSTANCE: &str = "instance";
 
 /// Longest request body a ceremony endpoint reads. A credential is a few
 /// kilobytes at most (an RSA-4096 key, a 1023-byte id).
@@ -102,6 +110,15 @@ pub fn signup_allows_passkey(ctx: &Ctx) -> bool {
     ctx.state.config.signup.policy != SignupPolicy::InviteOnly
 }
 
+/// A passkey proves no address, so while an allow-list is set
+/// (`CAMPBOOKS_SIGNUP__ALLOWED`) it cannot create an account.
+fn refuse_sign_up_under_allow_list(ctx: &Ctx) -> Result<()> {
+    if ctx.allow_list()?.is_restricted() {
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
+    }
+    Ok(())
+}
+
 /// The authentication methods a passkey sign-in reports (RFC 8176): a
 /// synced passkey is a software-protected key (`swk`), a device-bound one a
 /// hardware key (`hwk`); user verification was required (`user`).
@@ -119,11 +136,12 @@ fn expired() -> Error {
 }
 
 /// The waiting authorization request `request` names, checked before anything
-/// is stored: at most [`MAX_REQUEST_ID`] URL-safe characters, and known and
-/// unexpired. 404 otherwise.
+/// is stored: at most [`MAX_REQUEST_ID`] URL-safe characters, known,
+/// unexpired and this browser's. 404 otherwise.
 async fn waiting_request(
     ctx: &Ctx,
     issuer: &Issuer,
+    headers: &HeaderMap,
     request: Option<String>,
 ) -> Result<Option<String>> {
     let Some(request) = request else {
@@ -135,9 +153,14 @@ async fn waiting_request(
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_');
     if !well_formed
-        || authorize::load(&ctx.state.db, &request, issuer.now())
-            .await?
-            .is_none()
+        || authorize::load(
+            &ctx.state.db,
+            &request,
+            authorize::browser(issuer, headers).as_deref(),
+            issuer.now(),
+        )
+        .await?
+        .is_none()
     {
         return Err(Error::NotFound);
     }
@@ -231,7 +254,7 @@ pub struct SignInStart {
     path = "/auth/passkey/sign-in/options",
     tag = "identity",
     operation_id = "identity.start_passkey_sign_in",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body = SignInStart,
     security(()),
@@ -261,7 +284,7 @@ pub async fn sign_in_options(
     let rp = rp(issuer)?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let request = waiting_request(&ctx, issuer, body.request).await?;
+    let request = waiting_request(&ctx, issuer, &headers, body.request).await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
@@ -317,7 +340,7 @@ async fn take_ceremony(
     path = "/auth/passkey/sign-in",
     tag = "identity",
     operation_id = "identity.finish_passkey_sign_in",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.session"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body(content = AuthenticationCredential,
         description = "`PublicKeyCredential.toJSON()` of the assertion."),
@@ -328,8 +351,9 @@ async fn take_ceremony(
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted` (it did \
-            not verify, or it is no longer a way into any account), or `account_suspended` (it \
-            verified, but an administrator suspended the account).",
+            not verify, or it is no longer a way into any account), `account_suspended` (it \
+            verified, but an administrator suspended the account), or `sign_in_not_allowed` \
+            (it verified, but the account has no address on the instance's allow-list).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -385,6 +409,12 @@ pub async fn sign_in(
         tracing::info!("a suspended account tried to sign in with a passkey");
         return Err(Error::Denied(MESSAGES.reason("account_suspended")));
     }
+    // With an allow-list, only an account with a listed, provider-verified
+    // address signs in (a passkey-only account has none).
+    if !accounts::is_allowed(&mut tx, &ctx.allow_list()?, passkey.account_id).await? {
+        tracing::info!("an account the allow-list does not let in tried to sign in with a passkey");
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
+    }
     let reported = i64::from(verified.sign_count);
     if (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count {
         // A counter that does not move forward may mean a cloned
@@ -422,6 +452,7 @@ pub async fn sign_in(
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         ceremony.request_id.as_deref(),
         ceremony.return_to.as_deref().unwrap_or("/"),
         &started.session,
@@ -484,7 +515,7 @@ pub struct SignUpStart {
     path = "/auth/passkey/sign-up/options",
     tag = "identity",
     operation_id = "identity.start_passkey_sign_up",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.webauthn_challenge"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body = SignUpStart,
     security(()),
@@ -495,8 +526,9 @@ pub struct SignUpStart {
         (status = 400, description = "`display_name_required`, `invalid_return_to`, or \
             `invalid_body` (not JSON, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
-            instance takes invited people only, and a passkey proves no address).",
+        (status = 403, description = "`csrf_check_failed`, `signup_invite_only` (this \
+            instance takes invited people only, and a passkey proves no address), or \
+            `sign_in_not_allowed` (the instance has an allow-list, which a passkey cannot meet).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "No such waiting sign-in request (or it expired), this \
             instance offers no passkeys, or another identity provider serves it."),
@@ -516,11 +548,12 @@ pub async fn sign_up_options(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
+    refuse_sign_up_under_allow_list(&ctx)?;
     let display_name = passkeys::clean_name(&body.display_name)
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("display_name_required")))?;
     let return_to = web::return_to(body.return_to.as_deref())
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("invalid_return_to")))?;
-    let request = waiting_request(&ctx, issuer, body.request).await?;
+    let request = waiting_request(&ctx, issuer, &headers, body.request).await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &CHALLENGE_LIMIT, &RateKey::ip(ip))
@@ -551,7 +584,7 @@ pub async fn sign_up_options(
     path = "/auth/passkey/sign-up",
     tag = "identity",
     operation_id = "identity.finish_passkey_sign_up",
-    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.passkey", "identity.session"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low).records(["identity.account", "identity.passkey", "identity.session"]).access("identity.sign_in", campbooks_kernel::authz::Action::Write)))),
     params(("x-campbooks-csrf" = String, Header, description = "Must be `1`.")),
     request_body(content = RegistrationCredential,
         description = "`PublicKeyCredential.toJSON()` of the new passkey."),
@@ -561,8 +594,8 @@ pub async fn sign_up_options(
             headers(("set-cookie" = String))),
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, or \
-            `signup_invite_only`.", body = campbooks_kernel::Problem,
+        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, \
+            `signup_invite_only`, or `sign_in_not_allowed`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -595,8 +628,14 @@ pub async fn sign_up(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
-    // Accounts with no provider are cheap to make: a ceiling for the whole
-    // instance, besides the per-address one.
+    refuse_sign_up_under_allow_list(&ctx)?;
+    // Accounts with no provider are cheap to make: a few per address, and
+    // a ceiling for the whole instance. The address first, so one address
+    // past its own budget does not spend everyone's.
+    ctx.state
+        .rate_limits
+        .check(&ctx.state.db, &SIGN_UP_PER_ADDRESS, &RateKey::ip(ip))
+        .await?;
     ctx.state
         .rate_limits
         .check(&ctx.state.db, &SIGN_UP_LIMIT, &RateKey::text(INSTANCE))
@@ -610,7 +649,8 @@ pub async fn sign_up(
     };
     let mut tx = ctx.state.db.begin().await?;
     passkeys::create_account(&mut tx, account, &display_name, now).await?;
-    let Some(passkey) = passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, now).await?
+    let Some(passkey) =
+        passkeys::insert(&mut tx, account, &new, FIRST_PASSKEY_NAME, true, now).await?
     else {
         return Err(Error::Conflict(
             MESSAGES.reason("passkey_already_registered"),
@@ -652,6 +692,7 @@ pub async fn sign_up(
                 method: "passkey".to_owned(),
                 provider: None,
                 via: "sign_up".to_owned(),
+                way_in: Some(passkey),
             },
         )
         .await?;
@@ -660,6 +701,7 @@ pub async fn sign_up(
     let redirect = continue_after_sign_in(
         &ctx,
         issuer,
+        &headers,
         ceremony.request_id.as_deref(),
         ceremony.return_to.as_deref().unwrap_or("/"),
         &started.session,

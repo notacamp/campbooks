@@ -103,6 +103,22 @@ impl Capability {
     }
 }
 
+/// What becomes of the mail a connection brought in when it is removed
+/// (the owner's decision, campbooks-cloud#117): deleted with it (the
+/// default), or kept as read-only history. Only the member who connected
+/// it chooses when disconnecting; an owner or admin chooses when removing
+/// that member.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum MailChoice {
+    /// Delete the inboxes it fed: messages, conversations, drafts,
+    /// decisions, search entries, stored files and memberships.
+    #[default]
+    Delete,
+    /// Keep them read-only: no sync, nothing sent, memberships kept.
+    Keep,
+}
+
 /// How a connection is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
@@ -189,6 +205,8 @@ pub struct ConnectionView {
     pub display_name: Option<String>,
     /// The member who granted it.
     pub granted_by: UserId,
+    /// The caller granted it (only they may reconnect or disconnect it).
+    pub granted_by_you: bool,
     /// What it lets Campbooks do.
     pub capabilities: Vec<Capability>,
     /// How it is doing.

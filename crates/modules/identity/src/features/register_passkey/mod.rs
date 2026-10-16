@@ -40,7 +40,7 @@ pub struct RegisterPasskey {
     operation_id = "identity.register_passkey",
     tag = "identity",
     security(("bearer" = ["identity:write"])),
-    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.passkey"])))),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::High).records(["identity.passkey"]).access("identity.passkey", campbooks_kernel::authz::Action::Write)))),
     request_body = RegisterPasskey,
     responses(
         (status = CREATED, description = "Added: a way in from now on.", body = PasskeyView),
@@ -64,6 +64,13 @@ pub async fn handler(
     Unbound { principal, .. }: Unbound<IdentityWrite>,
     JsonBody(input): JsonBody<RegisterPasskey>,
 ) -> Result<(StatusCode, Json<PasskeyView>)> {
+    campbooks_kernel::authz::require_account(
+        &state,
+        &principal,
+        campbooks_kernel::authz::Action::Write,
+        "identity.passkey",
+        || campbooks_kernel::Error::Forbidden,
+    )?;
     let (issuer, account) = super::account(&deps, &principal)?;
     let rp = passkey::relying_party(&issuer).ok_or(Error::NotFound)?;
     let now = issuer.now();
@@ -91,7 +98,7 @@ pub async fn handler(
         .and_then(passkeys::clean_name)
         .unwrap_or_else(|| "Passkey".to_owned());
     let mut tx = state.db.begin().await?;
-    let id = passkeys::insert(&mut tx, account, &new, &name, now)
+    let id = passkeys::insert(&mut tx, account, &new, &name, false, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("passkey_already_registered")))?;
     accounts::audit(
@@ -111,6 +118,7 @@ pub async fn handler(
                 method: "passkey".to_owned(),
                 provider: None,
                 via: "passkey".to_owned(),
+                way_in: Some(id),
             },
         )
         .await?;

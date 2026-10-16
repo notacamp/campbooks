@@ -8,11 +8,12 @@
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
-    AppState, Error, Operation, Problem, Result, Risk,
+    AppState, Operation, Problem, Result, Risk,
+    authz::Action,
     db::BeginFor as _,
     extract,
     preferences::{MemberPreferences, PreferenceFuture},
-    tenancy::{Access, UserId, Workspace, WorkspaceId},
+    tenancy::{UserId, Workspace, WorkspaceId},
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -20,7 +21,7 @@ use sqlx::PgConnection;
 use utoipa::ToSchema;
 
 use crate::{
-    domain::Proactivity,
+    domain::{Proactivity, resources},
     scopes::{AssistantRead, AssistantWrite},
 };
 
@@ -52,7 +53,7 @@ pub struct ProfileUpdate {
     operation_id = "assistant.get_profile",
     tag = "assistant",
     security(("bearer" = ["assistant:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().records(["assistant.profile"])))),
+    extensions(("x-campbooks" = json!(Operation::query().records(["assistant.profile"]).access("assistant.profile", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     responses(
         (status = OK, description = "Your profile.", body = ProfileView),
@@ -68,8 +69,8 @@ pub async fn get(
     State(state): State<AppState>,
     workspace: Workspace<AssistantRead>,
 ) -> Result<Json<ProfileView>> {
-    let user = member(&workspace.access)?;
     let mut tx = state.db.begin_for(workspace.access.workspace).await?;
+    let user = resources::require_own(&state, &mut tx, &workspace.access, Action::Read).await?;
     let view = read(&mut tx, workspace.access.workspace, user).await?;
     tx.commit().await?;
     Ok(Json(view))
@@ -84,7 +85,7 @@ pub async fn get(
     security(("bearer" = ["assistant:write"])),
     // Undo is another update with the profile it answered before.
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
-        .records(["assistant.profile"])))),
+        .records(["assistant.profile"]).access("assistant.profile", campbooks_kernel::authz::Action::Write)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace.")),
     request_body = ProfileUpdate,
     responses(
@@ -104,9 +105,9 @@ pub async fn update(
     workspace: Workspace<AssistantWrite>,
     extract::Json(body): extract::Json<ProfileUpdate>,
 ) -> Result<Json<ProfileView>> {
-    let user = member(&workspace.access)?;
     let id = workspace.access.workspace;
     let mut tx = state.db.begin_for(id).await?;
+    let user = resources::require_own(&state, &mut tx, &workspace.access, Action::Write).await?;
     sqlx::query!(
         r#"
         INSERT INTO assistant.profiles (workspace_id, user_id, proactivity, asked_at)
@@ -127,13 +128,6 @@ pub async fn update(
     let view = read(&mut tx, id, user).await?;
     tx.commit().await?;
     Ok(Json(view))
-}
-
-/// The caller's user: a profile belongs to a member, never to a client.
-fn member(access: &Access) -> Result<UserId> {
-    access
-        .user
-        .ok_or_else(|| Error::Denied(crate::MESSAGES.reason("profile_needs_member")))
 }
 
 async fn read(

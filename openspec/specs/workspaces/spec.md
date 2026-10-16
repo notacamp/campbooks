@@ -28,6 +28,23 @@ policy tables, unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is set.
 - **WHEN** the runtime role is a superuser (for example `CAMPBOOKS_DATABASE_ROLE` empty), or a migration URL is set and the runtime login is a superuser
 - **THEN** the server refuses to start unless `CAMPBOOKS_DATABASE_ALLOW_RLS_BYPASS` is true
 
+### Requirement: Removing a member decides their mail
+`DELETE …/members/{user_id}` SHALL take `mail=delete` (the default) or
+`mail=keep`. `workspaces.member_left` SHALL carry the choice. Keeping
+SHALL be refused with 409 `keep_needs_a_reader` when an inbox the member
+connected would have nobody left to read it, asked in the departure's own
+transaction. A member who leaves on their own SHALL always have their mail
+deleted. Accepting an invitation SHALL be refused with 409 `still_leaving`
+while a departure of that person from the workspace is not yet handled by
+every module.
+
+#### Scenario: Offboarding with history kept
+- **WHEN** an owner removes a member with `mail=keep`
+- **THEN** `workspaces.member_left` says `"mail": "keep"`
+
+#### Scenario: Keeping mail nobody could read
+- **WHEN** an owner removes, with `mail=keep`, a member who is the only member of an inbox they connected
+- **THEN** the answer is 409 `keep_needs_a_reader` and the member stays
 ### Requirement: Signup requests under the approval policy
 Under the `approval` signup policy, a user with no workspace who tries to
 create one SHALL get exactly one signup request, however often they try, and
@@ -75,3 +92,14 @@ without any environment code.
 #### Scenario: Environment codes keep working
 - **WHEN** `CAMPBOOKS_SIGNUP__CODES` lists a code and several new users present it
 - **THEN** each creates a workspace
+
+### Requirement: Unverified addresses are not shown as members'
+The workspaces module SHALL record whether the identity provider verified a
+user's address at their last sign-in. A member's address SHALL be listed
+(`workspaces.list_members`, `workspaces.change_role`) only when verified, and
+inviting an address SHALL treat it as a member's only when a member verified
+it.
+
+#### Scenario: A claimed address
+- **WHEN** a person whose provider did not verify `ceo@example.com` creates a workspace and its members are listed
+- **THEN** their entry has no address, and after a sign-in where the provider verifies it the address is listed

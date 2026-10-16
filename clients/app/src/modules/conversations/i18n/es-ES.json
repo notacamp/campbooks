@@ -51,7 +51,11 @@
     "older_one": "{{count}} mensaje anterior",
     "older_other": "{{count}} mensajes anteriores",
     "showOlder": "Mostrar",
-    "attachments": "Adjuntos"
+    "attachments": "Adjuntos",
+    "kept": {
+      "title": "Conservado como historial",
+      "lead": "{{address}} se desconectó y su correo se conserva aquí, solo lectura: no llega nada nuevo y no se puede enviar ni cambiar nada desde él."
+    }
   },
   "actions": {
     "star": "Destacar",
@@ -99,7 +103,7 @@
     "whyHasDeadline": "Menciona una fecha",
     "whyUrgent": "Urgente",
     "whySuspicious": "Sospechosa",
-    "sortedTaught": "Campbooks la puso en {{stream}}, como le enseñaste"
+    "sortedTaught": "Campbooks la puso en {{stream}}, por una regla"
   },
   "reasons": {
     "signals": {
@@ -124,6 +128,7 @@
       "payment_due": "Hay un pago pendiente («{{evidence}}»).",
       "already_paid": "Dice que ya está pagado («{{evidence}}»).",
       "action_asked": "Te pide que hagas algo («{{evidence}}»).",
+      "security_alert": "Es una alerta de seguridad sobre algo tuyo («{{evidence}}»).",
       "conditional_ask": "Solo pide algo si procede («{{evidence}}»).",
       "notice": "Es un aviso: no hay nada que hacer.",
       "request": "Hace una petición («{{evidence}}»).",
@@ -142,7 +147,7 @@
     },
     "other": "{{rule}} ({{evidence}})",
     "taught": {
-      "rule": "Campbooks sigue una regla que le enseñaste para correos como este."
+      "rule": "Campbooks sigue una regla enseñada para correos como este."
     }
   },
   "shortcuts": {
@@ -215,7 +220,9 @@
       "pay": "{{name}} ha enviado una factura para pagar",
       "warning": "Esto puede ser phishing. No uses sus enlaces.",
       "checkReply": "¿{{name}} necesita respuesta?",
-      "checkDo": "¿{{name}} te ha pedido que hagas algo?"
+      "checkDo": "¿{{name}} te ha pedido que hagas algo?",
+      "taughtReply": "{{name}}: responder, por una regla",
+      "taughtDo": "{{name}}: por hacer, por una regla"
     },
     "chip": {
       "reply": "Necesita respuesta",
@@ -242,7 +249,7 @@
         "model": "Modelo",
         "knn": "Correo parecido",
         "cascade": "Reglas y luego modelo",
-        "taught": "Tu regla"
+        "taught": "Una regla"
       },
       "suggestion": "una sugerencia",
       "actsFrom": "actúa desde {{threshold}}",

@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type ComponentType, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
-import { problemCode } from "~/lib/api";
+import { problemCode, signOutAndLeave } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
@@ -22,13 +22,22 @@ import {
 import { useConnections } from "~/modules/connectors";
 
 import {
+  usePasskeys,
   useRemoveWayIn,
+  useSignOutEverywhere,
   useStartLink,
   useWaysIn,
   type StartLink,
   type WayIn,
 } from "../../api/queries";
-import { knownProvider, leavePage, stepUpUrl, type LinkResult, type Provider } from "../../model";
+import {
+  addedRecently,
+  knownProvider,
+  leavePage,
+  stepUpUrl,
+  type LinkResult,
+  type Provider,
+} from "../../model";
 
 export interface WaysInPageProps {
   /** The open workspace: where a mailbox to reconnect lives. */
@@ -67,7 +76,9 @@ const needsStepUp = (error: unknown) => problemCode(error) === "step_up_required
  * Remove, confirmed in place, never the last), Add another, Reconnect a
  * mailbox of yours here that stopped syncing, and the sections other ways in
  * bring (passkeys). Changing how you sign in needs a sign-in in the last ten
- * minutes; the page says so and offers one.
+ * minutes; the page says so and offers one. A way in added in the last week
+ * stands out (it may be a stranger's), and Sign out everywhere ends every
+ * sign-in of the account.
  */
 export function WaysInPage({
   workspaceId,
@@ -116,6 +127,7 @@ export function WaysInPage({
       <ReaderBody>
         <Text tone="secondary">{t("waysIn.lead")}</Text>
         <Outcome result={result} />
+        <RecentlyAdded ways={ways.data?.items} />
         {stepUp ? <StepUp returnTo={returnTo} leave={leave} /> : null}
         {start.isError && !stepUp ? (
           <Banner tone="danger" role="alert" title={t("waysIn.startFailed")} />
@@ -167,6 +179,7 @@ export function WaysInPage({
         {sections.map((Section, index) => (
           <Section key={index} />
         ))}
+        <SignOutEverywhere leave={leave} />
       </ReaderBody>
     </ReaderPane>
   );
@@ -195,6 +208,92 @@ function Outcome({ result }: { result: LinkResult | undefined }) {
           : t("waysIn.connected")
       }
     />
+  );
+}
+
+/**
+ * Says so when a way to sign in was added in the last week (other than the
+ * one you signed up with): if it wasn't you, what to do.
+ */
+function RecentlyAdded({ ways }: { ways: readonly WayIn[] | undefined }) {
+  const { t } = useTranslation("identity");
+  const passkeys = usePasskeys();
+  const recent =
+    (ways ?? []).some((way) => way.linked_via !== "sign_up" && addedRecently(way.linked_at)) ||
+    (passkeys.data?.items ?? []).some(
+      (passkey) => !passkey.signed_up_with && addedRecently(passkey.created_at),
+    );
+  if (!recent) {
+    return null;
+  }
+  return (
+    <Banner role="status" icon="key" title={t("waysIn.recent.title")}>
+      {t("waysIn.recent.lead")}
+    </Banner>
+  );
+}
+
+/**
+ * Sign out everywhere: every sign-in of the account ends (this browser's,
+ * other devices', every app's), confirmed in place; then this browser leaves
+ * for the sign-in.
+ */
+function SignOutEverywhere({ leave }: { leave: (url: string) => void }) {
+  const { t } = useTranslation("identity");
+  const titleId = useId();
+  const end = useSignOutEverywhere();
+  const [confirming, setConfirming] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
+      <Heading level={2} size="section" id={titleId}>
+        {t("waysIn.everywhere.title")}
+      </Heading>
+      <Text tone="tertiary" size="sm">
+        {t("waysIn.everywhere.lead")}
+      </Text>
+      {failed ? <Banner tone="danger" role="alert" title={t("waysIn.everywhere.failed")} /> : null}
+      <div>
+        <Button
+          variant="danger"
+          icon="sign-out"
+          aria-expanded={confirming}
+          onClick={() => {
+            setFailed(false);
+            setConfirming(true);
+          }}
+        >
+          {t("waysIn.everywhere.action")}
+        </Button>
+      </div>
+      {confirming ? (
+        <InlineConfirm
+          confirmLabel={t("waysIn.everywhere.confirm")}
+          cancelLabel={t("waysIn.cancel")}
+          busy={end.isPending}
+          onCancel={() => {
+            setConfirming(false);
+          }}
+          onConfirm={() => {
+            setFailed(false);
+            end.mutate(undefined, {
+              onSuccess: () => {
+                // This browser too: its session ends now, then the sign-in.
+                signOutAndLeave(leave).catch(() => {
+                  leave("/");
+                });
+              },
+              onError: () => {
+                setConfirming(false);
+                setFailed(true);
+              },
+            });
+          }}
+        >
+          {t("waysIn.everywhere.confirmLead")}
+        </InlineConfirm>
+      ) : null}
+    </section>
   );
 }
 
@@ -237,13 +336,15 @@ function ProviderWays({
 }) {
   const { t } = useTranslation("identity");
   const connections = useConnections(workspaceId);
-  // A mailbox of yours here that stopped syncing, by its address: every
-  // connected mailbox is a way in, so it is one of these rows. The server
-  // checks it is yours when you reconnect.
+  // A mailbox you connected here that stopped syncing, shown on the way in
+  // of the same account (by provider and address: a mailbox connected
+  // without signing in with it has no row here). Only its grantor can
+  // reconnect it, so a colleague's never is offered; the server checks too.
   const needsYou = (way: WayIn) =>
     connections.data?.find(
       (connection) =>
         connection.health === "needs_reauth" &&
+        connection.granted_by_you &&
         connection.provider === way.provider &&
         connection.address.toLowerCase() === way.email?.toLowerCase(),
     );
@@ -302,7 +403,13 @@ function WayInRow({
     <ListRow
       leading={<Icon name={reconnect === undefined ? "key" : "warning"} size="lg" />}
       title={provider}
-      badge={way.linked_via === "sign_up" ? t("waysIn.signedUpWith") : undefined}
+      badge={
+        way.linked_via === "sign_up"
+          ? t("waysIn.signedUpWith")
+          : addedRecently(way.linked_at)
+            ? t("waysIn.new")
+            : undefined
+      }
       meta={meta}
       trailing={
         <>

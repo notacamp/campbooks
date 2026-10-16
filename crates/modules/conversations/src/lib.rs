@@ -57,7 +57,9 @@ pub use domain::{
     decide::STATE_VERSION,
     policy::{Policy, Switch},
 };
-pub use features::{inbox_visibility::visibility, search_source::search_source};
+pub use features::{
+    inbox_visibility::visibility, kept_mail::kept_mail, search_source::search_source,
+};
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "conversations";
@@ -135,7 +137,10 @@ impl ConversationsDeps {
 /// to mount.
 pub fn module(deps: ConversationsDeps) -> Module {
     let model = deps.ai.filter(model_may_read_mail).map(|gateway| {
-        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE)) as Arc<dyn Strategy>
+        // Only while the role passes its answers check: otherwise the model
+        // pass leaves sorting to the rules, as if no model were configured.
+        Arc::new(Model::new("decide", gateway, domain::decide::PURPOSE).checked())
+            as Arc<dyn Strategy>
     });
     let needs = domain::needs::NeedSettings::new(deps.config.needs_window_days, &deps.policy);
     Module {
@@ -156,17 +161,24 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::SendRequested>()
             .publishes::<events::DraftSent>()
             .publishes::<events::SendFailed>()
+            .publishes::<events::InboxChanged>()
+            .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
             .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
+            .handler(features::fill_templates::FillTemplates)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
                 needs.clone(),
             ))
+            .handler(features::backfill_needs::BackfillNeeds::new(needs.clone()))
+            .schedule::<features::backfill_needs::DispatchNeedsBackfills>(
+                features::backfill_needs::EVERY,
+            )
             .consumer(features::decide_message::DecideMessage::new(
                 model,
                 deps.config.decide_backfill_days,
@@ -175,8 +187,11 @@ pub fn module(deps: ConversationsDeps) -> Module {
             ))
             .on_event::<features::ingest_messages::IngestMessages>()
             .on_event::<features::create_inbox::CreateInbox>()
+            .on_event::<features::forget_connection::ForgetConnection>()
+            .on_event::<features::forget_member::ForgetMember>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
+        resources: domain::resources::resources(),
     }
 }
 
@@ -241,6 +256,8 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rules::create))
         .routes(routes!(rules::get, rules::update, rules::remove))
         .routes(routes!(rules::confirm))
+        .routes(routes!(rules::decline))
+        .routes(routes!(rules::restore))
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))
 }
@@ -276,9 +293,17 @@ mod tests {
             "conversations.record_send",
             "conversations.check_send",
             "conversations.apply_rule",
+            "conversations.fill_templates",
+            "conversations.backfill_needs",
+            "conversations.dispatch_needs_backfills",
         ] {
             assert!(kinds.contains(&kind), "{kind}");
         }
+        assert!(
+            registry
+                .schedule_names()
+                .contains(&"conversations.dispatch_needs_backfills")
+        );
     }
 
     // A runtime query rather than `query!`, so this test needs no entry in

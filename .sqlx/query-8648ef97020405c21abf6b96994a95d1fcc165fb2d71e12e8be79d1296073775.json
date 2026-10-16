@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: StreamId\" FROM connectors.streams\n            WHERE connection_id = $1 AND NOT paused\n            ORDER BY id\n              FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: StreamId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "connectors.streams",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "8648ef97020405c21abf6b96994a95d1fcc165fb2d71e12e8be79d1296073775"
+}

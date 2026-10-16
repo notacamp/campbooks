@@ -185,6 +185,18 @@ export const Thread: Story = {
   },
 };
 
+/** A mailbox disconnected with its mail kept: history, read-only, nothing to act on. */
+export const KeptHistory: Story = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({ [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } } }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(await canvas.findByText("Kept as history")).toBeVisible();
+  },
+};
+
 /** An older message unfolded. */
 export const ThreadUnfolded: Story = {
   args: { path: `${PATH}/primary/${Q4.id}`, api: inbox() },
@@ -337,3 +349,83 @@ export const LongContent: Story = {
     }),
   },
 };
+
+// A conversation whose subject, sender name and address have no break
+// opportunity at all (no spaces or hyphens) and are longer than the reader is
+// wide, as real mail sometimes does (a reference number as the subject, an
+// automated sender).
+const UNBROKEN_SUBJECT =
+  "Invoice_INV2026100000184_paymentreference_0192f1a0c2d4e6f8a0b2c4d6e8f0a2b4c6d8e0f2a4b6c8d0e2f4a6b8";
+const UNBROKEN_SENDER = {
+  name: "WeeklyLedgerAccountsReceivableAutomatedBillingNotifications",
+  address: "billing.notifications.and.statements@accountsreceivable.weeklyledger.example",
+};
+const UNBROKEN = { ...LEDGER, subject: UNBROKEN_SUBJECT, latest_from: UNBROKEN_SENDER };
+const UNBROKEN_DETAIL = {
+  ...LEDGER_DETAIL,
+  conversation: UNBROKEN,
+  messages: LEDGER_DETAIL.messages.map((message) => ({
+    ...message,
+    from: UNBROKEN_SENDER,
+    subject: UNBROKEN_SUBJECT,
+  })),
+};
+
+/** A viewport the story test runs at (the addon reads `globals.viewport`). */
+function at(name: string, width: number, height: number) {
+  return {
+    parameters: {
+      viewport: {
+        options: {
+          [name]: { name, styles: { width: `${String(width)}px`, height: `${String(height)}px` } },
+        },
+      },
+    },
+    globals: { viewport: { value: name } },
+  };
+}
+
+const unbroken: Pick<Story, "args" | "play"> = {
+  args: {
+    path: `${PATH}/primary/${LEDGER.id}`,
+    api: inbox({
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: [UNBROKEN, ...PRIMARY.filter((c) => c.id !== LEDGER.id)],
+          next_cursor: null,
+        },
+      },
+      [`GET ${W}/conversations/${LEDGER.id}`]: { body: UNBROKEN_DETAIL },
+      [`POST ${W}/conversations/${LEDGER.id}/read`]: { body: { ...UNBROKEN, unread_count: 0 } },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const reader = await canvas.findByRole("main", { name: "Conversation" });
+    const inReader = within(reader);
+    const subject = await inReader.findByRole("heading", { level: 2, name: UNBROKEN_SUBJECT });
+    await expect(subject).toBeVisible();
+    // Long unbroken text wraps: the subject and the sender stay inside their boxes…
+    for (const text of [subject, ...inReader.getAllByText(UNBROKEN_SENDER.name)]) {
+      await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
+    }
+    // …so the page never scrolls sideways.
+    await waitFor(() =>
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(globalThis.innerWidth),
+    );
+    // From 64rem the reader sits beside the list, never under it.
+    if (globalThis.matchMedia("(width >= 64rem)").matches) {
+      const list = canvas.getByRole("region", { name: "Conversations" });
+      await expect(reader.getBoundingClientRect().top).toBe(list.getBoundingClientRect().top);
+    }
+  },
+};
+
+/** Long unbroken subject and sender on a phone: they wrap, nothing scrolls sideways. */
+export const UnbrokenTextPhone: Story = { ...unbroken, ...at("phone", 375, 812) };
+
+/** A narrow desktop window: the reader stays beside the list and the text wraps. */
+export const UnbrokenTextNarrowDesktop: Story = { ...unbroken, ...at("narrowDesktop", 1100, 800) };
+
+/** A wide desktop window: the text wraps within the reader's measure. */
+export const UnbrokenTextDesktop: Story = { ...unbroken, ...at("desktop", 1440, 900) };
