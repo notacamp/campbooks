@@ -36,6 +36,6 @@
 
 ## 6. Follow-ups (not in this change)
 
-- [ ] 6.1 Scheduled, advisory visual regression run over the pattern stories
-- [ ] 6.2 Module screens define shortcuts for their server operations, keyed by OpenAPI operationId (ADR 0013), through `ShortcutRegistry.define`
-- [ ] 6.3 Workspace accent picker and user-editable bindings
+- [x] 6.1 Scheduled, advisory visual regression run over the pattern stories — moved to campbooks-cloud#189
+- [x] 6.2 Module screens define shortcuts for their server operations, keyed by OpenAPI operationId (ADR 0013), through `ShortcutRegistry.define` — shipped: `conversations`/`search` module shortcuts through `MODULE_SHORTCUTS`
+- [x] 6.3 Workspace accent picker and user-editable bindings — moved to campbooks-cloud#190

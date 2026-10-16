@@ -26,7 +26,7 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 Store corrections per (purpose, question); refit temperatures from them; per-question eval sets
-- [ ] 5.2 Per-workspace `decide` overrides and "test connection" (with the workspaces module)
-- [ ] 5.3 Report the checkpoint revision per answer (laya-serve only exposes it on `/health`)
-- [ ] 5.4 Fine-tune a checkpoint on our own decisions once corrections exist
+- [x] 5.1 Store corrections per (purpose, question); refit temperatures from them; per-question eval sets — moved to campbooks-cloud#180
+- [x] 5.2 Per-workspace `decide` overrides and "test connection" (with the workspaces module) — tracked in campbooks-cloud#20
+- [x] 5.3 Report the checkpoint revision per answer (laya-serve only exposes it on `/health`) — moved to campbooks-cloud#181
+- [x] 5.4 Fine-tune a checkpoint on our own decisions once corrections exist — moved to campbooks-cloud#182

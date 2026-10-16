@@ -27,10 +27,10 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 First real events and jobs: `workspaces` (workspace created) and `connectors` (sync jobs), with row-level security policies reading `campbooks.workspace_id`
-- [ ] 5.2 `sync` role and per-provider rate limits (ADR 0010, 0011)
-- [ ] 5.3 Ordering key per event delivery, and payload upcasting for old event versions
-- [ ] 5.4 Operator tooling: list/retry/discard failed jobs; a health probe for worker-only processes; queue-depth metrics for autoscaling
+- [x] 5.1 First real events and jobs: `workspaces` (workspace created) and `connectors` (sync jobs), with row-level security policies reading `campbooks.workspace_id` — shipped: `workspaces` events, `connectors` sync jobs, `kernel__workspace_isolation` migration
+- [x] 5.2 `sync` role and per-provider rate limits (ADR 0010, 0011) — moved to campbooks-cloud#183
+- [x] 5.3 Ordering key per event delivery, and payload upcasting for old event versions — moved to campbooks-cloud#184
+- [x] 5.4 Operator tooling: list/retry/discard failed jobs; a health probe for worker-only processes; queue-depth metrics for autoscaling — moved to campbooks-cloud#185
 
 ## 6. Wrap-up
 

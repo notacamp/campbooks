@@ -25,8 +25,8 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 Once notacamp/campbooks#431 merges, make `deploy/idp/provision.sh` register the scopes from `campbooks-server scopes` instead of a hand-written list, and set `CAMPBOOKS_AUTH__ISSUER` / `CAMPBOOKS_AUTH__JWKS_URL` in `deploy/compose.yaml`
-- [ ] 5.2 BFF (issue #16): session cookie + token attachment for `/bff/*`
+- [x] 5.1 Once notacamp/campbooks#431 merges, make `deploy/idp/provision.sh` register the scopes from `campbooks-server scopes` instead of a hand-written list, and set `CAMPBOOKS_AUTH__ISSUER` / `CAMPBOOKS_AUTH__JWKS_URL` in `deploy/compose.yaml` — obsolete: Campbooks issues its own tokens (ADR 0014, `2026-10-14-remove-rauthy`); `deploy/idp/` is gone
+- [x] 5.2 BFF (issue #16): session cookie + token attachment for `/bff/*` — shipped: `crates/server/src/bff/` (cloud#16)
 
 ## 6. Wrap-up
 

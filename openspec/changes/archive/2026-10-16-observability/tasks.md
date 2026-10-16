@@ -26,6 +26,6 @@
 
 ## 5. Follow-ups (not in this change)
 
-- [ ] 5.1 Error reporting hook to a Sentry-compatible service (cloud-only)
-- [ ] 5.2 Dashboards and alert rules in the cloud repo
-- [ ] 5.3 Spans for connector sync once the `sync` role exists
+- [x] 5.1 Error reporting hook to a Sentry-compatible service (cloud-only) — moved to campbooks-cloud#186
+- [x] 5.2 Dashboards and alert rules in the cloud repo — moved to campbooks-cloud#187
+- [x] 5.3 Spans for connector sync once the `sync` role exists — moved to campbooks-cloud#188
