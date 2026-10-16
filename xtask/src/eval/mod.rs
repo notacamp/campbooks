@@ -99,10 +99,15 @@ async fn decide(root: &Path, args: &DecideArgs) -> Result<String> {
     let ctx = Context {
         dataset: &dataset,
         questions: &questions,
+        // An owner's export: only what they labelled goes to a model.
         selected: dataset
             .items
             .iter()
-            .map(|i| args.langs.is_empty() || args.langs.contains(&i.lang))
+            .map(|i| {
+                (args.langs.is_empty() || args.langs.contains(&i.lang))
+                    && (!dataset.manifest.private
+                        || questions.iter().any(|q| i.labels.value(&q.id).is_some()))
+            })
             .collect(),
     };
     let outcome = run_specs(&ctx, &specs, &Endpoints::from_env()).await?;

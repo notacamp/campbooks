@@ -14,7 +14,8 @@ All notable changes to Campbooks Next are documented here. The format follows
   question in the same call: does the email ask for a payment still owed, confirm one
   already made, or neither. Only a payment still owed raises Pay, and since Campbooks
   can't see your bank it asks: Already paid clears it, Still to pay keeps it. Existing
-  needs are worked out again on upgrade, and recent mail is asked the new question once.
+  needs are worked out again on upgrade, and mail from the last two weeks is asked the new
+  question once; a Pay item on older mail goes away and doesn't come back.
   For operators, `campbooks-server labelling export` writes your recent money mail as a
   sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
   model on it (campbooks-cloud#167).

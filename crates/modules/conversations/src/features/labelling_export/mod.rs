@@ -4,7 +4,7 @@
 //! The money question's operating point is set from mail the owner labels,
 //! never from emails an agent wrote (ADR 0018). This lists, for one
 //! workspace, the newest inbound message of every conversation sorted to
-//! Receipts or that ever had a Pay need, sent within the last `days`, as
+//! Receipts or with a Pay need (open or cleared), sent within the last `days`, as
 //! items in the format of `crates/ai/evals/decide/` (what the decide model
 //! reads: envelope, list and automation headers, attachment names and types,
 //! the first part of the text body), with no labels. The operator runs it on
@@ -108,7 +108,8 @@ pub async fn export_for_labelling(
               FROM conversations.messages m
               JOIN conversations.conversations c ON c.id = m.conversation_id
               JOIN conversations.inboxes i ON i.id = m.inbox_id
-             WHERE m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash
+             WHERE m.workspace_id = $3
+               AND m.direction = 'inbound' AND NOT m.in_spam AND NOT m.in_trash
                AND m.sent_at >= $1
                AND (c.stream = 'receipts'
                     OR EXISTS (SELECT 1 FROM conversations.needs n
@@ -121,6 +122,7 @@ pub async fn export_for_labelling(
     )
     .bind(since)
     .bind(MAX_ITEMS)
+    .bind(workspace.as_uuid())
     .fetch_all(&mut *tx)
     .await?;
     tx.commit().await?;

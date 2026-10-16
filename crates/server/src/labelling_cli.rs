@@ -14,7 +14,9 @@
 
 use std::{fs, io::Write as _, path::Path, process::ExitCode};
 
-use campbooks_conversations::labelling::{LabellingItem, export_for_labelling, manifest};
+use campbooks_conversations::labelling::{
+    LabellingItem, MAX_ITEMS, export_for_labelling, manifest,
+};
 use campbooks_kernel::{AppState, Config, tenancy::WorkspaceId};
 use clap::Subcommand;
 
@@ -22,8 +24,8 @@ use clap::Subcommand;
 #[derive(Debug, Subcommand)]
 pub enum LabellingCommand {
     /// Write a workspace's recent money mail (conversations in Receipts, or
-    /// that had a Pay need) as an unlabelled eval set, for its owner to
-    /// label locally. Real mail: never commit the folder.
+    /// with a Pay need) as an unlabelled eval set, for its owner to label
+    /// locally. Real mail: never commit the folder.
     Export {
         /// The workspace's id.
         #[arg(long)]
@@ -75,6 +77,12 @@ pub fn run(command: LabellingCommand) -> ExitCode {
         Ok(items) => items,
         Err(e) => return super::fail(&e),
     };
+    if items.len() >= usize::try_from(MAX_ITEMS).unwrap_or(usize::MAX) {
+        let _ = writeln!(
+            std::io::stdout(),
+            "only the newest {MAX_ITEMS} messages: use fewer --days for an older window"
+        );
+    }
     if let Err(e) = write(&out, &items) {
         return super::fail(&format!("could not write {}: {e}", out.display()));
     }
@@ -92,15 +100,18 @@ pub fn run(command: LabellingCommand) -> ExitCode {
 }
 
 fn write(out: &Path, items: &[LabellingItem]) -> std::io::Result<()> {
-    fs::create_dir_all(out.join("items"))?;
+    // Real mail: readable by the operator only, and never into a folder
+    // that exists (no labels overwritten, no race with the check above).
+    private_dir(out)?;
+    private_dir(&out.join("items"))?;
     let manifest = serde_json::to_string_pretty(&manifest()).map_err(std::io::Error::other)?;
-    fs::write(out.join("manifest.json"), manifest + "\n")?;
+    private_file(&out.join("manifest.json"), &(manifest + "\n"))?;
     let mut lines = String::new();
     for item in items {
         lines.push_str(&item.item.to_string());
         lines.push('\n');
     }
-    fs::write(out.join("items").join("owner.jsonl"), lines)?;
+    private_file(&out.join("items").join("owner.jsonl"), &lines)?;
     let mut csv = String::from("id,date,from,subject,attachments,money\n");
     for item in items {
         let row = [
@@ -115,7 +126,24 @@ fn write(out: &Path, items: &[LabellingItem]) -> std::io::Result<()> {
         csv.push_str(&cells.join(","));
         csv.push('\n');
     }
-    fs::write(out.join("labels.csv"), csv)
+    private_file(&out.join("labels.csv"), &csv)
+}
+
+/// Create `dir`, which must not exist, readable by its owner only.
+fn private_dir(dir: &Path) -> std::io::Result<()> {
+    let mut builder = fs::DirBuilder::new();
+    #[cfg(unix)]
+    std::os::unix::fs::DirBuilderExt::mode(&mut builder, 0o700);
+    builder.create(dir)
+}
+
+/// Write a new file readable by its owner only.
+fn private_file(path: &Path, contents: &str) -> std::io::Result<()> {
+    let mut options = fs::OpenOptions::new();
+    options.write(true).create_new(true);
+    #[cfg(unix)]
+    std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
+    options.open(path)?.write_all(contents.as_bytes())
 }
 
 /// A CSV cell: quoted, with quotes doubled and line breaks as spaces. A

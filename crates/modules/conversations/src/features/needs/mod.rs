@@ -219,6 +219,34 @@ pub async fn reopen(
     let id = path.conversation_id;
     let mut tx = state.db.begin_for(access.workspace).await?;
     lock_conversation(&state, &mut tx, access, id).await?;
+    // Done or Already paid over an earlier confirmation (Still to pay, then
+    // Already paid): Undo goes back to the confirmation, which keeps its
+    // correction.
+    let restored = sqlx::query(
+        "UPDATE conversations.needs
+            SET verdict = CASE WHEN question = 'money' THEN 'still_to_pay' ELSE 'confirmed' END,
+                updated_at = now()
+          WHERE conversation_id = $1 AND verdict_message_id = message_id
+            AND verdict IN ('done', 'already_paid') AND verdict_correction_id IS NOT NULL",
+    )
+    .bind(id.as_uuid())
+    .execute(&mut *tx)
+    .await?
+    .rows_affected()
+        > 0;
+    if restored {
+        needs::refresh(
+            &mut tx,
+            &state.events,
+            &access.workspace.to_string(),
+            id,
+            &settings,
+        )
+        .await?;
+        let summary = summary(&mut tx, access.user, id).await?;
+        tx.commit().await?;
+        return Ok(Json(summary));
+    }
     let withdrawn = sqlx::query_scalar!(
         r#"
         UPDATE conversations.needs n
@@ -279,20 +307,37 @@ async fn judge(
     .fetch_optional(&mut *tx)
     .await?
     .ok_or_else(|| Error::Conflict(crate::MESSAGES.reason("no_open_need")))?;
-    let paid_answer = matches!(verdict, NeedVerdict::AlreadyPaid | NeedVerdict::StillToPay);
-    if paid_answer && need.reason != NeedReason::Pay.as_str() {
-        return Err(Error::Conflict(crate::MESSAGES.reason("not_a_payment")));
-    }
-    // Only a question can be confirmed; Still to pay answers Pay's question.
-    if matches!(verdict, NeedVerdict::Confirmed | NeedVerdict::StillToPay) && need.trust != "check"
-    {
-        return Err(Error::Conflict(crate::MESSAGES.reason("no_open_need")));
-    }
     // Not the need the member saw (a newer message replaced it meanwhile):
     // record nothing rather than a wrong correction.
     if need.message != seen {
         return Err(Error::Conflict(crate::MESSAGES.reason("need_changed")));
     }
+    let paid_answer = matches!(verdict, NeedVerdict::AlreadyPaid | NeedVerdict::StillToPay);
+    if paid_answer && need.reason != NeedReason::Pay.as_str() {
+        return Err(Error::Conflict(crate::MESSAGES.reason("not_a_payment")));
+    }
+    // Still to pay again, on a bill already confirmed: nothing to change.
+    if verdict == NeedVerdict::StillToPay && need.trust != "check" {
+        let summary = summary(&mut tx, access.user, id).await?;
+        tx.commit().await?;
+        return Ok(summary);
+    }
+    // Only a question can be confirmed.
+    if verdict == NeedVerdict::Confirmed && need.trust != "check" {
+        return Err(Error::Conflict(crate::MESSAGES.reason("no_open_need")));
+    }
+    // A confirmation the member gave earlier on this message (Still to pay,
+    // then Already paid): kept with the later verdict, so Undo brings the
+    // confirmed need back rather than the question.
+    let earlier: Option<Option<sqlx::types::Uuid>> = sqlx::query_scalar(
+        "SELECT verdict_correction_id FROM conversations.needs
+          WHERE conversation_id = $1 AND verdict_message_id = message_id
+            AND verdict IN ('confirmed', 'still_to_pay')",
+    )
+    .bind(id.as_uuid())
+    .fetch_optional(&mut *tx)
+    .await?;
+    let earlier_correction = earlier.flatten().map(CorrectionId::from_uuid);
     // The money question is a choice: its answer behind a Pay need is
     // "owed"; "not owed" is what Not needed says of it.
     let money = need.question == NeedQuestion::Money.as_str();
@@ -323,7 +368,8 @@ async fn judge(
             )
             .await?,
         ),
-        None => None,
+        // Done or Already paid file nothing: an earlier confirmation stays.
+        None => earlier_correction,
     };
     sqlx::query!(
         r#"

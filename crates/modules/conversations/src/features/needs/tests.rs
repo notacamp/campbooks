@@ -107,11 +107,12 @@ async fn is_it_paid(db: PgPool) {
         (question.as_str(), from.as_str(), to.as_str()),
         ("money", "owed", "owed")
     );
-    // Asked once: it is no longer a question.
+    // Said twice: nothing changes, and nothing more is stored.
     let again = kit
         .post(&sam, &format!("{base}/resolve"), answer("still_to_pay"))
         .await;
-    assert_eq!(again.json["code"], "no_open_need");
+    assert_eq!(again.status, StatusCode::OK, "{:?}", again.json);
+    assert_eq!(again.json["need"]["trust"], "sure");
 
     // Then paid: cleared as done, nothing more stored.
     let paid = kit
@@ -127,10 +128,20 @@ async fn is_it_paid(db: PgPool) {
         .unwrap();
     assert_eq!(corrections, 1);
 
-    // Undo brings the need back.
+    // Undo brings back the bill the member said is still to pay, with its
+    // correction; undoing that too brings back the question.
     let back = kit.post(&sam, &format!("{base}/reopen"), None).await;
     assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
     assert_eq!(back.json["need"]["reason"], "pay");
+    assert_eq!(back.json["need"]["trust"], "sure");
+    let question = kit.post(&sam, &format!("{base}/reopen"), None).await;
+    assert_eq!(question.json["need"]["trust"], "check");
+    let withdrawn: bool =
+        sqlx::query_scalar("SELECT withdrawn_at IS NOT NULL FROM conversations.corrections")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert!(withdrawn);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

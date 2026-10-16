@@ -209,10 +209,11 @@ fn settled_no(answers: &[Answer], question: &str) -> bool {
 fn owed<'a>(answers: &'a [Answer], settings: &NeedSettings) -> Option<&'a Answer> {
     let money = |a: &&Answer| a.question == triage::MONEY;
     let says_owed = |a: &Answer| a.value.as_str() == Some(triage::OWED);
-    if answers
-        .iter()
-        .filter(money)
-        .any(|a| a.acted && !says_owed(a))
+    if taught_no_ask(answers)
+        || answers
+            .iter()
+            .filter(money)
+            .any(|a| a.acted && !says_owed(a))
     {
         return None;
     }
@@ -225,6 +226,14 @@ fn owed<'a>(answers: &'a [Answer], settings: &NeedSettings) -> Option<&'a Answer
                 || (a.basis == NeedBasis::Model
                     && a.confidence.is_some_and(|c| c >= settings.check_floor()))
         })
+}
+
+/// Whether a rule the member taught says this mail asks nothing of them: no
+/// bill to pay either.
+fn taught_no_ask(answers: &[Answer]) -> bool {
+    answers
+        .iter()
+        .any(|a| a.basis == NeedBasis::Taught && a.question == triage::ASKS_ACTION && !a.is_true())
 }
 
 /// The need the answers about `message` raise, if any, under `settings`.
@@ -371,6 +380,7 @@ fn rule_clears(answers: &[Answer], question: NeedQuestion) -> bool {
         return false;
     }
     surfaces_never(answers)
+        || (question == NeedQuestion::Money && taught_no_ask(answers))
         || answers.iter().any(|a| {
             a.basis == NeedBasis::Taught && a.question == question.as_str() && !a.is_true()
         })
@@ -1423,6 +1433,17 @@ mod tests {
         assert_eq!(raised(&acted).unwrap().reason, NeedReason::Pay);
         let settled = [money("paid", 0.6, true), money("owed", 0.95, false)];
         assert_eq!(raised(&settled), None);
+    }
+
+    #[test]
+    fn a_taught_no_ask_is_no_bill() {
+        let answers = [
+            stream(NeedBasis::Model, "receipts", true),
+            money("owed", 0.95, false),
+            answer(triage::ASKS_ACTION, NeedBasis::Taught, json!(false), true),
+        ];
+        assert_eq!(raised(&answers), None);
+        assert!(rule_clears(&answers, NeedQuestion::Money));
     }
 
     #[test]

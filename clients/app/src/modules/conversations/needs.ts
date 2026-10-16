@@ -23,7 +23,8 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
   }
   if (need.trust === "check") {
     if (need.question === "money") {
-      // Campbooks can't see the bank: a bill is a question until answered.
+      // Campbooks can't see the bank: a bill is a question until answered,
+      // worded so that Yes (confirm) means still to pay.
       return t("needs.line.checkPay", { name });
     }
     return t(need.question === "asks_action" ? "needs.line.checkDo" : "needs.line.checkReply", {

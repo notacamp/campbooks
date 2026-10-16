@@ -89,3 +89,23 @@ async fn three_questions_about_a_sample_email() {
         }
     }
 }
+
+/// The answers check (`check::cases`) against the configured `decide`
+/// role, exactly as the server runs it. With Jev through OpenRouter:
+///
+/// ```sh
+/// CAMPBOOKS_AI__DECIDE__PROTOCOL=laya \
+/// CAMPBOOKS_AI__DECIDE__BASE_URL=https://openrouter.ai/api/alpha \
+/// CAMPBOOKS_AI__DECIDE__PATH=decisions \
+/// CAMPBOOKS_AI__DECIDE__MODEL=typesafe/jev-1.13 \
+/// CAMPBOOKS_AI__DECIDE__API_KEY=… CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow \
+///   cargo test -p campbooks-ai --test decide_live answers_check -- --ignored --nocapture
+/// ```
+#[tokio::test]
+#[ignore = "needs a running decide provider; see the module docs"]
+async fn answers_check_against_the_configured_model() {
+    let gateway = Gateway::new(AiConfig::from_env().expect("decide config")).expect("gateway");
+    let report = gateway.run_answers_check().await;
+    println!("{report:?}");
+    assert!(report.passed(), "{report:?}");
+}

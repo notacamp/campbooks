@@ -156,8 +156,10 @@ correction of the question that raised it (true to false; for a `pay` need,
 `still_to_pay`, which turns a `check` `pay` need into a `sure` one with basis
 `member` and stores a correction of `money` from `owed` to `owed`; either
 outcome on a need that is not `pay` SHALL answer 409 `not_a_payment`, and
-`still_to_pay` on a `pay` need that is already `sure` SHALL answer 409
-`no_open_need`. `…/need/confirm` (`conversations.confirm_need`) SHALL turn a
+`still_to_pay` on a `pay` need that is already `sure` SHALL change nothing
+and answer 200. When the member resolves as `done` or `already_paid` a need
+they had confirmed (`confirmed`, `still_to_pay`), reopening SHALL bring back
+the confirmed need and keep its correction. `…/need/confirm` (`conversations.confirm_need`) SHALL turn a
 `check` need into a `sure` one and store a correction confirming the answer.
 `…/need/reopen` (`conversations.reopen_need`) SHALL undo any of them,
 restoring the need as it was and marking the correction withdrawn. Each SHALL
@@ -204,8 +206,10 @@ old rule raised is withdrawn as `superseded`). When a trusted `decide` role
 is configured, the backfill SHALL ask the model about each conversation's
 newest inbound message sent within the decide backfill window that lacks a
 checked model answer to any triage question, once; the checked answers
-already stored SHALL be kept and only the missing ones added. Running it
-again SHALL ask nothing more for a message the model answered.
+already stored SHALL be kept and only the missing ones added. An open `pay`
+need on a message older than that window SHALL be withdrawn and not raised
+again. Running it again SHALL ask nothing more for a message the model
+answered.
 
 #### Scenario: A receipt that was Pay
 - **WHEN** a payment confirmation in Receipts had an open `pay` need raised by `asks_action`, and the upgrade runs with Jev configured
@@ -220,7 +224,7 @@ again SHALL ask nothing more for a message the model answered.
 SHALL write, for one workspace, the newest inbound message (not in spam or
 the trash) of each conversation in Receipts or that had a `pay` need, sent
 within the last `n` days (default 90), newest first and at most 500, as an
-unlabelled eval set: `manifest.json` (a private set asking `money`),
+unlabelled eval set, readable by the operator only: `manifest.json` (a private set asking `money`),
 `items/owner.jsonl` (what the decide model reads of each message: envelope,
 list and automation headers, attachment names and media types, the start of
 the text body; items alternating `dev` and `test`) and `labels.csv` (id,
@@ -230,7 +234,9 @@ and say that the folder holds real mail to keep off the repository. `cargo
 xtask eval decide --set-dir <folder>` SHALL read such a set where it is,
 fill each item's `money` label from the sheet, leave unlabelled items out of
 the scores, skip the fictional set's reserved-domain and id checks for a
-private set, and write its report into the folder.
+private set (including its duplicate check), send only labelled items to
+a model, accept a sheet saved with a byte-order mark or `;` separators, and
+write its report into the folder.
 
 #### Scenario: Exporting
 - **WHEN** Sam's workspace holds a bill from Acme Hosting in Receipts, a question from Marta and a phishing message

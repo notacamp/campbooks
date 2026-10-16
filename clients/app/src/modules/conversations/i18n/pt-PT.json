@@ -228,7 +228,7 @@
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
-      "checkPay": "{{name}} enviou uma fatura. Já está paga?",
+      "checkPay": "A fatura de {{name}} ainda está por pagar?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra"
     },

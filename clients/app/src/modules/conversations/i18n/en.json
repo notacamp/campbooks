@@ -228,7 +228,7 @@
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
-      "checkPay": "{{name}} sent an invoice. Is it paid?",
+      "checkPay": "Is {{name}}'s invoice still to pay?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },

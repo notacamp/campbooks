@@ -247,6 +247,12 @@ mod tests {
                     );
                 }
             }
+            // Changing that is a reviewed change citing the owner's eval.
+            assert_eq!(
+                policy.switch(questions::MONEY, source),
+                Switch::Record,
+                "{name}: money"
+            );
             assert!(
                 measured.iter().all(|id| asked.iter().any(|q| q.id == *id)),
                 "{name}: the report measures a question nobody asks"

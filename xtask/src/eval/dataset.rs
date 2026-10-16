@@ -198,7 +198,9 @@ impl Dataset {
             if !ids.insert(item.id.as_str()) {
                 bad("duplicate id");
             }
-            if !keys.insert(message_key(&item.message.envelope)) {
+            // Real mail repeats itself (a monthly statement): only the
+            // fictional set must not.
+            if !self.manifest.private && !keys.insert(message_key(&item.message.envelope)) {
                 bad("duplicate message");
             }
             if !self.manifest.locales.contains(&item.lang) {
@@ -280,7 +282,16 @@ impl Dataset {
 /// a header row naming `id` and `money` columns, then one row per item;
 /// an empty `money` cell leaves the item unlabelled).
 fn apply_sheet(text: &str, items: &mut [Item]) -> Result<()> {
-    let mut rows = text.lines().map(csv_row);
+    // A spreadsheet saving "CSV UTF-8" adds a byte-order mark, and in
+    // pt-PT, es-ES or fr regional settings separates cells with `;`.
+    let text = text.trim_start_matches('\u{feff}');
+    let header_line = text.lines().next().unwrap_or_default();
+    let separator = if header_line.contains(';') && !header_line.contains(',') {
+        ';'
+    } else {
+        ','
+    };
+    let mut rows = text.lines().map(|line| csv_row(line, separator));
     let header = rows.next().unwrap_or_default();
     let column = |name: &str| {
         header
@@ -306,9 +317,10 @@ fn apply_sheet(text: &str, items: &mut [Item]) -> Result<()> {
     Ok(())
 }
 
-/// The cells of one CSV line: comma-separated, `"`-quoted cells with `""`
-/// for a quote (the sheet the export writes has no line breaks in cells).
-fn csv_row(line: &str) -> Vec<String> {
+/// The cells of one CSV line: `separator`-separated, `"`-quoted cells with
+/// `""` for a quote (the sheet the export writes has no line breaks in
+/// cells).
+fn csv_row(line: &str, separator: char) -> Vec<String> {
     let mut cells = Vec::new();
     let mut cell = String::new();
     let mut quoted = false;
@@ -320,7 +332,7 @@ fn csv_row(line: &str) -> Vec<String> {
                 chars.next();
             }
             ('"', _) => quoted = !quoted,
-            (',', false) => cells.push(std::mem::take(&mut cell)),
+            (c, false) if c == separator => cells.push(std::mem::take(&mut cell)),
             _ => cell.push(c),
         }
     }
@@ -431,7 +443,11 @@ mod tests {
         assert_eq!(items[1].labels.money, None, "left blank: unlabelled");
         assert!(apply_sheet("id,money\nnope,paid\n", &mut items).is_err());
         assert!(apply_sheet("id,label\n", &mut items).is_err());
-        assert_eq!(csv_row(r#""a,b","c""d",e"#), ["a,b", "c\"d", "e"]);
+        assert_eq!(csv_row(r#""a,b","c""d",e"#, ','), ["a,b", "c\"d", "e"]);
+        let mut items = vec![set.items[0].clone()];
+        let id = items[0].id.clone();
+        apply_sheet(&format!("\u{feff}id;money\n{id};paid\n"), &mut items).unwrap();
+        assert_eq!(items[0].labels.money.as_deref(), Some("paid"));
     }
 
     #[test]

@@ -21,6 +21,12 @@ context and the wording of the existing questions are unchanged, so
 `CONTEXT_VERSION` stays 2; answers to `money` are identified by their
 question id.
 
+The answers check goes from 33 to 50 expected answers (pass at 45). Jev
+1.13 answered all 50 right on 2026-10-17 (the ten cases asked through
+OpenRouter's decisions endpoint with the triage context rebuilt outside the
+server); `cargo test -p campbooks-ai --test decide_live answers_check --
+--ignored` runs the exact server check against the configured model.
+
 ## Raising Pay
 
 `raise()` (pure) reads the stored answers:
