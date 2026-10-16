@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id, audience, audience_user\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
+  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id, audience, audience_user,\n                          floor(extract(epoch FROM occurred_at))::bigint AS \"published_at!\"\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
   "describe": {
     "columns": [
       {
@@ -101,6 +101,12 @@
             "name": "audience_user"
           }
         }
+      },
+      {
+        "ordinal": 9,
+        "name": "published_at!",
+        "type_info": "Int8",
+        "origin": "Expression"
       }
     ],
     "parameters": {
@@ -119,8 +125,9 @@
       true,
       true,
       true,
-      true
+      true,
+      null
     ]
   },
-  "hash": "e7b0349642d6705458095022f566e2eb093ae0e081ec6e0144ded06af8b32434"
+  "hash": "d5eacc8b3466c883ac4cf634533d66b7dc0b0dace529aae52b2449a940f8c7f9"
 }

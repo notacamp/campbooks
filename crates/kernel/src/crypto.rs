@@ -178,6 +178,13 @@ impl Cipher {
 
     /// `FORMAT_V1 || nonce || ciphertext || tag`, bound to `context`.
     pub fn seal(&self, plaintext: &str, context: &[u8]) -> Vec<u8> {
+        self.seal_bytes(plaintext.as_bytes(), context)
+    }
+
+    /// [`seal`](Self::seal) for bytes. The sealed value is as long as
+    /// `plaintext` plus 29 bytes, so fixed-width plaintexts seal to values
+    /// of one length.
+    pub fn seal_bytes(&self, plaintext: &[u8], context: &[u8]) -> Vec<u8> {
         let mut nonce = [0_u8; NONCE_LEN];
         self.rng
             .fill(&mut nonce)
@@ -185,7 +192,7 @@ impl Cipher {
         let mut sealed = Vec::with_capacity(1 + NONCE_LEN + plaintext.len() + 16);
         sealed.push(FORMAT_V1);
         sealed.extend_from_slice(&nonce);
-        let mut body = plaintext.as_bytes().to_vec();
+        let mut body = plaintext.to_vec();
         self.key
             .seal_in_place_append_tag(
                 Nonce::assume_unique_for_key(nonce),
@@ -199,6 +206,11 @@ impl Cipher {
 
     /// The plaintext of `sealed`, which must have been sealed for `context`.
     pub fn open(&self, sealed: &[u8], context: &[u8]) -> Result<String, OpenError> {
+        String::from_utf8(self.open_bytes(sealed, context)?).map_err(|_| OpenError)
+    }
+
+    /// [`open`](Self::open) for bytes.
+    pub fn open_bytes(&self, sealed: &[u8], context: &[u8]) -> Result<Vec<u8>, OpenError> {
         let (&format, rest) = sealed.split_first().ok_or(OpenError)?;
         if format != FORMAT_V1 || rest.len() < NONCE_LEN {
             return Err(OpenError);
@@ -210,7 +222,7 @@ impl Cipher {
             .key
             .open_in_place(nonce, Aad::from(context), &mut body)
             .map_err(|_| OpenError)?;
-        String::from_utf8(plaintext.to_vec()).map_err(|_| OpenError)
+        Ok(plaintext.to_vec())
     }
 }
 
@@ -218,13 +230,21 @@ impl Cipher {
 /// flight would stop verifying).
 const SIGNER_PURPOSE: &[u8] = b"campbooks kernel signed values v1";
 
+/// The purpose of the [`Signer`]'s sealing key. Never change it (every
+/// sealed value in flight would stop opening).
+const SEALER_PURPOSE: &[u8] = b"campbooks kernel sealed values v1";
+
 /// Signs short values the server hands out and takes back (opaque cursors),
 /// so a client cannot forge or alter them: HMAC-SHA256 under a key derived
-/// from the instance secret. Each use names itself in its `context`, so a
-/// value signed for one purpose never verifies for another. Cheap to clone.
+/// from the instance secret. Values whose content the client must not read
+/// either (the change feed's resume tokens) are sealed instead
+/// ([`seal`](Self::seal), AES-256-GCM under another derived key). Each use
+/// names itself in its `context`, so a value signed or sealed for one
+/// purpose never verifies or opens for another. Cheap to clone.
 #[derive(Clone)]
 pub struct Signer {
     key: std::sync::Arc<hmac::Key>,
+    sealer: std::sync::Arc<Cipher>,
 }
 
 impl std::fmt::Debug for Signer {
@@ -237,7 +257,11 @@ impl Default for Signer {
     /// A signer with a random key: values verify in this process only. The
     /// server installs [`Signer::new`] instead.
     fn default() -> Self {
-        Self::with_key(random_token().as_bytes())
+        let mut bytes = [0_u8; SECRET_KEY_LEN];
+        SystemRandom::new()
+            .fill(&mut bytes)
+            .unwrap_or_else(|_| unreachable!("the system random number generator failed"));
+        Self::new(&SecretKey::from_bytes(bytes))
     }
 }
 
@@ -245,16 +269,13 @@ impl Signer {
     /// A signer keyed by `secret` (the instance secret): every process of
     /// the install agrees.
     pub fn new(secret: &SecretKey) -> Self {
-        Self::with_key(
-            derive_secret(secret, SIGNER_PURPOSE)
-                .expose_secret()
-                .as_bytes(),
-        )
-    }
-
-    fn with_key(key: &[u8]) -> Self {
+        let key = derive_secret(secret, SIGNER_PURPOSE);
         Self {
-            key: std::sync::Arc::new(hmac::Key::new(hmac::HMAC_SHA256, key)),
+            key: std::sync::Arc::new(hmac::Key::new(
+                hmac::HMAC_SHA256,
+                key.expose_secret().as_bytes(),
+            )),
+            sealer: std::sync::Arc::new(Cipher::new(secret, SEALER_PURPOSE)),
         }
     }
 
@@ -276,6 +297,19 @@ impl Signer {
     /// Whether `tag` is `value`'s for `context` (constant time).
     pub fn verify(&self, context: &[u8], value: &[u8], tag: &[u8]) -> bool {
         hmac::verify(&self.key, &Self::input(context, value), tag).is_ok()
+    }
+
+    /// `value` sealed for `context`: unreadable and unalterable without the
+    /// key, a fresh random nonce each time (sealing one value twice gives
+    /// two unrelated results), and `value.len() + 29` bytes long.
+    pub fn seal(&self, context: &[u8], value: &[u8]) -> Vec<u8> {
+        self.sealer.seal_bytes(value, context)
+    }
+
+    /// The value `sealed` holds, if it was sealed for `context` under this
+    /// key and not altered since.
+    pub fn open(&self, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+        self.sealer.open_bytes(sealed, context).ok()
     }
 }
 
@@ -405,5 +439,36 @@ mod tests {
         assert!(!signer.verify(b"other", b"page 2", &tag));
         assert!(Signer::new(&secret).verify(b"search.cursor", b"page 2", &tag));
         assert!(!Signer::default().verify(b"search.cursor", b"page 2", &tag));
+    }
+
+    #[test]
+    fn sealed_values_open_only_for_their_context_and_key_and_hide_their_content() {
+        let secret = SecretKey([7_u8; SECRET_KEY_LEN]);
+        let signer = Signer::new(&secret);
+        let value = [0_u8, 0, 0, 0, 0, 0, 0, 42];
+        let sealed = signer.seal(b"changes.cursor", &value);
+        assert_eq!(sealed.len(), value.len() + 29, "a fixed overhead");
+        assert_eq!(
+            signer.open(b"changes.cursor", &sealed).as_deref(),
+            Some(&value[..])
+        );
+        assert_eq!(
+            Signer::new(&secret)
+                .open(b"changes.cursor", &sealed)
+                .as_deref(),
+            Some(&value[..]),
+            "every process of the install opens it"
+        );
+        assert_ne!(
+            sealed,
+            signer.seal(b"changes.cursor", &value),
+            "a fresh nonce every time"
+        );
+        assert!(signer.open(b"other", &sealed).is_none());
+        assert!(Signer::default().open(b"changes.cursor", &sealed).is_none());
+        let mut altered = sealed.clone();
+        altered[20] ^= 1;
+        assert!(signer.open(b"changes.cursor", &altered).is_none());
+        assert!(signer.open(b"changes.cursor", b"").is_none());
     }
 }

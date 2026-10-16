@@ -433,14 +433,17 @@ export interface paths {
          *     that keep a cache: each `change` frame names a record and an operation
          *     (`{"cursor","record":{"type","id"},"op":"upsert"|"delete","version"}`),
          *     never its contents; refetch what you show. Frames: `ready` (where the
-         *     stream starts), `change`, `heartbeat` (an SSE comment, or the cursor when
-         *     it moved past changes you may not see), `reset` (your cursor is unknown,
-         *     expired or too far behind: refetch everything, continue from the
-         *     cursor given), `revoked` (you no longer belong to the workspace) and
-         *     `closing` (the stream ends; reconnect with your cursor). Every frame
-         *     that carries a cursor sets the SSE `id`, so `EventSource` resumes on its
-         *     own. You only receive changes of records a read operation you hold a
-         *     scope for returns.
+         *     stream starts), `change`, `heartbeat` (every heartbeat interval from the
+         *     open, busy or idle), `reset` (your token is unknown or expired, or
+         *     something you cached went out of sight: refetch everything, continue
+         *     from the token given), `revoked` (you no longer belong to the
+         *     workspace) and `closing` (the stream ends; reconnect with your token).
+         *     `ready`, `change`, `heartbeat` and `reset` carry a resume token as
+         *     `cursor` and as the SSE `id`, so `EventSource` resumes on its own. A
+         *     token is opaque and new on every frame: keep the latest, never parse or
+         *     compare one. You only receive changes of records a read operation you
+         *     hold a scope for returns, and nothing in the stream (tokens, heartbeats,
+         *     resets) depends on changes you may not see.
          */
         get: operations["changes.stream"];
         put?: never;
@@ -5876,14 +5879,14 @@ export interface operations {
         parameters: {
             query?: {
                 /**
-                 * @description The last cursor received, for clients that cannot send
-                 *     `Last-Event-ID` (the header wins when both are present). Omit it to
-                 *     start from now.
+                 * @description The last resume token received (any frame's `cursor`), for clients
+                 *     that cannot send `Last-Event-ID` (the header wins when both are
+                 *     present). Omit it to start from now.
                  */
                 after?: string;
             };
             header?: {
-                /** @description The last cursor received; resumes after it. */
+                /** @description The last resume token received; resumes after it. */
                 "Last-Event-ID"?: string | null;
             };
             path: {

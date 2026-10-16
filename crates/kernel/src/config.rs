@@ -823,11 +823,11 @@ pub struct ChangesConfig {
     /// arrives (`CAMPBOOKS_CHANGES__POLL_INTERVAL_MS`); notifications wake
     /// streams at once, the poll is the safety net.
     pub poll_interval_ms: u64,
-    /// A client further behind than this many changes is told to `reset`
-    /// instead of catching up (`CAMPBOOKS_CHANGES__MAX_BACKLOG`).
-    pub max_backlog: u64,
     /// How long changes are kept (`CAMPBOOKS_CHANGES__RETENTION_HOURS`);
-    /// a client resuming from an older cursor is told to `reset`.
+    /// a client resuming with a token older than this (less a few minutes)
+    /// is told to `reset`. Only the token's age decides, never how many
+    /// changes came after it, so a client learns nothing of changes it may
+    /// not see.
     pub retention_hours: u64,
     /// Streams one caller may hold open at once, per server process
     /// (`CAMPBOOKS_CHANGES__MAX_STREAMS_PER_PRINCIPAL`); more answer 429.
@@ -840,7 +840,6 @@ impl Default for ChangesConfig {
             heartbeat_seconds: 25,
             max_connection_seconds: 900,
             poll_interval_ms: 5_000,
-            max_backlog: 10_000,
             retention_hours: 72,
             max_streams_per_principal: 8,
         }
@@ -867,7 +866,6 @@ impl ChangesConfig {
                 self.poll_interval_ms >= 10,
                 "at least 10",
             ),
-            ("MAX_BACKLOG", self.max_backlog >= 1, "at least 1"),
             ("RETENTION_HOURS", self.retention_hours >= 1, "at least 1"),
             (
                 "MAX_STREAMS_PER_PRINCIPAL",

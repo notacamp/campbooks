@@ -394,9 +394,18 @@ async fn pruning_deletes_old_changes_and_rescues_stranded_ones(db: PgPool) {
     let state = state(&db).await;
     publish(&state, "ws-a", &["old", "new"]).await;
     Worker::new(state.clone()).run_until_idle().await;
+    // Kept by when it was numbered, not when it was published: a change
+    // published long ago but numbered just now stays.
+    sqlx::query(
+        "UPDATE kernel.changes SET sequenced_at = now() - interval '73 hours'
+          WHERE record_id = 'old'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
     sqlx::query(
         "UPDATE kernel.changes SET occurred_at = now() - interval '73 hours'
-          WHERE record_id = 'old'",
+          WHERE record_id = 'new'",
     )
     .execute(&db)
     .await
