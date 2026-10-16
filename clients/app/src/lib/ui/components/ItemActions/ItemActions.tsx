@@ -29,7 +29,7 @@ export interface ItemActionsProps {
    * A button was focused (Tab, a click): the highlight follows the focus;
    * `undefined` once the focus leaves the group.
    */
-  onHighlight?: ((id: string | undefined) => void) | undefined;
+  onHighlight?: ((id?: string) => void) | undefined;
   onAction: (id: string) => void;
   /** Accessible name of the group: "Actions for Marta Ferreira". */
   label: string;
@@ -80,6 +80,13 @@ export function ItemActions({
           onHighlight?.(action.id);
         }
       }}
+      onBlur={(event) => {
+        // The focus left the group: Enter there must not press a highlighted action.
+        const next = event.relatedTarget;
+        if (!(next instanceof Node && group.current?.contains(next) === true)) {
+          onHighlight?.();
+        }
+      }}
       onClick={() => {
         onAction(action.id);
       }}
@@ -89,23 +96,7 @@ export function ItemActions({
   );
 
   return (
-    <div
-      ref={group}
-      className={styles["actions"]}
-      role="group"
-      aria-label={label}
-      onBlur={(event) => {
-        // The focus went elsewhere: Enter there must not press a highlighted action.
-        if (
-          current !== undefined &&
-          !(
-            event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)
-          )
-        ) {
-          onHighlight?.(undefined);
-        }
-      }}
-    >
+    <div ref={group} className={styles["actions"]} role="group" aria-label={label}>
       {own.map(render)}
       {own.length > 0 && universal.length > 0 ? (
         <span className={styles["divider"]} aria-hidden="true" />

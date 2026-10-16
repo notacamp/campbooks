@@ -132,9 +132,11 @@ export const SnoozeDialog: Story = {
     await userEvent.keyboard("j");
     await userEvent.keyboard("s");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(
-      await body.findByRole("dialog", { name: "Snooze Marta Ferreira until…" }),
-    ).toBeVisible();
+    const dialog = await body.findByRole("dialog", { name: "Snooze Marta Ferreira until…" });
+    // It rises in over a moment.
+    await waitFor(async () => {
+      await expect(dialog).toBeVisible();
+    });
   },
 };
 
