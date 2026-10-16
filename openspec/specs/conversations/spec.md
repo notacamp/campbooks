@@ -1098,7 +1098,8 @@ deadlocks with a sync batch. It SHALL take, before the message, the conversation
 (without waiting) so that storing the need cannot wait for a lock a writer
 holds, and SHALL instead enqueue a durable `conversations.refresh_need` job
 for the conversation (one per deferral, a few seconds later; the job waits
-for the locks within a lock timeout and retries after one), so that a need skipped for a
+for the locks within a lock timeout, works the need out again once it holds
+them, and retries after a timeout), so that a need skipped for a
 busy message or conversation is still raised once the writer commits, whether or not that
 writer refreshes needs. A message that leaves spam or the trash SHALL raise its need again
 as any message does; a member's Done or Not needed SHALL still hold, and a
@@ -1136,6 +1137,14 @@ member's confirmation SHALL still make the reopened need theirs (basis
 #### Scenario: Done during a sync batch
 - **WHEN** a member marks a need Done while a sync batch has updated its message and not committed
 - **THEN** Done completes without waiting for the batch
+
+#### Scenario: Archived while the follow-up waits
+- **WHEN** a `conversations.refresh_need` job waits for a conversation whose archive is not yet committed, and the archive then commits
+- **THEN** the job works the need out again once it holds its locks and stores no open need for the archived conversation
+
+#### Scenario: A need stored while the follow-up waits
+- **WHEN** another refresh stores the conversation's first need (or a member's Done on it) while its `conversations.refresh_need` job waits
+- **THEN** the job keeps the stored need and does not overwrite it from what it read before waiting
 
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason
