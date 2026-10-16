@@ -11,7 +11,10 @@
   "toast": {
     "region": "Notificações",
     "undone": "Anulado: {{label}}",
-    "redone": "Refeito: {{label}}"
+    "redone": "Refeito: {{label}}",
+    "dismiss": "Fechar",
+    "retry": "Tentar de novo",
+    "cancelled": "Parado: {{label}}"
   },
   "note": {
     "label": "Ponto da situação"
