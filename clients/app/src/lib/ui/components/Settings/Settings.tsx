@@ -100,7 +100,7 @@ export function SettingsEmpty({ title, children, action }: SettingsEmptyProps) {
     <div className={styles["empty"]}>
       <p className={styles["emptyText"]}>
         <strong className={styles["emptyTitle"]}>{title}</strong>
-        {children === undefined ? null : <> {children}</>}
+        {children === undefined ? null : children}
       </p>
       {action}
     </div>

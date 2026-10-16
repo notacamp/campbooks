@@ -87,6 +87,8 @@
 }
 
 .emptyTitle {
+  display: block;
+  margin-bottom: var(--space-0-5);
   color: var(--text-primary);
   font-weight: var(--weight-semibold);
 }

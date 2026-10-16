@@ -212,8 +212,8 @@
     },
     "questions": {
       "title": "As suas respostas",
-      "askFirst": "Quando o Scout propõe uma regra a partir das suas correções, espera pelo seu sim.",
-      "actThenTell": "Quando o Scout propõe uma regra a partir das suas correções numa caixa só sua, ativa-a e avisa-o, com Anular.",
+      "askFirst": "Pergunte-me primeiro. Nada muda até dizer que sim.",
+      "actThenTell": "Faça e avise-me, com Anular, numa caixa só minha.",
       "never": "Ainda não respondeu às perguntas do Scout.",
       "again": "Responder de novo às perguntas",
       "start": "Responder às perguntas",

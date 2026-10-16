@@ -212,8 +212,8 @@
     },
     "questions": {
       "title": "Your answers",
-      "askFirst": "When Scout proposes a rule from your corrections, it waits for your yes.",
-      "actThenTell": "When Scout proposes a rule from your corrections in an inbox only you use, it starts it and tells you, with Undo.",
+      "askFirst": "Ask me first. Nothing changes until you say yes.",
+      "actThenTell": "Do it and tell me, with Undo, in an inbox only you use.",
       "never": "You haven’t answered Scout’s questions yet.",
       "again": "Answer the questions again",
       "start": "Answer the questions",

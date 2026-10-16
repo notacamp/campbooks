@@ -212,8 +212,8 @@
     },
     "questions": {
       "title": "Tus respuestas",
-      "askFirst": "Cuando Scout propone una regla a partir de tus correcciones, espera tu sí.",
-      "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
+      "askFirst": "Pregúntame primero. Nada cambia hasta que digas que sí.",
+      "actThenTell": "Hazlo y avísame, con Deshacer, en una bandeja solo mía.",
       "never": "Todavía no has respondido a las preguntas de Scout.",
       "again": "Responder de nuevo a las preguntas",
       "start": "Responder a las preguntas",
