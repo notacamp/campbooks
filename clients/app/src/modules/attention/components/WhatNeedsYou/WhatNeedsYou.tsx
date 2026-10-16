@@ -76,6 +76,8 @@ interface Row {
   name: string;
   /** Acted on: the one-line confirmation it shows while it folds away. */
   confirmation?: string | undefined;
+  /** Where the item stood in the list when it was acted on. */
+  at?: number | undefined;
 }
 
 type ActionId = OwnActionId | UniversalActionId;
@@ -122,7 +124,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const conversations = useConversationsByIds(workspaceId, ids);
   const byId = new Map((conversations.data ?? []).map((c) => [c.id, c] as const));
 
-  const shown: Row[] = openItems.flatMap((item) => {
+  // A row still folding away keeps its place even once the list no longer
+  // has its item (the server answered and the list refetched first).
+  const present = new Set(openItems.map(goneKey));
+  const listed = [...openItems];
+  for (const row of gone.values()) {
+    if (row.confirmation !== undefined && !present.has(goneKey(row.item))) {
+      listed.splice(Math.min(row.at ?? listed.length, listed.length), 0, row.item);
+    }
+  }
+  const shown: Row[] = listed.flatMap((item) => {
     const hidden = gone.get(goneKey(item));
     if (hidden !== undefined) {
       return hidden.confirmation === undefined ? [] : [hidden];
@@ -203,7 +214,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
 
   const hide = (row: Row, confirmation?: string) => {
     keepFocus();
-    setGone((current) => new Map([...current, [goneKey(row.item), { ...row, confirmation }]]));
+    const at = openItems.findIndex((item) => goneKey(item) === goneKey(row.item));
+    setGone((current) => new Map([...current, [goneKey(row.item), { ...row, confirmation, at }]]));
     const index = order.findIndex((r) => r.item.id === row.item.id);
     // The row below takes its place (or the one above, at the end).
     const next = order[index + 1] ?? order[index - 1];

@@ -355,6 +355,21 @@ describe("What needs you", () => {
     );
   });
 
+  it("keeps the confirmation in place when the list refetches without the item", async () => {
+    const live = { items: ITEMS };
+    api(ITEMS, live);
+    const { queryClient } = renderHome();
+    await screen.findByText("Marta Ferreira is waiting for your reply");
+    fireEvent.keyDown(document, { key: "j" });
+    // The server answers and the list no longer has Marta before the row has folded.
+    live.items = ITEMS.filter((item) => item.record.id !== MARTA.id);
+    fireEvent.keyDown(document, { key: "e" });
+    await queryClient.invalidateQueries();
+    // The row's own confirmation, next to the toast saying the same.
+    expect(screen.getAllByText("Done · Marta Ferreira")).toHaveLength(2);
+    expect(screen.queryByText("Marta Ferreira is waiting for your reply")).toBeNull();
+  });
+
   it("says a failure even when a second action follows at once, and drops it from Z", async () => {
     const calls = mockApi({
       [`GET ${W}/attention`]: (request) =>
