@@ -2451,10 +2451,13 @@ mod kernel_scope {
             .execute(&db)
             .await
             .unwrap();
-        sqlx::query("UPDATE kernel.changes SET occurred_at = now() - interval '400 days'")
-            .execute(&db)
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE kernel.changes SET occurred_at = now() - interval '400 days',
+                    sequenced_at = CASE WHEN seq IS NOT NULL THEN now() - interval '400 days' END",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
         sqlx::query("UPDATE kernel.blobs SET touched_at = now() - interval '400 days'")
             .execute(&db)
             .await

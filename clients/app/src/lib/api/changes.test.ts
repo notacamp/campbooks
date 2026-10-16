@@ -89,10 +89,9 @@ describe("the change feed", () => {
 
   describe("parseFrame", () => {
     it("reads the frames the server sends and ignores anything else", () => {
-      expect(parseFrame("ready", '{"cursor":"4","head":"6"}')).toStrictEqual({
+      expect(parseFrame("ready", '{"cursor":"4"}')).toStrictEqual({
         kind: "ready",
         cursor: "4",
-        head: "6",
       });
       expect(parseFrame("revoked", "{}")).toStrictEqual({ kind: "revoked" });
       expect(parseFrame("message", "{}")).toBeUndefined();
@@ -171,7 +170,7 @@ describe("the change feed", () => {
       });
       expect(feed.opens).toStrictEqual([{ workspace: WS, after: undefined, closed: false }]);
 
-      feed.send({ kind: "ready", cursor: "2", head: "2" });
+      feed.send({ kind: "ready", cursor: "2" });
       feed.send(change("3", "workspaces.member", "u1"));
       await vi.advanceTimersByTimeAsync(50);
       expect(stale(keys.members)).toBe(true);
@@ -189,7 +188,7 @@ describe("the change feed", () => {
         source: feed.source,
         page,
       });
-      feed.send({ kind: "ready", cursor: "2", head: "2" });
+      feed.send({ kind: "ready", cursor: "2" });
       feed.send(change("3", "workspaces.member", "u1"));
       feed.send({ kind: "heartbeat", cursor: "5" });
 
@@ -248,7 +247,7 @@ describe("the change feed", () => {
         source: feed.source,
         page: fakePage(),
       });
-      feed.send({ kind: "ready", cursor: "7", head: "7" });
+      feed.send({ kind: "ready", cursor: "7" });
       feed.refuse();
       expect(stale(keys.list)).toBe(true);
       await vi.advanceTimersByTimeAsync(1000);

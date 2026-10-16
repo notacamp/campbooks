@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH head AS (\n            SELECT head FROM kernel.change_heads WHERE workspace_id = $1 FOR UPDATE\n        ), numbered AS (\n            SELECT c.id, head.head + row_number() OVER (ORDER BY c.published) AS seq\n              FROM kernel.changes c, head\n             WHERE c.workspace_id = $1 AND c.seq IS NULL\n        ), updated AS (\n            UPDATE kernel.changes c SET seq = n.seq, sequenced_at = statement_timestamp()\n              FROM numbered n\n             WHERE c.id = n.id\n            RETURNING c.seq\n        )\n        UPDATE kernel.change_heads h\n           SET head = coalesce((SELECT max(seq) FROM updated), h.head), updated_at = now()\n         WHERE h.workspace_id = $1\n        RETURNING (SELECT count(*) FROM updated) AS \"numbered!\"\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "numbered!",
+        "type_info": "Int8",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "047ad6977fff863b680b8732bf8f6ef7806419ab575133623891c75e4bb476a6"
+}

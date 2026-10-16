@@ -394,9 +394,18 @@ async fn pruning_deletes_old_changes_and_rescues_stranded_ones(db: PgPool) {
     let state = state(&db).await;
     publish(&state, "ws-a", &["old", "new"]).await;
     Worker::new(state.clone()).run_until_idle().await;
+    // Kept by when it was numbered, not when it was published: a change
+    // published long ago but numbered just now stays.
+    sqlx::query(
+        "UPDATE kernel.changes SET sequenced_at = now() - interval '73 hours'
+          WHERE record_id = 'old'",
+    )
+    .execute(&db)
+    .await
+    .unwrap();
     sqlx::query(
         "UPDATE kernel.changes SET occurred_at = now() - interval '73 hours'
-          WHERE record_id = 'old'",
+          WHERE record_id = 'new'",
     )
     .execute(&db)
     .await
@@ -479,4 +488,113 @@ async fn waking_a_workspace_reaches_only_its_streams() {
     assert!(!b.has_changed().unwrap());
     a.mark_unchanged();
     b.mark_unchanged();
+}
+
+/// Changes of `test.thing` records, some of them hidden from a caller who
+/// reads only `test.thing` outside any container and in no audience: as
+/// another type, inside a container, or private to someone.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct Mixed {
+    workspace: String,
+    /// `(record id, how it is hidden)`: 0 shown, 1 another type, 2 in a
+    /// container, 3 someone else's.
+    changes: Vec<(String, u8)>,
+}
+
+impl DomainEvent for Mixed {
+    const NAME: &'static str = "test.mixed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        self.changes
+            .iter()
+            .map(|(id, hidden)| match hidden {
+                0 => Change::upsert(RecordRef::new("test.thing", id)),
+                1 => Change::upsert(RecordRef::new("test.other", id)),
+                2 => Change::upsert(RecordRef::new("test.thing", id))
+                    .within(RecordRef::new("test.box", "b-1")),
+                _ => Change::upsert(RecordRef::new("test.thing", id))
+                    .for_audience(Audience::User(crate::tenancy::UserId::new())),
+            })
+            .collect()
+    }
+}
+
+/// Page through `workspace`'s feed as a stream does, returning the record
+/// ids of each page.
+async fn pages_of(
+    state: &AppState,
+    workspace: &str,
+    sight: &super::stream::Sight,
+) -> Vec<Vec<String>> {
+    let mut cursor = 0;
+    let mut pages = Vec::new();
+    loop {
+        let mut tx = crate::db::begin_in(&state.db, workspace).await.unwrap();
+        let page =
+            super::stream::read_visible(&mut tx, workspace, cursor, sight, super::stream::PAGE)
+                .await
+                .unwrap();
+        tx.commit().await.unwrap();
+        pages.push(page.rows.iter().map(|row| row.record.id.clone()).collect());
+        cursor = match page.rows.last() {
+            Some(last) if page.full => last.seq,
+            _ => page.head,
+        };
+        if !page.full {
+            return pages;
+        }
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn pages_hold_visible_changes_only_whatever_the_hidden_volume(db: PgPool) {
+    let state = state(&db).await;
+    // The same 450 visible changes in both; in the busy workspace each is
+    // preceded by up to 9 hidden ones (of every kind), and 500 more come
+    // first: more hidden than a page, between every visible one.
+    let shown: Vec<String> = (0..450).map(|n| format!("t-{n}")).collect();
+    let mut busy = vec![];
+    for n in 0..500 {
+        busy.push((format!("h-{n}"), 1 + u8::try_from(n % 3).unwrap()));
+    }
+    for (n, id) in shown.iter().enumerate() {
+        for h in 0..(n % 10) {
+            busy.push((format!("h-{n}-{h}"), 1 + u8::try_from(h % 3).unwrap()));
+        }
+        busy.push((id.clone(), 0));
+    }
+    let quiet: Vec<(String, u8)> = shown.iter().map(|id| (id.clone(), 0)).collect();
+    for (workspace, changes) in [("ws-busy", busy), ("ws-quiet", quiet)] {
+        let mut tx = crate::db::begin_in(&state.db, workspace).await.unwrap();
+        state
+            .events
+            .publish(
+                &mut tx,
+                &Mixed {
+                    workspace: workspace.to_owned(),
+                    changes,
+                },
+            )
+            .await
+            .unwrap();
+        tx.commit().await.unwrap();
+    }
+    Worker::new(state.clone()).run_until_idle().await;
+    assert!(head_of(&db, "ws-busy").await.unwrap() > 2_000);
+
+    let sight = super::stream::Sight {
+        types: vec!["test.thing".into()],
+        ..Default::default()
+    };
+    let busy = pages_of(&state, "ws-busy", &sight).await;
+    let quiet = pages_of(&state, "ws-quiet", &sight).await;
+    let sizes: Vec<usize> = quiet.iter().map(Vec::len).collect();
+    assert_eq!(sizes, vec![200, 200, 50], "pages of visible changes");
+    assert_eq!(busy, quiet, "the same pages, whatever was hidden");
+    assert_eq!(busy.concat(), shown);
 }
