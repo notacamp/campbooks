@@ -8,6 +8,13 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Sender authentication is read more strictly.** An aligned DKIM signature no longer
+  counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
+  an authentication header over 8 KiB is treated as a failure instead of being parsed, and
+  "same organisation" now follows the real Public Suffix List (so two `github.io` sites, or
+  suffixes such as `co.at`, are never one sender) instead of a 24-entry guess. Separately,
+  a message that is being moved to spam or the trash can no longer have a first "needs you"
+  stored for it by a refresh running at the same moment. No migration.
 - **The API is rate-limited per person and per app.** Every call with a token now counts
   against a limit for whoever makes it, however it arrives (directly, through the web app,
   or from automation and the assistant): 600 reads and 120 writes a minute per person and
