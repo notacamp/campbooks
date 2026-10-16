@@ -488,24 +488,25 @@ function appendMessage(
   return message;
 }
 
-/** A new demo mailbox for `address`. */
 /**
- * `count` more issues of the Design Notes digest, a day apart: mail that
- * looks the same, for teaching once (`--lookalikes` of the fake provider).
+ * `count` more issues of the Design Notes digest, a few hours apart (so
+ * hundreds fit in the window a first sync reads): mail that looks the same,
+ * for teaching once (`--lookalikes` of the fake provider).
  */
 function lookalikes(me: string, count: number): DemoMessage[] {
   const topics = ["typography", "colour", "forms", "motion", "tables", "empty states"];
   return Array.from({ length: count }, (_, index) => ({
     from: "Design Notes <digest@design-notes.example>",
     to: me,
-    subject: `This week: ${topics[index % topics.length] ?? "layout"} (issue ${String(120 - index)})`,
-    hoursAgo: 34 + index * 24,
+    subject: `This week: ${topics[index % topics.length] ?? "layout"} (issue ${String(count + 120 - index)})`,
+    hoursAgo: 34 + index * 3,
     labels: ["INBOX", "CATEGORY_PROMOTIONS"],
     headers: { "List-Unsubscribe": "<mailto:leave@design-notes.example>", Precedence: "list" },
     text: "Three short essays, and what we read this week.",
   }));
 }
 
+/** A new demo mailbox for `address`. */
 export function createMailbox(address: string, images: string, extra = 0): Mailbox {
   const mailbox: Mailbox = {
     address,

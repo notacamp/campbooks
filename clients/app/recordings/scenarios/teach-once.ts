@@ -2,7 +2,7 @@ import type { Page } from "playwright";
 
 import { pause, type ScenarioContext } from "../context.ts";
 
-import { caption, signedIn } from "./inbox.ts";
+import { api, caption, signedIn } from "./inbox.ts";
 
 // Teach once (campbooks-cloud#125) on the real stack, as `inbox.ts` runs it,
 // with the fake Google's mailbox holding 600 more Design Notes digests, so the
@@ -30,6 +30,19 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
   await page.getByRole("heading", { level: 1, name: "Primary" }).waitFor();
   await page.getByText("This week: calmer dashboards").first().waitFor();
   await caption(page, "Primary holds a newsletter, issue after issue", 2000);
+  // The first sync brings every issue in: teach once on the whole mailbox.
+  let last = -1;
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const { streams } = (await api(page, "GET", `/bff/api/v1/w/${workspace}/streams`)) as {
+      streams: { stream: string; conversations: number }[];
+    };
+    const primary = streams.find((s) => s.stream === "primary")?.conversations ?? 0;
+    if (primary >= 600 || (primary === last && primary > 0 && attempt > 10)) {
+      break;
+    }
+    last = primary;
+    await pause(1000);
+  }
   await page.getByText("This week: calmer dashboards").first().click();
   await page.getByRole("heading", { name: "This week: calmer dashboards" }).waitFor();
 
@@ -78,7 +91,8 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
 
   await caption(page, "Undo (Z) brings the same rule back, and applies it again", 2000);
   await page.keyboard.press("z");
-  await pause(1500);
+  await page.getByRole("dialog", { name: /^(Finding|Moving|Moved)/u }).waitFor({ timeout: 60_000 });
+  await pause(2500);
 
   await page.goto(`/w/${workspace}/inbox/newsletters`);
   await page.getByRole("heading", { level: 1, name: "Newsletters" }).waitFor();
