@@ -5,7 +5,7 @@
 //!
 //! 1. read the batch and find which messages are new (a short read);
 //! 2. for each new message, store its participants document and ask the
-//!    rules strategy (blob reads and writes, no transaction);
+//!    rules strategy, the facts (blob reads and writes, no transaction);
 //! 3. in the job's transaction, apply every change in order: insert and
 //!    thread new messages, update flags and labels of known ones, remove
 //!    deleted ones, record the rules' answers, and publish the events.
@@ -24,8 +24,8 @@ use std::{
 };
 
 use campbooks_ai::decide::{
-    AnswerValue, Question,
-    signals::email::{triage, triage_questions},
+    Question,
+    signals::email::triage_questions,
     strategy::{Decided, Strategy},
 };
 use campbooks_kernel::{
@@ -48,6 +48,7 @@ use crate::{
         needs::{self, NeedSettings},
         policy::Policy,
         redact,
+        streams::{Inbound, sort_first_inbound},
     },
     events::{Change, MESSAGE_RECORD, MessageFacts, MessageReceived, MessageSent, Origin},
     ingest::{
@@ -184,6 +185,7 @@ impl JobHandler for ApplyChanges {
             events: &events,
             workspace,
             ws: &ws,
+            rules: self.rules.name(),
             policy: &self.policy,
             needs: &self.needs,
             inbox: batch.inbox,
@@ -374,6 +376,8 @@ struct Apply<'a> {
     events: &'a EventBus,
     workspace: WorkspaceId,
     ws: &'a str,
+    /// The rules strategy's name, recorded with its answers.
+    rules: &'a str,
     policy: &'a Policy,
     needs: &'a NeedSettings,
     inbox: InboxId,
@@ -533,7 +537,7 @@ impl Apply<'_> {
                 message: id,
                 conversation,
                 source: Source::Rules,
-                strategy: "rules",
+                strategy: self.rules,
                 questions: &questions,
                 answers: &prepared.answers,
                 policy: self.policy,
@@ -571,7 +575,16 @@ impl Apply<'_> {
     ) -> Result<(ConversationId, bool), JobError> {
         if let Some(conversation) = found {
             let sorted = match sort_to {
-                Some(stream) => sort_first_inbound(tx, conversation, stream).await?,
+                Some(stream) => {
+                    sort_first_inbound(
+                        tx,
+                        conversation,
+                        stream,
+                        StreamSource::Rules,
+                        Inbound::Arriving,
+                    )
+                    .await?
+                }
                 None => false,
             };
             return Ok((conversation, sorted));
@@ -866,35 +879,7 @@ fn accepted_stream(
         answers,
         policy,
     };
-    match &recorded.accepted(triage::STREAM)?.answer.value {
-        AnswerValue::Choice(label) => label.parse().ok(),
-        _ => None,
-    }
-}
-
-/// Sort an existing conversation by its first inbound message, unless a
-/// member or an earlier inbound message already placed it. Returns whether
-/// it did.
-async fn sort_first_inbound(
-    conn: &mut PgConnection,
-    conversation: ConversationId,
-    stream: Stream,
-) -> Result<bool, JobError> {
-    let sorted = sqlx::query!(
-        r#"
-        UPDATE conversations.conversations c
-           SET stream = $2, stream_source = 'rules', updated_at = now()
-         WHERE c.id = $1 AND c.stream_source = 'default'
-           AND NOT EXISTS (SELECT 1 FROM conversations.messages m
-                            WHERE m.conversation_id = c.id AND m.direction = 'inbound')
-        "#,
-        conversation as ConversationId,
-        stream.as_str(),
-    )
-    .execute(conn)
-    .await?
-    .rows_affected();
-    Ok(sorted > 0)
+    recorded.accepted_stream()
 }
 
 /// Put the provider's label `label` on `conversation`, creating the inbox's

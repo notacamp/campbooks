@@ -1,9 +1,9 @@
 //! What the decide pass reads about a message, and where its answers come
 //! from.
 //!
-//! The strategies, the triage questions and the rules live in
-//! `campbooks_ai::decide` (`strategy`, `signals::email`), measured by
-//! `cargo xtask eval decide`; this module only builds the
+//! The strategies, the triage questions and the facts live in
+//! `campbooks_ai::decide` (`strategy`, `signals::email`, `signals::facts`),
+//! measured by `cargo xtask eval decide`; this module only builds the
 //! [`Envelope`] from a stored message and records the answers.
 
 use std::collections::BTreeMap;
@@ -17,10 +17,12 @@ use crate::{ingest::Headers, model::Address};
 /// had no triage context; version `1 + n` is the email after context
 /// version `n` ([`campbooks_ai::decide::signals::inbox::CONTEXT_VERSION`]),
 /// so a change in what the model is told shows on every stored answer.
+/// Version 3 (context 2) is the first of the facts (ADR 0018): rules
+/// answers of an older version came from the retired content rules.
 pub const STATE_VERSION: i16 = 1 + campbooks_ai::decide::signals::inbox::CONTEXT_VERSION;
 
-/// Bytes of the text body read into an envelope (rules look for cue phrases
-/// in it; the model reads its first 1,500 characters).
+/// Bytes of the text body read into an envelope (the model reads its first
+/// 1,500 characters; the facts read none of it).
 pub const ENVELOPE_BODY_BYTES: usize = 16 * 1024;
 
 /// The purpose the model pass is traced and evaluated under.
@@ -29,7 +31,9 @@ pub const PURPOSE: &str = "conversations.triage";
 /// Which kind of strategy gave an answer, as recorded.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Source {
-    /// The deterministic email signals.
+    /// The facts: headers and addresses, which only say "no" (ADR 0018).
+    /// Answers stored before state version 3 came from the retired content
+    /// rules and no longer act.
     Rules,
     /// The `decide` model.
     Model,
@@ -102,7 +106,7 @@ pub fn envelope(parts: MessageParts<'_>) -> Envelope {
             })
             .collect(),
         body: parts.body.to_owned(),
-        // The decide pass adds whose inbox it is; the rules do not read it.
+        // The decide pass adds whose inbox it is; the facts do not read it.
         recipient: None,
     }
 }
@@ -119,7 +123,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn envelopes_carry_the_signals_rules_read() {
+    fn envelopes_carry_the_headers_the_facts_read() {
         let from = Address {
             name: Some("The Paper Kite".into()),
             address: "hello@letters.paperkite.example".into(),

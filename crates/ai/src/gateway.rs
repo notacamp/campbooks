@@ -488,7 +488,7 @@ impl Gateway {
                     state,
                     questions,
                 };
-                let request = self.post(provider, "systemone")?.json(&body);
+                let request = self.post(provider, provider.decide_path())?.json(&body);
                 let wire: decide::laya::Response = self.send_with_retry(request).await?;
                 let model = wire.model(&provider.model);
                 (wire.into_raw(questions)?, model, None)
@@ -509,7 +509,7 @@ impl Gateway {
                     logprobs: provider.logprobs.then_some(true),
                     top_logprobs: provider.logprobs.then_some(decide::openai::TOP_LOGPROBS),
                 };
-                let request = self.post(provider, "chat/completions")?.json(&body);
+                let request = self.post(provider, provider.decide_path())?.json(&body);
                 let wire: decide::openai::Response = self.send_with_retry(request).await?;
                 let model = if wire.model.is_empty() {
                     provider.model.clone()

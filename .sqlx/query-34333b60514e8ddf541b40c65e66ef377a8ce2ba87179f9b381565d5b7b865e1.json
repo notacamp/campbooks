@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\", m.direction,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model') AS \"answered!\",\n               i.address AS inbox_address, i.display_name AS inbox_name,\n               (SELECT count(*) FROM conversations.inbox_members im\n                 WHERE im.inbox_id = i.id) AS \"inbox_members!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n          JOIN conversations.inboxes i ON i.id = m.inbox_id\n         WHERE m.id = $1\n        ",
+  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\",\n               m.inbox_id AS \"inbox: InboxId\", m.direction, m.sent_at,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model'\n                          AND d.model_version LIKE 'checked:%') AS \"answered!\",\n               i.address AS inbox_address, i.display_name AS inbox_name,\n               (SELECT count(*) FROM conversations.inbox_members im\n                 WHERE im.inbox_id = i.id) AS \"inbox_members!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n          JOIN conversations.inboxes i ON i.id = m.inbox_id\n         WHERE m.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -16,6 +16,17 @@
       },
       {
         "ordinal": 1,
+        "name": "inbox: InboxId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "inbox_id"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
         "name": "direction",
         "type_info": "Text",
         "origin": {
@@ -26,7 +37,18 @@
         }
       },
       {
-        "ordinal": 2,
+        "ordinal": 3,
+        "name": "sent_at",
+        "type_info": "Timestamptz",
+        "origin": {
+          "Table": {
+            "table": "conversations.messages",
+            "name": "sent_at"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
         "name": "sender",
         "type_info": "Jsonb",
         "origin": {
@@ -37,7 +59,7 @@
         }
       },
       {
-        "ordinal": 3,
+        "ordinal": 5,
         "name": "recipients",
         "type_info": "Jsonb",
         "origin": {
@@ -48,7 +70,7 @@
         }
       },
       {
-        "ordinal": 4,
+        "ordinal": 6,
         "name": "subject",
         "type_info": "Text",
         "origin": {
@@ -59,7 +81,7 @@
         }
       },
       {
-        "ordinal": 5,
+        "ordinal": 7,
         "name": "headers",
         "type_info": "Jsonb",
         "origin": {
@@ -70,7 +92,7 @@
         }
       },
       {
-        "ordinal": 6,
+        "ordinal": 8,
         "name": "bodies",
         "type_info": "Jsonb",
         "origin": {
@@ -81,13 +103,13 @@
         }
       },
       {
-        "ordinal": 7,
+        "ordinal": 9,
         "name": "answered!",
         "type_info": "Bool",
         "origin": "Expression"
       },
       {
-        "ordinal": 8,
+        "ordinal": 10,
         "name": "inbox_address",
         "type_info": "Text",
         "origin": {
@@ -98,7 +120,7 @@
         }
       },
       {
-        "ordinal": 9,
+        "ordinal": 11,
         "name": "inbox_name",
         "type_info": "Text",
         "origin": {
@@ -109,19 +131,19 @@
         }
       },
       {
-        "ordinal": 10,
+        "ordinal": 12,
         "name": "inbox_members!",
         "type_info": "Int8",
         "origin": "Expression"
       },
       {
-        "ordinal": 11,
+        "ordinal": 13,
         "name": "filenames!",
         "type_info": "TextArray",
         "origin": "Expression"
       },
       {
-        "ordinal": 12,
+        "ordinal": 14,
         "name": "content_types!",
         "type_info": "TextArray",
         "origin": "Expression"
@@ -140,6 +162,8 @@
       false,
       false,
       false,
+      false,
+      false,
       null,
       false,
       true,
@@ -148,5 +172,5 @@
       null
     ]
   },
-  "hash": "4e3555439e762ecc8f9ce70df750f7f08421f56b2721fdcf1419a1dd2380dbe5"
+  "hash": "34333b60514e8ddf541b40c65e66ef377a8ce2ba87179f9b381565d5b7b865e1"
 }

@@ -180,7 +180,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             (from.as_str(), to.as_str(), source.as_str(), decisions),
-            ("newsletters", "primary", "rules", 1)
+            ("newsletters", "primary", "model", 1)
         );
         assert!(by.is_some());
         let requested = kit.events("conversations.changes_requested").await;

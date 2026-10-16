@@ -2076,8 +2076,8 @@ export interface components {
         /** @description One answer of the decide pass about the newest inbound message. */
         DecisionView: {
             /**
-             * @description Whether it changed anything. In this version only a confident rules
-             *     stream answer may; every other answer is a suggestion.
+             * @description Whether it changed anything: the policy let it act (a stream answer
+             *     only when it placed the conversation). The others are suggestions.
              */
             acted: boolean;
             /**
@@ -2612,7 +2612,8 @@ export interface components {
             basis: components["schemas"]["NeedBasis"];
             /**
              * Format: date
-             * @description When it is due.
+             * @description When it is due: none until a due date is extracted from the mail
+             *     (needs raised before ADR 0018 may carry one).
              */
             due_on?: string | null;
             /** @description The message it comes from. */
@@ -2625,9 +2626,9 @@ export interface components {
             /** @description Why. */
             reason: components["schemas"]["NeedReason"];
             /**
-             * @description The rule that decided it (`signals.reply_asked`, …), for the sentence
-             *     the client words it with.
-             * @example signals.reply_asked
+             * @description The rule that decided it (`model.decide`, …), for the sentence the
+             *     client words it with.
+             * @example model.decide
              */
             rule?: string | null;
             /** @description `sure`, or `check` for a question to the member. */
@@ -2805,8 +2806,8 @@ export interface components {
             /** @description What it matched (a header name, a word), possibly empty. */
             evidence: string;
             /**
-             * @description `<strategy>.<rule>`, e.g. `signals.list_header`.
-             * @example signals.list_header
+             * @description `<strategy>.<rule>`, e.g. `facts.list_mail`.
+             * @example facts.list_mail
              */
             rule: string;
             /**

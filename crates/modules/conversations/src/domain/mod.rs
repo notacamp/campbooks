@@ -16,4 +16,5 @@ pub mod policy;
 pub mod redact;
 pub mod resources;
 pub mod sanitize;
+pub mod streams;
 pub mod suggestions;

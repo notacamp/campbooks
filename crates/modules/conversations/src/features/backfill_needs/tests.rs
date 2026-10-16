@@ -1,15 +1,17 @@
 //! The needs backfill over mail stored "before attention": the fixtures are
 //! ingested, then their needs and need events are deleted, which is what a
 //! mailbox synced before the attention module looks like, and the
-//! migration's seed lists the inboxes again.
+//! migration's seed lists the inboxes again. And the upgrade to the facts
+//! (ADR 0018): the old rules' answers stop counting, the needs they raised
+//! are withdrawn, and recent mail no checked model answered is read again.
 
 use std::sync::Arc;
 
 use campbooks_ai::{
     AiConfig, Gateway, Protocol, ProviderConfig, Role,
     decide::{
-        Question,
-        signals::email::Envelope,
+        AnswerValue, Question,
+        signals::email::{Envelope, triage},
         strategy::{BoxFuture, Decisions, Strategy},
     },
 };
@@ -25,8 +27,12 @@ use wiremock::{Mock, MockServer, ResponseTemplate};
 use super::DispatchNeedsBackfills;
 use crate::{
     ConversationsDeps, dev,
+    domain::{
+        decide::Source,
+        policy::{Policy, Switch},
+    },
     model::{InboxId, InboxRole},
-    testkit::{Kit, fixture, sorting_deps},
+    testkit::{Gated, Kit, Scripted, fixture, script, sorting_deps},
 };
 
 /// Rules that must never be asked: the backfill reads stored answers only.
@@ -48,7 +54,7 @@ impl Strategy for Unasked {
 
 /// The module as the upgraded server composes it, except that asking the
 /// rules panics and the `decide` model is a server that must receive no
-/// request (checked when it is dropped).
+/// request (checked when it is dropped); its answers check has not run.
 async fn upgraded(db: &PgPool, deps: ConversationsDeps) -> (Kit, MockServer) {
     let server = MockServer::start().await;
     Mock::given(wiremock::matchers::any())
@@ -68,10 +74,20 @@ async fn upgraded(db: &PgPool, deps: ConversationsDeps) -> (Kit, MockServer) {
     .unwrap();
     let deps = ConversationsDeps {
         ai: Some(gateway),
+        model: None,
         ..deps
     }
     .with_rules(Arc::new(Unasked));
     (Kit::with_deps(db.clone(), deps).await, server)
+}
+
+/// The test settings without a model: mail stored before the upgrade, or
+/// while no trusted model answered.
+fn without_model() -> ConversationsDeps {
+    ConversationsDeps {
+        model: None,
+        ..sorting_deps()
+    }
 }
 
 /// Sam's inbox in a new workspace, holding the recorded batches `names`.
@@ -116,6 +132,21 @@ async fn seed(db: &PgPool) {
     let end = migration.find("-- seed end").unwrap();
     // The migration's own text, from the repository.
     sqlx::raw_sql(sqlx::AssertSqlSafe(migration[start..end].to_owned()))
+        .execute(db)
+        .await
+        .unwrap();
+}
+
+/// The migration that retired the content rules (ADR 0018), run again in
+/// full (as the migration's login).
+async fn upgrade(db: &PgPool) {
+    let migration = std::fs::read_to_string(format!(
+        "{}/../../../migrations/20261020070000_conversations__facts_and_model.sql",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    // The migration's own text, from the repository.
+    sqlx::raw_sql(sqlx::AssertSqlSafe(migration))
         .execute(db)
         .await
         .unwrap();
@@ -186,8 +217,8 @@ async fn old_answered_mail_gets_its_needs_without_asking_anyone(db: PgPool) {
             row("needs-5", "reply", "open", ""),
         ]
     );
-    // Published like live needs, so attention projects them; due dates come
-    // from the stored reasons.
+    // Published like live needs, so attention projects them, with no due
+    // date until one is extracted.
     let events = need_events(&db, old).await;
     assert_eq!(events.len(), 5, "{events:?}");
     assert!(events.iter().all(|e| e["workspace"] == old.to_string()));
@@ -203,7 +234,15 @@ async fn old_answered_mail_gets_its_needs_without_asking_anyone(db: PgPool) {
         .iter()
         .find(|e| e["conversation"] == marta.as_str())
         .unwrap();
-    assert_eq!(due["need"]["due_on"], "2026-10-14");
+    assert_eq!(due["need"]["due_on"], Value::Null);
+    // The mail had checked model answers: the model was not asked again.
+    let asked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.decide_backlog'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(asked, 0);
     // The other workspace is untouched.
     assert_eq!(needs_of(&db, current).await, current_needs);
     assert_eq!(need_events(&db, current).await.len(), current_events);
@@ -314,7 +353,13 @@ async fn running_it_twice_changes_nothing(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_large_inbox_is_done_a_page_at_a_time(db: PgPool) {
-    let kit = Kit::new(db.clone()).await;
+    let asks = Scripted::model((0..230).map(|i| {
+        (
+            format!("p{i}@people.example"),
+            script("primary", true, false, false, 1.0, false),
+        )
+    }));
+    let kit = Kit::with_deps(db.clone(), sorting_deps().with_model(Arc::new(asks))).await;
     let workspace = WorkspaceId::new();
     let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
     // 230 people each asking Sam a question: three pages.
@@ -397,6 +442,7 @@ async fn an_open_question_its_answers_no_longer_support_is_withdrawn(db: PgPool)
     // that an earlier version put to Sam as a question.
     let mut deps = sorting_deps();
     deps.config.needs_window_days = crate::DEFAULT_NEEDS_WINDOW_DAYS;
+    deps.config.decide_backfill_days = crate::DEFAULT_DECIDE_BACKFILL_DAYS;
     let kit = Kit::with_deps(db.clone(), deps.clone()).await;
     let workspace = WorkspaceId::new();
     let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
@@ -576,4 +622,110 @@ async fn a_kept_read_only_inbox_is_left_as_it_is(db: PgPool) {
     .unwrap();
     tx.commit().await.unwrap();
     assert!(need_events(&db, workspace).await.is_empty());
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_upgrade_withdraws_the_needs_the_old_rules_raised(db: PgPool) {
+    // The retired rules, as they read a shipping notice: a reply needed,
+    // sure enough to act.
+    let old_rules = Scripted::rules([(
+        "suivi@colis-rapide.example",
+        vec![(triage::NEEDS_REPLY, AnswerValue::Noul(true), 0.95)],
+    )]);
+    let deps =
+        without_model()
+            .with_rules(Arc::new(old_rules))
+            .with_policy(Policy::baseline().with(
+                triage::NEEDS_REPLY,
+                Source::Rules,
+                Switch::ActAbove(0.9),
+            ));
+    let kit = Kit::with_deps(db.clone(), deps).await;
+    let (workspace, _) = mailbox(&kit, &["fr"]).await;
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [row("fr-1", "reply", "open", "")]
+    );
+    // Stored about the envelope the old rules read.
+    sqlx::query("UPDATE conversations.decisions SET state_version = 2 WHERE source = 'rules'")
+        .execute(&db)
+        .await
+        .unwrap();
+
+    upgrade(&db).await;
+    let acted: Vec<bool> =
+        sqlx::query_scalar("SELECT acted FROM conversations.decisions WHERE source = 'rules'")
+            .fetch_all(&db)
+            .await
+            .unwrap();
+    assert_eq!(acted, [false], "kept as a record, no longer acting");
+    let queued: Vec<String> = sqlx::query_scalar("SELECT state FROM conversations.needs_backfills")
+        .fetch_all(&db)
+        .await
+        .unwrap();
+    assert_eq!(queued, ["pending"]);
+
+    let (kit, _model) = upgraded(&db, without_model()).await;
+    tick(&kit).await;
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [row("fr-1", "reply", "cleared", "superseded")]
+    );
+    let events = need_events(&db, workspace).await;
+    assert_eq!(events.last().unwrap()["cleared_because"], "superseded");
+
+    // Running it again changes nothing more.
+    let before = need_events(&db, workspace).await.len();
+    upgrade(&db).await;
+    tick(&kit).await;
+    assert_eq!(need_events(&db, workspace).await.len(), before);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn recent_mail_no_checked_model_answered_is_read_again_once(db: PgPool) {
+    // Stored before the upgrade, while no model was trusted: the facts'
+    // answers only.
+    let model = Gated::closed(Scripted::fixtures());
+    let kit = Kit::with_deps(db.clone(), sorting_deps().with_model(model.clone())).await;
+    let (workspace, _) = mailbox(&kit, &["needs"]).await;
+    assert!(needs_of(&db, workspace).await.is_empty());
+
+    // Upgraded, with a trusted model.
+    upgrade(&db).await;
+    model.open();
+    tick(&kit).await;
+    // The model was asked about each conversation's newest inbound message,
+    // once: it sorted them and raised their needs.
+    let asked: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.decide_backlog'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(asked, 5);
+    assert_eq!(
+        needs_of(&db, workspace).await,
+        [
+            row("needs-1", "reply", "open", ""),
+            row("needs-2", "do", "open", ""),
+            row("needs-3", "pay", "open", ""),
+            row("needs-4", "review", "open", ""),
+            row("needs-5", "reply", "open", ""),
+        ]
+    );
+    assert_eq!(
+        kit.stream_of("needs-3").await,
+        ("receipts".to_owned(), "model".to_owned())
+    );
+
+    // Again: every message has a checked answer now, so nothing is asked.
+    upgrade(&db).await;
+    tick(&kit).await;
+    let asked_again: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs WHERE kind = 'conversations.decide_backlog'",
+    )
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(asked_again, 5);
 }

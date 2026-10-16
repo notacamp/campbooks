@@ -17,8 +17,9 @@
 //! ([`Answer::accept_if`]) and ask the user otherwise.
 //!
 //! [`strategy`] puts other ways of answering the same questions behind one
-//! interface: deterministic [`signals`], [`knn`] over the workspace's own
-//! corrections, the model, and cascades of them. [`check`] grades the model
+//! interface: the structured facts of [`signals`] (which only say "no",
+//! ADR 0018), [`knn`] over the workspace's own corrections, the model, and
+//! cascades of them. [`check`] grades the model
 //! on obvious fictional emails, so a model that answers nonsense is not used.
 
 mod calibration;

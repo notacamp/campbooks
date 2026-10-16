@@ -4,9 +4,12 @@
 //! At most one need per conversation, kept in `conversations.needs`:
 //!
 //! - **Raised** ([`raise`], pure) from the decide pass's answers about the
-//!   newest inbound message that is not in spam or the trash: `pay`, `reply` or `do` from answers the policy
-//!   let act; `review` for a suspicious message (a warning) or, when a model
-//!   answers, for a suggestion put to the member as a question.
+//!   newest inbound message that is not in spam or the trash: `pay`, `reply`
+//!   or `do` from answers the policy let act (`pay` is an action asked by
+//!   mail sorted to Receipts); `review` for a suspicious message (a warning)
+//!   or, when a model answers, for a suggestion put to the member as a
+//!   question. The facts only ever say "no" (ADR 0018), so a sure need comes
+//!   from the model; a facts "no" still wins over a model's "yes".
 //! - **Settled** ([`settle`], pure) against what happened since: a reply
 //!   clears Reply and Do, an archive clears Reply and Review, the trash or
 //!   spam (the conversation's, or the need's own message's) clears
@@ -15,17 +18,18 @@
 //! - **Refreshed** ([`refresh`]) wherever those inputs change, publishing
 //!   `conversations.need_changed` with a growing revision when the need did.
 //!
-//! Mail text is never an instruction here: the sender's sentence is stored
-//! with the decision's reasons and only ever shown, quoted.
+//! Mail text is never an instruction here. A need carries no due date until
+//! one is extracted from the mail (a follow-up of ADR 0018); answers stored
+//! before then may carry the sender's sentence, only ever shown, quoted.
 
-use campbooks_ai::decide::signals::{dates::resolve_date, email::triage};
+use campbooks_ai::decide::signals::email::triage;
 use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
 use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
 use utoipa::ToSchema;
 
-use super::{conversation::ConversationSummary, policy::Policy};
+use super::{conversation::ConversationSummary, decide::Source, policy::Policy};
 use crate::{
     events::{NeedChanged, NeedFacts},
     model::{
@@ -34,21 +38,19 @@ use crate::{
     },
 };
 
-/// Rule id of a payment that is due (`campbooks_ai`'s email signals).
-const PAYMENT_DUE: &str = "signals.payment_due";
-/// Rule id of a deadline.
-const DEADLINE: &str = "signals.deadline";
 /// The `urgency` level meaning "today".
 const TODAY_LEVEL: f64 = 2.0;
+/// The stream whose mail asks for payment rather than an action.
+const RECEIPTS: &str = "receipts";
 
 /// How needs are raised: the window of mail that may raise one, and the
-/// policy's floor for questions.
+/// policy (which stream answers count, and its floor for questions).
 #[derive(Debug, Clone)]
 pub struct NeedSettings {
     /// Only inbound messages sent within this long ago raise a need.
     pub window: TimeDelta,
-    /// The confidence from which a model suggestion becomes a question.
-    pub check_floor: f64,
+    /// Which answers may act.
+    pub policy: Policy,
 }
 
 impl NeedSettings {
@@ -56,8 +58,13 @@ impl NeedSettings {
     pub fn new(days: u32, policy: &Policy) -> Self {
         Self {
             window: TimeDelta::days(i64::from(days)),
-            check_floor: policy.check_floor(),
+            policy: policy.clone(),
         }
+    }
+
+    /// The confidence from which a model suggestion becomes a question.
+    pub const fn check_floor(&self) -> f64 {
+        self.policy.check_floor()
     }
 }
 
@@ -102,8 +109,12 @@ impl Answer {
         self.value.as_f64()
     }
 
-    fn has_rule(&self, rule: &str) -> bool {
-        self.reasons.iter().any(|r| r.rule == rule)
+    /// The decide pass's source of this answer.
+    fn source(&self) -> Source {
+        match self.basis {
+            NeedBasis::Rules => Source::Rules,
+            NeedBasis::Model | NeedBasis::Member => Source::Model,
+        }
     }
 }
 
@@ -139,6 +150,24 @@ fn accepted<'a>(answers: &'a [Answer], question: &str) -> Option<&'a Answer> {
         .filter(|a| a.is_true())
 }
 
+/// Whether the message was sorted to Receipts by an answer the policy
+/// accepts: the stream answer acted (it placed the conversation), or the
+/// policy accepts it (a later message of a conversation already placed).
+/// The facts' answer wins over the model's, as for every question.
+fn sorted_to_receipts(answers: &[Answer], policy: &Policy) -> bool {
+    answers
+        .iter()
+        .filter(|a| {
+            a.question == triage::STREAM
+                && (a.acted
+                    || policy
+                        .switch(triage::STREAM, a.source())
+                        .accepts_confidence(a.confidence))
+        })
+        .min_by_key(|a| a.basis != NeedBasis::Rules)
+        .is_some_and(|a| a.value.as_str() == Some(RECEIPTS))
+}
+
 /// Whether an answer the policy let act says "no" to `question`: the
 /// question is settled, and no suggestion reopens it.
 fn settled_no(answers: &[Answer], question: &str) -> bool {
@@ -147,13 +176,9 @@ fn settled_no(answers: &[Answer], question: &str) -> bool {
         .any(|a| a.question == question && a.acted && !a.is_true())
 }
 
-/// The need the answers about `message` (sent on `sent_on`) raise, if any.
-pub fn raise(
-    message: MessageId,
-    sent_on: NaiveDate,
-    answers: &[Answer],
-    check_floor: f64,
-) -> Option<Need> {
+/// The need the answers about `message` raise, if any, under `settings`.
+pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) -> Option<Need> {
+    let check_floor = settings.check_floor();
     let need = |reason, trust, basis, question, decision: &Answer| Need {
         message,
         reason,
@@ -165,9 +190,9 @@ pub fn raise(
         urgent: false,
     };
     // A suspicious message is only ever a warning: its asks are not ours.
-    let suspicious = answers.iter().find(|a| {
-        a.question == triage::SUSPICIOUS && a.is_true() && (a.basis == NeedBasis::Rules || a.acted)
-    });
+    let suspicious = answers
+        .iter()
+        .find(|a| a.question == triage::SUSPICIOUS && a.is_true() && a.acted);
     if let Some(answer) = suspicious {
         return Some(need(
             NeedReason::Review,
@@ -178,7 +203,8 @@ pub fn raise(
         ));
     }
     let asks = accepted(answers, triage::ASKS_ACTION);
-    let raised = if let Some(asks) = asks.filter(|a| a.has_rule(PAYMENT_DUE)) {
+    let raised = if let Some(asks) = asks.filter(|_| sorted_to_receipts(answers, &settings.policy))
+    {
         Some(need(
             NeedReason::Pay,
             NeedTrust::Sure,
@@ -234,13 +260,6 @@ pub fn raise(
         })
     };
     raised.map(|mut need| {
-        if let Some(deadline) = accepted(answers, triage::HAS_DEADLINE) {
-            need.due_on = deadline
-                .reasons
-                .iter()
-                .filter(|r| r.rule == DEADLINE)
-                .find_map(|r| resolve_date(&r.evidence, r.sentence.as_deref(), sent_on));
-        }
         need.urgent = answers.iter().any(|a| {
             a.question == triage::URGENCY && a.acted && a.level().is_some_and(|l| l >= TODAY_LEVEL)
         });
@@ -437,12 +456,7 @@ async fn candidate(
         reread = row.is_some_and(|r| r.message_id == newest.id);
         if recent || reread {
             let answers = answers(tx, newest.id).await?;
-            raised = raise(
-                newest.id,
-                newest.sent_at.date_naive(),
-                &answers,
-                settings.check_floor,
-            );
+            raised = raise(newest.id, &answers, settings);
         }
     }
     let open = row.filter(|r| r.state == "open");
@@ -747,11 +761,12 @@ pub struct NeedView {
     pub basis: NeedBasis,
     /// The question that raised it.
     pub question: NeedQuestion,
-    /// The rule that decided it (`signals.reply_asked`, …), for the sentence
-    /// the client words it with.
-    #[schema(example = "signals.reply_asked")]
+    /// The rule that decided it (`model.decide`, …), for the sentence the
+    /// client words it with.
+    #[schema(example = "model.decide")]
     pub rule: Option<String>,
-    /// When it is due.
+    /// When it is due: none until a due date is extracted from the mail
+    /// (needs raised before ADR 0018 may carry one).
     pub due_on: Option<NaiveDate>,
     /// Whether the due date has passed.
     pub overdue: bool,
@@ -759,7 +774,8 @@ pub struct NeedView {
     pub urgent: bool,
     /// The message it comes from.
     pub message_id: MessageId,
-    /// What the sender wrote, when the rules quoted it.
+    /// What the sender wrote, when an answer stored before ADR 0018 quoted
+    /// it.
     pub quote: Option<Quote>,
 }
 
@@ -846,55 +862,60 @@ mod tests {
         }
     }
 
-    fn with_reason(mut a: Answer, rule: &str, evidence: &str, sentence: Option<&str>) -> Answer {
+    fn with_reason(mut a: Answer, rule: &str, evidence: &str) -> Answer {
         a.reasons.push(StoredReason {
             rule: rule.into(),
             evidence: evidence.into(),
-            sentence: sentence.map(Into::into),
+            sentence: None,
         });
         a
     }
 
-    // Monday 12 October 2026.
-    fn monday() -> NaiveDate {
-        NaiveDate::from_ymd_opt(2026, 10, 12).unwrap()
+    fn stream(basis: NeedBasis, label: &str, acted: bool) -> Answer {
+        answer(triage::STREAM, basis, json!(label), acted)
+    }
+
+    /// The shipped policy, with every model answer acting from 0.85.
+    fn settings() -> NeedSettings {
+        let mut policy = Policy::baseline();
+        for question in [triage::STREAM, triage::NEEDS_REPLY, triage::ASKS_ACTION] {
+            policy = policy.with(
+                question,
+                Source::Model,
+                super::super::policy::Switch::ActAbove(0.85),
+            );
+        }
+        NeedSettings::new(14, &policy)
     }
 
     fn raised(answers: &[Answer]) -> Option<Need> {
-        raise(MessageId::new(), monday(), answers, Policy::CHECK_FLOOR)
+        raise(MessageId::new(), answers, &settings())
     }
 
     #[test]
-    fn a_question_with_a_date_is_a_reply_due_that_day() {
+    fn a_question_from_a_person_is_a_reply_with_no_due_date() {
         let need = raised(&[
-            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(true), true),
-            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
-            with_reason(
-                answer(triage::HAS_DEADLINE, NeedBasis::Rules, json!(true), true),
-                DEADLINE,
-                "Wednesday",
-                Some("The builders need to know by Wednesday."),
-            ),
-            answer(triage::URGENCY, NeedBasis::Rules, json!(1.0), true),
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+            answer(triage::URGENCY, NeedBasis::Model, json!(1.0), false),
         ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Reply);
         assert_eq!(need.trust, NeedTrust::Sure);
-        assert_eq!(need.due_on, NaiveDate::from_ymd_opt(2026, 10, 14));
+        assert_eq!(need.basis, NeedBasis::Model);
+        assert_eq!(need.due_on, None, "no due date until one is extracted");
         assert!(!need.urgent);
     }
 
     #[test]
-    fn a_bill_is_pay_before_reply() {
+    fn a_bill_sorted_to_receipts_is_pay() {
         let need = raised(&[
-            with_reason(
-                answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
-                PAYMENT_DUE,
-                "payment due",
-                None,
-            ),
-            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(true), true),
-            answer(triage::URGENCY, NeedBasis::Rules, json!(2.0), true),
+            stream(NeedBasis::Model, "receipts", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            answer(triage::URGENCY, NeedBasis::Model, json!(2.0), true),
         ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Pay);
@@ -902,13 +923,31 @@ mod tests {
     }
 
     #[test]
-    fn a_request_is_do() {
-        let need = raised(&[answer(
-            triage::ASKS_ACTION,
-            NeedBasis::Rules,
-            json!(true),
-            true,
-        )])
+    fn a_later_bill_in_a_receipts_conversation_is_pay() {
+        // The conversation was placed by an earlier message: this stream
+        // answer did not act, but the policy accepts it.
+        let need = raised(&[
+            stream(NeedBasis::Model, "receipts", false),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+        ])
+        .unwrap();
+        assert_eq!(need.reason, NeedReason::Pay);
+        let mut unsure = stream(NeedBasis::Model, "receipts", false);
+        unsure.confidence = Some(0.6);
+        let need = raised(&[
+            unsure,
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+        ])
+        .unwrap();
+        assert_eq!(need.reason, NeedReason::Do, "an unsure stream is no bill");
+    }
+
+    #[test]
+    fn an_invoice_sent_by_hand_is_do() {
+        let need = raised(&[
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+        ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Do);
     }
@@ -916,8 +955,8 @@ mod tests {
     #[test]
     fn suspicious_mail_is_only_a_warning() {
         let need = raised(&[
-            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
-            answer(triage::SUSPICIOUS, NeedBasis::Rules, json!(true), false),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::SUSPICIOUS, NeedBasis::Model, json!(true), true),
         ])
         .unwrap();
         assert_eq!(need.reason, NeedReason::Review);
@@ -926,14 +965,13 @@ mod tests {
     }
 
     #[test]
-    fn answers_the_policy_did_not_accept_raise_nothing_from_rules() {
+    fn answers_that_did_not_act_raise_nothing_sure() {
+        // The retired rules' answers, marked not acted on upgrade.
         assert_eq!(
-            raised(&[answer(
-                triage::NEEDS_REPLY,
-                NeedBasis::Rules,
-                json!(true),
-                false
-            )]),
+            raised(&[
+                answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(true), false),
+                answer(triage::SUSPICIOUS, NeedBasis::Rules, json!(true), false),
+            ]),
             None
         );
         assert_eq!(
@@ -949,11 +987,12 @@ mod tests {
 
     #[test]
     fn a_confident_model_suggestion_is_a_question() {
-        // The rules said no, below the confidence they act from: unsure.
-        let need = raised(&[
-            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), false),
-            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
-        ])
+        let need = raised(&[answer(
+            triage::NEEDS_REPLY,
+            NeedBasis::Model,
+            json!(true),
+            false,
+        )])
         .unwrap();
         assert_eq!(
             (need.reason, need.trust, need.basis),
@@ -969,55 +1008,65 @@ mod tests {
         a
     }
 
-    /// A code host's notification as stored in production: the rules sure
-    /// it asks nothing (list mail, a service sender, no date) and acted; the
-    /// model, unmeasured so never acting, says it asks for an action.
+    /// A shipping notice with a list header ending "Questions? Contact our
+    /// support team.": the facts' acted "no", and a model that reads the
+    /// question mark as one for the recipient.
     fn notification_answers() -> Vec<Answer> {
         vec![
-            with_reason(
-                confident(
-                    answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(false), true),
-                    0.97,
-                ),
-                "signals.list_mail",
-                "",
-                None,
-            ),
-            confident(
-                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
-                0.875,
-            ),
             with_reason(
                 confident(
                     answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
                     0.99,
                 ),
-                "signals.service_sender",
-                "",
-                None,
+                "facts.list_mail",
+                "List-Unsubscribe",
             ),
-            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(false), false),
             confident(
-                answer(triage::HAS_DEADLINE, NeedBasis::Rules, json!(false), true),
+                answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
                 0.95,
             ),
             confident(
-                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), false),
-                0.976,
+                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
+                0.82,
             ),
         ]
     }
 
     #[test]
+    fn the_facts_no_beats_an_acted_model_yes() {
+        // The model's "yes" to a reply is overruled; its unaccepted ask is
+        // still a question.
+        let need = raised(&notification_answers()).unwrap();
+        assert_eq!(
+            (need.reason, need.trust, need.question),
+            (
+                NeedReason::Review,
+                NeedTrust::Check,
+                NeedQuestion::AsksAction
+            )
+        );
+        let mut answers = notification_answers();
+        answers.pop();
+        assert_eq!(raised(&answers), None, "a notification needs no reply");
+    }
+
+    #[test]
     fn a_suggestion_against_a_settled_answer_is_no_question() {
-        assert_eq!(raised(&notification_answers()), None);
+        let answers = [
+            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
+            confident(
+                answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
+                0.84,
+            ),
+        ];
+        assert_eq!(raised(&answers), None);
     }
 
     #[test]
     fn a_model_suggestion_alone_is_still_a_question() {
         let need = raised(&[confident(
             answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
-            0.875,
+            0.84,
         )])
         .unwrap();
         assert_eq!(
@@ -1028,45 +1077,6 @@ mod tests {
                 NeedQuestion::AsksAction
             )
         );
-    }
-
-    #[test]
-    fn an_acted_rules_yes_is_a_sure_do() {
-        let mut answers = notification_answers();
-        answers[0] = with_reason(
-            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
-            "signals.security_alert",
-            "vulnerability",
-            None,
-        );
-        let need = raised(&answers).unwrap();
-        assert_eq!(
-            (need.reason, need.trust, need.basis),
-            (NeedReason::Do, NeedTrust::Sure, NeedBasis::Rules)
-        );
-        // The model's deadline is a suggestion: no due date.
-        assert_eq!(need.due_on, None);
-    }
-
-    #[test]
-    fn the_rules_acted_no_beats_an_acted_model_yes() {
-        // Were a model answer ever to act, the rules' acted answer still
-        // wins for the same question.
-        let need = raised(&[
-            answer(triage::ASKS_ACTION, NeedBasis::Rules, json!(true), true),
-            answer(triage::HAS_DEADLINE, NeedBasis::Rules, json!(false), true),
-            with_reason(
-                answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
-                DEADLINE,
-                "Friday",
-                None,
-            ),
-            answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
-            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
-        ])
-        .unwrap();
-        assert_eq!(need.reason, NeedReason::Do);
-        assert_eq!(need.due_on, None);
     }
 
     fn need(reason: NeedReason) -> Need {

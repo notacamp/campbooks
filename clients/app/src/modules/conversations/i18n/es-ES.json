@@ -134,6 +134,11 @@
       "no_today": "Nada en ella es para hoy.",
       "no_phishing_tell": "Nada en ella parece phishing."
     },
+    "facts": {
+      "list_mail": "Se envió a una lista de correo ({{evidence}}), así que no necesita respuesta.",
+      "automatic": "Se envió automáticamente ({{evidence}}), así que no necesita respuesta.",
+      "no_reply_sender": "Viene de una dirección que nadie lee ({{evidence}}), así que no necesita respuesta."
+    },
     "model": {
       "decide": "El modelo de decisión ha respondido ({{evidence}})."
     },
