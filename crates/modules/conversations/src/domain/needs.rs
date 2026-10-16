@@ -613,6 +613,37 @@ async fn live_conversation(
     }))
 }
 
+/// Hold the messages a need of conversation `id` can come from `FOR SHARE`
+/// until the transaction ends: its newest inbound message that is not in
+/// spam or the trash, and the message the stored need comes from.
+///
+/// A provider move to spam or the trash (`apply_changes`) updates the
+/// message row, and a refresh running beside it would otherwise read the
+/// message before that commits and store an open need after it. With the
+/// share lock the refresh waits for the move to commit and reads it (the
+/// next statements see the committed row); a move starting later waits for
+/// the refresh, and its own refresh then clears the need. Taken before the
+/// needs row is locked, the order a move takes them in (the message it
+/// updates, then the needs row in its refresh), so the two cannot wait on
+/// each other; the ids are locked in order, one statement.
+async fn lock_sources(tx: &mut Transaction<'_, Postgres>, id: ConversationId) -> Result<()> {
+    sqlx::query(
+        "SELECT m.id FROM conversations.messages m
+          WHERE m.id IN (
+                (SELECT id FROM conversations.messages
+                  WHERE conversation_id = $1 AND direction = 'inbound'
+                    AND NOT in_spam AND NOT in_trash
+                  ORDER BY sent_at DESC, id DESC LIMIT 1),
+                (SELECT message_id FROM conversations.needs WHERE conversation_id = $1))
+          ORDER BY m.id
+            FOR SHARE OF m",
+    )
+    .bind(id)
+    .fetch_all(&mut **tx)
+    .await?;
+    Ok(())
+}
+
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
 /// gone, has no inbound message, or is in a kept read-only inbox
@@ -628,6 +659,7 @@ pub async fn refresh(
         return Ok(());
     };
     let conversation_state = (conversation.archived, conversation.trashed);
+    lock_sources(tx, id).await?;
     let row = current(tx, id).await?;
     let Candidate {
         need,

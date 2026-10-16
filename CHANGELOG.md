@@ -8,6 +8,15 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Security-alert detection is harder to fool.** An aligned DKIM signature no longer
+  counts when DMARC says anything but pass for the same message, an authentication header
+  over 8 KiB is ignored, and "same organisation" now follows the real Public Suffix List
+  (so `x.com.br` and `y.com.br`, or two `github.io` sites, are never one sender) instead of
+  a 24-entry guess. On GitHub, GitLab and the other listed platforms the sender's whole
+  display name must be the platform's, so a person named "GitHub Smith" is not an alert.
+  Separately, a message that is being moved to spam or the trash can no longer have an open
+  "needs you" stored for it by a refresh running at the same moment. No migration. Provider
+  reason headers (`X-GitHub-Reason`) are not read yet (follow-up).
 - **Suspending an account or signing out everywhere stops its access tokens at once.**
   Tokens already issued used to keep working until they expired (up to ten minutes).
   Now the API refuses them on the next request (401 `invalid_token`, the same answer
