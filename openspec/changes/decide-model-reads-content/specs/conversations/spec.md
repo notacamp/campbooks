@@ -81,7 +81,11 @@ policy and the conversation's state. A `sure` need SHALL come only from
 answers the policy accepts: `pay` when `asks_action` is accepted and true and
 the message's accepted `stream` answer is `receipts`, else `reply` when
 `needs_reply` is accepted and true, else `do` when `asks_action` is accepted
-and true. When answers of more than one source to the same question were
+and true. A `reply` or `do` need, `sure` or `check`, SHALL be raised only
+when the message's accepted `stream` answer is `primary`, or, when it is
+`updates` or no `stream` answer is accepted, when an accepted `has_deadline`
+answer is true; a message sorted to `newsletters` SHALL raise neither. When
+answers of more than one source to the same question were
 accepted, the facts' answer SHALL be the one used. A `suspicious` answer of
 true that the policy accepts SHALL raise a `review` need instead of any
 other. When the `decide` role is configured, a model answer of true for
@@ -108,6 +112,18 @@ never raise one.
 #### Scenario: A notification with a question
 - **WHEN** a shipping notice with a `List-Unsubscribe` header ends "Questions? Contact our support team." and the model answers `needs_reply` true
 - **THEN** the facts' accepted "no" wins and no `reply` need is raised
+
+#### Scenario: A notification that reads like an ask
+- **WHEN** the policy accepts the model's `stream` answer `updates` and its `asks_action` true for a calendar invitation, and its `has_deadline` answer is false
+- **THEN** no need is raised
+
+#### Scenario: A notification asking by a date
+- **WHEN** the policy accepts the model's `stream` answer `updates`, its `asks_action` true and its `has_deadline` true for a delivery to reschedule
+- **THEN** the need is `do`
+
+#### Scenario: A newsletter
+- **WHEN** the policy accepts the model's `stream` answer `newsletters` and its `asks_action` true
+- **THEN** no need is raised
 
 #### Scenario: Phishing asks for an action
 - **WHEN** the policy accepts the model's `suspicious` true and `asks_action` true for a message

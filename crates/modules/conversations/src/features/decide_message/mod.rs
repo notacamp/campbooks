@@ -799,12 +799,32 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn a_security_alert_the_model_reads_as_a_to_do_is_a_sure_do_in_updates(db: PgPool) {
+    async fn a_notification_the_model_reads_as_a_to_do_is_no_need_without_a_deadline(db: PgPool) {
         let (kit, _, state) = read_recorded(&db, &fixture("dependabot"), alert_answers()).await;
         assert_eq!(
             kit.stream_of("dependabot-1").await,
             ("updates".to_owned(), "model".to_owned())
         );
+        assert!(
+            needs(&db).await.is_empty(),
+            "automated mail asks something only with a time limit"
+        );
+        // The model was told the facts, as hints.
+        assert!(
+            state.contains(
+                "Facts from the headers, not decisions: list mail (List-Id \
+                 \"example-org/demo-shop <demo-shop.example-org.github.com>\"); \
+                 service sender address."
+            ),
+            "{state}"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn a_notification_asking_by_a_deadline_is_a_sure_do_in_updates(db: PgPool) {
+        let mut answers = alert_answers();
+        answers["answers"]["has_deadline"] = json!({"type": "noul", "noul": 0.9});
+        read_recorded(&db, &fixture("dependabot"), answers).await;
         assert_eq!(
             needs(&db).await,
             [(
@@ -820,15 +840,6 @@ mod tests {
                 .await
                 .unwrap();
         assert_eq!(due, None, "no due date until one is extracted");
-        // The model was told the facts, as hints.
-        assert!(
-            state.contains(
-                "Facts from the headers, not decisions: list mail (List-Id \
-                 \"example-org/demo-shop <demo-shop.example-org.github.com>\"); \
-                 service sender address."
-            ),
-            "{state}"
-        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

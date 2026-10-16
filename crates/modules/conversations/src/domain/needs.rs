@@ -42,6 +42,10 @@ use crate::{
 const TODAY_LEVEL: f64 = 2.0;
 /// The stream whose mail asks for payment rather than an action.
 const RECEIPTS: &str = "receipts";
+/// The stream of people writing personally.
+const PRIMARY: &str = "primary";
+/// The stream of list mail, which never needs anything of the recipient.
+const NEWSLETTERS: &str = "newsletters";
 
 /// How needs are raised: the window of mail that may raise one, and the
 /// policy (which stream answers count, and its floor for questions).
@@ -150,11 +154,11 @@ fn accepted<'a>(answers: &'a [Answer], question: &str) -> Option<&'a Answer> {
         .filter(|a| a.is_true())
 }
 
-/// Whether the message was sorted to Receipts by an answer the policy
-/// accepts: the stream answer acted (it placed the conversation), or the
-/// policy accepts it (a later message of a conversation already placed).
-/// The facts' answer wins over the model's, as for every question.
-fn sorted_to_receipts(answers: &[Answer], policy: &Policy) -> bool {
+/// The stream the message was sorted to by an answer the policy accepts:
+/// the stream answer acted (it placed the conversation), or the policy
+/// accepts it (a later message of a conversation already placed). The
+/// facts' answer wins over the model's, as for every question.
+fn sorted_stream<'a>(answers: &'a [Answer], policy: &Policy) -> Option<&'a str> {
     answers
         .iter()
         .filter(|a| {
@@ -165,7 +169,22 @@ fn sorted_to_receipts(answers: &[Answer], policy: &Policy) -> bool {
                         .accepts_confidence(a.confidence))
         })
         .min_by_key(|a| a.basis != NeedBasis::Rules)
-        .is_some_and(|a| a.value.as_str() == Some(RECEIPTS))
+        .and_then(|a| a.value.as_str())
+}
+
+/// Whether the message may need a reply or an action of the recipient,
+/// from the model's own answers (never from the text): a person writing
+/// personally may; list mail never does; automated mail (or mail no answer
+/// sorted) only when an accepted answer gives it a time limit. A calendar
+/// invite or a support notice reads like an ask, and the model says so;
+/// what the automated asks that matter share is a deadline
+/// (campbooks-cloud#144).
+fn may_ask(stream: Option<&str>, answers: &[Answer]) -> bool {
+    match stream {
+        Some(PRIMARY) => true,
+        Some(NEWSLETTERS) => false,
+        _ => accepted(answers, triage::HAS_DEADLINE).is_some(),
+    }
 }
 
 /// Whether an answer the policy let act says "no" to `question`: the
@@ -202,9 +221,10 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
             answer,
         ));
     }
+    let stream = sorted_stream(answers, &settings.policy);
+    let may_ask = may_ask(stream, answers);
     let asks = accepted(answers, triage::ASKS_ACTION);
-    let raised = if let Some(asks) = asks.filter(|_| sorted_to_receipts(answers, &settings.policy))
-    {
+    let raised = if let Some(asks) = asks.filter(|_| stream == Some(RECEIPTS)) {
         Some(need(
             NeedReason::Pay,
             NeedTrust::Sure,
@@ -212,6 +232,8 @@ pub fn raise(message: MessageId, answers: &[Answer], settings: &NeedSettings) ->
             NeedQuestion::AsksAction,
             asks,
         ))
+    } else if !may_ask {
+        None
     } else if let Some(reply) = accepted(answers, triage::NEEDS_REPLY) {
         Some(need(
             NeedReason::Reply,
@@ -934,12 +956,49 @@ mod tests {
         assert_eq!(need.reason, NeedReason::Pay);
         let mut unsure = stream(NeedBasis::Model, "receipts", false);
         unsure.confidence = Some(0.6);
+        let asks = answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true);
+        assert_eq!(
+            raised(&[unsure.clone(), asks.clone()]),
+            None,
+            "an unsure stream is no bill, and mail no answer sorted needs a deadline"
+        );
         let need = raised(&[
             unsure,
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            asks,
+            answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
         ])
         .unwrap();
-        assert_eq!(need.reason, NeedReason::Do, "an unsure stream is no bill");
+        assert_eq!(need.reason, NeedReason::Do);
+    }
+
+    #[test]
+    fn automated_mail_asks_only_with_a_deadline() {
+        // A calendar invite or a support notice the model reads as asking
+        // something, with no time limit: nothing.
+        let invite = [
+            stream(NeedBasis::Model, "updates", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(false), true),
+        ];
+        assert_eq!(raised(&invite), None);
+        // A delivery to reschedule by a date: something to do.
+        let reschedule = [
+            stream(NeedBasis::Model, "updates", true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+        ];
+        assert_eq!(raised(&reschedule).unwrap().reason, NeedReason::Do);
+    }
+
+    #[test]
+    fn list_mail_never_needs_anything() {
+        let newsletter = [
+            stream(NeedBasis::Model, "newsletters", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), true),
+            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), true),
+            answer(triage::HAS_DEADLINE, NeedBasis::Model, json!(true), true),
+        ];
+        assert_eq!(raised(&newsletter), None);
     }
 
     #[test]
@@ -987,12 +1046,10 @@ mod tests {
 
     #[test]
     fn a_confident_model_suggestion_is_a_question() {
-        let need = raised(&[answer(
-            triage::NEEDS_REPLY,
-            NeedBasis::Model,
-            json!(true),
-            false,
-        )])
+        let need = raised(&[
+            stream(NeedBasis::Model, "primary", true),
+            answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
+        ])
         .unwrap();
         assert_eq!(
             (need.reason, need.trust, need.basis),
@@ -1000,7 +1057,10 @@ mod tests {
         );
         let mut unsure = answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false);
         unsure.confidence = Some(0.6);
-        assert_eq!(raised(&[unsure]), None);
+        assert_eq!(
+            raised(&[stream(NeedBasis::Model, "primary", true), unsure]),
+            None
+        );
     }
 
     fn confident(mut a: Answer, confidence: f64) -> Answer {
@@ -1009,10 +1069,12 @@ mod tests {
     }
 
     /// A shipping notice with a list header ending "Questions? Contact our
-    /// support team.": the facts' acted "no", and a model that reads the
-    /// question mark as one for the recipient.
+    /// support team.", in a conversation a person started: the facts' acted
+    /// "no", and a model that reads the question mark as one for the
+    /// recipient.
     fn notification_answers() -> Vec<Answer> {
         vec![
+            stream(NeedBasis::Model, "primary", false),
             with_reason(
                 confident(
                     answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
@@ -1053,6 +1115,7 @@ mod tests {
     #[test]
     fn a_suggestion_against_a_settled_answer_is_no_question() {
         let answers = [
+            stream(NeedBasis::Model, "primary", true),
             answer(triage::NEEDS_REPLY, NeedBasis::Rules, json!(false), true),
             confident(
                 answer(triage::NEEDS_REPLY, NeedBasis::Model, json!(true), false),
@@ -1064,10 +1127,13 @@ mod tests {
 
     #[test]
     fn a_model_suggestion_alone_is_still_a_question() {
-        let need = raised(&[confident(
-            answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
-            0.84,
-        )])
+        let need = raised(&[
+            stream(NeedBasis::Model, "primary", true),
+            confident(
+                answer(triage::ASKS_ACTION, NeedBasis::Model, json!(true), false),
+                0.84,
+            ),
+        ])
         .unwrap();
         assert_eq!(
             (need.reason, need.trust, need.question),

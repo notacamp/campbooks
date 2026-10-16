@@ -97,6 +97,13 @@ A member's move (`member`) and an earlier placement are never overridden.
   answer is `receipts` (from any source).
 - `reply`: `needs_reply` accepted and true.
 - `do`: `asks_action` accepted and true otherwise.
+- `reply` and `do` (sure or check) only on mail the model sorted to
+  `primary`; on `updates` (or when no stream answer is accepted) only with
+  an accepted `has_deadline` true; never on `newsletters`. Measured on
+  2026-10-16: Jev 1.13 answers `asks_action` at 0.88 for a calendar
+  invitation and 0.89 for a support notice, both with `has_deadline` under
+  0.2, while every labelled ask from automated mail in mail-triage v1 has a
+  deadline. The gate uses the model's own answers, never the text.
 - `review` for `suspicious`, and the `check` question from an unaccepted
   confident model answer, as today.
 - `due_on` is always `None`; `urgent` from an accepted `urgency` of 2.

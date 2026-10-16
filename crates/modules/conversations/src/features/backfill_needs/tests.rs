@@ -626,20 +626,20 @@ async fn a_kept_read_only_inbox_is_left_as_it_is(db: PgPool) {
 
 #[sqlx::test(migrations = "../../../migrations")]
 async fn the_upgrade_withdraws_the_needs_the_old_rules_raised(db: PgPool) {
-    // The retired rules, as they read a shipping notice: a reply needed,
-    // sure enough to act.
+    // The retired rules, as they read a shipping notice: a reply needed by
+    // a date, sure enough to act.
     let old_rules = Scripted::rules([(
         "suivi@colis-rapide.example",
-        vec![(triage::NEEDS_REPLY, AnswerValue::Noul(true), 0.95)],
+        vec![
+            (triage::NEEDS_REPLY, AnswerValue::Noul(true), 0.95),
+            (triage::HAS_DEADLINE, AnswerValue::Noul(true), 0.95),
+        ],
     )]);
-    let deps =
-        without_model()
-            .with_rules(Arc::new(old_rules))
-            .with_policy(Policy::baseline().with(
-                triage::NEEDS_REPLY,
-                Source::Rules,
-                Switch::ActAbove(0.9),
-            ));
+    let deps = without_model().with_rules(Arc::new(old_rules)).with_policy(
+        Policy::baseline()
+            .with(triage::NEEDS_REPLY, Source::Rules, Switch::ActAbove(0.9))
+            .with(triage::HAS_DEADLINE, Source::Rules, Switch::ActAbove(0.9)),
+    );
     let kit = Kit::with_deps(db.clone(), deps).await;
     let (workspace, _) = mailbox(&kit, &["fr"]).await;
     assert_eq!(
@@ -658,7 +658,7 @@ async fn the_upgrade_withdraws_the_needs_the_old_rules_raised(db: PgPool) {
             .fetch_all(&db)
             .await
             .unwrap();
-    assert_eq!(acted, [false], "kept as a record, no longer acting");
+    assert_eq!(acted, [false, false], "kept as a record, no longer acting");
     let queued: Vec<String> = sqlx::query_scalar("SELECT state FROM conversations.needs_backfills")
         .fetch_all(&db)
         .await
