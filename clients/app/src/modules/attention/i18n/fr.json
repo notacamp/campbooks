@@ -14,7 +14,7 @@
     "do": "À faire",
     "pay": "À payer"
   },
-  "context": "Fait aujourd’hui et raccourcis",
+  "context": "Fait aujourd’hui",
   "doneTodayTitle": "Fait aujourd’hui",
   "doneTodayEmpty": "Rien pour l’instant aujourd’hui.",
   "doneToday": {
@@ -22,24 +22,33 @@
     "notNeeded": "Pas nécessaire · {{subject}}",
     "replied": "Répondu · {{subject}}",
     "archived": "Archivé · {{subject}}",
-    "later": "Plus tard · {{subject}}",
+    "snoozed": "Reporté · {{subject}}",
     "gone": "Plus nécessaire · {{subject}}"
   },
-  "later": {
-    "title": "Faire revenir",
+  "snooze": {
+    "title": "Reporter {{name}} jusqu’à…",
+    "description": "Il quitte l’accueil jusque-là, puis revient tout seul.",
+    "choices": "Quand",
     "today": "Plus tard aujourd’hui",
-    "tomorrow": "Demain",
-    "monday": "Lundi",
-    "toast": "Plus tard · {{name}}, revient {{when}}",
-    "button": "Plus tard",
+    "tomorrow": "Demain matin",
+    "monday": "Lundi matin",
+    "nextWeek": "La semaine prochaine",
+    "toast": "Reporté · {{name}}, revient {{when}}",
+    "button": "Reporter…",
     "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez."
   },
   "actions": {
     "reply": "Répondre",
     "open": "Ouvrir la conversation",
-    "undo": "Annuler"
+    "undo": "Annuler",
+    "label": "Actions pour {{name}}"
   },
-  "keyboard": "Clavier",
+  "confirm": {
+    "done": "Fait · {{name}}",
+    "notNeeded": "Pas nécessaire · {{name}}",
+    "safe": "Marqué comme sûr · {{name}}",
+    "snoozed": "Reporté · {{name}}, revient {{when}}"
+  },
   "error": {
     "title": "Impossible de charger ce qui a besoin de vous",
     "body": "Campbooks n’a pas pu joindre le serveur. Rien n’a été perdu.",

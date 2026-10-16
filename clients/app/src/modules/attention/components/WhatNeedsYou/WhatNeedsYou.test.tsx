@@ -134,7 +134,7 @@ describe("What needs you", () => {
     expect(screen.getByText("How Campbooks decided")).toBeVisible();
   });
 
-  it("moves with the arrow keys, which scroll again while an item is open", async () => {
+  it("moves with the arrow keys, even with an item open", async () => {
     api();
     renderHome();
     await screen.findByText("This may be phishing. Don’t use its links.");
@@ -144,11 +144,104 @@ describe("What needs you", () => {
     expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
     fireEvent.keyDown(document, { key: "Enter" });
     await screen.findByText("How Campbooks decided");
-    // Open: ↓ is the browser's (no step), J still steps.
-    expect(fireEvent.keyDown(document, { key: "ArrowDown" })).toBe(true);
-    expect(isSelected("This may be phishing. Don’t use its links.")).toBe(true);
-    fireEvent.keyDown(document, { key: "j" });
+    // Open: ↓ still steps (and closes it), as do J and K.
+    fireEvent.keyDown(document, { key: "ArrowDown" });
     expect(isSelected("Marta Ferreira is waiting for your reply")).toBe(true);
+    expect(screen.queryByText("How Campbooks decided")).toBeNull();
+    fireEvent.keyDown(document, { key: "j" });
+    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+  });
+
+  it("shows the selected item's actions in words with keys, and only its", async () => {
+    api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    // The warning: It's safe, then Done and Snooze.
+    const warning = screen.getByRole("group", {
+      name: "Actions for it-support@at3lier-sol.example",
+    });
+    expect(
+      within(warning)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["It’s safe1", "DoneE", "Snooze…S"]);
+    expect(screen.getAllByRole("group", { name: /^Actions for/u })).toHaveLength(1);
+    fireEvent.keyDown(document, { key: "j" });
+    const marta = screen.getByRole("group", { name: "Actions for Marta Ferreira" });
+    expect(
+      within(marta)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Reply1", "DoneE", "Snooze…S", "Not neededX"]);
+    // No bare key hints on the rows, and no keyboard legend in the aside.
+    const jonas = screen.getByText("Jonas Weber asked you a question").closest("button");
+    expect(jonas?.querySelector("kbd")).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Keyboard" })).toBeNull();
+  });
+
+  it("walks the actions with ← and →, presses one with Enter and clears with Esc", async () => {
+    const calls = api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "j" });
+    fireEvent.keyDown(document, { key: "ArrowRight" });
+    const reply = screen.getByRole("button", { name: /^Reply/u });
+    expect(reply).toHaveAttribute("data-highlighted", "true");
+    expect(reply).toHaveFocus();
+    fireEvent.keyDown(document.activeElement ?? document, { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: /^Done/u })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+    expect(screen.getByRole("button", { name: /^Done/u })).not.toHaveAttribute("data-highlighted");
+    // From nothing, ← lands on the last one: Not needed.
+    fireEvent.keyDown(document, { key: "ArrowLeft" });
+    expect(screen.getByRole("button", { name: /^Not needed/u })).toHaveFocus();
+    fireEvent.keyDown(document.activeElement ?? document, { key: "Enter" });
+    await waitFor(() => {
+      expect(calls.calls.map((c) => c.route)).toContain(
+        `POST ${W}/conversations/${MARTA.id}/need/resolve`,
+      );
+    });
+    // The row folds into its confirmation, and Jonas takes the selection.
+    expect(screen.getByText("Not needed · Marta Ferreira")).toBeVisible();
+    expect(isSelected("Jonas Weber asked you a question")).toBe(true);
+  });
+
+  it("answers a question with 1 and 2", async () => {
+    const question = {
+      ...JONAS,
+      need: JONAS.need === null ? null : { ...JONAS.need, trust: "check" as const },
+    };
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: {
+          conversations: NEEDS.map((c) => (c.id === JONAS.id ? question : c)),
+          next_cursor: null,
+        },
+      },
+      [`POST ${W}/conversations/${JONAS.id}/need/resolve`]: { body: { ...JONAS, need: null } },
+    });
+    renderHome();
+    const line = await screen.findByText("Jonas Weber");
+    fireEvent.click(line);
+    const actions = screen.getByRole("group", { name: "Actions for Jonas Weber" });
+    expect(
+      within(actions)
+        .getAllByRole("button")
+        .map((b) => b.textContent),
+    ).toEqual(["Yes1", "No2", "Snooze…S"]);
+    // E means nothing until it is answered.
+    fireEvent.keyDown(document, { key: "e" });
+    expect(calls.calls.some((c) => c.route.endsWith("/need/resolve"))).toBe(false);
+    fireEvent.keyDown(document, { key: "2" });
+    await waitFor(() => {
+      expect(calls.calls.find((c) => c.route.endsWith("/need/resolve"))?.body).toMatchObject({
+        outcome: "not_needed",
+      });
+    });
   });
 
   it("replies with R in the conversation's reader", async () => {
@@ -163,22 +256,56 @@ describe("What needs you", () => {
     expect(router.state.location.search).toEqual({ reply: true });
   });
 
-  it("puts an item off until Monday with L", async () => {
+  it("snoozes an item until Monday from the Snooze dialog (S)", async () => {
     const calls = api();
     renderHome();
     await screen.findByText("Pedro Alves asked you to do something");
     for (const key of ["j", "j", "j"]) {
       fireEvent.keyDown(document, { key });
     }
-    fireEvent.keyDown(document, { key: "l" });
-    const menu = await screen.findByRole("dialog", { name: "Bring it back" });
-    fireEvent.click(within(menu).getByRole("button", { name: "Monday" }));
+    fireEvent.keyDown(document, { key: "s" });
+    const dialog = await screen.findByRole("dialog", { name: "Snooze Pedro Alves until…" });
+    expect(within(dialog).getAllByRole("button", { name: /morning|today|week/u }).length).toBe(4);
+    fireEvent.click(within(dialog).getByRole("button", { name: /Monday morning/u }));
     await waitFor(() => {
       expect(screen.queryByText("Pedro Alves asked you to do something")).toBeNull();
     });
+    expect(screen.queryByRole("dialog")).toBeNull();
     const snooze = calls.calls.find((c) => c.route.endsWith("/snooze"));
     expect(new Date((snooze?.body as { until: string }).until).getDay()).toBe(1);
     expect(PEDRO.need?.reason).toBe("do");
+  });
+
+  it("closes the Snooze dialog with Esc and changes nothing", async () => {
+    const calls = api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "s" });
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.keyDown(within(dialog).getAllByRole("button")[1] ?? dialog, { key: "Escape" });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(screen.getByText("This may be phishing. Don’t use its links.")).toBeVisible();
+    expect(calls.calls.some((c) => c.route.endsWith("/snooze"))).toBe(false);
+  });
+
+  it("says a failed snooze until Retry or dismiss, and puts the item back", async () => {
+    mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
+      [`POST ${W}/attention/${ITEMS[0]?.id ?? ""}/snooze`]: problem(503, "unavailable"),
+    });
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "s" });
+    fireEvent.keyDown(await screen.findByRole("dialog"), { key: "2" });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Couldn’t snooze/u);
+    expect(screen.getByRole("button", { name: "Retry" })).toBeVisible();
+    expect(await screen.findByText("This may be phishing. Don’t use its links.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("keeps the selection when a live update takes the selected item away", async () => {

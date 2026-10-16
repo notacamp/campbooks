@@ -59,14 +59,19 @@ export function useNeedActions(
           onFailed?.(conversation);
           const need = conversation.need;
           const name = need === null || need === undefined ? "" : needSender(need, conversation);
-          undo.notify(
-            t(
-              problemCode(error) === "need_changed" ? "needs.toast.changed" : "needs.toast.failed",
-              {
-                name,
+          // A failure stays until Retry or dismiss. A need that changed
+          // meanwhile is not retried: the member should look again.
+          if (problemCode(error) === "need_changed") {
+            undo.fail({ label: t("needs.toast.changed", { name }) });
+          } else {
+            undo.fail({
+              label: t("needs.toast.failed", { name }),
+              retry: () => {
+                onRedo?.(conversation);
+                run(conversation, verdict);
               },
-            ),
-          );
+            });
+          }
         },
         onSettled: () => {
           onChanged?.();

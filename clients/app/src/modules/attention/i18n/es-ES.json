@@ -14,7 +14,7 @@
     "do": "Hacer",
     "pay": "Pagar"
   },
-  "context": "Hecho hoy y teclas",
+  "context": "Hecho hoy",
   "doneTodayTitle": "Hecho hoy",
   "doneTodayEmpty": "Todavía nada hoy.",
   "doneToday": {
@@ -22,24 +22,33 @@
     "notNeeded": "No hacía falta · {{subject}}",
     "replied": "Respondido · {{subject}}",
     "archived": "Archivado · {{subject}}",
-    "later": "Más tarde · {{subject}}",
+    "snoozed": "Pospuesto · {{subject}}",
     "gone": "Ya no hace falta · {{subject}}"
   },
-  "later": {
-    "title": "Volver a mostrar",
+  "snooze": {
+    "title": "Posponer {{name}} hasta…",
+    "description": "Sale del inicio hasta entonces y vuelve solo.",
+    "choices": "Cuándo",
     "today": "Más tarde hoy",
-    "tomorrow": "Mañana",
-    "monday": "El lunes",
-    "toast": "Más tarde · {{name}}, vuelve {{when}}",
-    "button": "Más tarde",
+    "tomorrow": "Mañana por la mañana",
+    "monday": "El lunes por la mañana",
+    "nextWeek": "La semana que viene",
+    "toast": "Pospuesto · {{name}}, vuelve {{when}}",
+    "button": "Posponer…",
     "failed": "No se ha podido posponer {{name}}: no ha cambiado nada. Vuelve a intentarlo."
   },
   "actions": {
     "reply": "Responder",
     "open": "Abrir conversación",
-    "undo": "Deshacer"
+    "undo": "Deshacer",
+    "label": "Acciones para {{name}}"
   },
-  "keyboard": "Teclado",
+  "confirm": {
+    "done": "Hecho · {{name}}",
+    "notNeeded": "No hacía falta · {{name}}",
+    "safe": "Marcado como seguro · {{name}}",
+    "snoozed": "Pospuesto · {{name}}, vuelve {{when}}"
+  },
   "error": {
     "title": "No se ha podido cargar lo que te necesita",
     "body": "Campbooks no ha podido conectar con el servidor. No se ha perdido nada.",

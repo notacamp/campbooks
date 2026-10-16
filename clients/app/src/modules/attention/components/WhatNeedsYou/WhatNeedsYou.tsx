@@ -1,24 +1,26 @@
 import { useNavigate } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
-import { useShortcut, useShortcuts } from "~/lib/shortcuts";
+import { useShortcut } from "~/lib/shortcuts";
 import {
   AsideSection,
   Button,
+  Dialog,
+  DialogChoices,
   EmptyState,
   HomeLayout,
   HowDecided,
   Item,
+  ItemActions,
   ItemDetail,
-  KbdHint,
   Line,
   LineMeta,
   PageHero,
-  Popover,
   QueueGroup,
   SkeletonList,
   useUndoToast,
+  type ItemAction,
 } from "~/lib/ui";
 import {
   dueLabel,
@@ -35,23 +37,28 @@ import {
 } from "~/modules/conversations";
 
 import { useAttention, useRefreshAttention, useSnooze, type ItemView } from "../../api/queries";
-import { doneTodayKind, groupByReason, laterOptions } from "../../model";
+import {
+  doneTodayKind,
+  groupByReason,
+  rowActionIds,
+  snoozeOptions,
+  type OwnActionId,
+  type UniversalActionId,
+} from "../../model";
 
 /** `t` for keys only known at runtime. */
 type Translate = (key: string, options?: Record<string, unknown>) => string;
 
 const CONVERSATION = "conversations.conversation";
 
-/** The keys Home teaches, from the registry. */
-const KEYS = [
-  "list.next",
-  "list.open",
-  "item.reply",
-  "item.done",
-  "item.later",
-  "conversations.resolve_need",
-  "undo",
-] as const;
+/** The item's own actions take 1, 2 and 3, in order. */
+const CHOICE_KEYS = ["item.choice1", "item.choice2", "item.choice3"] as const;
+
+const UNIVERSAL_KEYS: Record<UniversalActionId, string> = {
+  done: "item.done",
+  snooze: "item.snooze",
+  not_needed: "conversations.resolve_need",
+};
 
 export interface WhatNeedsYouProps {
   workspaceId: string;
@@ -67,23 +74,29 @@ interface Row {
   conversation: ConversationSummary;
   need: NeedView;
   name: string;
+  /** Acted on: the one-line confirmation it shows while it folds away. */
+  confirmation?: string | undefined;
 }
+
+type ActionId = OwnActionId | UniversalActionId;
+
+const kindOf = (need: NeedView) =>
+  need.question === "suspicious" ? "warning" : need.trust === "check" ? "question" : "need";
 
 /**
  * Home: what needs the member, grouped Review, Reply, Decide, Do, Pay, due
- * soonest first. J/K move, Enter opens, R replies, E is done, L is later,
- * X is not needed, Z undoes. The rows are the conversations module's
- * records; `attention` only says which, why and by when.
+ * soonest first. The selected item shows its actions under it (its own on
+ * 1 to 3, then Done E, Snooze S, Not needed X); ↑/↓ (J/K) move, ←/→ walk
+ * the buttons, Enter presses one or opens the item, Esc clears, Z undoes.
+ * A row acted on folds away with a one-line confirmation. The rows are the
+ * conversations module's records; `attention` only says which, why and by
+ * when.
  */
 export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const { t: typedAttention, i18n } = useTranslation("attention");
   const t = typedAttention as unknown as Translate;
   const { t: typedConversations } = useTranslation("conversations");
   const tc = typedConversations as unknown as Translate;
-  const { t: tAny } = useTranslation();
-  // Shortcut labels are namespaced keys only known at runtime.
-  const translateLabel = tAny as unknown as (key: string) => string;
-  const { registry } = useShortcuts();
   const navigate = useNavigate();
   const undo = useUndoToast();
 
@@ -93,7 +106,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const snooze = useSnooze(workspaceId);
 
   // Items acted on, hidden at once while the projection catches up; keyed
-  // by their cause, so a follow-up from the sender shows again.
+  // by their cause, so a follow-up from the sender shows again. A hidden
+  // row with a confirmation still shows it while it folds away.
   const [gone, setGone] = useState<ReadonlyMap<string, Row>>(new Map());
   const openItems = open.data?.items ?? [];
 
@@ -108,31 +122,35 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const conversations = useConversationsByIds(workspaceId, ids);
   const byId = new Map((conversations.data ?? []).map((c) => [c.id, c] as const));
 
-  const rows: Row[] = openItems.flatMap((item) => {
+  const shown: Row[] = openItems.flatMap((item) => {
+    const hidden = gone.get(goneKey(item));
+    if (hidden !== undefined) {
+      return hidden.confirmation === undefined ? [] : [hidden];
+    }
     const conversation = byId.get(item.record.id);
     const need = conversation?.need;
-    if (
-      gone.has(goneKey(item)) ||
-      conversation === undefined ||
-      need === null ||
-      need === undefined
-    ) {
+    if (conversation === undefined || need === null || need === undefined) {
       return [];
     }
     return [{ item, conversation, need, name: needSender(need, conversation) }];
   });
-  const groups = groupByReason(rows.map((row) => row.item)).map((group) => ({
+  const rows = shown.filter((row) => row.confirmation === undefined);
+  const groups = groupByReason(shown.map((row) => row.item)).map((group) => ({
     reason: group.reason,
-    rows: group.items.flatMap((item) => rows.filter((row) => row.item.id === item.id)),
+    rows: group.items.flatMap((item) => shown.filter((row) => row.item.id === item.id)),
   }));
-  const order = groups.flatMap((group) => group.rows);
+  const order = groups
+    .flatMap((group) => group.rows)
+    .filter((row) => row.confirmation === undefined);
 
   // The selection is always an explicit item id, with the position it was
   // last seen at: when a live update takes it away, its neighbour at that
   // position takes over, never the top of the list.
   const [selection, setSelection] = useState<{ id?: string; index: number }>({ index: 0 });
   const [expandedId, setExpandedId] = useState<string | undefined>();
-  const [laterId, setLaterId] = useState<string | undefined>();
+  // The action ←/→ are on, on the selected row.
+  const [highlight, setHighlight] = useState<string | undefined>();
+  const [snoozing, setSnoozing] = useState<Row | undefined>();
   const foundAt = order.findIndex((row) => row.item.id === selection.id);
   if (order.length > 0 && (foundAt === -1 || foundAt !== selection.index)) {
     // Adjusting state while rendering, so the change never shows a stale frame.
@@ -140,9 +158,28 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     const next = order[index];
     if (next !== undefined && (next.item.id !== selection.id || index !== selection.index)) {
       setSelection({ id: next.item.id, index });
+      setHighlight(undefined);
     }
   }
   const selected = order.find((row) => row.item.id === selection.id);
+
+  // Keyboard focus follows the selection when it was on the list (a row or
+  // its actions), so a screen reader hears where it went.
+  const list = useRef<HTMLDivElement>(null);
+  const focusFollows = useRef(false);
+  const keepFocus = () => {
+    const active = document.activeElement;
+    focusFollows.current = active !== null && list.current?.contains(active) === true;
+  };
+  const selectedId = selected?.item.id;
+  useEffect(() => {
+    if (!focusFollows.current || selectedId === undefined || highlight !== undefined) {
+      return;
+    }
+    focusFollows.current = false;
+    document.getElementById(itemId(selectedId))?.focus({ preventScroll: true });
+  }, [selectedId, highlight, snoozing]);
+
   const select = (id: string) => {
     setSelection({
       id,
@@ -151,10 +188,12 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         order.findIndex((row) => row.item.id === id),
       ),
     });
+    setHighlight(undefined);
   };
 
-  const hide = (row: Row) => {
-    setGone((current) => new Map([...current, [goneKey(row.item), row]]));
+  const hide = (row: Row, confirmation?: string) => {
+    keepFocus();
+    setGone((current) => new Map([...current, [goneKey(row.item), { ...row, confirmation }]]));
     const index = order.findIndex((r) => r.item.id === row.item.id);
     // The row below takes its place (or the one above, at the end).
     const next = order[index + 1] ?? order[index - 1];
@@ -163,7 +202,16 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       index: order[index + 1] === undefined ? Math.max(0, index - 1) : index,
     });
     setExpandedId(undefined);
-    setLaterId(undefined);
+    setHighlight(undefined);
+  };
+  // The confirmation has folded away: the row is simply hidden now.
+  const folded = (row: Row) => {
+    setGone((current) => {
+      const hidden = current.get(goneKey(row.item));
+      return hidden?.confirmation === undefined
+        ? current
+        : new Map([...current, [goneKey(row.item), { ...hidden, confirmation: undefined }]]);
+    });
   };
   const show = (row: Row) => {
     setGone((current) => new Map([...current].filter(([key]) => key !== goneKey(row.item))));
@@ -194,14 +242,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       }
     },
   });
-  const isQuestion = (row: Row) => row.need.trust === "check";
+
+  const when = (until: Date) =>
+    new Intl.DateTimeFormat(i18n.language, {
+      weekday: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(until);
 
   const done = (row: Row) => {
-    hide(row);
+    hide(row, t("confirm.done", { name: row.name }));
     needActions.done(row.conversation);
   };
   const notNeeded = (row: Row) => {
-    hide(row);
+    const warning = kindOf(row.need) === "warning";
+    hide(row, t(warning ? "confirm.safe" : "confirm.notNeeded", { name: row.name }));
     needActions.notNeeded(row.conversation);
   };
   const confirm = (row: Row) => {
@@ -214,24 +269,25 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         onError: () => {
           if (until === undefined) {
             hide(row);
-          } else {
-            show(row);
+            undo.fail({ label: t("snooze.failed", { name: row.name }) });
+            return;
           }
-          undo.notify(t("later.failed", { name: row.name }));
+          show(row);
+          undo.fail({
+            label: t("snooze.failed", { name: row.name }),
+            retry: () => {
+              snoozeUntil(row, until);
+            },
+          });
         },
       },
     );
   };
-  const later = (row: Row, until: Date) => {
-    hide(row);
+  const snoozeUntil = (row: Row, until: Date) => {
+    hide(row, t("confirm.snoozed", { name: row.name, when: when(until) }));
     snoozeOrRollBack(row, until);
-    const when = new Intl.DateTimeFormat(i18n.language, {
-      weekday: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(until);
     undo.push({
-      label: t("later.toast", { name: row.name, when }),
+      label: t("snooze.toast", { name: row.name, when: when(until) }),
       undo: () => {
         show(row);
         snoozeOrRollBack(row);
@@ -264,68 +320,178 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
     });
   };
 
+  /** What a row offers, in words with keys: the shape #166's ranked actions drop into. */
+  const actionsOf = (row: Row): { own: ItemAction[]; universal: ItemAction[] } => {
+    const ids = rowActionIds(kindOf(row.need));
+    const ownLabel: Record<OwnActionId, string> = {
+      reply: t("actions.reply"),
+      yes: tc("needs.actions.yes"),
+      no: tc("needs.actions.no"),
+      safe: tc("needs.actions.safe"),
+    };
+    const universalLabel: Record<UniversalActionId, string> = {
+      done: tc("needs.actions.done"),
+      snooze: t("snooze.button"),
+      not_needed: tc("needs.actions.notNeeded"),
+    };
+    return {
+      own: ids.own.slice(0, CHOICE_KEYS.length).map((id, index) => ({
+        id,
+        label: ownLabel[id],
+        key: CHOICE_KEYS[index] ?? "item.choice1",
+      })),
+      universal: ids.universal.map((id) => ({
+        id,
+        label: universalLabel[id],
+        key: UNIVERSAL_KEYS[id],
+      })),
+    };
+  };
+  const startSnooze = (row: Row) => {
+    keepFocus();
+    setHighlight(undefined);
+    setSnoozing(row);
+  };
+  const run = (row: Row, id: ActionId) => {
+    switch (id) {
+      case "reply": {
+        reply(row);
+        return;
+      }
+      case "yes": {
+        setHighlight(undefined);
+        confirm(row);
+        return;
+      }
+      case "no":
+      case "safe":
+      case "not_needed": {
+        notNeeded(row);
+        return;
+      }
+      case "done": {
+        done(row);
+        return;
+      }
+      case "snooze": {
+        startSnooze(row);
+        return;
+      }
+    }
+  };
+  const selectedActions = selected === undefined ? undefined : actionsOf(selected);
+  const offered = (id: ActionId) =>
+    selectedActions !== undefined &&
+    [...selectedActions.own, ...selectedActions.universal].some((action) => action.id === id);
+
   const move = (step: number) => {
+    keepFocus();
     const index = order.findIndex((row) => row.item.id === selected?.item.id);
     const target = Math.min(order.length - 1, Math.max(0, index + step));
     const next = order[target];
     if (next !== undefined) {
       setSelection({ id: next.item.id, index: target });
+      setHighlight(undefined);
+      if (next.item.id !== selected?.item.id) {
+        setExpandedId(undefined);
+      }
       const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
         document.getElementById(itemId(next.item.id));
       // Not every environment scrolls (tests run without layout).
       element?.scrollIntoView?.({ block: "nearest" });
     }
   };
+  const walk = (step: 1 | -1) => {
+    if (selectedActions === undefined) {
+      return;
+    }
+    const all = [...selectedActions.own, ...selectedActions.universal];
+    const at = all.findIndex((action) => action.id === highlight);
+    const next =
+      at === -1
+        ? step === 1
+          ? 0
+          : all.length - 1
+        : Math.max(0, Math.min(all.length - 1, at + step));
+    setHighlight(all[next]?.id);
+  };
   const hasRows = selected !== undefined;
-  // With an item open the arrows scroll it, as in the reader; J and K still step.
-  const alternates = expandedId === undefined;
+  useShortcut("list.next", () => {
+    move(1);
+  });
+  useShortcut("list.previous", () => {
+    move(-1);
+  });
   useShortcut(
-    "list.next",
+    "item.next_action",
     () => {
-      move(1);
+      walk(1);
     },
-    { alternates },
+    { enabled: hasRows },
   );
   useShortcut(
-    "list.previous",
+    "item.previous_action",
     () => {
-      move(-1);
+      walk(-1);
     },
-    { alternates },
+    { enabled: hasRows },
   );
   useShortcut(
     "list.open",
     () => {
-      if (selected !== undefined) {
+      if (selected === undefined) {
+        return;
+      }
+      if (highlight === undefined) {
         setExpandedId((id) => (id === selected.item.id ? undefined : selected.item.id));
+      } else {
+        run(selected, highlight as ActionId);
       }
     },
     { enabled: hasRows },
   );
   useShortcut(
+    "overlay.close",
+    () => {
+      keepFocus();
+      setHighlight(undefined);
+      setExpandedId(undefined);
+    },
+    { enabled: highlight !== undefined || expandedId !== undefined },
+  );
+  const own = (index: number) => () => {
+    const action = selectedActions?.own[index];
+    if (selected !== undefined && action !== undefined) {
+      run(selected, action.id as ActionId);
+    }
+  };
+  useShortcut("item.choice1", own(0), { enabled: selectedActions?.own[0] !== undefined });
+  useShortcut("item.choice2", own(1), { enabled: selectedActions?.own[1] !== undefined });
+  useShortcut("item.choice3", own(2), { enabled: selectedActions?.own[2] !== undefined });
+  useShortcut(
     "item.done",
     () => {
-      if (selected !== undefined && !isQuestion(selected)) {
+      if (selected !== undefined) {
         done(selected);
       }
     },
-    { enabled: hasRows },
+    { enabled: offered("done") },
   );
+  useShortcut(
+    "item.snooze",
+    () => {
+      if (selected !== undefined) {
+        startSnooze(selected);
+      }
+    },
+    { enabled: offered("snooze") },
+  );
+  // X: not needed, a warning's "It's safe" or a question's No.
   useShortcut(
     "conversations.resolve_need",
     () => {
       if (selected !== undefined) {
         notNeeded(selected);
-      }
-    },
-    { enabled: hasRows },
-  );
-  useShortcut(
-    "item.later",
-    () => {
-      if (selected !== undefined) {
-        setExpandedId(selected.item.id);
-        setLaterId(selected.item.id);
       }
     },
     { enabled: hasRows },
@@ -337,25 +503,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         reply(selected);
       }
     },
-    { enabled: hasRows },
-  );
-  useShortcut(
-    "item.choice1",
-    () => {
-      if (selected !== undefined && isQuestion(selected)) {
-        confirm(selected);
-      }
-    },
-    { enabled: selected !== undefined && isQuestion(selected) },
-  );
-  useShortcut(
-    "item.choice2",
-    () => {
-      if (selected !== undefined && isQuestion(selected)) {
-        notNeeded(selected);
-      }
-    },
-    { enabled: selected !== undefined && isQuestion(selected) },
+    { enabled: offered("reply") },
   );
 
   const today = now ?? new Date();
@@ -367,33 +515,22 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const loading = open.isPending || (ids.length > 0 && conversations.isPending);
   const count = order.length;
   const review = order.some((row) => row.item.reason === "review");
+  const times = snoozeOptions(today);
 
   const aside = (
-    <>
-      <AsideSection title={t("doneTodayTitle")}>
-        <DoneToday
-          items={clearedItems}
-          byId={byId}
-          t={t}
-          onReopen={(conversation) => {
-            needActions.reopen(conversation);
-          }}
-          onUnsnooze={(item) => {
-            snooze.mutate({ item: item.id, until: undefined });
-          }}
-        />
-      </AsideSection>
-      <AsideSection title={t("keyboard")}>
-        {KEYS.map((id) => {
-          const definition = registry.get(id);
-          return definition === undefined ? null : (
-            <Line key={id} trailing={<KbdHint shortcut={id} announce withAlternates />}>
-              {translateLabel(definition.label)}
-            </Line>
-          );
-        })}
-      </AsideSection>
-    </>
+    <AsideSection title={t("doneTodayTitle")}>
+      <DoneToday
+        items={clearedItems}
+        byId={byId}
+        t={t}
+        onReopen={(conversation) => {
+          needActions.reopen(conversation);
+        }}
+        onUnsnooze={(item) => {
+          snooze.mutate({ item: item.id, until: undefined });
+        }}
+      />
+    </AsideSection>
   );
 
   if (open.isError) {
@@ -428,78 +565,102 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
       />
       {offer}
       {loading ? <SkeletonList rows={4} /> : null}
-      {groups.map((group) => (
-        <QueueGroup
-          key={group.reason}
-          signal={group.reason}
-          name={t(`groups.${group.reason}`)}
-          count={group.rows.length}
-        >
-          {group.rows.map((row) => {
-            const due = dueLabel(tc, row.need, i18n.language, now);
-            const expanded = expandedId === row.item.id;
-            return (
-              <Item
-                key={row.item.id}
-                id={itemId(row.item.id)}
-                who={row.name}
-                what={needSentence(tc, row.need, row.name)}
-                excerpt={row.need.quote?.text}
-                avatar={{
-                  name: row.name,
-                  kind:
-                    row.item.reason === "pay" || row.need.question === "suspicious"
-                      ? "service"
-                      : "person",
-                }}
-                due={due?.text}
-                soon={due?.soon === true}
-                selected={row.item.id === selected?.item.id}
-                expanded={expanded}
-                hints={
-                  isQuestion(row) ? ["item.choice1", "item.choice2"] : ["item.done", "item.later"]
-                }
-                onToggle={() => {
-                  select(row.item.id);
-                  setExpandedId(expanded ? undefined : row.item.id);
-                }}
-                detail={
-                  <NeedDetail
-                    workspaceId={workspaceId}
-                    row={row}
-                    t={t}
-                    tc={tc}
-                    locale={i18n.language}
-                    laterOpen={laterId === row.item.id}
-                    onLaterOpenChange={(value) => {
-                      setLaterId(value ? row.item.id : undefined);
-                    }}
-                    now={today}
-                    onReply={() => {
-                      reply(row);
-                    }}
-                    onDone={() => {
-                      done(row);
-                    }}
-                    onNotNeeded={() => {
-                      notNeeded(row);
-                    }}
-                    onConfirm={() => {
-                      confirm(row);
-                    }}
-                    onLater={(until) => {
-                      later(row, until);
-                    }}
-                    onOpen={() => {
-                      openConversation(row);
-                    }}
-                  />
-                }
-              />
-            );
-          })}
-        </QueueGroup>
-      ))}
+      <div ref={list} className="flex flex-col">
+        {groups.map((group) => (
+          <QueueGroup
+            key={group.reason}
+            signal={group.reason}
+            name={t(`groups.${group.reason}`)}
+            count={group.rows.filter((row) => row.confirmation === undefined).length}
+          >
+            {group.rows.map((row) => {
+              const due = dueLabel(tc, row.need, i18n.language, now);
+              const expanded = expandedId === row.item.id;
+              const isSelected = row.item.id === selected?.item.id;
+              const actions = isSelected ? actionsOf(row) : undefined;
+              return (
+                <Item
+                  key={row.item.id}
+                  id={itemId(row.item.id)}
+                  who={row.name}
+                  what={needSentence(tc, row.need, row.name)}
+                  excerpt={row.need.quote?.text}
+                  avatar={{
+                    name: row.name,
+                    kind:
+                      row.item.reason === "pay" || row.need.question === "suspicious"
+                        ? "service"
+                        : "person",
+                  }}
+                  due={due?.text}
+                  soon={due?.soon === true}
+                  selected={isSelected}
+                  expanded={expanded}
+                  confirmation={row.confirmation}
+                  onConfirmEnd={() => {
+                    folded(row);
+                  }}
+                  onToggle={() => {
+                    select(row.item.id);
+                    setExpandedId(expanded ? undefined : row.item.id);
+                  }}
+                  actions={
+                    actions === undefined ? undefined : (
+                      <ItemActions
+                        label={t("actions.label", { name: row.name })}
+                        own={actions.own}
+                        universal={actions.universal}
+                        highlighted={highlight}
+                        onHighlight={setHighlight}
+                        onAction={(id) => {
+                          run(row, id as ActionId);
+                        }}
+                      />
+                    )
+                  }
+                  detail={
+                    <NeedDetail
+                      workspaceId={workspaceId}
+                      row={row}
+                      t={t}
+                      tc={tc}
+                      locale={i18n.language}
+                      onOpen={() => {
+                        openConversation(row);
+                      }}
+                    />
+                  }
+                />
+              );
+            })}
+          </QueueGroup>
+        ))}
+      </div>
+      <Dialog
+        open={snoozing !== undefined}
+        onClose={() => {
+          setSnoozing(undefined);
+        }}
+        title={t("snooze.title", { name: snoozing?.name ?? "" })}
+        description={t("snooze.description")}
+      >
+        <DialogChoices
+          label={t("snooze.choices")}
+          choices={times.map((option) => ({
+            id: option.key,
+            label: t(`snooze.${option.key}`),
+            detail: when(option.until),
+          }))}
+          onChoose={(key) => {
+            const row = snoozing;
+            const option = times.find((o) => o.key === key);
+            setSnoozing(undefined);
+            if (row !== undefined && option !== undefined) {
+              snoozeUntil(row, option.until);
+            }
+          }}
+        />
+      </Dialog>
     </HomeLayout>
   );
 }
@@ -514,106 +675,26 @@ interface NeedDetailProps {
   t: Translate;
   tc: Translate;
   locale: string;
-  laterOpen: boolean;
-  onLaterOpenChange: (open: boolean) => void;
-  now: Date;
-  onReply: () => void;
-  onDone: () => void;
-  onNotNeeded: () => void;
-  onConfirm: () => void;
-  onLater: (until: Date) => void;
   onOpen: () => void;
 }
 
-/** An opened item: the warning's tells, the sender's words, its actions and how it was decided. */
-function NeedDetail({
-  workspaceId,
-  row,
-  t,
-  tc,
-  locale,
-  laterOpen,
-  onLaterOpenChange,
-  now,
-  onReply,
-  onDone,
-  onNotNeeded,
-  onConfirm,
-  onLater,
-  onOpen,
-}: NeedDetailProps) {
+/** An opened item: the warning's tells, the sender's words and how it was decided. */
+function NeedDetail({ workspaceId, row, t, tc, locale, onOpen }: NeedDetailProps) {
   const { i18n } = useTranslation("conversations");
   const exists = (key: string) => i18n.exists(`conversations:${key}`);
   const detail = useConversation(workspaceId, row.conversation.id);
   const decisions = detail.data?.decisions ?? [];
   const { need } = row;
   const warning = need.question === "suspicious";
-  const question = need.trust === "check";
   return (
     <ItemDetail
       reasons={warning ? warningReasons(tc, exists, decisions) : []}
       quoteFrom={quoteAttribution(need, row.name, locale)}
       quote={need.quote?.text}
       actions={
-        <>
-          {question ? (
-            <>
-              <Button variant="primary" shortcut="item.choice1" onClick={onConfirm}>
-                {tc("needs.actions.yes")}
-              </Button>
-              <Button variant="secondary" shortcut="item.choice2" onClick={onNotNeeded}>
-                {tc("needs.actions.no")}
-              </Button>
-            </>
-          ) : (
-            <>
-              {warning ? null : (
-                <Button variant="primary" shortcut="item.reply" onClick={onReply}>
-                  {t("actions.reply")}
-                </Button>
-              )}
-              <Button
-                variant={warning ? "primary" : "secondary"}
-                shortcut="item.done"
-                onClick={onDone}
-              >
-                {tc("needs.actions.done")}
-              </Button>
-              <Popover
-                label={t("later.title")}
-                placement="top-start"
-                open={laterOpen}
-                onOpenChange={onLaterOpenChange}
-                renderTrigger={(trigger) => (
-                  <Button variant="ghost" shortcut="item.later" {...trigger}>
-                    {t("later.button")}
-                  </Button>
-                )}
-              >
-                {(close) =>
-                  laterOptions(now).map((option) => (
-                    <Button
-                      key={option.key}
-                      variant="ghost"
-                      onClick={() => {
-                        close();
-                        onLater(option.until);
-                      }}
-                    >
-                      {t(`later.${option.key}`)}
-                    </Button>
-                  ))
-                }
-              </Popover>
-              <Button variant="ghost" shortcut="conversations.resolve_need" onClick={onNotNeeded}>
-                {tc(warning ? "needs.actions.safe" : "needs.actions.notNeeded")}
-              </Button>
-            </>
-          )}
-          <Button variant="link" onClick={onOpen}>
-            {t("actions.open")}
-          </Button>
-        </>
+        <Button variant="link" onClick={onOpen}>
+          {t("actions.open")}
+        </Button>
       }
       how={<HowDecided rows={howRows(tc, exists, decisions)} footnote={tc("needs.how.footnote")} />}
     />

@@ -1,4 +1,5 @@
-// Pure helpers of Home's "What needs you": grouping, Later's times and the
+// Pure helpers of Home's "What needs you": grouping, Snooze's times, the
+// actions a row offers and the
 // sentences of Done today. No React, no fetching.
 import type { ItemView, Reason } from "./api/queries";
 
@@ -13,22 +14,64 @@ export function groupByReason(items: readonly ItemView[]): { reason: Reason; ite
   });
 }
 
-/** The choices of "Later", from `now`: later today (18:00), tomorrow and next Monday (08:00). */
-export function laterOptions(now: Date): { key: "today" | "tomorrow" | "monday"; until: Date }[] {
+export type SnoozeKey = "today" | "tomorrow" | "monday" | "nextWeek";
+
+/**
+ * The choices of Snooze, from `now`: later today (18:00, while that is more
+ * than an hour away), tomorrow, next Monday and a week from today (08:00).
+ * A day that would repeat an earlier choice is left out (Monday on a
+ * Sunday, next week on a Monday).
+ */
+export function snoozeOptions(now: Date): { key: SnoozeKey; until: Date }[] {
   const at = (days: number, hour: number) => {
     const date = new Date(now);
     date.setDate(date.getDate() + days);
     date.setHours(hour, 0, 0, 0);
     return date;
   };
-  const toMonday = ((8 - now.getDay()) % 7) + (now.getDay() === 1 ? 7 : 0);
+  const toMonday = (8 - now.getDay()) % 7 || 7;
   const evening = at(0, 18);
   const worthIt = evening.getTime() - now.getTime() > 60 * 60 * 1000;
-  return [
+  const options: { key: SnoozeKey; until: Date }[] = [
     ...(worthIt ? [{ key: "today" as const, until: evening }] : []),
-    { key: "tomorrow" as const, until: at(1, 8) },
-    { key: "monday" as const, until: at(toMonday === 0 ? 7 : toMonday, 8) },
+    { key: "tomorrow", until: at(1, 8) },
+    { key: "monday", until: at(toMonday, 8) },
+    { key: "nextWeek", until: at(7, 8) },
   ];
+  return options.filter(
+    (option, index) =>
+      !options
+        .slice(0, index)
+        .some((earlier) => earlier.until.getTime() === option.until.getTime()),
+  );
+}
+
+/** What a row offers: the item's own actions (keys 1 to 3), then the universal ones. */
+export type OwnActionId = "reply" | "yes" | "no" | "safe";
+export type UniversalActionId = "done" | "snooze" | "not_needed";
+
+/**
+ * The actions Home offers for a need today. A question (`check`) is
+ * answered Yes or No (No is "not needed", so Not needed is not repeated,
+ * and Done means nothing until it is answered); a warning is cleared with
+ * "It's safe" (its not needed); anything else is replied to. #166 will
+ * replace the own actions with a ranked list from the server.
+ */
+export function rowActionIds(kind: "question" | "warning" | "need"): {
+  own: OwnActionId[];
+  universal: UniversalActionId[];
+} {
+  switch (kind) {
+    case "question": {
+      return { own: ["yes", "no"], universal: ["snooze"] };
+    }
+    case "warning": {
+      return { own: ["safe"], universal: ["done", "snooze"] };
+    }
+    case "need": {
+      return { own: ["reply"], universal: ["done", "snooze", "not_needed"] };
+    }
+  }
 }
 
 /** Which sentence Done today uses for an item, and how it can be undone. */
@@ -37,7 +80,7 @@ export function doneTodayKind(item: ItemView): {
   undo: "reopen" | "unsnooze" | undefined;
 } {
   if (item.state === "open") {
-    return { key: "doneToday.later", undo: "unsnooze" };
+    return { key: "doneToday.snoozed", undo: "unsnooze" };
   }
   switch (item.cleared_because) {
     case "done": {

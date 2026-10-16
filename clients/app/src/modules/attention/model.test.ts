@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ItemView } from "./api/queries";
-import { doneTodayKind, groupByReason, laterOptions } from "./model";
+import { doneTodayKind, groupByReason, rowActionIds, snoozeOptions } from "./model";
 
 const item = (id: string, reason: ItemView["reason"], extra: Partial<ItemView> = {}): ItemView => ({
   id,
@@ -29,26 +29,42 @@ describe("attention model", () => {
     expect(groups[1]?.items.map((i) => i.id)).toEqual(["a", "c"]);
   });
 
-  it("offers later today only while it is worth it", () => {
+  it("offers later today only while it is worth it, and next week", () => {
     // Tuesday 13 October 2026, 09:00 local.
     const morning = new Date(2026, 9, 13, 9, 0);
-    expect(laterOptions(morning).map((o) => o.key)).toEqual(["today", "tomorrow", "monday"]);
-    const monday = laterOptions(morning).at(-1)?.until;
+    const options = snoozeOptions(morning);
+    expect(options.map((o) => o.key)).toEqual(["today", "tomorrow", "monday", "nextWeek"]);
+    const monday = options.find((o) => o.key === "monday")?.until;
     expect(monday?.getDay()).toBe(1);
     expect(monday?.getDate()).toBe(19);
+    const week = options.find((o) => o.key === "nextWeek")?.until;
+    expect([week?.getDate(), week?.getHours()]).toEqual([20, 8]);
     const evening = new Date(2026, 9, 13, 17, 30);
-    expect(laterOptions(evening).map((o) => o.key)).toEqual(["tomorrow", "monday"]);
-    // On a Monday, Monday means next week.
-    expect(
-      laterOptions(new Date(2026, 9, 19, 9, 0))
-        .at(-1)
-        ?.until.getDate(),
-    ).toBe(26);
+    expect(snoozeOptions(evening).map((o) => o.key)).toEqual(["tomorrow", "monday", "nextWeek"]);
+  });
+
+  it("never offers the same day twice", () => {
+    // On a Monday, Monday means next week: Next week would repeat it.
+    const onMonday = snoozeOptions(new Date(2026, 9, 19, 9, 0));
+    expect(onMonday.map((o) => o.key)).toEqual(["today", "tomorrow", "monday"]);
+    expect(onMonday.at(-1)?.until.getDate()).toBe(26);
+    // On a Sunday, Monday is tomorrow.
+    const onSunday = snoozeOptions(new Date(2026, 9, 18, 19, 0));
+    expect(onSunday.map((o) => o.key)).toEqual(["tomorrow", "nextWeek"]);
+  });
+
+  it("offers each kind of need its own actions, without repeating one", () => {
+    expect(rowActionIds("need")).toEqual({
+      own: ["reply"],
+      universal: ["done", "snooze", "not_needed"],
+    });
+    expect(rowActionIds("question")).toEqual({ own: ["yes", "no"], universal: ["snooze"] });
+    expect(rowActionIds("warning")).toEqual({ own: ["safe"], universal: ["done", "snooze"] });
   });
 
   it("words Done today and says what can be undone", () => {
     expect(doneTodayKind(item("a", "reply", { snoozed_until: "x" }))).toEqual({
-      key: "doneToday.later",
+      key: "doneToday.snoozed",
       undo: "unsnooze",
     });
     const done = item("b", "pay", { state: "cleared", cleared_because: "done" });
