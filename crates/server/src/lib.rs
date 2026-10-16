@@ -843,11 +843,11 @@ mod tests {
         );
     }
 
-    /// A transaction that sets no workspace (the scheduler's dispatcher) may
-    /// only read and lease the scheduling index, never insert or delete
-    /// rows of any workspace's: its maintenance policies are `FOR SELECT`
-    /// and `FOR UPDATE`, and no other policy admits a transaction without a
-    /// workspace on a module's table.
+    /// Cross-workspace maintenance on a module's table needs the kernel
+    /// scope (the schedulers' dispatchers), and may only read and lease (or
+    /// start): its maintenance policies are `FOR SELECT` and `FOR UPDATE`.
+    /// No policy admits a transaction merely for setting no workspace
+    /// (campbooks-cloud#129).
     #[sqlx::test(migrations = "../../migrations")]
     async fn maintenance_policies_only_read_and_lease(db: sqlx::PgPool) {
         let rows: Vec<(String, String, String, String)> = sqlx::query_as(
@@ -859,11 +859,21 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        // Policies admitting a transaction that set no workspace.
         let unset = "'campbooks.workspace_id'::text, true), ''::text) IS NULL";
+        let admitting_unset: Vec<&String> = rows
+            .iter()
+            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .map(|(_, name, _, _)| name)
+            .collect();
+        assert!(admitting_unset.is_empty(), "{admitting_unset:?}");
+        // Policies admitting the kernel scope.
+        let kernel = format!(
+            "'{}'::text, true) = 'on'::text",
+            testing::kernel_scope_setting()
+        );
         let policies: Vec<(String, String, String)> = rows
             .into_iter()
-            .filter(|(_, _, _, qual)| qual.contains(unset))
+            .filter(|(_, _, _, qual)| qual.contains(&kernel))
             .map(|(table, name, cmd, _)| (table, name, cmd))
             .collect();
         assert_eq!(

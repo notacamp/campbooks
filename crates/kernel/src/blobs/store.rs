@@ -233,7 +233,10 @@ impl BlobStore {
     /// Record, in the caller's transaction `tx`, that `owner` holds `blob`:
     /// the blob is kept while any owner holds it. Returns `false` if this
     /// owner already held it. Fails with [`BlobError::NotStored`] (leaving
-    /// `tx` usable) if the blob is not stored in `workspace`.
+    /// `tx` usable) if the blob is not stored in `workspace`, and with
+    /// [`BlobError::Database`] ([`sqlx::Error::InvalidArgument`]) when `tx`
+    /// does not work in `workspace` (another one, or none). Detaching is
+    /// refused the same way.
     pub async fn attach(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -243,6 +246,7 @@ impl BlobStore {
     ) -> Result<bool, BlobError> {
         check_workspace(workspace)?;
         check_owner(owner)?;
+        crate::db::require_scope(tx, workspace, "a blob").await?;
         let hash = blob.hash.to_string();
         // Hold the row against the sweeper until `tx` ends.
         let stored = sqlx::query_scalar!(
@@ -288,6 +292,7 @@ impl BlobStore {
     ) -> Result<bool, BlobError> {
         check_workspace(workspace)?;
         check_owner(owner)?;
+        crate::db::require_scope(tx, workspace, "a blob").await?;
         let detached = sqlx::query_scalar!(
             r#"
             WITH gone AS (
@@ -320,6 +325,7 @@ impl BlobStore {
     ) -> Result<u64, BlobError> {
         check_workspace(workspace)?;
         check_owner(owner)?;
+        crate::db::require_scope(tx, workspace, "a blob").await?;
         let detached = sqlx::query_scalar!(
             r#"
             WITH gone AS (
@@ -353,6 +359,7 @@ impl BlobStore {
     ) -> Result<u64, BlobError> {
         check_workspace(workspace)?;
         check_owner(&BlobOwner::new(kind.to_owned(), Uuid::nil()))?;
+        crate::db::require_scope(tx, workspace, "a blob").await?;
         let detached = sqlx::query_scalar!(
             r#"
             WITH gone AS (
@@ -391,7 +398,7 @@ impl BlobStore {
             .map_ok(|meta| meta.location)
             .boxed();
         let deleted = inner.delete_all(listed).await?;
-        let mut tx = inner.db.begin().await?;
+        let mut tx = crate::db::begin_in(&inner.db, workspace).await?;
         sqlx::query!(
             "DELETE FROM kernel.blob_refs WHERE workspace_id = $1",
             workspace
@@ -422,7 +429,8 @@ impl BlobStore {
         let inner = self.inner()?;
         let mut stats = SweepStats::default();
         loop {
-            let mut tx = inner.db.begin().await?;
+            // Every workspace's catalogue.
+            let mut tx = crate::db::begin_kernel(&inner.db).await?;
             let claimed = claim_unreferenced(&mut tx, grace).await?;
             let deleted = inner.delete_claimed(&mut tx, &claimed, grace).await?;
             tx.commit().await?;
@@ -589,6 +597,7 @@ impl Inner {
     /// Upsert the catalogue row, restarting its grace period. Committed
     /// before the object is written (see the module docs).
     async fn touch(&self, workspace: &str, hash: &BlobHash, size: u64) -> Result<(), BlobError> {
+        let mut tx = crate::db::begin_in(&self.db, workspace).await?;
         sqlx::query!(
             r#"
             INSERT INTO kernel.blobs (workspace_id, hash, size) VALUES ($1, $2, $3)
@@ -598,8 +607,9 @@ impl Inner {
             hash.to_string(),
             i64::try_from(size).unwrap_or(i64::MAX),
         )
-        .execute(&self.db)
+        .execute(&mut *tx)
         .await?;
+        tx.commit().await?;
         Ok(())
     }
 

@@ -28,6 +28,7 @@ use super::{Audience, ChangeOp, hub::StreamSlot};
 use crate::{
     AppState, Error,
     auth::Principal,
+    db::BeginFor as _,
     operations::ReadRules,
     records::RecordRef,
     tenancy::{Access, WorkspaceId},
@@ -109,13 +110,16 @@ pub async fn open(
     // Subscribe before reading the head, so nothing sequenced in between
     // goes unnoticed.
     let wake = state.changes.watch(&workspace);
+    // The feed of one workspace, read in that workspace's transaction.
+    let mut tx = state.db.begin_for(subscription.workspace).await?;
     let bounds = sqlx::query!(
         r#"SELECT coalesce((SELECT head FROM kernel.change_heads WHERE workspace_id = $1), 0) AS "head!",
                   (SELECT min(seq) FROM kernel.changes WHERE workspace_id = $1 AND seq IS NOT NULL) AS oldest"#,
         workspace
     )
-    .fetch_one(&state.db)
+    .fetch_one(&mut *tx)
     .await?;
+    tx.commit().await?;
     let (cursor, first) = match start(
         subscription.after.as_deref(),
         bounds.head,
@@ -295,7 +299,8 @@ impl Feed {
     async fn read_page(&mut self) -> Result<bool, Error> {
         let rows = {
             let _permit = self.state.changes.query_permit().await;
-            sqlx::query!(
+            let mut tx = self.state.db.begin_for(self.subscription.workspace).await?;
+            let rows = sqlx::query!(
                 r#"SELECT seq AS "seq!", event_id, record_type, record_id, op,
                           container_type, container_id, audience, audience_user
                      FROM kernel.changes
@@ -306,8 +311,10 @@ impl Feed {
                 self.cursor,
                 PAGE
             )
-            .fetch_all(&self.state.db)
-            .await?
+            .fetch_all(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            rows
         };
         let Some(last) = rows.last().map(|row| row.seq) else {
             return Ok(false);

@@ -29,7 +29,7 @@ nothing useful ("couldn't load your answers"). Seen in production on
 ## Impact
 
 - `crates/server/src/bff` (session lookup, sign-in, store), one migration
-  `20261020200000_bff__session_scopes.sql` (two nullable columns, no rewrite).
+  `20261020230000_bff__session_scopes.sql` (two nullable columns, no rewrite).
 - No client change, no API change.
 - Self-hosters: everyone signed in to the web app signs in once more after
   upgrading. Nothing else to do.

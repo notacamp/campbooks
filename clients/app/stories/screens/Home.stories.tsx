@@ -171,3 +171,67 @@ export const LoadError: Story = {
     ).toBeVisible();
   },
 };
+
+// A busy morning: forty things need you, more than fit in the window.
+const MANY_NEEDS = Array.from({ length: 40 }, (_, index) => {
+  const summary = NEEDS[index % NEEDS.length] ?? MARTA;
+  return index < NEEDS.length ? summary : { ...summary, id: `${summary.id}-${String(index)}` };
+});
+const MANY_ITEMS = MANY_NEEDS.map((summary, index) => {
+  const base = ITEMS[index % ITEMS.length] ?? ITEMS[0];
+  return index < ITEMS.length || base === undefined
+    ? base
+    : {
+        ...base,
+        id: `${base.id}-${String(index)}`,
+        record: { ...base.record, id: summary.id },
+      };
+}).filter((item) => item !== undefined);
+
+/** A viewport the story test runs at (the addon reads `globals.viewport`). */
+function at(name: string, width: number, height: number) {
+  return {
+    parameters: {
+      viewport: {
+        options: {
+          [name]: { name, styles: { width: `${String(width)}px`, height: `${String(height)}px` } },
+        },
+      },
+    },
+    globals: { viewport: { value: name } },
+  };
+}
+
+const busy: Pick<Story, "args" | "play"> = {
+  args: {
+    path: PATH,
+    api: home({
+      [`GET ${W}/attention`]: (_body, url) =>
+        url.searchParams.get("state") === "cleared"
+          ? { body: { items: CLEARED, counts: [] } }
+          : { body: { items: MANY_ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: {
+        body: { conversations: [...MANY_NEEDS, SOFIA], next_cursor: null },
+      },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await canvas.findByRole("heading", { level: 1, name: "40 things need you" });
+    const page = canvas.getByRole("main");
+    const [sidebar] = canvas.getAllByRole("navigation");
+    // Forty needs are taller than the window, so Home scrolls inside its pane…
+    await waitFor(() => expect(page.scrollHeight).toBeGreaterThan(page.clientHeight));
+    page.scrollTop = page.scrollHeight;
+    await waitFor(() => expect(page.scrollTop).toBeGreaterThan(0));
+    // …while the page itself stays the window's height and the sidebar stays put.
+    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(globalThis.innerHeight);
+    await expect(sidebar?.getBoundingClientRect().bottom).toBe(globalThis.innerHeight);
+  },
+};
+
+/** A busy Home in a narrow desktop window: Home scrolls, the page doesn't. */
+export const BusyNarrowDesktop: Story = { ...busy, ...at("narrowDesktop", 1100, 800) };
+
+/** A busy Home in a wide desktop window: Home scrolls, the page doesn't. */
+export const BusyDesktop: Story = { ...busy, ...at("desktop", 1440, 900) };

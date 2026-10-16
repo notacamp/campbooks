@@ -13850,6 +13850,16 @@
           }
         }
       },
+      "PausedReason": {
+        "type": "string",
+        "description": "Why a taught rule is paused: the one that would still hold once the\nmost passing one clears.",
+        "enum": [
+          "inbox_read_only",
+          "author_cannot_write",
+          "paused_by_member",
+          "author_unavailable"
+        ]
+      },
       "Phase": {
         "type": "string",
         "description": "Where a stream is in its reading.",
@@ -15540,6 +15550,17 @@
             ],
             "description": "The member's own words, for an instruction."
           },
+          "paused_reason": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PausedReason",
+                "description": "Why it is paused; absent unless `state` is `paused`."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "recent_exceptions": {
             "type": "integer",
             "format": "int32",
@@ -15563,7 +15584,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/RuleState",
-            "description": "Whether it acts. `paused` when its author can no longer change the inbox."
+            "description": "Whether it acts. `paused` when its author can no longer change the\ninbox or is away for now, its inbox is kept read-only, or a member\npaused it."
           },
           "taught_by": {
             "oneOf": [
