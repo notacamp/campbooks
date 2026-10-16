@@ -6,8 +6,38 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings pages are made of section cards.** Every Settings and Admin page now has a
+  display-face title with its lead, then each section in its own card with a larger title,
+  a count where it lists things ("Accounts · 2") and a one-line description. In Scout's
+  memory the rules no longer sit under a second "Rules" heading, the sentence field keeps
+  its label for screen readers only, and the privacy line has a lock. Ways to sign in
+  gets an Accounts card with "Add a way to sign in" at its bottom and Sign out everywhere
+  in its own card with an outlined danger button. Nothing behaves differently.
+
 ### Security
 
+- **The change feed reveals nothing about inboxes you can't see.** The live stream of
+  what changed used to carry the workspace's own change count: as the `ready` frame's
+  `head`, as every frame's cursor (so the gap between two of your changes counted the
+  ones you were not shown), in a heartbeat sent only when hidden changes had happened,
+  in when a resume answered `too_far_behind` or `cursor_expired`, and in how a catch-up
+  came in bursts (a page was 200 changes of the workspace, hidden ones included). A
+  member outside an inbox could tell from it how much mail that inbox gets, and when.
+  The stream now reads pages of changes you may see only, filtered in the database;
+  cursors are sealed resume tokens, new on every frame, all the same length and good
+  only for you; `ready` has no `head`; heartbeats come on a fixed timer, busy or idle,
+  each with a fresh token; every change you may see is its own frame; and a token
+  expires by its age alone (changes are now kept for the retention period after they
+  were numbered). A test compares each kind of caller's stream (member, admin, a client
+  acting for a member, a client acting for nobody) with and without activity they may
+  not see, and they match. `CAMPBOOKS_CHANGES__MAX_BACKLOG` and the `too_far_behind`
+  reset are gone; opening streams is now limited per person or client
+  (`CAMPBOOKS_CHANGES__OPENS_PER_WINDOW`, 30 per `OPENS_WINDOW_SECONDS` 60 by default),
+  and the server warns at startup when `CAMPBOOKS_SECRET_KEY` is not set. Apps holding
+  a cursor from before refetch once. Migration
+  `20261020220000_kernel__change_sequenced_at` (campbooks-cloud#131).
 - **A suspended member's rules pause until the suspension is lifted.** A rule acts in
   its author's name, so while an administrator has the author's account suspended their
   rules read as paused, exactly as when the author can no longer change the inbox: they
@@ -240,6 +270,29 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **New features no longer stay hidden from people signed in before the release that added them.**
+  A web session kept the permissions it asked for at sign-in, so after a release that adds
+  some (Scout's questions and memory in this one), the new features answered 403 and showed
+  nothing until the person signed out. Now a session that predates the permissions the web app
+  asks for ends on its next request and the app asks you to sign in again, which goes straight
+  through while your sign-in at the identity provider is still live; signing out of such a
+  session still ends everything. Migration `20261020230000_bff__session_scopes` adds two
+  nullable columns. After upgrading, everyone signed in to the web app signs in once more.
+  (campbooks-cloud#172)
+- **HTML email renders with its own styles, safely (campbooks-cloud#160).** Newsletters,
+  receipts and Outlook or Gmail replies looked broken: their style sheets were dropped
+  (the page's policy blocks them in the mail frame too), the document title and hidden
+  preview text showed up in the body, the frame's height was a guess (mail was cut short
+  or padded, and long mail scrolled inside its frame) and a 600px layout did not fit a
+  phone. Now the server inlines a message's style sheets into `style` attributes before
+  sanitising (never fetching a linked or imported sheet), filters every declaration with a
+  real CSS parser (nothing that loads or runs survives: no `url()`, `@import`,
+  `expression()`, `var()`, escapes), and returns the message's `@media` rules, filtered the
+  same way, in a new `css` field of the message body. The reader's frame is as tall as its
+  content, shrinks a layout wider than the reader to fit, and applies the `@media` rules to
+  the frame only. It still never runs a script, submits a form or loads a remote image
+  before "Show images"; tracking pixels sized or hidden by their style are now removed
+  too. The page's own policy is unchanged.
 - **A need settled while its follow-up waited is no longer overwritten.** When a first
   "needs you" was put off because its message was busy, the follow-up could store it from
   what it had read before waiting: an open need on a conversation archived meanwhile, or

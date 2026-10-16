@@ -12,7 +12,7 @@ const meta = {
   argTypes: {
     variant: {
       control: "inline-radio",
-      options: ["primary", "secondary", "ghost", "danger", "link"],
+      options: ["primary", "secondary", "ghost", "danger", "danger-outline", "link"],
     },
     size: { control: "inline-radio", options: ["md", "lg"] },
   },
@@ -46,6 +46,9 @@ export const Ai: Story = {
   },
 };
 export const Danger: Story = { args: { variant: "danger", children: "It was not me", keys: "2" } };
+export const DangerOutline: Story = {
+  args: { variant: "danger-outline", children: "Sign out everywhere", icon: "sign-out" },
+};
 export const Link: Story = { args: { variant: "link", children: "Why?" } };
 
 /** 44px, for touch: phone action bars. */

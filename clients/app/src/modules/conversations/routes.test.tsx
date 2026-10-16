@@ -119,7 +119,9 @@ describe("the inbox", () => {
     expect(await within(reader).findByRole("heading", { name: Q4.subject })).toBeVisible();
     // The newest message is open, in the sandboxed frame.
     const frame = await within(reader).findByTitle("Message from Maya Okafor");
-    expect(frame.getAttribute("sandbox")).toBe("allow-popups allow-popups-to-escape-sandbox");
+    expect(frame.getAttribute("sandbox")).toBe(
+      "allow-same-origin allow-popups allow-popups-to-escape-sandbox",
+    );
     expect(within(reader).getByText("q4-plan-v3.pdf")).toBeVisible();
     // The two older ones are folded until opened.
     const folded = within(reader).getAllByRole("button", { expanded: false });

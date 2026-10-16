@@ -2,10 +2,12 @@
 //! — one message's text and HTML bodies, as JSON.
 //!
 //! The HTML is untrusted and never served as `text/html`: it is sanitised
-//! here (`domain::sanitize`: no scripts, style sheets, forms or frames; links
-//! open in a new tab; remote images held back unless asked for; tracking
-//! pixels removed), then reaches the client as a string that the client
-//! renders only in its sandboxed frame (`lib/ui/safe-html`, AGENTS.md).
+//! here (`domain::sanitize`: style sheets inlined into filtered `style`
+//! attributes; no scripts, forms or frames; links open in a new tab; remote
+//! images held back unless asked for; tracking pixels removed), then reaches
+//! the client as a string that the client renders only in its sandboxed
+//! frame (`lib/ui/safe-html`, AGENTS.md), with the message's filtered
+//! `@media` rules beside it.
 //! Inline (`cid:`) images are not remote: they show the message's own parts
 //! as `data:` URLs, raster types only and within [`MAX_INLINE_IMAGE_BYTES`]
 //! and [`MAX_INLINE_TOTAL_BYTES`]; anything else shows the placeholder.
@@ -70,6 +72,10 @@ pub struct MessageBody {
     pub remote_images: u32,
     /// Whether the remote images were kept.
     pub images_shown: bool,
+    /// The HTML part's `@media` rules, filtered like its `style` attributes
+    /// (nothing that loads or runs survives): CSS the client applies to the
+    /// frame's document only, never to its own page.
+    pub css: Option<String>,
 }
 
 /// Read one message's text and HTML bodies.
@@ -148,13 +154,21 @@ pub async fn handler(
         }
         _ => InlineImages::new(),
     };
-    let sanitized = html
-        .as_deref()
-        .map(|html| sanitize(html, query.show_images, &inline));
+    // CPU-bound (inlining, two ammonia passes): off the async workers.
+    let show = query.show_images;
+    let sanitized = match html {
+        Some(html) => Some(
+            tokio::task::spawn_blocking(move || sanitize(&html, show, &inline))
+                .await
+                .map_err(Error::internal)?,
+        ),
+        None => None,
+    };
     Ok(Json(MessageBody {
         text,
         remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
         images_shown: query.show_images,
+        css: sanitized.as_ref().and_then(|s| s.css.clone()),
         html: sanitized.map(|s| s.html),
         truncated,
     }))
@@ -289,6 +303,49 @@ mod tests {
         assert!(!html.contains("script"), "{html}");
         assert!(!html.contains("cdn.brightloop.example"), "{html}");
         assert!(!html.contains("cid:"), "{html}");
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn style_sheets_are_inlined_and_media_rules_come_back_filtered(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let recorded = json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": "styled-1",
+            "from": {"name": "The Weekly Ledger", "address": "hello@weekly-ledger.example"},
+            "to": [{"address": "sam@example.com"}],
+            "subject": "Styled",
+            "sent_at": "2026-10-06T08:30:00Z",
+            "direction": "inbound",
+            "text": "Styled.",
+            "html": "<html><head><title>Ledger</title><link rel=stylesheet href=\"https://t.example/a.css\"><style>@import url(https://t.example/b.css); .lead { color: #3d4451; background: url(https://t.example/c.gif) } .pre { display: none } @media (max-width: 600px) { .c { width: 100% !important; background-image: url(https://t.example/d.gif) } } @media (prefers-color-scheme: dark) { .lead { color: #fff } }</style></head><body bgcolor=\"#eeeeee\"><span class=\"pre\">Preview</span><div class=\"c\" style=\"width: 600px\"><p class=\"lead\">Hi</p></div></body></html>",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        }}]});
+        let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+            .await
+            .unwrap();
+        dev::submit(&kit.state, workspace, &batch).await.unwrap();
+        kit.run_jobs().await;
+        let (conversation, message): (String, String) = sqlx::query_as(
+            "SELECT conversation_id::text, id::text FROM conversations.messages
+              WHERE provider_message_id = 'styled-1'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        let uri =
+            format!("/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body");
+        let body = kit.get(&sam, &uri).await;
+        assert_eq!(body.status, StatusCode::OK);
+        let html = body.json["html"].as_str().unwrap();
+        assert_eq!(
+            html,
+            r##"<div bgcolor="#eeeeee"><span class="pre" style="display: none">Preview</span><div class="c" style="width: 600px"><p class="lead" style="color: #3d4451">Hi</p></div></div>"##
+        );
+        assert_eq!(
+            body.json["css"],
+            "@media (max-width: 600px) {\n.c { width: 100% !important }\n}"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

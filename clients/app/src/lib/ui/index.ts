@@ -94,6 +94,15 @@ export {
   type HowDecidedRow,
 } from "./components/HowDecided/HowDecided";
 export { Dot, type DotProps } from "./components/Dot/Dot";
+export {
+  PrivacyLine,
+  SettingsEmpty,
+  SettingsPage,
+  SettingsSection,
+  type SettingsEmptyProps,
+  type SettingsPageProps,
+  type SettingsSectionProps,
+} from "./components/Settings/Settings";
 export { Fact, FactList, type FactProps, type FactStatus } from "./components/Facts/Facts";
 export { EmptyState, type EmptyStateProps } from "./components/EmptyState/EmptyState";
 export {

@@ -93,6 +93,10 @@ impl Replica {
         let state = crate::with_ports(
             AppState::new(pool, config)
                 .with_blobs(blobs)
+                // One instance secret, as every process of an install has.
+                .with_signer(campbooks_kernel::crypto::Signer::new(
+                    &campbooks_kernel::crypto::SecretKey::from_bytes([7; 32]),
+                ))
                 .with_registry(crate::registry().expect("valid registrations")),
         )
         .with_client_directory(agents.clone());
@@ -221,6 +225,22 @@ impl Frame {
     fn is(&self, event: &str) -> bool {
         self.event.as_deref() == Some(event)
     }
+
+    /// A heartbeat (or any SSE comment, which the server no longer sends).
+    fn is_beat(&self) -> bool {
+        self.comment.is_some() || self.is("heartbeat")
+    }
+
+    /// The frame's resume token: its SSE `id`, which its `cursor` repeats.
+    fn token(&self) -> String {
+        let id = self.id.clone().expect("the frame carries a resume token");
+        assert_eq!(
+            self.json()["cursor"].as_str(),
+            Some(id.as_str()),
+            "the SSE id is the cursor"
+        );
+        id
+    }
 }
 
 /// A test client reading a stream frame by frame.
@@ -254,14 +274,21 @@ impl Feed {
         }
     }
 
-    /// The next frame that is not a heartbeat comment.
+    /// The next frame that is not a heartbeat.
     async fn next_event(&mut self) -> Frame {
         loop {
             let frame = self.next().await.expect("the stream is still open");
-            if frame.comment.is_none() {
+            if !frame.is_beat() {
                 return frame;
             }
         }
+    }
+
+    /// The next heartbeat; panics on any other frame.
+    async fn next_beat(&mut self) -> Frame {
+        let frame = self.next().await.expect("the stream is still open");
+        assert!(frame.is("heartbeat"), "expected a heartbeat, got {frame:?}");
+        frame
     }
 
     /// Read whatever arrives until nothing has for `window` (it stays in
@@ -270,13 +297,13 @@ impl Feed {
         while let Ok(Some(_)) = tokio::time::timeout(window, self.read()).await {}
     }
 
-    /// Nothing but comments arrives within `window`.
+    /// Nothing but heartbeats arrives within `window`.
     async fn quiet_for(&mut self, window: Duration) {
         let deadline = tokio::time::Instant::now() + window;
         loop {
             match tokio::time::timeout_at(deadline, self.read()).await {
                 Err(_) => return,
-                Ok(Some(frame)) if frame.comment.is_some() => {}
+                Ok(Some(frame)) if frame.is_beat() => {}
                 Ok(other) => panic!("expected silence, got {other:?}"),
             }
         }
@@ -432,10 +459,18 @@ fn assert_ids_only(frame: &Frame) {
         .map(String::as_str)
         .collect();
     assert_eq!(record, BTreeSet::from(["id", "type"]));
-    assert_eq!(
-        frame.id.as_deref(),
-        data["cursor"].as_str(),
-        "the SSE id is the cursor"
+    assert_opaque(&frame.token());
+}
+
+/// A resume token: sealed, one length, never a number.
+fn assert_opaque(token: &str) {
+    assert_eq!(token.len(), 60, "{token}");
+    assert!(token.parse::<i64>().is_err(), "{token}");
+    assert!(
+        token
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_'),
+        "URL-safe: {token}"
     );
 }
 
@@ -461,11 +496,12 @@ async fn members_follow_renames_joins_role_changes_and_departures(db: PgPool) {
     let ready = feed.next_event().await;
     assert!(ready.is("ready"), "{ready:?}");
     assert_eq!(
-        ready.json()["cursor"],
-        "2",
-        "starts at the head: created + owner joined"
+        ready.json().as_object().unwrap().keys().collect::<Vec<_>>(),
+        vec!["cursor"],
+        "no head: it would count changes the caller may not see"
     );
-    assert_eq!(ready.id.as_deref(), Some("2"));
+    assert_opaque(&ready.token());
+    let mut tokens = BTreeSet::from([ready.token()]);
 
     world.rename(&ana, &ws, "Bakery Lisboa").await;
     world.server.sequence().await;
@@ -476,12 +512,13 @@ async fn members_follow_renames_joins_role_changes_and_departures(db: PgPool) {
         record_of(&renamed),
         ("workspaces.workspace".into(), ws.clone(), "upsert".into())
     );
-    assert_eq!(renamed.id.as_deref(), Some("3"));
+    tokens.insert(renamed.token());
 
     let (_, bea) = world.add_member(&ws, "bea", "member").await;
     world.server.sequence().await;
     let joined = feed.next_event().await;
     assert_ids_only(&joined);
+    tokens.insert(joined.token());
     assert_eq!(
         record_of(&joined),
         ("workspaces.member".into(), bea.to_string(), "upsert".into())
@@ -519,11 +556,8 @@ async fn members_follow_renames_joins_role_changes_and_departures(db: PgPool) {
         record_of(&left),
         ("workspaces.member".into(), bea.to_string(), "delete".into())
     );
-    assert_eq!(
-        left.id.as_deref(),
-        Some("6"),
-        "one cursor per change, no gap"
-    );
+    tokens.insert(left.token());
+    assert_eq!(tokens.len(), 4, "a new token on every frame");
 
     // No names, addresses or the workspace's name ever crossed the wire.
     for secret in ["Corner shop", "Bakery", "example.com", "Person"] {
@@ -543,7 +577,7 @@ async fn a_client_resumes_after_a_disconnect_in_order(db: PgPool) {
     world.server.sequence().await;
 
     let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
-    let cursor = feed.next_event().await.id.unwrap();
+    let cursor = feed.next_event().await.token();
     drop(feed);
 
     // While it is away: three different records change.
@@ -558,11 +592,14 @@ async fn a_client_resumes_after_a_disconnect_in_order(db: PgPool) {
         .await
         .unwrap();
     assert!(feed.next_event().await.is("ready"));
-    let missed: Vec<(String, String, String)> = vec![
-        record_of(&feed.next_event().await),
-        record_of(&feed.next_event().await),
-        record_of(&feed.next_event().await),
+    let missed: Vec<Frame> = vec![
+        feed.next_event().await,
+        feed.next_event().await,
+        feed.next_event().await,
     ];
+    let after_rename = missed[0].token();
+    let after_bea = missed[1].token();
+    let missed: Vec<(String, String, String)> = missed.iter().map(record_of).collect();
     assert_eq!(
         missed,
         vec![
@@ -575,85 +612,160 @@ async fn a_client_resumes_after_a_disconnect_in_order(db: PgPool) {
     // …then live.
     world.rename(&ana, &ws, "Shop three").await;
     world.server.sequence().await;
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("6"));
+    let renamed = ("workspaces.workspace".into(), ws.clone(), "upsert".into());
+    assert_eq!(record_of(&feed.next_event().await), renamed);
 
     // `?after=` works for clients that cannot send the header…
-    let uri = format!("/api/v1/w/{ws}/changes?after=4");
+    let uri = format!("/api/v1/w/{ws}/changes?after={after_rename}");
     let mut feed = world
         .server
         .subscribe_at(Some(&ana), &uri, None)
         .await
         .unwrap();
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("4"));
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("5"));
+    let ready = feed.next_event().await;
+    assert!(ready.is("ready"));
+    assert_ne!(ready.token(), after_rename, "sealed afresh");
+    assert_eq!(record_of(&feed.next_event().await).1, bea.to_string());
+    assert_eq!(record_of(&feed.next_event().await).1, cid.to_string());
     // …and the header wins over it.
     let mut feed = world
         .server
-        .subscribe_at(Some(&ana), &uri, Some("5"))
+        .subscribe_at(Some(&ana), &uri, Some(&after_bea))
         .await
         .unwrap();
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("5"));
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("6"));
+    assert!(feed.next_event().await.is("ready"));
+    assert_eq!(record_of(&feed.next_event().await).1, cid.to_string());
+    assert_eq!(record_of(&feed.next_event().await), renamed);
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn unknown_and_expired_cursors_reset(db: PgPool) {
-    let world = World::new(db).await;
+async fn unknown_and_expired_tokens_reset(db: PgPool) {
+    let world = World::with(db, |c| c.retention_hours = 1).await;
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
-    world.rename(&ana, &ws, "Shop two").await;
     world.server.sequence().await;
+    let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    let at_head = feed.next_event().await.token();
+    drop(feed);
+    let other = world.create_workspace(&ana, "Other shop").await;
+    world.server.sequence().await;
+    let mut feed = world
+        .server
+        .subscribe(Some(&ana), &other, None)
+        .await
+        .unwrap();
+    let elsewhere = feed.next_event().await.token();
+    drop(feed);
+    let mut altered = at_head.clone().into_bytes();
+    altered[30] = if altered[30] == b'A' { b'B' } else { b'A' };
+    let altered = String::from_utf8(altered).unwrap();
 
-    for cursor in ["99", "nonsense", "-3"] {
+    // Numeric cursors from before tokens, junk, another workspace's token,
+    // an altered one: refetch, then go on from a fresh token.
+    for token in ["2", "99", "nonsense", "-3", &elsewhere, &altered] {
         let mut feed = world
             .server
-            .subscribe(Some(&ana), &ws, Some(cursor))
+            .subscribe(Some(&ana), &ws, Some(token))
             .await
             .unwrap();
         let reset = feed.next_event().await;
-        assert!(reset.is("reset"), "{cursor}: {reset:?}");
+        assert!(reset.is("reset"), "{token}: {reset:?}");
         assert_eq!(reset.json()["reason"], "unknown_cursor");
-        assert_eq!(reset.json()["cursor"], "3");
-        assert_eq!(reset.id.as_deref(), Some("3"));
+        assert_opaque(&reset.token());
     }
 
-    // The first changes are pruned: resuming from before them resets.
-    sqlx::query("DELETE FROM kernel.changes WHERE workspace_id = $1 AND seq <= 2")
+    // A change published two hours ago, delivered now: its token is as old
+    // as the change, older than the retention, and resets.
+    world.rename(&ana, &ws, "Shop two").await;
+    sqlx::query(
+        "UPDATE kernel.changes SET occurred_at = now() - interval '2 hours'
+          WHERE workspace_id = $1 AND seq IS NULL",
+    )
+    .bind(&ws)
+    .execute(&world.db)
+    .await
+    .unwrap();
+    let mut feed = world
+        .server
+        .subscribe(Some(&ana), &ws, Some(&at_head))
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    world.server.sequence().await;
+    let old = feed.next_event().await.token();
+    drop(feed);
+    let mut feed = world
+        .server
+        .subscribe(Some(&ana), &ws, Some(&old))
+        .await
+        .unwrap();
+    let reset = feed.next_event().await;
+    assert_eq!(reset.json()["reason"], "cursor_expired");
+
+    // Changes after a young token were pruned anyway (a numbering that
+    // stalled): reset rather than skip them.
+    sqlx::query("DELETE FROM kernel.changes WHERE workspace_id = $1")
         .bind(&ws)
         .execute(&world.db)
         .await
         .unwrap();
     let mut feed = world
         .server
-        .subscribe(Some(&ana), &ws, Some("0"))
+        .subscribe(Some(&ana), &ws, Some(&at_head))
         .await
         .unwrap();
-    let reset = feed.next_event().await;
-    assert_eq!(reset.json()["reason"], "cursor_expired");
-    // From 2 nothing is missing.
-    let mut feed = world
-        .server
-        .subscribe(Some(&ana), &ws, Some("2"))
-        .await
-        .unwrap();
-    assert!(feed.next_event().await.is("ready"));
-    assert_eq!(feed.next_event().await.id.as_deref(), Some("3"));
+    assert_eq!(feed.next_event().await.json()["reason"], "cursor_expired");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn a_client_too_far_behind_resets(db: PgPool) {
-    let world = World::with(db, |c| c.max_backlog = 2).await;
+async fn a_long_hidden_backlog_never_resets_a_resume(db: PgPool) {
+    let world = World::new(db).await;
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
+    world.server.sequence().await;
+    // A reader without `workspaces:admin` sees no invitation.
+    let reader = world.token("ana", "workspaces:read");
+    let mut feed = world
+        .server
+        .subscribe(Some(&reader), &ws, None)
+        .await
+        .unwrap();
+    let token = feed.next_event().await.token();
+    drop(feed);
+    // More hidden changes than a page, then one it may see.
+    let mut tx = world.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &ws)
+        .await
+        .unwrap();
+    for n in 0..450 {
+        world
+            .server
+            .state
+            .events
+            .publish(
+                &mut tx,
+                &Busy {
+                    workspace: ws.clone(),
+                    n,
+                },
+            )
+            .await
+            .unwrap();
+    }
+    tx.commit().await.unwrap();
     world.rename(&ana, &ws, "Shop two").await;
     world.server.sequence().await;
     let mut feed = world
         .server
-        .subscribe(Some(&ana), &ws, Some("0"))
+        .subscribe(Some(&reader), &ws, Some(&token))
         .await
         .unwrap();
-    let reset = feed.next_event().await;
-    assert_eq!(reset.json()["reason"], "too_far_behind");
+    assert!(feed.next_event().await.is("ready"));
+    assert_eq!(
+        record_of(&feed.next_event().await),
+        ("workspaces.workspace".into(), ws.clone(), "upsert".into())
+    );
+    feed.quiet_for(Duration::from_millis(300)).await;
 }
 
 // --- access ------------------------------------------------------------------
@@ -720,7 +832,7 @@ impl DomainEvent for Hidden {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
-async fn changes_the_caller_may_not_see_are_skipped_but_advance_the_cursor(db: PgPool) {
+async fn changes_the_caller_may_not_see_are_skipped_and_a_heartbeat_resumes_past_them(db: PgPool) {
     let world = World::with(db, |c| c.heartbeat_seconds = 1).await;
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
@@ -731,7 +843,8 @@ async fn changes_the_caller_may_not_see_are_skipped_but_advance_the_cursor(db: P
         .subscribe(Some(&reader), &ws, None)
         .await
         .unwrap();
-    assert!(feed.next_event().await.is("ready"));
+    let ready = feed.next_event().await;
+    assert!(ready.is("ready"));
 
     let mut tx = world.db.begin().await.unwrap();
     campbooks_kernel::db::set_workspace(&mut tx, &ws)
@@ -752,16 +865,22 @@ async fn changes_the_caller_may_not_see_are_skipped_but_advance_the_cursor(db: P
     tx.commit().await.unwrap();
     world.server.sequence().await;
 
-    // No change frame; the heartbeat moves the client's cursor past them.
-    let heartbeat = feed.next_event().await;
-    assert!(heartbeat.is("heartbeat"), "{heartbeat:?}");
-    assert_eq!(heartbeat.json()["cursor"], "5");
-    assert_eq!(heartbeat.id.as_deref(), Some("5"));
+    // No change frame, only the heartbeat it would have had anyway; its
+    // token resumes past them.
+    let heartbeat = feed.next_beat().await;
+    assert_opaque(&heartbeat.token());
+    let mut resumed = world
+        .server
+        .subscribe(Some(&reader), &ws, Some(&heartbeat.token()))
+        .await
+        .unwrap();
+    assert!(resumed.next_event().await.is("ready"));
+    resumed.quiet_for(Duration::from_millis(500)).await;
 
     // An admin-scoped token does see the invitation (and only that).
     let mut admin = world
         .server
-        .subscribe(Some(&ana), &ws, Some("2"))
+        .subscribe(Some(&ana), &ws, Some(&ready.token()))
         .await
         .unwrap();
     assert!(admin.next_event().await.is("ready"));
@@ -995,7 +1114,11 @@ async fn a_client_whose_member_left_loses_its_feed(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
-    let world = World::with(db, |c| c.max_streams_per_principal = 64).await;
+    let world = World::with(db, |c| {
+        c.max_streams_per_principal = 64;
+        c.opens_per_window = 0;
+    })
+    .await;
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
     world.server.sequence().await;
@@ -1014,7 +1137,10 @@ async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
     }))
     .await;
     for frame in received {
-        assert_eq!(frame.id.as_deref(), Some("3"));
+        assert_eq!(
+            record_of(&frame),
+            ("workspaces.workspace".into(), ws.clone(), "upsert".into())
+        );
     }
     // Forty streams were mid-query a moment ago: close them and their pool
     // before the test database is dropped.
@@ -1042,6 +1168,69 @@ async fn a_caller_holds_a_limited_number_of_streams(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_caller_opens_a_limited_number_of_streams_per_window(db: PgPool) {
+    let world = World::with(db, |c| {
+        c.opens_per_window = 2;
+        c.opens_window_seconds = 60;
+    })
+    .await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.add_member(&ws, "bea", "member").await;
+    for _ in 0..2 {
+        drop(world.server.subscribe(Some(&ana), &ws, None).await.unwrap());
+    }
+    // Closed or not, the third open in the window is refused, with or
+    // without a token.
+    let (status, problem) = world
+        .server
+        .subscribe(Some(&ana), &ws, Some("anything"))
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate_limited", "{problem}");
+    // Per caller.
+    let bea = world.user("bea");
+    assert!(world.server.subscribe(Some(&bea), &ws, None).await.is_ok());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_resumes_only_for_the_caller_it_was_given_to(db: PgPool) {
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (bea, _) = world.add_member(&ws, "bea", "member").await;
+    world
+        .server
+        .agents
+        .set("ana-agent", ClientActor::ActsFor("ana".into()));
+    world.server.sequence().await;
+    let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    let token = feed.next_event().await.token();
+    drop(feed);
+
+    // Ana again, on another connection and with other scopes: resumes.
+    let narrower = world.token("ana", "workspaces:read");
+    let mut feed = world
+        .server
+        .subscribe(Some(&narrower), &ws, Some(&token))
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // Anyone else, even a client acting for Ana: a token they cannot open.
+    for other in [bea, world.client("ana-agent", &ws)] {
+        let mut feed = world
+            .server
+            .subscribe(Some(&other), &ws, Some(&token))
+            .await
+            .unwrap();
+        let reset = feed.next_event().await;
+        assert_eq!(reset.json()["reason"], "unknown_cursor", "{reset:?}");
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn idle_streams_beat_and_end_cleanly(db: PgPool) {
     let world = World::with(db, |c| {
         c.heartbeat_seconds = 1;
@@ -1051,9 +1240,11 @@ async fn idle_streams_beat_and_end_cleanly(db: PgPool) {
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
     let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
-    assert!(feed.next().await.unwrap().is("ready"));
-    let beat = feed.next().await.unwrap();
-    assert_eq!(beat.comment.as_deref(), Some("heartbeat"));
+    let ready = feed.next().await.unwrap();
+    assert!(ready.is("ready"));
+    let beat = feed.next_beat().await;
+    assert_ne!(beat.token(), ready.token());
+    assert_opaque(&beat.token());
     let closing = feed.next_event().await;
     assert!(closing.is("closing"));
     assert_eq!(closing.json()["reason"], "max_age");
@@ -1095,7 +1286,7 @@ async fn cursors_mean_the_same_on_every_replica(db: PgPool) {
     world.server.sequence().await;
 
     let mut here = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
-    let cursor = here.next_event().await.id.unwrap();
+    let cursor = here.next_event().await.token();
     drop(here);
     world.rename(&ana, &ws, "Shop two").await;
     // The other process sequences and serves.
@@ -1106,14 +1297,19 @@ async fn cursors_mean_the_same_on_every_replica(db: PgPool) {
         .unwrap();
     assert!(there.next_event().await.is("ready"));
     let frame = there.next_event().await;
-    assert_eq!(frame.id.as_deref(), Some("3"));
+    let renamed = ("workspaces.workspace".into(), ws.clone(), "upsert".into());
+    assert_eq!(record_of(&frame), renamed);
 
-    // A change sequenced by one process wakes streams on the other.
-    let mut live = other.subscribe(Some(&ana), &ws, Some("3")).await.unwrap();
+    // A change sequenced by one process wakes streams on the other, resumed
+    // with a token the other sealed.
+    let mut live = other
+        .subscribe(Some(&ana), &ws, Some(&frame.token()))
+        .await
+        .unwrap();
     assert!(live.next_event().await.is("ready"));
     world.rename(&ana, &ws, "Shop three").await;
     world.server.sequence().await;
-    assert_eq!(live.next_event().await.id.as_deref(), Some("4"));
+    assert_eq!(record_of(&live.next_event().await), renamed);
 }
 
 // --- inboxes and private records (campbooks-cloud#117) ---------------------------
@@ -1310,4 +1506,536 @@ async fn drafts_and_connections_reach_only_who_may_see_them(db: PgPool) {
     dan_feed.drain(Duration::from_millis(500)).await;
     assert!(!dan_feed.raw.contains(&draft.to_string()));
     assert!(!dan_feed.raw.contains(&connection.to_string()));
+}
+
+// --- nothing about what the caller may not see (campbooks-cloud#131) -------------
+//
+// The matrix: two workspaces set up alike. Both see the same visible
+// activity; one also has activity a given observer may not see (mail in an
+// inbox they are not in, someone else's draft or connection, a client's
+// draft). Every observer's stream in the busy workspace must match its
+// stream in the quiet one: the same frames in the same order with the same
+// fields, tokens that are all fresh and of one length, heartbeats on the
+// same fixed timer, and resuming from any token they were given replaying
+// the same frames. Values that differ between any two runs (record ids,
+// event ids, tokens) are compared by where they first appear.
+
+/// The matrix's heartbeat: long enough for a round's work to finish
+/// between two.
+const MATRIX_BEAT: Duration = Duration::from_secs(2);
+
+/// Whose stream is compared.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Observer {
+    /// Bea: a member, reader of the shared inbox.
+    Member,
+    /// Cid: an admin (a manager of the workspace), manager of the shared
+    /// inbox.
+    Manager,
+    /// A client Bea registered: it acts as Bea.
+    Agent,
+    /// A client bound to the workspace, acting for nobody.
+    App,
+}
+
+/// Activity the observers may not see.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Unseen {
+    /// Mail into Hal's inbox, which only Hal is in.
+    Mail,
+    /// A draft Hal sent (audience: Hal).
+    Draft,
+    /// A connection Hal added (audience: Hal and the managers).
+    Connection,
+    /// A draft a client sent in the shared inbox (audience: clients).
+    ClientDraft,
+}
+
+/// One of the matrix's two workspaces.
+struct Space {
+    ws: String,
+    shared: campbooks_conversations::model::InboxId,
+    hals: campbooks_conversations::model::InboxId,
+    bea: UserId,
+    hal: UserId,
+}
+
+/// A stream read by a task of its own, every frame stamped with when it
+/// arrived after the stream was asked for.
+struct Recorder {
+    frames: std::sync::Arc<std::sync::Mutex<Vec<(Duration, Frame)>>>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl Recorder {
+    fn start(mut feed: Feed, opened: tokio::time::Instant) -> Self {
+        let frames = std::sync::Arc::<std::sync::Mutex<Vec<(Duration, Frame)>>>::default();
+        let sink = std::sync::Arc::clone(&frames);
+        let task = tokio::spawn(async move {
+            while let Some(frame) = feed.read().await {
+                sink.lock().unwrap().push((opened.elapsed(), frame));
+            }
+        });
+        Self { frames, task }
+    }
+
+    fn beats(&self) -> usize {
+        self.frames
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, frame)| frame.is("heartbeat"))
+            .count()
+    }
+
+    /// Everything up to and including the `n`th heartbeat; the stream stops.
+    fn take(self, n: usize) -> Vec<(Duration, Frame)> {
+        self.task.abort();
+        let frames = self.frames.lock().unwrap().clone();
+        let mut seen = 0;
+        frames
+            .into_iter()
+            .take_while(|(_, frame)| {
+                let before = seen < n;
+                if frame.is("heartbeat") {
+                    seen += 1;
+                }
+                before
+            })
+            .collect()
+    }
+}
+
+/// Wait until every recorder has had `n` heartbeats.
+async fn until_beats(recorders: &[&Recorder], n: usize) {
+    tokio::time::timeout(MATRIX_BEAT * u32::try_from(n + 3).unwrap(), async {
+        while recorders.iter().any(|r| r.beats() < n) {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .unwrap_or_else(|_| panic!("no heartbeat {n} in time"));
+}
+
+impl World {
+    /// A client token of `id` for `workspace` with `scopes`.
+    fn client_with(&self, id: &str, workspace: &str, scopes: &str) -> String {
+        let mut claims = self.idp.claims(scopes);
+        let object = claims.as_object_mut().unwrap();
+        object.remove("sub");
+        object.insert("azp".into(), id.into());
+        object.insert("workspace_id".into(), workspace.into());
+        self.idp.token(&claims)
+    }
+
+    /// A workspace of Ana's with Bea (member), Cid (admin) and Hal
+    /// (member); a shared inbox Cid manages and Bea reads; an inbox only
+    /// Hal is in.
+    async fn space(&self, name: &str) -> Space {
+        use campbooks_conversations::{dev, model::InboxRole};
+        let ana = self.user("ana");
+        let ws = self.create_workspace(&ana, name).await;
+        let (_, bea) = self.add_member(&ws, "bea", "member").await;
+        let (_, cid) = self.add_member(&ws, "cid", "admin").await;
+        let (_, hal) = self.add_member(&ws, "hal", "member").await;
+        let workspace = ws.parse().unwrap();
+        let shared = dev::create_inbox(
+            &self.server.state,
+            workspace,
+            "shop@example.com",
+            &[(cid, InboxRole::Manager), (bea, InboxRole::Reader)],
+        )
+        .await
+        .unwrap();
+        let hals = dev::create_inbox(
+            &self.server.state,
+            workspace,
+            "hal@example.com",
+            &[(hal, InboxRole::Manager)],
+        )
+        .await
+        .unwrap();
+        self.server.sequence().await;
+        Space {
+            ws,
+            shared,
+            hals,
+            bea,
+            hal,
+        }
+    }
+
+    fn observer_token(&self, observer: Observer, ws: &str) -> String {
+        match observer {
+            Observer::Member => self.token("bea", READ_ALL),
+            Observer::Manager => self.token("cid", READ_ALL),
+            Observer::Agent => self.client_with("bea-agent", ws, READ_ALL),
+            Observer::App => self.client_with("app", ws, READ_ALL),
+        }
+    }
+
+    /// Open `observer`'s stream of `ws` and record it.
+    async fn record(&self, observer: Observer, ws: &str, after: Option<&str>) -> Recorder {
+        let token = self.observer_token(observer, ws);
+        let opened = tokio::time::Instant::now();
+        let feed = self
+            .server
+            .subscribe(Some(&token), ws, after)
+            .await
+            .unwrap_or_else(|e| panic!("{observer:?} may not follow {ws}: {e:?}"));
+        Recorder::start(feed, opened)
+    }
+
+    /// What everyone in `space` does in round `round`, seen by every
+    /// observer that may see it.
+    async fn visible_round(&self, space: &Space, round: usize) {
+        use campbooks_conversations::{events::DraftSent, model::DraftId};
+        match round {
+            0 => {
+                self.rename(&self.user("ana"), &space.ws, "Bakery").await;
+                self.server.sequence().await;
+            }
+            1 => self.ingest(&space.ws, space.shared, EN).await,
+            _ => {
+                self.publish(&DraftSent {
+                    workspace: space.ws.clone(),
+                    inbox: space.shared,
+                    draft: DraftId::new(),
+                    conversation: None,
+                    author: Some(space.bea),
+                })
+                .await;
+            }
+        }
+    }
+
+    /// `hidden` activity in `space`, in round `round`.
+    async fn hidden_round(&self, space: &Space, hidden: &[Unseen], round: usize) {
+        use campbooks_connectors::{ConnectionId, Provider, events::ConnectionAdded};
+        use campbooks_conversations::{events::DraftSent, model::DraftId};
+        for kind in hidden {
+            match kind {
+                Unseen::Mail => {
+                    let mail = if round.is_multiple_of(2) { FR } else { EN };
+                    self.ingest(&space.ws, space.hals, mail).await;
+                }
+                Unseen::Draft => {
+                    self.publish(&DraftSent {
+                        workspace: space.ws.clone(),
+                        inbox: space.hals,
+                        draft: DraftId::new(),
+                        conversation: None,
+                        author: Some(space.hal),
+                    })
+                    .await;
+                }
+                Unseen::Connection => {
+                    self.publish(&ConnectionAdded {
+                        workspace: space.ws.clone(),
+                        connection: ConnectionId::new(),
+                        provider: Provider::Google,
+                        granted_by: space.hal,
+                        account_subject: None,
+                        grantor_subject: None,
+                        refreshed: false,
+                    })
+                    .await;
+                }
+                Unseen::ClientDraft => {
+                    self.publish(&DraftSent {
+                        workspace: space.ws.clone(),
+                        inbox: space.shared,
+                        draft: DraftId::new(),
+                        conversation: None,
+                        author: None,
+                    })
+                    .await;
+                }
+            }
+        }
+    }
+}
+
+/// `frames` with every value that differs between runs replaced by where
+/// it first appears, heartbeats left out; checks every token on the way.
+fn canonical(frames: &[(Duration, Frame)]) -> Vec<String> {
+    let mut names: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut name = |value: &str| {
+        let next = names.len();
+        format!("#{}", *names.entry(value.to_owned()).or_insert(next))
+    };
+    frames
+        .iter()
+        .filter(|(_, frame)| !frame.is_beat())
+        .map(|(_, frame)| {
+            let mut data = frame.json();
+            if frame.id.is_some() {
+                assert_opaque(&frame.token());
+                data["cursor"] = "<token>".into();
+            }
+            if data.get("record").is_some() {
+                assert_ids_only(frame);
+                let id = data["record"]["id"].as_str().unwrap().to_owned();
+                data["record"]["id"] = name(&id).into();
+                let version = data["version"].as_str().unwrap().to_owned();
+                data["version"] = name(&version).into();
+            }
+            format!("{} {}", frame.event.as_deref().unwrap_or("<comment>"), data)
+        })
+        .collect()
+}
+
+/// Every token in `frames` is new, and every heartbeat is a token on the
+/// fixed timer from the open.
+fn assert_tokens_fresh_and_beats_on_time(frames: &[(Duration, Frame)], what: &str) {
+    let tokens: Vec<String> = frames.iter().filter_map(|(_, f)| f.id.clone()).collect();
+    let distinct: BTreeSet<&String> = tokens.iter().collect();
+    assert_eq!(distinct.len(), tokens.len(), "{what}: a token repeated");
+    let beats: Vec<Duration> = frames
+        .iter()
+        .filter(|(_, frame)| frame.is("heartbeat"))
+        .map(|(at, frame)| {
+            let data = frame.json();
+            assert_eq!(
+                data.as_object().unwrap().keys().collect::<Vec<_>>(),
+                vec!["cursor"],
+                "{what}: a heartbeat carries its token only"
+            );
+            *at
+        })
+        .collect();
+    for (k, at) in beats.iter().enumerate() {
+        let due = MATRIX_BEAT * u32::try_from(k + 1).unwrap();
+        let off = at.abs_diff(due);
+        assert!(
+            off < MATRIX_BEAT / 2,
+            "{what}: heartbeat {k} at {at:?}, due at {due:?}"
+        );
+    }
+}
+
+/// Follow every observer in a busy and a quiet workspace through three
+/// rounds, then resume from the tokens they were given; their streams must
+/// not tell the two apart.
+async fn assert_blind(db: PgPool, observers: &[Observer], hidden: &[Unseen]) {
+    const ROUNDS: usize = 3;
+    let world = World::with(db, |c| {
+        c.heartbeat_seconds = MATRIX_BEAT.as_secs();
+        c.poll_interval_ms = 100;
+    })
+    .await;
+    world
+        .server
+        .agents
+        .set("bea-agent", ClientActor::ActsFor("bea".into()));
+    let busy = world.space("Busy").await;
+    let quiet = world.space("Quiet").await;
+
+    let mut live = Vec::new();
+    for &observer in observers {
+        for space in [&busy, &quiet] {
+            live.push(world.record(observer, &space.ws, None).await);
+        }
+    }
+    for round in 0..ROUNDS {
+        until_beats(&live.iter().collect::<Vec<_>>(), round + 1).await;
+        world.hidden_round(&busy, hidden, round).await;
+        world.visible_round(&busy, round).await;
+        world.hidden_round(&busy, hidden, round + 1).await;
+        world.visible_round(&quiet, round).await;
+    }
+    until_beats(&live.iter().collect::<Vec<_>>(), ROUNDS + 2).await;
+    let mut transcripts = Vec::new();
+    for recorder in live {
+        transcripts.push(recorder.take(ROUNDS + 2));
+    }
+
+    for (i, &observer) in observers.iter().enumerate() {
+        let (seen, unseen) = (&transcripts[2 * i], &transcripts[2 * i + 1]);
+        let what = format!("{observer:?} with {hidden:?}");
+        assert_tokens_fresh_and_beats_on_time(seen, &what);
+        assert_tokens_fresh_and_beats_on_time(unseen, &what);
+        assert_eq!(
+            canonical(seen),
+            canonical(unseen),
+            "{what}: the streams differ\nbusy: {seen:#?}\nquiet: {unseen:#?}"
+        );
+
+        // Resuming from any token it was given replays the same.
+        let tokens = |frames: &[(Duration, Frame)]| -> Vec<String> {
+            frames.iter().filter_map(|(_, f)| f.id.clone()).collect()
+        };
+        let (seen_tokens, unseen_tokens) = (tokens(seen), tokens(unseen));
+        assert_eq!(seen_tokens.len(), unseen_tokens.len(), "{what}");
+        let picks = [
+            0,
+            seen_tokens.len() / 3,
+            seen_tokens.len() / 2,
+            seen_tokens.len() - 1,
+        ];
+        let mut resumed = Vec::new();
+        for &pick in &picks {
+            resumed.push(
+                world
+                    .record(observer, &busy.ws, Some(&seen_tokens[pick]))
+                    .await,
+            );
+            resumed.push(
+                world
+                    .record(observer, &quiet.ws, Some(&unseen_tokens[pick]))
+                    .await,
+            );
+        }
+        until_beats(&resumed.iter().collect::<Vec<_>>(), 1).await;
+        let mut resumed = resumed.into_iter();
+        for &pick in &picks {
+            let seen = resumed.next().unwrap().take(1);
+            let unseen = resumed.next().unwrap().take(1);
+            assert_eq!(
+                canonical(&seen),
+                canonical(&unseen),
+                "{what}: resuming from token {pick} differs\nbusy: {seen:#?}\nquiet: {unseen:#?}"
+            );
+            assert!(seen[0].1.is("ready"), "{what}: {seen:#?}");
+        }
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn no_caller_learns_of_mail_or_drafts_in_an_inbox_it_cannot_see(db: PgPool) {
+    assert_blind(
+        db,
+        &[
+            Observer::Member,
+            Observer::Manager,
+            Observer::Agent,
+            Observer::App,
+        ],
+        &[Unseen::Mail, Unseen::Draft],
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_member_learns_nothing_of_another_members_connections(db: PgPool) {
+    assert_blind(
+        db,
+        &[Observer::Member, Observer::Agent],
+        &[Unseen::Connection],
+    )
+    .await;
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn people_learn_nothing_of_drafts_clients_write(db: PgPool) {
+    assert_blind(
+        db,
+        &[Observer::Member, Observer::Manager, Observer::Agent],
+        &[Unseen::ClientDraft],
+    )
+    .await;
+}
+
+/// Conversations filed into an inbox, as one event: the catch-up test's
+/// changes, many at once.
+#[derive(Debug, Serialize, Deserialize)]
+struct Filed {
+    workspace: String,
+    /// `(inbox, conversation id)` in order.
+    into: Vec<(String, String)>,
+}
+
+impl DomainEvent for Filed {
+    const NAME: &'static str = "test.filed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        self.into
+            .iter()
+            .map(|(inbox, id)| {
+                Change::upsert(RecordRef::new("conversations.conversation", id))
+                    .within(RecordRef::new("conversations.inbox", inbox))
+            })
+            .collect()
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
+    let world = World::with(db, |c| c.heartbeat_seconds = MATRIX_BEAT.as_secs()).await;
+    let busy = world.space("Busy").await;
+    let quiet = world.space("Quiet").await;
+    let mut tokens = Vec::new();
+    for space in [&busy, &quiet] {
+        let mut feed = world
+            .server
+            .subscribe(
+                Some(&world.observer_token(Observer::Member, &space.ws)),
+                &space.ws,
+                None,
+            )
+            .await
+            .unwrap();
+        tokens.push(feed.next_event().await.token());
+    }
+    // While Bea is away: the same 450 conversations in the shared inbox in
+    // both; in the busy one, 500 in Hal's inbox first and up to 9 more
+    // before each of hers.
+    let markers: Vec<String> = (0..450).map(|n| format!("c-{n}")).collect();
+    let mut busy_into: Vec<(String, String)> = (0..500)
+        .map(|n| (busy.hals.to_string(), format!("h-{n}")))
+        .collect();
+    for (n, marker) in markers.iter().enumerate() {
+        for h in 0..(n % 10) {
+            busy_into.push((busy.hals.to_string(), format!("h-{n}-{h}")));
+        }
+        busy_into.push((busy.shared.to_string(), marker.clone()));
+    }
+    let quiet_into = markers
+        .iter()
+        .map(|marker| (quiet.shared.to_string(), marker.clone()))
+        .collect();
+    world
+        .publish(&Filed {
+            workspace: busy.ws.clone(),
+            into: busy_into,
+        })
+        .await;
+    world
+        .publish(&Filed {
+            workspace: quiet.ws.clone(),
+            into: quiet_into,
+        })
+        .await;
+
+    let mut recorders = Vec::new();
+    for (space, token) in [&busy, &quiet].into_iter().zip(&tokens) {
+        recorders.push(world.record(Observer::Member, &space.ws, Some(token)).await);
+    }
+    until_beats(&recorders.iter().collect::<Vec<_>>(), 1).await;
+    let mut recorders = recorders.into_iter();
+    let seen = recorders.next().unwrap().take(1);
+    let unseen = recorders.next().unwrap().take(1);
+    assert_eq!(canonical(&seen), canonical(&unseen), "the catch-up differs");
+    for frames in [&seen, &unseen] {
+        let changes: Vec<String> = frames
+            .iter()
+            .filter(|(_, f)| f.is("change"))
+            .map(|(_, f)| record_of(f).1)
+            .collect();
+        assert_eq!(changes, markers, "every visible change, once, in order");
+        // The whole catch-up comes before the first heartbeat.
+        let (_, last) = frames.last().unwrap();
+        assert!(last.is("heartbeat"), "{last:?}");
+        assert_eq!(
+            frames.len(),
+            markers.len() + 2,
+            "ready, the changes, a heartbeat"
+        );
+        assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
+    }
 }

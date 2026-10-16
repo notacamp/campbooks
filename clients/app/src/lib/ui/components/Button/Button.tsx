@@ -14,7 +14,8 @@ import { Visor } from "../Visor/Visor";
 
 import styles from "./Button.module.css";
 
-export type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "link";
+export type ButtonVariant =
+  "primary" | "secondary" | "ghost" | "danger" | "danger-outline" | "link";
 /** md follows density (32px, 26px compact); lg is the 44px touch size. */
 export type ButtonSize = "md" | "lg";
 

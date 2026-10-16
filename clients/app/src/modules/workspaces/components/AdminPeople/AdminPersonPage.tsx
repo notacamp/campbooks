@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useId, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
@@ -9,7 +9,7 @@ import {
   EmptyState,
   Fact,
   FactList,
-  Heading,
+  SettingsSection,
   List,
   ListRow,
   SkeletonList,
@@ -102,12 +102,8 @@ function PersonWorkspaces({ detail }: { detail: AdminUserDetail }) {
   const { t } = useTranslation("workspaces");
   const formatDate = useDateFormat();
   const link = useRouterLink();
-  const titleId = useId();
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("admin.person.workspaces")}
-      </Heading>
+    <SettingsSection title={t("admin.person.workspaces")} count={detail.workspaces.length}>
       {detail.workspaces.length === 0 ? (
         <Text tone="tertiary" size="sm">
           {t("admin.person.noWorkspaces")}
@@ -139,6 +135,6 @@ function PersonWorkspaces({ detail }: { detail: AdminUserDetail }) {
           ))}
         </List>
       )}
-    </section>
+    </SettingsSection>
   );
 }
