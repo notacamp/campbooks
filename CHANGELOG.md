@@ -232,6 +232,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   isn't connected first, and waits for a connect you retried. If connecting
   a mailbox breaks unexpectedly, you now land back on Mailboxes with an
   error instead of a server error page.
+- **Home fits the window on desktop too, and scrollbars match the app.** A busy Home
+  still made the whole page scroll and pushed the account menu down; from 1024px wide
+  Home now scrolls on its own beside the sidebar, like the inbox. Scrollbars are thin
+  and quiet, a soft thumb with no track that firms up when you point at the pane, in
+  light and dark.
 - **The inbox no longer grows taller than the window on desktop.** A long list of
   conversations made the whole page scroll, pushing the account menu down and taking
   the open conversation with it. From 1024px wide the page is the window's height:

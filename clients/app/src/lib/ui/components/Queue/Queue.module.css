@@ -1,6 +1,11 @@
+/* The page: takes what the sidebar leaves and, on desktop, scrolls on its own. */
+.page {
+  flex: 999 1 var(--home-min);
+  min-width: 0;
+}
+
 .home {
   display: flex;
-  flex: 999 1 var(--home-min);
   flex-wrap: wrap;
   align-content: flex-start;
   gap: var(--space-10);
