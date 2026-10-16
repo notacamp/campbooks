@@ -452,7 +452,6 @@
       "suggestion": "Suggested by Campbooks"
     },
     "list": {
-      "label": "Rules",
       "waiting": "Waiting for you",
       "keep": "Keep this rule",
       "no": "No",
@@ -462,7 +461,7 @@
       "cancel": "Keep",
       "forEveryone": "For everyone",
       "paused": "Paused: whoever taught it can no longer change this inbox",
-      "empty": "No rules yet. When you move, archive or clear one email, Campbooks offers to do the same to the ones like it.",
+      "empty": "Teach Scout above, or answer its questions below. When you move, archive or clear an email, Campbooks also offers to do the same to the ones like it.",
       "leave": "Leave them as they are",
       "changedMail": "The mail it changed",
       "applied_one": "{{n}} so far",
@@ -474,7 +473,8 @@
       "lastActed": "Last acted {{time}}",
       "failed": "Could not load the rules",
       "retry": "Try again",
-      "inbox": "An inbox"
+      "inbox": "An inbox",
+      "emptyTitle": "No rules yet"
     }
   }
 }

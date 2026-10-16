@@ -183,7 +183,8 @@
       "announce": "Here’s the rule I understood: {{rule}}",
       "saveFailed": "Scout couldn’t save the rule. Try again.",
       "savePartial": "Saved in {{saved}} of {{total}} inboxes, then Scout stopped. Try again saves it in the rest.",
-      "retry": "Try again"
+      "retry": "Try again",
+      "description": "Say it in a sentence. Scout shows you the rule, and what it matches, before anything is saved."
     },
     "builder": {
       "noModel": "This server has no language model for reading sentences, so build the rule here.",
@@ -216,9 +217,12 @@
       "never": "You haven’t answered Scout’s questions yet.",
       "again": "Answer the questions again",
       "start": "Answer the questions",
-      "failed": "Scout couldn’t load your answers just now."
+      "failed": "Scout couldn’t load your answers just now.",
+      "description": "Three quick questions: whose mail always reaches you, what never needs you, and whether Scout asks first.",
+      "proactivity": "When Scout is sure"
     },
-    "rules": "Your rules"
+    "rules": "Your rules",
+    "rulesDescription": "Everything Scout does on its own. Remove a rule and it stops; you choose whether the mail it moved goes back."
   },
   "shortcuts": {
     "skip": "Skip this question",

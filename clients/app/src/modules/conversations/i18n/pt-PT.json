@@ -452,7 +452,6 @@
       "suggestion": "Sugerida pelo Campbooks"
     },
     "list": {
-      "label": "Regras",
       "waiting": "À sua espera",
       "keep": "Manter esta regra",
       "no": "Não",
@@ -462,7 +461,7 @@
       "cancel": "Manter",
       "forEveryone": "Para todos",
       "paused": "Em pausa: quem a ensinou já não pode alterar esta caixa de entrada",
-      "empty": "Ainda não há regras. Quando move, arquiva ou limpa uma mensagem, o Campbooks oferece-se para fazer o mesmo às parecidas.",
+      "empty": "Ensine o Scout acima ou responda às perguntas abaixo. Quando move, arquiva ou limpa um email, o Campbooks também se oferece para fazer o mesmo aos parecidos.",
       "leave": "Deixá-las como estão",
       "changedMail": "As mensagens que alterou",
       "applied_one": "{{n}} até agora",
@@ -474,7 +473,8 @@
       "lastActed": "Última vez {{time}}",
       "failed": "Não foi possível carregar as regras",
       "retry": "Tentar de novo",
-      "inbox": "Uma caixa de entrada"
+      "inbox": "Uma caixa de entrada",
+      "emptyTitle": "Ainda não há regras"
     }
   }
 }

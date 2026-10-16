@@ -109,3 +109,27 @@
   flex-direction: column;
   gap: var(--space-2);
 }
+
+/* In a settings card the card is the panel: rows sit flat, divided by lines. */
+.list[data-flush] {
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.list[data-flush] > .row {
+  padding-inline: 0;
+  border-radius: 0;
+}
+
+/* The chosen row's highlight bleeds past the card's text edge, so it is not cramped. */
+.list[data-flush] > .row[data-selected] {
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 var(--row-pad-x) var(--surface-selected);
+}
+
+@media (width < 48rem) {
+  .list[data-flush] > .row[data-selected] {
+    box-shadow: none;
+  }
+}

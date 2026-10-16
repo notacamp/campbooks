@@ -6,7 +6,7 @@ import {
   Button,
   CodeBlock,
   EmptyState,
-  Heading,
+  SettingsSection,
   InlineConfirm,
   List,
   ListRow,
@@ -55,10 +55,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
   });
 
   return (
-    <section className="flex flex-col gap-3">
-      <Heading level={2} size="section">
-        {t("jobs.failed.title")}
-      </Heading>
+    <SettingsSection title={t("jobs.failed.title")}>
       <Select
         label={t("jobs.failed.filter")}
         value={kind ?? ""}
@@ -148,7 +145,7 @@ export function FailedJobs({ kind, kinds, onKind, onNotice }: FailedJobsProps) {
           ) : null}
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

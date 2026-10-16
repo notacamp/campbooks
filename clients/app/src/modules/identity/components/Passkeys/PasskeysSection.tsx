@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
@@ -6,11 +6,12 @@ import { useShortcut } from "~/lib/shortcuts";
 import {
   Banner,
   Button,
-  Heading,
   Icon,
   InlineConfirm,
   List,
   ListRow,
+  SettingsEmpty,
+  SettingsSection,
   SkeletonList,
   Text,
   TextField,
@@ -77,7 +78,6 @@ function addProblem(error: unknown): AddProblem {
  */
 export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSectionProps) {
   const { t } = useTranslation("identity");
-  const titleId = useId();
   const passkeys = usePasskeys();
   const add = useAddPasskey();
   const [problem, setProblem] = useState<AddProblem | undefined>();
@@ -100,14 +100,22 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
     leave(stepUpUrl(returnTo ?? here(), { fresh: problem === "freshSignIn" }));
   };
 
+  // Nothing to list: the empty panel carries the add button itself.
+  const none = passkeys.isSuccess && passkeys.data.items.length === 0;
+  const addButton = (
+    <Button
+      variant="secondary"
+      icon="plus"
+      disabled={add.isPending || !passkeys.isSuccess}
+      shortcut="identity.add_passkey"
+      onClick={start}
+    >
+      {add.isPending ? t("passkeys.adding") : t("passkeys.add")}
+    </Button>
+  );
+
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("passkeys.title")}
-      </Heading>
-      <Text tone="tertiary" size="sm">
-        {t("passkeys.lead")}
-      </Text>
+    <SettingsSection title={t("passkeys.title")} description={t("passkeys.lead")}>
       {problem === "stepUp" || problem === "freshSignIn" ? (
         <StepUpBanner fresh={problem === "freshSignIn"} onSignIn={stepUp} />
       ) : problem === undefined ? null : (
@@ -143,10 +151,10 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
             </Button>
           }
         />
-      ) : passkeys.data.items.length === 0 ? (
-        <Text tone="secondary" size="sm">
-          {t("passkeys.none")}
-        </Text>
+      ) : none ? (
+        <SettingsEmpty title={t("passkeys.none")} action={supported ? addButton : undefined}>
+          {supported ? t("passkeys.noneLead") : t("passkeys.unsupported")}
+        </SettingsEmpty>
       ) : (
         <List label={t("passkeys.list")}>
           {passkeys.data.items.map((passkey) => (
@@ -160,24 +168,14 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
           ))}
         </List>
       )}
-      {supported ? (
-        <div>
-          <Button
-            variant="secondary"
-            icon="plus"
-            disabled={add.isPending || !passkeys.isSuccess}
-            shortcut="identity.add_passkey"
-            onClick={start}
-          >
-            {add.isPending ? t("passkeys.adding") : t("passkeys.add")}
-          </Button>
-        </div>
+      {none ? null : supported ? (
+        <div>{addButton}</div>
       ) : (
         <Text tone="tertiary" size="sm">
           {t("passkeys.unsupported")}
         </Text>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

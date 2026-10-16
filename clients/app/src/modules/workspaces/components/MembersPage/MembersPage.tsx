@@ -9,16 +9,13 @@ import {
   Button,
   CopyField,
   EmptyState,
-  Heading,
   InlineConfirm,
   List,
   ListRow,
-  PaneHeader,
-  ReaderBody,
-  ReaderPane,
   Select,
+  SettingsPage,
+  SettingsSection,
   SkeletonList,
-  Spacer,
   Text,
   TextField,
   useUndoToast,
@@ -75,13 +72,12 @@ export function MembersPage({ workspace }: { workspace: Workspace }) {
   );
 
   return (
-    <ReaderPane label={t("members.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("members.title")}
-        </Heading>
-        <Spacer />
-        {manage ? (
+    <SettingsPage
+      label={t("members.title")}
+      title={t("members.title")}
+      lead={t("members.lead", { workspace: workspace.name })}
+      actions={
+        manage ? (
           <Button
             icon="plus"
             shortcut="workspaces.invite_member"
@@ -91,10 +87,13 @@ export function MembersPage({ workspace }: { workspace: Workspace }) {
           >
             {t("invite.title")}
           </Button>
-        ) : null}
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t("members.lead", { workspace: workspace.name })}</Text>
+        ) : undefined
+      }
+    >
+      <SettingsSection
+        title={t("members.list", { workspace: workspace.name })}
+        count={members.data?.length}
+      >
         {members.isPending ? (
           <div role="status" aria-label={t("members.loading")}>
             <SkeletonList rows={3} />
@@ -119,18 +118,18 @@ export function MembersPage({ workspace }: { workspace: Workspace }) {
         ) : (
           <MemberList workspace={workspace} members={members.data} />
         )}
-        {manage ? (
-          <>
-            <InviteForm workspace={workspace} emailField={emailField} />
-            <PendingInvitations workspace={workspace} />
-          </>
-        ) : (
-          <Text tone="tertiary" size="sm">
-            {t("members.readOnly")}
-          </Text>
-        )}
-      </ReaderBody>
-    </ReaderPane>
+      </SettingsSection>
+      {manage ? (
+        <>
+          <InviteForm workspace={workspace} emailField={emailField} />
+          <PendingInvitations workspace={workspace} />
+        </>
+      ) : (
+        <Text tone="tertiary" size="sm">
+          {t("members.readOnly")}
+        </Text>
+      )}
+    </SettingsPage>
   );
 }
 
@@ -310,13 +309,7 @@ function InviteForm({
   };
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("invite.title")}
-      </Heading>
-      <Text tone="tertiary" size="sm">
-        {t("invite.lead")}
-      </Text>
+    <SettingsSection title={t("invite.title")} description={t("invite.lead")} titleId={titleId}>
       <form
         className="flex flex-col gap-3 sm:flex-row sm:items-start"
         aria-labelledby={titleId}
@@ -367,7 +360,7 @@ function InviteForm({
           <InvitationLink invitation={issued} />
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -376,10 +369,11 @@ function PendingInvitations({ workspace }: { workspace: Workspace }) {
   const invitations = useInvitations(workspace.id, true);
   const titleId = useId();
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("invite.pending")}
-      </Heading>
+    <SettingsSection
+      title={t("invite.pending")}
+      count={invitations.data?.length === 0 ? undefined : invitations.data?.length}
+      titleId={titleId}
+    >
       {invitations.isPending ? (
         <SkeletonList rows={1} />
       ) : invitations.isError ? (
@@ -407,7 +401,7 @@ function PendingInvitations({ workspace }: { workspace: Workspace }) {
           ))}
         </List>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

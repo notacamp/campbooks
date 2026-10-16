@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, EmptyState, Heading, InlineConfirm, List, ListRow, Text } from "~/lib/ui";
+import { Button, EmptyState, InlineConfirm, List, ListRow, SettingsSection, Text } from "~/lib/ui";
 
 import { useRetryKind, type KindSummary, type QueueSummary } from "../../api/jobs";
 import { formatUptime } from "../SystemAdminPanel/SystemOverview";
@@ -42,10 +42,7 @@ export function JobsSummary({ summary, onShowFailed, onNotice }: JobsSummaryProp
   };
 
   return (
-    <section className="flex flex-col gap-3">
-      <Heading level={2} size="section">
-        {t("jobs.queue.title")}
-      </Heading>
+    <SettingsSection title={t("jobs.queue.title")}>
       {summary.kinds.length === 0 ? (
         <EmptyState title={t("jobs.queue.emptyTitle")}>{t("jobs.queue.emptyLead")}</EmptyState>
       ) : (
@@ -101,7 +98,7 @@ export function JobsSummary({ summary, onShowFailed, onNotice }: JobsSummaryProp
           })}
         </List>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

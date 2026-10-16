@@ -1,8 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { useId } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Banner, Button, Fact, FactList, Heading, SkeletonList, Text } from "~/lib/ui";
+import { Banner, Button, Fact, FactList, SettingsSection, SkeletonList, Text } from "~/lib/ui";
 
 import { adminConnectionsQuery, type AdminConnection } from "../../api/admin";
 
@@ -27,13 +26,9 @@ function useDateFormat() {
 export function WorkspaceConnectionsAdmin({ workspaceId }: WorkspaceConnectionsAdminProps) {
   const { t } = useTranslation("connectors");
   const connections = useQuery(adminConnectionsQuery(workspaceId));
-  const titleId = useId();
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("admin.title")}
-      </Heading>
+    <SettingsSection title={t("admin.title")}>
       {connections.isPending ? (
         <div role="status" aria-label={t("admin.loading")}>
           <SkeletonList rows={2} />
@@ -63,7 +58,7 @@ export function WorkspaceConnectionsAdmin({ workspaceId }: WorkspaceConnectionsA
           ))}
         </FactList>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

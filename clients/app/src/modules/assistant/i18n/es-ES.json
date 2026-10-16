@@ -183,7 +183,8 @@
       "announce": "Esta es la regla que he entendido: {{rule}}",
       "saveFailed": "Scout no ha podido guardar la regla. Inténtalo de nuevo.",
       "savePartial": "Guardada en {{saved}} de {{total}} bandejas, y Scout se ha detenido. Reintentar la guarda en las demás.",
-      "retry": "Reintentar"
+      "retry": "Reintentar",
+      "description": "Dilo en una frase. Scout te muestra la regla, y a qué correos afecta, antes de guardar nada."
     },
     "builder": {
       "noModel": "Este servidor no tiene un modelo de lenguaje para leer frases, así que crea la regla aquí.",
@@ -216,9 +217,12 @@
       "never": "Todavía no has respondido a las preguntas de Scout.",
       "again": "Responder de nuevo a las preguntas",
       "start": "Responder a las preguntas",
-      "failed": "Scout no ha podido cargar tus respuestas ahora."
+      "failed": "Scout no ha podido cargar tus respuestas ahora.",
+      "description": "Tres preguntas rápidas: de quién llegan siempre los correos hasta ti, cuáles nunca te necesitan y si Scout pregunta primero.",
+      "proactivity": "Cuando Scout está seguro"
     },
-    "rules": "Tus reglas"
+    "rules": "Tus reglas",
+    "rulesDescription": "Todo lo que Scout hace por su cuenta. Si quitas una regla, deja de actuar; tú eliges si los correos que movió vuelven a su sitio."
   },
   "shortcuts": {
     "skip": "Omitir esta pregunta",

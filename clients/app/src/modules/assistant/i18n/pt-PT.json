@@ -183,7 +183,8 @@
       "announce": "Eis a regra que percebi: {{rule}}",
       "saveFailed": "O Scout não conseguiu guardar a regra. Tente de novo.",
       "savePartial": "Guardada em {{saved}} de {{total}} caixas, e o Scout parou. Tentar de novo guarda-a nas restantes.",
-      "retry": "Tentar de novo"
+      "retry": "Tentar de novo",
+      "description": "Diga-o numa frase. O Scout mostra-lhe a regra, e o que ela apanha, antes de guardar seja o que for."
     },
     "builder": {
       "noModel": "Este servidor não tem um modelo de linguagem para ler frases, por isso crie a regra aqui.",
@@ -216,9 +217,12 @@
       "never": "Ainda não respondeu às perguntas do Scout.",
       "again": "Responder de novo às perguntas",
       "start": "Responder às perguntas",
-      "failed": "O Scout não conseguiu carregar as suas respostas agora."
+      "failed": "O Scout não conseguiu carregar as suas respostas agora.",
+      "description": "Três perguntas rápidas: de quem os emails chegam sempre até si, o que nunca precisa de si e se o Scout pergunta primeiro.",
+      "proactivity": "Quando o Scout tem a certeza"
     },
-    "rules": "As suas regras"
+    "rules": "As suas regras",
+    "rulesDescription": "Tudo o que o Scout faz sozinho. Se remover uma regra, ela deixa de atuar; é você que escolhe se os emails que ela moveu voltam ao sítio."
   },
   "shortcuts": {
     "skip": "Saltar esta pergunta",

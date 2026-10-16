@@ -183,7 +183,8 @@
       "announce": "Voici la règle que j’ai comprise : {{rule}}",
       "saveFailed": "Scout n’a pas pu enregistrer la règle. Réessayez.",
       "savePartial": "Enregistrée dans {{saved}} boîtes sur {{total}}, puis Scout s’est arrêté. Réessayer l’enregistre dans les autres.",
-      "retry": "Réessayer"
+      "retry": "Réessayer",
+      "description": "Dites-le en une phrase. Scout vous montre la règle, et ce qu’elle concerne, avant d’enregistrer quoi que ce soit."
     },
     "builder": {
       "noModel": "Ce serveur n’a pas de modèle de langage pour lire des phrases, alors créez la règle ici.",
@@ -216,9 +217,12 @@
       "never": "Vous n’avez pas encore répondu aux questions de Scout.",
       "again": "Répondre à nouveau aux questions",
       "start": "Répondre aux questions",
-      "failed": "Scout n’a pas pu charger vos réponses pour l’instant."
+      "failed": "Scout n’a pas pu charger vos réponses pour l’instant.",
+      "description": "Trois questions rapides : de qui les e-mails vous parviennent toujours, ce qui n’a jamais besoin de vous et si Scout demande d’abord.",
+      "proactivity": "Quand Scout est sûr"
     },
-    "rules": "Vos règles"
+    "rules": "Vos règles",
+    "rulesDescription": "Tout ce que Scout fait de lui-même. Si vous retirez une règle, elle s’arrête ; vous choisissez si les e-mails qu’elle a déplacés reviennent."
   },
   "shortcuts": {
     "skip": "Passer cette question",

@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ReactNode, type RefObject } from "react";
+import { useId, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode } from "~/lib/api";
@@ -14,11 +14,9 @@ import {
   InlineConfirm,
   List,
   ListRow,
-  PaneHeader,
-  ReaderBody,
-  ReaderPane,
+  SettingsPage,
+  SettingsSection,
   SkeletonList,
-  Spacer,
   Tag,
   Text,
   TextField,
@@ -85,51 +83,33 @@ export function AppsPage({ workspaceId, returnTo, leave = leavePage }: AppsPageP
   useShortcut("identity.register_client", startNew, { enabled: admin });
 
   return (
-    <ReaderPane label={t("apps.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("apps.title")}
-        </Heading>
-        <Spacer />
-        {admin ? (
+    <SettingsPage
+      label={t("apps.title")}
+      title={t("apps.title")}
+      lead={t("apps.lead")}
+      actions={
+        admin ? (
           <Button icon="plus" shortcut="identity.register_client" onClick={startNew}>
             {t("apps.workspace.new")}
           </Button>
-        ) : null}
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t("apps.lead")}</Text>
-        <ConnectedApps workspaces={workspaces.data ?? []} />
-        {workspace === undefined ? null : (
-          <WorkspaceApps
-            workspace={workspace}
-            admin={admin}
-            creating={creating}
-            nameField={nameField}
-            onDoneCreating={() => {
-              setCreating(false);
-            }}
-            returnTo={returnTo}
-            leave={leave}
-          />
-        )}
-      </ReaderBody>
-    </ReaderPane>
-  );
-}
-
-function Section({ title, lead, children }: { title: string; lead: string; children: ReactNode }) {
-  const titleId = useId();
-  return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {title}
-      </Heading>
-      <Text tone="tertiary" size="sm">
-        {lead}
-      </Text>
-      {children}
-    </section>
+        ) : undefined
+      }
+    >
+      <ConnectedApps workspaces={workspaces.data ?? []} />
+      {workspace === undefined ? null : (
+        <WorkspaceApps
+          workspace={workspace}
+          admin={admin}
+          creating={creating}
+          nameField={nameField}
+          onDoneCreating={() => {
+            setCreating(false);
+          }}
+          returnTo={returnTo}
+          leave={leave}
+        />
+      )}
+    </SettingsPage>
   );
 }
 
@@ -151,7 +131,11 @@ function ConnectedApps({ workspaces }: { workspaces: readonly Workspace[] }) {
   const { t } = useTranslation("identity");
   const apps = useConnectedApps();
   return (
-    <Section title={t("apps.connected.title")} lead={t("apps.connected.lead")}>
+    <SettingsSection
+      title={t("apps.connected.title")}
+      count={apps.data?.length}
+      description={t("apps.connected.lead")}
+    >
       {apps.isPending ? (
         <div role="status" aria-label={t("apps.loading")}>
           <SkeletonList rows={2} />
@@ -173,7 +157,7 @@ function ConnectedApps({ workspaces }: { workspaces: readonly Workspace[] }) {
           ))}
         </List>
       )}
-    </Section>
+    </SettingsSection>
   );
 }
 
@@ -283,9 +267,9 @@ function WorkspaceApps({
   const [stepUp, setStepUp] = useState(false);
   const [secret, setSecret] = useState<RegisteredClient | undefined>();
   return (
-    <Section
+    <SettingsSection
       title={t("apps.workspace.title")}
-      lead={t("apps.workspace.lead", { workspace: workspace.name })}
+      description={t("apps.workspace.lead", { workspace: workspace.name })}
     >
       {admin ? (
         <>
@@ -329,7 +313,7 @@ function WorkspaceApps({
           {t("apps.workspace.notAdmin")}
         </Text>
       )}
-    </Section>
+    </SettingsSection>
   );
 }
 

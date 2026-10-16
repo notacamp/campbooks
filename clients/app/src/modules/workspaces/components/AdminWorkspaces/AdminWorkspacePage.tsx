@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useId, type ComponentType } from "react";
+import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus } from "~/lib/api";
@@ -10,7 +10,7 @@ import {
   EmptyState,
   Fact,
   FactList,
-  Heading,
+  SettingsSection,
   List,
   ListRow,
   SkeletonList,
@@ -112,12 +112,8 @@ function Members({ detail }: { detail: AdminWorkspaceDetail }) {
   const { t } = useTranslation("workspaces");
   const formatDate = useDateFormat();
   const link = useRouterLink();
-  const titleId = useId();
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("admin.workspace.members")}
-      </Heading>
+    <SettingsSection title={t("admin.workspace.members")} count={detail.members.length}>
       <List label={t("members.list", { workspace: detail.workspace.name })}>
         {detail.members.map((member) => {
           const name = member.display_name ?? member.email ?? member.user_id;
@@ -148,6 +144,6 @@ function Members({ detail }: { detail: AdminWorkspaceDetail }) {
           );
         })}
       </List>
-    </section>
+    </SettingsSection>
   );
 }

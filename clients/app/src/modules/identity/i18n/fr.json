@@ -205,7 +205,7 @@
   },
   "waysIn": {
     "title": "Moyens de connexion",
-    "lead": "Vous pouvez vous connecter à Campbooks avec n’importe lequel de ces comptes. Chaque boîte mail que vous connectez en devient un aussi.",
+    "lead": "Comment vous entrez dans Campbooks. Gardez-en au moins deux, pour que perdre l’une ne vous enferme jamais dehors.",
     "list": "Vos moyens de connexion",
     "loading": "Chargement de vos moyens de connexion…",
     "loadError": {
@@ -307,7 +307,9 @@
       "confirm": "Oui, me déconnecter partout",
       "confirmLead": "Vous déconnecter de Campbooks sur tous vos appareils et dans toutes les applications, ce navigateur compris ? Vous vous reconnecterez ensuite ici.",
       "failed": "Impossible de vous déconnecter partout. Rien n’a changé ; réessayez."
-    }
+    },
+    "accounts": "Comptes",
+    "accountsLead": "Vous pouvez vous connecter avec n’importe lequel de ceux-ci. Chaque boîte mail que vous connectez en devient un aussi."
   },
   "passkeySignUp": {
     "eyebrow": "Nouveau compte",
@@ -406,7 +408,8 @@
         "lead": "Rien n’a été ajouté. Réessayez."
       }
     },
-    "freshSignIn": "Par sécurité, ajouter une clé d’accès demande une connexion de moins de cinq minutes. Reconnectez-vous ; vous reviendrez directement ici."
+    "freshSignIn": "Par sécurité, ajouter une clé d’accès demande une connexion de moins de cinq minutes. Reconnectez-vous ; vous reviendrez directement ici.",
+    "noneLead": "Ajoutez-en une sur cet appareil."
   },
   "admin": {
     "title": "Compte",

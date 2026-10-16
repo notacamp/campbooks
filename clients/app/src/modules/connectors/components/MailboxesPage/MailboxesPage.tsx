@@ -9,16 +9,14 @@ import {
   Checkbox,
   ChoiceCards,
   EmptyState,
-  Heading,
   InlineConfirm,
   List,
   ListRow,
-  PaneHeader,
   ProviderMark,
-  ReaderBody,
-  ReaderPane,
+  SettingsEmpty,
+  SettingsPage,
+  SettingsSection,
   SkeletonList,
-  Spacer,
   StatusText,
   Text,
 } from "~/lib/ui";
@@ -132,43 +130,44 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
   );
 
   return (
-    <ReaderPane label={t("mailboxes.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("mailboxes.title")}
-        </Heading>
-        <Spacer />
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t("mailboxes.lead", { workspace: workspace.name })}</Text>
-        {/* Said once: a disconnect afterwards replaces it. */}
-        {disconnected === undefined ? (
-          <Outcome result={result} connections={connections.data} />
-        ) : null}
-        {gone === undefined ? null : (
-          <div ref={doneRef} tabIndex={-1}>
-            <Banner
-              tone="danger"
-              role="alert"
-              title={t("disconnect.errors.gone", { address: gone })}
-            />
-          </div>
-        )}
-        {disconnected === undefined ? null : (
-          // Focus lands here once the row it was in is gone.
-          <div ref={doneRef} tabIndex={-1}>
-            <Banner
-              role="status"
-              icon="check"
-              title={t("disconnect.done", { address: disconnected.address })}
-            >
-              {disconnected.mail === "keep"
-                ? t("disconnect.doneKept", { provider: disconnected.provider })
-                : t("disconnect.doneDeleted", { provider: disconnected.provider })}
-            </Banner>
-          </div>
-        )}
-        <Refusal consent={consent} />
+    <SettingsPage
+      label={t("mailboxes.title")}
+      title={t("mailboxes.title")}
+      lead={t("mailboxes.lead", { workspace: workspace.name })}
+    >
+      {/* Said once: a disconnect afterwards replaces it. */}
+      {disconnected === undefined ? (
+        <Outcome result={result} connections={connections.data} />
+      ) : null}
+      {gone === undefined ? null : (
+        <div ref={doneRef} tabIndex={-1}>
+          <Banner
+            tone="danger"
+            role="alert"
+            title={t("disconnect.errors.gone", { address: gone })}
+          />
+        </div>
+      )}
+      {disconnected === undefined ? null : (
+        // Focus lands here once the row it was in is gone.
+        <div ref={doneRef} tabIndex={-1}>
+          <Banner
+            role="status"
+            icon="check"
+            title={t("disconnect.done", { address: disconnected.address })}
+          >
+            {disconnected.mail === "keep"
+              ? t("disconnect.doneKept", { provider: disconnected.provider })
+              : t("disconnect.doneDeleted", { provider: disconnected.provider })}
+          </Banner>
+        </div>
+      )}
+      <Refusal consent={consent} />
+      <SettingsSection
+        title={t("mailboxes.list")}
+        count={connections.data?.length}
+        description={seesAll ? undefined : t("mailboxes.onlyYours")}
+      >
         {connections.isPending ? (
           <div role="status" aria-label={t("mailboxes.loading")}>
             <SkeletonList rows={2} />
@@ -191,9 +190,9 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
             {t("mailboxes.loadError.lead")}
           </EmptyState>
         ) : list.length === 0 ? (
-          <EmptyState title={t("mailboxes.empty.title")} visor="happy" visorSize="lg">
+          <SettingsEmpty title={t("mailboxes.empty.title")}>
             {t("mailboxes.empty.lead")}
-          </EmptyState>
+          </SettingsEmpty>
         ) : (
           <List label={t("mailboxes.list")}>
             {list.map((connection) => (
@@ -232,14 +231,9 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
             ))}
           </List>
         )}
-        {seesAll ? null : (
-          <Text tone="tertiary" size="sm">
-            {t("mailboxes.onlyYours")}
-          </Text>
-        )}
-        <ConnectSection groupRef={connectGroup} consent={consent} />
-      </ReaderBody>
-    </ReaderPane>
+      </SettingsSection>
+      <ConnectSection groupRef={connectGroup} consent={consent} />
+    </SettingsPage>
   );
 }
 
@@ -532,10 +526,11 @@ function ConnectSection({
   const providers = consent.providers;
   const [signIn, setSignIn] = useState(true);
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("connect.title")}
-      </Heading>
+    <SettingsSection
+      title={t("connect.title")}
+      description={providers !== undefined && providers.length > 0 ? t("connect.lead") : undefined}
+      titleId={titleId}
+    >
       {providers === undefined ? (
         consent.providersFailed ? (
           <Text tone="tertiary" size="sm">
@@ -552,9 +547,6 @@ function ConnectSection({
         </Text>
       ) : (
         <>
-          <Text tone="tertiary" size="sm">
-            {t("connect.lead")}
-          </Text>
           <Checkbox
             label={t("connect.signIn")}
             hint={t("connect.signInHint")}
@@ -586,6 +578,6 @@ function ConnectSection({
           </div>
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
