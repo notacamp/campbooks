@@ -187,6 +187,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),

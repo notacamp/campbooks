@@ -16,8 +16,8 @@ had no test.
   List (the `psl` crate, compiled in, ICANN and private sections), replacing
   the 24-entry list. A bare public suffix as From authenticates nothing.
 - A conversation's first need is not stored for a message a concurrent
-  provider move to spam or the trash has locked (`FOR SHARE SKIP LOCKED`; it
-  never waits).
+  transaction is changing (`FOR SHARE SKIP LOCKED`; it never waits); a
+  durable `conversations.refresh_need` job settles it afterwards.
 - Tests: leaving spam re-raises the need; a trash round trip keeps a member's
   confirmation and a Done.
 

@@ -657,8 +657,29 @@ async fn live_conversation(
     }))
 }
 
-/// Whether the message an open need is about to be stored for can still
-/// carry it, checked on the locked row.
+/// What the check of a first need's source message found.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SourceCheck {
+    /// It can carry the need.
+    Carries,
+    /// It is in spam or the trash (or gone): no need, now or later.
+    Cannot,
+    /// Another transaction is changing it right now: undecided.
+    Busy,
+}
+
+/// How a refresh ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Refreshed {
+    /// Settled (stored, cleared, or nothing to change).
+    Settled,
+    /// A first need was not stored because its message is being changed by
+    /// another transaction; the need is still to be worked out.
+    Deferred,
+}
+
+/// Check the message an open first need is about to be stored for, on the
+/// locked row.
 ///
 /// The race: a decide pass reads a message before a provider move to spam or
 /// the trash commits, then stores an open need after it. It exists only when
@@ -666,22 +687,30 @@ async fn live_conversation(
 /// UPDATE`, which serialises refreshes, and the move's own refresh (the end
 /// of `apply_changes`) clears a stale need. So this runs only for a first
 /// insert, and it never waits: the message row is taken `FOR SHARE SKIP
-/// LOCKED`. A row someone else is changing (an uncommitted move, a flag
-/// update) is skipped, and nothing is stored: whoever changes a message
-/// refreshes its conversation before it commits, and that refresh decides.
-/// A row that is free is re-read under the share lock, which holds a later
-/// move back until this transaction ends.
+/// LOCKED`. A free row is re-read under the share lock, which holds a later
+/// move back until this transaction ends. A row someone else is changing
+/// (an uncommitted move, a template fill, any writer) is [`SourceCheck::Busy`]:
+/// nothing is stored, and the refresh is [`Refreshed::Deferred`], which
+/// [`refresh`] turns into a durable `conversations.refresh_need` job. That is
+/// what makes the skip safe whatever the writer is: not every writer refreshes
+/// the conversation (`fill_templates` does not), so the follow-up does not
+/// depend on it.
 ///
 /// Lock order, for every caller of [`refresh`]: no caller waits on a message
 /// lock here, so this adds no wait edge and no deadlock with the order the
 /// callers already take (`apply_changes`: messages, then the conversation's
 /// counts, then the needs row; `judge`, `reopen`: conversation, then the
-/// needs row; rules and flags: the conversation row; the decide pass and the
-/// backfill: the needs row). `judge` and `reopen` always have a needs row, so
-/// they never get here. The backfill keeps these share locks until its page
-/// commits; a conversation it skips because a message is mid-change is
-/// settled by that change's own refresh.
-async fn source_can_carry(tx: &mut Transaction<'_, Postgres>, message: MessageId) -> Result<bool> {
+/// needs row; rules and flags: the conversation row; the decide pass, the
+/// backfill and the follow-up job: the needs row). `judge` and `reopen`
+/// always have a needs row, so they never get here. The backfill keeps these
+/// share locks until its page commits.
+async fn source_can_carry(
+    tx: &mut Transaction<'_, Postgres>,
+    message: MessageId,
+) -> Result<SourceCheck> {
+    // `SKIP LOCKED` returns no row for a locked one and for a missing one;
+    // a plain read tells them apart, and cannot wait (a plain read never
+    // waits on a row lock).
     let free: Option<bool> = sqlx::query_scalar(
         "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
           WHERE id = $1 FOR SHARE SKIP LOCKED",
@@ -689,13 +718,33 @@ async fn source_can_carry(tx: &mut Transaction<'_, Postgres>, message: MessageId
     .bind(message)
     .fetch_optional(&mut **tx)
     .await?;
-    Ok(free == Some(true))
+    match free {
+        Some(true) => Ok(SourceCheck::Carries),
+        Some(false) => Ok(SourceCheck::Cannot),
+        None => {
+            let exists: bool = sqlx::query_scalar(
+                "SELECT EXISTS (SELECT 1 FROM conversations.messages WHERE id = $1)",
+            )
+            .bind(message)
+            .fetch_one(&mut **tx)
+            .await?;
+            Ok(if exists {
+                SourceCheck::Busy
+            } else {
+                SourceCheck::Cannot
+            })
+        }
+    }
 }
 
 /// Work out conversation `id`'s need again and, when it changed, store it
 /// and publish `conversations.need_changed` in `tx`. A conversation that is
 /// gone, has no inbound message, or is in a kept read-only inbox
 /// (`detached_at`) changes nothing.
+///
+/// A first need whose message another transaction is changing is not stored
+/// now; a `conversations.refresh_need` job, enqueued in `tx`, works it out
+/// again a few seconds later.
 pub async fn refresh(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
@@ -703,8 +752,22 @@ pub async fn refresh(
     id: ConversationId,
     settings: &NeedSettings,
 ) -> Result<()> {
+    if refresh_now(tx, events, workspace, id, settings).await? == Refreshed::Deferred {
+        crate::features::refresh_need::enqueue(tx, workspace, id).await?;
+    }
+    Ok(())
+}
+
+/// [`refresh`] without the follow-up: says whether it deferred.
+pub async fn refresh_now(
+    tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
+    workspace: &str,
+    id: ConversationId,
+    settings: &NeedSettings,
+) -> Result<Refreshed> {
     let Some(conversation) = live_conversation(tx, id).await? else {
-        return Ok(());
+        return Ok(Refreshed::Settled);
     };
     let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
@@ -714,7 +777,7 @@ pub async fn refresh(
         withdrawn,
     } = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
-        return Ok(());
+        return Ok(Refreshed::Settled);
     };
 
     let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
@@ -730,11 +793,15 @@ pub async fn refresh(
     };
     // A first need for a message a move may be changing right now: store
     // nothing, the move's refresh decides (see `source_can_carry`).
-    if row.is_none() && cause.is_none() && !source_can_carry(tx, need.message).await? {
-        return Ok(());
+    if row.is_none() && cause.is_none() {
+        match source_can_carry(tx, need.message).await? {
+            SourceCheck::Carries => {}
+            SourceCheck::Cannot => return Ok(Refreshed::Settled),
+            SourceCheck::Busy => return Ok(Refreshed::Deferred),
+        }
     }
     if !worth_announcing(row.as_ref(), need, cause, latest)? {
-        return Ok(());
+        return Ok(Refreshed::Settled);
     }
     let cleared_by = match cause {
         Some(ClearCause::Done | ClearCause::NotNeeded) => row.as_ref().and_then(|r| r.verdict_by),
@@ -800,7 +867,7 @@ pub async fn refresh(
             },
         )
         .await?;
-    Ok(())
+    Ok(Refreshed::Settled)
 }
 
 /// Whether settling `need` (cleared by `cause`, if any) changes what was

@@ -541,6 +541,52 @@ async fn a_trash_round_trip_keeps_a_members_confirmation_and_done(db: PgPool) {
     assert_eq!(cause, "done");
 }
 
+/// A refresh of `conversation` as a decide pass runs it, committed.
+async fn refreshed(kit: &Kit, workspace: WorkspaceId, conversation: &str) {
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    crate::domain::needs::refresh(
+        &mut tx,
+        &kit.state.events,
+        &workspace.to_string(),
+        conversation.parse().unwrap(),
+        &crate::domain::needs::NeedSettings::new(
+            36_500,
+            &crate::domain::policy::Policy::baseline(),
+        ),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+}
+
+/// Pending `conversations.refresh_need` jobs.
+async fn pending_refreshes(db: &PgPool) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE kind = 'conversations.refresh_need' AND state = 'pending'",
+    )
+    .fetch_one(db)
+    .await
+    .unwrap()
+}
+
+/// Run the follow-up jobs now, not in their few seconds.
+async fn run_refreshes(kit: &Kit, db: &PgPool) {
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(db)
+        .await
+        .unwrap();
+    kit.run_jobs().await;
+}
+
+async fn needs_stored(db: &PgPool, conversation: &str) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(conversation)
+        .fetch_one(db)
+        .await
+        .unwrap()
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
 async fn a_first_need_is_not_stored_for_a_message_mid_move(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
@@ -565,68 +611,68 @@ async fn a_first_need_is_not_stored_for_a_message_mid_move(db: PgPool) {
     .await
     .unwrap();
 
-    // A decide-pass refresh of the conversation starts beside it.
-    let refreshing = {
-        let state = kit.state.clone();
-        let conversation = conversation.clone();
-        tokio::spawn(async move {
-            let mut tx = state.db.begin_for(workspace).await.unwrap();
-            crate::domain::needs::refresh(
-                &mut tx,
-                &state.events,
-                &workspace.to_string(),
-                conversation.parse().unwrap(),
-                &crate::domain::needs::NeedSettings::new(
-                    36_500,
-                    &crate::domain::policy::Policy::baseline(),
-                ),
-            )
-            .await
-            .unwrap();
-            tx.commit().await.unwrap();
-        })
-    };
-    // It does not wait for the move (a wait here could deadlock with a
-    // request holding the needs row), and stores nothing for a message that
-    // is mid-change: the move's own refresh decides.
-    tokio::time::timeout(std::time::Duration::from_secs(10), refreshing)
-        .await
-        .expect("the refresh never waits on a message")
-        .unwrap();
-    moving.commit().await.unwrap();
-    let open: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid",
+    // A decide-pass refresh beside it does not wait (a wait could deadlock
+    // with a request holding the needs row) and stores nothing.
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        refreshed(&kit, workspace, &conversation),
     )
-    .bind(&conversation)
-    .fetch_one(&db)
     .await
-    .unwrap();
-    assert_eq!(open, 0, "no need is stored for a message that is in spam");
+    .expect("the refresh never waits on a message");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
 
-    // The move's own refresh, as `apply_changes` runs it before it commits,
-    // has the last word; with the message in spam there is no need.
-    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
-    crate::domain::needs::refresh(
-        &mut tx,
-        &kit.state.events,
-        &workspace.to_string(),
-        conversation.parse().unwrap(),
-        &crate::domain::needs::NeedSettings::new(
-            36_500,
-            &crate::domain::policy::Policy::baseline(),
-        ),
-    )
-    .await
-    .unwrap();
-    tx.commit().await.unwrap();
-    let open: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid",
-    )
-    .bind(&conversation)
-    .fetch_one(&db)
-    .await
-    .unwrap();
-    assert_eq!(open, 0);
+    // The move commits; the follow-up finds a message in spam: still nothing.
+    moving.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_skipped_first_need_is_worked_out_by_a_follow_up(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let message = kit.message_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // Another writer that never refreshes (a template fill) holds the row.
+    let mut writer = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET subject_template = '' WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *writer)
+        .await
+        .unwrap();
+
+    // Skipped twice: nothing stored, exactly one follow-up job.
+    refreshed(&kit, workspace, &conversation).await;
+    refreshed(&kit, workspace, &conversation).await;
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // Still held when the job first runs: it retries, keeping its key.
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let stats = campbooks_kernel::jobs::Worker::new(kit.state.clone())
+        .run_until_idle()
+        .await;
+    assert_eq!(stats.failed, 0, "{stats:?}");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // The writer commits; the follow-up stores the open need.
+    writer.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
+    assert_eq!(pending_refreshes(&db).await, 0);
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply", "{marta}");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

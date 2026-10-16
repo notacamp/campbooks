@@ -50,21 +50,29 @@ content to decide.
   exists only when the conversation has no needs row yet: with one,
   `current` locks it `FOR UPDATE`, which serialises refreshes, and the
   move's own refresh (the end of `apply_changes`) clears a stale need. So
-  only a first insert re-checks: it reads the need's message
-  `FOR SHARE SKIP LOCKED` and stores nothing when the row is locked by
-  another change (that change's own refresh decides) or is in spam or the
-  trash. It never waits on a message lock, so it adds no wait edge. The
-  callers of `needs::refresh` take: `apply_changes`, messages, then the
-  conversation's counts, then the needs row; `judge` and `reopen`, the
-  conversation then the needs row (a row always exists there, so they never
-  reach the check); rules and flags, the conversation row; the decide pass
-  and the backfill, the needs row. An earlier draft share-locked the
-  messages before the needs row for every refresh; that put messages after
-  the needs row for `judge`, against `apply_changes`, and could deadlock, so
-  it was dropped. The share lock taken by a first insert is held to the end
-  of the transaction (the backfill's page), which holds a later move back
-  but is never waited on by the refresh. A skipped conversation is not
-  retried by the backfill; the change that held the lock settles it.
+  only a first insert re-checks, reading the need's message
+  `FOR SHARE SKIP LOCKED`. In spam or the trash (or gone): nothing is
+  stored, no follow-up. Locked by another transaction: nothing is stored
+  and a durable `conversations.refresh_need` job (payload: the conversation
+  id; unique per conversation; run a few seconds later) is enqueued in the
+  same transaction. The skip is not safe on the assumption that the writer
+  refreshes the conversation: `fill_templates` updates messages and never
+  does, and any future writer might not, so the follow-up does not depend
+  on it. The job runs the same refresh; if the message is still busy it
+  retries after 10 s (bounded attempts), keeping its unique key, so it
+  cannot spin or pile up. It never waits on a message lock either.
+  Lock order of the callers of `needs::refresh`: `apply_changes`, messages,
+  then the conversation's counts, then the needs row; `judge` and `reopen`,
+  the conversation then the needs row (a row always exists there, so they
+  never reach the check); rules and flags, the conversation row; the decide
+  pass, the backfill and the follow-up job, the needs row. Because the
+  check never waits, none of these orders gains a wait edge. An earlier
+  draft share-locked the messages before the needs row for every refresh;
+  that put messages after the needs row for `judge`, against
+  `apply_changes`, and could deadlock, so it was dropped. The share lock
+  taken by a first insert is held to the end of the transaction (the
+  backfill's page), which holds a later move back but is never waited on by
+  the refresh.
 - **What a trash round trip does.** A message leaving the trash or spam
   raises its need again through the ordinary path (newest eligible inbound
   message, its answers). A Done or Not needed verdict stays: the need clears
