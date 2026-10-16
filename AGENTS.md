@@ -154,12 +154,23 @@ plurals). Every string a user can see exists in all four before it ships.
   plainly how the translations were produced.
 
 
-- **Open-weight models only** in the shipped catalog. Every AI call goes through
-  `campbooks-ai` by **role** (`decide`, `embed`, `complete`, optional
-  `vision`), never by vendor. Providers speak the OpenAI-compatible HTTP API, so
-  a self-hosted vLLM / llama.cpp / Ollama / TEI and a hosted provider serving
-  open weights are interchangeable. Users and instance admins configure every
-  role. See ADR 0005.
+- **Open-weight models by default.** The shipped catalog and defaults are
+  open-weight; an instance may point `decide` at a hosted decision model (Jev)
+  by configuration, with content sent only after the admin opts in (ADR 0018).
+  Every AI call goes through `campbooks-ai` by **role** (`decide`, `embed`,
+  `complete`, optional `vision`), never by vendor. Providers speak the
+  OpenAI-compatible HTTP API (or Laya's decision protocol for `decide`), so a
+  self-hosted vLLM / llama.cpp / Ollama / TEI and a hosted provider are
+  interchangeable. Users and instance admins configure every role. See ADR 0005.
+- **No content rules.** Deciding what an email means is a model's job (ADR
+  0018). No deterministic code reads a message's subject, body or attachment
+  names to decide anything: no phrase lists, keyword lists or regular
+  expressions over content, in any language, not even as a fallback.
+  Deterministic code reads structured facts only (headers, addresses,
+  authentication results, media types) and may only say "no"; what it cannot
+  settle that way is the model's, or stays undecided. Text hygiene (HTML to
+  text, dropping quoted history) is not a decision. *(CI: the facts module's
+  source test, `campbooks_ai::decide::signals::facts`.)*
 - AI output that changes user data is a **proposal** the user can undo, never a
   silent mutation.
 
