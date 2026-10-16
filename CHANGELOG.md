@@ -397,8 +397,8 @@ All notable changes to Campbooks Next are documented here. The format follows
   stays until you choose Retry or dismiss it instead of fading after six seconds.
 - **Pin, on P.** Star is now called Pin, and pinned conversations stay at the top of
   their stream in the inbox. It is still the provider's star (Gmail's STARRED), synced
-  as before. Migrations `20261020230000_conversations__pinned_stream_list_index` and
-  `20261020230100_conversations__pinned_inbox_list_index` add the matching indexes,
+  as before. Migrations `20261020235000_conversations__pinned_stream_list_index` and
+  `20261020235100_conversations__pinned_inbox_list_index` add the matching indexes,
   built concurrently.
 
 - **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
