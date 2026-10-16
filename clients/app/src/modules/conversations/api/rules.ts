@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type Schema } from "~/lib/api";
+import { api, operationKey, unwrap, unwrapEmpty, type Schema } from "~/lib/api";
 
 import type { Stream } from "./queries";
 
@@ -59,7 +59,7 @@ export async function dismissSuggestions(
 ): Promise<void> {
   await Promise.all(
     keys.map(async (key) => {
-      unwrap(
+      unwrapEmpty(
         await api.POST(
           "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss",
           {

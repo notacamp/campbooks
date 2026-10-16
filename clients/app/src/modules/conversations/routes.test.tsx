@@ -249,6 +249,9 @@ describe("the inbox", () => {
       (call) => call.route === `POST ${W}/conversations/${LEDGER.id}/rule-suggestions/dismiss`,
     );
     expect(dismissed?.body).toEqual({ key: "sender|ledger" });
+    // Recorded (204): no word of failure.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText(/could not record/u)).toBeNull();
   });
 
   it("dismisses the offer with Esc as soon as it appears, leaving the reader open", async () => {

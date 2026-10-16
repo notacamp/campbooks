@@ -31,33 +31,38 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
   await page.getByText("This week: calmer dashboards").first().waitFor();
   await caption(page, "Primary holds a newsletter, issue after issue", 2000);
   // The first sync brings every issue in: teach once on the whole mailbox.
-  let last = -1;
-  for (let attempt = 0; attempt < 120; attempt += 1) {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
     const { streams } = (await api(page, "GET", `/bff/api/v1/w/${workspace}/streams`)) as {
       streams: { stream: string; conversations: number }[];
     };
     const primary = streams.find((s) => s.stream === "primary")?.conversations ?? 0;
-    if (primary >= 600 || (primary === last && primary > 0 && attempt > 10)) {
+    if (primary >= 600) {
       break;
     }
-    last = primary;
     await pause(1000);
   }
   await page.getByText("This week: calmer dashboards").first().click();
   await page.getByRole("heading", { name: "This week: calmer dashboards" }).waitFor();
 
-  // Marking it read offers to mark them all read: Esc says "just this one".
-  await caption(page, "Mark it unread, then read again (U, U)", 1600);
-  await page.keyboard.press("u");
-  await pause(800);
-  await page.keyboard.press("u");
-  const readOffer = page.getByRole("dialog", { name: /like this read/u });
-  await readOffer.waitFor();
-  await caption(page, "Campbooks offers to mark them all read", 2000);
-  await caption(page, "Esc: just this one", 1200);
+  // A first move offers to move every one like it: Esc says "just this one".
+  await caption(page, "Move it to Updates first (M, then 2)", 1600);
+  if (phone) {
+    await page.getByRole("button", { name: /^Move/u }).first().click();
+    await page
+      .getByRole("button", { name: /Updates/u })
+      .last()
+      .click();
+  } else {
+    await page.keyboard.press("m");
+    await pause(500);
+    await page.keyboard.press("2");
+  }
+  const firstOffer = page.getByRole("dialog", { name: /like this to Updates/u });
+  await firstOffer.waitFor();
+  await caption(page, "Not what I meant: Esc, just this one", 1600);
   await page.keyboard.press("Escape");
-  await readOffer.waitFor({ state: "hidden" });
-  await caption(page, "Gone, and it won't offer that again for this mail", 1800);
+  await firstOffer.waitFor({ state: "hidden" });
+  await caption(page, "Gone, and the reader stays open", 1600);
 
   await caption(page, "Move this one to Newsletters (M, then 4)", 1800);
   if (phone) {
