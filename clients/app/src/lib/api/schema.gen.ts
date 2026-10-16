@@ -685,7 +685,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Mark what a conversation needs as done, or as not needed. */
+        /** Resolve what a conversation needs: done, not needed, already paid or still to pay. */
         post: operations["conversations.resolve_need"];
         delete?: never;
         options?: never;
@@ -2972,7 +2972,7 @@ export interface components {
          * @description The question whose answer raised a need.
          * @enum {string}
          */
-        NeedQuestion: "needs_reply" | "asks_action" | "suspicious";
+        NeedQuestion: "needs_reply" | "asks_action" | "suspicious" | "money";
         /**
          * @description Why a conversation needs its inbox's members (attention).
          * @enum {string}
@@ -3058,7 +3058,7 @@ export interface components {
          * @description How a member resolves a need.
          * @enum {string}
          */
-        Outcome: "done" | "not_needed";
+        Outcome: "done" | "not_needed" | "already_paid" | "still_to_pay";
         /** @description The query as understood. */
         ParsedQuery: {
             /** @description The filters applied. */
@@ -3516,7 +3516,7 @@ export interface components {
              *     `need_changed`).
              */
             message_id: components["schemas"]["MessageId"];
-            /** @description Done or Not needed. */
+            /** @description Done, Not needed, or for a Pay need Already paid or Still to pay. */
             outcome: components["schemas"]["Outcome"];
         };
         /** @description How to bring a removed rule back. */
@@ -6860,7 +6860,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description It needs nothing (`no_open_need`), or not what you saw any more (`need_changed`). */
+            /** @description It needs nothing (`no_open_need`), not what you saw any more (`need_changed`), or a paid answer for a need that is not Pay (`not_a_payment`). */
             409: {
                 headers: {
                     [name: string]: unknown;

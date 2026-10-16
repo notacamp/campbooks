@@ -79,8 +79,7 @@ pub struct Confirm {
     pub message_id: MessageId,
 }
 
-/// Mark what a conversation needs as done or as not needed, or answer a
-/// Pay need's "Is it paid?" (already paid, still to pay).
+/// Resolve what a conversation needs: done, not needed, already paid or still to pay.
 #[utoipa::path(
     post,
     path = "/api/v1/w/{workspace_id}/conversations/{conversation_id}/need/resolve",
