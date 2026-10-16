@@ -429,3 +429,42 @@ export const UnbrokenTextNarrowDesktop: Story = { ...unbroken, ...at("narrowDesk
 
 /** A wide desktop window: the text wraps within the reader's measure. */
 export const UnbrokenTextDesktop: Story = { ...unbroken, ...at("desktop", 1440, 900) };
+
+// A real inbox: many more conversations than fit in the window.
+const MANY = Array.from({ length: 40 }, (_, index) => {
+  const base = PRIMARY[index % PRIMARY.length] ?? Q4;
+  return index < PRIMARY.length ? base : { ...base, id: `${base.id}-${String(index)}` };
+});
+
+const many: Pick<Story, "args" | "play"> = {
+  args: {
+    path: `${PATH}/primary/${Q4.id}`,
+    api: inbox({
+      [`GET ${W}/conversations`]: { body: { conversations: MANY, next_cursor: null } },
+    }),
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const reader = await canvas.findByRole("main", { name: "Conversation" });
+    const list = canvas.getByRole("region", { name: "Conversations" });
+    const tabs = within(list).getByRole("heading", { level: 1 });
+    // Forty rows are taller than the window, so the list scrolls inside its pane…
+    await waitFor(() => expect(list.scrollHeight).toBeGreaterThan(list.clientHeight));
+    list.scrollTop = list.scrollHeight;
+    await waitFor(() => expect(list.scrollTop).toBeGreaterThan(0));
+    // …while the page itself stays the window's height…
+    await expect(document.documentElement.scrollHeight).toBeLessThanOrEqual(globalThis.innerHeight);
+    // …the list's header stays at the top of its pane, and the reader stays in view.
+    await expect(tabs.getBoundingClientRect().top).toBeGreaterThanOrEqual(
+      list.getBoundingClientRect().top,
+    );
+    await expect(reader.getBoundingClientRect().top).toBe(0);
+    await expect(reader.getBoundingClientRect().bottom).toBe(globalThis.innerHeight);
+  },
+};
+
+/** A full inbox in a narrow desktop window: the list scrolls, the page doesn't. */
+export const ManyConversationsNarrowDesktop: Story = { ...many, ...at("narrowDesktop", 1100, 800) };
+
+/** A full inbox in a wide desktop window: the list scrolls, the page doesn't. */
+export const ManyConversationsDesktop: Story = { ...many, ...at("desktop", 1440, 900) };
