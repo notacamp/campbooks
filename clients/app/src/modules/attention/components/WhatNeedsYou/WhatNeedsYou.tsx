@@ -169,11 +169,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const focusFollows = useRef(false);
   const keepFocus = () => {
     const active = document.activeElement;
+    // Inside the Snooze dialog: it was decided when the dialog opened.
+    if ((active?.closest("[role='dialog']") ?? null) !== null) {
+      return;
+    }
     focusFollows.current = active !== null && list.current?.contains(active) === true;
   };
   const selectedId = selected?.item.id;
   useEffect(() => {
-    if (!focusFollows.current || selectedId === undefined || highlight !== undefined) {
+    // The dialog holds the focus while it is open; it comes back here after.
+    if (
+      !focusFollows.current ||
+      selectedId === undefined ||
+      highlight !== undefined ||
+      snoozing !== undefined
+    ) {
       return;
     }
     focusFollows.current = false;
