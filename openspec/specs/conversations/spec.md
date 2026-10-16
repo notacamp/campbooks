@@ -1138,6 +1138,14 @@ member's confirmation SHALL still make the reopened need theirs (basis
 - **WHEN** a member marks a need Done while a sync batch has updated its message and not committed
 - **THEN** Done completes without waiting for the batch
 
+#### Scenario: Archived while the follow-up waits
+- **WHEN** a `conversations.refresh_need` job waits for a conversation whose archive is not yet committed, and the archive then commits
+- **THEN** the job works the need out again once it holds its locks and stores no open need for the archived conversation
+
+#### Scenario: Done while the follow-up waits
+- **WHEN** a member's Done is stored for the conversation while its `conversations.refresh_need` job waits
+- **THEN** the job keeps the Done and does not overwrite it with an open need
+
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason
 `signals.security_alert`, and `stream` `updates`, for a message whose subject

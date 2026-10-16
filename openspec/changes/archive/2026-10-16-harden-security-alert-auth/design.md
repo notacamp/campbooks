@@ -78,32 +78,16 @@ content to decide.
   may have read before the deferring transaction committed. Each run is an
   idempotent refresh and the number of jobs is bounded by the deferrals.
 
-  The job is the one place that waits. When it gets to the check it holds
-  no needs row and no message lock (plain reads so far), so it may wait: it
-  takes both locks blocking under a 5 s `lock_timeout` inside a savepoint,
-  and a timeout makes it retry later (the previous timeout is put back with
-  a transaction-local `set_config`, not a session-wide `RESET`). While it
-  waits for the message it holds the conversation `FOR KEY SHARE`, which a
-  request taking that conversation `FOR UPDATE` waits on, so a longer cycle
-  (for example with a rule run over several conversations) is possible but
-  bounded: the deadlock detector or the lock timeout breaks it and the job
-  retries. Waiting means a long-held lock does not use up its ten attempts.
-
-  Its reads (`live_conversation`, the needs row, the candidate, what
-  happened since) were made before it waited, and under READ COMMITTED the
-  writer it waited for may have archived the conversation or another refresh
-  may have stored the first need. So once it holds both locks, the job works
-  the refresh out again, once, in the same transaction: its own locks are
-  not waited for, so the second pass cannot wait or ask again, and every
-  read is fresh (an archived conversation stores no open Reply need; an
-  existing need is read under its row lock, not overwritten from a stale
-  view).
+  The job is the one place that waits. It holds no other lock when it gets
+  to the check (no needs row, plain reads only), so nobody can be waiting on
+  it and it cannot be part of a cycle; it takes both locks blocking under a
+  5 s `lock_timeout` inside a savepoint, and a timeout makes it retry later.
+  Waiting means a long-held lock does not use up its ten attempts.
 
   Real order of each caller of `needs::refresh`: `apply_changes`, messages,
   then the conversation's recount, then the needs row (and, for a first
   need, the check); flags, the conversation `FOR UPDATE`, then messages, then
-  the check; rules (`carry_out` updates messages before it refreshes), the
-  conversation, then messages, then the check; `judge` and `reopen`,
+  the check; rules, the conversation, then the check; `judge` and `reopen`,
   the conversation then the needs row; the decide pass and the backfill, the
   needs row (none yet), then the check. The check never waits outside the
   job, so none of these gains a wait edge. An earlier draft share-locked the

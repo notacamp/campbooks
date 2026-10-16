@@ -202,6 +202,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **A need settled while its follow-up waited is no longer overwritten.** When a first
+  "needs you" was put off because its message was busy, the follow-up could store it from
+  what it had read before waiting: an open need on a conversation archived meanwhile, or
+  over a Done a member had just given. It now works the need out again once it has its
+  locks. No migration.
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
   shipped. Questions? Contact our support team." raised a Reply need, because a rule
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
