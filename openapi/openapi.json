@@ -1718,7 +1718,7 @@
             }
           },
           "503": {
-            "description": "The language model failed (`compile_failed`).",
+            "description": "The language model failed (`compile_failed`), or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             "content": {
               "application/problem+json": {
                 "schema": {

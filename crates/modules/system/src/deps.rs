@@ -1,11 +1,14 @@
 //! What the system module is composed with: the AI gateway (to show each
-//! role's health) and the facts only the server knows (which identity
+//! role's health), the AI usage meter the gateway counts with (for its cap
+//! and its day), and the facts only the server knows (which identity
 //! provider and which sign-in and mail providers this instance runs with).
 
 use campbooks_ai::Gateway;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 use utoipa::ToSchema;
+
+use crate::AiUsageMeter;
 
 /// The system module's dependencies.
 #[derive(Debug, Clone)]
@@ -16,6 +19,9 @@ pub struct Deps {
     pub facts: Facts,
     /// When this server process started.
     pub started_at: DateTime<Utc>,
+    /// The meter the gateway counts AI calls with: the admin AI usage read
+    /// shows its cap and its day.
+    pub ai_usage: AiUsageMeter,
 }
 
 impl Default for Deps {
@@ -24,6 +30,7 @@ impl Default for Deps {
             ai: None,
             facts: Facts::default(),
             started_at: Utc::now(),
+            ai_usage: AiUsageMeter::default(),
         }
     }
 }

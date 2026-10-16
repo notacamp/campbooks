@@ -276,6 +276,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+
+- **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
+  5000, `0` for none).** Every model call (`decide`, `embed`, `complete`, `vision`) is
+  now counted per workspace, role and feature, per UTC day, with the tokens the
+  provider reports, in two new tables of the `system` schema (migration
+  `20261020190000_system__ai_usage`). Past the limit a workspace's new mail is still
+  stored and sorted by the facts and taught rules, without the model pass, until
+  00:00 UTC; nothing errors, and skipped mail is not asked again later. One log line
+  says when a workspace reaches it. If the count cannot be written, the call is not
+  made and the job retries. A tenth of the limit is kept for what people ask
+  themselves: background work stops 500 calls short of the default 5000, so a mail
+  flood cannot silence Scout; past the whole limit, compiling a sentence answers 503
+  `ai_daily_limit_reached`. Administrators read a day's usage per workspace, capped
+  ones first, at `GET /admin/v1/system/ai-usage` (`system.read`). Self-hosters
+  running their own model can set `0`.
 - **Teach once in the inbox.** After you move, archive, mark read or clear one
   email, Campbooks offers to do the same to every one like it, and to new
   ones: it says which mail and how many, shows a few, and makes a rule with
