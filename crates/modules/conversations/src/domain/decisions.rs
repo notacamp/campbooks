@@ -11,7 +11,7 @@ use super::{
     decide::{STATE_VERSION, Source},
     policy::Policy,
 };
-use crate::model::{ConversationId, DecisionId, MessageId};
+use crate::model::{ConversationId, DecisionId, MessageId, Stream};
 
 /// One strategy's verdicts on one message, with the switch applied.
 #[derive(Debug)]
@@ -44,11 +44,22 @@ impl Recorded<'_> {
             .filter(|decided| switch.accepts(&decided.answer))
     }
 
+    /// The stream the policy lets the stream answer place the conversation
+    /// in, if any.
+    pub fn accepted_stream(&self) -> Option<Stream> {
+        match &self.accepted(triage::STREAM)?.answer.value {
+            AnswerValue::Choice(label) => label.parse().ok(),
+            _ => None,
+        }
+    }
+
     /// Store every non-abstaining verdict. An answer is marked `acted` when
     /// the policy accepts it; the stream answer only when it actually placed
     /// the conversation (`placed_stream`; later messages never re-sort). A
     /// verdict already stored for the same message, question and source (a
-    /// replayed delivery) is kept.
+    /// replayed delivery) is kept, unless it is a model answer no answers
+    /// check vouched for (`model_version` without the `checked:` stamp): a
+    /// trusted model asked again replaces it.
     pub async fn store(
         &self,
         conn: &mut PgConnection,
@@ -66,12 +77,7 @@ impl Recorded<'_> {
             let reasons: Vec<_> = decided
                 .reasons
                 .iter()
-                .map(|r| match &r.sentence {
-                    Some(sentence) => {
-                        json!({"rule": r.rule, "evidence": r.evidence, "sentence": sentence})
-                    }
-                    None => json!({"rule": r.rule, "evidence": r.evidence}),
-                })
+                .map(|r| json!({"rule": r.rule, "evidence": r.evidence}))
                 .collect();
             let latency_ms = i32::try_from(answer.latency.as_millis()).unwrap_or(i32::MAX);
             sqlx::query!(
@@ -81,7 +87,17 @@ impl Recorded<'_> {
                      value, options, probabilities, confidence, model, model_version,
                      latency_ms, reasons, acted, state_version)
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-                ON CONFLICT (message_id, question, source) DO NOTHING
+                ON CONFLICT (message_id, question, source) DO UPDATE
+                   SET strategy = EXCLUDED.strategy, value = EXCLUDED.value,
+                       options = EXCLUDED.options, probabilities = EXCLUDED.probabilities,
+                       confidence = EXCLUDED.confidence, model = EXCLUDED.model,
+                       model_version = EXCLUDED.model_version,
+                       latency_ms = EXCLUDED.latency_ms, reasons = EXCLUDED.reasons,
+                       acted = EXCLUDED.acted, state_version = EXCLUDED.state_version,
+                       created_at = now()
+                 WHERE conversations.decisions.source = 'model'
+                   AND coalesce(conversations.decisions.model_version, '') NOT LIKE 'checked:%'
+                   AND EXCLUDED.model_version LIKE 'checked:%'
                 "#,
                 DecisionId::new() as DecisionId,
                 workspace.as_uuid(),

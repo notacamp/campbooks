@@ -4,7 +4,9 @@
 //!
 //! Strategies that need a model server read it from `CAMPBOOKS_EVAL_*`
 //! (`LAYA_URL`, `INSTRUCT_URL` + `INSTRUCT_MODEL`, `EMBED_URL` + `EMBED_MODEL`,
-//! each with an optional `_API_KEY`); without it they are reported as not run.
+//! each with an optional `_API_KEY`; `JEV_API_KEY`, with `JEV_URL`,
+//! `JEV_PATH` and `JEV_MODEL` defaulting to the decisions endpoint at `openrouter.ai`
+//! and `typesafe/jev-1.13`); without it they are reported as not run.
 
 mod dataset;
 mod metrics;
@@ -25,23 +27,25 @@ use run::{BASE, Context, Endpoints, Run, is_offline, run_base, run_cascade, run_
 
 /// Strategies run when none is named: every base strategy and the cascades
 /// worth comparing. Those needing an endpoint run only when it is configured.
-const DEFAULT: [&str; 10] = [
-    "signals",
+const DEFAULT: [&str; 12] = [
+    "facts",
     "knn-lexical",
-    "signals>knn-lexical",
+    "facts>knn-lexical",
     "knn-embed",
     "laya",
+    "jev",
     "instruct",
-    "signals>laya",
-    "signals>knn-lexical>laya",
-    "signals>instruct",
-    "signals>knn-embed>instruct",
+    "facts>laya",
+    "facts>jev",
+    "facts>knn-lexical>laya",
+    "facts>instruct",
+    "facts>knn-embed>instruct",
 ];
 
 #[derive(Debug, Args)]
 pub struct DecideArgs {
-    /// Strategy to run: a base strategy (signals, knn-lexical, knn-embed,
-    /// laya, instruct) or a cascade (`signals>knn-lexical>laya`). Repeatable;
+    /// Strategy to run: a base strategy (facts, knn-lexical, knn-embed,
+    /// laya, jev, instruct) or a cascade (`facts>knn-lexical>jev`). Repeatable;
     /// default: all of them.
     #[arg(long = "strategy")]
     strategies: Vec<String>,
@@ -272,7 +276,8 @@ async fn learning_curve(
     Ok(learning_curve)
 }
 
-/// Compare offline strategies with the committed baseline.
+/// Compare offline strategies with the committed baseline. Online runs in
+/// the baseline (a hosted model's) are not run here and not compared.
 fn check(reports_dir: &Path, report: &Report) -> Result<String> {
     let path = reports_dir.join("baseline.json");
     let baseline: Report = serde_json::from_str(
@@ -282,7 +287,8 @@ fn check(reports_dir: &Path, report: &Report) -> Result<String> {
     if baseline.version != report.version {
         bail!(
             "the baseline was made on {} v{}, the set is v{}: regenerate it with \
-                 `cargo xtask eval decide --offline --baseline`",
+                 `cargo xtask eval decide --baseline` (with CAMPBOOKS_EVAL_JEV_API_KEY set, \
+                 so the model run the policy is pinned to is in it)",
             baseline.dataset,
             baseline.version,
             report.version
@@ -293,7 +299,8 @@ fn check(reports_dir: &Path, report: &Report) -> Result<String> {
         bail!(
             "offline decide strategies fell below the baseline (tolerance {:.0} points):\n  {}\n\
                  Fix the regression, or regenerate the baseline with \
-                 `cargo xtask eval decide --offline --baseline` if it is intended.",
+                 `cargo xtask eval decide --baseline` (with CAMPBOOKS_EVAL_JEV_API_KEY set) \
+                 if it is intended.",
             report::TOLERANCE * 100.0,
             worse.join("\n  ")
         );
