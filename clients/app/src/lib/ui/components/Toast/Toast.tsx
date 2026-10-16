@@ -72,7 +72,11 @@ export interface UndoableAction {
 export interface PendingAction {
   /** What is happening, as the toast says it: "Sending to Marta…". */
   label: string;
-  /** Take it back while it is still pending (Undo, Z); omit when it can't be. */
+  /**
+   * Take it back while it is still pending (Undo, Z); omit when it can't be.
+   * It must really stop the action: once cancelled, a later `done` or `fail`
+   * is ignored, so the toast keeps saying it stopped.
+   */
   cancel?: (() => void) | undefined;
   /** What the toast says once cancelled (default "Stopped: <label>"). */
   cancelled?: string | undefined;
@@ -98,8 +102,10 @@ export interface UndoEntry extends UndoableAction {
 }
 
 export interface UndoApi {
-  /** Records an action that just happened and shows it with Undo. */
-  push: (action: UndoableAction) => void;
+  /** Records an action that just happened and shows it with Undo; returns its id. */
+  push: (action: UndoableAction) => number;
+  /** Takes an entry out of the history: its action failed, so there is nothing to undo. */
+  retract: (id: number) => void;
   /** Undoes the most recent action that is not undone yet (Z). */
   undo: () => void;
   /** Undo or redo one entry of the history. */
@@ -186,6 +192,7 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
       nextId.current += 1;
       commit([entry, ...historyRef.current]);
       show(action.label, "undoable", { ms: action.durationMs });
+      return entry.id;
     },
     [commit, show],
   );
@@ -194,6 +201,9 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
     () => ({
       history,
       push,
+      retract: (id) => {
+        commit(historyRef.current.filter((entry) => entry.id !== id));
+      },
       notify: (text) => {
         show(text, "done");
       },
@@ -261,7 +271,7 @@ export function UndoProvider({ children, toastMs = 6000 }: UndoProviderProps) {
         }
       },
     }),
-    [history, push, show, undoEntry, setUndone, t],
+    [history, push, commit, show, undoEntry, setUndone, t],
   );
 
   useShortcut("undo", () => {

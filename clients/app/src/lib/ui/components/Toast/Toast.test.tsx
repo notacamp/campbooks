@@ -52,6 +52,47 @@ describe("UndoProvider", () => {
     vi.useRealTimers();
   });
 
+  it("takes a failed action out of the history, so Z skips it", () => {
+    const undone: string[] = [];
+    function Retracting() {
+      const undo = useUndoToast();
+      return (
+        <div>
+          <button
+            type="button"
+            onClick={() => {
+              undo.push({
+                label: "Done · Ana",
+                undo: () => {
+                  undone.push("ana");
+                },
+              });
+              const failed = undo.push({
+                label: "Done · Rui",
+                undo: () => {
+                  undone.push("rui");
+                },
+              });
+              undo.retract(failed);
+            }}
+          >
+            act
+          </button>
+          <p>{`entries ${String(undo.history.length)}`}</p>
+        </div>
+      );
+    }
+    renderUi(
+      <UndoProvider>
+        <Retracting />
+      </UndoProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "act" }));
+    expect(screen.getByText("entries 1")).toBeVisible();
+    fireEvent.keyDown(document, { key: "z" });
+    expect(undone).toEqual(["ana"]);
+  });
+
   it("shows each action with Undo in a polite live region", () => {
     renderUi(
       <UndoProvider>

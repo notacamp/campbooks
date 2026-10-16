@@ -272,31 +272,31 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   const confirm = (row: Row) => {
     needActions.confirm(row.conversation);
   };
-  const snoozeOrRollBack = (row: Row, until?: Date) => {
-    snooze.mutate(
-      { item: row.item.id, until },
-      {
-        onError: () => {
-          if (until === undefined) {
-            hide(row);
-            undo.fail({ label: t("snooze.undoFailed", { name: row.name }) });
-            return;
-          }
-          show(row);
-          undo.fail({
-            label: t("snooze.failed", { name: row.name }),
-            retry: () => {
-              snoozeUntil(row, until);
-            },
-          });
+  // Each request settles on its own promise (`mutate`'s callbacks only fire
+  // for the latest call). `entry` is the snooze's undo entry, taken back when
+  // it fails.
+  const snoozeOrRollBack = (row: Row, until?: Date, entry?: number) => {
+    void snooze.mutateAsync({ item: row.item.id, until }).catch(() => {
+      if (until === undefined) {
+        hide(row);
+        undo.fail({ label: t("snooze.undoFailed", { name: row.name }) });
+        return;
+      }
+      if (entry !== undefined) {
+        undo.retract(entry);
+      }
+      show(row);
+      undo.fail({
+        label: t("snooze.failed", { name: row.name }),
+        retry: () => {
+          snoozeUntil(row, until);
         },
-      },
-    );
+      });
+    });
   };
   const snoozeUntil = (row: Row, until: Date) => {
     hide(row, t("confirm.snoozed", { name: row.name, when: when(until) }));
-    snoozeOrRollBack(row, until);
-    undo.push({
+    const entry = undo.push({
       label: t("snooze.toast", { name: row.name, when: when(until) }),
       undo: () => {
         show(row);
@@ -307,6 +307,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         snoozeOrRollBack(row, until);
       },
     });
+    snoozeOrRollBack(row, until, entry);
   };
   const reply = (row: Row) => {
     void navigate({

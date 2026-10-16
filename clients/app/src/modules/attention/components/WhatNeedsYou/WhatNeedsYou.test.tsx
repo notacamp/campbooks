@@ -355,6 +355,40 @@ describe("What needs you", () => {
     );
   });
 
+  it("says a failure even when a second action follows at once, and drops it from Z", async () => {
+    const calls = mockApi({
+      [`GET ${W}/attention`]: (request) =>
+        new URL(request.url).searchParams.get("state") === "cleared"
+          ? { body: { items: [], counts: [] } }
+          : { body: { items: ITEMS, counts: COUNTS } },
+      [`GET ${W}/conversations`]: { body: { conversations: NEEDS, next_cursor: null } },
+      [`POST ${W}/conversations/${PHISH.id}/need/resolve`]: problem(503, "unavailable"),
+      [`POST ${W}/conversations/${MARTA.id}/need/resolve`]: { body: { ...MARTA, need: null } },
+      [`POST ${W}/conversations/${MARTA.id}/need/reopen`]: { body: MARTA },
+    });
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    // X on the warning, then E on the row that took its place, before the
+    // first request comes back.
+    fireEvent.keyDown(document, { key: "x" });
+    fireEvent.keyDown(document, { key: "e" });
+    expect(await screen.findByRole("alert")).toHaveTextContent(/nothing changed/u);
+    expect(await screen.findByText("This may be phishing. Don’t use its links.")).toBeVisible();
+    // Z takes back Marta's Done; the failed verdict is not in the history,
+    // so a second Z reopens nothing.
+    fireEvent.keyDown(document, { key: "z" });
+    await waitFor(() => {
+      expect(calls.calls.map((c) => c.route)).toContain(
+        `POST ${W}/conversations/${MARTA.id}/need/reopen`,
+      );
+    });
+    fireEvent.keyDown(document, { key: "z" });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(calls.calls.map((c) => c.route)).not.toContain(
+      `POST ${W}/conversations/${PHISH.id}/need/reopen`,
+    );
+  });
+
   it("puts the item back and says so when the need changed meanwhile", async () => {
     mockApi({
       [`GET ${W}/attention`]: (request) =>
