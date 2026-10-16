@@ -199,10 +199,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   A web session kept the permissions it asked for at sign-in, so after a release that adds
   some (Scout's questions and memory in this one), the new features answered 403 and showed
   nothing until the person signed out. Now a session that predates the permissions the web app
-  asks for ends on its next request, and the app signs in again and comes back to the same
-  page, straight through when the sign-in is still live at the identity provider. Migration
-  `20261020190000_bff__session_scopes` adds one nullable column. After upgrading, everyone
-  signed in to the web app signs in once more. (campbooks-cloud#172)
+  asks for ends on its next request and the app asks you to sign in again, which goes straight
+  through while your sign-in at the identity provider is still live; signing out of such a
+  session still ends everything. Migration `20261020190000_bff__session_scopes` adds two
+  nullable columns. After upgrading, everyone signed in to the web app signs in once more.
+  (campbooks-cloud#172)
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
   shipped. Questions? Contact our support team." raised a Reply need, because a rule
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.

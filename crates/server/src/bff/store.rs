@@ -22,9 +22,10 @@ pub struct NewSession<'a> {
     pub now: DateTime<Utc>,
     pub idle_expires_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
-    /// The scopes it asks for (space-separated), to tell later whether the
-    /// BFF has started asking for more.
-    pub scopes: &'a str,
+    /// The scopes its sign-in asked for (space-separated), to tell later
+    /// whether the BFF has started asking for more; `None` for a sign-in
+    /// started before they were recorded.
+    pub scopes: Option<&'a str>,
 }
 
 /// A live session, found by its cookie.
@@ -65,6 +66,8 @@ pub struct LoginTransaction {
     pub return_to: String,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes it asked the identity provider for (space-separated).
+    pub scopes: Option<String>,
 }
 
 pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()> {
@@ -387,8 +390,9 @@ pub async fn insert_login(db: &PgPool, login: &LoginTransaction) -> sqlx::Result
     sqlx::query!(
         r#"
         INSERT INTO bff.login_transactions
-            (state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at,
+             scopes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
         login.state_hash,
         login.browser_hash,
@@ -397,6 +401,7 @@ pub async fn insert_login(db: &PgPool, login: &LoginTransaction) -> sqlx::Result
         login.return_to,
         login.created_at,
         login.expires_at,
+        login.scopes,
     )
     .execute(db)
     .await?;
@@ -410,7 +415,8 @@ pub async fn take_login(db: &PgPool, state_hash: &[u8]) -> sqlx::Result<Option<L
         LoginTransaction,
         r#"
         DELETE FROM bff.login_transactions WHERE state_hash = $1
-        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at
+        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at,
+                  scopes
         "#,
         state_hash,
     )

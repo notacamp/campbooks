@@ -371,8 +371,23 @@ fn seconds_until(until: DateTime<Utc>, now: DateTime<Utc>) -> i64 {
 
 impl Inner {
     /// The live session the request's cookie names, recording its use and
-    /// rotating its token when due.
+    /// rotating its token when due. A session that predates the scopes the
+    /// BFF asks for now is retired and counts as none.
     async fn current(&self, headers: &HeaderMap) -> Result<Option<Current>, Error> {
+        self.lookup(headers, true).await
+    }
+
+    /// [`Self::current`], keeping a session whatever scopes it asked for:
+    /// for signing out, which ends it in full.
+    async fn current_any_scopes(&self, headers: &HeaderMap) -> Result<Option<Current>, Error> {
+        self.lookup(headers, false).await
+    }
+
+    async fn lookup(
+        &self,
+        headers: &HeaderMap,
+        check_scopes: bool,
+    ) -> Result<Option<Current>, Error> {
         let Some(token) = self.cookies.session(headers) else {
             return Ok(None);
         };
@@ -386,19 +401,6 @@ impl Inner {
             }
             return Ok(None);
         };
-        if !asked_for_all(session.scopes.as_deref(), self.oidc.scopes()) {
-            // Signed in before a release that asks for more (a new module's
-            // scopes): its tokens can never get them, and every feature
-            // behind them would answer 403. It ends like an expired session,
-            // so the app signs in again and comes back with every scope; the
-            // identity provider's own session is left alone, so that sign-in
-            // can go straight through.
-            tracing::info!(
-                "a web session predates scopes the BFF now asks for; it ends so the next sign-in asks for them"
-            );
-            self.retire(session.id).await?;
-            return Ok(None);
-        }
         let mut rotated = None;
         if !session.current && session.rotated_at <= now - ROTATION_GRACE {
             if session.token_delivered {
@@ -445,6 +447,19 @@ impl Inner {
             }
         } else if session.current && !session.token_delivered {
             store::delivered(&self.db, session.id, &token_hash).await?;
+        }
+        if check_scopes && !asked_for_all(session.scopes.as_deref(), self.oidc.scopes()) {
+            // Signed in before a release that asks for more (a new module's
+            // scopes): its tokens can never get them, and every feature
+            // behind them would answer 403. It ends like an expired session,
+            // so the app signs in again and comes back with every scope; the
+            // identity provider's own session is left alone, so that sign-in
+            // can go straight through.
+            tracing::info!(
+                "a web session predates scopes the BFF now asks for; it ends so the next sign-in asks for them"
+            );
+            self.retire(session.id).await?;
+            return Ok(None);
         }
         if now - session.last_seen_at >= TOUCH_EVERY {
             let idle_until = (now + self.timeouts.idle).min(session.expires_at);

@@ -672,16 +672,13 @@ async fn a_session_missing_newer_scopes_ends_and_signs_in_again(db: PgPool) {
     // it ends like an expired session and the app signs in again; its
     // refresh token is revoked.
     exec(&h.db, "UPDATE bff.sessions SET scopes = 'openid'").await;
-    browser
-        .get("/bff/api/v1/test/whoami")
-        .await
-        .assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    let reply = browser.get("/bff/api/v1/test/whoami").await;
+    reply.assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert!(reply.set_cookie(SESSION).unwrap().contains("Max-Age=0"));
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
-    assert_eq!(
-        h.idp.revoked_tokens().len(),
-        1,
-        "its refresh token is revoked"
-    );
+    let revoked = h.idp.revoked_tokens();
+    assert_eq!(revoked.len(), 1, "its refresh token is revoked");
+    assert!(!h.idp.is_live_refresh_token(&revoked[0]));
 
     // The next sign-in asks for every scope, and stays signed in.
     browser.sign_in(&h.idp, "/").await;
@@ -703,7 +700,25 @@ async fn a_session_from_before_scopes_were_recorded_ends(db: PgPool) {
     exec(&h.db, "UPDATE bff.sessions SET scopes = NULL").await;
     let reply = browser.get("/bff/session").await;
     assert_eq!(reply.json()["authenticated"], false);
+    assert!(reply.set_cookie(SESSION).unwrap().contains("Max-Age=0"));
     assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(h.idp.revoked_tokens().len(), 1);
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_sign_in_keeps_the_scopes_it_started_with(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    // Started before a deploy that added a scope, finished after it: the
+    // session records what the sign-in asked for, so it ends on use.
+    let login = browser.get("/bff/login?return_to=%2F").await;
+    exec(&h.db, "UPDATE bff.login_transactions SET scopes = 'openid'").await;
+    let callback = h.idp.authorize(login.header(header::LOCATION).unwrap());
+    browser.get(&path_and_query(&callback)).await;
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        false
+    );
 }
 
 #[test]
