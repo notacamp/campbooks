@@ -68,6 +68,24 @@ describe("PasskeysSection", () => {
     expect(browser.create).toHaveBeenCalledTimes(1);
   });
 
+  it("puts focus back on Add a passkey once the first one swaps the empty panel for the list", async () => {
+    stubWebAuthn();
+    const added = { ...PHONE_PASSKEY, id: "p3", name: "Passkey on Mac" };
+    mockApi({
+      [LIST]: { body: { items: [] } },
+      [START]: { status: 201, body: CREATION_OPTIONS },
+      [REGISTER]: { status: 201, body: added },
+    });
+    renderSection();
+
+    expect(await screen.findByText("No passkeys yet.")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Add a passkey/u }));
+    expect(await screen.findByRole("list", { name: "Your passkeys" })).toBeVisible();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /Add a passkey/u })).toHaveFocus(),
+    );
+  });
+
   it("marks a passkey added this week New, but not the one the account was made with", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date("2026-10-14T12:00:00Z"));

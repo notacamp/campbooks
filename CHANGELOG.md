@@ -6,6 +6,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings pages are made of section cards.** Every Settings and Admin page now has a
+  display-face title with its lead, then each section in its own card with a larger title,
+  a count where it lists things ("Accounts · 2") and a one-line description. In Scout's
+  memory the rules no longer sit under a second "Rules" heading, the sentence field keeps
+  its label for screen readers only, and the privacy line has a lock. Ways to sign in
+  gets an Accounts card with "Add a way to sign in" at its bottom and Sign out everywhere
+  in its own card with an outlined danger button. Nothing behaves differently.
+
 ### Security
 
 - **The change feed reveals nothing about inboxes you can't see.** The live stream of

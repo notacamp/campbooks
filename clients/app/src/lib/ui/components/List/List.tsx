@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 
+import { useInCard } from "../../internal/in-card";
+
 import styles from "./List.module.css";
 
 /** A plain list of rows (members, invitations), named for screen readers. */
 export function List({ label, children }: { label: string; children: ReactNode }) {
+  const flush = useInCard();
   return (
-    <ul className={styles["list"]} aria-label={label}>
+    <ul className={styles["list"]} aria-label={label} data-flush={flush || undefined}>
       {children}
     </ul>
   );

@@ -205,7 +205,7 @@
   },
   "waysIn": {
     "title": "Ways to sign in",
-    "lead": "You can sign in to Campbooks with any of these accounts. Every mailbox you connect becomes one too.",
+    "lead": "How you get into Campbooks. Keep at least two, so losing one never locks you out.",
     "list": "Your ways to sign in",
     "loading": "Loading your ways to sign in…",
     "loadError": {
@@ -307,7 +307,9 @@
       "confirm": "Yes, sign out everywhere",
       "confirmLead": "Sign out of Campbooks on every device and in every app, this browser included? You’ll sign in again here next.",
       "failed": "Couldn’t sign out everywhere. Nothing changed; try again."
-    }
+    },
+    "accounts": "Accounts",
+    "accountsLead": "You can sign in with any of these. Every mailbox you connect becomes one too."
   },
   "passkeySignUp": {
     "eyebrow": "New account",
@@ -406,7 +408,8 @@
         "lead": "Nothing was added. Try again."
       }
     },
-    "freshSignIn": "For your security, adding a passkey needs a sign-in from the last five minutes. Sign in again; it takes you straight back here."
+    "freshSignIn": "For your security, adding a passkey needs a sign-in from the last five minutes. Sign in again; it takes you straight back here.",
+    "noneLead": "Add one on this device."
   },
   "admin": {
     "title": "Account",

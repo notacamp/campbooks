@@ -9,6 +9,7 @@ import {
   Fact,
   FactList,
   Heading,
+  SettingsSection,
   InlineConfirm,
   List,
   ListRow,
@@ -49,13 +50,9 @@ function useDateFormat() {
 export function AccountAdminPanel({ accountId, name }: AccountAdminPanelProps) {
   const { t } = useTranslation("identity");
   const account = useQuery(adminAccountQuery(accountId));
-  const titleId = useId();
 
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("admin.title")}
-      </Heading>
+    <SettingsSection title={t("admin.title")}>
       {account.isPending ? (
         <div role="status" aria-label={t("admin.loading")}>
           <SkeletonList rows={3} />
@@ -87,7 +84,7 @@ export function AccountAdminPanel({ accountId, name }: AccountAdminPanelProps) {
           <Suspension account={account.data} name={name} />
         </>
       )}
-    </section>
+    </SettingsSection>
   );
 }
 

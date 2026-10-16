@@ -66,6 +66,16 @@
   color: var(--danger);
 }
 
+.button[data-variant="danger-outline"] {
+  background: var(--surface-raised);
+  color: var(--danger);
+  box-shadow: inset 0 0 0 var(--border-width) var(--danger);
+}
+
+.button[data-variant="danger-outline"]:hover {
+  background: var(--danger-soft);
+}
+
 .button[data-variant="link"] {
   height: auto;
   padding: 0;

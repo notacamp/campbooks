@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Heading, PaneHeader, ReaderBody, ReaderPane, Segmented, Spacer, Text } from "~/lib/ui";
+import { Segmented, SettingsPage } from "~/lib/ui";
 
 import { SignupCodes } from "./SignupCodes";
 import { SignupRequests } from "./SignupRequests";
@@ -20,12 +20,11 @@ export function SignupsAdminPanel() {
   const [part, setPart] = useState<Part>("requests");
 
   return (
-    <ReaderPane label={t("signups.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("signups.title")}
-        </Heading>
-        <Spacer />
+    <SettingsPage
+      label={t("signups.title")}
+      title={t("signups.title")}
+      lead={t(`signups.lead.${part}`)}
+      actions={
         <Segmented
           label={t("signups.parts.label")}
           value={part}
@@ -35,11 +34,9 @@ export function SignupsAdminPanel() {
             { value: "codes", label: t("signups.parts.codes") },
           ]}
         />
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t(`signups.lead.${part}`)}</Text>
-        {part === "requests" ? <SignupRequests /> : <SignupCodes />}
-      </ReaderBody>
-    </ReaderPane>
+      }
+    >
+      {part === "requests" ? <SignupRequests /> : <SignupCodes />}
+    </SettingsPage>
   );
 }
