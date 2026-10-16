@@ -51,7 +51,11 @@
     "older_one": "{{count}} mensagem anterior",
     "older_other": "{{count}} mensagens anteriores",
     "showOlder": "Mostrar",
-    "attachments": "Anexos"
+    "attachments": "Anexos",
+    "kept": {
+      "title": "Mantida como histórico",
+      "lead": "{{address}} foi desligada e o correio dela ficou aqui, só de leitura: nada de novo chega, e nada pode ser enviado nem alterado a partir dela."
+    }
   },
   "actions": {
     "star": "Marcar com estrela",

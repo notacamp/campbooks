@@ -2640,7 +2640,8 @@
         "required": [
           "user_id",
           "role",
-          "joined_at"
+          "joined_at",
+          "you"
         ],
         "properties": {
           "display_name": {
@@ -2669,6 +2670,10 @@
           "user_id": {
             "$ref": "#/components/schemas/UserId",
             "description": "The user."
+          },
+          "you": {
+            "type": "boolean",
+            "description": "It is the caller (by user id, never by email)."
           }
         }
       },

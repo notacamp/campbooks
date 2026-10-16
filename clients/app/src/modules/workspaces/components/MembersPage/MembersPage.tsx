@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
-import { errorStatus, problemCode, useSession } from "~/lib/api";
+import { errorStatus, problemCode } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   Avatar,
@@ -136,17 +136,10 @@ export function MembersPage({ workspace }: { workspace: Workspace }) {
 
 function MemberList({ workspace, members }: { workspace: Workspace; members: Member[] }) {
   const { t } = useTranslation("workspaces");
-  const session = useSession();
-  const myEmail = session.data?.user?.email?.toLowerCase();
   return (
     <List label={t("members.list", { workspace: workspace.name })}>
       {members.map((member) => (
-        <MemberRow
-          key={member.user_id}
-          workspace={workspace}
-          member={member}
-          isMe={myEmail !== undefined && member.email?.toLowerCase() === myEmail}
-        />
+        <MemberRow key={member.user_id} workspace={workspace} member={member} isMe={member.you} />
       ))}
     </List>
   );

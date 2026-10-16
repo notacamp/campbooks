@@ -88,7 +88,7 @@
       "workspaceScoped": true,
       "payload": {
         "type": "object",
-        "description": "A member connected an outside account.",
+        "description": "A member connected an outside account, or connected it again (a\nreconnect, or the same account consenting anew: `refreshed`). Published\nin the transaction that stores the grant, so whoever handed the grant\nover can tell which connection it became even if its own request died.",
         "required": [
           "workspace",
           "connection",
@@ -96,6 +96,13 @@
           "granted_by"
         ],
         "properties": {
+          "account_subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The provider's stable id of the account (`sub`; opaque, never an\naddress)."
+          },
           "connection": {
             "$ref": "#/components/schemas/ConnectionId",
             "description": "The connection."
@@ -104,9 +111,20 @@
             "$ref": "#/components/schemas/UserId",
             "description": "The member who granted it."
           },
+          "grantor_subject": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The grantor as the identity module knows them (the token subject the\ngrant was handed over for)."
+          },
           "provider": {
             "$ref": "#/components/schemas/Provider",
             "description": "The provider."
+          },
+          "refreshed": {
+            "type": "boolean",
+            "description": "An existing connection got this grant (it was not created now)."
           },
           "workspace": {
             "type": "string",

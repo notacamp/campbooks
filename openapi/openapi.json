@@ -9780,6 +9780,7 @@
           "address",
           "address_verified",
           "granted_by",
+          "granted_by_you",
           "capabilities",
           "health",
           "health_changed_at",
@@ -9817,6 +9818,10 @@
           "granted_by": {
             "$ref": "#/components/schemas/UserId",
             "description": "The member who granted it."
+          },
+          "granted_by_you": {
+            "type": "boolean",
+            "description": "The caller granted it (only they may reconnect or disconnect it)."
           },
           "health": {
             "$ref": "#/components/schemas/Health",
@@ -11298,7 +11303,8 @@
         "required": [
           "user_id",
           "role",
-          "joined_at"
+          "joined_at",
+          "you"
         ],
         "properties": {
           "display_name": {
@@ -11327,6 +11333,10 @@
           "user_id": {
             "$ref": "#/components/schemas/UserId",
             "description": "The user."
+          },
+          "you": {
+            "type": "boolean",
+            "description": "It is the caller (by user id, never by email)."
           }
         }
       },
@@ -12735,6 +12745,13 @@
             ],
             "description": "Same-origin path to come back to (default `/`), with `linked=`,\n`connected=` or `link_error=` added."
           },
+          "sign_in": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "description": "For `connect`: also sign in with the account (default `true`).\n`false` for a shared mailbox (support@): it is connected, never\nadded as a way in. Ignored by the other purposes."
+          },
           "workspace_id": {
             "oneOf": [
               {
@@ -13168,9 +13185,18 @@
           "kind",
           "provider",
           "linked_via",
-          "linked_at"
+          "linked_at",
+          "mailboxes",
+          "connections"
         ],
         "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The connections among them that are known (the connectors module's\nids), to tell which mailbox a way in came with."
+          },
           "email": {
             "type": [
               "string",
@@ -13204,6 +13230,12 @@
             "type": "string",
             "description": "`sign_up`, `link` or `connect`."
           },
+          "mailboxes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "For a way in a connect created: how many workspaces its mailbox is\nconnected in. It goes when the last of them is disconnected (unless\nit is the last way in). 0 for any other way in.",
+            "minimum": 0
+          },
           "provider": {
             "type": "string",
             "description": "`google`, `microsoft` or `zoho`."
@@ -13215,7 +13247,8 @@
         "description": "The caller's ways in.",
         "required": [
           "items",
-          "providers"
+          "providers",
+          "mailbox_providers"
         ],
         "properties": {
           "items": {
@@ -13224,6 +13257,13 @@
               "$ref": "#/components/schemas/WayIn"
             },
             "description": "Oldest first."
+          },
+          "mailbox_providers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The providers a mailbox can be connected from (`identity.start_link`\nwith `connect`): offered, and with a mail adapter. Same order."
           },
           "providers": {
             "type": "array",

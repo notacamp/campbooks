@@ -205,6 +205,8 @@ pub struct ConnectionView {
     pub display_name: Option<String>,
     /// The member who granted it.
     pub granted_by: UserId,
+    /// The caller granted it (only they may reconnect or disconnect it).
+    pub granted_by_you: bool,
     /// What it lets Campbooks do.
     pub capabilities: Vec<Capability>,
     /// How it is doing.

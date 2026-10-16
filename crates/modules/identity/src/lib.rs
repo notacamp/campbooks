@@ -87,6 +87,8 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()
             .publishes::<events::ConsentRevoked>()
+            .consumer(features::forget_connected_way_in::ForgetConnectedWayIn)
+            .consumer(features::name_connected_mailbox::NameConnectedMailbox)
             .consumer(features::member_left::RevokeDepartedConsents)
             .consumer(features::notify_way_in_added::NotifyWayInAdded)
             .consumer(features::workspace_deleting::RemoveWorkspaceClients)

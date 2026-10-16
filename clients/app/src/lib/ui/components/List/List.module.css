@@ -16,6 +16,27 @@
   padding: var(--row-pad-y) var(--row-pad-x);
 }
 
+.row[data-selected] {
+  background: var(--surface-selected);
+}
+
+/* Phones choose by touch, not with J/K: no row looks pressed. */
+@media (width < 48rem) {
+  .row[data-selected] {
+    background: none;
+  }
+}
+
+.row:first-child {
+  border-top-left-radius: var(--panel-radius);
+  border-top-right-radius: var(--panel-radius);
+}
+
+.row:last-child {
+  border-bottom-right-radius: var(--panel-radius);
+  border-bottom-left-radius: var(--panel-radius);
+}
+
 .row + .row {
   border-top: var(--border-width) solid var(--border-subtle);
 }

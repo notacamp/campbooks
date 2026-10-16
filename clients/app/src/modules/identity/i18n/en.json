@@ -200,7 +200,8 @@
     "confirmForget": "Forget {{address}}? Campbooks deletes the permission Google gave it. You can still sign in with this account.",
     "confirm": "Forget it",
     "cancel": "Keep it",
-    "forgetFailed": "Couldn’t forget it. Try again."
+    "forgetFailed": "Couldn’t forget it. Try again.",
+    "other": "Connect a different mailbox"
   },
   "waysIn": {
     "title": "Ways to sign in",
@@ -275,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "Mail access wasn’t allowed.",
-        "lead": "You can sign in with that account now, but its mailbox isn’t connected. Try again and allow mail access."
+        "lead": "Nothing was connected, and that account wasn’t added as a way to sign in. Try again and allow mail access."
       },
       "account_mismatch": {
         "title": "That’s a different account.",

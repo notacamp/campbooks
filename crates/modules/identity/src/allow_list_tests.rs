@@ -280,3 +280,64 @@ async fn a_way_in_to_link_must_be_on_the_list_too(db: PgPool) {
     let back = kit.via(Provider::Zoho, &at_zoho).await;
     assert!(back.location().ends_with("?linked=zoho"), "{back:?}");
 }
+
+/// Connect Google account `subject` as `access` (`sign_in`: also as a way
+/// in); where the browser lands.
+async fn connect_as(kit: &Kit, access: &str, subject: &str, sign_in: bool) -> String {
+    kit.google.set_user(user(subject));
+    let started = kit
+        .start_link(
+            access,
+            &json!({ "purpose": "connect", "provider": "google", "sign_in": sign_in,
+                     "workspace_id": uuid::Uuid::now_v7(), "return_to": "/w/ws" }),
+        )
+        .await;
+    assert_eq!(started.status, StatusCode::CREATED, "{started:?}");
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    kit.via(Provider::Google, &to_google.location())
+        .await
+        .location()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_connect_that_would_add_a_way_in_must_be_on_the_list(db: PgPool) {
+    let kit = Kit::with_allowed(db, SignupPolicy::Open, &[], ME).await;
+    let access = kit.signed_up().await;
+
+    // Also as a way in: refused before anything is written or handed over.
+    let back = connect_as(&kit, &access, "stranger", true).await;
+    assert_eq!(back, "/w/ws?link_error=sign_in_not_allowed");
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.provider_identities").await,
+        1,
+        "no way in was added"
+    );
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.mailbox_links").await,
+        0,
+        "nothing recorded"
+    );
+    assert!(kit.intake.adopted().is_empty(), "no grant handed over");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_shared_mailbox_off_the_list_connects_but_never_signs_in(db: PgPool) {
+    let kit = Kit::with_allowed(db, SignupPolicy::Open, &[], ME).await;
+    let access = kit.signed_up().await;
+
+    // Not a way in: connected, with nothing written on the identity side.
+    let back = connect_as(&kit, &access, "stranger", false).await;
+    assert_eq!(back, "/w/ws?connected=connection-1");
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.provider_identities").await,
+        1
+    );
+    assert_eq!(
+        count(&kit, "SELECT count(*) FROM identity.mailbox_links").await,
+        0
+    );
+    // And it is no road around the list: signing in with it is still refused.
+    kit.new_browser();
+    let refused = kit.round_trip(None).await;
+    assert_eq!(refused.location(), "/sign-in?error=sign_in_not_allowed");
+}

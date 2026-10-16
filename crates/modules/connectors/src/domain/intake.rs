@@ -108,6 +108,7 @@ impl GrantIntake for Intake {
                             .map(|t| t.expose_secret().to_owned()),
                         scope: Some(grant.scopes.join(" ")),
                     },
+                    grantor_subject: Some(grant.subject.clone()),
                     extending: grant
                         .extending
                         .as_deref()

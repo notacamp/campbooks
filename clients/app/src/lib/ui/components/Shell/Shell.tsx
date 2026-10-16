@@ -182,6 +182,18 @@ export function PhoneHeader({ children }: { children: ReactNode }) {
   return <header className={styles["phoneHeader"]}>{children}</header>;
 }
 
+/**
+ * A second phone bar (below 48rem only), under the header: a page's own
+ * sections as chips (Settings: Members, Mailboxes, Ways to sign in).
+ */
+export function PhoneSubnav({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <nav className={styles["phoneSubnav"]} aria-label={label}>
+      {children}
+    </nav>
+  );
+}
+
 export interface AccountButtonProps extends Omit<ComponentPropsWithRef<"button">, "children"> {
   /** The signed-in person's name (falls back to the email). */
   name: string;

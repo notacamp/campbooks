@@ -173,6 +173,8 @@ pub struct MemberView {
     pub role: Role,
     /// When they joined.
     pub joined_at: DateTime<Utc>,
+    /// It is the caller (by user id, never by email).
+    pub you: bool,
 }
 
 /// The path of one member: `/api/v1/w/{workspace_id}/members/{user_id}`.

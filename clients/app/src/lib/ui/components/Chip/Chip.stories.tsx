@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
-import { Chip, ChipRow } from "./Chip";
+import { Chip, ChipLink, ChipRow } from "./Chip";
 
 const meta = {
   title: "Components/Chip",
@@ -24,5 +24,20 @@ export const Row: Story = {
       <Chip pressed={false}>Newsletters</Chip>
       <Chip pressed={false}>Clients</Chip>
     </ChipRow>
+  ),
+};
+
+/** Chips that go somewhere: links, the current one marked as the page. */
+export const Links: Story = {
+  render: () => (
+    <nav aria-label="Settings">
+      <ChipRow label="Settings sections">
+        <ChipLink href="#members">Members</ChipLink>
+        <ChipLink href="#mailboxes" current>
+          Mailboxes
+        </ChipLink>
+        <ChipLink href="#sign-in">Ways to sign in</ChipLink>
+      </ChipRow>
+    </nav>
   ),
 };

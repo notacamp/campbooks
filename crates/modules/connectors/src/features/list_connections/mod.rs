@@ -60,7 +60,7 @@ pub async fn execute(state: &AppState, access: &Access) -> Result<ConnectionList
     let mut views = Vec::new();
     for connection in connections::list(&mut tx).await? {
         if resources::visible(&state.resources, access, connection.granted_by) {
-            views.push(connections::view(&mut tx, connection).await?);
+            views.push(connections::view(&mut tx, connection, access.user).await?);
         }
     }
     tx.commit().await?;

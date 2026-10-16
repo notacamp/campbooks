@@ -87,7 +87,7 @@
     "roleOf": "Rôle de {{name}}",
     "remove": "Retirer",
     "removeLabel": "Retirer {{name}}",
-    "confirmRemove": "Retirer {{name}} de {{workspace}} ? Son accès s’arrête tout de suite. Pour le faire revenir, invitez-le à nouveau.",
+    "confirmRemove": "Retirer {{name}} de {{workspace}} ? Son accès s’arrête tout de suite. Pour le faire revenir, invitez-le à nouveau. Ses boîtes mail ici sont déconnectées, et un moyen de connexion qu’il n’a ajouté qu’en reliant l’une d’elles disparaît aussi.",
     "cancel": "Annuler",
     "roleChanged": "{{name}} : {{role}}",
     "readOnly": "Seuls les propriétaires et les administrateurs peuvent inviter des personnes ou changer les rôles.",

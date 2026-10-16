@@ -47,7 +47,10 @@ pub struct BlobSchema {
     content_type: String,
 }
 
-/// A member connected an outside account.
+/// A member connected an outside account, or connected it again (a
+/// reconnect, or the same account consenting anew: `refreshed`). Published
+/// in the transaction that stores the grant, so whoever handed the grant
+/// over can tell which connection it became even if its own request died.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ConnectionAdded {
     /// The workspace.
@@ -58,6 +61,17 @@ pub struct ConnectionAdded {
     pub provider: Provider,
     /// The member who granted it.
     pub granted_by: UserId,
+    /// The provider's stable id of the account (`sub`; opaque, never an
+    /// address).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account_subject: Option<String>,
+    /// The grantor as the identity module knows them (the token subject the
+    /// grant was handed over for).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub grantor_subject: Option<String>,
+    /// An existing connection got this grant (it was not created now).
+    #[serde(default)]
+    pub refreshed: bool,
 }
 
 impl DomainEvent for ConnectionAdded {

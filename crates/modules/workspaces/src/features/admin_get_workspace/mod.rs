@@ -83,7 +83,7 @@ pub async fn execute(conn: &mut PgConnection, id: WorkspaceId) -> Result<AdminWo
     .fetch_optional(&mut *conn)
     .await?
     .ok_or(Error::NotFound)?;
-    let members = list_members::load(conn, id, None).await?;
+    let members = list_members::load(conn, id, None, None).await?;
     let owner_ids: Vec<UserId> = members
         .iter()
         .filter(|member| member.role == campbooks_kernel::tenancy::Role::Owner)

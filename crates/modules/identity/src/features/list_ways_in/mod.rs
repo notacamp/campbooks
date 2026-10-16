@@ -1,6 +1,6 @@
 //! `GET /api/v1/identity/ways-in` — how the caller can sign in: their
-//! provider ways in, and the providers this instance offers. Passkeys are
-//! listed by `identity.list_passkeys`.
+//! provider ways in, the providers this instance offers, and those a mailbox
+//! can be connected from. Passkeys are listed by `identity.list_passkeys`.
 
 use axum::{Extension, Json, extract::State};
 use campbooks_kernel::{AppState, Operation, Problem, Result, auth::Unbound};
@@ -9,7 +9,11 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use uuid::Uuid;
 
-use crate::{deps::Deps, domain::accounts, scopes::IdentityRead};
+use crate::{
+    deps::Deps,
+    domain::{accounts, mailbox_links},
+    scopes::IdentityRead,
+};
 
 /// A provider account the caller signs in with.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -29,6 +33,13 @@ pub struct WayIn {
     pub linked_at: DateTime<Utc>,
     /// When it was last used to sign in.
     pub last_used_at: Option<DateTime<Utc>>,
+    /// For a way in a connect created: how many workspaces its mailbox is
+    /// connected in. It goes when the last of them is disconnected (unless
+    /// it is the last way in). 0 for any other way in.
+    pub mailboxes: u32,
+    /// The connections among them that are known (the connectors module's
+    /// ids), to tell which mailbox a way in came with.
+    pub connections: Vec<String>,
 }
 
 /// The caller's ways in.
@@ -38,6 +49,9 @@ pub struct WaysIn {
     pub items: Vec<WayIn>,
     /// The providers this instance offers, in display order.
     pub providers: Vec<String>,
+    /// The providers a mailbox can be connected from (`identity.start_link`
+    /// with `connect`): offered, and with a mail adapter. Same order.
+    pub mailbox_providers: Vec<String>,
 }
 
 /// List how you sign in.
@@ -71,25 +85,45 @@ pub async fn handler(
         || campbooks_kernel::Error::Forbidden,
     )?;
     let (issuer, account) = super::account(&deps, &principal)?;
+    let mut tracked: std::collections::HashMap<Uuid, (i64, Vec<String>)> = {
+        let mut conn = state.db.acquire().await?;
+        mailbox_links::of_account(&mut conn, account)
+            .await?
+            .into_iter()
+            .map(|(way_in, count, connections)| (way_in, (count, connections)))
+            .collect()
+    };
     let items = accounts::ways_in(&state.db, account)
         .await?
         .into_iter()
-        .map(|way| WayIn {
-            id: way.id,
-            kind: "provider".to_owned(),
-            provider: way.provider,
-            email: way.email,
-            linked_via: way.linked_via,
-            linked_at: way.linked_at,
-            last_used_at: way.last_used_at,
+        .map(|way| {
+            let (mailboxes, connections) = tracked.remove(&way.id).unwrap_or_default();
+            WayIn {
+                id: way.id,
+                kind: "provider".to_owned(),
+                provider: way.provider,
+                email: way.email,
+                linked_via: way.linked_via,
+                linked_at: way.linked_at,
+                last_used_at: way.last_used_at,
+                mailboxes: u32::try_from(mailboxes).unwrap_or(u32::MAX),
+                connections,
+            }
         })
+        .collect();
+    let providers: Vec<String> = issuer
+        .upstreams
+        .iter()
+        .map(|u| u.provider().as_str().to_owned())
+        .collect();
+    let mailbox_providers = providers
+        .iter()
+        .filter(|provider| !state.grants.mailbox_scopes(provider).is_empty())
+        .cloned()
         .collect();
     Ok(Json(WaysIn {
         items,
-        providers: issuer
-            .upstreams
-            .iter()
-            .map(|u| u.provider().as_str().to_owned())
-            .collect(),
+        providers,
+        mailbox_providers,
     }))
 }

@@ -23,6 +23,7 @@ export const ANA = {
   email: "ana@example.com",
   role: "owner",
   joined_at: "2026-09-01T09:00:00Z",
+  you: true,
 } as const;
 
 export const SOFIA = {
@@ -31,6 +32,7 @@ export const SOFIA = {
   email: "sofia@example.com",
   role: "admin",
   joined_at: "2026-09-03T09:00:00Z",
+  you: false,
 } as const;
 
 export const RUI = {
@@ -39,6 +41,7 @@ export const RUI = {
   email: "rui@example.com",
   role: "member",
   joined_at: "2026-09-10T09:00:00Z",
+  you: false,
 } as const;
 
 export const PENDING = {

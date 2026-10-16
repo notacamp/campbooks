@@ -38,6 +38,12 @@ async fn grantors_admins_and_clients_see_a_connection(db: PgPool) {
     assert_eq!(list(kit.client(ws).token).await, 1);
 
     let one = format!("/api/v1/w/{ws}/connections/{id}");
+    assert_eq!(kit.get(&ana, &one).await.json["granted_by_you"], true);
+    assert_eq!(kit.get(&carl, &one).await.json["granted_by_you"], false);
+    assert_eq!(
+        kit.get(&kit.client(ws).token, &one).await.json["granted_by_you"],
+        false
+    );
     assert_eq!(kit.get(&ana, &one).await.status, StatusCode::OK);
     assert_eq!(kit.get(&bea, &one).await.status, StatusCode::NOT_FOUND);
     assert_eq!(kit.get(&carl, &one).await.status, StatusCode::OK);
