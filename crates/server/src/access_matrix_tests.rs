@@ -1398,8 +1398,8 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
     .await
     .unwrap();
     sqlx::query(
-        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, run_at)
-         VALUES ('default', 'test.instance_wide', '{}', NULL, now() + interval '1 day')",
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, run_at, max_attempts)
+         VALUES ('default', 'test.instance_wide', '{}', NULL, now() + interval '1 day', 1)",
     )
     .execute(&world.db)
     .await
