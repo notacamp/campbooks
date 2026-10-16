@@ -94,7 +94,7 @@ pub async fn export_for_labelling(
     let since = Utc::now() - TimeDelta::days(i64::from(days));
     let mut tx = state.db.begin_for(workspace).await?;
     let rows: Vec<Row> = sqlx::query_as(
-        r#"
+        r"
         SELECT * FROM (
             SELECT DISTINCT ON (m.conversation_id)
                    m.id, m.sent_at, m.sender, m.recipients, m.subject, m.headers, m.bodies,
@@ -117,7 +117,7 @@ pub async fn export_for_labelling(
         ) newest
         ORDER BY sent_at DESC, id DESC
         LIMIT $2
-        "#,
+        ",
     )
     .bind(since)
     .bind(MAX_ITEMS)
@@ -128,78 +128,83 @@ pub async fn export_for_labelling(
     let ws = workspace.to_string();
     let mut items = Vec::with_capacity(rows.len());
     for (n, row) in rows.into_iter().enumerate() {
-        let decode = |e: serde_json::Error| Error::internal(redact::json(&e));
-        let from: Address = serde_json::from_value(row.sender).map_err(decode)?;
-        let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
-        let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;
-        let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
-        let body = match &bodies.text {
-            // A body that cannot be read is left out, not the message.
-            Some(text) => read_text(&state.blobs, &ws, text, ENVELOPE_BODY_BYTES)
-                .await
-                .map(|(body, _)| body)
-                .unwrap_or_default(),
-            None => String::new(),
-        };
-        let attachments: Vec<(String, String)> = row
-            .filenames
-            .iter()
-            .cloned()
-            .zip(row.content_types)
-            .collect();
-        let env = envelope(MessageParts {
-            from: &from,
-            to: &recipients.to,
-            cc: &recipients.cc,
-            reply_to: &recipients.reply_to,
-            subject: &row.subject,
-            headers: &headers,
-            attachments: &attachments,
-            body: &body,
-        });
-        let id = format!("owner-{:03}", n + 1);
-        let party = |p: &campbooks_ai::decide::signals::email::Party| json!({"name": p.name, "address": p.address});
-        let item = json!({
-            "id": id,
-            "lang": OWNER,
-            // Alternate dev and test: thresholds are fitted on one half and
-            // reported on the other.
-            "split": if n % 2 == 0 { "dev" } else { "test" },
-            "workspace": OWNER,
-            "hard": [],
-            "message": {
-                "date": row.sent_at.to_rfc3339(),
-                "from": party(&env.from),
-                "to": env.to.iter().map(party).collect::<Vec<_>>(),
-                "cc": env.cc.iter().map(party).collect::<Vec<_>>(),
-                "subject": env.subject,
-                "headers": env.headers,
-                "attachments": env.attachments.iter()
-                    .map(|a| json!({"name": a.name, "content_type": a.content_type}))
-                    .collect::<Vec<_>>(),
-                "body": env.body,
-                "recipient": {
-                    "name": row.inbox_name.clone().unwrap_or_default(),
-                    "addresses": [row.inbox_address],
-                    "shared": row.inbox_members > 1,
-                },
-            },
-            "labels": {},
-            "rationale": "",
-        });
-        items.push(LabellingItem {
-            id,
-            sent_at: row.sent_at,
-            from: match &from.name {
-                Some(name) if !name.is_empty() => format!("{name} <{}>", from.address),
-                _ => from.address.clone(),
-            },
-            subject: row.subject,
-            attachments: row.filenames,
-            item,
-        });
+        items.push(labelling_item(state, &ws, n, row).await?);
     }
     Ok(items)
+}
+
+/// One stored message, as an item to label (`owner-<n + 1>`).
+async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Result<LabellingItem> {
+    let decode = |e: serde_json::Error| Error::internal(redact::json(&e));
+    let from: Address = serde_json::from_value(row.sender).map_err(decode)?;
+    let recipients: Recipients = serde_json::from_value(row.recipients).map_err(decode)?;
+    let headers: Headers = serde_json::from_value(row.headers).map_err(decode)?;
+    let bodies: Bodies = serde_json::from_value(row.bodies).map_err(decode)?;
+    let body = match &bodies.text {
+        // A body that cannot be read is left out, not the message.
+        Some(text) => read_text(&state.blobs, ws, text, ENVELOPE_BODY_BYTES)
+            .await
+            .map(|(body, _)| body)
+            .unwrap_or_default(),
+        None => String::new(),
+    };
+    let attachments: Vec<(String, String)> = row
+        .filenames
+        .iter()
+        .cloned()
+        .zip(row.content_types)
+        .collect();
+    let env = envelope(MessageParts {
+        from: &from,
+        to: &recipients.to,
+        cc: &recipients.cc,
+        reply_to: &recipients.reply_to,
+        subject: &row.subject,
+        headers: &headers,
+        attachments: &attachments,
+        body: &body,
+    });
+    let id = format!("owner-{:03}", n + 1);
+    let party = |p: &campbooks_ai::decide::signals::email::Party| json!({"name": p.name, "address": p.address});
+    let item = json!({
+        "id": id,
+        "lang": OWNER,
+        // Alternate dev and test: thresholds are fitted on one half and
+        // reported on the other.
+        "split": if n % 2 == 0 { "dev" } else { "test" },
+        "workspace": OWNER,
+        "hard": [],
+        "message": {
+            "date": row.sent_at.to_rfc3339(),
+            "from": party(&env.from),
+            "to": env.to.iter().map(party).collect::<Vec<_>>(),
+            "cc": env.cc.iter().map(party).collect::<Vec<_>>(),
+            "subject": env.subject,
+            "headers": env.headers,
+            "attachments": env.attachments.iter()
+                .map(|a| json!({"name": a.name, "content_type": a.content_type}))
+                .collect::<Vec<_>>(),
+            "body": env.body,
+            "recipient": {
+                "name": row.inbox_name.clone().unwrap_or_default(),
+                "addresses": [row.inbox_address],
+                "shared": row.inbox_members > 1,
+            },
+        },
+        "labels": {},
+        "rationale": "",
+    });
+    Ok(LabellingItem {
+        id,
+        sent_at: row.sent_at,
+        from: match &from.name {
+            Some(name) if !name.is_empty() => format!("{name} <{}>", from.address),
+            _ => from.address.clone(),
+        },
+        subject: row.subject,
+        attachments: row.filenames,
+        item,
+    })
 }
 
 /// The locale and workspace name every exported item carries: the owner's

@@ -159,9 +159,9 @@ function answerWords(t: Translate, decision: DecisionView): string {
     return t(`needs.how.urgency${String(Math.max(0, Math.min(2, Math.round(value))))}`);
   }
   if (decision.question === "money") {
-    return t(`needs.how.money.${String(value)}`);
+    return t(`needs.how.money.${value}`);
   }
-  return t(`streams.${String(value)}`);
+  return t(`streams.${value}`);
 }
 
 /** A confidence of 0 to 100, as "0.90". */
