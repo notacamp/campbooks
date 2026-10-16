@@ -6,6 +6,19 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pay asks "Is it paid?", and receipts never land in Pay.** Pay used to be raised for
+  any money mail the decide model read as asking something, so invoices already paid and
+  payment confirmations showed up as "Pay". The decide model now answers one more
+  question in the same call: does the email ask for a payment still owed, confirm one
+  already made, or neither. Only a payment still owed raises Pay, and since Campbooks
+  can't see your bank it asks: Already paid clears it, Still to pay keeps it. Existing
+  needs are worked out again on upgrade, and recent mail is asked the new question once.
+  For operators, `campbooks-server labelling export` writes your recent money mail as a
+  sheet to label on your own machine, and `cargo xtask eval decide --set-dir` measures the
+  model on it (campbooks-cloud#167).
+
 ### Changed
 
 - **Settings pages are made of section cards.** Every Settings and Admin page now has a

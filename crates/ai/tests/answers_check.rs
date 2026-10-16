@@ -176,7 +176,7 @@ async fn the_recorded_laya_answers_fail_the_check() {
 
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Failed);
-    assert_eq!((report.right, report.total), (8, 33));
+    assert_eq!((report.right, report.total), (11, 50));
     assert_eq!(
         report.model.as_deref(),
         Some("convaiinnovations/laya/multilingual")
@@ -190,7 +190,7 @@ async fn the_answers_before_the_context_failed_it_too() {
     let (_server, gateway) = laya(Replay(recorded("laya-multilingual-before"))).await;
     let report = gateway.run_answers_check().await;
     assert_eq!(report.outcome, CheckOutcome::Failed);
-    assert_eq!((report.right, report.total), (18, 33));
+    assert_eq!((report.right, report.total), (21, 50));
 }
 
 /// The "yes" is the model's own: each answer is what laya-serve said,
