@@ -31,6 +31,7 @@ pub mod styles;
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    fmt::Write as _,
     sync::{
         Arc, LazyLock,
         atomic::{AtomicU32, Ordering},
@@ -176,11 +177,12 @@ fn wrap_body(html: &str, body: &[(String, String)]) -> String {
     if body.is_empty() {
         return html.to_owned();
     }
-    let attributes: String = body
-        .iter()
-        .map(|(name, value)| format!(r#" {name}="{}""#, escape_attribute(value)))
-        .collect();
-    format!("<div{attributes}>{html}</div>")
+    let mut wrapped = String::from("<div");
+    for (name, value) in body {
+        let _ = write!(wrapped, r#" {name}="{}""#, escape_attribute(value));
+    }
+    let _ = write!(wrapped, ">{html}</div>");
+    wrapped
 }
 
 /// An attribute value with every character that could end it or start
@@ -597,5 +599,211 @@ mod tests {
             &format!(r#"<p>x</p><img src="{PLACEHOLDER}">"#),
             &inline
         ));
+    }
+
+    /// The fixture emails (campbooks-cloud#160): real-world-shaped mail and
+    /// a hostile message.
+    fn fixture(name: &str) -> &'static str {
+        match name {
+            "newsletter" => include_str!("../../../fixtures/email-html/newsletter.html"),
+            "receipt" => include_str!("../../../fixtures/email-html/receipt.html"),
+            "outlook" => include_str!("../../../fixtures/email-html/outlook.html"),
+            "gmail" => include_str!("../../../fixtures/email-html/gmail.html"),
+            "marketing-600" => include_str!("../../../fixtures/email-html/marketing-600.html"),
+            "marketing-fluid" => include_str!("../../../fixtures/email-html/marketing-fluid.html"),
+            "hostile" => include_str!("../../../fixtures/email-html/hostile.html"),
+            _ => unreachable!("no fixture {name}"),
+        }
+    }
+
+    const FIXTURES: [&str; 7] = [
+        "newsletter",
+        "receipt",
+        "outlook",
+        "gmail",
+        "marketing-600",
+        "marketing-fluid",
+        "hostile",
+    ];
+
+    static HANDLER: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)<[^>]*\son[a-z]+\s*=").unwrap_or_else(|e| unreachable!("{e}"))
+    });
+
+    /// What no output may ever hold, for any fixture, images shown or not.
+    fn assert_inert(name: &str, result: &Sanitized, show: bool) {
+        let html = result.html.to_ascii_lowercase();
+        for gone in [
+            "<script",
+            "<style",
+            "<title",
+            "<form",
+            "<input",
+            "<button",
+            "<iframe",
+            "<object",
+            "<embed",
+            "<meta",
+            "<base",
+            "<link",
+            "<svg",
+            "<math",
+            "<video",
+            "<audio",
+            "javascript:",
+            "vbscript:",
+            "data:text",
+            "url(",
+            "image-set",
+            "@import",
+            "expression(",
+            "behavior",
+            "-moz-binding",
+            "alert",
+            "evil.example",
+            "exfil.example",
+            "track.example",
+            "<!--",
+        ] {
+            assert!(!html.contains(gone), "{name} (show {show}): {gone}");
+        }
+        assert!(!HANDLER.is_match(&html), "{name} (show {show}): a handler");
+        if !show {
+            assert!(
+                only_own_sources(&result.html, &InlineImages::new()),
+                "{name}: a remote source while blocked"
+            );
+        }
+        if let Some(css) = &result.css {
+            let css = css.to_ascii_lowercase();
+            for gone in [
+                "url(",
+                "@import",
+                "@font-face",
+                "expression",
+                "prefers-color-scheme",
+                "\\",
+                "<",
+                "behavior",
+                "image-set",
+            ] {
+                assert!(!css.contains(gone), "{name}: {gone} in css");
+            }
+        }
+    }
+
+    #[test]
+    fn no_fixture_can_run_load_or_submit_anything() {
+        for name in FIXTURES {
+            for show in [false, true] {
+                assert_inert(name, &run(fixture(name), show), show);
+            }
+        }
+    }
+
+    #[test]
+    fn a_newsletter_keeps_its_style_sheet_as_inline_styles() {
+        let result = run(fixture("newsletter"), false);
+        let html = &result.html;
+        // The document title is not part of the message.
+        assert!(!html.contains("Simple Transactional Email"), "{html}");
+        // The preheader stays hidden, the button keeps its look.
+        assert!(
+            html.contains(r#"<span class="preheader" style="color: transparent; display: none"#),
+            "{html}"
+        );
+        assert!(html.contains("background-color: #0867ec"), "{html}");
+        // The body's background moves to the wrapper.
+        assert!(
+            html.starts_with(r#"<div style="font-family: Helvetica"#),
+            "{html}"
+        );
+        assert!(html.contains("background-color: #f4f5f6"), "{html}");
+        // The responsive rules come back separately.
+        let css = result.css.unwrap_or_default();
+        assert!(
+            css.contains("@media only screen and (max-width: 640px)"),
+            "{css}"
+        );
+        assert!(css.contains(".container { padding: 0 !important"), "{css}");
+    }
+
+    #[test]
+    fn a_receipt_loses_its_web_font_and_dark_rules_but_keeps_its_tables() {
+        let result = run(fixture("receipt"), true);
+        assert!(!result.html.contains("fonts.googleapis"), "{}", result.html);
+        assert!(result.html.contains("<table"), "{}", result.html);
+        assert!(result.html.contains("R-20418"));
+        let css = result.css.unwrap_or_default();
+        assert!(!css.contains("prefers-color-scheme"), "{css}");
+        assert!(css.contains("max-width: 600px"), "{css}");
+    }
+
+    #[test]
+    fn outlook_and_gmail_replies_keep_their_shape() {
+        let outlook = clean(fixture("outlook"));
+        assert!(!outlook.contains("o:p"), "{outlook}");
+        assert!(
+            !outlook.contains("mso-hide") && !outlook.contains("[if"),
+            "{outlook}"
+        );
+        // `p.MsoNormal { margin: 0 }` from Word's sheet.
+        assert!(
+            outlook.contains(r#"<p class="MsoNormal" style="margin: 0cm"#),
+            "{outlook}"
+        );
+        let gmail = clean(fixture("gmail"));
+        assert!(
+            gmail.contains(r#"<blockquote class="gmail_quote" style="margin: 0px 0px 0px 0.8ex; border-left: 1px solid rgb(204,204,204); padding-left: 1ex">"#),
+            "{gmail}"
+        );
+    }
+
+    #[test]
+    fn the_hostile_fixture_keeps_only_its_harmless_parts() {
+        for show in [false, true] {
+            let result = run(fixture("hostile"), show);
+            let html = &result.html;
+            assert!(
+                html.contains(r#"<p class="fine" style="color: #0a7d32; font-weight: bold">"#),
+                "{html}"
+            );
+            // The class beacon's colour is kept, its background is not.
+            assert!(
+                html.contains(r#"<p class="beacon" style="color: #123456">"#),
+                "{html}"
+            );
+            assert!(
+                html.contains(r#"<p style="color: red; font-size: 14px">"#),
+                "{html}"
+            );
+            assert!(
+                html.contains(
+                    r#"href="https://example.com/ok" target="_blank" rel="noopener noreferrer""#
+                ),
+                "{html}"
+            );
+            assert!(!html.contains("ping="), "{html}");
+            // Only the real logo is a remote image; every pixel is gone.
+            assert_eq!(result.remote_images, 1, "{html}");
+            assert_eq!(result.css, None);
+        }
+    }
+
+    #[test]
+    fn pixels_sized_or_hidden_by_style_are_removed() {
+        let html = r#"<p>x</p><img src="https://t.example/a.gif" style="width:1px;height:1px"><img src="https://t.example/b.gif" width="200" height="50" style="max-height:0"><img src="https://t.example/c.gif" width="200" height="50" style="visibility: hidden"><img src="https://t.example/d.gif" width="200" height="50" style="opacity: 0"><img src="https://t.example/e.gif" style="WIDTH: 0PX; height: 0 !important"><img src="https://cdn.example/real.png" width="200" height="50" style="opacity: 1">"#;
+        for show in [false, true] {
+            let result = run(html, show);
+            assert!(!result.html.contains("t.example"), "{}", result.html);
+            assert_eq!(result.remote_images, 1, "{}", result.html);
+        }
+    }
+
+    #[test]
+    fn a_fixed_width_layout_keeps_its_widths_for_the_reader_to_fit() {
+        let html = clean(fixture("marketing-600"));
+        assert!(html.contains(r#"width="600""#), "{html}");
+        assert!(html.contains("width: 600px"), "{html}");
     }
 }

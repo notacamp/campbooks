@@ -299,6 +299,49 @@ mod tests {
     }
 
     #[sqlx::test(migrations = "../../../migrations")]
+    async fn style_sheets_are_inlined_and_media_rules_come_back_filtered(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, inbox, sam) = kit.sams_inbox().await;
+        let recorded = json!({"changes": [{"op": "upsert", "message": {
+            "provider_message_id": "styled-1",
+            "from": {"name": "The Weekly Ledger", "address": "hello@weekly-ledger.example"},
+            "to": [{"address": "sam@example.com"}],
+            "subject": "Styled",
+            "sent_at": "2026-10-06T08:30:00Z",
+            "direction": "inbound",
+            "text": "Styled.",
+            "html": "<html><head><title>Ledger</title><link rel=stylesheet href=\"https://t.example/a.css\"><style>@import url(https://t.example/b.css); .lead { color: #3d4451; background: url(https://t.example/c.gif) } .pre { display: none } @media (max-width: 600px) { .c { width: 100% !important; background-image: url(https://t.example/d.gif) } } @media (prefers-color-scheme: dark) { .lead { color: #fff } }</style></head><body bgcolor=\"#eeeeee\"><span class=\"pre\">Preview</span><div class=\"c\" style=\"width: 600px\"><p class=\"lead\">Hi</p></div></body></html>",
+            "mailbox": {"in_inbox": true},
+            "read": false, "starred": false
+        }}]});
+        let batch = dev::record(&kit.state, workspace, inbox, &recorded)
+            .await
+            .unwrap();
+        dev::submit(&kit.state, workspace, &batch).await.unwrap();
+        kit.run_jobs().await;
+        let (conversation, message): (String, String) = sqlx::query_as(
+            "SELECT conversation_id::text, id::text FROM conversations.messages
+              WHERE provider_message_id = 'styled-1'",
+        )
+        .fetch_one(&db)
+        .await
+        .unwrap();
+        let uri =
+            format!("/api/v1/w/{workspace}/conversations/{conversation}/messages/{message}/body");
+        let body = kit.get(&sam, &uri).await;
+        assert_eq!(body.status, StatusCode::OK);
+        let html = body.json["html"].as_str().unwrap();
+        assert_eq!(
+            html,
+            r##"<div bgcolor="#eeeeee"><span class="pre" style="display: none">Preview</span><div class="c" style="width: 600px"><p class="lead" style="color: #3d4451">Hi</p></div></div>"##
+        );
+        assert_eq!(
+            body.json["css"],
+            "@media (max-width: 600px) {\n.c { width: 100% !important }\n}"
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
     async fn html_is_returned_as_json_data_never_as_a_page(db: PgPool) {
         let kit = Kit::new(db.clone()).await;
         let (workspace, _, sam) = kit.sams_inbox().await;

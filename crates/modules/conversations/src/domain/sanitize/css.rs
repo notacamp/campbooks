@@ -200,7 +200,7 @@ fn inert_value(input: &mut Parser<'_>, depth: usize) -> bool {
             _ => false,
         };
         if nested
-            && !input
+            && input
                 .parse_nested_block(|inner| {
                     if inert_value(inner, depth + 1) {
                         Ok(())
@@ -208,7 +208,7 @@ fn inert_value(input: &mut Parser<'_>, depth: usize) -> bool {
                         Err(ParseError::<()>::custom(()))
                     }
                 })
-                .is_ok()
+                .is_err()
         {
             return false;
         }
@@ -248,7 +248,7 @@ fn inert_prelude(input: &mut Parser<'_>, functions: &[&str], depth: usize) -> bo
             _ => false,
         };
         if nested
-            && !input
+            && input
                 .parse_nested_block(|inner| {
                     if inert_prelude(inner, functions, depth + 1) {
                         Ok(())
@@ -256,7 +256,7 @@ fn inert_prelude(input: &mut Parser<'_>, functions: &[&str], depth: usize) -> bo
                         Err(ParseError::<()>::custom(()))
                     }
                 })
-                .is_ok()
+                .is_err()
         {
             return false;
         }
@@ -296,19 +296,19 @@ impl<'i> DeclarationParser<'i> for Declarations {
     }
 }
 
-impl<'i> AtRuleParser<'i> for Declarations {
+impl AtRuleParser<'_> for Declarations {
     type Prelude = ();
     type AtRule = Declaration;
     type Error = ();
 }
 
-impl<'i> QualifiedRuleParser<'i> for Declarations {
+impl QualifiedRuleParser<'_> for Declarations {
     type Prelude = ();
     type QualifiedRule = Declaration;
     type Error = ();
 }
 
-impl<'i> RuleBodyItemParser<'i, Declaration, ()> for Declarations {
+impl RuleBodyItemParser<'_, Declaration, ()> for Declarations {
     fn parse_declarations(&self) -> bool {
         true
     }
@@ -362,7 +362,7 @@ impl<'i> AtRuleParser<'i> for TopLevel {
 }
 
 // Plain style rules are inlined, not handed on: the default skips them.
-impl<'i> QualifiedRuleParser<'i> for TopLevel {
+impl QualifiedRuleParser<'_> for TopLevel {
     type Prelude = ();
     type QualifiedRule = Option<String>;
     type Error = ();
@@ -403,18 +403,18 @@ impl<'i> QualifiedRuleParser<'i> for StyleRules {
     }
 }
 
-impl<'i> AtRuleParser<'i> for StyleRules {
+impl AtRuleParser<'_> for StyleRules {
     type Prelude = ();
     type AtRule = String;
     type Error = ();
 }
 
-impl<'i> DeclarationParser<'i> for StyleRules {
+impl DeclarationParser<'_> for StyleRules {
     type Declaration = String;
     type Error = ();
 }
 
-impl<'i> RuleBodyItemParser<'i, String, ()> for StyleRules {
+impl RuleBodyItemParser<'_, String, ()> for StyleRules {
     fn parse_declarations(&self) -> bool {
         false
     }

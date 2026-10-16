@@ -62,10 +62,10 @@ pub fn inline(html: &str) -> Inlined {
         .resolver(Arc::new(Refuse))
         .build();
     match inliner.inline(html) {
-        Ok(inlined) => {
-            let found = scan(&inlined);
+        Ok(output) => {
+            let found = scan(&output);
             Inlined {
-                html: inlined,
+                html: output,
                 body: found.body,
                 leftover: found.styles,
             }
