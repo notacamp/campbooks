@@ -57,6 +57,13 @@ impl Operations {
     }
 }
 
+/// Who invoked a request in-process, next to its
+/// [`AuthenticatedPrincipal`]: the per-caller rate limits count automation
+/// and the assistant apart from the person's own apps. Private to the
+/// kernel, like the principal it accompanies.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct InvokedBy(pub(crate) Caller);
+
 /// Who is invoking: each kind may call only the operations whose
 /// `x-campbooks` opts it in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -339,9 +346,9 @@ fn build_request(
     let mut request = request
         .body(body)
         .map_err(|e| InvokeError::InvalidInput(format!("cannot build the request: {e}")))?;
-    request
-        .extensions_mut()
-        .insert(AuthenticatedPrincipal(invocation.principal.clone()));
+    let extensions = request.extensions_mut();
+    extensions.insert(AuthenticatedPrincipal(invocation.principal.clone()));
+    extensions.insert(InvokedBy(invocation.caller));
     Ok(request)
 }
 
