@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Campbooks API",
-    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. Operations require an OAuth 2.1 bearer token with the scope they list (401 without a valid token, 403 without the scope) unless they are public. The `/bff/*` operations serve the web app only: they authenticate with its session cookie instead of a token.",
+    "description": "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. Operations require an OAuth 2.1 bearer token with the scope they list (401 without a valid token, 403 without the scope) unless they are public. Those operations are rate-limited per caller (a person per app, an app on its own) in classes: reads, writes, and mail sends (`x-campbooks.rate_limit: send`, counted per person across their apps). Over a limit they answer 429 `rate_limited` with `Retry-After`, in seconds. The `/bff/*` operations serve the web app only: they authenticate with its session cookie instead of a token.",
     "license": {
       "name": "Sustainable Use License",
       "identifier": "LicenseRef-Sustainable-Use"
@@ -5447,6 +5447,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -5464,6 +5474,7 @@
           "assistant": true,
           "automation": false,
           "mutates": true,
+          "rate_limit": "send",
           "records": [
             "conversations.draft"
           ],

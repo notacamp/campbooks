@@ -18,7 +18,7 @@ use crate::{
     jobs::Registry,
     operations::Operations,
     preferences::{AskFirst, MemberPreferencesPort},
-    rate_limit::RateLimits,
+    rate_limit::{RateLimits, api::ApiLimits},
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
     telemetry::{self, Metrics},
@@ -90,6 +90,10 @@ pub struct AppState {
     /// The server installs one keyed by the instance secret, shared by all
     /// its processes; until then it counts per process.
     pub rate_limits: RateLimits,
+    /// The authenticated API's per-caller limits
+    /// ([`rate_limit::api`](crate::rate_limit::api)): the settings and this
+    /// process's buckets. Built from `config.rate_limits`.
+    pub api_limits: ApiLimits,
     /// Signs opaque values the server hands out (cursors). The server
     /// installs one keyed by the instance secret; until then it signs per
     /// process.
@@ -126,6 +130,7 @@ impl AppState {
             metrics,
             db,
             auth: TokenVerifier::new(&config.auth),
+            api_limits: ApiLimits::new(&config.rate_limits),
             config: Arc::new(config),
             events: EventBus::default(),
             membership: Arc::new(NoMembership),
@@ -256,6 +261,14 @@ impl AppState {
     #[must_use]
     pub fn with_rate_limits(mut self, rate_limits: RateLimits) -> Self {
         self.rate_limits = rate_limits;
+        self
+    }
+
+    /// The same state, counting the API's per-caller limits with `limits`
+    /// (tests install one timed by a `FixedClock`, or other settings).
+    #[must_use]
+    pub fn with_api_limits(mut self, limits: ApiLimits) -> Self {
+        self.api_limits = limits;
         self
     }
 
