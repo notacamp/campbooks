@@ -108,6 +108,9 @@ CREATE TABLE conversations.rule_applications (
 );
 CREATE INDEX rule_applications_conversation_idx
     ON conversations.rule_applications (conversation_id);
+-- The exceptions a rule still holds, subtracted from its count.
+CREATE INDEX rule_applications_excepted_idx
+    ON conversations.rule_applications (rule_id) WHERE excepted_at IS NOT NULL;
 
 -- A suggestion a member turned down: hidden for 30 days, for good after two.
 CREATE TABLE conversations.rule_dismissals (

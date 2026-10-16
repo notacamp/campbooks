@@ -154,11 +154,13 @@ async fn views(
             recent_exceptions: exceptions.get(&rule.id).copied().unwrap_or_default(),
             run: runs.remove(&rule.id),
             shared: shared.contains(&rule.inbox),
-            may_change: rules::may_change(
-                inbox_roles.get(&rule.inbox).copied(),
-                access.user,
-                rule.taught_by,
-            ),
+            // Nobody changes a rule of an inbox kept read-only.
+            may_change: !rule.inbox_detached
+                && rules::may_change(
+                    inbox_roles.get(&rule.inbox).copied(),
+                    access.user,
+                    rule.taught_by,
+                ),
         })
         .collect())
 }
@@ -610,6 +612,7 @@ pub async fn create_in(
     inbox: InboxId,
     body: &CreateRule,
 ) -> Result<CreatedRule> {
+    rules::labels_of_inbox(tx, inbox, &body.conditions, &body.actions).await?;
     let from_evidence = matches!(body.origin, RuleOrigin::Correction | RuleOrigin::Suggestion);
     let (rule_state, acted_without_asking) = if from_evidence {
         // Rules from evidence act for the member only when they let
@@ -729,6 +732,7 @@ async fn retire(
     inbox: InboxId,
     rule: RuleId,
 ) -> Result<()> {
+    rule_runs::lock_running(tx, rule).await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(),
@@ -778,7 +782,7 @@ pub struct ConfirmRule {
     extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
         .undo("conversations.remove_rule")
         .assistant()
-        .records(["conversations.rule", "conversations.conversation"]).access("conversations.rule", campbooks_kernel::authz::Action::Write)))),
+        .records(["conversations.rule", "conversations.conversation"]).access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("rule_id" = RuleId, Path, description = "The rule."),
@@ -810,6 +814,7 @@ pub async fn confirm(
     if rule.state != RuleState::Proposed {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
+    rule_runs::lock_running(&mut tx, rule.id).await?;
     replace(
         &mut tx,
         &state,
@@ -822,7 +827,7 @@ pub async fn confirm(
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'active', confirmed_at = now(), updated_at = now(),
-                  taught_by = coalesce($2, taught_by)
+                  taught_by = coalesce(taught_by, $2)
             WHERE id = $1"#,
         rule.id as RuleId,
         access.user.map(|u| *u.as_uuid()),
@@ -920,6 +925,7 @@ pub async fn update(
     let conditions = rules::normalise(&body.conditions.unwrap_or_else(|| rule.conditions.clone()));
     let actions = body.actions.unwrap_or_else(|| rule.actions.clone());
     rules::validate(&conditions, &actions)?;
+    rules::labels_of_inbox(&mut tx, rule.inbox, &conditions, &actions).await?;
     let next_state = match body.paused {
         Some(true) => RuleState::Paused,
         Some(false) if rule.state == RuleState::Paused => RuleState::Active,
@@ -1013,24 +1019,20 @@ pub async fn remove(
 ) -> Result<Json<RuleView>> {
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
-    // A proposed rule can be turned down by anyone who may teach there.
-    // Any other is removed by its author or a manager (the catalogue's
-    // `delete` on the rule), in a kept read-only inbox too.
+    // Removed (or, proposed, turned down) by its author or a manager: the
+    // catalogue's `delete` on the rule, in a kept read-only inbox too.
     let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
-    if rule.state == RuleState::Proposed {
-        may_teach(&state, &mut tx, access, rule.inbox).await?;
-    } else {
-        campbooks_kernel::authz::require(
-            &state,
-            &mut tx,
-            access,
-            Action::Delete,
-            &resources::rule(rule.id),
-            || Error::Denied(crate::MESSAGES.reason("rule_not_yours")),
-        )
-        .await?;
-    }
+    campbooks_kernel::authz::require(
+        &state,
+        &mut tx,
+        access,
+        Action::Delete,
+        &resources::rule(rule.id),
+        || Error::Denied(crate::MESSAGES.reason("rule_not_yours")),
+    )
+    .await?;
     member_only(&workspace.principal)?;
+    rule_runs::lock_running(&mut tx, rule.id).await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()
@@ -1042,7 +1044,8 @@ pub async fn remove(
     let mut removed = rule.clone();
     removed.state = RuleState::Removed;
     let ws = access.workspace.to_string();
-    if query.restore {
+    // Nothing is put back in an inbox kept read-only.
+    if query.restore && !rule.inbox_detached {
         rule_runs::start(&mut tx, &state.events, &ws, &removed, RunKind::Revert).await?;
     } else {
         sqlx::query!(
@@ -1128,6 +1131,8 @@ pub async fn restore(
         &resources::rule(path.rule_id),
     )
     .await?;
+    // Runs before the rule row, as every path takes them.
+    rule_runs::lock_running(&mut tx, path.rule_id).await?;
     let found = sqlx::query!(
         r#"SELECT removed_from,
                   (state = 'removed' AND removed_at > now() - make_interval(mins => $2))

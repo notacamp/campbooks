@@ -333,6 +333,8 @@ async fn moving_one_back_makes_it_an_exception(db: PgPool) {
         .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
         .await;
     assert_eq!(got.json["recent_exceptions"], 2);
+    // It holds 4 of the 4 changed... less the 2 changed back.
+    assert_eq!(got.json["applied_count"], 2);
     let placed = streams(&kit).await;
     assert_eq!(
         placed.iter().find(|(id, ..)| id == "gh-1").unwrap().1,
@@ -1067,9 +1069,18 @@ async fn undo_all_still_works_after_the_rule_moves_mail_elsewhere(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn an_inbox_owner_teaches_without_a_membership(db: PgPool) {
+async fn an_inbox_owner_without_a_membership_teaches_nothing(db: PgPool) {
     let kit = kit(db).await;
     let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    // Sam owns the inbox but is no longer in it: the catalogue's model.
     sqlx::query("UPDATE conversations.inboxes SET owner = $2 WHERE id = $1")
         .bind(inbox.as_uuid())
         .bind(sam_id.as_uuid())
@@ -1081,16 +1092,19 @@ async fn an_inbox_owner_teaches_without_a_membership(db: PgPool) {
         .execute(&kit.db)
         .await
         .unwrap();
-    let created = kit
+    let refused = kit
         .post(
             &sam,
-            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules/preview"),
             Some(move_github()),
         )
         .await;
-    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
-    assert_eq!(created.json["rule"]["may_change"], true);
-    assert_eq!(created.json["rule"]["state"], "active");
+    assert_eq!(refused.status, StatusCode::FORBIDDEN, "{:?}", refused.json);
+    assert_eq!(refused.json["code"], "inbox_read_only");
+    let hidden = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+        .await;
+    assert_eq!(hidden.status, StatusCode::NOT_FOUND);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

@@ -251,6 +251,44 @@ pub fn normalise(conditions: &[RuleCondition]) -> Vec<RuleCondition> {
     normal
 }
 
+/// 400 `invalid_rule` unless every label the rule names (in a condition or
+/// an `add_label`) is one of `inbox`'s.
+pub async fn labels_of_inbox(
+    conn: &mut PgConnection,
+    inbox: InboxId,
+    conditions: &[RuleCondition],
+    actions: &[RuleAction],
+) -> Result<()> {
+    let mut named: Vec<LabelId> = conditions
+        .iter()
+        .filter_map(|c| match c {
+            RuleCondition::Label(label) => Some(*label),
+            _ => None,
+        })
+        .chain(actions.iter().filter_map(|a| match a {
+            RuleAction::AddLabel { label } => Some(*label),
+            _ => None,
+        }))
+        .collect();
+    named.sort_unstable();
+    named.dedup();
+    if named.is_empty() {
+        return Ok(());
+    }
+    let found = sqlx::query_scalar!(
+        r#"SELECT count(*) AS "n!" FROM conversations.labels
+            WHERE inbox_id = $1 AND id = ANY($2)"#,
+        inbox as InboxId,
+        &named as &[LabelId],
+    )
+    .fetch_one(conn)
+    .await?;
+    if usize::try_from(found).unwrap_or_default() != named.len() {
+        return Err(Error::BadRequest(crate::MESSAGES.reason("invalid_rule")));
+    }
+    Ok(())
+}
+
 /// The sum of the conditions' weights.
 pub fn specificity(conditions: &[RuleCondition]) -> i32 {
     let sum: u32 = conditions
@@ -387,8 +425,13 @@ pub async fn find_any(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stor
                r.teaching_id AS "teaching_id: TeachingId", r.conditions, r.actions, r.origin,
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
-               r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
-               (r.taught_by IS NULL OR i.owner = r.taught_by OR EXISTS (
+               r.created_at, r.confirmed_at,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
+               r.last_applied_at,
+               (r.taught_by IS NULL OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
@@ -413,8 +456,13 @@ pub async fn of_inboxes(conn: &mut PgConnection, inboxes: &[InboxId]) -> Result<
                r.teaching_id AS "teaching_id: TeachingId", r.conditions, r.actions, r.origin,
                r.origin_text, r.state, r.taught_by,
                r.from_conversation_id AS "from_conversation_id: ConversationId",
-               r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,
-               (r.taught_by IS NULL OR i.owner = r.taught_by OR EXISTS (
+               r.created_at, r.confirmed_at,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
+               r.last_applied_at,
+               (r.taught_by IS NULL OR EXISTS (
                    SELECT 1 FROM conversations.inbox_members im
                     WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by
                       AND im.role IN ('sender', 'manager'))) AS "author_may_act!",
@@ -476,13 +524,11 @@ pub async fn roles_of(
     let Some(user) = user else {
         return Ok(std::collections::HashMap::new());
     };
-    // The inbox's owner changes its rules as a manager does.
+    // Membership alone, as the catalogue's `conversations.rule` reads it.
     let rows = sqlx::query!(
-        r#"SELECT i.id AS "inbox!: InboxId",
-                  CASE WHEN i.owner = $2 THEN 'manager' ELSE m.role END AS "role!"
-             FROM conversations.inboxes i
-             LEFT JOIN conversations.inbox_members m ON m.inbox_id = i.id AND m.user_id = $2
-            WHERE i.id = ANY($1) AND (i.owner = $2 OR m.user_id IS NOT NULL)"#,
+        r#"SELECT inbox_id AS "inbox!: InboxId", role AS "role!"
+             FROM conversations.inbox_members
+            WHERE inbox_id = ANY($1) AND user_id = $2"#,
         inboxes as &[InboxId],
         user.as_uuid(),
     )
@@ -493,8 +539,8 @@ pub async fn roles_of(
         .collect()
 }
 
-/// The caller's role in `inbox` (its owner counts as a manager); `None` for a
-/// non-member.
+/// The caller's role in `inbox`; `None` for a non-member (an owner without a
+/// membership row too).
 pub async fn role_in(
     conn: &mut PgConnection,
     inbox: InboxId,
@@ -557,6 +603,21 @@ pub async fn replaced(
                 .map(ToOwned::to_owned)
         })
         .collect();
+    // Their running runs first, then the rules: the lock order every path
+    // keeps (`rule_runs::lock_running`).
+    sqlx::query!(
+        r#"SELECT u.id FROM conversations.rule_runs u
+            WHERE u.state = 'running' AND u.rule_id IN (
+                  SELECT id FROM conversations.rules
+                   WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
+                     AND id IS DISTINCT FROM $3)
+            FOR UPDATE OF u"#,
+        inbox as InboxId,
+        json!(conditions),
+        this as Option<RuleId>,
+    )
+    .fetch_all(&mut *conn)
+    .await?;
     let rows = sqlx::query!(
         r#"SELECT id AS "id: RuleId", taught_by FROM conversations.rules
             WHERE inbox_id = $1 AND state = 'active' AND conditions = $2

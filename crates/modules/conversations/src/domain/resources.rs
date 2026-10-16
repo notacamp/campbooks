@@ -67,7 +67,7 @@ const fn inside(
 static TYPES: [ResourceType; 9] = [
     ResourceType {
         owner: Owner::Member,
-        owner_actions: &[Read, Write],
+        owner_actions: &[Read],
         container: Some(INBOX_RECORD),
         roles: &["reader", "sender", "manager"],
         grants: &[
@@ -82,7 +82,7 @@ static TYPES: [ResourceType; 9] = [
             INBOX_RECORD,
             "An address the workspace receives and sends on, owned by the member whose \
              connection feeds it and shared with its members by role (`reader` < `sender` < \
-             `manager`). Its owner, senders and managers write in it (teach it rules). \
+             `manager`). Its senders and managers write in it (teach it rules). \
              Workspace owners and admins get nothing without a membership. Kept after its \
              connection is removed, it is read-only.",
             Tenancy::Workspace,

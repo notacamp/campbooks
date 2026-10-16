@@ -122,8 +122,8 @@ pub struct RuleMark {
     pub conditions: Vec<RuleCondition>,
     /// How many conversations it has changed.
     pub applied_count: u32,
-    /// Whether the caller may stop it ("Stop doing this"): its author, or a
-    /// manager or owner of its inbox, while the inbox is not kept read-only.
+    /// Whether the caller may stop it ("Stop doing this"): its author while a
+    /// sender, or a manager of its inbox, while the inbox is not kept read-only.
     pub may_change: bool,
 }
 
@@ -142,12 +142,16 @@ pub async fn attach(
         r#"
         SELECT DISTINCT ON (a.conversation_id)
                a.conversation_id AS "conversation: ConversationId", r.id AS "rule: RuleId",
-               r.actions, r.conditions, r.applied_count,
+               r.actions, r.conditions,
+               r.applied_count - (
+                   SELECT count(*)::int FROM conversations.rule_applications x
+                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL
+                      AND x.reverted_at IS NULL) AS "applied_count!",
                (i.detached_at IS NULL AND $2::uuid IS NOT NULL
-                AND (i.owner = $2 OR EXISTS (
+                AND EXISTS (
                     SELECT 1 FROM conversations.inbox_members m
                      WHERE m.inbox_id = r.inbox_id AND m.user_id = $2
-                       AND (m.role = 'manager' OR (m.role = 'sender' AND r.taught_by = $2)))))
+                       AND (m.role = 'manager' OR (m.role = 'sender' AND r.taught_by = $2))))
                    AS "may_change!"
           FROM conversations.rule_applications a
           JOIN conversations.rules r ON r.id = a.rule_id
