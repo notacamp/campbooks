@@ -34,12 +34,12 @@
 
 - [x] 4.1 Merge `next`; implement the `MemberPreferences` port; turn on question 3; end-to-end test ("do it and tell me" → the next suggestion is active in a personal inbox)
 - [x] 4.2 Wire `preview_rule` (counts and samples) and `create_rule` (Save, origin `onboarding` / `instruction`, one Undo)
-- [ ] 4.3 Adopt #479's resource catalogue and `authorize` for `assistant.profile`, `list_senders` and `list_labels`; matrix tests
+- [x] 4.3 Adopt #479's resource catalogue and `authorize` for `assistant.profile`, `list_senders` and `list_labels`; matrix tests
 
 ## 5. Finish
 
 - [x] 5.1 OpenAPI regenerated, client types regenerated, `.sqlx` regenerated
 - [x] 5.2 CHANGELOG updated
-- [ ] 5.3 Gates green (Rust, client, OpenSpec validate)
+- [x] 5.3 Gates green (Rust, client, OpenSpec validate)
 - [x] 5.4 UI verified at 375px and desktop; recording of typing an instruction → proposed rule with preview → Save
-- [ ] 5.5 Archive the change into `openspec/specs/`
+- [x] 5.5 Archive the change into `openspec/specs/`

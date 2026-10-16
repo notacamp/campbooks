@@ -1,15 +1,16 @@
-## Purpose
+# memory-ui Specification
 
+## Purpose
 Scout's memory: the page where a member sees what Scout was taught,
 teaches it more in their own words, and answers the questions again.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: The Scout's memory page
-Settings SHALL have a Scout's memory page at
+Settings SHALL list Scout's memory as one of its sections, a page at
 `/w/{workspace_id}/settings/memory` with, in order: "Teach Scout
-something", the rules (a slot the conversations module fills), and "Answer
-the questions" (the question flow). On phones it SHALL be one column with
+something", the rules (the conversations module's list, `rules-ui`), and
+"Answer the questions" (the question flow). On phones it SHALL be one column with
 no horizontal scrolling at 375px, in en, pt-PT, es-ES and fr.
 
 #### Scenario: Opening it
@@ -36,8 +37,7 @@ as a rule; any proposal left SHALL be offered as the closest rule.
 - **THEN** the page says Scout can't send or forward mail, and nothing is saved
 
 ### Requirement: A rule builder without AI
-When compile answers 503 (`ai_role_not_configured` or
-`ai_external_content_refused`), the composer SHALL say that this server
+When compile answers 409 `compile_unavailable`, the composer SHALL say that this server
 has no language model for sentences and show a builder instead: a
 condition (the sender is, the sender's domain is, the subject contains,
 it's from a mailing list, it's an automatic notification) and an action
@@ -45,5 +45,5 @@ it's from a mailing list, it's an automatic notification) and an action
 same proposal card.
 
 #### Scenario: No model
-- **WHEN** compile answers `ai_role_not_configured`
+- **WHEN** compile answers `compile_unavailable`
 - **THEN** the builder is shown, and choosing "the sender is" rita@silva-contas.example with "always show it" shows the same proposal as the composer would

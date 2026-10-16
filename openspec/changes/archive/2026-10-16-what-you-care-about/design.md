@@ -166,10 +166,9 @@ to do with it.") plus the closest valid rule, if one is left. Nothing is
 stored.
 
 Without a usable `complete` role (`RoleNotConfigured` or
-`ExternalContentRefused`), the operation answers 503
-`ai_role_not_configured` / `ai_external_content_refused` (the gateway's
-reasons) without calling anything, and the client shows the manual
-builder: "When [the sender is ▾] [ … ] then [always show it ▾]", with the
+`ExternalContentRefused`), the operation answers 409
+`compile_unavailable` (a fixed reason, never the gateway's words) without
+calling anything, and the client shows the manual builder: "When [the sender is ▾] [ … ] then [always show it ▾]", with the
 same preview and Save. The questions need no model at all.
 
 ### 5. Scout's memory
@@ -237,6 +236,12 @@ then `Enter` saves the shown rule, `Esc` cancels.
 ## Data ownership, events, scopes
 
 - Schema `assistant`: `profiles`. Compile results are not stored.
+- Access (ADR 0017): resource type `assistant.profile`, owner `Member` with
+  `read` and `write`, no grants; every operation declares it and asks the
+  central check through `resources::require_own` (listed in
+  `architecture.toml`); the access matrix seeds a profile.
+  `list_senders` and `list_labels` declare and check `conversations.inbox`
+  `read`, like `list_inboxes`.
 - Scopes: `assistant:read` (`get_profile`), `assistant:write`
   (`update_profile`, `compile_instruction`).
 - Operations (OpenAPI, ADR 0013): `assistant.get_profile` (GET),

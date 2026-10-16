@@ -104,9 +104,10 @@ conditions or a `who` phrase from the sentence, 1 to 4 actions and at most
 `conversations.list_senders` and SHALL never be resolved by the model.
 The answer SHALL say `rules`, `unsupported` (with the reason `sends_mail`,
 `deletes_mail`, `not_about_mail` or `too_vague`) or `unclear`, and SHALL
-store nothing. It SHALL allow 20 calls per member per hour (429), and
-answer 503 with the AI gateway's reason, calling nothing, when the
-`complete` role is not configured or may not receive content.
+store nothing. It SHALL allow 20 calls per member per hour (429), answer
+409 `compile_unavailable`, calling nothing, when the `complete` role is not
+configured or may not receive content, and 503 `compile_failed` when the
+model call fails, without the provider's words.
 
 #### Scenario: Anything from my accountant
 - **WHEN** a member writes "anything from my accountant always matters" and the model returns one rule with `who` = "my accountant" and action `surface: always`
@@ -126,11 +127,11 @@ answer 503 with the AI gateway's reason, calling nothing, when the
 
 #### Scenario: No language model
 - **WHEN** the `complete` role is not configured
-- **THEN** the response is 503 with code `ai_role_not_configured` and no model is called
+- **THEN** the response is 409 with code `compile_unavailable` and no model is called
 
 #### Scenario: An external provider without the opt-in
 - **WHEN** the `complete` role points off the instance's network without `CAMPBOOKS_AI__COMPLETE__EXTERNAL_CONTENT=allow`
-- **THEN** the response is 503 with code `ai_external_content_refused` and nothing is sent
+- **THEN** the response is 409 with code `compile_unavailable` and nothing is sent
 
 ### Requirement: Nothing personal in telemetry or logs
 Spans, logs and metrics of this module SHALL never hold the member's text,
