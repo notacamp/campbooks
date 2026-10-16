@@ -4,20 +4,29 @@
 //! (`lib/ui/safe-html`); this is the first of the two layers, so the frame
 //! never receives markup that could run, load or submit anything unasked:
 //!
+//! - **style sheets** are inlined into `style` attributes first
+//!   ([`styles`]): mail is written for clients that drop `<style>`, and the
+//!   frame's inherited policy blocks it too. Their `@media` rules come back
+//!   separately, filtered ([`css::media_rules`]), for the client to apply to
+//!   the frame's document; the `<body>`'s own look moves to a wrapper `div`;
 //! - **ammonia** keeps a fixed allow-list of tags and attributes, drops
-//!   `<script>`, `<style>` (with their content), forms, frames, event
-//!   handlers and comments, allows only `http`, `https`, `mailto` and `tel`
-//!   links, and makes every link open in a new tab with
+//!   `<script>`, `<style>` and `<title>` (with their content), forms,
+//!   frames, event handlers and comments, allows only `http`, `https`,
+//!   `mailto` and `tel` links, and makes every link open in a new tab with
 //!   `rel="noopener noreferrer"`;
-//! - **style attributes** keep only declarations that cannot load or run
-//!   anything (no `url(`, `@import`, `expression`, escapes);
+//! - **style attributes** keep only declarations a real CSS parser shows to
+//!   load and run nothing ([`css`]);
 //! - **images**: remote images lose their `src` unless the member asked to
 //!   see them (and are counted, so the reader can offer "Show images"), and
-//!   tracking pixels (an image of at most 2×2, or one hidden by its style)
-//!   are removed either way. An inline image (`cid:`) shows the message's
-//!   own part as a `data:` URL the caller built; every image left without a
-//!   source shows [`PLACEHOLDER`], so the reader never shows the browser's
-//!   broken-image icon. Those two are the only `data:` sources that leave.
+//!   tracking pixels (an image of at most 2×2, by attribute or style, or
+//!   one hidden by its style) are removed either way. An inline image
+//!   (`cid:`) shows the message's own part as a `data:` URL the caller
+//!   built; every image left without a source shows [`PLACEHOLDER`], so the
+//!   reader never shows the browser's broken-image icon. Those two are the
+//!   only `data:` sources that leave.
+
+pub mod css;
+pub mod styles;
 
 use std::{
     borrow::Cow,
@@ -38,6 +47,9 @@ pub struct Sanitized {
     pub html: String,
     /// Remote images in the message (blocked unless shown).
     pub remote_images: u32,
+    /// The message's `@media` rules, filtered, for the client to apply to
+    /// the frame's document only.
+    pub css: Option<String>,
 }
 
 /// What an image shows when its source is held back or unusable: a light
@@ -57,21 +69,10 @@ pub type InlineImages = HashMap<String, String>;
 /// Tags email layouts use, on top of ammonia's defaults.
 const EXTRA_TAGS: [&str; 2] = ["center", "font"];
 
-/// Presentational attributes allowed on any tag.
-const GENERIC_ATTRIBUTES: [&str; 8] = [
-    "style", "align", "valign", "width", "height", "bgcolor", "dir", "border",
-];
-
-/// Declarations in a `style` attribute that can load or run something, or
-/// hide what they do behind CSS escapes.
-const UNSAFE_CSS: [&str; 7] = [
-    "url(",
-    "image-set(",
-    "@import",
-    "expression",
-    "behavior",
-    "-moz-binding",
-    "\\",
+/// Presentational attributes allowed on any tag. `class` stays so the
+/// message's `@media` rules can match; nothing else reads it.
+const GENERIC_ATTRIBUTES: [&str; 9] = [
+    "style", "align", "valign", "width", "height", "bgcolor", "dir", "border", "class",
 ];
 
 /// What the second pass does with every image source that survived the
@@ -133,17 +134,20 @@ fn content_id(url: &str) -> Option<String> {
 /// `show_remote_images` is set; `cid:` images show their part from `inline`
 /// either way.
 ///
-/// Four steps: ammonia cleans (allow-lists, schemes, links, style
-/// declarations); a best-effort pass drops tracking pixels from its canonical
-/// output; ammonia runs again with the image policy in its attribute filter,
-/// so every `img[src]` the HTML parser sees is counted and, unless shown,
-/// removed, and every `cid:` source becomes its part's `data:` URL; then
-/// every image left without a source gets the placeholder. A last check
-/// strips every image if any source other than those survived a blocked
-/// render.
+/// Five steps: the style sheets are inlined ([`styles::inline`]); ammonia
+/// cleans (allow-lists, schemes, links, style declarations) and the body's
+/// look moves to a wrapper; a best-effort pass drops tracking pixels from
+/// its canonical output; ammonia runs again with the image policy in its
+/// attribute filter, so every `img[src]` the HTML parser sees is counted
+/// and, unless shown, removed, and every `cid:` source becomes its part's
+/// `data:` URL; then every image left without a source gets the
+/// placeholder. A last check strips every image if any source other than
+/// those survived a blocked render.
 pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> Sanitized {
-    let cleaned = builder(None).clean(html).to_string();
-    let without_pixels = drop_tracking_pixels(&cleaned);
+    let inlined = styles::inline(html);
+    let cleaned = builder(None).clean(&inlined.html).to_string();
+    let wrapped = wrap_body(&cleaned, &inlined.body);
+    let without_pixels = drop_tracking_pixels(&wrapped);
     let seen = Arc::new(AtomicU32::new(0));
     let policy = Images {
         show: show_remote_images,
@@ -161,13 +165,40 @@ pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> 
     Sanitized {
         html,
         remote_images: seen.load(Ordering::Relaxed),
+        css: css::media_rules(&inlined.leftover),
     }
+}
+
+/// `html` inside a `div` carrying the message body's `style` and `bgcolor`
+/// (ammonia drops `<body>`), or `html` itself when it had neither. The
+/// values are escaped here and filtered by the next ammonia pass.
+fn wrap_body(html: &str, body: &[(String, String)]) -> String {
+    if body.is_empty() {
+        return html.to_owned();
+    }
+    let attributes: String = body
+        .iter()
+        .map(|(name, value)| format!(r#" {name}="{}""#, escape_attribute(value)))
+        .collect();
+    format!("<div{attributes}>{html}</div>")
+}
+
+/// An attribute value with every character that could end it or start
+/// markup escaped.
+fn escape_attribute(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn builder(images: Option<Images>) -> Builder<'static> {
     let mut builder = Builder::default();
     builder
         .add_tags(EXTRA_TAGS)
+        // A document's `<title>` is not part of what the message says.
+        .add_clean_content_tags(["title"])
         .add_generic_attributes(GENERIC_ATTRIBUTES)
         .add_tag_attributes("img", ["src", "alt", "width", "height"])
         .add_tag_attributes("font", ["color", "face", "size"])
@@ -181,7 +212,7 @@ fn builder(images: Option<Images>) -> Builder<'static> {
         .link_rel(Some("noopener noreferrer"))
         .set_tag_attribute_value("a", "target", "_blank")
         .attribute_filter(move |element, attribute, value| match (element, attribute) {
-            (_, "style") => safe_style(value).map(Cow::Owned),
+            (_, "style") => css::style_attribute(value).map(Cow::Owned),
             ("img", "src") => match &images {
                 None => Some(Cow::Borrowed(value)),
                 Some(images) => images.source(value),
@@ -190,21 +221,6 @@ fn builder(images: Option<Images>) -> Builder<'static> {
             _ => Some(Cow::Borrowed(value)),
         });
     builder
-}
-
-/// The declarations of a `style` attribute that are safe to keep, or `None`
-/// when none are.
-fn safe_style(style: &str) -> Option<String> {
-    let kept: Vec<&str> = style
-        .split(';')
-        .map(str::trim)
-        .filter(|declaration| !declaration.is_empty())
-        .filter(|declaration| {
-            let lower = declaration.to_ascii_lowercase();
-            !UNSAFE_CSS.iter().any(|bad| lower.contains(bad))
-        })
-        .collect();
-    (!kept.is_empty()).then(|| kept.join("; "))
 }
 
 /// An `<img>` tag as ammonia serialises it: lower-case attribute names,
@@ -282,25 +298,49 @@ fn attribute<'a>(attributes: &[(&str, &'a str)], name: &str) -> Option<&'a str> 
 }
 
 /// An image too small to see, or hidden: there to report that the message
-/// was opened.
+/// was opened. Read from its attributes and its (already filtered) style.
 fn is_tracking_pixel(attributes: &[(&str, &str)]) -> bool {
-    let tiny = |name: &str| {
-        attribute(attributes, name).is_some_and(|value| {
-            value
-                .trim()
-                .trim_end_matches("px")
-                .parse::<f32>()
-                .is_ok_and(|n| n <= 2.0)
-        })
+    let style = attribute(attributes, "style")
+        .map(css::declarations)
+        .unwrap_or_default();
+    let declared = |name: &str| {
+        style
+            .iter()
+            .rev()
+            .find(|d| d.name == name)
+            .map(|d| d.value.to_ascii_lowercase())
     };
-    let hidden = attribute(attributes, "style").is_some_and(|style| {
-        let style = style.to_ascii_lowercase().replace(' ', "");
-        style.contains("display:none")
-            || style.contains("visibility:hidden")
-            || style.contains("opacity:0;")
-            || style.ends_with("opacity:0")
-    });
-    (tiny("width") && tiny("height")) || hidden
+    let tiny = |name: &str| {
+        attribute(attributes, name).is_some_and(tiny_length)
+            || declared(name).is_some_and(|value| tiny_length(&value))
+    };
+    let zero =
+        |name: &str| declared(name).is_some_and(|value| length(&value).is_some_and(|n| n <= 0.0));
+    let hidden = declared("display").is_some_and(|v| keyword(&v) == "none")
+        || declared("visibility").is_some_and(|v| matches!(keyword(&v), "hidden" | "collapse"))
+        || declared("opacity").is_some_and(|v| length(&v).is_some_and(|n| n <= 0.01));
+    (tiny("width") && tiny("height")) || hidden || zero("max-width") || zero("max-height")
+}
+
+/// A value without `!important`, trimmed.
+fn keyword(value: &str) -> &str {
+    value.trim().trim_end_matches("!important").trim()
+}
+
+/// A length in pixels (or a plain number), if `value` is one.
+fn length(value: &str) -> Option<f32> {
+    let value = keyword(value).to_ascii_lowercase();
+    let number = value.strip_suffix("px").unwrap_or(&value).trim();
+    number.parse::<f32>().ok().or_else(|| {
+        // Any zero length is zero, whatever its unit.
+        let digits = value.trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%');
+        digits.parse::<f32>().ok().filter(|n| *n == 0.0)
+    })
+}
+
+/// At most 2 px.
+fn tiny_length(value: &str) -> bool {
+    length(value).is_some_and(|n| n <= 2.0)
 }
 
 #[cfg(test)]

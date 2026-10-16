@@ -11,6 +11,10 @@ publish.workspace = true
 [dependencies]
 # Sanitising email HTML bodies (`domain::sanitize`).
 ammonia.workspace = true
+# Inlining their style sheets and filtering their CSS (`domain::sanitize`).
+css-inline.workspace = true
+cssparser.workspace = true
+html5ever.workspace = true
 axum.workspace = true
 # Opaque list cursors.
 base64.workspace = true
