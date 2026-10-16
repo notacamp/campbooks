@@ -30,7 +30,7 @@ rules come about.
 
 #### Scenario: A rule naming a public suffix
 - **WHEN** a rule is listed with `state` `paused` and `paused_reason` `domain_too_broad`
-- **THEN** its line starts "Paused: it names a whole group of sites, so it matches nothing. Remove it" and Remove is offered
+- **THEN** its line starts "Paused: its domain is too broad" and Remove is offered
 
 ### Requirement: Keeping, turning down and removing a rule
 A proposed rule SHALL offer Keep this rule (`conversations.confirm_rule`) and

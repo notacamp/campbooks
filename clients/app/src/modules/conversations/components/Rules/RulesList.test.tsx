@@ -209,7 +209,7 @@ describe("the rules list", () => {
     expect(within(mine).queryByText(/can no longer change this inbox/u)).toBeNull();
   });
 
-  it("says a rule naming a whole group of sites matches nothing", async () => {
+  it("says a rule naming a public suffix is too broad", async () => {
     const broad = {
       ...LEDGER_RULE,
       state: "paused" as const,
@@ -222,6 +222,6 @@ describe("the rules list", () => {
     });
     renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
     const mine = await screen.findByRole("list", { name: INBOX.address });
-    expect(within(mine).getByText(/^Paused: it names a whole group of sites/u)).toBeVisible();
+    expect(within(mine).getByText(/^Paused: its domain is too broad/u)).toBeVisible();
   });
 });
