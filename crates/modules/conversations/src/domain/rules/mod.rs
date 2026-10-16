@@ -409,6 +409,20 @@ impl TryFrom<RuleRow> for Stored {
     }
 }
 
+/// Lock rule `id`'s row (after its runs: `rule_runs::lock_running`) and
+/// return its state as it is now, so a check on it holds until the
+/// transaction ends.
+pub async fn lock_state(conn: &mut PgConnection, id: RuleId) -> Result<Option<RuleState>> {
+    sqlx::query_scalar!(
+        "SELECT state FROM conversations.rules WHERE id = $1 FOR UPDATE",
+        id as RuleId,
+    )
+    .fetch_optional(conn)
+    .await?
+    .map(|state| state.parse())
+    .transpose()
+}
+
 /// Rule `id`, if it exists in the transaction's workspace (not removed).
 pub async fn find(conn: &mut PgConnection, id: RuleId) -> Result<Option<Stored>> {
     Ok(find_any(conn, id)

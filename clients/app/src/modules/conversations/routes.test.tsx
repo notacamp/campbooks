@@ -140,6 +140,38 @@ describe("the inbox", () => {
     });
   });
 
+  it("shows a kept inbox's mail as read-only history, with nothing to act on", async () => {
+    const api = inbox({
+      [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, read_only: true }] } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(await within(reader).findByText("Kept as history")).toBeVisible();
+    for (const name of [/^Done/u, /^Reply/u, /^Star/u]) {
+      expect(within(reader).queryByRole("button", { name })).toBeNull();
+    }
+    fireEvent.keyDown(document, { key: "e" });
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/read`,
+    );
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/archive`,
+    );
+  });
+
+  it("offers nothing to act on until it knows the inbox can be written", async () => {
+    const api = inbox({ [`GET ${W}/inboxes`]: { status: 503 } });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(await within(reader).findByRole("heading", { name: Q4.subject })).toBeVisible();
+    expect(within(reader).queryByRole("button", { name: /^Done/u })).toBeNull();
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/read`,
+    );
+  });
+
   it("archives with E and takes it back with Z", async () => {
     const api = inbox();
     renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);

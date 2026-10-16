@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { HELD_GRANT } from "../../../../../test/demo/identity";
 import { DUARTE } from "../../../../../test/demo/workspaces";
@@ -12,7 +12,12 @@ const DISCARD = `DELETE /bff/api/v1/identity/held-grants/${HELD_GRANT.id}`;
 
 function renderOffer() {
   return renderWithProviders(
-    <MailboxOffer grant={HELD_GRANT} workspaceId={DUARTE.id} workspaceName={DUARTE.name} />,
+    <MailboxOffer
+      grant={HELD_GRANT}
+      workspaceId={DUARTE.id}
+      workspaceName={DUARTE.name}
+      other={{ href: `/w/${DUARTE.id}/settings/mailboxes`, onClick: vi.fn() }}
+    />,
   );
 }
 
@@ -23,6 +28,10 @@ describe("MailboxOffer", () => {
 
     expect(screen.getByRole("heading", { name: "Connect ana@example.com" })).toBeVisible();
     expect(screen.getByText("Waiting until October 20")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Connect a different mailbox" })).toHaveAttribute(
+      "href",
+      `/w/${DUARTE.id}/settings/mailboxes`,
+    );
     fireEvent.click(screen.getByRole("button", { name: "Connect" }));
 
     await waitFor(() => {

@@ -51,7 +51,11 @@
     "older_one": "{{count}} message plus ancien",
     "older_other": "{{count}} messages plus anciens",
     "showOlder": "Afficher",
-    "attachments": "Pièces jointes"
+    "attachments": "Pièces jointes",
+    "kept": {
+      "title": "Gardée comme historique",
+      "lead": "{{address}} a été déconnectée et ses e-mails sont gardés ici, en lecture seule : rien de nouveau n’arrive, et rien ne peut être envoyé ni modifié depuis cette boîte."
+    }
   },
   "actions": {
     "star": "Suivre",

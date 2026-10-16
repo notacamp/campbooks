@@ -13,6 +13,7 @@ export const INBOX = {
   address: "sam.rivera@example.com",
   display_name: "Sam Rivera",
   role: "manager",
+  read_only: false,
   unread_count: 3,
 } as const;
 

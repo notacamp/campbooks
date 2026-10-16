@@ -1,4 +1,4 @@
--- Validate the checks `…120000_conversations__taught_rules` widened NOT VALID.
+-- Validate the checks `…160000_conversations__taught_rules` widened NOT VALID.
 -- (campbooks-cloud#125) A migration of its own, so it runs in a transaction
 -- of its own: VALIDATE CONSTRAINT takes only SHARE UPDATE EXCLUSIVE, so
 -- reads and writes go on while it scans the rows.

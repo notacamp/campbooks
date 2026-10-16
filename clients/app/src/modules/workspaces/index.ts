@@ -6,6 +6,6 @@ export {
   SIGNUPS_ADMIN_SECTION,
   WORKSPACES_ADMIN_SECTION,
 } from "./admin";
-export { useMembers, useWorkspaces, type Workspace } from "./api/queries";
+export { useMembers, useWorkspaces, type Member, type Workspace } from "./api/queries";
 export { buildWorkspacesRoutes } from "./routes";
 export { WORKSPACES_SHORTCUTS } from "./shortcuts";

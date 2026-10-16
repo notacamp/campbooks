@@ -59,7 +59,11 @@ export function useDraft(workspaceId: string, draftId: string | undefined) {
   });
 }
 
-/** `conversations.list_inboxes`: where the caller may send from (sender and manager roles). */
+/**
+ * `conversations.list_inboxes`: where the caller may send from (sender and
+ * manager roles), never an inbox kept read-only after its mailbox was
+ * disconnected.
+ */
 export function useSendingInboxes(workspaceId: string) {
   return useQuery({
     queryKey: draftKeys.inboxes(workspaceId),
@@ -71,7 +75,9 @@ export function useSendingInboxes(workspaceId: string) {
         }),
       ).inboxes,
     select: (inboxes) =>
-      inboxes.filter((inbox) => inbox.role === "sender" || inbox.role === "manager"),
+      inboxes.filter(
+        (inbox) => !inbox.read_only && (inbox.role === "sender" || inbox.role === "manager"),
+      ),
   });
 }
 

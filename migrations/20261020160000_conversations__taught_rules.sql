@@ -9,7 +9,7 @@ SET LOCAL lock_timeout = '5s';
 -- A rule may place a conversation and answer the decide pass's questions.
 -- The widened checks are added NOT VALID: swapping them takes the tables'
 -- exclusive lock only for a moment. They are validated by the next migration
--- (`…120001_conversations__taught_rules_validate`), in a transaction of its
+-- (`…160001_conversations__taught_rules_validate`), in a transaction of its
 -- own, so the rows are checked under SHARE UPDATE EXCLUSIVE alone; here, the
 -- exclusive lock would be held through the scans until this one commits.
 ALTER TABLE conversations.conversations DROP CONSTRAINT conversations_stream_source_check;
@@ -32,7 +32,7 @@ ALTER TABLE conversations.needs ADD CONSTRAINT needs_cleared_because_check
 -- rule preview or run in their inbox works it out.
 ALTER TABLE conversations.messages ADD COLUMN subject_template text;
 -- Older mail still to get one has an index built concurrently by
--- `…120050_conversations__taught_rules_messages_template_missing_index`.
+-- `…160050_conversations__taught_rules_messages_template_missing_index`.
 
 CREATE TABLE conversations.rules (
     id uuid PRIMARY KEY,

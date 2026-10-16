@@ -28,6 +28,7 @@ export const CONNECTION: Schema<"ConnectionView"> = {
   health: "ok",
   health_changed_at: "2026-10-13T09:00:00Z",
   health_reason: null,
+  granted_by_you: true,
   streams: [],
   created_at: "2026-10-13T09:00:00Z",
 };
@@ -41,6 +42,8 @@ export const GOOGLE_WAY_IN: Schema<"WayIn"> = {
   linked_via: "sign_up",
   linked_at: "2026-10-01T09:00:00Z",
   last_used_at: "2026-10-13T08:30:00Z",
+  mailboxes: 0,
+  connections: [],
 };
 
 export const ZOHO_WAY_IN: Schema<"WayIn"> = {
@@ -51,9 +54,41 @@ export const ZOHO_WAY_IN: Schema<"WayIn"> = {
   linked_via: "link",
   linked_at: "2026-10-12T15:00:00Z",
   last_used_at: null,
+  mailboxes: 0,
+  connections: [],
 };
 
 export const ALL_PROVIDERS = ["google", "microsoft", "zoho"] as const;
+
+/** Ana's Zoho Mail mailbox in Duarte & Pessoa, waiting for her to sign in again. */
+export const ZOHO_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c2",
+  provider: "zoho",
+  address: "ana.duarte@example.net",
+  health: "needs_reauth",
+  health_reason: "grant_revoked",
+};
+
+/** The shop's shared mailbox Ana connected without signing in with it. */
+export const SHARED_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c4",
+  address: "loja@example.com",
+  display_name: "Loja Duarte & Pessoa",
+};
+
+/** Sofia's Gmail mailbox, paused by Gmail for a few minutes. */
+export const SOFIA_CONNECTION: Schema<"ConnectionView"> = {
+  ...CONNECTION,
+  id: "0192f1a0-0000-7000-8000-0000000000c3",
+  address: "sofia@example.com",
+  display_name: "Sofia Pessoa",
+  granted_by: "0192f1a0-0000-7000-8000-0000000000a2",
+  granted_by_you: false,
+  health: "throttled",
+  health_reason: "rate_limited",
+};
 
 /** A request an MCP agent made: unverified, on this device, bound to a workspace. */
 export const AGENT_CONSENT: Schema<"ConsentRequest"> = {

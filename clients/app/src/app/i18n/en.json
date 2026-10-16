@@ -48,9 +48,8 @@
     "title": "Nothing needs you yet",
     "subline": "When Campbooks has something for you, it shows up here.",
     "connectTitle": "Connect your mail",
-    "connectLead": "Campbooks will read your mail and bring what needs you to this page. Connecting a mailbox from here is still being built.",
+    "connectLead": "Campbooks reads your mail and brings what needs you to this page. Connect a mailbox to start.",
     "connect": "Connect your mail",
-    "soon": "Coming soon",
     "context": "Getting started",
     "start": "Getting started",
     "invite": "Invite the people you work with",
@@ -75,5 +74,11 @@
     "reauthAction": "Sign in again",
     "unreachableTitle": "Can’t open administration",
     "unreachableLead": "The server didn’t answer. Check your connection, then try again."
+  },
+  "settings": {
+    "sections": "Settings sections",
+    "members": "Members",
+    "mailboxes": "Mailboxes",
+    "waysIn": "Ways to sign in"
   }
 }

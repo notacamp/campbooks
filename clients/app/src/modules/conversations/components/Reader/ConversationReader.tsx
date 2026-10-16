@@ -5,6 +5,7 @@ import { errorStatus } from "~/lib/api";
 import { useShortcut } from "~/lib/shortcuts";
 import {
   ActionBar,
+  Banner,
   Button,
   EmptyState,
   focusNextAttachment,
@@ -19,7 +20,12 @@ import {
   Spacer,
 } from "~/lib/ui";
 
-import { useConversation, type ConversationSummary, type Stream } from "../../api/queries";
+import {
+  useConversation,
+  useInboxes,
+  type ConversationSummary,
+  type Stream,
+} from "../../api/queries";
 import {
   avatarKind,
   displayName,
@@ -76,7 +82,7 @@ export function ConversationReader({
   onPrevious,
   onNext,
   onDone,
-  renderReplySlot,
+  renderReplySlot: replySlot,
   startReply = false,
   now,
 }: ConversationReaderProps) {
@@ -87,11 +93,21 @@ export function ConversationReader({
   const detail = query.data;
   const conversation = detail?.conversation;
   const needActions = useNeedActions(workspaceId);
+  // An inbox kept as history after its mailbox was disconnected (or one you
+  // only read): nothing is written to it or sent from it, so no action is
+  // offered (the server would answer `inbox_read_only`).
+  const inbox = useInboxes(workspaceId).data?.find(
+    (candidate) => candidate.id === conversation?.inbox_id,
+  );
+  const kept = inbox?.read_only === true;
+  // Until the inbox is known (or if it can't be), nothing is offered.
+  const writable = inbox !== undefined && !kept && inbox.role !== "reader";
+  const renderReplySlot = writable ? replySlot : undefined;
+  const need = writable ? (conversation?.need ?? undefined) : undefined;
   const ruleActions = useRuleActions(workspaceId);
   // While a teach-once offer or question is up, it holds the choice keys:
   // the reader's own choices stay clickable but unbound and unhinted.
   const offering = useTeachOnce()?.offering ?? false;
-  const need = conversation?.need ?? undefined;
   const ruleMark = conversation?.rule ?? undefined;
   // Only whoever may change the rule (its author, a manager) may stop it.
   const stoppable = ruleMark?.may_change === true;
@@ -123,19 +139,20 @@ export function ConversationReader({
   useEffect(() => {
     if (
       conversation !== undefined &&
+      writable &&
       conversation.unread_count > 0 &&
       readOnce.current !== conversation.id
     ) {
       readOnce.current = conversation.id;
       actions.markRead(conversation);
     }
-  }, [conversation, actions]);
+  }, [conversation, actions, writable]);
 
   const messages = detail?.messages ?? [];
   const open = new Set([...openByDefault(messages), ...opened]);
   const newest = messages.at(-1);
-  const suggestion = conversation?.suggestion ?? undefined;
-  const active = conversation !== undefined;
+  const suggestion = writable ? (conversation?.suggestion ?? undefined) : undefined;
+  const active = conversation !== undefined && writable;
 
   const askReply = (mode: ReplyMode) => {
     if (newest === undefined) {
@@ -196,13 +213,14 @@ export function ConversationReader({
     },
     { enabled: active },
   );
-  useShortcut("inbox.show_images", showAllImages, { enabled: active });
+  const viewing = conversation !== undefined;
+  useShortcut("inbox.show_images", showAllImages, { enabled: viewing });
   useShortcut(
     "inbox.next_attachment",
     () => {
       focusNextAttachment();
     },
-    { enabled: active },
+    { enabled: viewing },
   );
   useShortcut("overlay.close", onBack, { enabled: !moving });
   // J/K step between conversations; the arrows keep scrolling this one.
@@ -362,42 +380,46 @@ export function ConversationReader({
     <>
       <PaneHeader>
         {back}
-        <span className="flex max-md:hidden">
-          <Button
-            icon="archive"
-            shortcut="item.done"
-            onClick={() => {
-              onDone(conversation);
-            }}
-          >
-            {tShortcuts("item.done")}
-          </Button>
-        </span>
-        <IconButton
-          label={conversation.starred ? t("actions.unstar") : t("actions.star")}
-          icon={conversation.starred ? "star-filled" : "star"}
-          shortcut="conversations.star"
-          aria-pressed={conversation.starred}
-          onClick={() => {
-            actions.toggleStar(conversation);
-          }}
-        />
-        <IconButton
-          label={unread ? t("actions.read") : t("actions.unread")}
-          icon={unread ? "check" : "unread"}
-          shortcut="conversations.mark_unread"
-          onClick={() => {
-            actions.toggleRead(conversation);
-          }}
-        />
-        <MovePicker
-          current={conversation.stream}
-          open={moving}
-          onOpenChange={setMoving}
-          onMove={(target) => {
-            actions.move(conversation, target);
-          }}
-        />
+        {writable ? (
+          <>
+            <span className="flex max-md:hidden">
+              <Button
+                icon="archive"
+                shortcut="item.done"
+                onClick={() => {
+                  onDone(conversation);
+                }}
+              >
+                {tShortcuts("item.done")}
+              </Button>
+            </span>
+            <IconButton
+              label={conversation.starred ? t("actions.unstar") : t("actions.star")}
+              icon={conversation.starred ? "star-filled" : "star"}
+              shortcut="conversations.star"
+              aria-pressed={conversation.starred}
+              onClick={() => {
+                actions.toggleStar(conversation);
+              }}
+            />
+            <IconButton
+              label={unread ? t("actions.read") : t("actions.unread")}
+              icon={unread ? "check" : "unread"}
+              shortcut="conversations.mark_unread"
+              onClick={() => {
+                actions.toggleRead(conversation);
+              }}
+            />
+            <MovePicker
+              current={conversation.stream}
+              open={moving}
+              onOpenChange={setMoving}
+              onMove={(target) => {
+                actions.move(conversation, target);
+              }}
+            />
+          </>
+        ) : null}
         {replyButtons}
         {renderReplySlot === undefined ? null : (
           // Phones: Reply is in the floating bar; these two stay in the header.
@@ -448,7 +470,11 @@ export function ConversationReader({
             ]}
           />
         </div>
-        {need === undefined ? (
+        {kept ? (
+          <Banner icon="archive" role="status" title={t("reader.kept.title")}>
+            {t("reader.kept.lead", { address: inbox.address })}
+          </Banner>
+        ) : need === undefined ? (
           <Note
             key={conversation.id}
             label={t("scout.label")}
@@ -578,7 +604,7 @@ export function ConversationReader({
         {renderReplySlot?.(replyContext)}
       </ReaderBody>
       {/* While the composer is open it owns the bottom of the screen. */}
-      {reply === null ? (
+      {reply === null && writable ? (
         <ActionBar label={t("reader.actions")} phoneOnly aboveTabBar>
           {renderReplySlot === undefined ? null : (
             <Button

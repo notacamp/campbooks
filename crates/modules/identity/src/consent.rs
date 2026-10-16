@@ -45,6 +45,9 @@ impl ConsentDoor for FrontDoor {
                     workspace_id: Some(request.workspace),
                     connection_id: request.connection,
                     return_to: None,
+                    // As before the choice existed: the account becomes a
+                    // way in. The Mailboxes screen asks first.
+                    sign_in: None,
                 },
             )
             .await?;
