@@ -25,8 +25,11 @@
     "empty": "Nothing matches “{{query}}”",
     "results": "Commands",
     "ask": "Ask Campbooks: {{query}}",
-    "askGroup": "Ask or search",
-    "search": "Search conversations for “{{query}}”"
+    "askGroup": "Ask",
+    "hintMove": "Move",
+    "hintOpen": "Open",
+    "hintAll": "All results",
+    "hintClose": "Close"
   },
   "shortcutSheet": {
     "title": "Keyboard shortcuts"

@@ -1,4 +1,12 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 
 import { useShortcutDefinitions, useShortcuts, type ShortcutId } from "~/lib/shortcuts";
@@ -6,6 +14,8 @@ import { useShortcutDefinitions, useShortcuts, type ShortcutId } from "~/lib/sho
 import { Overlay } from "../../internal/Overlay";
 import { useTranslateKey } from "../../internal/translate-key";
 import { Kbd, KbdHint } from "../Kbd/Kbd";
+import { SearchFieldChips, type SearchFieldChip } from "../SearchField/SearchField";
+import { Text } from "../Typography/Typography";
 import { Visor } from "../Visor/Visor";
 
 import styles from "./CommandMenu.module.css";
@@ -20,6 +30,41 @@ export interface Command {
   onSelect: () => void;
 }
 
+/** One row of an extra section. Plain text by default; `render` draws it itself. */
+export interface MenuOption {
+  id: string;
+  label: string;
+  /** Runs on ↵ or a click, after the menu closes. */
+  onSelect: () => void;
+  /** Stay open after it runs (a suggestion that fills the field). */
+  keepOpen?: boolean | undefined;
+  /**
+   * Draw the row: it must be an `option` with this `id`, `aria-selected` from
+   * `selected`, and call `select` when clicked.
+   */
+  render?: ((row: { id: string; selected: boolean; select: () => void }) => ReactNode) | undefined;
+}
+
+/** What a screen adds above the commands, driven by what is typed. */
+export interface MenuSection {
+  /** Heading of its rows. */
+  group: string;
+  /** Rows, first in the one keyboard order (↑ ↓ ↵ run across every group). */
+  options: MenuOption[];
+  /** Under the heading, above the rows: notes, a loading state, a problem. */
+  status?: ReactNode;
+  /** Filters understood from the query, removable, under the input. */
+  chips?: readonly SearchFieldChip[] | undefined;
+  /** ⌘↵ with a query: close and show everything. */
+  onSubmitAll?: (() => void) | undefined;
+}
+
+/** What a section hook is given: the query, and a way to rewrite it. */
+export interface MenuQuery {
+  query: string;
+  setQuery: (query: string) => void;
+}
+
 export interface CommandMenuProps {
   open: boolean;
   onClose: () => void;
@@ -27,8 +72,12 @@ export interface CommandMenuProps {
   commands?: Command[] | undefined;
   /** Offered as the last row while there is a query: hand it to the assistant. */
   onAsk?: ((query: string) => void) | undefined;
-  /** Offered next to Ask while there is a query: search conversations for it. */
-  onSearch?: ((query: string) => void) | undefined;
+  /**
+   * A hook returning the section listed above the commands (conversation
+   * hits). Called on every render of the open menu, so it must be a stable,
+   * module-level function; return `undefined` for no section.
+   */
+  useSection?: ((menu: MenuQuery) => MenuSection | undefined) | undefined;
 }
 
 /** Hidden from the menu: they open or close menus themselves. */
@@ -40,17 +89,21 @@ const fold = (text: string) =>
     .replaceAll(/\p{Diacritic}/gu, "")
     .toLocaleLowerCase();
 
+const noSection = (): undefined => undefined;
+
 /**
- * ⌘K: search every command that is live right now (each shortcut with a
+ * ⌘K or `/`: search every command that is live right now (each shortcut with a
  * bound handler, from the registry) plus this screen's own commands, run one
- * with ↑ ↓ ↵, or ask the assistant.
+ * with ↑ ↓ ↵, or ask the assistant. A screen can add one more section of
+ * rows above them (`useSection`, e.g. matching conversations) that shares the
+ * same cursor.
  */
-export function CommandMenu({ open, onClose, commands = [], onAsk, onSearch }: CommandMenuProps) {
+export function CommandMenu({ open, onClose, commands = [], onAsk, useSection }: CommandMenuProps) {
   const { t } = useTranslation("ui");
   return (
     <Overlay open={open} onClose={onClose} label={t("commandMenu.label")}>
       {/* Mounted only while open, so every opening starts with an empty query. */}
-      <MenuContent onClose={onClose} commands={commands} onAsk={onAsk} onSearch={onSearch} />
+      <MenuContent onClose={onClose} commands={commands} onAsk={onAsk} useSection={useSection} />
     </Overlay>
   );
 }
@@ -59,12 +112,12 @@ function MenuContent({
   onClose,
   commands,
   onAsk,
-  onSearch,
+  useSection,
 }: {
   onClose: () => void;
   commands: Command[];
   onAsk: ((query: string) => void) | undefined;
-  onSearch: ((query: string) => void) | undefined;
+  useSection: ((menu: MenuQuery) => MenuSection | undefined) | undefined;
 }) {
   const { t } = useTranslation("ui");
   const translate = useTranslateKey();
@@ -74,6 +127,17 @@ function MenuContent({
   const [active, setActive] = useState(0);
   const listId = useId();
   const list = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const useExtra = useSection ?? noSection;
+  const section = useExtra({
+    query,
+    setQuery: (next) => {
+      setQuery(next);
+      setActive(0);
+    },
+  });
+  const extra = section?.options ?? [];
+  const typed = query.trim();
 
   const all = useMemo<Command[]>(() => {
     const fromRegistry = definitions
@@ -87,21 +151,8 @@ function MenuContent({
           registry.run(definition.id);
         },
       }));
-    const typed = query.trim();
-    const ask: Command[] = [
-      ...(onSearch !== undefined && typed !== ""
-        ? [
-            {
-              id: "search",
-              label: t("commandMenu.search", { query: typed }),
-              group: t("commandMenu.askGroup"),
-              onSelect: () => {
-                onSearch(typed);
-              },
-            },
-          ]
-        : []),
-      ...(onAsk !== undefined && typed !== ""
+    const ask: Command[] =
+      onAsk !== undefined && typed !== ""
         ? [
             {
               id: "ask",
@@ -112,28 +163,36 @@ function MenuContent({
               },
             },
           ]
-        : []),
-    ];
-    const needle = fold(query.trim());
+        : [];
+    const needle = fold(typed);
     const matches = [...commands, ...fromRegistry].filter((command) =>
       fold(command.label).includes(needle),
     );
     return [...matches, ...ask];
-  }, [definitions, isBound, translate, registry, commands, onAsk, onSearch, query, t]);
+  }, [definitions, isBound, translate, registry, commands, onAsk, typed, t]);
 
-  const groups = useMemo(() => {
-    const byGroup = new Map<string, { command: Command; index: number }[]>();
-    for (const [index, command] of all.entries()) {
-      byGroup.set(command.group, [...(byGroup.get(command.group) ?? []), { command, index }]);
-    }
-    return [...byGroup];
-  }, [all]);
+  // One cursor over everything: the section's rows, then the commands.
+  const byGroup = new Map<string, { command: Command; index: number }[]>();
+  for (const [position, command] of all.entries()) {
+    const index = extra.length + position;
+    byGroup.set(command.group, [...(byGroup.get(command.group) ?? []), { command, index }]);
+  }
+  const groups = [...byGroup];
 
-  const activeIndex = Math.min(active, Math.max(all.length - 1, 0));
+  const total = extra.length + all.length;
+  const activeIndex = Math.min(active, Math.max(total - 1, 0));
   const optionId = (index: number) => `${listId}-option-${String(index)}`;
 
   const run = (index: number) => {
-    const command = all[index];
+    const option = extra[index];
+    if (option !== undefined) {
+      if (option.keepOpen !== true) {
+        onClose();
+      }
+      option.onSelect();
+      return;
+    }
+    const command = all[index - extra.length];
     if (command === undefined) {
       return;
     }
@@ -145,28 +204,34 @@ function MenuContent({
     runRef.current = run;
   });
 
+  const activeId = optionId(activeIndex);
+  useEffect(() => {
+    const element: { scrollIntoView?: (options: ScrollIntoViewOptions) => void } | null =
+      document.getElementById(activeId);
+    element?.scrollIntoView?.({ block: "nearest" });
+  }, [activeId, total]);
+
   // Pointer selection is delegated to the listbox (options are not focusable:
-  // focus stays in the input, as the combobox pattern requires).
+  // focus stays in the input, as the combobox pattern requires). A section
+  // draws its own rows and handles their clicks itself; hovering still moves
+  // the cursor.
   useEffect(() => {
     const element = list.current;
     if (element === null) {
       return;
     }
-    const indexOf = (event: Event) => {
-      const option =
-        event.target instanceof Element ? event.target.closest<HTMLElement>("[data-index]") : null;
-      return option === null ? null : Number(option.dataset["index"]);
-    };
+    const optionOf = (event: Event) =>
+      event.target instanceof Element ? event.target.closest<HTMLElement>("[data-index]") : null;
     const onClick = (event: MouseEvent) => {
-      const index = indexOf(event);
-      if (index !== null) {
-        runRef.current(index);
+      const option = optionOf(event);
+      if (option !== null && option.dataset["own"] === undefined) {
+        runRef.current(Number(option.dataset["index"]));
       }
     };
     const onMove = (event: MouseEvent) => {
-      const index = indexOf(event);
-      if (index !== null) {
-        setActive(index);
+      const option = optionOf(event);
+      if (option !== null) {
+        setActive(Number(option.dataset["index"]));
       }
     };
     element.addEventListener("click", onClick);
@@ -177,18 +242,57 @@ function MenuContent({
     };
   }, []);
 
+  const move = (by: number) => {
+    setActive((activeIndex + by + Math.max(total, 1)) % Math.max(total, 1));
+  };
+  const onKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.nativeEvent.isComposing) {
+      return;
+    }
+    const key = event.key.toLowerCase();
+    if (key === "arrowdown" || (event.ctrlKey && key === "j")) {
+      event.preventDefault();
+      move(1);
+    } else if (key === "arrowup" || (event.ctrlKey && key === "k")) {
+      event.preventDefault();
+      move(-1);
+    } else if (key === "enter") {
+      event.preventDefault();
+      if ((event.metaKey || event.ctrlKey) && section?.onSubmitAll !== undefined) {
+        if (typed !== "") {
+          onClose();
+          section.onSubmitAll();
+        }
+      } else {
+        run(activeIndex);
+      }
+    }
+  };
+
+  const chips = (section?.chips ?? []).map((chip) => ({
+    ...chip,
+    onRemove: () => {
+      chip.onRemove();
+      setActive(0);
+      // The chip is gone: keep typing and the arrow keys where they were.
+      input.current?.focus();
+    },
+  }));
+  const hasStatus = section?.status !== undefined && section.status !== null;
+
   return (
     <>
       <div className={styles["inputRow"]}>
         <Visor size="md" />
         <input
+          ref={input}
           data-autofocus
           className={styles["input"]}
           role="combobox"
           aria-expanded="true"
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={all.length > 0 ? optionId(activeIndex) : undefined}
+          aria-activedescendant={total > 0 ? activeId : undefined}
           aria-label={t("commandMenu.placeholder")}
           placeholder={t("commandMenu.placeholder")}
           value={query}
@@ -196,30 +300,15 @@ function MenuContent({
             setQuery(event.target.value);
             setActive(0);
           }}
-          onKeyDown={(event) => {
-            const count = Math.max(all.length, 1);
-            switch (event.key) {
-              case "ArrowDown": {
-                event.preventDefault();
-                setActive((activeIndex + 1) % count);
-                break;
-              }
-              case "ArrowUp": {
-                event.preventDefault();
-                setActive((activeIndex - 1 + count) % count);
-                break;
-              }
-              case "Enter": {
-                event.preventDefault();
-                run(activeIndex);
-                break;
-              }
-              default:
-            }
-          }}
+          onKeyDown={onKeyDown}
         />
         <Kbd>Esc</Kbd>
       </div>
+      {chips.length === 0 ? null : (
+        <div className={styles["chips"]}>
+          <SearchFieldChips chips={chips} />
+        </div>
+      )}
       <div
         ref={list}
         id={listId}
@@ -227,7 +316,38 @@ function MenuContent({
         role="listbox"
         aria-label={t("commandMenu.results")}
       >
-        {all.length === 0 ? (
+        {section === undefined ? null : (
+          <div role="group" aria-label={section.group}>
+            <div className={styles["groupLabel"]} aria-hidden="true">
+              {section.group}
+            </div>
+            {section.status}
+            {extra.map((option, index) => (
+              <div key={option.id} data-index={index} data-own={option.render ? "" : undefined}>
+                {option.render === undefined ? (
+                  <div
+                    id={optionId(index)}
+                    className={styles["option"]}
+                    role="option"
+                    aria-selected={index === activeIndex}
+                    tabIndex={-1}
+                  >
+                    <span className={styles["label"]}>{option.label}</span>
+                  </div>
+                ) : (
+                  option.render({
+                    id: optionId(index),
+                    selected: index === activeIndex,
+                    select: () => {
+                      run(index);
+                    },
+                  })
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {all.length === 0 && extra.length === 0 && !hasStatus ? (
           <p className={styles["empty"]}>{t("commandMenu.empty", { query })}</p>
         ) : (
           groups.map(([group, entries]) => (
@@ -255,6 +375,24 @@ function MenuContent({
           ))
         )}
       </div>
+      <div className={styles["footer"]}>
+        <Hint keys="arrowup" extra="arrowdown" label={t("commandMenu.hintMove")} />
+        <Hint keys="enter" label={t("commandMenu.hintOpen")} />
+        {section?.onSubmitAll === undefined ? null : (
+          <Hint keys="mod+enter" label={t("commandMenu.hintAll")} />
+        )}
+        <Hint keys="escape" label={t("commandMenu.hintClose")} />
+      </div>
     </>
+  );
+}
+
+function Hint({ keys, extra, label }: { keys: string; extra?: string; label: string }) {
+  return (
+    <Text as="span" size="xs" tone="tertiary" className={styles["hint"]}>
+      <KbdHint keys={keys} />
+      {extra === undefined ? null : <KbdHint keys={extra} />}
+      {label}
+    </Text>
   );
 }

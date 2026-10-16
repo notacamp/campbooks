@@ -71,6 +71,9 @@ export {
   CommandMenu,
   type Command,
   type CommandMenuProps,
+  type MenuOption,
+  type MenuQuery,
+  type MenuSection,
 } from "./components/CommandMenu/CommandMenu";
 export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
