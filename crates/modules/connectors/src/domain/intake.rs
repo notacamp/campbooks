@@ -8,8 +8,8 @@ use campbooks_kernel::{
     AppState, Error,
     auth::{Principal, PrincipalKind},
     connections::{
-        AdoptFuture, GrantIntake, GrantIntakePort, ProviderGrant as Grant, ReconnectTarget,
-        TargetFuture,
+        AdoptFuture, ConnectionOfFuture, GrantIntake, GrantIntakePort, ProviderGrant as Grant,
+        ReconnectTarget, TargetFuture,
     },
     db::BeginFor as _,
     tenancy::{Access, UserId, WorkspaceId},
@@ -154,6 +154,42 @@ impl GrantIntake for Intake {
                 account_subject: found.account_subject,
                 needs_reauth: found.health == Health::NeedsReauth.as_str(),
             })
+        })
+    }
+
+    fn connection_of<'a>(
+        &'a self,
+        state: &'a AppState,
+        subject: &'a str,
+        workspace: WorkspaceId,
+        provider: &'a str,
+        account_subject: &'a str,
+    ) -> ConnectionOfFuture<'a> {
+        Box::pin(async move {
+            // Someone who left the workspace grants nothing there.
+            let user = match member(state, subject, workspace).await {
+                Ok(access) => access.user,
+                Err(Error::NotFound) => None,
+                Err(error) => return Err(error),
+            };
+            let Some(user) = user else {
+                return Ok(None);
+            };
+            let mut tx = state.db.begin_for(workspace).await?;
+            let found = sqlx::query_scalar!(
+                r#"SELECT id AS "id: ConnectionId"
+                     FROM connectors.connections
+                    WHERE workspace_id = $1 AND provider = $2 AND account_subject = $3
+                      AND granted_by = $4"#,
+                workspace as WorkspaceId,
+                provider,
+                account_subject,
+                user as UserId,
+            )
+            .fetch_optional(&mut *tx)
+            .await?;
+            tx.commit().await?;
+            Ok(found.map(|id| id.to_string()))
         })
     }
 }
@@ -335,5 +371,39 @@ mod tests {
             intake.adopt(&kit.state, no_mail).await,
             Err(Error::Denied(_))
         ));
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn identity_learns_whether_a_grantors_connection_exists(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let ws = WorkspaceId::new();
+        let ana = kit.user("ana");
+        kit.join(&ana, ws, Role::Owner);
+        let bea = kit.user("bea");
+        kit.join(&bea, ws, Role::Member);
+        let intake = grant_intake(kit.deps.clone());
+        let of = |subject: &'static str, workspace: WorkspaceId, account: &'static str| {
+            let intake = intake.clone();
+            let state = kit.state.clone();
+            async move {
+                intake
+                    .connection_of(&state, subject, workspace, "google", account)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(of("ana", ws, ACCOUNT_SUB).await, None);
+
+        let id = intake
+            .adopt(&kit.state, grant(ws, "ana", "google"))
+            .await
+            .unwrap();
+        assert_eq!(of("ana", ws, ACCOUNT_SUB).await, Some(id));
+        // Not for another member, another account, another workspace, or
+        // someone who is no member there.
+        assert_eq!(of("bea", ws, ACCOUNT_SUB).await, None);
+        assert_eq!(of("ana", ws, "someone-else").await, None);
+        assert_eq!(of("ana", WorkspaceId::new(), ACCOUNT_SUB).await, None);
+        assert_eq!(of("cid", ws, ACCOUNT_SUB).await, None);
     }
 }

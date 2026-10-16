@@ -349,13 +349,30 @@ async fn hand_over_detached(
     way_in: Option<WayInLink>,
 ) -> Result<Response> {
     let ctx = ctx.clone();
-    tokio::spawn(async move {
+    let return_to = flow.return_to.clone();
+    detached(&return_to, async move {
         let issuer = ctx.issuer()?.clone();
         let upstream = super::sign_in::configured(&issuer, flow.provider)?;
         Ok(hand_over(&ctx, upstream, flow, identity, tokens, way_in).await)
     })
     .await
-    .map_err(campbooks_kernel::Error::internal)?
+}
+
+/// Run `work` in a task of its own. Should it panic, the browser still goes
+/// back to `return_to`, with a generic `link_error`, never a bare 500 (a
+/// record it left unnamed is the sweep's to settle).
+async fn detached<F>(return_to: &str, work: F) -> Result<Response>
+where
+    F: Future<Output = Result<Response>> + Send + 'static,
+{
+    match tokio::spawn(work).await {
+        Ok(response) => response,
+        Err(error) => {
+            tracing::error!(%error, "a mailbox hand-over stopped halfway");
+            let code = campbooks_kernel::Error::internal(error).code();
+            Ok(back(return_to, "link_error", code))
+        }
+    }
 }
 
 /// Hand the mailbox grant of a connect or reconnect to the connectors
@@ -478,6 +495,20 @@ mod tests {
         assert_eq!(
             location(back("/w/1?tab=a", "link_error", "a b")),
             "/w/1?tab=a&link_error=a+b"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_hand_over_that_panics_still_sends_the_browser_back() {
+        let response = detached("/w/1/settings/mailboxes", async {
+            panic!("the hand-over broke");
+        })
+        .await
+        .unwrap();
+        assert_eq!(response.status(), axum::http::StatusCode::SEE_OTHER);
+        assert_eq!(
+            response.headers()["location"].to_str().unwrap(),
+            "/w/1/settings/mailboxes?link_error=internal_error"
         );
     }
 }

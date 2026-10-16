@@ -156,6 +156,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **A connected mailbox no longer loses its way to sign in to the cleanup.**
+  The background cleanup that removes a way to sign in left behind by a
+  mailbox connect that never finished now checks that the mailbox really
+  isn't connected first, and waits for a connect you retried. If connecting
+  a mailbox breaks unexpectedly, you now land back on Mailboxes with an
+  error instead of a server error page.
 - **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
   open conversation no longer drops below the list; it stays beside it. A long
   subject, sender or address with no spaces now wraps inside the reader instead of
@@ -213,6 +219,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Teach once in the inbox.** After you move, archive, mark read or clear one
+  email, Campbooks offers to do the same to every one like it, and to new
+  ones: it says which mail and how many, shows a few, and makes a rule with
+  one key (1). The rule's run shows its progress with Undo all; rows it
+  handled say so ("Campbooks moved this · like 23 others from …"), with Stop
+  doing this in the reader; changing back the same rule's work twice in a
+  month asks whether to keep it. The rules list for Scout's memory is ready
+  for its page. Demo: `pnpm --dir clients fake-google --lookalikes 24` and
+  `pnpm --dir clients record teach-once`.
 - **Tell Scout what you care about** (campbooks-cloud#121): three optional
   questions offered on Home after mail is connected (whose mail always
   reaches you, what never needs you, and whether Scout should ask first),

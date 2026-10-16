@@ -752,10 +752,20 @@ account (`grantor_subject`); `identity.name_connected_mailbox`, consuming
 it, SHALL name the record of that provider account's way in in that
 workspace, and only when that way in belongs to the grantor's account and
 is tracked (has a record). Replaying the event SHALL change nothing.
-A record still naming no connection a day after it was written never became
-one: the daily prune SHALL delete it and, under the account lock, remove a
-way in a connect created that it leaves with no record (as below, unless it
-is the account's last), published with reason `mailbox_never_connected`.
+A record still naming no connection a day after it was written SHALL be
+checked with the connectors module through the grant-intake port: when the
+connection of that provider account in that workspace, granted by that
+account, exists, the prune SHALL name the record with it and leave the way
+in; when it does not, the prune SHALL delete the record (if it is still
+unnamed and still that old) and, under the account lock, remove a way in a
+connect created that it leaves with no record (as below, unless it is the
+account's last), published with reason `mailbox_never_connected`. A record
+the port could not answer for SHALL be left for a later run. The prune
+SHALL settle one account per transaction, in account order. A connect
+retried for a record still naming no connection SHALL write that record
+afresh, so it is a day old only a day after the last attempt; a named
+record SHALL keep the time it was written. Should the hand-over task fail
+unexpectedly, the browser SHALL still go back with a `link_error`.
 `identity.forget_connected_way_in`, consuming `connectors.connection_removed`
 (its workspace, connection, `provider` and `account_subject`), SHALL lock
 the account, then act only on the record naming that very connection (a
@@ -790,8 +800,20 @@ the last way in SHALL stay. Replaying the event SHALL change nothing.
 - **THEN** no record is named or written
 
 #### Scenario: A record nothing ever named
-- **WHEN** a record still names no connection a day after it was written
-- **THEN** the daily prune deletes it and removes the way in it alone kept, with one `identity.way_in_removed`, unless that way in is the account's last
+- **WHEN** a record still names no connection a day after it was written, and the connectors module holds no such connection
+- **THEN** the prune deletes it and removes the way in it alone kept, with one `identity.way_in_removed`, unless that way in is the account's last
+
+#### Scenario: A connected mailbox whose record was never named
+- **WHEN** a record still names no connection a day after it was written, but the connectors module holds the grantor's connection of that account in that workspace
+- **THEN** the prune names the record with it, and the way in stays
+
+#### Scenario: A connect retried a day later
+- **WHEN** a connect is retried for a record left unnamed by an attempt two days ago
+- **THEN** the record is written afresh, and a prune while the retry is in flight leaves it and the way in
+
+#### Scenario: The hand-over breaks
+- **WHEN** the hand-over task panics
+- **THEN** the browser goes back to where it started with `link_error=internal_error`, not a server error page
 
 #### Scenario: Two of its mailboxes removed at once
 - **WHEN** the two workspaces' mailboxes of a way in a connect created are removed concurrently

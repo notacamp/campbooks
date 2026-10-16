@@ -37,7 +37,10 @@ import {
 } from "../../model";
 import { howRows, needSender, needSentence, quoteAttribution, warningReasons } from "../../needs";
 import { NeedChips } from "../Needs/NeedChips";
+import { ruleLine } from "../../rules-text";
 import { useNeedActions } from "../Needs/use-need-actions";
+import { useTeachOnce } from "../TeachOnce/TeachOnce";
+import { useRuleActions } from "../TeachOnce/use-rule-actions";
 import type { InboxActions } from "../InboxScreen/use-inbox-actions";
 
 import { MovePicker } from "./MovePicker";
@@ -101,6 +104,28 @@ export function ConversationReader({
   const writable = inbox !== undefined && !kept && inbox.role !== "reader";
   const renderReplySlot = writable ? replySlot : undefined;
   const need = writable ? (conversation?.need ?? undefined) : undefined;
+  const ruleActions = useRuleActions(workspaceId);
+  // While a teach-once offer or question is up, it holds the choice keys:
+  // the reader's own choices stay clickable but unbound and unhinted.
+  const offering = useTeachOnce()?.offering ?? false;
+  const ruleMark = conversation?.rule ?? undefined;
+  // Only whoever may change the rule (its author, a manager) may stop it.
+  const stoppable = ruleMark?.may_change === true;
+  /** "Stop doing this": remove the rule that handled it; Undo brings it back. */
+  const stopRule = () => {
+    if (ruleMark === undefined || !stoppable) {
+      return;
+    }
+    ruleActions.removeRule(ruleMark, { restore: false });
+  };
+  const stopButton = stoppable ? (
+    <Button variant="ghost" disabled={ruleActions.removing} onClick={stopRule}>
+      {t("rules.reader.stop")}
+    </Button>
+  ) : null;
+  const choiceKey = (id: "item.choice1" | "item.choice2") => (offering ? {} : { shortcut: id });
+  const footerLine = (summary: NonNullable<typeof conversation>) =>
+    ruleMark === undefined ? placementLine(t, summary) : ruleLine(t, ruleMark, i18n.language);
   const question = need?.trust === "check";
 
   const [opened, setOpened] = useState<Set<string>>(new Set());
@@ -235,7 +260,7 @@ export function ConversationReader({
         actions.move(conversation, suggestion.stream);
       }
     },
-    { enabled: question || suggestion !== undefined },
+    { enabled: (question || suggestion !== undefined) && !offering },
   );
   useShortcut(
     "item.choice2",
@@ -244,7 +269,7 @@ export function ConversationReader({
         needActions.notNeeded(conversation);
       }
     },
-    { enabled: question },
+    { enabled: question && !offering },
   );
   useShortcut(
     "conversations.resolve_need",
@@ -454,7 +479,8 @@ export function ConversationReader({
             key={conversation.id}
             label={t("scout.label")}
             visor={suggestion === undefined ? "idle" : "unsure"}
-            footer={placementLine(t, conversation)}
+            footer={footerLine(conversation)}
+            {...(stopButton === null ? {} : { actions: stopButton })}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }
@@ -466,7 +492,7 @@ export function ConversationReader({
                     options: [
                       {
                         label: t("scout.accept", { stream: streamName(t, suggestion.stream) }),
-                        shortcut: "item.choice1",
+                        ...choiceKey("item.choice1"),
                         onSelect: () => {
                           actions.move(conversation, suggestion.stream);
                         },
@@ -505,20 +531,21 @@ export function ConversationReader({
                     options: [
                       {
                         label: t("needs.actions.yes"),
-                        shortcut: "item.choice1",
+                        ...choiceKey("item.choice1"),
                         onSelect: () => {
                           needActions.confirm(conversation);
                         },
                       },
                       {
                         label: t("needs.actions.no"),
-                        shortcut: "item.choice2",
+                        ...choiceKey("item.choice2"),
                         onSelect: () => {
                           needActions.notNeeded(conversation);
                         },
                       },
                     ],
                   },
+                  ...(stopButton === null ? {} : { actions: stopButton }),
                 }
               : {
                   actions: (
@@ -544,10 +571,11 @@ export function ConversationReader({
                             : "needs.actions.notNeeded",
                         )}
                       </Button>
+                      {stopButton}
                     </>
                   ),
                 })}
-            footer={placementLine(t, conversation)}
+            footer={footerLine(conversation)}
             how={
               <HowDecided rows={howRows(t, exists, decisions)} footnote={t("needs.how.footnote")} />
             }

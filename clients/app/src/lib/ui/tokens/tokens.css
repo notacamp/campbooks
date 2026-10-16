@@ -302,6 +302,9 @@
   --toast-offset: var(--space-6);
   --overlay-width: 560px;
   --popover-width: 300px;
+  --offer-width: 420px;
+  --offer-max-height: calc(100dvh - var(--toast-offset) - var(--toast-height) - var(--space-12));
+  --progress-height: 6px;
   --narrow-width: 30rem;
   --row-text-min: 12rem;
   --size-sheet-column: 220px;
