@@ -49,9 +49,10 @@ screen until the next arrive. There SHALL be one active row across all groups:
 ↑ and ↓ (and Ctrl+J and Ctrl+K: plain J and K are text while the field has
 focus) SHALL move it, ↵ SHALL run it (a conversation opens in the inbox reader
 and the query is remembered), ⌘↵ (Ctrl↵) SHALL open all results for the query
-at `/w/:workspace/search?q=`, and Esc SHALL close the menu. Focus SHALL stay in
-the field (`aria-activedescendant`; rows are not focusable). A footer SHALL
-hint the keys. Outside a workspace the menu SHALL hold commands and Ask only.
+at `/w/:workspace/search?q=`, and so SHALL ↵ pressed before any conversation
+has arrived, rather than run a command. Esc SHALL close the menu. Focus SHALL
+stay in the field (`aria-activedescendant`; rows are not focusable). A footer
+SHALL hint the keys. Outside a workspace the menu SHALL hold commands and Ask only.
 
 #### Scenario: Instant results
 
@@ -72,6 +73,11 @@ hint the keys. Outside a workspace the menu SHALL hold commands and Ask only.
 
 - **WHEN** the user presses ⌘↵ with `invoice` typed, or chooses "All results for 'invoice'"
 - **THEN** the results page opens at `/w/:workspace/search?q=invoice`
+
+#### Scenario: Enter before the hits arrive
+
+- **WHEN** the user types `invoice` and presses ↵ before any conversation is listed
+- **THEN** the results page opens at `/w/:workspace/search?q=invoice` and no command runs
 
 #### Scenario: Remove a chip
 

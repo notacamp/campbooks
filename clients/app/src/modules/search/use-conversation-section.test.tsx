@@ -96,6 +96,21 @@ describe("the conversations in the command menu", () => {
     expect(screen.getByRole("group", { name: "Conversations" })).toBeInTheDocument();
   });
 
+  it("shows all results when ↵ comes before the hits do", async () => {
+    mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT]) } });
+    const { router, onClose, onAsk } = renderMenu();
+    const input = await field();
+    type(input, "invoice");
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/search`);
+    });
+    expect(router.state.location.search).toEqual({ q: "invoice" });
+    expect(onClose).toHaveBeenCalled();
+    expect(onAsk).not.toHaveBeenCalled();
+  });
+
   it("moves across hits, commands and Ask with one cursor, and opens a hit in the inbox reader", async () => {
     mockApi({ ...SIGNED_IN, [`GET ${W}/search`]: { body: results([INVOICE_HIT, LEDGER_HIT]) } });
     const { router, onClose } = renderMenu();

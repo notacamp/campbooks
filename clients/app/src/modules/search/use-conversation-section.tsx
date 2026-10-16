@@ -106,6 +106,7 @@ export function useConversationSection({ query, setQuery }: MenuQuery): MenuSect
     group: t("menu.group"),
     options,
     onSubmitAll: showAll,
+    pending: loading || !settled,
     chips: filters.map((filter) => ({
       id: `${filter.operator}:${filter.value}`,
       label: chipLabel(t, filter),

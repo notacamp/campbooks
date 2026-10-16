@@ -57,6 +57,8 @@ export interface MenuSection {
   chips?: readonly SearchFieldChip[] | undefined;
   /** ⌘↵ with a query: close and show everything. */
   onSubmitAll?: (() => void) | undefined;
+  /** Its rows are still on their way: ↵ shows everything rather than run a command. */
+  pending?: boolean | undefined;
 }
 
 /** What a section hook is given: the query, and a way to rewrite it. */
@@ -258,7 +260,9 @@ function MenuContent({
       move(-1);
     } else if (key === "enter") {
       event.preventDefault();
-      if ((event.metaKey || event.ctrlKey) && section?.onSubmitAll !== undefined) {
+      const everything =
+        event.metaKey || event.ctrlKey || (section?.pending === true && extra.length === 0);
+      if (everything && section?.onSubmitAll !== undefined) {
         if (typed !== "") {
           onClose();
           section.onSubmitAll();
