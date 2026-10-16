@@ -1137,6 +1137,11 @@ async fn a_removed_rule_comes_back_as_it_was_within_the_undo_window(db: PgPool) 
             .filter(|(id, ..)| id.starts_with("gh-"))
             .all(|(_, s, _)| s == "updates")
     );
+    // Counted once per conversation it holds changed, not once per pass.
+    let got = kit
+        .get(&sam, &format!("/api/v1/w/{workspace}/rules/{rule}"))
+        .await;
+    assert_eq!(got.json["applied_count"], 3);
     // Not removed: nothing to bring back.
     let again = kit.post(&sam, &restore, Some(json!({}))).await;
     assert_eq!(again.status, StatusCode::CONFLICT);

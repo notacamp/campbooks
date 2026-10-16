@@ -246,9 +246,9 @@ pub async fn store_decision(
 }
 
 /// Record that `rule` changed conversation `id` (in `run`, or as mail
-/// arrived), and count it. A conversation it changed again keeps what it was
-/// before the first time, adds what the rule did since and where it last
-/// moved it.
+/// arrived), and count it unless it already held it changed. A
+/// conversation it changed again keeps what it was before the first time,
+/// adds what the rule did since and where it last moved it.
 pub async fn record(
     conn: &mut PgConnection,
     workspace: Uuid,
@@ -257,6 +257,18 @@ pub async fn record(
     before: &super::Before,
 ) -> Result<()> {
     let (id, run) = at;
+    // Counted once per conversation it holds changed: not again when it
+    // changes one it already holds (a new message in it), again after a
+    // revert put it back.
+    let holds = sqlx::query_scalar!(
+        r#"SELECT reverted_at IS NULL AS "holds!" FROM conversations.rule_applications
+            WHERE rule_id = $1 AND conversation_id = $2 FOR UPDATE"#,
+        rule as RuleId,
+        id as ConversationId,
+    )
+    .fetch_optional(&mut *conn)
+    .await?
+    .unwrap_or(false);
     sqlx::query!(
         r#"
         INSERT INTO conversations.rule_applications
@@ -303,9 +315,11 @@ pub async fn record(
     .await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
-              SET applied_count = applied_count + 1, last_applied_at = now(), updated_at = now()
+              SET applied_count = applied_count + CASE WHEN $2 THEN 0 ELSE 1 END,
+                  last_applied_at = now(), updated_at = now()
             WHERE id = $1"#,
         rule as RuleId,
+        holds,
     )
     .execute(conn)
     .await?;
