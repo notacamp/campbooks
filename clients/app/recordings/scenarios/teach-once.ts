@@ -46,6 +46,19 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
   await page.getByText("This week: calmer dashboards").first().click();
   await page.getByRole("heading", { name: "This week: calmer dashboards" }).waitFor();
 
+  // Marking it read offers to mark them all read: Esc says "just this one".
+  await caption(page, "Mark it unread, then read again (U, U)", 1600);
+  await page.keyboard.press("u");
+  await pause(800);
+  await page.keyboard.press("u");
+  const readOffer = page.getByRole("dialog", { name: /like this read/u });
+  await readOffer.waitFor();
+  await caption(page, "Campbooks offers to mark them all read", 2000);
+  await caption(page, "Esc: just this one", 1200);
+  await page.keyboard.press("Escape");
+  await readOffer.waitFor({ state: "hidden" });
+  await caption(page, "Gone, and it won't offer that again for this mail", 1800);
+
   await caption(page, "Move this one to Newsletters (M, then 4)", 1800);
   if (phone) {
     await page.getByRole("button", { name: /^Move/u }).first().click();
@@ -82,8 +95,8 @@ export default async function teachOnce({ page }: ScenarioContext): Promise<void
     .waitFor({ timeout: 180_000 });
   await caption(page, "Done: a rule moved them, and will move new ones", 2200);
 
-  await caption(page, "Changed your mind? Undo all puts every one back", 1800);
-  await page.getByRole("button", { name: "Undo all" }).click();
+  await caption(page, "Changed your mind? Undo all (Shift+Z) puts every one back", 2000);
+  await page.keyboard.press("Shift+Z");
   await page
     .getByRole("dialog", { name: /back\. The rule is removed\./u })
     .waitFor({ timeout: 180_000 });

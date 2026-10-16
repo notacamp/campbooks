@@ -101,7 +101,7 @@ export function TeachOnceProvider({
   const [announcement, setAnnouncement] = useState("");
   // Undo of a new rule may run after its offer is gone: it needs a mutation
   // that lives as long as the inbox does.
-  const { removeOnce } = useRuleActions(workspaceId);
+  const { removeOnce, restoreRule } = useRuleActions(workspaceId);
   const asked = useRef(0);
 
   const after = useCallback(
@@ -150,6 +150,7 @@ export function TeachOnceProvider({
           setState={setState}
           announce={setAnnouncement}
           removeOnce={removeOnce}
+          restoreRule={restoreRule}
         />
       )}
       {/* Mounted for good, so what the offer says is read out as it changes. */}
@@ -176,9 +177,12 @@ interface StepProps<S extends Step["step"]> {
   spoken: boolean;
   /** Remove a rule once, from a mutation that outlives the offer. */
   removeOnce: RemoveOnce;
+  /** Bring a removed rule back, from a mutation that outlives the offer. */
+  restoreRule: RestoreRule;
 }
 
 type RemoveOnce = ReturnType<typeof useRuleActions>["removeOnce"];
+type RestoreRule = ReturnType<typeof useRuleActions>["restoreRule"];
 
 /** Esc, as an offer's button carries it: only while the offer holds Esc. */
 function escWhen(focused: boolean): { shortcut?: "overlay.close" } {
@@ -191,12 +195,14 @@ function TeachOffer({
   setState,
   announce,
   removeOnce,
+  restoreRule,
 }: {
   workspaceId: string;
   state: Exclude<Step, { step: "idle" }>;
   setState: Dispatch<SetStateAction<Step>>;
   announce: (text: string) => void;
   removeOnce: RemoveOnce;
+  restoreRule: RestoreRule;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
@@ -241,7 +247,7 @@ function TeachOffer({
     setFocused(ref.current?.contains(document.activeElement) === true);
   }, [state.step]);
 
-  const common = { workspaceId, setState, announce, focused, spoken, removeOnce };
+  const common = { workspaceId, setState, announce, focused, spoken, removeOnce, restoreRule };
   return (
     <div ref={ref} className="contents">
       {state.step === "asking" ? <Asking {...common} state={state} /> : null}
@@ -277,6 +283,7 @@ function Asking({
   focused,
   spoken,
   removeOnce,
+  restoreRule,
 }: StepProps<"asking">) {
   const { t, locale, number } = useT();
   const undo = useUndoToast();
@@ -346,7 +353,12 @@ function Asking({
                     ? { ...current, reverting: true }
                     : current,
                 );
-                undo.notify(t("rules.toast.stopped", { rule: sentence }));
+                undo.push({
+                  label: t("rules.toast.stopped", { rule: sentence }),
+                  undo: () => {
+                    restoreRule(rule.id, true);
+                  },
+                });
               });
             },
           });
@@ -466,7 +478,8 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
   if (rule.isError) {
     title = t("rules.run.loadFailed");
   } else if (removedElsewhere || shown?.state === "cancelled") {
-    const changed = applyRun?.changed ?? 0;
+    // Cut short mid-way: say how far it got. Finished, then removed: removed.
+    const changed = applyRun?.state === "cancelled" ? applyRun.changed : 0;
     title =
       changed > 0
         ? t("rules.run.stopped", { count: changed, n: number(changed) })
@@ -533,7 +546,13 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
 
   return (
     <Offer
-      visor={settled ? (ended && !rule.isError ? "happy" : "unsure") : "thinking"}
+      visor={
+        settled
+          ? shown?.state === "done" && !removedElsewhere && !rule.isError
+            ? "happy"
+            : "unsure"
+          : "thinking"
+      }
       title={title}
       detail={detail}
       actions={

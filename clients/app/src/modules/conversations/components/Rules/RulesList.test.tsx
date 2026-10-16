@@ -117,6 +117,30 @@ describe("the rules list", () => {
     expect(within(list).getByText(/Taught when someone acted on one email/u)).toBeVisible();
   });
 
+  it("turns a proposal down for anyone who may teach, with Undo", async () => {
+    const api = mockApi({
+      ...people,
+      [`GET ${W}/rules`]: { body: { rules: [{ ...PROPOSED, may_change: false }] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: "sender" }] } },
+      [`POST ${W}/rules/${PROPOSED.id}/decline`]: { body: { ...PROPOSED, state: "removed" } },
+      [`POST ${W}/rules/${PROPOSED.id}/restore`]: { body: PROPOSED },
+    });
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    const waiting = await screen.findByRole("list", { name: "Waiting for you" });
+    fireEvent.click(await within(waiting).findByRole("button", { name: "No" }));
+    expect(
+      await screen.findByText(
+        "Rule declined · Mail from billing@hosting.example → never needs you",
+      ),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() => {
+      expect(
+        api.calls.find((call) => call.route === `POST ${W}/rules/${PROPOSED.id}/restore`)?.body,
+      ).toEqual({ apply_to_existing: false });
+    });
+  });
+
   it("offers Keep and No only where the member may teach", async () => {
     mockApi({
       ...people,

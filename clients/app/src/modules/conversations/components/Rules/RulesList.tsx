@@ -95,7 +95,11 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
   // where the member writes, never in a reader's or a kept inbox.
   const teaches = (rule: RuleView) => {
     const inbox = inboxes.data?.find((item) => item.id === rule.inbox_id);
-    return inbox !== undefined && !inbox.read_only && inbox.role !== "reader";
+    return (
+      inbox !== undefined &&
+      !inbox.read_only &&
+      (inbox.role === "sender" || inbox.role === "manager")
+    );
   };
   const row = (rule: RuleView) => (
     <RuleRow
@@ -157,7 +161,8 @@ function RuleRow({
 }) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
-  const { removeRule, keepRule, removing, keeping } = useRuleActions(workspaceId);
+  const { removeRule, keepRule, declineRule, removing, keeping, declining } =
+    useRuleActions(workspaceId);
   const [confirming, setConfirming] = useState(false);
   const [putBack, setPutBack] = useState<"back" | "keep">("back");
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
@@ -191,18 +196,16 @@ function RuleRow({
           >
             {t("rules.list.keep")}
           </Button>
-          {/* Turning it down removes it: its author's or a manager's to do. */}
-          {rule.may_change ? (
-            <Button
-              variant="ghost"
-              disabled={removing}
-              onClick={() => {
-                removeRule(rule, { restore: false, label: "declined" });
-              }}
-            >
-              {t("rules.list.no")}
-            </Button>
-          ) : null}
+          {/* Like saying yes, anyone who may teach here may say no: it does not act yet. */}
+          <Button
+            variant="ghost"
+            disabled={declining}
+            onClick={() => {
+              declineRule(rule);
+            }}
+          >
+            {t("rules.list.no")}
+          </Button>
         </>
       ) : undefined
     ) : rule.may_change && !confirming ? (

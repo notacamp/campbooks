@@ -202,6 +202,19 @@ export function useRuleMutations(workspaceId: string) {
       ),
     onSettled: settle,
   });
+  const decline = useMutation({
+    mutationFn: async ({ ruleId }: { ruleId: string }) =>
+      unwrap(
+        await api.POST("/api/v1/w/{workspace_id}/rules/{rule_id}/decline", {
+          params: { path: { workspace_id: workspaceId, rule_id: ruleId } },
+        }),
+      ),
+    onSuccess: (rule) => {
+      queryClient.setQueryData(removedKey(workspaceId, rule.id), true);
+      queryClient.setQueryData(keys.rule(workspaceId, rule.id), rule);
+    },
+    onSettled: settle,
+  });
   const restore = useMutation({
     mutationFn: async ({ ruleId, applyToExisting }: { ruleId: string; applyToExisting: boolean }) =>
       unwrap(
@@ -219,5 +232,5 @@ export function useRuleMutations(workspaceId: string) {
   /** Whether `ruleId` was removed from this screen already. */
   const wasRemoved = (ruleId: string) =>
     queryClient.getQueryData<boolean>(removedKey(workspaceId, ruleId)) === true;
-  return { create, remove, confirm, restore, wasRemoved };
+  return { create, remove, confirm, decline, restore, wasRemoved };
 }
