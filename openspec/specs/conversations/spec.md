@@ -815,11 +815,13 @@ Rules SHALL be the access catalogue's `conversations.rule`, inside their
 inbox. Previewing, creating and confirming a rule, and asking for or
 dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (a
 `sender` or a `manager`; a `reader`, an owner without a membership, or anyone
-in an inbox kept read-only, gets 403 `inbox_read_only`). Confirming a proposed
-rule SHALL keep its author (the confirmer becomes it only when it had none).
-Updating, removing (turning down, for a proposed rule) and restoring it SHALL
-take its author while a `sender`, or a `manager` of the inbox; other writers
-get 403 `rule_not_yours`. Reading rules SHALL take any role on the inbox; a
+in an inbox kept read-only, gets 403 `inbox_read_only`). A proposed rule does
+not act yet: confirming it and turning it down (`POST …/rules/{rule_id}/decline`,
+`conversations.decline_rule`) SHALL take the same `write` on the inbox, and
+confirming SHALL keep its author (the confirmer becomes it only when it had
+none). Updating, removing and restoring an active rule SHALL take its author
+while a `sender`, or a `manager` of the inbox; other writers get 403
+`rule_not_yours`. Reading rules SHALL take any role on the inbox; a
 rule in an inbox the caller cannot see SHALL answer 404. A client token, even
 one a member registered (which arrives as that member), SHALL only read and
 preview rules: creating, confirming, changing, removing or restoring one

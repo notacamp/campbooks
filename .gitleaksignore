@@ -1,3 +1,0 @@
-# A JWT-shaped test value (a dummy, not a credential) in an earlier commit of the
-# admin follow-ups branch (campbooks-cloud#122); the file no longer holds it.
-24d6560475d535ebf6e267fbddaab1d5288feff6:crates/kernel/src/redact.rs:jwt:297

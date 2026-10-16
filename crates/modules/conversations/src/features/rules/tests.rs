@@ -1212,3 +1212,74 @@ async fn rows_say_who_may_stop_the_rule_that_moved_them(db: PgPool) {
     assert_eq!(marks(sam).await, [true, true]);
     assert_eq!(marks(ana).await, [false, false]);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, sam_id) = sams_notifications(&kit, 2).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    let propose = || {
+        let mut proposed = move_github();
+        proposed["state"] = json!("proposed");
+        proposed
+    };
+    // Sam proposes; Leo, another sender, says yes: Sam stays its author.
+    let first = kit.post(&sam, &rules, Some(propose())).await;
+    let first = first.json["rule"]["id"].as_str().unwrap().to_owned();
+    let confirmed = kit
+        .post(
+            &leo,
+            &format!("/api/v1/w/{workspace}/rules/{first}/confirm"),
+            Some(json!({"apply_to_existing": false})),
+        )
+        .await;
+    assert_eq!(confirmed.status, StatusCode::OK, "{:?}", confirmed.json);
+    assert_eq!(confirmed.json["taught_by"], sam_id.to_string());
+    // Active now: only its author or a manager changes it.
+    let refused = kit
+        .post(
+            &leo,
+            &format!("/api/v1/w/{workspace}/rules/{first}/decline"),
+            None,
+        )
+        .await;
+    assert_eq!(refused.status, StatusCode::CONFLICT);
+    let refused = kit
+        .delete(&leo, &format!("/api/v1/w/{workspace}/rules/{first}"))
+        .await;
+    assert_eq!(refused.json["code"], "rule_not_yours");
+
+    // Another proposal: Leo turns it down, and can bring it back.
+    let second = kit
+        .post(
+            &sam,
+            &rules,
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": "news@example.com"}],
+                "actions": [{"action": "archive"}],
+                "state": "proposed",
+            })),
+        )
+        .await;
+    let second = second.json["rule"]["id"].as_str().unwrap().to_owned();
+    let declined = kit
+        .post(
+            &leo,
+            &format!("/api/v1/w/{workspace}/rules/{second}/decline"),
+            None,
+        )
+        .await;
+    assert_eq!(declined.status, StatusCode::OK, "{:?}", declined.json);
+    assert_eq!(declined.json["state"], "removed");
+    let back = kit
+        .post(
+            &leo,
+            &format!("/api/v1/w/{workspace}/rules/{second}/restore"),
+            Some(json!({})),
+        )
+        .await;
+    assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
+    assert_eq!(back.json["state"], "proposed");
+}

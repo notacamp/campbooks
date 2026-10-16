@@ -21,6 +21,8 @@ mod admin_tests;
 #[cfg(test)]
 mod identity_tests;
 #[cfg(test)]
+mod revocation_tests;
+#[cfg(test)]
 mod search_tests;
 
 use std::{fmt::Write as _, sync::Arc, time::Duration};
@@ -233,7 +235,8 @@ pub fn with_ports(state: AppState) -> AppState {
 /// [`with_ports`], plus the ports of the modules composed with
 /// `composition`: the connectors module takes mailbox grants obtained at
 /// sign-in, and when the issuer runs in this process the API validates
-/// tokens with its keys, read in-process (ADR 0014).
+/// tokens with its keys, read in-process (ADR 0014), and refuses a person's
+/// token once their account is suspended or signed out everywhere.
 pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppState {
     let state = with_ports(state)
         .with_grant_intake(campbooks_connectors::grant_intake(
@@ -255,11 +258,14 @@ pub fn with_composed_ports(state: AppState, composition: &Composition) -> AppSta
             // `CAMPBOOKS_AUTH__AUDIENCE` is what an outside IdP sends.
             let mut auth = state.config.auth.clone();
             auth.audience.clone_from(&issuer.resource);
+            // Its subjects are identity accounts: a person's token stops at
+            // once when the account is suspended or signs out everywhere.
             let verifier = campbooks_kernel::auth::TokenVerifier::in_process(
                 &auth,
                 &issuer.url,
                 Arc::new(keys),
-            );
+            )
+            .with_revocation(state.db.clone(), campbooks_identity::token_revocation());
             state.with_auth(verifier)
         }
         None => state,
@@ -938,6 +944,7 @@ mod tests {
             email_verified: false,
             name: None,
             expires_at: None,
+            issued_at: None,
             auth_time: None,
         };
         // Probes opt neither automation nor the assistant in.

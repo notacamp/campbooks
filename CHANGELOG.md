@@ -8,6 +8,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **Suspending an account or signing out everywhere stops its access tokens at once.**
+  Tokens already issued used to keep working until they expired (up to ten minutes).
+  Now the API refuses them on the next request (401 `invalid_token`, the same answer
+  as any bad token), on every route, the admin API, the idempotency layer and the web
+  app's calls, and an open change feed ends within a heartbeat. Unsuspending does not
+  bring them back: the person signs in again. A code or refresh token from a sign-in
+  before the revocation gets `invalid_grant`. Each request with a person's token now
+  reads one row of `identity.accounts` (migration
+  `20261020060000_identity__tokens_not_before` adds one nullable column). Instances
+  using an outside identity provider, and workspace clients' tokens, are unchanged.
 - **An allow-list for who may sign in (`CAMPBOOKS_SIGNUP__ALLOWED`).** A comma-separated
   list of addresses and domains (a domain matches `*@domain` exactly, not subdomains).
   Unset or empty changes nothing. When set, only listed people can sign in or create an

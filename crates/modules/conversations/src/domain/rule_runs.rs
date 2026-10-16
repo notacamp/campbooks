@@ -252,7 +252,7 @@ impl RunBatch {
 pub async fn lock_running(conn: &mut sqlx::PgConnection, rule: RuleId) -> Result<()> {
     sqlx::query!(
         r#"SELECT id FROM conversations.rule_runs
-            WHERE rule_id = $1 AND state = 'running' FOR UPDATE"#,
+            WHERE rule_id = $1 AND state = 'running' ORDER BY id FOR UPDATE"#,
         rule as RuleId,
     )
     .fetch_all(conn)

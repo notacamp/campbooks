@@ -124,6 +124,7 @@ mod tests {
             email_verified: true,
             name: None,
             expires_at: None,
+            issued_at: None,
             auth_time: None,
         };
         let get = |subject: &str| {

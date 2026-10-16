@@ -254,6 +254,7 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(rules::create))
         .routes(routes!(rules::get, rules::update, rules::remove))
         .routes(routes!(rules::confirm))
+        .routes(routes!(rules::decline))
         .routes(routes!(rules::restore))
         .routes(routes!(suggest_rules::suggest))
         .routes(routes!(suggest_rules::dismiss))

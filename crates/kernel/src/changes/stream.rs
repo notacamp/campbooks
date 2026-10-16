@@ -463,9 +463,20 @@ impl Feed {
         );
     }
 
-    /// Resolve membership again; when it is gone, say so and end.
+    /// Resolve membership again; when it is gone, say so and end. A token
+    /// that no longer stands (its account suspended or signed out
+    /// everywhere since the stream opened) ends it the same way.
     async fn check_access(&mut self) -> Result<(), Error> {
         self.access_checked = Instant::now();
+        if !self
+            .state
+            .auth
+            .still_stands(&self.subscription.principal)
+            .await?
+        {
+            self.end("revoked", &json!({}));
+            return Ok(());
+        }
         let access = match crate::tenancy::resolve_access(
             self.state.membership.as_ref(),
             self.state.clients.as_ref(),

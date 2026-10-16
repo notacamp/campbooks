@@ -203,6 +203,16 @@ async fn keep_inbox(
         // Its rules act no more: their runs stop, and what only served
         // acting again goes (the member's words, what each rule changed, the
         // suggestions turned down). The rules stay listed, paused.
+        // Runs before rules, in id order (`rule_runs::lock_running`).
+        sqlx::query!(
+            r#"SELECT u.id FROM conversations.rule_runs u
+                WHERE u.state = 'running'
+                  AND u.rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)
+                ORDER BY u.id FOR UPDATE OF u"#,
+            inbox as InboxId
+        )
+        .fetch_all(&mut **tx)
+        .await?;
         sqlx::query!(
             r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
                 WHERE state = 'running'

@@ -7024,6 +7024,108 @@
         }
       }
     },
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/decline": {
+      "post": {
+        "tags": [
+          "conversations"
+        ],
+        "summary": "Turn down a proposed rule (\"No\"): like confirming it, anyone who may\nteach in its inbox may, since it does not act yet. Undo with\n`conversations.restore_rule`.",
+        "operationId": "conversations.decline_rule",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "path",
+            "description": "The workspace.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/WorkspaceId"
+            }
+          },
+          {
+            "name": "rule_id",
+            "in": "path",
+            "description": "The rule.",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RuleId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The rule, turned down (removed).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RuleView"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid access token.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Missing scope, or you may only read this inbox.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such rule, or you cannot see it.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is not waiting for a yes.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": [
+              "conversations:write"
+            ]
+          }
+        ],
+        "x-campbooks": {
+          "access": {
+            "action": "write",
+            "resource": "conversations.inbox"
+          },
+          "assistant": true,
+          "automation": false,
+          "mutates": true,
+          "records": [
+            "conversations.rule"
+          ],
+          "risk": "low",
+          "undo": "conversations.restore_rule"
+        }
+      }
+    },
     "/api/v1/w/{workspace_id}/rules/{rule_id}/restore": {
       "post": {
         "tags": [
