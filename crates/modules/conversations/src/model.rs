@@ -462,6 +462,9 @@ vocabulary!(
         AsksAction => "asks_action",
         /// `suspicious`.
         Suspicious => "suspicious",
+        /// `money`: it asks for a payment still owed (a Pay need, always a
+        /// question until a member answers it, campbooks-cloud#167).
+        Money => "money",
     }
 );
 
@@ -494,6 +497,11 @@ vocabulary!(
         NotNeeded => "not_needed",
         /// A question answered yes (stored as a correction).
         Confirmed => "confirmed",
+        /// A Pay need is already paid: it is cleared as done.
+        AlreadyPaid => "already_paid",
+        /// A Pay need is still to pay: Campbooks stands behind it (stored
+        /// as a correction confirming the money answer).
+        StillToPay => "still_to_pay",
     }
 );
 

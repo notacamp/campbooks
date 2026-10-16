@@ -4,10 +4,11 @@
 //! October 2026 the multilingual Laya checkpoint answered "yes" to almost
 //! every triage question, at confidence 1.000 (campbooks-cloud#128). The
 //! reachability probe ([`Gateway::health`]) cannot see that, so the gateway
-//! also asks the triage questions about eight fictional emails whose answers
+//! also asks the triage questions about ten fictional emails whose answers
 //! are not in doubt (a newsletter needs no reply, a friend asking for a call
-//! does, a look-alike domain asking for a password is phishing) and grades
-//! the answers.
+//! does, a look-alike domain asking for a password is phishing, a bill asks
+//! for a payment still owed and a receipt confirms one made) and grades the
+//! answers.
 //!
 //! The check runs when the server starts and then periodically
 //! ([`Gateway::keep_answers_checked`]): every [`RECHECK_PASSED`] while it
@@ -111,6 +112,8 @@ pub enum Expected {
     No,
     /// This stream.
     Stream(&'static str),
+    /// This answer to the money question.
+    Money(&'static str),
 }
 
 /// A fictional email and the answers it must get.
@@ -154,8 +157,9 @@ fn email(from: Party, subject: &str, headers: &[(&str, &str)], body: &str) -> En
     }
 }
 
-/// The eight fictional emails and what each must get: 33 expected answers
-/// in all. Every sender is on a reserved domain except the code-review
+/// The ten fictional emails and what each must get: 50 expected answers
+/// in all (the first eight, and their 33 answers to the six questions
+/// before the money question, are the original check). Every sender is on a reserved domain except the code-review
 /// notification's, which uses GitHub's real notification address so the
 /// case looks like the mail it stands for; its text is made up.
 pub fn cases() -> Vec<Case> {
@@ -168,12 +172,14 @@ pub fn cases() -> Vec<Case> {
         review_by_friday(),
         password_notice(),
         colleague_update(),
+        bill_to_pay(),
+        payment_confirmation(),
     ]
 }
 
 fn newsletter() -> Case {
-    use Expected::{No, Stream};
-    use triage::{ASKS_ACTION, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream};
+    use triage::{ASKS_ACTION, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS};
     Case {
         name: "newsletter",
         envelope: email(
@@ -195,13 +201,14 @@ fn newsletter() -> Case {
             (NEEDS_REPLY, No),
             (ASKS_ACTION, No),
             (SUSPICIOUS, No),
+            (MONEY, Money(NEITHER)),
         ],
     }
 }
 
 fn friend_asks_for_a_call() -> Case {
-    use Expected::{No, Stream, Yes};
-    use triage::{ASKS_ACTION, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream, Yes};
+    use triage::{ASKS_ACTION, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS};
     Case {
         name: "a friend asks for a call",
         envelope: email(
@@ -216,6 +223,7 @@ fn friend_asks_for_a_call() -> Case {
             (NEEDS_REPLY, Yes),
             (ASKS_ACTION, Yes),
             (SUSPICIOUS, No),
+            (MONEY, Money(NEITHER)),
         ],
     }
 }
@@ -265,8 +273,8 @@ fn phishing() -> Case {
 }
 
 fn shop_receipt() -> Case {
-    use Expected::{No, Stream};
-    use triage::{ASKS_ACTION, HAS_DEADLINE, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream};
+    use triage::{ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, PAID, STREAM, SUSPICIOUS};
     Case {
         name: "a shop receipt",
         envelope: email(
@@ -282,13 +290,16 @@ fn shop_receipt() -> Case {
             (ASKS_ACTION, No),
             (HAS_DEADLINE, No),
             (SUSPICIOUS, No),
+            (MONEY, Money(PAID)),
         ],
     }
 }
 
 fn review_by_friday() -> Case {
-    use Expected::{No, Stream, Yes};
-    use triage::{ASKS_ACTION, HAS_DEADLINE, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream, Yes};
+    use triage::{
+        ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS,
+    };
     let mut review = email(
         party("Rita Gomes", "rita@gomes-legal.example"),
         "Contract for the studio lease",
@@ -310,13 +321,14 @@ fn review_by_friday() -> Case {
             (ASKS_ACTION, Yes),
             (HAS_DEADLINE, Yes),
             (SUSPICIOUS, No),
+            (MONEY, Money(NEITHER)),
         ],
     }
 }
 
 fn password_notice() -> Case {
-    use Expected::{No, Stream};
-    use triage::{HAS_DEADLINE, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream};
+    use triage::{HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS};
     Case {
         name: "a password change notice",
         envelope: email(
@@ -331,13 +343,16 @@ fn password_notice() -> Case {
             (NEEDS_REPLY, No),
             (HAS_DEADLINE, No),
             (SUSPICIOUS, No),
+            (MONEY, Money(NEITHER)),
         ],
     }
 }
 
 fn colleague_update() -> Case {
-    use Expected::{No, Stream};
-    use triage::{ASKS_ACTION, HAS_DEADLINE, NEEDS_REPLY, STREAM, SUSPICIOUS};
+    use Expected::{Money, No, Stream};
+    use triage::{
+        ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS,
+    };
     Case {
         name: "a colleague shares an update",
         envelope: email(
@@ -354,6 +369,59 @@ fn colleague_update() -> Case {
             (ASKS_ACTION, No),
             (HAS_DEADLINE, No),
             (SUSPICIOUS, No),
+            (MONEY, Money(NEITHER)),
+        ],
+    }
+}
+
+fn bill_to_pay() -> Case {
+    use Expected::{Money, No, Stream, Yes};
+    use triage::{ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, OWED, STREAM, SUSPICIOUS};
+    let mut bill = email(
+        party("Lumen Energy", "billing@lumen-energy.example.com"),
+        "Your October electricity bill",
+        &[("Auto-Submitted", "auto-generated")],
+        "Hello Alex,\n\nYour electricity bill for October is ready.\n\nAmount due: EUR \
+         62.40\nDue date: 31 October 2026\n\nPlease pay by bank transfer to the account on \
+         the attached invoice before the due date.\n\nLumen Energy",
+    );
+    bill.attachments = vec![Attachment {
+        name: "invoice-2026-10.pdf".into(),
+        content_type: "application/pdf".into(),
+    }];
+    Case {
+        name: "a bill to pay",
+        envelope: bill,
+        expect: vec![
+            (STREAM, Stream("receipts")),
+            (NEEDS_REPLY, No),
+            (ASKS_ACTION, Yes),
+            (HAS_DEADLINE, Yes),
+            (SUSPICIOUS, No),
+            (MONEY, Money(OWED)),
+        ],
+    }
+}
+
+fn payment_confirmation() -> Case {
+    use Expected::{Money, No, Stream};
+    use triage::{ASKS_ACTION, MONEY, NEEDS_REPLY, PAID, STREAM, SUSPICIOUS};
+    Case {
+        name: "a payment confirmation",
+        envelope: email(
+            party("Lumen Energy", "billing@lumen-energy.example.com"),
+            "Payment received for invoice 2026-09",
+            &[("Auto-Submitted", "auto-generated")],
+            "Hello Alex,\n\nWe received your payment of EUR 58.10 for invoice 2026-09 on 3 \
+             October. Thank you. Your account is up to date and there is nothing more to \
+             pay.\n\nLumen Energy",
+        ),
+        expect: vec![
+            (STREAM, Stream("receipts")),
+            (NEEDS_REPLY, No),
+            (ASKS_ACTION, No),
+            (SUSPICIOUS, No),
+            (MONEY, Money(PAID)),
         ],
     }
 }
@@ -370,7 +438,7 @@ pub fn grade(case: &Case, answers: &[Answer]) -> (u32, u32) {
         let ok = match expected {
             Expected::Yes => answer.noul() == Some(true),
             Expected::No => answer.noul() == Some(false),
-            Expected::Stream(stream) => answer.choice() == Some(stream),
+            Expected::Stream(label) | Expected::Money(label) => answer.choice() == Some(label),
         };
         right += u32::from(ok);
     }
@@ -507,9 +575,19 @@ mod tests {
     #[test]
     fn cases_cover_both_answers_on_reserved_domains() {
         let cases = cases();
-        assert_eq!(cases.len(), 8);
+        assert_eq!(cases.len(), 10);
         let total: usize = cases.iter().map(|c| c.expect.len()).sum();
-        assert_eq!(total, 33);
+        assert_eq!(total, 50);
+        // Each money option has a case, or always-"neither" would pass it.
+        let money: HashSet<_> = cases
+            .iter()
+            .flat_map(|c| &c.expect)
+            .filter(|(q, _)| *q == triage::MONEY)
+            .map(|(_, e)| *e)
+            .collect();
+        for option in triage::MONEY_OPTIONS {
+            assert!(money.contains(&Expected::Money(option)), "{option}");
+        }
         for question in [
             triage::NEEDS_REPLY,
             triage::ASKS_ACTION,
@@ -545,6 +623,8 @@ mod tests {
     fn ninety_percent_passes() {
         assert_eq!(outcome(30, 33), CheckOutcome::Passed);
         assert_eq!(outcome(29, 33), CheckOutcome::Failed);
+        assert_eq!(outcome(45, 50), CheckOutcome::Passed);
+        assert_eq!(outcome(44, 50), CheckOutcome::Failed);
         assert_eq!(outcome(0, 0), CheckOutcome::Failed);
     }
 
