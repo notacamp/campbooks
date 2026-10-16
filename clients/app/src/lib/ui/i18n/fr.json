@@ -64,7 +64,7 @@
   },
   "conversation": {
     "unread": "Non lue",
-    "starred": "Suivie",
+    "starred": "Épinglée",
     "attachment": "Contient des pièces jointes"
   },
   "recipients": {

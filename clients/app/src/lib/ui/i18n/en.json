@@ -64,7 +64,7 @@
   },
   "conversation": {
     "unread": "Unread",
-    "starred": "Starred",
+    "starred": "Pinned",
     "attachment": "Has attachments"
   },
   "recipients": {

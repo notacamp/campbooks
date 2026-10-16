@@ -58,8 +58,8 @@
     }
   },
   "actions": {
-    "star": "Suivre",
-    "unstar": "Ne plus suivre",
+    "star": "Épingler",
+    "unstar": "Désépingler",
     "read": "Marquer comme lue",
     "unread": "Marquer comme non lue",
     "move": "Déplacer",
@@ -73,8 +73,8 @@
   },
   "toast": {
     "done": "Terminé · {{subject}}",
-    "starred": "Suivie · {{subject}}",
-    "unstarred": "Plus suivie · {{subject}}",
+    "starred": "Épinglée · {{subject}}",
+    "unstarred": "Désépinglée · {{subject}}",
     "read": "Marquée comme lue · {{subject}}",
     "unread": "Marquée comme non lue · {{subject}}",
     "moved": "Déplacée vers {{stream}} · {{subject}}"
@@ -160,7 +160,7 @@
     "updates": "Aller à Notifications",
     "receipts": "Aller à Reçus",
     "newsletters": "Aller à Newsletters",
-    "star": "Suivre ou ne plus suivre",
+    "star": "Épingler ou désépingler",
     "unread": "Marquer comme lue ou non lue",
     "move": "Déplacer vers un flux",
     "replyAll": "Répondre à tous",

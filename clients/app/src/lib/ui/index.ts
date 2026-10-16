@@ -104,6 +104,14 @@ export {
   type TextFieldProps,
 } from "./components/Field/Field";
 export { Brand, FocusPage, type FocusPageProps } from "./components/FocusPage/FocusPage";
+export {
+  Dialog,
+  DialogChoices,
+  type DialogChoice,
+  type DialogChoicesProps,
+  type DialogProps,
+  type DialogResult,
+} from "./components/Dialog/Dialog";
 export { Icon, ICON_NAMES, type IconName, type IconProps } from "./components/Icon/Icon";
 export { IconButton, type IconButtonProps } from "./components/IconButton/IconButton";
 export {
@@ -113,6 +121,11 @@ export {
   type ItemDetailProps,
   type ItemProps,
 } from "./components/Item/Item";
+export {
+  ItemActions,
+  type ItemAction,
+  type ItemActionsProps,
+} from "./components/ItemActions/ItemActions";
 export { InlineConfirm, type InlineConfirmProps } from "./components/InlineConfirm/InlineConfirm";
 export {
   SearchField,
