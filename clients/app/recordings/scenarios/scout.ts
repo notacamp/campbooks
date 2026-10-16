@@ -37,12 +37,18 @@ async function record(page: Page): Promise<void> {
   // Home offers the questions once mail is connected.
   await page.goto(`/w/${workspace}`);
   await page.getByRole("button", { name: "Start" }).waitFor();
-  await caption(page, "Once mail is connected, Home offers three optional questions", 2000);
-  await page.getByRole("button", { name: "Start" }).click();
+  await caption(
+    page,
+    phone
+      ? "Once mail is connected, Home offers three optional questions"
+      : "Once mail is connected, Home offers three optional questions. T starts",
+    2000,
+  );
+  await (phone ? page.getByRole("button", { name: "Start" }).click() : page.keyboard.press("t"));
 
   // 1 of 3: always reach me, from the people replied to most.
   await page.getByRole("heading", { name: "Whose mail should always reach you?" }).waitFor();
-  await caption(page, "One question per view. S skips, Esc is Not now");
+  await caption(page, "One question per view. S skips, B goes back, Esc is Not now");
   await page.getByRole("checkbox", { name: "Maya Okafor" }).click();
   await page
     .getByText(/^Matches \d+ email/u)
@@ -62,6 +68,15 @@ async function record(page: Page): Promise<void> {
   await page.getByRole("checkbox", { name: "Newsletters and mailing lists" }).click();
   await page.getByText("Newsletters and mailing lists never need you.").waitFor();
   await pause(1600);
+  if (!phone) {
+    // B goes back, answers kept; Enter comes forward again.
+    await page.keyboard.press("b");
+    await page.getByRole("heading", { name: "Whose mail should always reach you?" }).waitFor();
+    await pause(1000);
+    await page.keyboard.press("Enter");
+    await page.getByRole("heading", { name: "What never needs you?" }).waitFor();
+    await pause(800);
+  }
   await (phone
     ? page.getByRole("button", { name: /^Next/u }).click()
     : page.keyboard.press("Enter"));
@@ -78,7 +93,7 @@ async function record(page: Page): Promise<void> {
     ? page.getByRole("button", { name: /^Save/u }).click()
     : page.keyboard.press("Enter"));
   await page.getByRole("heading", { name: "Scout knows what you care about" }).waitFor();
-  await pause(1800);
+  await caption(page, "The count is the rules the server created, with one Undo", 2200);
 
   // Scout's memory: teach it in your own words.
   await page.goto(`/w/${workspace}/settings/memory`);
@@ -97,10 +112,16 @@ async function record(page: Page): Promise<void> {
     .getByText(/^Matches \d+ email/u)
     .first()
     .waitFor();
-  await caption(page, "The rule it understood, with what it matches. Enter saves", 2400);
+  await caption(
+    page,
+    phone
+      ? "The rule it understood, with what it matches"
+      : "The rule it understood, with what it matches. ⌘↵ saves",
+    2400,
+  );
   await (phone
     ? page.getByRole("button", { name: /^Save rule/u }).click()
-    : page.keyboard.press("Enter"));
+    : page.keyboard.press("ControlOrMeta+Enter"));
   await page.getByText("Rule saved").waitFor();
   await pause(2200);
 
