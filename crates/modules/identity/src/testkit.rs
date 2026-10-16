@@ -24,7 +24,9 @@ use campbooks_kernel::{
     auth::{Principal, ScopeInfo, TokenVerifier},
     clock::SystemClock,
     config::SignupPolicy,
-    connections::{AdoptFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture},
+    connections::{
+        AdoptFuture, ConnectionOfFuture, GrantIntake, ProviderGrant, ReconnectTarget, TargetFuture,
+    },
     crypto::{SecretKey, pkce_challenge, random_token},
     signup::{Invitations, InvitedFuture},
     tenancy::{Access, Membership, MembershipFuture, Role, UserId, WorkspaceId},
@@ -106,6 +108,10 @@ pub type Handed = (
     Option<String>,
 );
 
+/// A connection the fake intake holds: workspace, grantor's token subject,
+/// provider, provider account, id.
+type Held = (WorkspaceId, String, String, String, String);
+
 /// Records the grants it is handed.
 #[derive(Debug, Default)]
 pub struct FakeIntake {
@@ -116,6 +122,8 @@ pub struct FakeIntake {
     zoho_mail: std::sync::atomic::AtomicBool,
     /// Refuse the next grant (as when another member connected it).
     refuse_next: std::sync::atomic::AtomicBool,
+    /// The connections it holds.
+    connections: Mutex<Vec<Held>>,
 }
 
 /// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
@@ -139,6 +147,14 @@ impl FakeIntake {
     pub fn refuse_next(&self) {
         self.refuse_next
             .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// Every connection it holds goes (as on disconnect), unannounced.
+    pub fn drop_connections(&self) {
+        self.connections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clear();
     }
 
     /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
@@ -188,6 +204,20 @@ impl GrantIntake for FakeIntake {
             let new = adopted.iter().filter(|handed| handed.5.is_none()).count() + 1;
             format!("connection-{new}")
         });
+        let mut connections = self
+            .connections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        if !connections.iter().any(|c| c.4 == id) {
+            connections.push((
+                grant.workspace,
+                grant.subject.clone(),
+                grant.provider.clone(),
+                grant.account_subject.clone(),
+                id.clone(),
+            ));
+        }
+        drop(connections);
         adopted.push((
             grant.workspace,
             grant.subject,
@@ -224,6 +254,26 @@ impl GrantIntake for FakeIntake {
                 })
                 .ok_or(Error::NotFound)
         })
+    }
+
+    fn connection_of<'a>(
+        &'a self,
+        _state: &'a AppState,
+        subject: &'a str,
+        workspace: WorkspaceId,
+        provider: &'a str,
+        account_subject: &'a str,
+    ) -> ConnectionOfFuture<'a> {
+        let found = self
+            .connections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .iter()
+            .find(|c| {
+                c.0 == workspace && c.1 == subject && c.2 == provider && c.3 == account_subject
+            })
+            .map(|c| c.4.clone());
+        Box::pin(async move { Ok(found) })
     }
 }
 

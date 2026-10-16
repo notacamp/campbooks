@@ -6,12 +6,13 @@
 //! recognised as such), revoked consents after 30 days, clients that
 //! registered themselves (or are known by a metadata document) and went
 //! unused for 30 days, and mailbox records that never got a connection
-//! within [`UNNAMED_GRACE`] (with the way in a connect created that they
-//! leave without a mailbox, as a disconnect would remove it).
+//! within [`UNNAMED_GRACE`] (once the connectors module confirms there is
+//! none; with the way in a connect created that they leave without a
+//! mailbox, as a disconnect would remove it).
 
 use std::time::Duration;
 
-use campbooks_kernel::{Job, JobContext, JobError};
+use campbooks_kernel::{Job, JobContext, JobError, tenancy::WorkspaceId};
 use chrono::{TimeDelta, Utc};
 use serde::{Deserialize, Serialize};
 
@@ -133,19 +134,52 @@ impl Job for Prune {
     }
 }
 
-/// Delete mailbox records that never got a connection, and remove the ways
-/// in they leave without a mailbox (audited and announced as a disconnect
-/// would). How many ways in went.
+/// Settle mailbox records unnamed past [`UNNAMED_GRACE`]: ask the
+/// connectors module whether each one's connection exists (then name it),
+/// delete the rest, and remove the ways in they leave without a mailbox
+/// (audited and announced as a disconnect would). One transaction per
+/// account, in `account_id` order; a record the port could not answer for
+/// is left for the next run. How many ways in went.
 pub async fn sweep_unnamed_mailboxes(
     ctx: &mut JobContext,
     now: chrono::DateTime<Utc>,
 ) -> campbooks_kernel::Result<usize> {
     let state = ctx.state().clone();
-    let mut tx = state.db.begin().await?;
-    let removed = mailbox_links::sweep_unnamed(&mut tx, now - UNNAMED_GRACE, now).await?;
-    for gone in &removed {
-        announce(&state, &mut tx, gone, "mailbox_never_connected", now).await?;
+    let cutoff = now - UNNAMED_GRACE;
+    let unnamed = {
+        let mut conn = state.db.acquire().await?;
+        mailbox_links::unnamed_before(&mut conn, cutoff).await?
+    };
+    let mut gone = 0;
+    for rows in unnamed.chunk_by(|a, b| a.account == b.account) {
+        let account = rows[0].account;
+        let mut checked = Vec::with_capacity(rows.len());
+        for row in rows {
+            let connection = state
+                .grants
+                .connection_of(
+                    &state,
+                    &account.to_string(),
+                    WorkspaceId::from_uuid(row.workspace),
+                    &row.provider,
+                    &row.subject,
+                )
+                .await;
+            match connection {
+                Ok(connection) => checked.push((row.clone(), connection)),
+                Err(error) => {
+                    tracing::warn!(%error, "could not check a mailbox record's connection");
+                }
+            }
+        }
+        let mut tx = state.db.begin().await?;
+        let removed =
+            mailbox_links::settle_unnamed(&mut tx, account, &checked, cutoff, now).await?;
+        for way_in in &removed {
+            announce(&state, &mut tx, way_in, "mailbox_never_connected", now).await?;
+        }
+        tx.commit().await?;
+        gone += removed.len();
     }
-    tx.commit().await?;
-    Ok(removed.len())
+    Ok(gone)
 }
