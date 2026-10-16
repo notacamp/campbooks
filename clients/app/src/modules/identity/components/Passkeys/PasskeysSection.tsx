@@ -181,7 +181,9 @@ export function PasskeysSection({ returnTo, leave = leavePage }: PasskeysSection
           ))}
         </List>
       )}
-      {none ? null : supported ? (
+      {/* Not while loading: an empty list moves the button into its panel,
+          and a press on the one shown meanwhile would be lost. */}
+      {none || passkeys.isPending ? null : supported ? (
         <div>{addButton}</div>
       ) : (
         <Text tone="tertiary" size="sm">
