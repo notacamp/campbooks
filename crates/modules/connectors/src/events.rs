@@ -405,6 +405,14 @@ pub enum RequestedChange {
     Archive,
     /// Back in the inbox.
     Unarchive,
+    /// Into the trash.
+    Trash,
+    /// Out of the trash, back in the inbox.
+    Untrash,
+    /// Reported as spam: into the spam folder, out of the inbox.
+    Spam,
+    /// Not spam: out of the spam folder, back in the inbox.
+    Unspam,
     /// Put a label on.
     AddLabel {
         /// The conversations label (not used here).

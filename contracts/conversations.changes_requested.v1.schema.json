@@ -34,10 +34,11 @@
       "oneOf": [
         {
           "type": "object",
+          "description": "A flag change. `trash` / `untrash` put the message in the trash and take it out again (back to the inbox); `spam` / `unspam` report it as spam (out of the inbox) and take that back (back to the inbox). Consumers of an older revision of v1 read the four as an unknown kind and skip them.",
           "required": ["kind"],
           "additionalProperties": false,
           "properties": {
-            "kind": { "enum": ["mark_read", "mark_unread", "star", "unstar", "archive", "unarchive"] }
+            "kind": { "enum": ["mark_read", "mark_unread", "star", "unstar", "archive", "unarchive", "trash", "untrash", "spam", "unspam"] }
           }
         },
         {

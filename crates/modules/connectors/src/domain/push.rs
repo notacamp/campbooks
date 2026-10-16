@@ -52,7 +52,8 @@ pub struct Plan {
     /// The (message, label) pairs each change won.
     won: HashMap<Uuid, Vec<(String, String)>>,
     /// Changes that would bring a message in the trash or spam back into
-    /// the inbox or a category: skipped.
+    /// the inbox or a category without taking it out of the trash or spam
+    /// (an untrash or "not spam" does): skipped.
     in_trash: HashSet<Uuid>,
 }
 
@@ -78,10 +79,16 @@ impl Plan {
         let mut wants = Wants::new();
         let mut in_trash = HashSet::new();
         for change in &backlog.pending {
+            // In the trash or spam, and not taken out of every one of them
+            // by this change (an untrash or a "not spam" is).
             let trashed = backlog
                 .labels
                 .get(&change.provider_message_id)
-                .is_some_and(|labels| labels.iter().any(|l| l == "TRASH" || l == "SPAM"));
+                .is_some_and(|labels| {
+                    labels
+                        .iter()
+                        .any(|l| (l == "TRASH" || l == "SPAM") && !change.remove.contains(l))
+                });
             let restores = change
                 .add
                 .iter()

@@ -23,8 +23,8 @@ pub const CATEGORIES: [&str; 5] = [
 ];
 
 /// Gmail's system labels, never written except through their own intents
-/// (`UNREAD`, `STARRED`, `INBOX`, the categories) and never through a label
-/// change.
+/// (`UNREAD`, `STARRED`, `INBOX`, `TRASH`, `SPAM`, the categories) and never
+/// through a label change.
 pub const SYSTEM_LABELS: [&str; 9] = [
     "INBOX",
     "UNREAD",
@@ -45,7 +45,7 @@ pub fn is_system(label: &str) -> bool {
 /// Whether a change may put on or take off `label`: the labels of the
 /// flag intents and the categories, or a user label.
 pub fn writable(label: &str) -> bool {
-    matches!(label, "UNREAD" | "STARRED" | "INBOX")
+    matches!(label, "UNREAD" | "STARRED" | "INBOX" | "TRASH" | "SPAM")
         || CATEGORIES.contains(&label)
         || !is_system(label)
 }
@@ -111,6 +111,10 @@ pub const fn kind(change: &RequestedChange) -> &'static str {
         RequestedChange::Unstar => "unstar",
         RequestedChange::Archive => "archive",
         RequestedChange::Unarchive => "unarchive",
+        RequestedChange::Trash => "trash",
+        RequestedChange::Untrash => "untrash",
+        RequestedChange::Spam => "spam",
+        RequestedChange::Unspam => "unspam",
         RequestedChange::AddLabel { .. } => "add_label",
         RequestedChange::RemoveLabel { .. } => "remove_label",
         RequestedChange::MoveToStream { .. } => "move_to_stream",
@@ -137,6 +141,19 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
         RequestedChange::Unstar => remove("STARRED"),
         RequestedChange::Archive => remove("INBOX"),
         RequestedChange::Unarchive => add("INBOX"),
+        // Gmail lets `TRASH` and `SPAM` be put on and taken off like any
+        // label; moving to spam also leaves the inbox, and back from spam
+        // returns to it (as Gmail's own "Not spam" does).
+        RequestedChange::Trash => add("TRASH"),
+        RequestedChange::Untrash => remove("TRASH"),
+        RequestedChange::Spam => Mapped::Labels {
+            add: vec!["SPAM".to_owned()],
+            remove: vec!["INBOX".to_owned()],
+        },
+        RequestedChange::Unspam => Mapped::Labels {
+            add: vec!["INBOX".to_owned()],
+            remove: vec!["SPAM".to_owned()],
+        },
         RequestedChange::AddLabel { provider_key, .. }
         | RequestedChange::RemoveLabel { provider_key, .. } => {
             let key = provider_key
@@ -170,8 +187,9 @@ pub fn map(change: &RequestedChange, known: &HashSet<String>) -> Mapped {
 }
 
 /// `change` in a Zoho message's state tokens (`zoho/state.rs`): read,
-/// flag and inbox. Zoho's labels are not carried and it has no streams of
-/// its own, so label changes and moves between streams are skipped.
+/// flag, inbox, trash and spam. Zoho's labels are not carried and it has no
+/// streams of its own, so label changes and moves between streams are
+/// skipped. Out of the trash or spam means back to the Inbox folder.
 pub fn map_zoho(change: &RequestedChange) -> Mapped {
     let set = |token: &str, on: bool| Mapped::Labels {
         add: if on {
@@ -192,6 +210,16 @@ pub fn map_zoho(change: &RequestedChange) -> Mapped {
         RequestedChange::Unstar => set("STARRED", false),
         RequestedChange::Archive => set("INBOX", false),
         RequestedChange::Unarchive => set("INBOX", true),
+        RequestedChange::Trash => set("TRASH", true),
+        RequestedChange::Spam => set("SPAM", true),
+        RequestedChange::Untrash => Mapped::Labels {
+            add: vec!["INBOX".to_owned()],
+            remove: vec!["TRASH".to_owned()],
+        },
+        RequestedChange::Unspam => Mapped::Labels {
+            add: vec!["INBOX".to_owned()],
+            remove: vec!["SPAM".to_owned()],
+        },
         RequestedChange::AddLabel { .. } | RequestedChange::RemoveLabel { .. } => {
             Mapped::Skip("label_not_at_provider")
         }
@@ -600,6 +628,10 @@ mod tests {
             (RequestedChange::Unstar, Some((vec![], vec!["STARRED"]))),
             (RequestedChange::Archive, Some((vec![], vec!["INBOX"]))),
             (RequestedChange::Unarchive, Some((vec!["INBOX"], vec![]))),
+            (RequestedChange::Trash, Some((vec!["TRASH"], vec![]))),
+            (RequestedChange::Untrash, Some((vec![], vec!["TRASH"]))),
+            (RequestedChange::Spam, Some((vec!["SPAM"], vec!["INBOX"]))),
+            (RequestedChange::Unspam, Some((vec!["INBOX"], vec!["SPAM"]))),
             (
                 RequestedChange::AddLabel {
                     label: lab,
@@ -691,6 +723,34 @@ mod tests {
             }
         );
         assert_eq!(
+            map_zoho(&RequestedChange::Trash),
+            Mapped::Labels {
+                add: labels(&["TRASH"]),
+                remove: vec![]
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::Spam),
+            Mapped::Labels {
+                add: labels(&["SPAM"]),
+                remove: vec![]
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::Untrash),
+            Mapped::Labels {
+                add: labels(&["INBOX"]),
+                remove: labels(&["TRASH"])
+            }
+        );
+        assert_eq!(
+            map_zoho(&RequestedChange::Unspam),
+            Mapped::Labels {
+                add: labels(&["INBOX"]),
+                remove: labels(&["SPAM"])
+            }
+        );
+        assert_eq!(
             map_zoho(&RequestedChange::AddLabel {
                 label: lab,
                 provider_key: Some("123".into())
@@ -742,21 +802,15 @@ mod tests {
                 );
             }
         }
-        for label in [
-            "TRASH",
-            "SPAM",
-            "SENT",
-            "DRAFT",
-            "CHAT",
-            "IMPORTANT",
-            "CATEGORY_NEW",
-        ] {
+        for label in ["SENT", "DRAFT", "CHAT", "IMPORTANT", "CATEGORY_NEW"] {
             assert!(!writable(label), "{label}");
         }
         for label in [
             "UNREAD",
             "STARRED",
             "INBOX",
+            "TRASH",
+            "SPAM",
             "CATEGORY_PROMOTIONS",
             "Label_7",
         ] {

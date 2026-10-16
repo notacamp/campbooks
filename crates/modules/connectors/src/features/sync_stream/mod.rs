@@ -323,7 +323,12 @@ impl SyncStream {
         }
         let mail = zoho.mail(&centre, token, &target.mailbox_key);
         if backlog.last().is_some() {
-            let pushed = zoho::write::push(&mail, backlog, cursor.inbox()).await;
+            let folders = zoho::write::Folders {
+                inbox: cursor.inbox(),
+                trash: cursor.folder_of_kind(zoho::state::FolderKind::Trash),
+                spam: cursor.folder_of_kind(zoho::state::FolderKind::Spam),
+            };
+            let pushed = zoho::write::push(&mail, backlog, &folders).await;
             if let Some(err) = Self::record_push(ctx, workspace, target.stream, pushed, now).await?
             {
                 self.trouble(ctx, workspace, target, &err, now).await?;
