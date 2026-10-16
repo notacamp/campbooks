@@ -348,6 +348,19 @@ With the built-in issuer:
   so the sign-in cookies are always `Secure`.
 - New accounts follow `CAMPBOOKS_SIGNUP__POLICY`: on `invite_only`, only people whose
   Google address has a pending invitation get an account.
+- **Only your own people.** `CAMPBOOKS_SIGNUP__ALLOWED` is a comma-separated list of
+  addresses (`ana@example.com`) and domains (`example.com`, which matches
+  `*@example.com` exactly, not subdomains), case-insensitive. Unset or empty, nothing is
+  restricted. When set, every way in checks it on top of the policy (an invitation does
+  not bypass it): a provider sign-in needs a provider-verified address on the list, for
+  new and existing accounts alike; a new account is checked again when it is created;
+  a way in added later must be on it; a passkey signs in only an account that has a
+  listed, provider-verified address and cannot create an account; and token refresh is
+  refused for an account that no longer qualifies, so removing someone cuts their access
+  at their next refresh (about every ten minutes) and a restart is enough to apply a
+  change. Refused people see "This Campbooks isn't open to this address" and nothing is
+  kept; the message never says whether an account exists. A malformed entry stops startup
+  (the error names the entry's position, not its text).
 - **Client secrets are files.** `compose.yaml` mounts `deploy/secrets/` read-only into the
   server at `/run/secrets/campbooks`: put each provider's secret in a file there
   (`google-client-secret`, `microsoft-client-secret`, `zoho-client-secret`, readable by uid

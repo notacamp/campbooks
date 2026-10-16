@@ -7,7 +7,13 @@ import { autofillSupported, ceremonyFailure, getPasskey, passkeysSupported } fro
 
 /** Why a passkey sign-in didn't go through, as the screen explains it. */
 type PasskeyProblem =
-  "cancelled" | "not_accepted" | "suspended" | "expired" | "rate_limited" | "failed";
+  | "cancelled"
+  | "not_accepted"
+  | "suspended"
+  | "not_allowed"
+  | "expired"
+  | "rate_limited"
+  | "failed";
 
 export interface PasskeySignIn {
   /** Whether this browser can use passkeys at all. */
@@ -28,6 +34,8 @@ function problemOf(error: unknown): PasskeyProblem {
       return "not_accepted";
     case "account_suspended":
       return "suspended";
+    case "sign_in_not_allowed":
+      return "not_allowed";
     case "passkey_expired":
       return "expired";
     case "rate_limited":

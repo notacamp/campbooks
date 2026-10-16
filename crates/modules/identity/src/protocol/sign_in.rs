@@ -18,7 +18,11 @@
 //! `?error=<code>`: `invalid_state`, `cancelled_at_provider`,
 //! `provider_unavailable`, `login_failed`, `account_suspended`, and
 //! `signup_invite_only` (an invite-only instance, and no pending invitation
-//! for the provider's verified address: nothing is kept).
+//! for the provider's verified address: nothing is kept), and
+//! `sign_in_not_allowed` (`CAMPBOOKS_SIGNUP__ALLOWED` is set and the
+//! provider's verified address is not on it: asked first, for known
+//! accounts and new ones alike, so it says nothing about accounts; nothing
+//! is kept).
 
 use std::time::Duration;
 
@@ -121,7 +125,8 @@ pub async fn request(
         client_id: request.client_id,
         providers: providers(issuer),
         passkey_sign_up: passkey::relying_party(issuer).is_some()
-            && passkey::signup_allows_passkey(&ctx),
+            && passkey::signup_allows_passkey(&ctx)
+            && !ctx.allow_list()?.is_restricted(),
     }))
 }
 
@@ -411,6 +416,19 @@ pub async fn callback(
     }
     let Upstreamed { identity, tokens } = signed_in;
     let request = flow.request_id.as_deref();
+    // The allow-list comes first, whether or not an account exists, so the
+    // answer says nothing about accounts. Nothing is kept.
+    if !ctx.permits_identity(&identity)? {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+        tracing::info!(
+            provider = provider.as_str(),
+            "refused a sign-in the allow-list does not let in"
+        );
+        return Ok(with_cookie(
+            sign_in_error("sign_in_not_allowed", request),
+            clear_flow,
+        ));
+    }
     let response = match accounts::find(&ctx.state.db, &identity).await? {
         Some(Linked { disabled: true, .. }) => sign_in_error("account_suspended", request),
         // A sign-in never changes a workspace's mailbox: a refresh token
@@ -804,8 +822,9 @@ pub struct Created {
     responses(
         (status = 201, description = "Created and signed in.", body = Created,
             headers(("set-cookie" = String))),
-        (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
-            instance takes invited people only; nothing was kept).", body = campbooks_kernel::Problem,
+        (status = 403, description = "`csrf_check_failed`, `signup_invite_only` (this \
+            instance takes invited people only; nothing was kept), or `sign_in_not_allowed` \
+            (the address is not on the instance's allow-list; nothing was kept).", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "Nothing pending for this browser."),
         (status = 409, description = "`sign_up_expired`, or `way_in_belongs_to_another_account` \
@@ -827,6 +846,11 @@ pub async fn create_account(State(ctx): State<Ctx>, headers: HeaderMap) -> Resul
     let pending = upstream::take_sign_up(&mut tx, &issuer.cipher, &token, now)
         .await?
         .ok_or_else(|| Error::Conflict(MESSAGES.reason("sign_up_expired")))?;
+    if !ctx.permits_identity(&pending.identity)? {
+        // The allow-list may have been tightened since the round trip.
+        tx.commit().await?;
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
+    }
     if !may_create_account(&ctx, &pending.identity).await? {
         // The pending sign-up (and its tokens) is gone with this commit.
         tx.commit().await?;

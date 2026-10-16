@@ -9,6 +9,7 @@
     "held_grant_not_found": "Aucune boîte mail n’attend d’être connectée.",
     "invalid_id_token_hint": "Cette demande de déconnexion n’est pas signée par Campbooks pour cette application ; rien n’a été fermé.",
     "signup_invite_only": "Ce Campbooks n’accueille que les personnes invitées. Demandez à quelqu’un d’inviter cette adresse, puis reconnectez-vous.",
+    "sign_in_not_allowed": "Ce Campbooks n’accepte que les personnes approuvées par son propriétaire, et cette adresse n’en fait pas partie. Rien n’a été conservé.",
     "step_up_required": "Reconnectez-vous d’abord : pour changer votre façon de vous connecter, il faut vous être connecté dans les dix dernières minutes.",
     "last_way_in": "C’est votre seul moyen de connexion : il ne peut pas être retiré. Ajoutez-en d’abord un autre.",
     "link_incomplete": "Précisez le fournisseur, l’espace de travail ou la boîte mail concernés.",

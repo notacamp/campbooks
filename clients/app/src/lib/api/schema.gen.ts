@@ -8905,7 +8905,7 @@ export interface operations {
                     "application/json": components["schemas"]["Created"];
                 };
             };
-            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only; nothing was kept). */
+            /** @description `csrf_check_failed`, `signup_invite_only` (this instance takes invited people only; nothing was kept), or `sign_in_not_allowed` (the address is not on the instance's allow-list; nothing was kept). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8968,7 +8968,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), or `account_suspended` (it verified, but an administrator suspended the account). */
+            /** @description `csrf_check_failed`, `passkey_not_accepted` (it did not verify, or it is no longer a way into any account), `account_suspended` (it verified, but an administrator suspended the account), or `sign_in_not_allowed` (it verified, but the account has no address on the instance's allow-list). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9102,7 +9102,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, `passkey_not_accepted`, or `signup_invite_only`. */
+            /** @description `csrf_check_failed`, `passkey_not_accepted`, `signup_invite_only`, or `sign_in_not_allowed`. */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9173,7 +9173,7 @@ export interface operations {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
             };
-            /** @description `csrf_check_failed`, or `signup_invite_only` (this instance takes invited people only, and a passkey proves no address). */
+            /** @description `csrf_check_failed`, `signup_invite_only` (this instance takes invited people only, and a passkey proves no address), or `sign_in_not_allowed` (the instance has an allow-list, which a passkey cannot meet). */
             403: {
                 headers: {
                     [name: string]: unknown;
