@@ -129,7 +129,7 @@ pub async fn execute(
             )
             .await?;
     }
-    let view = list_members::load(&mut tx, id, Some(member))
+    let view = list_members::load(&mut tx, id, Some(member), access.user)
         .await?
         .pop()
         .ok_or(Error::NotFound)?;

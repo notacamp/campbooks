@@ -5,6 +5,8 @@ import { Avatar } from "../Avatar/Avatar";
 import { Button } from "../Button/Button";
 import { Select } from "../Field/Field";
 import { InlineConfirm } from "../InlineConfirm/InlineConfirm";
+import { ProviderMark } from "../ProviderMark/ProviderMark";
+import { StatusText } from "../StatusText/StatusText";
 
 import { List, ListRow } from "./List";
 
@@ -77,6 +79,42 @@ export const Invitations: Story = {
           meta="Admin · expired"
           trailing={<Button variant="ghost">Send again</Button>}
         />
+      </List>
+    </div>
+  ),
+};
+
+/** Mailboxes: the chosen row (J/K) is highlighted and carries the keys. */
+export const Selected: Story = {
+  render: () => (
+    <div className="max-w-measure">
+      <List label="Mailboxes">
+        <ListRow
+          leading={<ProviderMark name="Gmail" size="lg" />}
+          title="ana@example.com"
+          meta="Gmail · Connected by you"
+          trailing={<Button variant="ghost">Disconnect</Button>}
+        >
+          <StatusText tone="ok">Syncing</StatusText>
+        </ListRow>
+        <ListRow
+          selected
+          leading={<ProviderMark name="Zoho Mail" size="lg" />}
+          title="ana.duarte@example.net"
+          meta="Zoho Mail · Connected by you"
+          trailing={
+            <>
+              <Button variant="secondary" keys="r">
+                Reconnect
+              </Button>
+              <Button variant="ghost" keys="backspace">
+                Disconnect
+              </Button>
+            </>
+          }
+        >
+          <StatusText tone="problem">Needs you to sign in again</StatusText>
+        </ListRow>
       </List>
     </div>
   ),

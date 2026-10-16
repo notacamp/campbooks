@@ -51,7 +51,11 @@
     "older_one": "{{count}} older message",
     "older_other": "{{count}} older messages",
     "showOlder": "Show",
-    "attachments": "Attachments"
+    "attachments": "Attachments",
+    "kept": {
+      "title": "Kept as history",
+      "lead": "{{address}} was disconnected and its mail kept here, read-only: nothing new arrives, and nothing can be sent or changed from it."
+    }
   },
   "actions": {
     "star": "Star",

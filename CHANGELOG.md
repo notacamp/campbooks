@@ -229,6 +229,35 @@ All notable changes to Campbooks Next are documented here. The format follows
   and `dismiss_rule_suggestion`; new event `conversations.rule_changed`. The
   screens that use them follow in the next release.
 - `conversations.need_changed` may clear a need with cause `rule`.
+- Settings → Mailboxes: every mailbox connected to the workspace (yours;
+  all of them for owners and admins), who connected it and whether it is
+  syncing, waiting for someone to sign in again, paused by the provider or
+  failing. Connect Gmail or Zoho Mail from there (only the providers your
+  instance has set up for mail), choosing whether you also sign in with that
+  account (untick it for a shared mailbox like support@, which then never
+  becomes a way in); reconnect a mailbox of yours that stopped; or
+  disconnect one, choosing whether its mail in Campbooks is deleted (the
+  default) or kept as read-only history. The mail at Gmail or Zoho is never
+  touched; a way to sign in that came only from connecting that mailbox
+  goes with it. Keys: ⇧C connect, J/K choose, R reconnect, ⌫ disconnect. Home's
+  "Connect your mail" now opens it, and Settings lists its sections
+  (Members, Mailboxes, Ways to sign in) in the sidebar and, on phones,
+  under the header. API: `identity.list_ways_in` returns
+  `mailbox_providers`; `identity.start_link` takes `sign_in` for a connect
+  (default `true`) and adds no way in when it is `false`; a way in that came
+  only from connecting a mailbox is removed when that mailbox is disconnected
+  (unless another connection of yours uses it or it is your last way in),
+  signing out whoever used it, and a connect that fails (mail access declined,
+  or the mailbox refused) leaves no new way in behind;
+  `connectors.connection_added` now names the provider account and the
+  grantor's account and is published for every accepted grant; connections
+  show `granted_by_you` and members
+  `you` (the app no longer works out who you are by matching email
+  addresses). An inbox kept as history after a disconnect opens read-only,
+  saying so, with nothing to act on; new messages never offer it. Two
+  migrations (link tickets, and the connections a way in brought); nothing
+  to do.
+
 - **Move through the inbox with the arrow keys.** ↓ and ↑ move through a
   stream's conversations like J and K, Enter opens one, and going past the
   last row loads more. In an open conversation the arrows scroll it (J and K

@@ -200,7 +200,8 @@
     "confirmForget": "Oublier {{address}} ? Campbooks supprime l’autorisation que Google lui a donnée. Vous pourrez toujours vous connecter avec ce compte.",
     "confirm": "L’oublier",
     "cancel": "La garder",
-    "forgetFailed": "Impossible de l’oublier. Réessayez."
+    "forgetFailed": "Impossible de l’oublier. Réessayez.",
+    "other": "Relier une autre boîte mail"
   },
   "waysIn": {
     "title": "Moyens de connexion",
@@ -275,7 +276,7 @@
       },
       "consent_incomplete": {
         "title": "L’accès aux mails n’a pas été autorisé.",
-        "lead": "Vous pouvez vous connecter avec ce compte, mais sa boîte mail n’est pas connectée. Réessayez en autorisant l’accès aux mails."
+        "lead": "Rien n’a été connecté, et ce compte n’a pas été ajouté comme moyen de connexion. Réessayez en autorisant l’accès aux mails."
       },
       "account_mismatch": {
         "title": "C’est un autre compte.",

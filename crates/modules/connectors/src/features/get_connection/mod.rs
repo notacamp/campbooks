@@ -72,7 +72,7 @@ pub async fn execute(
     let connection = connections::load(&mut tx, id)
         .await?
         .ok_or(Error::NotFound)?;
-    let view = connections::view(&mut tx, connection).await?;
+    let view = connections::view(&mut tx, connection, access.user).await?;
     tx.commit().await?;
     Ok(view)
 }

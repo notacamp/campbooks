@@ -87,7 +87,7 @@
     "roleOf": "Rol de {{name}}",
     "remove": "Quitar",
     "removeLabel": "Quitar a {{name}}",
-    "confirmRemove": "¿Quitar a {{name}} de {{workspace}}? Pierde el acceso al instante. Para que vuelva, tendrás que invitarle de nuevo.",
+    "confirmRemove": "¿Quitar a {{name}} de {{workspace}}? Pierde el acceso al instante. Para que vuelva, tendrás que invitarle de nuevo. Sus buzones de aquí se desconectan, y una forma de iniciar sesión que solo añadió al conectar uno de ellos también desaparece.",
     "cancel": "Cancelar",
     "roleChanged": "{{name}}: {{role}}",
     "readOnly": "Solo los propietarios y administradores pueden invitar a personas o cambiar roles.",

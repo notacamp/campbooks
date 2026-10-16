@@ -66,6 +66,11 @@ pub struct StartLink {
     /// The connection, for `reconnect`.
     #[serde(default)]
     pub connection_id: Option<String>,
+    /// For `connect`: also sign in with the account (default `true`).
+    /// `false` for a shared mailbox (support@): it is connected, never
+    /// added as a way in. Ignored by the other purposes.
+    #[serde(default)]
+    pub sign_in: Option<bool>,
     /// Same-origin path to come back to (default `/`), with `linked=`,
     /// `connected=` or `link_error=` added.
     #[serde(default)]
@@ -158,6 +163,7 @@ pub async fn execute(
                 expected_subject: None,
                 login_hint: None,
                 return_to,
+                adds_way_in: true,
             }
         }
         LinkPurpose::Connect => {
@@ -181,6 +187,7 @@ pub async fn execute(
                 expected_subject: None,
                 login_hint: None,
                 return_to,
+                adds_way_in: input.sign_in.unwrap_or(true),
             }
         }
         LinkPurpose::Reconnect => {
@@ -204,6 +211,7 @@ pub async fn execute(
                 expected_subject: Some(target.account_subject),
                 login_hint: Some(target.address),
                 return_to,
+                adds_way_in: false,
             }
         }
     };

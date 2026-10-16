@@ -160,6 +160,9 @@ pub struct Flow {
     pub code_verifier: String,
     /// Whether this round trip already asked for consent again.
     pub consent_retry: bool,
+    /// Whether a connect also adds the account as a way in (`false` for a
+    /// shared mailbox). Always `true` for other purposes.
+    pub adds_way_in: bool,
 }
 
 impl Flow {
@@ -177,6 +180,7 @@ impl Flow {
             nonce: random_token(),
             code_verifier: random_token(),
             consent_retry: false,
+            adds_way_in: true,
         }
     }
 }
@@ -202,8 +206,8 @@ pub async fn store_flow(
         "INSERT INTO identity.upstream_flows
              (state_hash, browser_hash, provider, purpose, account_id, target_workspace_id,
               connection_id, expected_subject, request_id, return_to, nonce, code_verifier,
-              consent_retry, created_at, expires_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)",
+              consent_retry, created_at, expires_at, adds_way_in)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)",
     )
     .bind(&state_hash)
     .bind(hash(browser_token))
@@ -220,6 +224,7 @@ pub async fn store_flow(
     .bind(flow.consent_retry)
     .bind(now)
     .bind(now + FLOW_LIFETIME)
+    .bind(flow.adds_way_in)
     .execute(db)
     .await?;
     Ok(())
@@ -248,6 +253,7 @@ pub async fn take_flow(
         return_to: String,
         nonce: String,
         code_verifier: Vec<u8>,
+        adds_way_in: bool,
         consent_retry: bool,
         expires_at: DateTime<Utc>,
     }
@@ -257,7 +263,8 @@ pub async fn take_flow(
         "DELETE FROM identity.upstream_flows WHERE state_hash = $1
          RETURNING browser_hash, provider, purpose, account_id,
                    target_workspace_id AS workspace_id, connection_id, expected_subject,
-                   request_id, return_to, nonce, code_verifier, consent_retry, expires_at",
+                   request_id, return_to, nonce, code_verifier, consent_retry, expires_at,
+                   adds_way_in",
     )
     .bind(&state_hash)
     .fetch_optional(db)
@@ -289,6 +296,7 @@ pub async fn take_flow(
         nonce: row.nonce,
         code_verifier,
         consent_retry: row.consent_retry,
+        adds_way_in: row.adds_way_in,
     }))
 }
 

@@ -133,10 +133,6 @@ reason = "A test file (`#[cfg(test)] mod flows;`): fixtures publish from plain t
 
 # Published events nothing consumes yet, and why they exist.
 [[access.unconsumed_events]]
-name = "connectors.connection_added"
-reason = "The change feed (connections list) and automation to come."
-
-[[access.unconsumed_events]]
 name = "connectors.connection_needs_reauth"
 reason = "The change feed (a connection's health) and notifications to come."
 

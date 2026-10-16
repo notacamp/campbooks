@@ -911,6 +911,8 @@ export interface components {
             role: components["schemas"]["Role"];
             /** @description The user. */
             user_id: components["schemas"]["UserId"];
+            /** @description It is the caller (by user id, never by email). */
+            you: boolean;
         };
         /**
          * @description When schema migrations run.

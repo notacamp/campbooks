@@ -1,6 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { api, operationKey, unwrap, type Schema } from "~/lib/api";
+import {
+  api,
+  errorStatus,
+  operationKey,
+  unwrap,
+  unwrapEmpty,
+  type OperationQuery,
+  type Schema,
+} from "~/lib/api";
 
 export type Connection = Schema<"ConnectionView">;
 
@@ -18,5 +26,57 @@ export function useConnections(workspaceId: string) {
           signal,
         }),
       ).connections,
+  });
+}
+
+/** What becomes of a disconnected mailbox's mail in Campbooks. */
+export type MailChoice = NonNullable<OperationQuery<"connectors.disconnect">["mail"]>;
+
+/**
+ * `connectors.disconnect`: stops syncing for good and gives up the grant at
+ * the provider; its mail in Campbooks is deleted or kept read-only (`mail`).
+ * Only its grantor may. The connection leaves the cached list.
+ */
+export function useDisconnect(workspaceId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ connectionId, mail }: { connectionId: string; mail: MailChoice }) => {
+      unwrapEmpty(
+        await api.DELETE("/api/v1/w/{workspace_id}/connections/{connection_id}", {
+          params: {
+            path: { workspace_id: workspaceId, connection_id: connectionId },
+            query: { mail },
+          },
+        }),
+      );
+      return connectionId;
+    },
+    onSuccess: (connectionId) => {
+      queryClient.setQueryData<Connection[]>(
+        operationKey("connectors.list_connections", { workspace_id: workspaceId }),
+        (connections) => connections?.filter((connection) => connection.id !== connectionId),
+      );
+      // A way in may have gone with it, and its inboxes were deleted or kept.
+      // Not awaited: the row that asked is gone from the list, and the
+      // caller's own onSuccess must still run.
+      void Promise.all([
+        queryClient.invalidateQueries({ queryKey: operationKey("identity.list_ways_in") }),
+        queryClient.invalidateQueries({
+          queryKey: operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: operationKey("conversations.list", { workspace_id: workspaceId }),
+        }),
+      ]);
+    },
+    onError: (error) => {
+      // Gone already (or never yours to see): the stale row goes. Not
+      // awaited, so the caller hears of the failure before its row does.
+      if (errorStatus(error) === 404) {
+        void queryClient.invalidateQueries({
+          queryKey: operationKey("connectors.list_connections", { workspace_id: workspaceId }),
+        });
+      }
+    },
   });
 }
