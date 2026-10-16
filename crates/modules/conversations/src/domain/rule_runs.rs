@@ -180,7 +180,8 @@ pub async fn start(
         workspace,
         rule.inbox,
         rule.id,
-        rule.state,
+        // As readers see it: paused while its author may not act.
+        rule.effective_state(),
         run.as_ref(),
     )
     .await?;

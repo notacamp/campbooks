@@ -269,3 +269,89 @@ mod tests {
         );
     }
 }
+
+/// A member's account was suspended (`identity.account_suspended`): they
+/// cannot get in, and whatever acts in their name in the workspace stops
+/// until the suspension is lifted. Published in every workspace they belong
+/// to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MemberSuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When the suspension took effect; of two changes to one member, the
+    /// later `at` is the truth, whatever order they arrive in.
+    pub at: DateTime<Utc>,
+}
+
+impl DomainEvent for MemberSuspended {
+    const NAME: &'static str = "workspaces.member_suspended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// A member's suspension was lifted (`identity.account_unsuspended`).
+/// Published in every workspace they belong to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct MemberUnsuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When the lift took effect, ordered like [`MemberSuspended::at`].
+    pub at: DateTime<Utc>,
+}
+
+impl DomainEvent for MemberUnsuspended {
+    const NAME: &'static str = "workspaces.member_unsuspended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+// --- Events this module reads -------------------------------------------------
+
+/// `identity.account_suspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountSuspended {
+    /// The account: a user's `idp_subject`.
+    pub account: uuid::Uuid,
+    /// When it took effect; absent on events published before it existed.
+    #[serde(default)]
+    pub at: Option<DateTime<Utc>>,
+}
+
+impl DomainEvent for AccountSuspended {
+    const NAME: &'static str = "identity.account_suspended";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}
+
+/// `identity.account_unsuspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AccountUnsuspended {
+    /// The account: a user's `idp_subject`.
+    pub account: uuid::Uuid,
+    /// When it took effect.
+    pub at: DateTime<Utc>,
+}
+
+impl DomainEvent for AccountUnsuspended {
+    const NAME: &'static str = "identity.account_unsuspended";
+    const VERSION: u16 = 1;
+    const WORKSPACE_SCOPED: bool = false;
+
+    fn workspace(&self) -> Option<&str> {
+        None
+    }
+}

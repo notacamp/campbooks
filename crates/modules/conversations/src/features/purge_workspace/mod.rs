@@ -54,6 +54,13 @@ impl Job for PurgeWorkspace {
         .execute(&mut **tx)
         .await?
         .rows_affected();
+        // Not tied to an inbox: whether each member is suspended.
+        sqlx::query!(
+            "DELETE FROM conversations.member_suspensions WHERE workspace_id = $1",
+            workspace.as_uuid()
+        )
+        .execute(&mut **tx)
+        .await?;
         tracing::info!(
             inboxes = deleted,
             "conversations purged for a deleted workspace"
@@ -78,6 +85,16 @@ mod tests {
         for workspace in [gone, kept] {
             let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
             kit.ingest(workspace, inbox, "en").await;
+            // A member suspended there.
+            sqlx::query(
+                "INSERT INTO conversations.member_suspensions
+                     (workspace_id, user_id, suspended, as_of)
+                 VALUES ($1, gen_random_uuid(), true, now())",
+            )
+            .bind(workspace.as_uuid())
+            .execute(&db)
+            .await
+            .unwrap();
         }
         let mut tx = kit.state.db.begin().await.unwrap();
         campbooks_kernel::db::set_workspace(&mut tx, &gone.to_string())
@@ -104,5 +121,11 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(left, [(kept.to_string(), 4)]);
+        let suspensions: Vec<String> =
+            sqlx::query_scalar("SELECT workspace_id::text FROM conversations.member_suspensions")
+                .fetch_all(&db)
+                .await
+                .unwrap();
+        assert_eq!(suspensions, [kept.to_string()]);
     }
 }

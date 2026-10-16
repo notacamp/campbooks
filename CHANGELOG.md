@@ -8,6 +8,20 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A suspended member's rules pause until the suspension is lifted.** A rule acts in
+  its author's name, so while an administrator has the author's account suspended their
+  rules read as paused, exactly as when the author can no longer change the inbox: they
+  leave new mail alone, a run over existing mail stops at its next batch, and previews
+  and suggestions no longer count them. Unsuspending makes them act again, with nothing
+  to redo (a run they stopped is not restarted). Other members see only that the rule
+  is paused for now and acts again on its own, never that its author is suspended. A
+  member removed while suspended gets their rules back when invited again. The identity
+  module now also publishes `identity.account_unsuspended`, both suspension events carry
+  an ordered `at`, and the workspaces module announces each in every workspace of the
+  account (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
+  `20261020210000_conversations__member_suspensions`. An account suspended before this
+  version keeps its rules acting until an administrator unsuspends and suspends it again
+  (campbooks-cloud#147).
 - **A database transaction that names no workspace now sees nothing.** The kernel's
   event log, job queue, change feed and blob catalogue used to show every workspace's
   rows to any transaction that set no workspace, which is how background work crossed
@@ -186,6 +200,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **The rules list says why a rule is paused**, first on its line: its author can no
+  longer change the inbox, its author is away for now (it acts again on its own; the
+  cause is never shown), a member paused it, or the inbox is kept read-only
+  (`RuleView.paused_reason`). A rule a member paused no longer claims its author lost
+  access.
 - One "Search or ask" field and menu, with conversations inline. The sidebar's
   separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
   wider) open the same menu, which lists matching conversations first (matched words

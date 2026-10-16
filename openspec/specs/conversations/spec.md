@@ -871,7 +871,11 @@ preview rules: creating, confirming, changing, removing or restoring one
 answers 403 `rule_needs_member`. A rule SHALL act for every member of its
 inbox. When its author no longer may write in the inbox, or the inbox is kept
 read-only, the rule SHALL be paused (and its running runs stop) until a
-manager adopts or removes it.
+manager adopts or removes it. While its author's account is suspended, the
+rule SHALL be paused the same way (a running apply run is cancelled at its
+next batch, new mail is not changed by it, and previews and suggestions do
+not count it), and lifting the suspension SHALL make it act again with
+nothing to redo; a run it cancelled is not restarted.
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -880,6 +884,14 @@ manager adopts or removes it.
 #### Scenario: The author leaves
 - **WHEN** Leo is removed from info@
 - **THEN** his rules there are paused and stop acting on new mail
+
+#### Scenario: The author is suspended, then the suspension is lifted
+- **WHEN** an administrator suspends Leo, who taught a rule in info@, and later lifts the suspension
+- **THEN** while suspended the rule reads as paused with `paused_reason` `author_unavailable` and leaves new mail alone, and once lifted it is active and acts on new mail again
+
+#### Scenario: A run going when the author is suspended
+- **WHEN** Leo's rule is being applied to existing mail and Leo is suspended before its next batch
+- **THEN** that batch cancels the run and changes nothing
 
 #### Scenario: An app
 - **WHEN** a client token with `conversations:write`, registered by Sam, creates a rule
@@ -1032,9 +1044,10 @@ and kind as creating one does. Otherwise the response SHALL be 409
 
 ### Requirement: Purging rules
 Removing an inbox's mail and purging a workspace SHALL delete its rules,
-runs, applications and dismissals. Keeping an inbox read-only SHALL cancel
-its rules' runs and drop what only served acting again: the members' words
-(`origin_text`), what each rule changed (`before`) and the dismissed
+runs, applications and dismissals; purging a workspace SHALL also delete the
+suspensions it recorded for its members. Keeping an inbox read-only SHALL
+cancel its rules' runs and drop what only served acting again: the members'
+words (`origin_text`), what each rule changed (`before`) and the dismissed
 suggestions. A member leaving SHALL drop the suggestions they dismissed.
 
 #### Scenario: Disconnecting with the mail deleted
@@ -1310,3 +1323,31 @@ message.
 #### Scenario: Recent mail is read again
 - **WHEN** the upgrade runs with Jev configured and a conversation's newest inbound message from three days ago has no checked model answer
 - **THEN** the model is asked about it once and its accepted answers sort the conversation and raise its need
+
+### Requirement: Suspended authors
+The module SHALL record, per workspace, whether each member is suspended,
+from `workspaces.member_suspended` and `workspaces.member_unsuspended`
+(`conversations.pause_suspended_author`,
+`conversations.resume_unsuspended_author`), keeping for each member the
+change with the newest `at`: a duplicate, or a change older than the one
+recorded, SHALL change nothing. Whenever it records a change, the module
+SHALL publish `conversations.rule_changed` for each of the member's rules
+that is not removed. A member leaving the workspace SHALL be recorded as not
+suspended as of their departure (they come back only by signing in).
+`RuleView` SHALL carry `paused_reason` when its state is `paused`:
+`inbox_read_only`, else `author_cannot_write`, else `paused_by_member`, else
+`author_unavailable`. A suspension is an administrator's action and SHALL
+not be disclosed to other members, clients or the assistant: no rule
+reason, event or text readable in the workspace names it.
+
+#### Scenario: Delivered out of order
+- **WHEN** the lift (newer `at`) is delivered before the suspension it lifts
+- **THEN** the member is recorded as not suspended and their rules stay active
+
+#### Scenario: Delivered twice
+- **WHEN** the same suspension is delivered twice
+- **THEN** the member is suspended once and `rule_changed` is published once per rule
+
+#### Scenario: Removed while suspended, invited back after
+- **WHEN** a suspended member is removed from the workspace, the suspension is lifted (which no longer reaches that workspace), and they are invited back to the inbox
+- **THEN** their rules act again

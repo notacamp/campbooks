@@ -808,7 +808,7 @@
       "workspaceScoped": false,
       "payload": {
         "type": "object",
-        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions).",
+        "description": "An administrator suspended an account: its sessions ended and its\nrefresh tokens were revoked, and it cannot sign in until it is\nunsuspended. Consumers drop whatever else keeps it signed in (the web\nBFF's sessions) and stop whatever acts in its name (the rules its\nmember taught).",
         "required": [
           "account"
         ],
@@ -817,6 +817,40 @@
             "type": "string",
             "format": "uuid",
             "description": "The account (the `sub` of its tokens)."
+          },
+          "at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "When the suspension took effect, read under the account's lock: a\nlater suspension or lift of the same account always has a later\n`at`. Absent on events published before it existed (use the event's\n`occurred_at`)."
+          }
+        }
+      }
+    },
+    {
+      "name": "identity.account_unsuspended",
+      "module": "identity",
+      "version": 1,
+      "workspaceScoped": false,
+      "payload": {
+        "type": "object",
+        "description": "An administrator lifted an account's suspension: it may sign in again.\nNothing that the suspension ended comes back, but what was only paused\n(the rules its member taught) acts again.",
+        "required": [
+          "account",
+          "at"
+        ],
+        "properties": {
+          "account": {
+            "type": "string",
+            "format": "uuid",
+            "description": "The account (the `sub` of its tokens)."
+          },
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the lift took effect, ordered like [`AccountSuspended::at`]."
           }
         }
       }
@@ -1199,6 +1233,66 @@
           "to": {
             "$ref": "#/components/schemas/Role",
             "description": "Their new role."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_suspended",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's account was suspended (`identity.account_suspended`): they\ncannot get in, and whatever acts in their name in the workspace stops\nuntil the suspension is lifted. Published in every workspace they belong\nto.",
+        "required": [
+          "workspace",
+          "user",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the suspension took effect; of two changes to one member, the\nlater `at` is the truth, whatever order they arrive in."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The member."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
+      "name": "workspaces.member_unsuspended",
+      "module": "workspaces",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A member's suspension was lifted (`identity.account_unsuspended`).\nPublished in every workspace they belong to.",
+        "required": [
+          "workspace",
+          "user",
+          "at"
+        ],
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the lift took effect, ordered like [`MemberSuspended::at`]."
           },
           "user": {
             "$ref": "#/components/schemas/UserId",

@@ -8,10 +8,17 @@
 //! live session and revokes every refresh-token family at once, records it
 //! in the account's audit trail and publishes
 //! [`AccountSuspended`](crate::events::AccountSuspended), on which the web
-//! BFF drops the account's web sessions. The access tokens already issued
+//! BFF drops the account's web sessions and the rules its member taught
+//! pause. The access tokens already issued
 //! stop at once: the account's revocation epoch moves to now
 //! ([`accounts::revoke_tokens`]), and the API checks it on every request.
-//! Unsuspending leaves the epoch: those tokens never come back.
+//! Unsuspending leaves the epoch: those tokens never come back. It publishes
+//! [`AccountUnsuspended`](crate::events::AccountUnsuspended), on which the
+//! paused rules act again.
+//!
+//! Both events carry `at`, read after the account's row is locked: a change
+//! that waited for an earlier one to commit reads a later time, so consumers
+//! can order the two by `at` whatever order they arrive in.
 
 use campbooks_kernel::{EventBus, Result};
 use chrono::{DateTime, Utc};
@@ -19,7 +26,7 @@ use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
 use super::accounts;
-use crate::events::AccountSuspended;
+use crate::events::{AccountSuspended, AccountUnsuspended};
 
 /// What suspending or unsuspending changed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -81,7 +88,16 @@ pub async fn suspend(
         now,
     )
     .await?;
-    events.publish(tx, &AccountSuspended { account }).await?;
+    let at = changed_at(tx).await?;
+    events
+        .publish(
+            tx,
+            &AccountSuspended {
+                account,
+                at: Some(at),
+            },
+        )
+        .await?;
     Ok(Outcome::Changed)
 }
 
@@ -90,6 +106,7 @@ pub async fn suspend(
 /// tokens issued before the suspension included (the epoch stays).
 pub async fn unsuspend(
     tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
     account: Uuid,
     by: &str,
     now: DateTime<Utc>,
@@ -112,5 +129,18 @@ pub async fn unsuspend(
         now,
     )
     .await?;
+    let at = changed_at(tx).await?;
+    events
+        .publish(tx, &AccountUnsuspended { account, at })
+        .await?;
     Ok(Outcome::Changed)
+}
+
+/// The moment a suspension or lift takes effect, for ordering: the
+/// database's clock now, while the account's row is locked (not the
+/// transaction's start, which may precede an earlier change's commit).
+async fn changed_at(tx: &mut Transaction<'_, Postgres>) -> Result<DateTime<Utc>> {
+    Ok(sqlx::query_scalar("SELECT clock_timestamp()")
+        .fetch_one(&mut **tx)
+        .await?)
 }

@@ -83,6 +83,7 @@ pub fn module(deps: Deps) -> Module {
             .publishes::<events::WayInRemoved>()
             .publishes::<events::SignedOutEverywhere>()
             .publishes::<events::AccountSuspended>()
+            .publishes::<events::AccountUnsuspended>()
             .publishes::<events::ClientRegistered>()
             .publishes::<events::ClientRemoved>()
             .publishes::<events::ConsentGranted>()

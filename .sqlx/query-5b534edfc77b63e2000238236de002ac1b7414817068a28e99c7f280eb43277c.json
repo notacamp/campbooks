@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT id AS \"id: RuleId\" FROM conversations.rules\n            WHERE taught_by = $1 AND state <> 'removed' ORDER BY id",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id: RuleId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rules",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "5b534edfc77b63e2000238236de002ac1b7414817068a28e99c7f280eb43277c"
+}
