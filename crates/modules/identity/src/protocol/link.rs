@@ -153,6 +153,16 @@ pub(super) async fn finish(
         }
         return Ok(hand_over(ctx, upstream, flow, identity, tokens).await);
     }
+    // A way in added to an account must be an address the allow-list lets in.
+    if !ctx.permits_identity(&identity)? {
+        drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+        tracing::info!(
+            provider = provider.as_str(),
+            purpose = flow.purpose.as_str(),
+            "refused a way in the allow-list does not let in"
+        );
+        return Ok(back(&flow.return_to, "link_error", "sign_in_not_allowed"));
+    }
     let via = if flow.purpose == Purpose::Link {
         "link"
     } else {

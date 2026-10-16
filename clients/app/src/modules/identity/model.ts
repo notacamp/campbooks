@@ -80,6 +80,7 @@ const SIGN_IN_ERRORS = [
   "account_suspended",
   "way_in_belongs_to_another_account",
   "signup_invite_only",
+  "sign_in_not_allowed",
 ] as const;
 export type SignInError = (typeof SIGN_IN_ERRORS)[number] | "unknown";
 
@@ -109,6 +110,7 @@ const LINK_ERRORS = [
   "consent_incomplete",
   "account_mismatch",
   "account_connected_by_another_member",
+  "sign_in_not_allowed",
 ] as const;
 type LinkError = (typeof LINK_ERRORS)[number] | "unknown";
 

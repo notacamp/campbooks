@@ -244,6 +244,28 @@ pub async fn is_suspended(conn: &mut PgConnection, id: Uuid) -> Result<bool> {
     Ok(active != Some(true))
 }
 
+/// Whether `allow` lets account `id` in: an unrestricted list always does;
+/// a restricted one only when the account has a provider way in whose
+/// address the provider verified and the list permits (a passkey proves no
+/// address). Judged on the address recorded when the way in was linked.
+pub async fn is_allowed(
+    conn: &mut PgConnection,
+    allow: &campbooks_kernel::config::AllowList,
+    id: Uuid,
+) -> Result<bool> {
+    if !allow.is_restricted() {
+        return Ok(true);
+    }
+    let addresses: Vec<String> = sqlx::query_scalar(
+        "SELECT email_at_link FROM identity.provider_identities
+          WHERE account_id = $1 AND email_verified_at_link AND email_at_link IS NOT NULL",
+    )
+    .bind(id)
+    .fetch_all(conn)
+    .await?;
+    Ok(addresses.iter().any(|a| allow.permits(Some(a))))
+}
+
 /// Record `kind` in the account's audit trail. `metadata` holds ids,
 /// provider names and methods only.
 pub async fn audit(
