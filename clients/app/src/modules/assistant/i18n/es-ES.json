@@ -3,7 +3,8 @@
     "title": "Dile a Scout lo que te importa",
     "lead": "Tres preguntas rápidas, todas opcionales. Tus respuestas se convierten en reglas que ves antes de guardarlas.",
     "start": "Empezar",
-    "notNow": "Ahora no"
+    "notNow": "Ahora no",
+    "notNowFailed": "Scout no ha podido aplazar las preguntas. Inténtalo de nuevo."
   },
   "flow": {
     "step": "{{step}} de {{total}}",
@@ -62,18 +63,30 @@
       "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
       "save": "Guardar",
       "saving": "Guardando",
-      "failed": "Scout no ha podido guardarlo todo. Lo guardado aparece en la memoria de Scout; inténtalo de nuevo para el resto."
+      "retry": "Reintentar",
+      "tryAgain": "Reintentar",
+      "inboxesFailed": "Scout no ha podido cargar tus bandejas de entrada, así que no sabe dónde pueden ir estas reglas.",
+      "chooseInbox": "Tus bandejas de entrada están compartidas con otras personas, así que las reglas quedan desactivadas hasta que actives una arriba.",
+      "nowhere": "Solo puedes leer tus bandejas de entrada, así que estas reglas no tienen dónde ir. Vuelve atrás y omítelas, o pregunta a quien gestiona la bandeja.",
+      "rulesFailed": "Scout no ha podido guardar las reglas. No se ha guardado nada; inténtalo de nuevo.",
+      "partial": "Scout ha guardado {{saved}} de {{total}} y se ha detenido. Esas siguen guardadas; Reintentar guarda solo el resto.",
+      "answersFailed": "Scout no ha podido guardar tus respuestas. Inténtalo de nuevo; nada se guarda dos veces."
     },
     "done": {
       "title": "Scout sabe lo que te importa",
       "lead_one": "{{count}} regla está activa. La encontrarás en la memoria de Scout.",
       "lead_other": "{{count}} reglas están activas. Las encontrarás en la memoria de Scout.",
-      "leadNone": "No ha cambiado nada. Puedes volver a responder cuando quieras en la memoria de Scout.",
       "toast_one": "Guardada {{count}} regla y tus respuestas",
       "toast_other": "Guardadas {{count}} reglas y tus respuestas",
       "home": "Abrir Inicio",
-      "memory": "Ver la memoria de Scout"
-    }
+      "memory": "Ver la memoria de Scout",
+      "leadAskFirst": "Ninguna regla nueva. A partir de ahora, Scout te pregunta antes de actuar.",
+      "leadActThenTell": "Ninguna regla nueva. A partir de ahora, en una bandeja solo tuya, Scout actúa cuando está seguro y te avisa, con Deshacer.",
+      "leadSame": "Ninguna regla nueva, y tus respuestas son las mismas que antes. Puedes volver a responder cuando quieras en la memoria de Scout.",
+      "toastAnswers": "Tus respuestas se han guardado"
+    },
+    "notNowFailed": "Scout no ha podido aplazar las preguntas. Inténtalo de nuevo, o respóndelas.",
+    "undoFailed": "Scout no ha podido deshacerlo. Tus reglas están en la memoria de Scout, donde puedes quitarlas."
   },
   "rule": {
     "tag": "Regla",
@@ -164,7 +177,13 @@
         "instruction_too_long": "Usa como máximo 300 caracteres: una o dos frases.",
         "instruction_has_link": "No incluyas enlaces. Di qué correo y qué hacer con él.",
         "instruction_pasted_mail": "Esto parece pegado de un correo. Di con tus palabras qué correo y qué hacer con él."
-      }
+      },
+      "tryAgain": "Reintentar",
+      "inboxesFailed": "Scout no ha podido cargar tus bandejas de entrada, así que no sabe dónde puede ir esta regla.",
+      "announce": "Esta es la regla que he entendido: {{rule}}",
+      "saveFailed": "Scout no ha podido guardar la regla. Inténtalo de nuevo.",
+      "savePartial": "Guardada en {{saved}} de {{total}} bandejas, y Scout se ha detenido. Reintentar la guarda en las demás.",
+      "retry": "Reintentar"
     },
     "builder": {
       "noModel": "Este servidor no tiene un modelo de lenguaje para leer frases, así que crea la regla aquí.",
@@ -187,7 +206,8 @@
         "newsletters": "Moverlo a Boletines",
         "archive": "Archivarlo"
       },
-      "show": "Mostrar la regla"
+      "show": "Mostrar la regla",
+      "byHand": "Scout no ha podido leer tu frase, así que crea la regla aquí."
     },
     "questions": {
       "title": "Tus respuestas",
@@ -195,12 +215,18 @@
       "actThenTell": "Cuando Scout propone una regla a partir de tus correcciones en una bandeja solo tuya, la activa y te avisa, con Deshacer.",
       "never": "Todavía no has respondido a las preguntas de Scout.",
       "again": "Responder de nuevo a las preguntas",
-      "start": "Responder a las preguntas"
+      "start": "Responder a las preguntas",
+      "failed": "Scout no ha podido cargar tus respuestas ahora."
     },
     "rules": "Tus reglas"
   },
   "shortcuts": {
     "skip": "Omitir esta pregunta",
-    "next": "Siguiente, o guardar"
+    "next": "Siguiente, o guardar",
+    "back": "Volver a la pregunta anterior",
+    "offerStart": "Responder a las preguntas de Scout",
+    "offerNotNow": "Aplazar las preguntas de Scout",
+    "questions": "Responder de nuevo a las preguntas de Scout",
+    "saveRule": "Guardar la regla"
   }
 }

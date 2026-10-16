@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Select, TextField } from "~/lib/ui";
+import { Banner, Button, Select, SkeletonList, TextField } from "~/lib/ui";
 import { useInboxes } from "~/modules/conversations";
 
 import type { Action, Condition, RuleShape } from "../../api/queries";
@@ -80,6 +80,29 @@ export function RuleBuilder({ workspaceId }: { workspaceId: string }) {
     shared: inbox.shared,
   }));
 
+  if (rule !== undefined && inboxes.isPending) {
+    // Not "read-only": the inboxes aren't known yet.
+    return <SkeletonList rows={1} />;
+  }
+  if (rule !== undefined && inboxes.isError) {
+    return (
+      <Banner
+        tone="danger"
+        role="alert"
+        title={t("memory.teach.inboxesFailed")}
+        action={
+          <Button
+            variant="secondary"
+            onClick={() => {
+              void inboxes.refetch();
+            }}
+          >
+            {t("memory.teach.tryAgain")}
+          </Button>
+        }
+      />
+    );
+  }
   if (rule !== undefined) {
     return (
       <RuleSave
@@ -87,7 +110,7 @@ export function RuleBuilder({ workspaceId }: { workspaceId: string }) {
         rule={rule}
         inboxes={targets}
         origin="instruction"
-        focusSave
+        primary
         onDone={() => {
           setRule(undefined);
           setValue("");

@@ -11,6 +11,7 @@ import {
   ChoiceCards,
   FocusPage,
   Heading,
+  SkeletonList,
   Text,
   useUndoToast,
   Visor,
@@ -72,7 +73,16 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   const [chosen, setChosen] = useState<Proactivity | undefined>();
   const [sharedOn, setSharedOn] = useState<string[]>([]);
   const [existing, setExisting] = useState(true);
-  const [saved, setSaved] = useState(0);
+  // Rules created so far, by `<rule>|<inbox>`, so a retry sends only the rest.
+  const [created, setCreated] = useState<ReadonlyMap<string, string>>(new Map());
+  // One teaching per answer, the same across retries.
+  const [teachings] = useState(() => new Map<string, string>());
+  const [failure, setFailure] = useState<"rules" | "answers" | undefined>();
+  // What saving changed, for the done screen.
+  const [saved, setSaved] = useState<{ rules: number; proactivity: Proactivity | undefined }>({
+    rules: 0,
+    proactivity: undefined,
+  });
   const proactivity = chosen ?? profile.data?.proactivity ?? "ask_first";
 
   const all: TeachInbox[] = (inboxes.data ?? []).map((inbox) => ({
@@ -97,10 +107,24 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   const position = QUESTIONS.indexOf(step as (typeof QUESTIONS)[number]) + 1;
 
   const notNow = () => {
-    update.mutate(
-      { proactivity: profile.data?.proactivity ?? "ask_first", asked: true },
-      { onSettled: onHome },
-    );
+    void (async () => {
+      // Wait for the answers rather than overwrite them; unknown ones are
+      // left alone (Scout asks again another time).
+      const current = profile.data ?? (await profile.refetch()).data;
+      if (current === undefined) {
+        onHome();
+        return;
+      }
+      update.mutate(
+        { proactivity: current.proactivity, asked: true },
+        {
+          onSuccess: onHome,
+          onError: () => {
+            undo.notify(t("flow.notNowFailed"));
+          },
+        },
+      );
+    })();
   };
   const next = () => {
     setStep((current) => {
@@ -131,42 +155,95 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
     next();
   };
   useShortcut("scout.skip", skip, { enabled: asking });
+  useShortcut("scout.back", back, { enabled: step !== "always" && step !== "done" });
   useShortcut("overlay.close", notNow, { enabled: step !== "done" });
 
-  const save = () => {
+  // Every rule in every chosen inbox; the ones not created yet.
+  const wanted: NewRule[] = rules.flatMap((rule) => {
+    let teaching = teachings.get(rule.key);
+    if (teaching === undefined) {
+      teaching = teachingId();
+      teachings.set(rule.key, teaching);
+    }
+    const id = teaching;
+    return targets.map((inbox) => ({
+      key: `${rule.key}|${inbox.id}`,
+      inboxId: inbox.id,
+      conditions: rule.conditions,
+      actions: rule.actions,
+      origin: "onboarding" as const,
+      applyToExisting: existing,
+      teachingId: id,
+    }));
+  });
+  const pending = wanted.filter((rule) => !created.has(rule.key));
+  // Rules with nowhere to go: Save waits for an inbox (once they're known).
+  const noTarget = rules.length > 0 && inboxes.isSuccess && targets.length === 0;
+  const inboxesUnknown = rules.length > 0 && !inboxes.isSuccess;
+  const busy = create.isPending || update.isPending;
+
+  /** The answers, once every rule is in: then the done screen and one Undo. */
+  const finish = (all: ReadonlyMap<string, string>) => {
     const previous = profile.data;
-    const toCreate: NewRule[] = rules.flatMap((rule) => {
-      const teaching = teachingId();
-      return targets.map((inbox) => ({
-        inboxId: inbox.id,
-        conditions: rule.conditions,
-        actions: rule.actions,
-        origin: "onboarding" as const,
-        applyToExisting: existing,
-        teachingId: teaching,
-      }));
-    });
-    create.mutate(toCreate, {
-      onSuccess: (ids) => {
-        update.mutate(
-          { proactivity, asked: true },
-          {
-            onSuccess: () => {
-              setSaved(rules.length);
-              setStep("done");
-              undo.push({
-                label: t("flow.done.toast", { count: rules.length }),
-                undo: () => {
-                  remove.mutate(ids);
-                  update.mutate({
-                    proactivity: previous?.proactivity ?? "ask_first",
-                    asked: true,
-                  });
-                },
+    update.mutate(
+      { proactivity, asked: true },
+      {
+        onError: () => {
+          setFailure("answers");
+        },
+        onSuccess: () => {
+          setFailure(undefined);
+          const ids = [...all.values()];
+          // Rules that exist somewhere, not the answers given.
+          const count = new Set([...all.keys()].map((key) => key.split("|", 1)[0])).size;
+          setSaved({
+            rules: count,
+            proactivity: previous?.proactivity === proactivity ? undefined : proactivity,
+          });
+          setStep("done");
+          undo.push({
+            label: count === 0 ? t("flow.done.toastAnswers") : t("flow.done.toast", { count }),
+            // Promises, not mutate's callbacks: Undo may come after leaving
+            // for Home, and a failure must still be said.
+            undo: () => {
+              Promise.all([
+                ids.length > 0 ? remove.mutateAsync(ids) : undefined,
+                update.mutateAsync({
+                  proactivity: previous?.proactivity ?? "ask_first",
+                  asked: true,
+                }),
+              ]).catch(() => {
+                undo.notify(t("flow.undoFailed"));
               });
             },
-          },
-        );
+          });
+        },
+      },
+    );
+  };
+  const save = () => {
+    if (busy || noTarget || inboxesUnknown) {
+      return;
+    }
+    if (pending.length === 0) {
+      finish(created);
+      return;
+    }
+    create.mutate(pending, {
+      onSuccess: (result) => {
+        const all = new Map(created);
+        for (const each of result.created) {
+          all.set(each.key, each.id);
+        }
+        setCreated(all);
+        if (result.failed) {
+          setFailure("rules");
+          return;
+        }
+        finish(all);
+      },
+      onError: () => {
+        setFailure("rules");
       },
     });
   };
@@ -181,9 +258,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
     if (asking) {
       next();
     } else if (step === "review") {
-      if (!create.isPending && !update.isPending) {
-        save();
-      }
+      save();
     } else {
       onHome();
     }
@@ -208,7 +283,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
         {t("flow.skip")}
       </Button>
       {step === "always" ? null : (
-        <Button variant="ghost" size="lg" onClick={back}>
+        <Button variant="ghost" size="lg" shortcut="scout.back" onClick={back}>
           {t("flow.back")}
         </Button>
       )}
@@ -370,7 +445,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
       );
     }
     case "review": {
-      const busy = create.isPending || update.isPending;
+      const createdCount = wanted.length - pending.length;
       return (
         <FocusPage
           top={top}
@@ -381,11 +456,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
               : t("flow.reviewStep.rules", { count: rules.length })
           }
           footer={t("flow.footer")}
-          onSubmit={() => {
-            if (!busy) {
-              save();
-            }
-          }}
+          onSubmit={save}
           actions={
             <>
               <Button
@@ -393,11 +464,21 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
                 variant="primary"
                 size="lg"
                 shortcut="scout.next"
-                disabled={busy}
+                disabled={busy || noTarget || inboxesUnknown}
               >
-                {busy ? t("flow.reviewStep.saving") : t("flow.reviewStep.save")}
+                {busy
+                  ? t("flow.reviewStep.saving")
+                  : failure === undefined
+                    ? t("flow.reviewStep.save")
+                    : t("flow.reviewStep.retry")}
               </Button>
-              <Button variant="ghost" size="lg" disabled={busy} onClick={back}>
+              <Button
+                variant="ghost"
+                size="lg"
+                shortcut="scout.back"
+                disabled={busy}
+                onClick={back}
+              >
                 {t("flow.back")}
               </Button>
             </>
@@ -412,7 +493,25 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
               names={names}
             />
           ))}
-          {rules.length === 0 ? null : (
+          {rules.length > 0 && inboxes.isPending ? <SkeletonList rows={1} /> : null}
+          {rules.length > 0 && inboxes.isError ? (
+            <Banner
+              tone="danger"
+              role="alert"
+              title={t("flow.reviewStep.inboxesFailed")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void inboxes.refetch();
+                  }}
+                >
+                  {t("flow.reviewStep.tryAgain")}
+                </Button>
+              }
+            />
+          ) : null}
+          {rules.length === 0 || !inboxes.isSuccess ? null : (
             <section className="flex flex-col gap-2" aria-label={t("flow.reviewStep.where")}>
               <Heading level={2} size="section">
                 {t("flow.reviewStep.where")}
@@ -462,8 +561,27 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
               ? t("flow.reviewStep.askFirst")
               : t("flow.reviewStep.actThenTell")}
           </Text>
-          {create.isError || update.isError ? (
-            <Banner tone="danger" role="alert" title={t("flow.reviewStep.failed")} />
+          {noTarget ? (
+            <Banner
+              role="status"
+              title={
+                shared.length > 0 ? t("flow.reviewStep.chooseInbox") : t("flow.reviewStep.nowhere")
+              }
+            />
+          ) : null}
+          {failure === "rules" ? (
+            <Banner
+              tone="danger"
+              role="alert"
+              title={
+                createdCount === 0
+                  ? t("flow.reviewStep.rulesFailed")
+                  : t("flow.reviewStep.partial", { saved: createdCount, total: wanted.length })
+              }
+            />
+          ) : null}
+          {failure === "answers" ? (
+            <Banner tone="danger" role="alert" title={t("flow.reviewStep.answersFailed")} />
           ) : null}
         </FocusPage>
       );
@@ -474,7 +592,15 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
           top={top}
           leading={<Visor state="happy" size="xl" />}
           title={t("flow.done.title")}
-          lead={saved === 0 ? t("flow.done.leadNone") : t("flow.done.lead", { count: saved })}
+          lead={
+            saved.rules > 0
+              ? t("flow.done.lead", { count: saved.rules })
+              : saved.proactivity === "act_then_tell"
+                ? t("flow.done.leadActThenTell")
+                : saved.proactivity === "ask_first"
+                  ? t("flow.done.leadAskFirst")
+                  : t("flow.done.leadSame")
+          }
           onSubmit={onHome}
           actions={
             <>

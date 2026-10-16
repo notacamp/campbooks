@@ -1,7 +1,17 @@
 import type { ComponentType } from "react";
 import { useTranslation } from "react-i18next";
 
-import { Button, Heading, PaneHeader, ReaderBody, ReaderPane, Text } from "~/lib/ui";
+import { useShortcut } from "~/lib/shortcuts";
+import {
+  Banner,
+  Button,
+  Heading,
+  PaneHeader,
+  ReaderBody,
+  ReaderPane,
+  SkeletonList,
+  Text,
+} from "~/lib/ui";
 
 import { useProfile } from "../../api/queries";
 import { TeachScout } from "../TeachScout/TeachScout";
@@ -22,6 +32,7 @@ export function MemoryPage({ workspaceId, rules: Rules, onQuestions }: MemoryPag
   const { t } = useTranslation("assistant");
   const profile = useProfile(workspaceId);
   const answered = profile.data?.asked_at !== null && profile.data?.asked_at !== undefined;
+  useShortcut("scout.questions", onQuestions);
   return (
     <ReaderPane label={t("memory.title")}>
       <PaneHeader>
@@ -49,14 +60,35 @@ export function MemoryPage({ workspaceId, rules: Rules, onQuestions }: MemoryPag
           <Heading level={2} size="section" id="scout-answers">
             {t("memory.questions.title")}
           </Heading>
-          <Text>
-            {answered
-              ? profile.data?.proactivity === "act_then_tell"
-                ? t("memory.questions.actThenTell")
-                : t("memory.questions.askFirst")
-              : t("memory.questions.never")}
-          </Text>
-          <Button onClick={onQuestions}>
+          {profile.isPending ? (
+            <SkeletonList rows={1} />
+          ) : profile.isError ? (
+            // Not "never answered": Scout couldn't tell.
+            <Banner
+              tone="danger"
+              role="alert"
+              title={t("memory.questions.failed")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void profile.refetch();
+                  }}
+                >
+                  {t("memory.teach.tryAgain")}
+                </Button>
+              }
+            />
+          ) : (
+            <Text>
+              {answered
+                ? profile.data.proactivity === "act_then_tell"
+                  ? t("memory.questions.actThenTell")
+                  : t("memory.questions.askFirst")
+                : t("memory.questions.never")}
+            </Text>
+          )}
+          <Button shortcut="scout.questions" onClick={onQuestions}>
             {answered ? t("memory.questions.again") : t("memory.questions.start")}
           </Button>
         </section>

@@ -3,7 +3,8 @@
     "title": "Dites à Scout ce qui compte pour vous",
     "lead": "Trois questions rapides, toutes facultatives. Vos réponses deviennent des règles que vous voyez avant qu’elles soient enregistrées.",
     "start": "Commencer",
-    "notNow": "Pas maintenant"
+    "notNow": "Pas maintenant",
+    "notNowFailed": "Scout n’a pas pu reporter les questions. Réessayez."
   },
   "flow": {
     "step": "{{step}} sur {{total}}",
@@ -62,18 +63,30 @@
       "actThenTell": "Quand Scout propose une règle à partir de vos corrections dans une boîte que vous êtes seul à utiliser, il l’active et vous prévient, avec Annuler.",
       "save": "Enregistrer",
       "saving": "Enregistrement",
-      "failed": "Scout n’a pas pu tout enregistrer. Ce qui l’a été figure dans la mémoire de Scout ; réessayez pour le reste."
+      "retry": "Réessayer",
+      "tryAgain": "Réessayer",
+      "inboxesFailed": "Scout n’a pas pu charger vos boîtes de réception, il ne sait donc pas où ces règles peuvent aller.",
+      "chooseInbox": "Vos boîtes de réception sont partagées avec d’autres personnes : les règles y restent désactivées tant que vous n’en activez pas une ci-dessus.",
+      "nowhere": "Vous pouvez seulement lire vos boîtes de réception, ces règles n’ont donc nulle part où aller. Revenez en arrière et passez-les, ou demandez à la personne qui gère la boîte.",
+      "rulesFailed": "Scout n’a pas pu enregistrer les règles. Rien n’a été enregistré ; réessayez.",
+      "partial": "Scout en a enregistré {{saved}} sur {{total}}, puis s’est arrêté. Celles-ci restent enregistrées ; Réessayer n’enregistre que le reste.",
+      "answersFailed": "Scout n’a pas pu enregistrer vos réponses. Réessayez ; rien n’est enregistré deux fois."
     },
     "done": {
       "title": "Scout sait ce qui compte pour vous",
       "lead_one": "{{count}} règle est active. Vous la trouverez dans la mémoire de Scout.",
       "lead_other": "{{count}} règles sont actives. Vous les trouverez dans la mémoire de Scout.",
-      "leadNone": "Rien n’a changé. Vous pouvez répondre à nouveau à tout moment dans la mémoire de Scout.",
       "toast_one": "{{count}} règle et vos réponses enregistrées",
       "toast_other": "{{count}} règles et vos réponses enregistrées",
       "home": "Ouvrir l’accueil",
-      "memory": "Voir la mémoire de Scout"
-    }
+      "memory": "Voir la mémoire de Scout",
+      "leadAskFirst": "Aucune nouvelle règle. Désormais, Scout vous demande d’abord avant d’agir.",
+      "leadActThenTell": "Aucune nouvelle règle. Désormais, dans une boîte que vous êtes seul à utiliser, Scout agit quand il est sûr et vous prévient, avec Annuler.",
+      "leadSame": "Aucune nouvelle règle, et vos réponses sont les mêmes qu’avant. Vous pouvez répondre à nouveau à tout moment dans la mémoire de Scout.",
+      "toastAnswers": "Vos réponses sont enregistrées"
+    },
+    "notNowFailed": "Scout n’a pas pu reporter les questions. Réessayez, ou répondez-y.",
+    "undoFailed": "Scout n’a pas pu annuler. Vos règles sont dans la mémoire de Scout, où vous pouvez les supprimer."
   },
   "rule": {
     "tag": "Règle",
@@ -164,7 +177,13 @@
         "instruction_too_long": "Restez sous 300 caractères : une ou deux phrases.",
         "instruction_has_link": "Ne mettez pas de lien. Dites quel courrier et quoi en faire.",
         "instruction_pasted_mail": "Cela ressemble à un e-mail collé. Dites avec vos mots quel courrier et quoi en faire."
-      }
+      },
+      "tryAgain": "Réessayer",
+      "inboxesFailed": "Scout n’a pas pu charger vos boîtes de réception, il ne sait donc pas où cette règle peut aller.",
+      "announce": "Voici la règle que j’ai comprise : {{rule}}",
+      "saveFailed": "Scout n’a pas pu enregistrer la règle. Réessayez.",
+      "savePartial": "Enregistrée dans {{saved}} boîtes sur {{total}}, puis Scout s’est arrêté. Réessayer l’enregistre dans les autres.",
+      "retry": "Réessayer"
     },
     "builder": {
       "noModel": "Ce serveur n’a pas de modèle de langage pour lire des phrases, alors créez la règle ici.",
@@ -187,7 +206,8 @@
         "newsletters": "Le déplacer vers Newsletters",
         "archive": "L’archiver"
       },
-      "show": "Afficher la règle"
+      "show": "Afficher la règle",
+      "byHand": "Scout n’a pas pu lire votre phrase, alors créez la règle ici."
     },
     "questions": {
       "title": "Vos réponses",
@@ -195,12 +215,18 @@
       "actThenTell": "Quand Scout propose une règle à partir de vos corrections dans une boîte que vous êtes seul à utiliser, il l’active et vous prévient, avec Annuler.",
       "never": "Vous n’avez pas encore répondu aux questions de Scout.",
       "again": "Répondre à nouveau aux questions",
-      "start": "Répondre aux questions"
+      "start": "Répondre aux questions",
+      "failed": "Scout n’a pas pu charger vos réponses pour l’instant."
     },
     "rules": "Vos règles"
   },
   "shortcuts": {
     "skip": "Passer cette question",
-    "next": "Suivant, ou enregistrer"
+    "next": "Suivant, ou enregistrer",
+    "back": "Revenir à la question précédente",
+    "offerStart": "Répondre aux questions de Scout",
+    "offerNotNow": "Reporter les questions de Scout",
+    "questions": "Répondre à nouveau aux questions de Scout",
+    "saveRule": "Enregistrer la règle"
   }
 }

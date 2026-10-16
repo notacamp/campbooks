@@ -3,7 +3,8 @@
     "title": "Tell Scout what you care about",
     "lead": "Three quick questions, all optional. Your answers become rules you can see before they are saved.",
     "start": "Start",
-    "notNow": "Not now"
+    "notNow": "Not now",
+    "notNowFailed": "Scout couldn’t put the questions off. Try again."
   },
   "flow": {
     "step": "{{step}} of {{total}}",
@@ -62,18 +63,30 @@
       "actThenTell": "When Scout proposes a rule from your corrections in an inbox only you use, it starts it and tells you, with Undo.",
       "save": "Save",
       "saving": "Saving",
-      "failed": "Scout couldn’t save everything. What was saved is listed in Scout’s memory; try again for the rest."
+      "retry": "Try again",
+      "tryAgain": "Try again",
+      "inboxesFailed": "Scout couldn’t load your inboxes, so it can’t tell where these rules can go.",
+      "chooseInbox": "Your inboxes are shared with other people, so rules there stay off until you switch one on above.",
+      "nowhere": "You can only read your inboxes, so these rules have nowhere to go. Go back and skip them, or ask whoever manages the inbox.",
+      "rulesFailed": "Scout couldn’t save the rules. Nothing was saved; try again.",
+      "partial": "Scout saved {{saved}} of {{total}}, then stopped. Those stay saved; Try again saves only the rest.",
+      "answersFailed": "Scout couldn’t save your answers. Try again; nothing is saved twice."
     },
     "done": {
       "title": "Scout knows what you care about",
       "lead_one": "{{count}} rule is on. You’ll find it in Scout’s memory.",
       "lead_other": "{{count}} rules are on. You’ll find them in Scout’s memory.",
-      "leadNone": "Nothing changed. You can answer again anytime in Scout’s memory.",
       "toast_one": "Saved {{count}} rule and your answers",
       "toast_other": "Saved {{count}} rules and your answers",
       "home": "Open Home",
-      "memory": "See Scout’s memory"
-    }
+      "memory": "See Scout’s memory",
+      "leadAskFirst": "No new rules. From now on, Scout asks you first before it acts.",
+      "leadActThenTell": "No new rules. From now on, in an inbox only you use, Scout acts when it’s sure and tells you, with Undo.",
+      "leadSame": "No new rules, and your answers are the same as before. You can answer again anytime in Scout’s memory.",
+      "toastAnswers": "Saved your answers"
+    },
+    "notNowFailed": "Scout couldn’t put the questions off. Try again, or answer them.",
+    "undoFailed": "Scout couldn’t undo that. Your rules are in Scout’s memory, where you can remove them."
   },
   "rule": {
     "tag": "Rule",
@@ -164,7 +177,13 @@
         "instruction_too_long": "Keep it to 300 characters: one or two sentences.",
         "instruction_has_link": "Leave links out. Say which mail, and what to do with it.",
         "instruction_pasted_mail": "This looks pasted from an email. Say in your own words which mail, and what to do with it."
-      }
+      },
+      "tryAgain": "Try again",
+      "inboxesFailed": "Scout couldn’t load your inboxes, so it can’t tell where this rule can go.",
+      "announce": "Here’s the rule I understood: {{rule}}",
+      "saveFailed": "Scout couldn’t save the rule. Try again.",
+      "savePartial": "Saved in {{saved}} of {{total}} inboxes, then Scout stopped. Try again saves it in the rest.",
+      "retry": "Try again"
     },
     "builder": {
       "noModel": "This server has no language model for reading sentences, so build the rule here.",
@@ -187,7 +206,8 @@
         "newsletters": "Move it to Newsletters",
         "archive": "Archive it"
       },
-      "show": "Show the rule"
+      "show": "Show the rule",
+      "byHand": "Scout couldn’t read your sentence, so build the rule here."
     },
     "questions": {
       "title": "Your answers",
@@ -195,12 +215,18 @@
       "actThenTell": "When Scout proposes a rule from your corrections in an inbox only you use, it starts it and tells you, with Undo.",
       "never": "You haven’t answered Scout’s questions yet.",
       "again": "Answer the questions again",
-      "start": "Answer the questions"
+      "start": "Answer the questions",
+      "failed": "Scout couldn’t load your answers just now."
     },
     "rules": "Your rules"
   },
   "shortcuts": {
     "skip": "Skip this question",
-    "next": "Next, or save"
+    "next": "Next, or save",
+    "back": "Back to the previous question",
+    "offerStart": "Answer Scout’s questions",
+    "offerNotNow": "Put Scout’s questions off",
+    "questions": "Answer Scout’s questions again",
+    "saveRule": "Save the rule"
   }
 }

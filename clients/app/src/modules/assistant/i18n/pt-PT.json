@@ -3,7 +3,8 @@
     "title": "Diga ao Scout o que lhe importa",
     "lead": "Três perguntas rápidas, todas opcionais. As suas respostas tornam-se regras que vê antes de serem guardadas.",
     "start": "Começar",
-    "notNow": "Agora não"
+    "notNow": "Agora não",
+    "notNowFailed": "O Scout não conseguiu adiar as perguntas. Tente de novo."
   },
   "flow": {
     "step": "{{step}} de {{total}}",
@@ -62,18 +63,30 @@
       "actThenTell": "Quando o Scout propõe uma regra a partir das suas correções numa caixa só sua, ativa-a e avisa-o, com Anular.",
       "save": "Guardar",
       "saving": "A guardar",
-      "failed": "O Scout não conseguiu guardar tudo. O que foi guardado está na memória do Scout; tente de novo para o resto."
+      "retry": "Tentar de novo",
+      "tryAgain": "Tentar de novo",
+      "inboxesFailed": "O Scout não conseguiu carregar as suas caixas de entrada, por isso não sabe onde estas regras podem ficar.",
+      "chooseInbox": "As suas caixas de entrada são partilhadas com outras pessoas, por isso as regras ficam desligadas até ligar uma acima.",
+      "nowhere": "Só pode ler as suas caixas de entrada, por isso estas regras não têm onde ficar. Volte atrás e salte-as, ou fale com quem gere a caixa.",
+      "rulesFailed": "O Scout não conseguiu guardar as regras. Nada foi guardado; tente de novo.",
+      "partial": "O Scout guardou {{saved}} de {{total}} e parou. Essas ficam guardadas; Tentar de novo guarda só o resto.",
+      "answersFailed": "O Scout não conseguiu guardar as suas respostas. Tente de novo; nada é guardado duas vezes."
     },
     "done": {
       "title": "O Scout sabe o que lhe importa",
       "lead_one": "{{count}} regra está ativa. Encontra-a na memória do Scout.",
       "lead_other": "{{count}} regras estão ativas. Encontra-as na memória do Scout.",
-      "leadNone": "Nada mudou. Pode responder de novo a qualquer momento na memória do Scout.",
       "toast_one": "Guardada {{count}} regra e as suas respostas",
       "toast_other": "Guardadas {{count}} regras e as suas respostas",
       "home": "Abrir o Início",
-      "memory": "Ver a memória do Scout"
-    }
+      "memory": "Ver a memória do Scout",
+      "leadAskFirst": "Nenhuma regra nova. A partir de agora, o Scout pergunta-lhe primeiro antes de agir.",
+      "leadActThenTell": "Nenhuma regra nova. A partir de agora, numa caixa só sua, o Scout age quando tem a certeza e avisa-o, com Anular.",
+      "leadSame": "Nenhuma regra nova, e as suas respostas são as mesmas de antes. Pode responder de novo a qualquer momento na memória do Scout.",
+      "toastAnswers": "As suas respostas foram guardadas"
+    },
+    "notNowFailed": "O Scout não conseguiu adiar as perguntas. Tente de novo, ou responda-lhes.",
+    "undoFailed": "O Scout não conseguiu anular isto. As suas regras estão na memória do Scout, onde as pode remover."
   },
   "rule": {
     "tag": "Regra",
@@ -164,7 +177,13 @@
         "instruction_too_long": "Use no máximo 300 caracteres: uma ou duas frases.",
         "instruction_has_link": "Não inclua ligações. Diga que correio e o que fazer com ele.",
         "instruction_pasted_mail": "Isto parece colado de um email. Diga por palavras suas que correio e o que fazer com ele."
-      }
+      },
+      "tryAgain": "Tentar de novo",
+      "inboxesFailed": "O Scout não conseguiu carregar as suas caixas de entrada, por isso não sabe onde esta regra pode ficar.",
+      "announce": "Eis a regra que percebi: {{rule}}",
+      "saveFailed": "O Scout não conseguiu guardar a regra. Tente de novo.",
+      "savePartial": "Guardada em {{saved}} de {{total}} caixas, e o Scout parou. Tentar de novo guarda-a nas restantes.",
+      "retry": "Tentar de novo"
     },
     "builder": {
       "noModel": "Este servidor não tem um modelo de linguagem para ler frases, por isso crie a regra aqui.",
@@ -187,7 +206,8 @@
         "newsletters": "Movê-lo para Newsletters",
         "archive": "Arquivá-lo"
       },
-      "show": "Mostrar a regra"
+      "show": "Mostrar a regra",
+      "byHand": "O Scout não conseguiu ler a sua frase, por isso crie a regra aqui."
     },
     "questions": {
       "title": "As suas respostas",
@@ -195,12 +215,18 @@
       "actThenTell": "Quando o Scout propõe uma regra a partir das suas correções numa caixa só sua, ativa-a e avisa-o, com Anular.",
       "never": "Ainda não respondeu às perguntas do Scout.",
       "again": "Responder de novo às perguntas",
-      "start": "Responder às perguntas"
+      "start": "Responder às perguntas",
+      "failed": "O Scout não conseguiu carregar as suas respostas agora."
     },
     "rules": "As suas regras"
   },
   "shortcuts": {
     "skip": "Saltar esta pergunta",
-    "next": "Seguinte, ou guardar"
+    "next": "Seguinte, ou guardar",
+    "back": "Voltar à pergunta anterior",
+    "offerStart": "Responder às perguntas do Scout",
+    "offerNotNow": "Adiar as perguntas do Scout",
+    "questions": "Responder de novo às perguntas do Scout",
+    "saveRule": "Guardar a regra"
   }
 }

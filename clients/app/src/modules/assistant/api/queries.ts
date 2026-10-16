@@ -124,6 +124,8 @@ export function usePreviews(
 
 /** A rule to create in one inbox. */
 export interface NewRule extends RuleShape {
+  /** The caller's key for it, to know which ones were created. */
+  key: string;
   inboxId: string;
   origin: RuleOrigin;
   /** The member's own words, for an instruction. */
@@ -133,18 +135,28 @@ export interface NewRule extends RuleShape {
   teachingId: string;
 }
 
+/** What a batch of creations did: the rules created, by key, and whether it stopped short. */
+export interface Created {
+  created: { key: string; id: string }[];
+  /** Set when a creation failed: the ones after it were not tried. */
+  failed: boolean;
+}
+
 /**
- * `conversations.create_rule` for each of `rules`, active (the member said
- * yes by saving). Returns the created rules' ids, for one Undo.
+ * `conversations.create_rule` for each of `rules` in turn, active (the
+ * member said yes by saving), stopping at the first failure. Resolves with
+ * what was created, so a retry sends only the rest; the created ids are the
+ * one Undo.
  */
 export function useCreateRules(workspaceId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (rules: readonly NewRule[]) => {
-      const created: string[] = [];
+    mutationFn: async (rules: readonly NewRule[]): Promise<Created> => {
+      const created: Created["created"] = [];
       for (const rule of rules) {
-        const result = unwrap(
-          await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules", {
+        let id: string | undefined;
+        try {
+          const result = await api.POST("/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules", {
             params: { path: { workspace_id: workspaceId, inbox_id: rule.inboxId } },
             body: {
               conditions: rule.conditions,
@@ -155,11 +167,17 @@ export function useCreateRules(workspaceId: string) {
               apply_to_existing: rule.applyToExisting,
               teaching_id: rule.teachingId,
             },
-          }),
-        );
-        created.push(result.rule.id);
+          });
+          id = result.data?.rule.id;
+        } catch {
+          // The network gave out: what was created so far still counts.
+        }
+        if (id === undefined) {
+          return { created, failed: true };
+        }
+        created.push({ key: rule.key, id });
       }
-      return created;
+      return { created, failed: false };
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: keys.rules(workspaceId) });

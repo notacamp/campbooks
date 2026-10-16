@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { mockApi, problem, renderWithProviders } from "../../../../../test/render";
@@ -120,5 +120,92 @@ describe("TeachScout", () => {
 
     teach("From: Ana");
     expect(await screen.findByText(/looks pasted from an email/u)).toBeVisible();
+  });
+
+  it("keeps the focus in the sentence, announces the rule, saves with ⌘↵ and retries only the inbox that failed", async () => {
+    const other = { id: "inbox-two", address: "ines@sousa-pessoal.example", shared: false };
+    let tries = 0;
+    const api = mockApi({
+      [`POST ${W}/assistant/compile`]: {
+        body: {
+          outcome: "rules",
+          unsupported: null,
+          text: "rita always matters",
+          proposals: [
+            {
+              conditions: [{ field: "sender_address", value: "rita@silva-contas.example" }],
+              actions: [{ action: "surface", value: "always" }],
+              inboxes: [INBOX, other],
+              who: null,
+            },
+          ],
+        },
+      },
+      [`POST ${W}/inboxes/inbox-own/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/inbox-two/rules/preview`]: { body: PREVIEW },
+      [`POST ${W}/inboxes/inbox-own/rules`]: {
+        status: 201,
+        body: { rule: { id: "rule-1" }, acted_without_asking: false },
+      },
+      [`POST ${W}/inboxes/inbox-two/rules`]: () => {
+        tries += 1;
+        return tries === 1
+          ? problem(503, "unavailable")
+          : { status: 201, body: { rule: { id: "rule-2" }, acted_without_asking: false } };
+      },
+      [`DELETE ${W}/rules/rule-1`]: problem(503, "unavailable"),
+      [`DELETE ${W}/rules/rule-2`]: problem(503, "unavailable"),
+    });
+    renderWithProviders(<TeachScout workspaceId={WS} />);
+
+    const field = screen.getByRole("textbox", { name: "What should Scout do?" });
+    field.focus();
+    fireEvent.change(field, { target: { value: "rita always matters" } });
+    fireEvent.submit(field);
+    expect(
+      await screen.findByText(
+        /^Here’s the rule I understood: Mail from rita@silva-contas\.example/u,
+      ),
+    ).toBeInTheDocument();
+    expect(field).toHaveFocus();
+
+    fireEvent.keyDown(field, { key: "Enter", ctrlKey: true });
+    expect(
+      await screen.findByText(
+        "Saved in 1 of 2 inboxes, then Scout stopped. Try again saves it in the rest.",
+      ),
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /Try again/u }));
+    expect(await screen.findByText("2 rules saved")).toBeVisible();
+    const routes = api.calls
+      .filter((call) => call.route.startsWith("POST") && call.route.endsWith("/rules"))
+      .map((call) => call.route);
+    expect(routes).toEqual([
+      `POST ${W}/inboxes/inbox-own/rules`,
+      `POST ${W}/inboxes/inbox-two/rules`,
+      `POST ${W}/inboxes/inbox-two/rules`,
+    ]);
+
+    // An Undo that fails says so.
+    fireEvent.click(screen.getByRole("button", { name: /Undo/u }));
+    expect(
+      await screen.findByText(
+        "Scout couldn’t undo that. Your rules are in Scout’s memory, where you can remove them.",
+      ),
+    ).toBeVisible();
+  });
+
+  it("doesn't blame a missing model when reading the sentence just failed", async () => {
+    mockApi({ [`POST ${W}/assistant/compile`]: problem(502, "upstream") });
+    renderWithProviders(<TeachScout workspaceId={WS} />);
+
+    teach();
+    fireEvent.click(await screen.findByRole("button", { name: /Show the rule/u }));
+    await waitFor(() => {
+      expect(
+        screen.getAllByText("Scout couldn’t read your sentence, so build the rule here.")[0],
+      ).toBeVisible();
+    });
+    expect(screen.queryByText(/This server has no language model/u)).toBeNull();
   });
 });

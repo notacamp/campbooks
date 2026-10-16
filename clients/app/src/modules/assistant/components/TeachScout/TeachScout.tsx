@@ -49,8 +49,11 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
   if (manual || noModel) {
     return (
       <div className="flex flex-col gap-3">
-        <Note visor="unsure" label={t("memory.builder.noModel")}>
-          {noModel ? t("memory.builder.noModel") : t("memory.teach.failed")}
+        <Note
+          visor="unsure"
+          label={noModel ? t("memory.builder.noModel") : t("memory.builder.byHand")}
+        >
+          {noModel ? t("memory.builder.noModel") : t("memory.builder.byHand")}
         </Note>
         <RuleBuilder workspaceId={workspaceId} />
       </div>
@@ -235,7 +238,7 @@ function ProposalCard({
       origin="instruction"
       originText={text}
       names={names}
-      focusSave={first}
+      primary={first}
       onDone={onDone}
     />
   );
