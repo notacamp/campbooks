@@ -20,9 +20,14 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   SQLX_OFFLINE: "true"
+  # Line numbers in backtraces without full debug info: faster links and
+  # smaller caches for the four test shards.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
-  rust:
+  # The Rust gates run as parallel jobs (checks, the scaffold check, the tests
+  # in four shards); `rust`, the required check, is green only when all are.
+  rust-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -43,8 +48,9 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml
         with: { cache: false }
       - uses: Swatinem/rust-cache@v2
+        with: { save-if: "${{ github.ref == 'refs/heads/next' }}" }
       - uses: taiki-e/install-action@v2
-        with: { tool: "cargo-nextest,cargo-machete,sqlx-cli" }
+        with: { tool: "cargo-machete,sqlx-cli" }
       - name: Format
         if: always()
         run: cargo fmt --all --check
@@ -72,9 +78,6 @@ jobs:
       - name: Translations at parity (server)
         if: always()
         run: cargo xtask i18n
-      - name: Tests
-        if: always()
-        run: cargo nextest run --workspace --no-tests=warn && cargo test --workspace --doc
       - name: sqlx offline cache is current
         if: always()
         # Online check needs the schema the queries were prepared against.
@@ -85,11 +88,85 @@ jobs:
       - name: Unused dependencies
         if: always()
         run: cargo machete
+
+  rust-scaffold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: campbooks
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/campbooks
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@v2
+        with: { save-if: "${{ github.ref == 'refs/heads/next' }}" }
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-machete" }
       - name: Generated module and feature pass the gates
-        if: always()
         # `cargo xtask new-module` + `new-feature` in a temporary copy, then
         # fmt, OpenAPI, arch, clippy, the generated tests and machete on it.
         run: cargo xtask scaffold-check
+
+  rust-tests:
+    # Each shard builds the tests (the dependencies come from the cache) and
+    # runs a quarter of them: one runner has 4 cores, and the tests keep all
+    # four busy for ~8 minutes, so more runners is what makes them faster.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: campbooks
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/campbooks
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rust-lang/setup-rust-toolchain@v2 # reads rust-toolchain.toml
+        with: { cache: false }
+      - uses: Swatinem/rust-cache@v2
+        with: { save-if: "${{ github.ref == 'refs/heads/next' && matrix.shard == 1 }}" }
+      - uses: taiki-e/install-action@v2
+        with: { tool: "cargo-nextest" }
+      - name: Tests (shard ${{ matrix.shard }} of 4)
+        run: cargo nextest run --workspace --no-tests=warn --partition "count:${{ matrix.shard }}/4"
+      - name: Doc tests
+        if: matrix.shard == 1
+        run: cargo test --workspace --doc
+
+  rust:
+    # The required check: every Rust job above passed.
+    if: always()
+    needs: [rust-checks, rust-scaffold, rust-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "rust-checks, rust-scaffold, rust-tests: $RESULTS"
+          for r in $RESULTS; do [ "$r" = success ] || exit 1; done
 
   deny:
     runs-on: ubuntu-latest
@@ -185,7 +262,9 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
 
   image:
-    # Builds the release image exactly as published and scans it. Not pushed.
+    # On a pull request: builds the release image exactly as published and
+    # scans it. Not pushed. (On a push to next, `image-push` below does it.)
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -207,6 +286,37 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+
+  # On a push to next, build both images once, on both architectures, scan
+  # and attest them, and push them as `ci-<sha>` while the tests run. When CI
+  # is green, `publish-next.yml` only adds the `next-<sha>` and `next` tags
+  # and dispatches the deploys: nothing is built twice, and nothing is
+  # deployed before CI is green.
+  image-push:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ github.sha }}
+      tags: ci-${{ github.sha }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+  laya-image-push:
+    if: github.event_name == 'push'
+    uses: ./.github/workflows/image.yml
+    with:
+      ref: ${{ github.sha }}
+      image: campbooks-laya
+      context: deploy/laya
+      tags: ci-${{ github.sha }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
 
   laya-image:
     # Builds the Laya model server image (deploy/laya, the `decide` role) as

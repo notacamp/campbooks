@@ -1,9 +1,10 @@
 name: Image
 
 # Reusable: build one image for one commit (amd64 + arm64, natively), publish
-# it under the requested tags, scan it, and attest it. Called by
-# `publish-next.yml` (every green push to next) and `release-next.yml`
-# (versioned releases), once for the server image (`campbooks`, the repo root)
+# it under the requested tags, scan it, and attest it. Called by `ci.yml`
+# (every push to next, as `ci-<sha>`, which `publish-next.yml` tags for
+# deploy once CI is green) and `release-next.yml` (versioned releases), once
+# for the server image (`campbooks`, the repo root)
 # and once for the Laya model server (`campbooks-laya`, deploy/laya), so there
 # is exactly one build recipe and both images share every tag.
 #

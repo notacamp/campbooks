@@ -551,10 +551,11 @@ mod tests {
     #[test]
     fn depth_is_the_tree_s_not_the_tags() {
         // Stray end tags the tree builder ignores: the tags balance out,
-        // the tree is thousands deep.
+        // the tree is past the cap. Just past it: the tree builder's work
+        // grows with depth squared, so thousands deep takes minutes here.
         let stray = format!(
             "<style>p {{ color: red }}</style>{}<p>x</p>",
-            "<div></span>".repeat(50_000)
+            "<div></span>".repeat(MAX_NESTING + 10)
         );
         assert!(shape(&stray).deepest > MAX_NESTING);
         assert_eq!(inline(&stray).html, stray);
