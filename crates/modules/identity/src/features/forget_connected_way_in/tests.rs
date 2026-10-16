@@ -45,9 +45,9 @@ async fn connect(
         .to_owned()
 }
 
-/// What the connectors module publishes when the mailbox of Google account
-/// `subject` in `workspace` goes.
-async fn removed(kit: &Kit, workspace: WorkspaceId, subject: &str) {
+/// What the connectors module publishes when connection `connection` (of
+/// Google account `subject`) in `workspace` goes.
+async fn removed_connection(kit: &Kit, workspace: WorkspaceId, connection: &str, subject: &str) {
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     kit.state
         .events
@@ -55,7 +55,7 @@ async fn removed(kit: &Kit, workspace: WorkspaceId, subject: &str) {
             &mut tx,
             &ConnectionRemoved {
                 workspace: workspace.to_string(),
-                connection: format!("connection-of-{subject}"),
+                connection: connection.to_owned(),
                 provider: Some("google".to_owned()),
                 account_subject: Some(subject.to_owned()),
             },
@@ -64,6 +64,30 @@ async fn removed(kit: &Kit, workspace: WorkspaceId, subject: &str) {
         .unwrap();
     tx.commit().await.unwrap();
     kit.run_jobs().await;
+}
+
+/// The connection identity recorded for the mailbox of Google account
+/// `subject` in `workspace` (or an unknown one when none is recorded).
+async fn recorded(kit: &Kit, workspace: WorkspaceId, subject: &str) -> String {
+    sqlx::query_scalar::<_, Option<String>>(
+        "SELECT l.connection_id FROM identity.mailbox_links l
+           JOIN identity.provider_identities p ON p.id = l.provider_identity_id
+          WHERE l.in_workspace_id = $1 AND p.subject = $2",
+    )
+    .bind(workspace.as_uuid())
+    .bind(subject)
+    .fetch_optional(&kit.state.db)
+    .await
+    .unwrap()
+    .flatten()
+    .unwrap_or_else(|| "never-recorded".to_owned())
+}
+
+/// The connectors module removes the connection it holds for Google account
+/// `subject` in `workspace`.
+async fn removed(kit: &Kit, workspace: WorkspaceId, subject: &str) {
+    let connection = recorded(kit, workspace, subject).await;
+    removed_connection(kit, workspace, &connection, subject).await;
 }
 
 fn addresses(ways: &Value) -> Vec<String> {
@@ -135,13 +159,18 @@ async fn two_of_its_mailboxes_removed_at_once_still_remove_it(db: PgPool) {
 
     // Both removals in their own transactions at the same time: the account
     // lock orders them, so the second sees the first's row gone.
-    let forget = |workspace: WorkspaceId| {
+    let (first, second) = (
+        recorded(&kit, one, "work-sam").await,
+        recorded(&kit, two, "work-sam").await,
+    );
+    let forget = |workspace: WorkspaceId, connection: String| {
         let db = kit.state.db.clone();
         async move {
             let mut tx = db.begin().await.unwrap();
             let gone = mailbox_links::forget(
                 &mut tx,
                 *workspace.as_uuid(),
+                &connection,
                 "google",
                 "work-sam",
                 Utc::now(),
@@ -152,7 +181,7 @@ async fn two_of_its_mailboxes_removed_at_once_still_remove_it(db: PgPool) {
             gone
         }
     };
-    let (a, b) = tokio::join!(forget(one), forget(two));
+    let (a, b) = tokio::join!(forget(one, first), forget(two, second));
     assert_eq!(
         usize::from(a.is_some()) + usize::from(b.is_some()),
         1,
@@ -237,4 +266,92 @@ async fn the_last_way_in_stays(db: PgPool) {
         addresses(&kit.ways_in(&access).await),
         ["work-sam@example.com"]
     );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn another_members_disconnect_never_removes_your_way_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let ws = WorkspaceId::new();
+    // B connects the shared support@ mailbox here, not as a way in.
+    kit.google.set_user(user("bea"));
+    let bea = kit.signed_up().await;
+    let bea_connection = connect(&kit, &bea, ws, "support", false).await;
+    // A connects the same account here as a way in: the way in is added,
+    // then the connectors module refuses the grant (it is B's here).
+    kit.new_browser();
+    kit.google.set_user(user("ana"));
+    let ana = kit.signed_up().await;
+    kit.intake.refuse_next();
+    kit.google.set_user(user("support"));
+    let started = kit
+        .start_link(
+            &ana,
+            &json!({ "purpose": "connect", "provider": "google", "workspace_id": ws,
+                     "sign_in": true, "return_to": BACK }),
+        )
+        .await;
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    let back = kit.via(Provider::Google, &to_google.location()).await;
+    assert!(back.location().contains("link_error="), "{back:?}");
+    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
+    // Nothing connected for A, so nothing is recorded on A's way in.
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.mailbox_links")
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0, "the failed hand-over took its record back");
+
+    // B disconnects: A's way in is untouched.
+    removed_connection(&kit, ws, &bea_connection, "support").await;
+    assert!(addresses(&kit.ways_in(&ana).await).contains(&"support@example.com".to_owned()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_record_naming_no_connection_is_never_acted_on(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    connect(&kit, &access, ws, "work-sam", true).await;
+    // As if naming the connection had failed (or the hand-over were still
+    // in flight): the row names none.
+    sqlx::query("UPDATE identity.mailbox_links SET connection_id = NULL")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    removed_connection(&kit, ws, "someone-elses-connection", "work-sam").await;
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_failed_hand_over_leaves_no_record(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    kit.google.set_user(user("work-sam"));
+    let started = kit
+        .start_link(
+            &access,
+            &json!({ "purpose": "connect", "provider": "google", "workspace_id": ws,
+                     "sign_in": true, "return_to": BACK }),
+        )
+        .await;
+    let to_google = kit.get(started.json["url"].as_str().unwrap()).await;
+    // The person unticks the mail permission: the way in is added, nothing
+    // is connected.
+    let declined = to_google.location().replace(
+        &url::form_urlencoded::byte_serialize(crate::testkit::MAIL_SCOPE.as_bytes())
+            .collect::<String>(),
+        "",
+    );
+    let back = kit.via(Provider::Google, &declined).await;
+    assert_eq!(
+        back.location(),
+        format!("{BACK}?link_error=consent_incomplete")
+    );
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    let rows: i64 = sqlx::query_scalar("SELECT count(*) FROM identity.mailbox_links")
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap();
+    assert_eq!(rows, 0);
 }

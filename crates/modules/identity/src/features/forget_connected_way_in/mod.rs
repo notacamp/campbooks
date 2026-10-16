@@ -46,9 +46,10 @@ impl EventConsumer for ForgetConnectedWayIn {
         let now = Utc::now();
         let state = ctx.state().clone();
         let tx = ctx.tx().await?;
-        let Some(gone) = mailbox_links::forget(tx, workspace, &provider, &subject, now)
-            .await
-            .map_err(retry)?
+        let Some(gone) =
+            mailbox_links::forget(tx, workspace, &removed.connection, &provider, &subject, now)
+                .await
+                .map_err(retry)?
         else {
             return Ok(());
         };

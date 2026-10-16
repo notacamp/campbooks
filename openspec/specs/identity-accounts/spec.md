@@ -239,6 +239,14 @@ mailbox, SHALL be audited, and SHALL publish `identity.way_in_removed`.
 - **WHEN** a person with only a Google way in removes it
 - **THEN** the response is 409 with `code` = `last_way_in` and the way in remains
 
+#### Scenario: Another member's disconnect
+- **WHEN** B connects support@ in a workspace without signing in with it, A then connects the same account there as a way in and the grant is refused, and B later disconnects their connection
+- **THEN** A's way in is untouched, and no record of A's was left behind
+
+#### Scenario: A failed hand-over
+- **WHEN** a connect adds a way in but mail access was declined at the provider
+- **THEN** the way in stays and no mailbox record is left
+
 #### Scenario: Two of its mailboxes removed at once
 - **WHEN** the two workspaces' mailboxes of a way in a connect created are removed concurrently
 - **THEN** exactly one of the two removals removes the way in
@@ -743,9 +751,15 @@ SHALL record, in the transaction that creates the way in, the workspace its
 mailbox is connected in, and SHALL record every later workspace that way in's
 mailbox is connected in before that grant is handed over; if the record
 cannot be written, the round trip SHALL fail rather than hand the grant over.
+When the hand-over then fails (the connectors module refuses the grant, mail
+access was declined, no refresh token came back), a record that round trip
+wrote SHALL be taken back. Once the grant is accepted, the record SHALL name
+the connection it became.
 `identity.forget_connected_way_in`, consuming `connectors.connection_removed`
-(its workspace, `provider` and `account_subject`), SHALL lock the account,
-then forget that workspace's record and, when that way in has none left, was
+(its workspace, connection, `provider` and `account_subject`), SHALL lock
+the account, then act only on the record naming that very connection (a
+record that names none is never acted on), forget it and, when that way in
+has none left, was
 linked by connecting, and is not the account's last way in (provider accounts
 and passkeys), SHALL remove it as
 `identity.remove_way_in` does: ending every session signed in with it,

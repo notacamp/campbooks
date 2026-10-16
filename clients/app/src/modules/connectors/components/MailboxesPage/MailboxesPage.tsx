@@ -69,12 +69,15 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
   const [disconnected, setDisconnected] = useState<
     { address: string; provider: string; mail: MailChoice } | undefined
   >();
+  // A disconnect that found nothing: said here, since its row goes with the
+  // list's next answer.
+  const [gone, setGone] = useState<string | undefined>();
 
   useEffect(() => {
-    if (disconnected !== undefined) {
+    if (disconnected !== undefined || gone !== undefined) {
       doneRef.current?.focus();
     }
-  }, [disconnected]);
+  }, [disconnected, gone]);
 
   // The server marks the caller's own connections (by id, never by email).
   const mine = (connection: Connection) => connection.granted_by_you;
@@ -142,6 +145,15 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
         {disconnected === undefined ? (
           <Outcome result={result} connections={connections.data} />
         ) : null}
+        {gone === undefined ? null : (
+          <div ref={doneRef} tabIndex={-1}>
+            <Banner
+              tone="danger"
+              role="alert"
+              title={t("disconnect.errors.gone", { address: gone })}
+            />
+          </div>
+        )}
         {disconnected === undefined ? null : (
           // Focus lands here once the row it was in is gone.
           <div ref={doneRef} tabIndex={-1}>
@@ -202,8 +214,14 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
                   setChosen(connection.id);
                   setConfirming(open ? connection.id : undefined);
                 }}
+                onGone={() => {
+                  setConfirming(undefined);
+                  setDisconnected(undefined);
+                  setGone(connection.address);
+                }}
                 onDisconnected={(mail) => {
                   setConfirming(undefined);
+                  setGone(undefined);
                   setDisconnected({
                     address: connection.address,
                     provider: providerName(connection.provider),
@@ -305,6 +323,8 @@ interface MailboxRowProps {
   onChoose: () => void;
   onConfirm: (open: boolean) => void;
   onDisconnected: (mail: MailChoice) => void;
+  /** The disconnect found nothing (404): the page says so. */
+  onGone: () => void;
 }
 
 function MailboxRow({
@@ -319,10 +339,11 @@ function MailboxRow({
   onChoose,
   onConfirm,
   onDisconnected,
+  onGone,
 }: MailboxRowProps) {
   const { t } = useTranslation("connectors");
   const disconnect = useDisconnect(workspaceId);
-  const [failed, setFailed] = useState<"gone" | "notYours" | "failed" | undefined>();
+  const [failed, setFailed] = useState<"notYours" | "failed" | undefined>();
   const [mail, setMail] = useState<MailChoice>("delete");
   const disconnectButton = useRef<HTMLButtonElement>(null);
   // Back on Disconnect when the confirmation closes and the row stays
@@ -423,14 +444,13 @@ function MailboxRow({
                 },
                 onError: (error) => {
                   onConfirm(false);
-                  // Never a silent success: a 404 is said as one.
-                  setFailed(
-                    errorStatus(error) === 404
-                      ? "gone"
-                      : problemCode(error) === "disconnect_owner_only"
-                        ? "notYours"
-                        : "failed",
-                  );
+                  // Never a silent success: a 404 is said as one, by the
+                  // page (this row leaves with the list's next answer).
+                  if (errorStatus(error) === 404) {
+                    onGone();
+                    return;
+                  }
+                  setFailed(problemCode(error) === "disconnect_owner_only" ? "notYours" : "failed");
                 },
               },
             );

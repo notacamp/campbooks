@@ -117,6 +117,57 @@ describe("useMailboxConsent", () => {
   });
 });
 
+/** What the hook says disconnecting connection `c1` does to sign-in. */
+function Fate() {
+  const consent = useMailboxConsent({ workspaceId: DUARTE.id, returnTo: HERE }, vi.fn());
+  return <p>fate: {consent.wayInFate("c1") ?? "unknown"}</p>;
+}
+
+describe("the way-in sentence's source", () => {
+  const items = [
+    {
+      id: "g",
+      kind: "provider",
+      provider: "google",
+      email: "ana@example.com",
+      linked_via: "sign_up",
+      linked_at: "2026-10-01T09:00:00Z",
+      last_used_at: null,
+      mailboxes: 0,
+      connections: [],
+    },
+    {
+      id: "z",
+      kind: "provider",
+      provider: "zoho",
+      email: "ana@example.net",
+      linked_via: "connect",
+      linked_at: "2026-10-02T09:00:00Z",
+      last_used_at: null,
+      mailboxes: 1,
+      connections: ["c1"],
+    },
+  ];
+
+  it("says nothing until the passkeys are known too", async () => {
+    mockApi({
+      [WAYS]: { body: { items, providers: [], mailbox_providers: [] } },
+      "GET /bff/api/v1/identity/passkeys": { status: 503 },
+    });
+    renderWithProviders(<Fate />);
+    expect(await screen.findByText("fate: unknown")).toBeVisible();
+  });
+
+  it("says it goes once both are known", async () => {
+    mockApi({
+      [WAYS]: { body: { items, providers: [], mailbox_providers: [] } },
+      "GET /bff/api/v1/identity/passkeys": { body: { items: [] } },
+    });
+    renderWithProviders(<Fate />);
+    expect(await screen.findByText("fate: removed")).toBeVisible();
+  });
+});
+
 describe("wayInFate", () => {
   const way = (provider: string, linked_via: string, connections: string[]) => ({
     id: `${provider}-${linked_via}`,

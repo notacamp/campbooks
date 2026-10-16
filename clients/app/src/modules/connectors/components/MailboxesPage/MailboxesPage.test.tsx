@@ -229,7 +229,15 @@ describe("MailboxesPage", () => {
   });
 
   it("treats a disconnect that finds nothing as an error, not a success", async () => {
-    api([CONNECTION], { [DISCONNECT(CONNECTION.id)]: problem(404, "not_found") });
+    // As on the real server: the list no longer has it on the next ask.
+    let lists = 0;
+    api([], {
+      [CONNECTIONS]: () => {
+        lists += 1;
+        return { body: { connections: lists === 1 ? [CONNECTION] : [] } };
+      },
+      [DISCONNECT(CONNECTION.id)]: problem(404, "not_found"),
+    });
     renderPage();
 
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect ana@example.com" }));
@@ -237,6 +245,11 @@ describe("MailboxesPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "ana@example.com wasn’t found: it may already be disconnected",
     );
+    // The row goes with the list's next answer; the message stays.
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Disconnect ana@example.com" })).toBeNull();
+    });
+    expect(screen.getByRole("alert")).toHaveTextContent("wasn’t found");
     expect(screen.queryByText("ana@example.com is disconnected")).toBeNull();
   });
 

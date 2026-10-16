@@ -69,10 +69,11 @@ export function useDisconnect(workspaceId: string) {
         }),
       ]);
     },
-    onError: async (error) => {
-      // Gone already (or never yours to see): the stale row goes.
+    onError: (error) => {
+      // Gone already (or never yours to see): the stale row goes. Not
+      // awaited, so the caller hears of the failure before its row does.
       if (errorStatus(error) === 404) {
-        await queryClient.invalidateQueries({
+        void queryClient.invalidateQueries({
           queryKey: operationKey("connectors.list_connections", { workspace_id: workspaceId }),
         });
       }

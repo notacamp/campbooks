@@ -550,9 +550,11 @@ minutes", `failing` "Not syncing — we'll keep trying". The page SHALL offer:
   what becomes of the way in: that it goes too only when `identity.list_ways_in`
   records this very connection as the only mailbox of a way in a connect
   created and it is not the last way in, and otherwise that how the person
-  signs in does not change (never decided from an address). Its cancel
-  SHALL read "Don't disconnect". A disconnect that fails, including one that
-  finds nothing (404), SHALL be said as a failure, never shown as done; focus
+  signs in does not change (never decided from an address), and nothing
+  until the ways in and passkeys are known. Its cancel SHALL read "Don't
+  disconnect". A disconnect that fails SHALL be said as a failure, never
+  shown as done; one that finds nothing (404) SHALL be said by the page, as
+  the row leaves with the list's next answer; focus
   SHALL return to Disconnect when the confirmation closes and the row stays,
   and move to the result once it is gone;
 - "Sign in again" (a fresh sign-in, back to this page) when starting is
@@ -591,8 +593,8 @@ empty and error states, fit 375px, and pass axe in light and dark.
 - **THEN** the confirmation says it also stops being a way to sign in
 
 #### Scenario: A disconnect that finds nothing
-- **WHEN** `connectors.disconnect` answers 404
-- **THEN** an alert says the mailbox was not found, and nothing says it is disconnected
+- **WHEN** `connectors.disconnect` answers 404 and the list no longer has the connection
+- **THEN** the row goes, an alert on the page says the mailbox was not found, and nothing says it is disconnected
 
 #### Scenario: Keep the history
 - **WHEN** the person chooses "Keep its history, read-only" and confirms

@@ -16,7 +16,9 @@ import { leavePage, stepUpUrl } from "./model";
  * will decide it: a way in a connect created goes with its last recorded
  * mailbox, unless it is your last way in (provider accounts and passkeys).
  * Only the server's record of which connections a way in came with is
- * used, never an address.
+ * used, never an address. It agrees with the server's rule: a record that
+ * names no connection (its naming failed) is never acted on there, so a
+ * connection missing from every list leaves sign-in unchanged.
  */
 export function wayInFate(
   items: readonly WayIn[],
@@ -93,9 +95,11 @@ export function useMailboxConsent(
     signInAgain: () => {
       leave(stepUpUrl(returnTo));
     },
+    // Until both are known, say nothing rather than guess (whether it is
+    // the last way in counts the passkeys too).
     wayInFate: (connection) =>
-      ways.data === undefined
+      ways.data === undefined || passkeys.data === undefined
         ? undefined
-        : wayInFate(ways.data.items, passkeys.data?.items.length ?? 0, connection),
+        : wayInFate(ways.data.items, passkeys.data.items.length, connection),
   };
 }

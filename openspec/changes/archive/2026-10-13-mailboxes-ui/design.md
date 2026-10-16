@@ -277,6 +277,18 @@ per-workspace rows behind row-level security.
    removed at once are counted one after the other), then deletes the row
    and counts the others. A way in linked before the table existed is never
    tracked, so it is never removed by mistake.
+
+   Two guards keep a row from outliving its mailbox or answering for
+   someone else's: a hand-over that fails takes back the row its round trip
+   wrote (no connection came of it), and the removal acts **only on the row
+   naming the disconnected connection**. A row naming none (a hand-over in
+   flight, or one whose naming failed) is never acted on, so its way in
+   stays; the event's `granted_by` is the workspaces module's user id, which
+   `identity` cannot map to an account, so it cannot be used instead. This
+   is what keeps B's disconnect of a shared mailbox from removing the way in
+   A tried to make of the same account in that workspace. The event carries
+   no issuer, so the row (found by connection) is checked against provider
+   and subject only.
 2. **Ask `connectors` through a kernel port** ("does any connection of
    provider X, account S remain?"). A cross-workspace read of `connectors`'
    rows: either a privileged connection that skips row-level security or a

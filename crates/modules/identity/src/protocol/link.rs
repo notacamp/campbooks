@@ -39,7 +39,7 @@ use crate::{
     },
     events::WayInAdded,
     upstream::{
-        Flow, Purpose,
+        Flow, Provider, Purpose,
         client::{SignedIn, Tokens, Upstream},
     },
     web::see_other,
@@ -154,7 +154,7 @@ pub(super) async fn finish(
             return Ok(back(&flow.return_to, "link_error", "account_mismatch"));
         }
         let way_in = own_way_in(ctx, &identity, account).await?;
-        track(ctx, way_in, flow.workspace_id, now).await?;
+        let way_in = track(ctx, way_in, flow.workspace_id, now).await?;
         return Ok(hand_over(ctx, upstream, flow, identity, tokens, way_in).await);
     }
     if flow.purpose == Purpose::Connect && !flow.adds_way_in {
@@ -192,39 +192,23 @@ pub(super) async fn finish(
             ));
         }
         LinkOutcome::Already(id) => {
-            if let (Purpose::Connect, Some(workspace)) = (flow.purpose, flow.workspace_id) {
-                mailbox_links::record(&mut tx, id, workspace, false, now).await?;
-            }
-            id
+            let recorded = match (flow.purpose, flow.workspace_id) {
+                (Purpose::Connect, Some(workspace)) => {
+                    mailbox_links::record(&mut tx, id, workspace, false, now).await?
+                }
+                _ => false,
+            };
+            (id, recorded)
         }
         LinkOutcome::Added(id) => {
-            accounts::audit(
-                &mut tx,
-                Some(account),
-                "way_in_added",
-                serde_json::json!({ "method": "provider", "provider": provider.as_str(), "via": via, "way_in": id }),
-                now,
-            )
-            .await?;
-            ctx.state
-                .events
-                .publish(
-                    &mut tx,
-                    &WayInAdded {
-                        account,
-                        method: "provider".to_owned(),
-                        provider: Some(provider.as_str().to_owned()),
-                        via: via.to_owned(),
-                        way_in: Some(id),
-                    },
-                )
-                .await?;
-            // Tracked in the transaction that creates it: a way in a
-            // connect created is never left without its record.
-            if let (Purpose::Connect, Some(workspace)) = (flow.purpose, flow.workspace_id) {
-                mailbox_links::record(&mut tx, id, workspace, true, now).await?;
-            }
-            id
+            announce_added(ctx, &mut tx, account, provider, via, id, now).await?;
+            let recorded = match (flow.purpose, flow.workspace_id) {
+                (Purpose::Connect, Some(workspace)) => {
+                    mailbox_links::record(&mut tx, id, workspace, true, now).await?
+                }
+                _ => false,
+            };
+            (id, recorded)
         }
     };
     tx.commit().await?;
@@ -233,6 +217,40 @@ pub(super) async fn finish(
         return Ok(back(&flow.return_to, "linked", provider.as_str()));
     }
     Ok(hand_over(ctx, upstream, flow, identity, tokens, Some(way_in)).await)
+}
+
+/// Audit and announce way in `id`, just linked to `account` by `via`.
+async fn announce_added(
+    ctx: &Ctx,
+    tx: &mut sqlx::Transaction<'static, sqlx::Postgres>,
+    account: Uuid,
+    provider: Provider,
+    via: &str,
+    id: Uuid,
+    now: DateTime<Utc>,
+) -> Result<()> {
+    accounts::audit(
+        tx,
+        Some(account),
+        "way_in_added",
+        serde_json::json!({ "method": "provider", "provider": provider.as_str(), "via": via, "way_in": id }),
+        now,
+    )
+    .await?;
+    ctx.state
+        .events
+        .publish(
+            tx,
+            &WayInAdded {
+                account,
+                method: "provider".to_owned(),
+                provider: Some(provider.as_str().to_owned()),
+                via: via.to_owned(),
+                way_in: Some(id),
+            },
+        )
+        .await?;
+    Ok(())
 }
 
 /// A connect asked not to add a way in (a shared mailbox): connected, never
@@ -261,7 +279,7 @@ async fn finish_shared(
         ));
     }
     let way_in = linked.map(|l| l.identity_id);
-    track(ctx, way_in, flow.workspace_id, now).await?;
+    let way_in = track(ctx, way_in, flow.workspace_id, now).await?;
     Ok(hand_over(ctx, upstream, flow, identity, tokens, way_in).await)
 }
 
@@ -276,33 +294,38 @@ async fn own_way_in(ctx: &Ctx, identity: &ProviderIdentity, account: Uuid) -> Re
 /// Record, before the grant is handed over, that the mailbox of way in
 /// `way_in` is connected in `workspace` (when that way in is tracked). If it
 /// cannot be recorded, the round trip fails rather than leave a mailbox the
-/// way in's removal would not know about.
+/// way in's removal would not know about. The way in, and whether this call
+/// wrote its row.
 async fn track(
     ctx: &Ctx,
     way_in: Option<Uuid>,
     workspace: Option<Uuid>,
     now: DateTime<Utc>,
-) -> Result<()> {
-    if let (Some(way_in), Some(workspace)) = (way_in, workspace) {
-        let mut conn = ctx.state.db.acquire().await?;
-        mailbox_links::record(&mut conn, way_in, workspace, false, now).await?;
-    }
-    Ok(())
+) -> Result<Option<(Uuid, bool)>> {
+    let (Some(way_in), Some(workspace)) = (way_in, workspace) else {
+        return Ok(way_in.map(|id| (id, false)));
+    };
+    let mut conn = ctx.state.db.acquire().await?;
+    let recorded = mailbox_links::record(&mut conn, way_in, workspace, false, now).await?;
+    Ok(Some((way_in, recorded)))
 }
 
 /// Hand the mailbox grant of a connect or reconnect to the connectors
 /// module; where the browser goes next. `way_in` is the person's way in of
-/// that account (already tracked, when it is), whose record is told which
-/// connection the mailbox became.
+/// that account and whether this round trip wrote its mailbox record: on
+/// success the record is told which connection the mailbox became; on any
+/// failure a record this round trip wrote is taken back, since no
+/// connection came of it.
 async fn hand_over(
     ctx: &Ctx,
     upstream: &Upstream,
     flow: Flow,
     identity: ProviderIdentity,
     tokens: Tokens,
-    way_in: Option<Uuid>,
+    way_in: Option<(Uuid, bool)>,
 ) -> Response {
     let provider = flow.provider;
+    let fresh = way_in.filter(|(_, recorded)| *recorded).map(|(id, _)| id);
     let (Some(account), Some(workspace)) = (flow.account_id, flow.workspace_id) else {
         drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
         return back(&flow.return_to, "link_error", "link_expired");
@@ -314,8 +337,9 @@ async fn hand_over(
         identity.email.clone(),
     ) else {
         // A way in it may have become stays: the round trip proved the
-        // account is theirs.
+        // account is theirs. Its mailbox record does not: nothing connected.
         drop_refresh(upstream, &identity.issuer, tokens.refresh_token.as_deref()).await;
+        take_back(ctx, fresh, workspace).await;
         return back(&flow.return_to, "link_error", "consent_incomplete");
     };
     let issuer = identity.issuer.clone();
@@ -336,14 +360,16 @@ async fn hand_over(
     };
     match ctx.state.grants.adopt(&ctx.state, grant).await {
         Ok(connection) => {
-            if let Some(way_in) = way_in {
+            if let Some((way_in, _)) = way_in {
                 name_connection(ctx, way_in, workspace, &connection).await;
             }
             back(&flow.return_to, "connected", &connection)
         }
         Err(error) => {
-            // Refused: the token is not kept anywhere.
+            // Refused: the token is not kept anywhere, and no connection
+            // came of it, so neither does a mailbox record.
             drop_refresh(upstream, &issuer, Some(&refresh)).await;
+            take_back(ctx, fresh, workspace).await;
             tracing::info!(
                 provider = provider.as_str(),
                 purpose = flow.purpose.as_str(),
@@ -355,9 +381,26 @@ async fn hand_over(
     }
 }
 
-/// Note which connection the mailbox became, for Ways to sign in to show.
-/// Best effort: nothing is decided from it (the record itself is already
-/// written).
+/// Take back the mailbox record this round trip wrote, when the hand-over
+/// failed. If even that fails, the row stays without a connection named, and
+/// a row like that is never acted on (the way in stays).
+async fn take_back(ctx: &Ctx, way_in: Option<Uuid>, workspace: Uuid) {
+    let Some(way_in) = way_in else {
+        return;
+    };
+    let taken = async {
+        let mut conn = ctx.state.db.acquire().await?;
+        mailbox_links::unrecord(&mut conn, way_in, workspace).await
+    }
+    .await;
+    if let Err(error) = taken {
+        tracing::warn!(%error, "could not take back the mailbox record of a failed hand-over");
+    }
+}
+
+/// Note which connection the mailbox became: the removal acts only on the
+/// row naming the disconnected connection. If naming fails, the row stays
+/// unnamed and is never acted on, so the way in stays (the safe side).
 async fn name_connection(ctx: &Ctx, way_in: Uuid, workspace: Uuid, connection: &str) {
     let named = async {
         let mut conn = ctx.state.db.acquire().await?;

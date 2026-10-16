@@ -114,6 +114,8 @@ pub struct FakeIntake {
     issuers: Mutex<Vec<String>>,
     /// Whether the instance syncs Zoho mailboxes too.
     zoho_mail: std::sync::atomic::AtomicBool,
+    /// Refuse the next grant (as when another member connected it).
+    refuse_next: std::sync::atomic::AtomicBool,
 }
 
 /// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
@@ -130,6 +132,13 @@ impl FakeIntake {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .clone()
+    }
+
+    /// Refuse the next grant handed over, as the connectors module does when
+    /// another member already connected that account here.
+    pub fn refuse_next(&self) {
+        self.refuse_next
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// Sync Zoho mailboxes too: a Zoho sign-in then asks for mail.
@@ -159,6 +168,16 @@ impl GrantIntake for FakeIntake {
     }
 
     fn adopt<'a>(&'a self, _state: &'a AppState, grant: ProviderGrant) -> AdoptFuture<'a> {
+        if self
+            .refuse_next
+            .swap(false, std::sync::atomic::Ordering::SeqCst)
+        {
+            return Box::pin(async {
+                Err(campbooks_kernel::Error::Conflict(
+                    campbooks_kernel::i18n::MESSAGES.reason("mailbox_unsupported"),
+                ))
+            });
+        }
         self.issuers
             .lock()
             .unwrap_or_else(PoisonError::into_inner)

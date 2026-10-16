@@ -26,14 +26,16 @@ use super::{accounts, sessions, ways_in};
 /// `workspace`: always when the round trip created the way in (`created`),
 /// otherwise only when the way in is already tracked. Run it in the
 /// transaction that creates the way in, or before the grant is handed over.
+/// Whether this call wrote the row (so a failed hand-over can take it back
+/// with [`unrecord`]).
 pub async fn record(
     conn: &mut PgConnection,
     identity_id: Uuid,
     workspace: Uuid,
     created: bool,
     now: DateTime<Utc>,
-) -> Result<()> {
-    sqlx::query(
+) -> Result<bool> {
+    let inserted = sqlx::query(
         "INSERT INTO identity.mailbox_links (provider_identity_id, in_workspace_id, created_at)
          SELECT $1, $2, $3
           WHERE $4 OR EXISTS (SELECT 1 FROM identity.mailbox_links
@@ -44,6 +46,22 @@ pub async fn record(
     .bind(workspace)
     .bind(now)
     .bind(created)
+    .execute(conn)
+    .await?
+    .rows_affected();
+    Ok(inserted > 0)
+}
+
+/// Take back a row [`record`] wrote for a hand-over that then failed: no
+/// connection came of it, so nothing may later be removed on its account.
+/// Only a row no connection was named on yet.
+pub async fn unrecord(conn: &mut PgConnection, identity_id: Uuid, workspace: Uuid) -> Result<()> {
+    sqlx::query(
+        "DELETE FROM identity.mailbox_links
+          WHERE provider_identity_id = $1 AND in_workspace_id = $2 AND connection_id IS NULL",
+    )
+    .bind(identity_id)
+    .bind(workspace)
     .execute(conn)
     .await?;
     Ok(())
@@ -82,14 +100,21 @@ pub struct Removed {
     pub sessions_ended: usize,
 }
 
-/// The mailbox of `provider` account `subject` in `workspace` was
-/// disconnected: forget it and, when it was the last mailbox of a way in a
-/// connect created and that way in is not the account's last, remove the way
-/// in (ending its sessions and revoking their refresh tokens). Locks the
+/// Connection `connection` (of `provider` account `subject`) in `workspace`
+/// was disconnected: forget it and, when it was the last mailbox of a way in
+/// a connect created and that way in is not the account's last, remove the
+/// way in (ending its sessions and revoking their refresh tokens). Locks the
 /// account before touching the record.
+///
+/// Only the row naming that very connection counts. A row with no
+/// connection named yet (a hand-over still in flight, or one whose naming
+/// failed) is never acted on: the way in stays. So another member's
+/// connection of the same account in the same workspace (theirs, not this
+/// way in's) can never remove it.
 pub async fn forget(
     conn: &mut PgConnection,
     workspace: Uuid,
+    connection: &str,
     provider: &str,
     subject: &str,
     now: DateTime<Utc>,
@@ -98,9 +123,11 @@ pub async fn forget(
         "SELECT p.id, p.account_id, p.linked_via
            FROM identity.mailbox_links l
            JOIN identity.provider_identities p ON p.id = l.provider_identity_id
-          WHERE l.in_workspace_id = $1 AND p.provider = $2 AND p.subject = $3",
+          WHERE l.in_workspace_id = $1 AND l.connection_id = $2
+            AND p.provider = $3 AND p.subject = $4",
     )
     .bind(workspace)
+    .bind(connection)
     .bind(provider)
     .bind(subject)
     .fetch_optional(&mut *conn)
@@ -112,10 +139,11 @@ pub async fn forget(
     let count = ways_in::lock_and_count(conn, account).await?;
     let deleted = sqlx::query(
         "DELETE FROM identity.mailbox_links
-          WHERE provider_identity_id = $1 AND in_workspace_id = $2",
+          WHERE provider_identity_id = $1 AND in_workspace_id = $2 AND connection_id = $3",
     )
     .bind(way_in)
     .bind(workspace)
+    .bind(connection)
     .execute(&mut *conn)
     .await?
     .rows_affected();
