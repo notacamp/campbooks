@@ -12687,6 +12687,13 @@
           "images_shown"
         ],
         "properties": {
+          "css": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The HTML part's `@media` rules, filtered like its `style` attributes\n(nothing that loads or runs survives): CSS the client applies to the\nframe's document only, never to its own page."
+          },
           "html": {
             "type": [
               "string",

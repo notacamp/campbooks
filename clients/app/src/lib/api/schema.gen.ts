@@ -2755,6 +2755,12 @@ export interface components {
         };
         /** @description A message's bodies. */
         MessageBody: {
+            /**
+             * @description The HTML part's `@media` rules, filtered like its `style` attributes
+             *     (nothing that loads or runs survives): CSS the client applies to the
+             *     frame's document only, never to its own page.
+             */
+            css?: string | null;
             /** @description The HTML part, sanitised; still to be shown only in a sandboxed frame. */
             html?: string | null;
             /** @description Whether the remote images were kept. */

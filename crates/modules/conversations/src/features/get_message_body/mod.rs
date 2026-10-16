@@ -2,10 +2,12 @@
 //! — one message's text and HTML bodies, as JSON.
 //!
 //! The HTML is untrusted and never served as `text/html`: it is sanitised
-//! here (`domain::sanitize`: no scripts, style sheets, forms or frames; links
-//! open in a new tab; remote images held back unless asked for; tracking
-//! pixels removed), then reaches the client as a string that the client
-//! renders only in its sandboxed frame (`lib/ui/safe-html`, AGENTS.md).
+//! here (`domain::sanitize`: style sheets inlined into filtered `style`
+//! attributes; no scripts, forms or frames; links open in a new tab; remote
+//! images held back unless asked for; tracking pixels removed), then reaches
+//! the client as a string that the client renders only in its sandboxed
+//! frame (`lib/ui/safe-html`, AGENTS.md), with the message's filtered
+//! `@media` rules beside it.
 //! Inline (`cid:`) images are not remote: they show the message's own parts
 //! as `data:` URLs, raster types only and within [`MAX_INLINE_IMAGE_BYTES`]
 //! and [`MAX_INLINE_TOTAL_BYTES`]; anything else shows the placeholder.
@@ -70,6 +72,10 @@ pub struct MessageBody {
     pub remote_images: u32,
     /// Whether the remote images were kept.
     pub images_shown: bool,
+    /// The HTML part's `@media` rules, filtered like its `style` attributes
+    /// (nothing that loads or runs survives): CSS the client applies to the
+    /// frame's document only, never to its own page.
+    pub css: Option<String>,
 }
 
 /// Read one message's text and HTML bodies.
@@ -155,6 +161,7 @@ pub async fn handler(
         text,
         remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
         images_shown: query.show_images,
+        css: sanitized.as_ref().and_then(|s| s.css.clone()),
         html: sanitized.map(|s| s.html),
         truncated,
     }))

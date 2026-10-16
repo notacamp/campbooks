@@ -102,6 +102,7 @@ export function ThreadMessage({
         html={html}
         title={t("reader.frameTitle", { name: from })}
         remoteImages={body.data?.images_shown ?? false}
+        css={body.data?.css}
       />
     );
   }

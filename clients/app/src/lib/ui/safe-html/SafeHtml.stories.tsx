@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, waitFor } from "storybook/test";
 
 import { SafeHtml } from "./SafeHtml";
 
@@ -47,7 +48,80 @@ export const ImagesShown: Story = {
   },
 };
 
-/** A long message scrolls inside its frame. */
+/** The message's frame, once it has loaded. */
+function loadedFrame(canvas: HTMLElement): { frame: HTMLIFrameElement; doc: Document } {
+  const frame = canvas.querySelector("iframe");
+  const doc = frame?.contentDocument ?? undefined;
+  if (frame === null || doc?.URL !== "about:srcdoc") {
+    throw new Error("frame not loaded");
+  }
+  return { frame, doc };
+}
+
+/** The frame is exactly as tall as its content: nothing cut, no padding. */
+async function fitsItsContent(canvas: HTMLElement): Promise<void> {
+  await waitFor(() => {
+    const { frame, doc } = loadedFrame(canvas);
+    const content = Math.ceil(doc.documentElement.getBoundingClientRect().height);
+    if (Math.abs(frame.getBoundingClientRect().height - content) > 1) {
+      throw new Error("the frame is not as tall as its content yet");
+    }
+  });
+}
+
+/** A long message: the frame grows to its whole height, it never scrolls inside. */
 export const Long: Story = {
   args: { html: `<p>${"A long paragraph of an email body. ".repeat(400)}</p>` },
+  play: async ({ canvasElement }) => {
+    await fitsItsContent(canvasElement);
+    await expect(loadedFrame(canvasElement).frame.getBoundingClientRect().height).toBeGreaterThan(1400);
+  },
+};
+
+/**
+ * A fixed 600px layout in a narrow reader: shrunk to fit, as mobile mail
+ * apps do, so the page never scrolls sideways.
+ */
+export const WideLayout: Story = {
+  args: {
+    html: `<table width="600" style="width:600px" bgcolor="#eef1f4" cellpadding="24"><tr><td><h1 style="font: bold 28px Georgia, serif; color: #14213d">Thirty per cent off waterproofs</h1><p style="font: 16px/1.5 Arial, sans-serif">Every jacket, boot and bag in the autumn range, until Sunday.</p></td></tr></table>`,
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ width: "343px" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await fitsItsContent(canvasElement);
+    const { frame, doc } = loadedFrame(canvasElement);
+    await expect(Number(doc.body.style.zoom)).toBeLessThan(1);
+    await expect(doc.documentElement.scrollWidth).toBeLessThanOrEqual(frame.clientWidth + 1);
+  },
+};
+
+/**
+ * The message's own `@media` rules (filtered by the server) apply inside
+ * the frame, against the frame's width.
+ */
+export const Responsive: Story = {
+  args: {
+    html: `<table class="container" width="600" style="width:600px" bgcolor="#f4f5f6"><tr><td style="padding:24px">A newsletter that reflows on a phone.</td></tr></table>`,
+    css: "@media only screen and (max-width: 620px) {\n.container { width: 100% !important }\n}",
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ width: "343px" }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await fitsItsContent(canvasElement);
+    const { frame, doc } = loadedFrame(canvasElement);
+    await expect(doc.adoptedStyleSheets).toHaveLength(1);
+    await expect(doc.body.style.zoom).toBe("");
+    await expect(doc.documentElement.scrollWidth).toBeLessThanOrEqual(frame.clientWidth);
+  },
 };

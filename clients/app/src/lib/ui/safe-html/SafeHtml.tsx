@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from "react";
+
 import styles from "./SafeHtml.module.css";
 
 /**
@@ -18,6 +20,15 @@ export function framePolicy(remoteImages: boolean): string {
 }
 
 /**
+ * The frame's sandbox. Never `allow-scripts`: nothing in the frame ever
+ * runs, so it can share the app's origin (`allow-same-origin`) for the one
+ * thing the app needs from it, reading the message's size from outside to
+ * fit it. No forms, no top navigation; links open a new tab without an
+ * opener.
+ */
+export const SANDBOX = "allow-same-origin allow-popups allow-popups-to-escape-sandbox";
+
+/**
  * The frame's base look, as an attribute: the page's policy blocks style
  * sheets in the frame. Mail is written for a white page, so it gets one in
  * every theme, on a rounded card.
@@ -28,7 +39,7 @@ const BODY_STYLE = [
   "font: 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
   "color: #1f2328",
   "background: #ffffff",
-  "overflow-wrap: anywhere",
+  "overflow-wrap: break-word",
   "color-scheme: light",
 ].join("; ");
 
@@ -46,14 +57,14 @@ function frameDocument(html: string, remoteImages: boolean): string {
   ].join("");
 }
 
-/** Smallest and largest frame heights, in px; longer mail scrolls inside. */
+/** Smallest and largest estimated heights, in px. */
 const MIN_HEIGHT = 96;
 const MAX_HEIGHT = 1400;
 
 /**
- * A height for the frame from the markup alone: a frame with no scripts and
- * no same-origin access cannot be measured from outside, so it is sized
- * from its text and declared image heights, and scrolls past that.
+ * A first height for the frame from the markup alone, used until the
+ * message has been measured (or if it cannot be): its text and declared
+ * image heights.
  */
 export function estimateHeight(html: string): number {
   const text = html.replaceAll(/<[^>]*>/gu, " ").replaceAll(/\s+/gu, " ");
@@ -66,6 +77,64 @@ export function estimateHeight(html: string): number {
   return Math.round(Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, 24 + lines * 23 + images)));
 }
 
+/** The smallest scale a wide message is shown at; past it, it scrolls sideways in its frame. */
+export const MIN_ZOOM = 0.5;
+
+/** The tallest a measured frame grows, in px. */
+export const MAX_MEASURED_HEIGHT = 30_000;
+
+/**
+ * The scale that fits a message `contentWidth` wide into a frame
+ * `frameWidth` wide, as mobile mail apps shrink a fixed-width layout:
+ * 1 when it fits, never below {@link MIN_ZOOM}.
+ */
+export function fitZoom(contentWidth: number, frameWidth: number): number {
+  if (frameWidth <= 0 || contentWidth <= frameWidth + 1) {
+    return 1;
+  }
+  return Math.max(MIN_ZOOM, Math.floor((frameWidth / contentWidth) * 1000) / 1000);
+}
+
+/**
+ * Apply the message's `@media` rules (filtered by the server) to the
+ * frame's document, and to nothing else: a constructed style sheet, not a
+ * `<style>` element, which the page's policy blocks in the frame. Loads
+ * the rules could still name are under the frame's policy all the same.
+ */
+function adoptStyles(doc: Document, css: string | undefined): void {
+  const view = doc.defaultView;
+  if (view === null) {
+    return;
+  }
+  if (css === undefined || css === "") {
+    doc.adoptedStyleSheets = [];
+    return;
+  }
+  const sheet = new view.CSSStyleSheet();
+  sheet.replaceSync(css);
+  doc.adoptedStyleSheets = [sheet];
+}
+
+/**
+ * Fit the message to the frame's width (shrinking a layout that is too
+ * wide) and return the height it then takes.
+ */
+function fit(doc: Document, frameWidth: number): number {
+  const root = doc.documentElement;
+  doc.body.style.removeProperty("zoom");
+  const zoom = fitZoom(root.scrollWidth, frameWidth);
+  if (zoom < 1) {
+    doc.body.style.setProperty("zoom", String(zoom));
+  }
+  // Wider than even the smallest scale: it scrolls sideways, so leave room
+  // for the scrollbar.
+  const view = doc.defaultView;
+  const scrollbar =
+    view !== null && root.scrollWidth > root.clientWidth ? view.innerHeight - root.clientHeight : 0;
+  const height = Math.ceil(root.getBoundingClientRect().height) + Math.max(0, scrollbar);
+  return Math.min(MAX_MEASURED_HEIGHT, height);
+}
+
 export interface SafeHtmlProps {
   /** HTML the server sanitised. Still untrusted: shown only in the sandbox. */
   html: string;
@@ -73,24 +142,71 @@ export interface SafeHtmlProps {
   title: string;
   /** Let remote images load (the member chose "Show images"). */
   remoteImages?: boolean | undefined;
+  /** The message's `@media` rules, filtered by the server; frame only. */
+  css?: string | null | undefined;
 }
 
 /**
- * Untrusted HTML (an email body) in a sandboxed frame: no scripts, an
- * opaque origin (no same-origin access either way), its own strict policy,
- * and links that can only open a new tab without an opener. The only place
- * the app renders HTML it did not write (AGENTS.md).
+ * Untrusted HTML (an email body) in a sandboxed frame: no scripts, its own
+ * strict policy, links that can only open a new tab without an opener, as
+ * tall as its content and fitted to its width. The only place the app
+ * renders HTML it did not write (AGENTS.md).
  */
-export function SafeHtml({ html, title, remoteImages = false }: SafeHtmlProps) {
+export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlProps) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  const [measured, setMeasured] = useState<number | undefined>();
+  const srcDoc = frameDocument(html, remoteImages);
+  const rules = css ?? undefined;
+
+  useEffect(() => {
+    const element = frame.current;
+    if (element === null) {
+      return;
+    }
+    let observer: ResizeObserver | undefined;
+    const settle = () => {
+      const doc = element.contentDocument;
+      if (doc?.URL !== "about:srcdoc") {
+        return;
+      }
+      const height = fit(doc, element.clientWidth);
+      setMeasured((previous) =>
+        previous !== undefined && Math.abs(previous - height) < 1 ? previous : height,
+      );
+    };
+    const attach = () => {
+      const doc = element.contentDocument;
+      // Not this message's document yet, or not readable: keep the estimate.
+      if (doc?.URL !== "about:srcdoc") {
+        return;
+      }
+      adoptStyles(doc, rules);
+      observer?.disconnect();
+      observer = new ResizeObserver(settle);
+      observer.observe(element);
+      observer.observe(doc.documentElement);
+      settle();
+    };
+    element.addEventListener("load", attach);
+    if (element.contentDocument?.readyState === "complete") {
+      attach();
+    }
+    return () => {
+      element.removeEventListener("load", attach);
+      observer?.disconnect();
+    };
+  }, [srcDoc, rules]);
+
   return (
     <iframe
+      ref={frame}
       className={styles["frame"]}
       title={title}
-      sandbox="allow-popups allow-popups-to-escape-sandbox"
+      sandbox={SANDBOX}
       referrerPolicy="no-referrer"
       loading="lazy"
-      srcDoc={frameDocument(html, remoteImages)}
-      style={{ height: `${String(estimateHeight(html))}px` }}
+      srcDoc={srcDoc}
+      style={{ height: `${String(measured ?? estimateHeight(html))}px` }}
     />
   );
 }
