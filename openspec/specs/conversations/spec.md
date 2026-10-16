@@ -1098,7 +1098,8 @@ deadlocks with a sync batch. It SHALL take, before the message, the conversation
 (without waiting) so that storing the need cannot wait for a lock a writer
 holds, and SHALL instead enqueue a durable `conversations.refresh_need` job
 for the conversation (one per deferral, a few seconds later; the job waits
-for the locks within a lock timeout and retries after one), so that a need skipped for a
+for the locks within a lock timeout, works the need out again once it holds
+them, and retries after a timeout), so that a need skipped for a
 busy message or conversation is still raised once the writer commits, whether or not that
 writer refreshes needs. A message that leaves spam or the trash SHALL raise its need again
 as any message does; a member's Done or Not needed SHALL still hold, and a
