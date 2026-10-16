@@ -87,7 +87,8 @@ conversation's first inbound message, and the conversation's
 `stream_source` is still `default`, it sets the stream with source `model`
 and stores the stream answer as acted. The sorting code shared with
 `apply_changes` (`sort_first_inbound`) moves to `domain/` so both use it.
-A member's move (`member`) and an earlier placement are never overridden.
+A member's move (`member`) and the model's earlier placement are never
+overridden; a placement by the retired content rules (`rules`) gives way.
 
 ## Needs
 

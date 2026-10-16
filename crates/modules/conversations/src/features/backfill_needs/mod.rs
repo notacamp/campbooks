@@ -21,7 +21,8 @@
 //!   `conversations.need_changed` as for live mail, and the attention module
 //!   projects the items.
 //! - When a `decide` model is configured and has not failed its answers
-//!   check, each of those conversations' newest inbound message sent within
+//!   check on its answers (a check still running, or one the provider did
+//!   not answer, still queues: the pass waits for it), each of those conversations' newest inbound message sent within
 //!   the decide window (`CAMPBOOKS_CONVERSATIONS__DECIDE_BACKFILL_DAYS`)
 //!   that no checked model answered is queued for the model pass
 //!   (`conversations.decide_backlog`, one job per message, ids only), which

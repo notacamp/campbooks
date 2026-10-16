@@ -101,6 +101,7 @@ fn jev() -> Result<ProviderConfig, String> {
         .with_external_content(ExternalContent::Allow)
         .with_protocol(Protocol::Laya)
         .with_path(path)
+        .map_err(|e| format!("CAMPBOOKS_EVAL_JEV_PATH: {e}"))?
         .with_api_key(SecretString::from(key)))
 }
 

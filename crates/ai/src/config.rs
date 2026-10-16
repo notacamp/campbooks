@@ -171,10 +171,13 @@ impl ProviderConfig {
 
     /// The same provider posting `decide` requests to `path` (relative to
     /// the base URL).
-    #[must_use]
-    pub fn with_path(mut self, path: impl Into<String>) -> Self {
-        self.path = clean_path(&path.into());
-        self
+    ///
+    /// # Errors
+    /// [`Error::Config`] when `path` is not plain segments (see the
+    /// `PATH` setting).
+    pub fn with_path(mut self, path: impl Into<String>) -> Result<Self, Error> {
+        self.path = clean_path(&path.into()).map_err(Error::Config)?;
+        Ok(self)
     }
 
     /// The path `decide` requests are posted to: [`path`](Self::path), or
@@ -196,15 +199,37 @@ impl ProviderConfig {
 
 /// A path relative to the base URL: surrounding blanks and leading slashes
 /// dropped (a leading `/` would replace the base URL's own path); empty is
-/// none.
-fn clean_path(raw: &str) -> Option<String> {
+/// none. Anything but plain segments of letters, digits, `-` and `_` is
+/// refused: a scheme, a backslash, a `.` or `..` segment or an escape could
+/// point the request, its content and its key at another host or path
+/// than the base URL, past the external-content gate, which judges the
+/// base URL alone.
+fn clean_path(raw: &str) -> Result<Option<String>, String> {
     let path = raw.trim().trim_start_matches('/');
-    (!path.is_empty()).then(|| path.to_owned())
+    if path.is_empty() {
+        return Ok(None);
+    }
+    let plain = path.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    });
+    if plain {
+        Ok(Some(path.to_owned()))
+    } else {
+        Err(format!(
+            "path {path:?}: only segments of letters, digits, `-` and `_` (such as `decisions`)"
+        ))
+    }
 }
 
 /// `CAMPBOOKS_AI__<ROLE>__PATH`; blank (left empty in `.env`) is none.
 fn endpoint_path<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
-    Ok(Option::<String>::deserialize(d)?.and_then(|raw| clean_path(&raw)))
+    match Option::<String>::deserialize(d)? {
+        Some(raw) => clean_path(&raw).map_err(serde::de::Error::custom),
+        None => Ok(None),
+    }
 }
 
 /// Whether a role whose endpoint is off the instance's network may receive
@@ -577,6 +602,30 @@ mod tests {
             "systemone",
             "left empty in .env"
         );
+    }
+
+    #[test]
+    fn a_path_that_could_leave_the_base_url_is_refused() {
+        for path in [
+            "https://elsewhere.example/decisions",
+            "//elsewhere.example/decisions",
+            "\\\\elsewhere.example/decisions",
+            "../decisions",
+            "a/./b",
+            "%2e%2e/decisions",
+            "decisions?x=1",
+            "decisions#x",
+        ] {
+            let figment = Figment::from(Serialized::defaults(serde_json::json!({
+                "ai": {"decide": {"base_url": "http://laya:8000/v1", "model": "m",
+                                  "protocol": "laya", "path": path}}
+            })));
+            assert!(AiConfig::from_figment(&figment).is_err(), "{path}");
+        }
+        let ok = ProviderConfig::new(Url::parse("http://laya:8000/v1").unwrap(), "m")
+            .with_path("api/alpha_2/decisions-v1")
+            .unwrap();
+        assert_eq!(ok.decide_path(), "api/alpha_2/decisions-v1");
     }
 
     #[test]

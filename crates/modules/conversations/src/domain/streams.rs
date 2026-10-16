@@ -3,9 +3,10 @@
 //! after it (`decide_message`).
 //!
 //! A conversation is sorted once, by its first inbound message, and only
-//! while nobody placed it: a member's move (`member`) or an earlier
-//! placement (`rules`, `model`) is never overridden, and later messages
-//! never re-sort it.
+//! while nobody placed it: a member's move (`member`) or the model's earlier
+//! placement (`model`) is never overridden, and later messages never re-sort
+//! it. A placement by the retired content rules (`rules`, before ADR 0018;
+//! the facts never answer `stream`) gives way to the model's.
 
 use campbooks_kernel::Result;
 use sqlx::PgConnection;
@@ -24,7 +25,8 @@ pub enum Inbound {
 }
 
 /// Put `conversation` in `stream` (placed by `source`) when `message` is its
-/// first inbound message and nobody placed it yet. Returns whether it did.
+/// first inbound message and nobody but the retired rules placed it yet.
+/// Returns whether it did.
 pub async fn sort_first_inbound(
     conn: &mut PgConnection,
     conversation: ConversationId,
@@ -40,7 +42,7 @@ pub async fn sort_first_inbound(
         r#"
         UPDATE conversations.conversations c
            SET stream = $2, stream_source = $3, updated_at = now()
-         WHERE c.id = $1 AND c.stream_source = 'default'
+         WHERE c.id = $1 AND c.stream_source IN ('default', 'rules')
            AND NOT EXISTS (
                SELECT 1 FROM conversations.messages m
                 WHERE m.conversation_id = c.id AND m.direction = 'inbound'

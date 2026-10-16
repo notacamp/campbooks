@@ -149,6 +149,7 @@ async fn jev_is_reached_at_the_configured_path_with_the_laya_body() {
     )
     .with_protocol(Protocol::Laya)
     .with_path("decisions")
+    .unwrap()
     .with_api_key("router-key");
 
     let answers = gateway(provider)

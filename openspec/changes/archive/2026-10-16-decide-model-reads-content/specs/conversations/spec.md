@@ -8,9 +8,10 @@ the policy accepts; otherwise it SHALL be `primary`. The facts never answer
 `stream`, so a conversation is stored in `primary` and the model pass places
 it: when the policy accepts the model's `stream` answer for the
 conversation's first inbound message and the conversation's stream source is
-still `default`, the conversation SHALL move to that stream with stream
-source `model`. Later messages SHALL never re-sort a conversation, and a
-member's move SHALL stick.
+still `default`, or `rules` (a placement by the content rules retired in
+ADR 0018), the conversation SHALL move to that stream with stream source
+`model`. Later messages SHALL never re-sort a conversation, and a member's
+move SHALL stick.
 
 #### Scenario: No rules strategy
 - **WHEN** the module runs with no `decide` role
@@ -27,6 +28,10 @@ member's move SHALL stick.
 #### Scenario: The model sorts a newsletter
 - **WHEN** the policy accepts model stream answers from 0.9 and the model answers `newsletters` at 0.98 for a conversation's first inbound message
 - **THEN** the conversation is in `newsletters` with stream source `model`, and the answer is stored as acted
+
+#### Scenario: A placement by the retired rules gives way
+- **WHEN** the content rules placed a conversation in `receipts` before the upgrade, and the model pass answers `newsletters` for its first inbound message with an accepted confidence
+- **THEN** the conversation is in `newsletters` with stream source `model`
 
 #### Scenario: A member's move sticks
 - **WHEN** a member moved a conversation to `primary` before the model pass answers `newsletters` with an accepted confidence

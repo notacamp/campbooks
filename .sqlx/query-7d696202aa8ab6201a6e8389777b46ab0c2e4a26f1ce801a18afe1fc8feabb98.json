@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\",\n               m.inbox_id AS \"inbox: InboxId\", m.direction, m.sent_at,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model'\n                          AND d.model_version LIKE 'checked:%') AS \"answered!\",\n               i.address AS inbox_address, i.display_name AS inbox_name,\n               (SELECT count(*) FROM conversations.inbox_members im\n                 WHERE im.inbox_id = i.id) AS \"inbox_members!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n          JOIN conversations.inboxes i ON i.id = m.inbox_id\n         WHERE m.id = $1\n        ",
+  "query": "\n        SELECT m.conversation_id AS \"conversation: ConversationId\",\n               m.inbox_id AS \"inbox: InboxId\", m.direction, m.sent_at,\n               m.sender, m.recipients, m.subject, m.headers, m.bodies,\n               EXISTS (SELECT 1 FROM conversations.decisions d\n                        WHERE d.message_id = m.id AND d.source = 'model'\n                          AND d.model_version LIKE 'checked:%') AS \"answered!\",\n               i.address AS inbox_address, i.display_name AS inbox_name,\n               (SELECT count(*) FROM conversations.inbox_members im\n                 WHERE im.inbox_id = i.id) AS \"inbox_members!\",\n               ARRAY(SELECT a.filename FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"filenames!\",\n               ARRAY(SELECT a.content_type FROM conversations.attachments a\n                      WHERE a.message_id = m.id ORDER BY a.position) AS \"content_types!\"\n          FROM conversations.messages m\n          JOIN conversations.inboxes i ON i.id = m.inbox_id\n         WHERE m.id = $1\n           -- A kept, read-only inbox (its connection removed) is never sent\n           -- to a model again.\n           AND i.detached_at IS NULL\n        ",
   "describe": {
     "columns": [
       {
@@ -172,5 +172,5 @@
       null
     ]
   },
-  "hash": "34333b60514e8ddf541b40c65e66ef377a8ce2ba87179f9b381565d5b7b865e1"
+  "hash": "7d696202aa8ab6201a6e8389777b46ab0c2e4a26f1ce801a18afe1fc8feabb98"
 }

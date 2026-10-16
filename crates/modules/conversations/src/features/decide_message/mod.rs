@@ -17,14 +17,16 @@
 //! `conversations.decide_backlog` is the same pass for one stored message,
 //! enqueued by the needs backfill (`backfill_needs`) for recent mail that a
 //! trusted model never answered: mail stored before the upgrade to the
-//! facts (ADR 0018), or while the model was down or failing its check.
+//! facts (ADR 0018). A backlog pass waits while the answers check has not
+//! run or the provider did not answer it (about a day at most); when the
+//! check failed on the model's answers, the backfill queues nothing.
 
 use std::sync::Arc;
 
 use campbooks_ai::{
     Gateway,
     decide::{
-        check::AnswersCheck,
+        check::{AnswersCheck, CheckOutcome},
         signals::email::{Envelope, Recipient, triage_questions},
         strategy::Strategy,
     },
@@ -54,6 +56,9 @@ use crate::{
 
 /// How long a backlog pass waits for the answers check's first run.
 const CHECK_PENDING_RETRY: std::time::Duration = std::time::Duration::from_mins(2);
+/// How long a backlog pass waits when the provider did not answer the
+/// check: the check runs again on this cadence.
+const CHECK_UNAVAILABLE_RETRY: std::time::Duration = campbooks_ai::decide::check::RECHECK_FAILED;
 
 /// The model the pass asks: the `decide` role's strategy and, when it is
 /// the role's, its gateway (whose answers check says whether to ask).
@@ -76,20 +81,27 @@ impl ModelPass {
         self.gateway.as_ref().is_none_or(Gateway::answers_trusted)
     }
 
-    /// Whether the role's answers check has not finished yet: its answers
-    /// may soon be trusted.
-    fn check_pending(&self) -> bool {
-        self.gateway
-            .as_ref()
-            .is_some_and(|g| matches!(g.answers_check(), AnswersCheck::Pending))
+    /// How long to wait before its answers may be trusted, when they may
+    /// soon be: the check has not run yet, or the provider did not answer it
+    /// (down, overloaded) and it runs again shortly.
+    fn wait_for_check(&self) -> Option<std::time::Duration> {
+        match self.gateway.as_ref()?.answers_check() {
+            AnswersCheck::Pending => Some(CHECK_PENDING_RETRY),
+            AnswersCheck::Done(report) if report.outcome == CheckOutcome::Unavailable => {
+                Some(CHECK_UNAVAILABLE_RETRY)
+            }
+            AnswersCheck::Done(_) => None,
+        }
     }
 
-    /// Whether the role's last answers check failed: its answers are not
-    /// used, so there is no point asking.
+    /// Whether the role's last answers check failed on its answers: they
+    /// are not used, so there is no point asking. A provider that did not
+    /// answer the check is not refused: it may be back shortly.
     pub fn refused(&self) -> bool {
-        self.gateway.as_ref().is_some_and(
-            |g| matches!(g.answers_check(), AnswersCheck::Done(report) if !report.passed()),
-        )
+        self.gateway.as_ref().is_some_and(|g| {
+            matches!(g.answers_check(), AnswersCheck::Done(report)
+                if report.outcome == CheckOutcome::Failed)
+        })
     }
 }
 
@@ -296,7 +308,9 @@ impl JobHandler for DecideBacklog {
     type Payload = Backlog;
     const NAME: &'static str = "conversations.decide_backlog";
     const QUEUE: &'static str = "ai";
-    const MAX_ATTEMPTS: u32 = 5;
+    /// About a day of a provider that does not answer its check, at
+    /// [`CHECK_UNAVAILABLE_RETRY`].
+    const MAX_ATTEMPTS: u32 = 100;
 
     async fn run(&self, ctx: &mut JobContext, backlog: Backlog) -> Result<(), JobError> {
         let workspace: WorkspaceId = ctx
@@ -304,14 +318,15 @@ impl JobHandler for DecideBacklog {
             .and_then(|w| w.parse().ok())
             .ok_or_else(|| JobError::fatal("decide backlog enqueued outside a workspace"))?;
         let passed = self.0.run(ctx, workspace, backlog.message).await?;
-        // Right after a start the check may not have run yet: ask again once
-        // it has, rather than lose the message.
+        // Right after a start the check may not have run yet, or the
+        // provider may have been down when it ran: ask again once it has
+        // passed, rather than lose the message.
         if matches!(passed, Passed::NotTrusted)
-            && self.0.model.as_ref().is_some_and(ModelPass::check_pending)
+            && let Some(wait) = self.0.model.as_ref().and_then(ModelPass::wait_for_check)
         {
             return Err(JobError::retry_after(
-                "the decide answers check has not finished",
-                CHECK_PENDING_RETRY,
+                "the decide answers check has not passed yet",
+                wait,
             ));
         }
         Ok(())
@@ -327,7 +342,8 @@ struct Loaded {
 }
 
 /// The message's conversation and envelope, or `None` when there is nothing
-/// to do (gone, outbound, or already answered by a checked model).
+/// to do (gone, its inbox detached, outbound, or already answered by a
+/// checked model).
 async fn load(
     ctx: &JobContext,
     workspace: WorkspaceId,
@@ -353,6 +369,9 @@ async fn load(
           FROM conversations.messages m
           JOIN conversations.inboxes i ON i.id = m.inbox_id
          WHERE m.id = $1
+           -- A kept, read-only inbox (its connection removed) is never sent
+           -- to a model again.
+           AND i.detached_at IS NULL
         "#,
         message as MessageId,
     )
@@ -535,6 +554,29 @@ mod tests {
         gateway
     }
 
+    #[tokio::test]
+    async fn a_provider_down_at_its_check_is_waited_for_and_a_failed_one_refused() {
+        let server = MockServer::start().await;
+        let pass = |outcome| {
+            super::ModelPass::new(
+                std::sync::Arc::new(Scripted::fixtures()),
+                Some(checked_gateway(&server, outcome)),
+            )
+        };
+        let down = pass(CheckOutcome::Unavailable);
+        assert!(!down.trusted() && !down.refused());
+        assert_eq!(down.wait_for_check(), Some(super::CHECK_UNAVAILABLE_RETRY));
+        let failed = pass(CheckOutcome::Failed);
+        assert!(failed.refused());
+        assert_eq!(
+            failed.wait_for_check(),
+            None,
+            "a failed check is not waited for"
+        );
+        let passed = pass(CheckOutcome::Passed);
+        assert!(passed.trusted() && !passed.refused());
+    }
+
     async fn kit_with_checked_model(
         db: PgPool,
         server: &MockServer,
@@ -645,6 +687,48 @@ mod tests {
         assert_eq!(
             kit.stream_of("en-1").await,
             ("primary".to_owned(), "model".to_owned())
+        );
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn the_model_replaces_a_placement_by_the_retired_rules(db: PgPool) {
+        let model = Gated::closed(Scripted::fixtures());
+        let kit = Kit::with_deps(db.clone(), sorting_deps().with_model(model.clone())).await;
+        let workspace = WorkspaceId::new();
+        let (_, sam) = kit.member("sam", workspace);
+        let inbox = kit
+            .inbox(
+                workspace,
+                "sam@example.com",
+                &[(sam, crate::model::InboxRole::Manager)],
+            )
+            .await;
+        kit.ingest(workspace, inbox, "en").await;
+        // The content rules placed the newsletter before the upgrade.
+        sqlx::query(
+            "UPDATE conversations.conversations c
+                SET stream = 'receipts', stream_source = 'rules'
+               FROM conversations.messages m
+              WHERE m.conversation_id = c.id AND m.provider_message_id = 'en-3'",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
+
+        model.open();
+        kit.state
+            .events
+            .replay(
+                &kit.state.db,
+                "conversations.decide_message",
+                campbooks_kernel::events::ReplayFrom::Beginning,
+            )
+            .await
+            .unwrap();
+        kit.run_jobs().await;
+        assert_eq!(
+            kit.stream_of("en-3").await,
+            ("newsletters".to_owned(), "model".to_owned())
         );
     }
 
