@@ -11,6 +11,10 @@ publish.workspace = true
 [dependencies]
 # Sanitising email HTML bodies (`domain::sanitize`).
 ammonia.workspace = true
+# Inlining their style sheets and filtering their CSS (`domain::sanitize`).
+css-inline.workspace = true
+cssparser.workspace = true
+html5ever.workspace = true
 axum.workspace = true
 # Opaque list cursors.
 base64.workspace = true
@@ -26,6 +30,8 @@ regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
+# Sanitising off the async workers (`get_message_body`).
+tokio.workspace = true
 tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
@@ -33,7 +39,6 @@ utoipa-axum.workspace = true
 [dev-dependencies]
 boon.workspace = true
 campbooks-kernel = { workspace = true, features = ["test-util"] }
-tokio.workspace = true
 # `Kit::get_raw`: whole responses (headers and bytes).
 tower.workspace = true
 wiremock.workspace = true

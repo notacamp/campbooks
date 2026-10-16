@@ -57,7 +57,7 @@ async fn every_sign_in_of_the_account_ends(db: PgPool) {
                 (SELECT count(*) FROM identity.audit_events
                   WHERE kind = 'signed_out_everywhere')",
     )
-    .fetch_one(&kit.state.db)
+    .fetch_one(&kit.kernel)
     .await
     .unwrap();
     assert_eq!((events, audits), (1, 1));

@@ -30,6 +30,8 @@ impl Job for PruneJobs {
         let settling = ctx.state().events.registry().settling_events();
         let mut pruned = 0_u64;
         loop {
+            // Every workspace's history; one transaction per batch.
+            let mut tx = crate::db::begin_kernel(ctx.pool()).await?;
             let deleted = sqlx::query!(
                 r#"
                 DELETE FROM kernel.jobs
@@ -49,9 +51,10 @@ impl Job for PruneJobs {
                 PRUNE_BATCH,
                 &settling as &[&str],
             )
-            .execute(ctx.pool())
+            .execute(&mut *tx)
             .await?
             .rows_affected();
+            tx.commit().await?;
             pruned += deleted;
             if deleted < PRUNE_BATCH.unsigned_abs() {
                 break;
@@ -84,6 +87,8 @@ impl Job for PruneEvents {
         let settling = ctx.state().events.registry().settling_events();
         let mut pruned = 0_u64;
         loop {
+            // Every workspace's history; one transaction per batch.
+            let mut tx = crate::db::begin_kernel(ctx.pool()).await?;
             let deleted = sqlx::query!(
                 r#"
                 DELETE FROM kernel.events
@@ -101,9 +106,10 @@ impl Job for PruneEvents {
                 PRUNE_BATCH,
                 &settling as &[&str],
             )
-            .execute(ctx.pool())
+            .execute(&mut *tx)
             .await?
             .rows_affected();
+            tx.commit().await?;
             pruned += deleted;
             if deleted < PRUNE_BATCH.unsigned_abs() {
                 break;
@@ -117,11 +123,13 @@ impl Job for PruneEvents {
 /// Delete a purged workspace's finished jobs (succeeded or failed) and its
 /// events, except events still waiting to be delivered. Unfinished jobs stay:
 /// other modules' purges may still be queued. Returns how many jobs and
-/// events were deleted.
+/// events were deleted. Runs in a transaction working in `workspace` (the
+/// purge job's own); refused in one that cannot reach its rows.
 pub async fn purge_workspace(
     tx: &mut Transaction<'_, Postgres>,
     workspace: &str,
 ) -> Result<(u64, u64), sqlx::Error> {
+    crate::db::require_scope(tx, workspace, "the purge of a workspace's jobs").await?;
     let jobs = sqlx::query!(
         "DELETE FROM kernel.jobs
           WHERE workspace_id = $1 AND state IN ('succeeded', 'failed')",

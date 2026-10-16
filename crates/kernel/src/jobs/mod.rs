@@ -240,6 +240,10 @@ pub enum Enqueued {
 
 /// Enqueue `job` inside `tx`: it exists for workers once `tx` commits, and
 /// never if it rolls back. The job's span will link to the current span.
+///
+/// # Errors
+/// [`sqlx::Error::InvalidArgument`] when `options` names a workspace that
+/// `tx` does not work in (another one, or none and no kernel scope).
 pub async fn enqueue<J: Job>(
     tx: &mut Transaction<'_, Postgres>,
     job: &J,
@@ -288,6 +292,28 @@ struct NewJob {
 }
 
 async fn insert(
+    tx: &mut Transaction<'_, Postgres>,
+    job: NewJob,
+    options: EnqueueOptions,
+) -> Result<Enqueued, sqlx::Error> {
+    // A workspace's job is enqueued where that workspace's rows are in
+    // reach: refused in a transaction that set no workspace (row-level
+    // security would hide the queue from it). An instance-wide job may be
+    // enqueued from anywhere: the kernel lifts a transaction that set
+    // nothing for this one insert.
+    let lifted = match &options.workspace {
+        Some(workspace) => {
+            crate::db::require_scope(tx, workspace, &format!("job `{}`", job.kind)).await?;
+            false
+        }
+        None => crate::db::lift_for_instance_rows(tx).await?,
+    };
+    let enqueued = insert_row(tx, job, options).await?;
+    crate::db::lower(tx, lifted).await?;
+    Ok(enqueued)
+}
+
+async fn insert_row(
     tx: &mut Transaction<'_, Postgres>,
     job: NewJob,
     options: EnqueueOptions,

@@ -37,6 +37,16 @@ impl ReadRules {
         Self(rules)
     }
 
+    /// Every record type `principal` holds a scope of some read of (what
+    /// [`allows`](Self::allows) admits), for queries that filter by it.
+    pub fn readable(&self, principal: &Principal) -> Vec<String> {
+        self.0
+            .keys()
+            .filter(|record_type| self.allows(principal, record_type))
+            .cloned()
+            .collect()
+    }
+
     /// Whether `principal` holds a scope of some read of `record_type`.
     /// A record type no read operation returns is shown to nobody.
     pub fn allows(&self, principal: &Principal, record_type: &str) -> bool {

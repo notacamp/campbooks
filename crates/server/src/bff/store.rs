@@ -22,6 +22,10 @@ pub struct NewSession<'a> {
     pub now: DateTime<Utc>,
     pub idle_expires_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes its sign-in asked for (space-separated), to tell later
+    /// whether the BFF has started asking for more; `None` for a sign-in
+    /// started before they were recorded.
+    pub scopes: Option<&'a str>,
 }
 
 /// A live session, found by its cookie.
@@ -41,6 +45,9 @@ pub struct Session {
     pub access_expires_at: DateTime<Utc>,
     pub last_seen_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes it asked for at sign-in; `None` for a session from before
+    /// they were recorded.
+    pub scopes: Option<String>,
 }
 
 /// A session's tokens, read under a row lock for refreshing.
@@ -59,6 +66,8 @@ pub struct LoginTransaction {
     pub return_to: String,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes it asked the identity provider for (space-separated).
+    pub scopes: Option<String>,
 }
 
 pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()> {
@@ -67,8 +76,8 @@ pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()>
         INSERT INTO bff.sessions
             (id, token_hash, rotated_at, subject, idp_session_id, name, email,
              access_token, access_expires_at, refresh_token, id_token, user_agent,
-             created_at, last_seen_at, idle_expires_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $3, $3, $13, $14)
+             created_at, last_seen_at, idle_expires_at, expires_at, scopes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $3, $3, $13, $14, $15)
         "#,
         s.id,
         s.token_hash,
@@ -84,6 +93,7 @@ pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()>
         s.user_agent,
         s.idle_expires_at,
         s.expires_at,
+        s.scopes,
     )
     .execute(db)
     .await?;
@@ -102,7 +112,7 @@ pub async fn find_session(
         Session,
         r#"
         SELECT id, token_hash = $1 AS "current!", rotated_at, token_delivered, subject, name, email,
-               access_token, access_expires_at, last_seen_at, expires_at
+               access_token, access_expires_at, last_seen_at, expires_at, scopes
           FROM bff.sessions
          WHERE (token_hash = $1 OR previous_token_hash = $1)
            AND idle_expires_at > $2
@@ -380,8 +390,9 @@ pub async fn insert_login(db: &PgPool, login: &LoginTransaction) -> sqlx::Result
     sqlx::query!(
         r#"
         INSERT INTO bff.login_transactions
-            (state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+            (state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at,
+             scopes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         "#,
         login.state_hash,
         login.browser_hash,
@@ -390,6 +401,7 @@ pub async fn insert_login(db: &PgPool, login: &LoginTransaction) -> sqlx::Result
         login.return_to,
         login.created_at,
         login.expires_at,
+        login.scopes,
     )
     .execute(db)
     .await?;
@@ -403,7 +415,8 @@ pub async fn take_login(db: &PgPool, state_hash: &[u8]) -> sqlx::Result<Option<L
         LoginTransaction,
         r#"
         DELETE FROM bff.login_transactions WHERE state_hash = $1
-        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at
+        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at,
+                  scopes
         "#,
         state_hash,
     )

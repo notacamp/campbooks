@@ -10,8 +10,8 @@
 //! `conversations.needs_backfills`; then:
 //!
 //! - `conversations.dispatch_needs_backfills`, every minute, starts the
-//!   pending rows (a maintenance transaction, no workspace set: it reads ids
-//!   and states only);
+//!   pending rows (a maintenance transaction in the kernel scope: it reads
+//!   ids and states only, through the table's maintenance policies);
 //! - `conversations.backfill_needs` pages through one inbox's conversations
 //!   by id, in the inbox's workspace (row-level security applies), and runs
 //!   [`needs::refresh`] on each one whose last message falls within the
@@ -74,7 +74,10 @@ impl Job for DispatchNeedsBackfills {
     const MAX_ATTEMPTS: u32 = 1;
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
-        let tx = ctx.tx().await?;
+        // Across workspaces, through the table's maintenance policies (ids
+        // and states only): the kernel scope, allowed for this file in
+        // `architecture.toml`.
+        let tx = ctx.kernel_tx().await?;
         sqlx::query!(
             r#"UPDATE conversations.needs_backfills b SET state = 'running'
                 WHERE b.inbox_id IN (

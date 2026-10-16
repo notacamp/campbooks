@@ -1,0 +1,33 @@
+<!-- Fixture for the sanitiser tests (campbooks-cloud#160): a fixed 600px
+     marketing layout. Written for Campbooks; fictional content. -->
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Autumn sale</title>
+<style>
+  .wrap { background: #eef1f4; padding: 24px 0; }
+  .card { background: #ffffff; }
+  .hero-title { font: bold 32px/1.2 Georgia, serif; color: #14213d; margin: 0 0 12px; }
+  .lead { font: 16px/1.5 Arial, sans-serif; color: #3d4451; }
+  .cta { background: #e85d04; color: #ffffff !important; padding: 14px 28px; border-radius: 6px; font: bold 16px Arial, sans-serif; text-decoration: none; display: inline-block; }
+  .col { width: 280px; vertical-align: top; }
+  .small { font: 12px/1.4 Arial, sans-serif; color: #8a8f98; }
+</style></head>
+<body style="margin:0">
+<table class="wrap" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td align="center">
+<table class="card" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px">
+  <tr><td><img src="https://images.example/autumn-banner.jpg" width="600" height="240" alt="Autumn sale at Harbourline" style="display:block;width:600px;height:240px"></td></tr>
+  <tr><td style="padding:32px 40px">
+    <h1 class="hero-title">Thirty per cent off waterproofs</h1>
+    <p class="lead">The rain is back. Every jacket, boot and bag in the autumn range is thirty per cent off until Sunday.</p>
+    <p style="margin:24px 0"><a class="cta" href="https://shop.example/autumn">Shop the sale</a></p>
+  </td></tr>
+  <tr><td style="padding:0 20px 32px">
+    <table width="560" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td class="col" style="padding:0 10px"><img src="https://images.example/jacket.jpg" width="260" height="260" alt="Harbour jacket"><p class="lead"><b>Harbour jacket</b><br>€84 <s>€120</s></p></td>
+      <td class="col" style="padding:0 10px"><img src="https://images.example/boots.jpg" width="260" height="260" alt="Pier boots"><p class="lead"><b>Pier boots</b><br>€63 <s>€90</s></p></td>
+    </tr></table>
+  </td></tr>
+  <tr><td style="padding:24px 40px;border-top:1px solid #e3e6ea"><p class="small">You are receiving this because you bought from Harbourline. <a href="https://shop.example/unsubscribe">Unsubscribe</a>.</p></td></tr>
+</table>
+<img src="https://track.example/open?u=42" width="1" height="1" alt="" style="display:block">
+</td></tr></table>
+</body></html>

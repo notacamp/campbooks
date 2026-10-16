@@ -334,7 +334,7 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
             .with_writer(move || writer.clone())
             .finish(),
     );
-    let (mut browser, google, _) = world(db).await;
+    let (mut browser, google, _) = world(db.clone()).await;
 
     println!("\nSign up with Google through the web app, Campbooks as its own issuer:");
     // The web app sends the browser to sign in; the issuer shows its screen.
@@ -420,7 +420,13 @@ async fn a_new_person_signs_up_through_the_bff_and_their_mailbox_reaches_their_w
     );
     step("adopted -> connectors made it the workspace's Gmail connection; no consent asked");
 
-    // Signing out ends the issuer's session too, with no confirmation page.
+    // Signing out ends the issuer's session too, with no confirmation page,
+    // even for a session from before a release that asks for more scopes
+    // (one that would otherwise be retired, the issuer's session kept).
+    sqlx::query("UPDATE bff.sessions SET scopes = 'openid'")
+        .execute(&db)
+        .await
+        .unwrap();
     let out = browser.send(Method::POST, "/bff/logout", None).await;
     // The BFF ended the issuer session itself, with the ID token it keeps:
     // nothing for the browser to visit.

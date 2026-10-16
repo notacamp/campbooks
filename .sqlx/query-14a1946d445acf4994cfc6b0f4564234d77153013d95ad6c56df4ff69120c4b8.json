@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.member_suspensions (workspace_id, user_id, suspended, as_of)\n               VALUES ($1, $2, false, $3)\n               ON CONFLICT (workspace_id, user_id) DO UPDATE\n                  SET suspended = false, as_of = EXCLUDED.as_of\n                WHERE member_suspensions.as_of < EXCLUDED.as_of",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "14a1946d445acf4994cfc6b0f4564234d77153013d95ad6c56df4ff69120c4b8"
+}

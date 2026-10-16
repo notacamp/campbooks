@@ -22,7 +22,7 @@ use std::{
 };
 
 use axum::{Extension, Json, extract::State};
-use campbooks_ai::{Gateway, Role};
+use campbooks_ai::{Gateway, Role, usage::Scope};
 use campbooks_kernel::{
     AppState, Error, Operation, Problem, Result, Risk,
     auth::Principal,
@@ -112,7 +112,8 @@ impl Compiler {
             content_type = "application/problem+json"),
         (status = CONFLICT, description = "No language model may read sentences here (`compile_unavailable`): build the rule by hand.",
             body = Problem, content_type = "application/problem+json"),
-        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`compile_failed`).",
+        (status = SERVICE_UNAVAILABLE, description = "The language model failed (`compile_failed`), \
+            or the workspace used its whole daily AI limit (`ai_daily_limit_reached`).",
             body = Problem, content_type = "application/problem+json"),
     )
 )]
@@ -156,8 +157,14 @@ pub async fn handler(
         streams: STREAMS,
         labels: ctx.labels.iter().map(|l| l.name.as_str()).collect(),
     };
-    let output = match gateway.chat(Role::Complete, prompt::request(&input)).await {
+    // A person is waiting: the call may use the share of the workspace's
+    // daily AI limit kept for people (campbooks-cloud#152).
+    let usage = Scope::workspace(state.db.clone(), workspace.id, "assistant.compile").interactive();
+    let asked = gateway.chat(Role::Complete, prompt::request(&input));
+    let output = match usage.run(asked).await {
         Ok(response) => response.json::<ModelOutput>().ok(),
+        // The workspace used its whole daily AI limit: 503, saying so.
+        Err(error @ campbooks_ai::Error::OverDailyCap { .. }) => return Err(error.into()),
         Err(error) => {
             // The kind only: a provider's error can echo the request.
             tracing::warn!(error = error_kind(&error), "compile: the model call failed");
@@ -209,6 +216,9 @@ fn error_kind(error: &campbooks_ai::Error) -> &'static str {
         campbooks_ai::Error::InvalidResponse(_) => "invalid_response",
         campbooks_ai::Error::InvalidQuestion(_) | campbooks_ai::Error::Config(_) => "config",
         campbooks_ai::Error::AnswersNotTrusted => "answers_not_trusted",
+        campbooks_ai::Error::OverDailyCap { .. } => "over_daily_cap",
+        campbooks_ai::Error::Unattributed => "unattributed",
+        campbooks_ai::Error::Metering => "metering",
     }
 }
 

@@ -1,0 +1,218 @@
+//! A suspended author's rules pause, and act again once the suspension is
+//! lifted (campbooks-cloud#147).
+
+use campbooks_kernel::{
+    DomainEvent,
+    tenancy::{UserId, WorkspaceId},
+};
+use chrono::{DateTime, Duration, Utc};
+use sqlx::PgPool;
+
+use crate::{
+    events::{MemberLeft, MemberSuspended, MemberUnsuspended},
+    features::rules::tests::{GITHUB, kit, move_github, sams_notifications, streams},
+    model::{InboxId, InboxRole},
+    testkit::{Kit, notifications},
+};
+
+/// Publish a workspaces event in `workspace`, as the workspaces module does,
+/// and let every handler run.
+async fn deliver<E: DomainEvent>(kit: &Kit, workspace: WorkspaceId, event: &E) {
+    let mut tx = kit.state.db.begin().await.unwrap();
+    campbooks_kernel::db::set_workspace(&mut tx, &workspace.to_string())
+        .await
+        .unwrap();
+    kit.state.events.publish(&mut tx, event).await.unwrap();
+    tx.commit().await.unwrap();
+    kit.run_jobs().await;
+}
+
+async fn suspend(kit: &Kit, workspace: WorkspaceId, user: UserId, at: DateTime<Utc>) {
+    let event = MemberSuspended {
+        workspace: workspace.to_string(),
+        user,
+        at,
+    };
+    deliver(kit, workspace, &event).await;
+}
+
+async fn lift(kit: &Kit, workspace: WorkspaceId, user: UserId, at: DateTime<Utc>) {
+    let event = MemberUnsuspended {
+        workspace: workspace.to_string(),
+        user,
+        at,
+    };
+    deliver(kit, workspace, &event).await;
+}
+
+/// Sam's inbox with Leo, a sender there, and the rule Leo taught (its run
+/// over existing mail done).
+async fn leos_rule(kit: &Kit) -> (WorkspaceId, InboxId, String, UserId, String) {
+    let (workspace, inbox, sam, _) = sams_notifications(kit, 2).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let created = kit
+        .post(
+            &leo,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    kit.run_jobs().await;
+    (workspace, inbox, sam, leo_id, rule)
+}
+
+async fn stream_of(kit: &Kit, message: &str) -> String {
+    streams(kit)
+        .await
+        .into_iter()
+        .find(|(id, ..)| id == message)
+        .unwrap()
+        .1
+}
+
+/// The states `rule_changed` announced for `rule`, oldest first.
+async fn announced(kit: &Kit, rule: &str) -> Vec<String> {
+    sqlx::query_scalar(
+        "SELECT payload ->> 'state' FROM kernel.events
+          WHERE name = 'conversations.rule_changed' AND payload ->> 'rule' = $1 ORDER BY id",
+    )
+    .bind(rule)
+    .fetch_all(&kit.db)
+    .await
+    .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_suspended_authors_rule_pauses_until_the_suspension_is_lifted(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let before = announced(&kit, &rule).await.len();
+
+    suspend(&kit, workspace, leo, Utc::now()).await;
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "paused");
+    // Readers learn it acts again on its own, never why its author is away.
+    assert_eq!(got.json["paused_reason"], "author_unavailable");
+    assert_eq!(announced(&kit, &rule).await[before..], ["paused"]);
+    // New mail is left alone.
+    kit.ingest_value(workspace, inbox, &notifications("later", 1, GITHUB, None))
+        .await;
+    assert_eq!(stream_of(&kit, "later-0").await, "primary");
+
+    lift(&kit, workspace, leo, Utc::now()).await;
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "active");
+    assert!(got.json.get("paused_reason").is_none(), "{:?}", got.json);
+    assert_eq!(announced(&kit, &rule).await[before..], ["paused", "active"]);
+    // It acts again, with nothing redone by hand.
+    kit.ingest_value(workspace, inbox, &notifications("again", 1, GITHUB, None))
+        .await;
+    assert_eq!(stream_of(&kit, "again-0").await, "updates");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn late_and_repeated_deliveries_change_nothing(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let before = announced(&kit, &rule).await.len();
+    let suspended_at = Utc::now();
+    let lifted_at = suspended_at + Duration::seconds(5);
+
+    // The lift arrives first (recorded, so announced), then the suspension
+    // it lifts (older: nothing).
+    lift(&kit, workspace, leo, lifted_at).await;
+    suspend(&kit, workspace, leo, suspended_at).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "active");
+    assert_eq!(announced(&kit, &rule).await[before..], ["active"]);
+
+    // A newer suspension, delivered twice: paused, announced once.
+    let again = lifted_at + Duration::seconds(5);
+    suspend(&kit, workspace, leo, again).await;
+    suspend(&kit, workspace, leo, again).await;
+    assert_eq!(kit.get(&sam, &one).await.json["state"], "paused");
+    assert_eq!(announced(&kit, &rule).await[before..], ["active", "paused"]);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_run_stops_at_its_next_batch_when_its_author_is_suspended(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, _, _) = sams_notifications(&kit, 5).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    kit.post(
+        &leo,
+        &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+        Some(move_github()),
+    )
+    .await;
+    // Leo is suspended before the run's next batch.
+    sqlx::query(
+        "INSERT INTO conversations.member_suspensions (workspace_id, user_id, suspended, as_of)
+         VALUES ($1, $2, true, now())",
+    )
+    .bind(workspace.as_uuid())
+    .bind(leo_id.as_uuid())
+    .execute(&kit.db)
+    .await
+    .unwrap();
+    kit.run_jobs().await;
+    assert!(streams(&kit).await.iter().all(|(_, s, _)| s == "primary"));
+    let state: String = sqlx::query_scalar("SELECT state FROM conversations.rule_runs")
+        .fetch_one(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(state, "cancelled");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_reason_that_would_still_hold_is_given(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, _, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    suspend(&kit, workspace, leo, Utc::now()).await;
+    // A manager pauses it too: lifting the suspension would not resume it.
+    let paused = kit
+        .patch(&sam, &one, serde_json::json!({"paused": true}))
+        .await;
+    assert_eq!(paused.json["paused_reason"], "paused_by_member");
+    // Leo leaves the inbox: only a manager brings it back.
+    sqlx::query("DELETE FROM conversations.inbox_members WHERE user_id = $1")
+        .bind(leo.as_uuid())
+        .execute(&kit.db)
+        .await
+        .unwrap();
+    assert_eq!(
+        kit.get(&sam, &one).await.json["paused_reason"],
+        "author_cannot_write"
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn leaving_ends_a_suspension_so_coming_back_resumes_the_rules(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, leo, rule) = leos_rule(&kit).await;
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+    let suspended_at = Utc::now();
+    suspend(&kit, workspace, leo, suspended_at).await;
+    // Leo is removed while suspended; the lift will never reach this
+    // workspace (he is no member of it any more).
+    let left = MemberLeft {
+        workspace: workspace.to_string(),
+        user: leo,
+    };
+    deliver(&kit, workspace, &left).await;
+    assert_eq!(
+        kit.get(&sam, &one).await.json["paused_reason"],
+        "author_cannot_write"
+    );
+    // A late copy of the suspension changes nothing.
+    suspend(&kit, workspace, leo, suspended_at).await;
+    // He signs in again and is invited back, a sender again: his rule acts.
+    kit.add_to_inbox(inbox, leo, InboxRole::Sender).await;
+    let got = kit.get(&sam, &one).await;
+    assert_eq!(got.json["state"], "active", "{:?}", got.json);
+}

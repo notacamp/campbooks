@@ -182,8 +182,8 @@ with an opaque cursor and a limit of 1 to 100 (else 400).
 conversation, up to its 100 newest messages with their plain-text bodies, and
 the decide pass's answers about its newest inbound message.
 `GET …/messages/{message_id}/body` (`conversations.get_message_body`) SHALL
-return the text and the sanitised HTML bodies as JSON; HTML SHALL never be
-served as `text/html`.
+return the text and the sanitised HTML bodies as JSON, with the HTML body's
+filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 
 #### Scenario: Paging
 - **WHEN** a member lists three conversations two at a time
@@ -261,28 +261,60 @@ workspace's rows when its grace period ends.
 
 ### Requirement: Sanitised email HTML
 `conversations.get_message_body` SHALL sanitise the HTML body before
-returning it: only an allow-list of tags and attributes survives; `script`
-and `style` elements are removed with their content, as are forms, frames,
+returning it. First the body's style sheets SHALL be inlined into `style`
+attributes from the sheets' filtered rules only, without ever fetching or
+reading a linked or imported sheet; sheets SHALL be dropped instead past
+256 KiB of style text, 20,000 elements, a nesting of 256 levels in the
+parsed tree, 1,000,000 elements times distinct properties, 50,000,000
+selectors times elements, or 500,000,000 declarations times elements times
+distinct properties. Then only an allow-list of
+tags and attributes survives (`class` included); `script`, `style` and
+`title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;
-links keep only `http`, `https`, `mailto` and `tel` URLs, relative URLs are
-dropped, and every link opens in a new tab with `rel="noopener noreferrer"`;
-`style` attributes keep only declarations that load nothing (no `url(`,
-`image-set(`, `@import`, `expression`, `behavior`, `-moz-binding` or CSS
-escapes). Images of at most 2×2 pixels, or hidden by their style, SHALL be
-removed. Other remote images SHALL have their source replaced by the
-server's placeholder image (a fixed `data:` URL; their size and alt text
-kept) unless the request asks `show_images=true`, and the response SHALL say
-how many remote images the message has (`remote_images`) and whether they
-were kept (`images_shown`). An image whose source is `cid:<id>` SHALL be
-shown, whether or not images are shown, as a `data:` URL of the message's
-inline part with that `Content-ID` (at most 255 characters; a longer one
-is not stored) when that part has a raster image type its bytes confirm
-and fits the size limits, and as the placeholder otherwise. No other `data:`
-source survives.
+the `body` element's `style` and `bgcolor` move to a wrapping `div`; links
+keep only `http`, `https`, `mailto` and `tel` URLs, relative URLs are
+dropped, and every link opens in a new tab with `rel="noopener noreferrer"`.
+Every `style` declaration SHALL be read with a CSS parser and kept only when
+it loads and runs nothing: its value calls only functions from an allow-list
+(colours, arithmetic, gradients, transforms, filters, timing, shapes,
+counters, grid) and has no URL token, at-keyword, malformed token, CSS escape
+or `<`, its property is a plain lower-case name written without escapes,
+and it is not a custom property, `behavior`, `-moz-binding` or a
+length in viewport or container units. The response's `css` SHALL hold the sheets'
+`@media` rules filtered the same way (queries and selectors with no URL,
+escape or non-structural function; nothing about `prefers-color-scheme`; at
+most 64 KiB), or nothing. Images of at most 2×2 pixels by attribute or style,
+with a `max-width` or `max-height` of 0, or hidden by their style (`display:
+none`, `visibility: hidden`, `opacity: 0`) SHALL be removed. Other remote
+images SHALL have their source replaced by the server's placeholder image (a
+fixed `data:` URL; their size and alt text kept) unless the request asks
+`show_images=true`, and the response SHALL say how many remote images the
+message has (`remote_images`) and whether they were kept (`images_shown`).
+An image whose source is `cid:<id>` SHALL be shown, whether or not images are
+shown, as a `data:` URL of the message's inline part with that `Content-ID`
+(at most 255 characters; a longer one is not stored) when that part has a
+raster image type its bytes confirm and fits the size limits, and as the
+placeholder otherwise. No other `data:` source survives.
 
 #### Scenario: A newsletter with a script, a style sheet and a tracking pixel
 - **WHEN** a member reads the HTML body of a message that has a `<script>`, a `<style>` with a remote `url()`, an `onclick` handler, a 1×1 image and a remote logo
 - **THEN** the HTML has no script, style sheet, handler or tracking pixel, the logo's source is the placeholder, and `remote_images` is 1
+
+#### Scenario: A newsletter styled by its style sheet
+- **WHEN** a member reads a message whose `<style>` gives `.lead` a colour, hides `.preheader` and makes `.container` full width under `@media (max-width: 640px)`
+- **THEN** the paragraph with class `lead` carries that colour in its `style`, the preheader carries `display: none`, there is no `<style>` or `<title>` text in the HTML, and `css` holds the `@media` rule
+
+#### Scenario: Linked and imported sheets
+- **WHEN** the body links `https://t.example/a.css`, `file:///etc/passwd` and imports another sheet
+- **THEN** nothing is fetched or read, and the `<link>` elements are gone
+
+#### Scenario: CSS that loads or runs
+- **WHEN** a declaration or `@media` rule uses `url(`, `image-set(`, `expression(`, `var(`, an escaped `u\72l(`, `behavior` or `-moz-binding`
+- **THEN** that declaration is dropped and its neighbours are kept
+
+#### Scenario: A pixel sized by its style
+- **WHEN** the body has `<img src="https://t.example/o.gif" style="width:1px;height:1px">` and the member shows images
+- **THEN** the image is removed and not counted
 
 #### Scenario: Show images
 - **WHEN** the same body is read with `show_images=true`
@@ -871,7 +903,11 @@ preview rules: creating, confirming, changing, removing or restoring one
 answers 403 `rule_needs_member`. A rule SHALL act for every member of its
 inbox. When its author no longer may write in the inbox, or the inbox is kept
 read-only, the rule SHALL be paused (and its running runs stop) until a
-manager adopts or removes it.
+manager adopts or removes it. While its author's account is suspended, the
+rule SHALL be paused the same way (a running apply run is cancelled at its
+next batch, new mail is not changed by it, and previews and suggestions do
+not count it), and lifting the suspension SHALL make it act again with
+nothing to redo; a run it cancelled is not restarted.
 
 #### Scenario: Leo's rule in a shared inbox
 - **WHEN** Leo taught a rule in info@ and Ana, a sender there, tries to remove it
@@ -880,6 +916,14 @@ manager adopts or removes it.
 #### Scenario: The author leaves
 - **WHEN** Leo is removed from info@
 - **THEN** his rules there are paused and stop acting on new mail
+
+#### Scenario: The author is suspended, then the suspension is lifted
+- **WHEN** an administrator suspends Leo, who taught a rule in info@, and later lifts the suspension
+- **THEN** while suspended the rule reads as paused with `paused_reason` `author_unavailable` and leaves new mail alone, and once lifted it is active and acts on new mail again
+
+#### Scenario: A run going when the author is suspended
+- **WHEN** Leo's rule is being applied to existing mail and Leo is suspended before its next batch
+- **THEN** that batch cancels the run and changes nothing
 
 #### Scenario: An app
 - **WHEN** a client token with `conversations:write`, registered by Sam, creates a rule
@@ -1032,9 +1076,10 @@ and kind as creating one does. Otherwise the response SHALL be 409
 
 ### Requirement: Purging rules
 Removing an inbox's mail and purging a workspace SHALL delete its rules,
-runs, applications and dismissals. Keeping an inbox read-only SHALL cancel
-its rules' runs and drop what only served acting again: the members' words
-(`origin_text`), what each rule changed (`before`) and the dismissed
+runs, applications and dismissals; purging a workspace SHALL also delete the
+suspensions it recorded for its members. Keeping an inbox read-only SHALL
+cancel its rules' runs and drop what only served acting again: the members'
+words (`origin_text`), what each rule changed (`before`) and the dismissed
 suggestions. A member leaving SHALL drop the suggestions they dismissed.
 
 #### Scenario: Disconnecting with the mail deleted
@@ -1090,7 +1135,21 @@ may send from it.
 A message in spam or the trash SHALL never raise a need: a conversation's
 need SHALL come from its newest inbound message that is in neither, and a
 need whose own message moves to spam or the trash SHALL be cleared as
-`trashed`.
+`trashed`. Working out a conversation's first need SHALL NOT store an open
+need for a message that another transaction is changing (a move to spam or
+the trash, a template fill, any writer), and SHALL NOT wait for it, so that no
+open need is stored for a message after its move committed and no request
+deadlocks with a sync batch. It SHALL take, before the message, the conversation's row `FOR KEY SHARE`
+(without waiting) so that storing the need cannot wait for a lock a writer
+holds, and SHALL instead enqueue a durable `conversations.refresh_need` job
+for the conversation (one per deferral, a few seconds later; the job waits
+for the locks within a lock timeout, works the need out again once it holds
+them, and retries after a timeout), so that a need skipped for a
+busy message or conversation is still raised once the writer commits, whether or not that
+writer refreshes needs. A message that leaves spam or the trash SHALL raise its need again
+as any message does; a member's Done or Not needed SHALL still hold, and a
+member's confirmation SHALL still make the reopened need theirs (basis
+`member`).
 
 #### Scenario: The lease goes to the trash
 - **WHEN** the message Pedro's `do` need comes from is moved to the trash, while his later message stays
@@ -1100,60 +1159,37 @@ need whose own message moves to spam or the trash SHALL be cleared as
 - **WHEN** a question lands in spam inside a conversation whose need comes from an earlier message
 - **THEN** the need still comes from the earlier message
 
-### Requirement: Security alerts are a to-do
-The email signals SHALL answer `asks_action` true with the reason
-`signals.security_alert`, and `stream` `updates`, for a message whose subject
-names a security problem (a security alert or advisory, a vulnerability, in
-English, European Portuguese, Spanish and French; "action required" alone is
-not one) only when all of these hold: the sender is a service (list mail or
-an automated address); its domain is plain ASCII (no internationalised
-label) and its display name names that domain; the receiving provider's own
-authentication results, read as RFC 8601 says (comments and quoted strings
-are not results), hold exactly one `dmarc` result, `pass`, whose own
-`header.from` is the From domain, or a `dkim=pass` whose own signing domain
-has the From domain's registrable domain; the message has no
-phishing tell and carries no marketing words. It SHALL take precedence over
-the list-mail "no action" answer. A sure `do` need from a security alert
-SHALL require an authenticated sender on the listed code hosts and package
-registries (`github.com`, `gitlab.com`, `bitbucket.org`, `npmjs.com`,
-`pypi.org`, `rubygems.org`, `crates.io`, `snyk.io`), signing with the
-platform's own name (`npm` for `npmjs.com`, `crates.io` for `crates.io`); for any other
-authenticated sender the answer SHALL stay below every confidence the policy
-acts from, so it raises at most a question. Anything that offers a message's
-own links as the action on its need SHALL offer them only for a message
-whose sender is authenticated this way and that is not suspicious.
+#### Scenario: Not spam after all
+- **WHEN** the message Marta's `reply` need comes from is moved to spam and later back to the inbox
+- **THEN** the need is cleared as `trashed`, then open again from the same message
 
-#### Scenario: A dependency vulnerability
-- **WHEN** "GitHub" `<notifications@github.com>` sends list mail titled "[example-org/demo-shop] High severity vulnerability in tiny-template" with Review, Dismiss and Upgrade links, the receiving provider reports `dkim=pass` and `dmarc=pass` for `github.com`, and the model also answers `asks_action` true with 0.875
-- **THEN** the conversation is sorted to Updates and has a `sure` `do` need with basis `rules`
+#### Scenario: A trash round trip
+- **WHEN** a confirmed need's message and a Done need's message are trashed and then restored
+- **THEN** the confirmed need is open with basis `member`, and the Done one stays cleared as `done`
 
-#### Scenario: The same alert, not authenticated
-- **WHEN** the same alert arrives with no authentication results from the receiving provider, or with `dmarc=fail`
-- **THEN** no `do` need is raised
+#### Scenario: A move and a refresh at once
+- **WHEN** a decide pass refreshes a conversation while a provider move of its message to spam is not yet committed
+- **THEN** the refresh stores no need for that message, without waiting for the move, and a follow-up job run after the move commits still stores none
 
-#### Scenario: A crafted envelope sender
-- **WHEN** a message from "Crates" `<alerts@crates.io>` fails DMARC, and its envelope sender `"a; dmarc=pass header.from=crates.io x"@evil.example` is echoed in the provider's results
-- **THEN** `asks_action` is not answered by `signals.security_alert`
+#### Scenario: A busy message that is not moving
+- **WHEN** a first need's message is held by another transaction that changes only its subject template, and then commits
+- **THEN** the refresh stores nothing and enqueues a `conversations.refresh_need`, which stores the open need once the other transaction has committed
 
-#### Scenario: A look-alike that signs its own mail
-- **WHEN** "GitHub Security" `<alerts@githubsecurity.example>`, with `dkim=pass` and `dmarc=pass` for its own domain, sends "Security alert: new sign-in to your account"
-- **THEN** no `sure` need is raised
+#### Scenario: An archive in progress
+- **WHEN** a first need's conversation is locked `FOR UPDATE` by another transaction (an archive that will update its messages next)
+- **THEN** the refresh stores nothing, does not wait, enqueues a `conversations.refresh_need`, and the other transaction can update the messages and commit
 
-#### Scenario: An internationalised look-alike
-- **WHEN** the sender's domain spells "github" with a Cyrillic letter, or as `xn--` punycode
-- **THEN** `asks_action` is not answered by `signals.security_alert`
+#### Scenario: Done during a sync batch
+- **WHEN** a member marks a need Done while a sync batch has updated its message and not committed
+- **THEN** Done completes without waiting for the batch
 
-#### Scenario: Action required alone
-- **WHEN** an authenticated GitHub notification's subject says "Action required: review your settings" and names no security problem
-- **THEN** `asks_action` is not answered by `signals.security_alert`
+#### Scenario: Archived while the follow-up waits
+- **WHEN** a `conversations.refresh_need` job waits for a conversation whose archive is not yet committed, and the archive then commits
+- **THEN** the job works the need out again once it holds its locks and stores no open need for the archived conversation
 
-#### Scenario: A comment on a watched issue
-- **WHEN** the same code host sends a notification of a comment on an issue the member watches
-- **THEN** no need is raised
-
-#### Scenario: Marketing that says action required
-- **WHEN** a newsletter's subject is "Action required: claim your discount"
-- **THEN** `asks_action` is false and the stream is Newsletters
+#### Scenario: A need stored while the follow-up waits
+- **WHEN** another refresh stores the conversation's first need (or a member's Done on it) while its `conversations.refresh_need` job waits
+- **THEN** the job keeps the stored need and does not overwrite it from what it read before waiting
 
 ### Requirement: Needs for mail stored before attention
 When the module is upgraded to a version with needs, every inbox that
@@ -1264,3 +1300,31 @@ message.
 #### Scenario: Recent mail is read again
 - **WHEN** the upgrade runs with Jev configured and a conversation's newest inbound message from three days ago has no checked model answer
 - **THEN** the model is asked about it once and its accepted answers sort the conversation and raise its need
+
+### Requirement: Suspended authors
+The module SHALL record, per workspace, whether each member is suspended,
+from `workspaces.member_suspended` and `workspaces.member_unsuspended`
+(`conversations.pause_suspended_author`,
+`conversations.resume_unsuspended_author`), keeping for each member the
+change with the newest `at`: a duplicate, or a change older than the one
+recorded, SHALL change nothing. Whenever it records a change, the module
+SHALL publish `conversations.rule_changed` for each of the member's rules
+that is not removed. A member leaving the workspace SHALL be recorded as not
+suspended as of their departure (they come back only by signing in).
+`RuleView` SHALL carry `paused_reason` when its state is `paused`:
+`inbox_read_only`, else `author_cannot_write`, else `paused_by_member`, else
+`author_unavailable`. A suspension is an administrator's action and SHALL
+not be disclosed to other members, clients or the assistant: no rule
+reason, event or text readable in the workspace names it.
+
+#### Scenario: Delivered out of order
+- **WHEN** the lift (newer `at`) is delivered before the suspension it lifts
+- **THEN** the member is recorded as not suspended and their rules stay active
+
+#### Scenario: Delivered twice
+- **WHEN** the same suspension is delivered twice
+- **THEN** the member is suspended once and `rule_changed` is published once per rule
+
+#### Scenario: Removed while suspended, invited back after
+- **WHEN** a suspended member is removed from the workspace, the suspension is lifted (which no longer reaches that workspace), and they are invited back to the inbox
+- **THEN** their rules act again

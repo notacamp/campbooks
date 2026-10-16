@@ -452,7 +452,6 @@
       "suggestion": "Sugerida por Campbooks"
     },
     "list": {
-      "label": "Reglas",
       "waiting": "Esperando tu respuesta",
       "keep": "Mantener esta regla",
       "no": "No",
@@ -461,8 +460,13 @@
       "confirmRemove": "Quitar",
       "cancel": "Mantener",
       "forEveryone": "Para todos",
-      "paused": "En pausa: quien la enseñó ya no puede cambiar esta bandeja de entrada",
-      "empty": "Aún no hay reglas. Cuando mueves, archivas o quitas un correo, Campbooks se ofrece a hacer lo mismo con los parecidos.",
+      "paused": {
+        "inbox_read_only": "En pausa: esta bandeja de entrada es de solo lectura",
+        "author_cannot_write": "En pausa: quien la enseñó ya no puede cambiar esta bandeja de entrada",
+        "paused_by_member": "Pausada por un miembro",
+        "author_unavailable": "En pausa por ahora; volverá a actuar sola"
+      },
+      "empty": "Enseña a Scout arriba o responde a sus preguntas más abajo. Cuando mueves, archivas o quitas un correo, Campbooks también se ofrece a hacer lo mismo con los parecidos.",
       "leave": "Dejarlos como están",
       "changedMail": "Los correos que cambió",
       "applied_one": "{{n}} hasta ahora",
@@ -474,7 +478,8 @@
       "lastActed": "Última vez {{time}}",
       "failed": "No se pudieron cargar las reglas",
       "retry": "Reintentar",
-      "inbox": "Una bandeja de entrada"
+      "inbox": "Una bandeja de entrada",
+      "emptyTitle": "Aún no hay reglas"
     }
   }
 }

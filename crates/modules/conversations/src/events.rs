@@ -681,6 +681,46 @@ impl DomainEvent for MemberLeft {
     }
 }
 
+/// `workspaces.member_suspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberSuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When it took effect: the newest `at` is the truth.
+    pub at: DateTime<Utc>,
+}
+
+impl DomainEvent for MemberSuspended {
+    const NAME: &'static str = "workspaces.member_suspended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
+/// `workspaces.member_unsuspended` v1, as this module reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MemberUnsuspended {
+    /// The workspace.
+    pub workspace: String,
+    /// The member.
+    pub user: UserId,
+    /// When it took effect: the newest `at` is the truth.
+    pub at: DateTime<Utc>,
+}
+
+impl DomainEvent for MemberUnsuspended {
+    const NAME: &'static str = "workspaces.member_unsuspended";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 pub struct AccountDocument {
     /// The format version, 1.

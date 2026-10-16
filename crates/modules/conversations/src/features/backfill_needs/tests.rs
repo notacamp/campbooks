@@ -539,8 +539,18 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _) = mailbox(&kit, &["needs"]).await;
     seed(&db).await;
-    // The dispatcher's context (no workspace) may only start rows.
+    // A transaction that sets nothing sees no row (campbooks-cloud#129).
     let mut tx = kit.state.db.begin().await.unwrap();
+    let seen: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.needs_backfills")
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, 0);
+    tx.rollback().await.unwrap();
+    // The dispatcher's context (the kernel scope) may only start rows.
+    let mut tx = campbooks_kernel::db::begin_kernel(&kit.state.db)
+        .await
+        .unwrap();
     let moved = sqlx::query(
         "UPDATE conversations.needs_backfills SET state = 'running', workspace_id = $1",
     )
@@ -549,7 +559,9 @@ async fn a_backfill_row_keeps_its_inbox_and_workspace(db: PgPool) {
     .await;
     assert!(moved.is_err(), "moved to another workspace");
     tx.rollback().await.unwrap();
-    let mut tx = kit.state.db.begin().await.unwrap();
+    let mut tx = campbooks_kernel::db::begin_kernel(&kit.state.db)
+        .await
+        .unwrap();
     let finished = sqlx::query("UPDATE conversations.needs_backfills SET state = 'done'")
         .execute(&mut *tx)
         .await;

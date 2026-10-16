@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
-import { Banner, Button, Note, Text, TextField } from "~/lib/ui";
+import { Banner, Button, Note, PrivacyLine, Text, TextField } from "~/lib/ui";
 
 import { useCompile, type CompileResult, type Proposal, type RuleShape } from "../../api/queries";
 import { answerWho, type Translate } from "../../model";
@@ -76,6 +76,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
         <div className="min-w-0 flex-1">
           <TextField
             label={t("memory.teach.label")}
+            hideLabel
             placeholder={t("memory.teach.placeholder")}
             maxLength={MAX_CHARS}
             value={text}
@@ -88,9 +89,7 @@ export function TeachScout({ workspaceId }: TeachScoutProps) {
           {t("memory.teach.submit")}
         </Button>
       </form>
-      <Text tone="tertiary" size="sm">
-        {t("memory.teach.privacy")}
-      </Text>
+      <PrivacyLine>{t("memory.teach.privacy")}</PrivacyLine>
       {compile.isPending ? (
         <Note visor="thinking" label={t("memory.teach.reading")}>
           <strong>{t("memory.teach.reading")}</strong> {t("memory.teach.readingLead")}
