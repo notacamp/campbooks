@@ -141,7 +141,7 @@ async fn seed(db: &PgPool) {
 /// full (as the migration's login).
 async fn upgrade(db: &PgPool) {
     let migration = std::fs::read_to_string(format!(
-        "{}/../../../migrations/20261020150000_conversations__facts_and_model.sql",
+        "{}/../../../migrations/20261020170000_conversations__facts_and_model.sql",
         env!("CARGO_MANIFEST_DIR")
     ))
     .unwrap();

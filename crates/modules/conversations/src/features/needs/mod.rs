@@ -232,7 +232,7 @@ pub async fn reopen(
         &settings,
     )
     .await?;
-    let summary = summary(&mut tx, id).await?;
+    let summary = summary(&mut tx, access.user, id).await?;
     tx.commit().await?;
     Ok(Json(summary))
 }
@@ -321,7 +321,7 @@ async fn judge(
         settings,
     )
     .await?;
-    let summary = summary(&mut tx, id).await?;
+    let summary = summary(&mut tx, access.user, id).await?;
     tx.commit().await?;
     Ok(summary)
 }

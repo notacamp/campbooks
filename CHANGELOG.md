@@ -183,6 +183,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
   Automated mail (a calendar invitation, a support notice) becomes something to do
   only when the model also finds a deadline in it, and a newsletter never does.
+- **A connected mailbox no longer loses its way to sign in to the cleanup.**
+  The background cleanup that removes a way to sign in left behind by a
+  mailbox connect that never finished now checks that the mailbox really
+  isn't connected first, and waits for a connect you retried. If connecting
+  a mailbox breaks unexpectedly, you now land back on Mailboxes with an
+  error instead of a server error page.
 - **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
   open conversation no longer drops below the list; it stays beside it. A long
   subject, sender or address with no spaces now wraps inside the reader instead of
@@ -240,6 +246,31 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+- **Teach once in the inbox.** After you move, archive, mark read or clear one
+  email, Campbooks offers to do the same to every one like it, and to new
+  ones: it says which mail and how many, shows a few, and makes a rule with
+  one key (1). The rule's run shows its progress with Undo all; rows it
+  handled say so ("Campbooks moved this · like 23 others from …"), with Stop
+  doing this in the reader; changing back the same rule's work twice in a
+  month asks whether to keep it. The rules list for Scout's memory is ready
+  for its page. Demo: `pnpm --dir clients fake-google --lookalikes 24` and
+  `pnpm --dir clients record teach-once`.
+- **Rules you teach, applied to the mail that looks the same.** A taught rule
+  says which mail it is about (the sender, its domain, a mailing list, the
+  subject's template or words, a header, a label or a stream) and what to do
+  (move it to a stream, archive it, label it, mark it read, say whether it
+  needs a reply or an action, or always or never show it). A rule's answer
+  beats the built-in signals' and any model's, always gives the same result
+  for the same mail, and never hides mail that looks suspicious or waits for
+  your review. Creating one applies
+  it to the mail already in the inbox in the background, a hundred
+  conversations at a time, with progress; removing it can put that mail back.
+  Moving one back by hand makes it an exception the rule leaves alone. New
+  operations: `conversations.preview_rule`, `create_rule`, `confirm_rule`,
+  `update_rule`, `remove_rule`, `list_rules`, `get_rule`, `suggest_rules`
+  and `dismiss_rule_suggestion`; new event `conversations.rule_changed`. The
+  screens that use them follow in the next release.
+- `conversations.need_changed` may clear a need with cause `rule`.
 - Settings → Mailboxes: every mailbox connected to the workspace (yours;
   all of them for owners and admins), who connected it and whether it is
   syncing, waiting for someone to sign in again, paused by the provider or

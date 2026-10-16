@@ -169,7 +169,9 @@ plurals). Every string a user can see exists in all four before it ships.
   Deterministic code reads structured facts only (headers, addresses,
   authentication results, media types) and may only say "no"; what it cannot
   settle that way is the model's, or stays undecided. Text hygiene (HTML to
-  text, dropping quoted history) is not a decision. *(CI: the facts module's
+  text, dropping quoted history) is not a decision, and neither is a rule a
+  member taught matching the words or subject pattern the member chose
+  (campbooks-cloud#125): that is the member's decision, applied as given. *(CI: the facts module's
   source test, `campbooks_ai::decide::signals::facts`.)*
 - AI output that changes user data is a **proposal** the user can undo, never a
   silent mutation.

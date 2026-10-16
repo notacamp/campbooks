@@ -181,9 +181,12 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .publishes::<events::InboxChanged>()
             .publishes::<events::InboxRemoved>()
             .publishes::<events::NeedChanged>()
+            .publishes::<events::RuleChanged>()
             .handler(features::release_send::ReleaseSend)
             .handler(features::check_send::CheckSend)
             .consumer(features::record_send::RecordSend)
+            .handler(features::apply_rule::ApplyRules::new(needs.clone()))
+            .handler(features::fill_templates::FillTemplates)
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -245,7 +248,7 @@ fn router() -> OpenApiRouter<AppState> {
     use features::{
         archive, create_draft, get_attachment, get_conversation, get_message_body, labels,
         list_conversations, list_drafts, list_inboxes, list_streams, mark_read, move_to_stream,
-        needs, send_draft, star, update_draft,
+        needs, rules, send_draft, star, suggest_rules, update_draft,
     };
     OpenApiRouter::new()
         .routes(routes!(list_inboxes::handler))
@@ -274,6 +277,15 @@ fn router() -> OpenApiRouter<AppState> {
         .routes(routes!(needs::resolve))
         .routes(routes!(needs::reopen))
         .routes(routes!(needs::confirm))
+        .routes(routes!(rules::preview))
+        .routes(routes!(rules::list))
+        .routes(routes!(rules::create))
+        .routes(routes!(rules::get, rules::update, rules::remove))
+        .routes(routes!(rules::confirm))
+        .routes(routes!(rules::decline))
+        .routes(routes!(rules::restore))
+        .routes(routes!(suggest_rules::suggest))
+        .routes(routes!(suggest_rules::dismiss))
 }
 
 #[cfg(test)]
@@ -307,6 +319,8 @@ mod tests {
             "conversations.release_send",
             "conversations.record_send",
             "conversations.check_send",
+            "conversations.apply_rule",
+            "conversations.fill_templates",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

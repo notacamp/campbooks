@@ -21,7 +21,8 @@ use utoipa::ToSchema;
 
 use crate::model::{
     BlobPointer, Channel, ClearCause, ConnectionId, ConversationId, DraftId, InboxId, LabelId,
-    MessageId, NeedReason, NeedTrust, SendId, Stream,
+    MessageId, NeedReason, NeedTrust, RuleId, RuleRunId, RuleState, RunKind, RunState, SendId,
+    Stream,
 };
 
 /// Record type of an inbox: the container a conversation's changes are
@@ -31,6 +32,8 @@ pub const INBOX_RECORD: &str = "conversations.inbox";
 pub const CONVERSATION_RECORD: &str = "conversations.conversation";
 /// Record type of a message.
 pub const MESSAGE_RECORD: &str = "conversations.message";
+/// Record type of a taught rule (visible within its inbox).
+pub const RULE_RECORD: &str = "conversations.rule";
 /// Record type of a draft (visible to its author only; the feed carries
 /// its id, never its content).
 pub const DRAFT_RECORD: &str = "conversations.draft";
@@ -687,4 +690,55 @@ pub struct AccountDocument {
     /// The account's display name, when the provider gives one.
     #[serde(default)]
     pub display_name: Option<String>,
+}
+
+/// A taught rule's run, as `rule_changed` carries it: counts only.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RunFacts {
+    /// The run.
+    pub id: RuleRunId,
+    /// Applying the rule, or putting back what it changed.
+    pub kind: RunKind,
+    /// Where it is.
+    pub state: RunState,
+    /// Conversations it will look at.
+    pub total: u32,
+    /// Conversations done so far.
+    pub done: u32,
+}
+
+/// A taught rule or its run changed (no other module consumes it; its schema
+/// is in `openapi/events.json`).
+/// Ids, enums and counts only: never its conditions, the member's words or
+/// an address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RuleChanged {
+    /// The workspace.
+    pub workspace: String,
+    /// The inbox: who may see the rule.
+    pub inbox: InboxId,
+    /// The rule.
+    pub rule: RuleId,
+    /// Its state.
+    pub state: RuleState,
+    /// Its current run, when it has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run: Option<RunFacts>,
+}
+
+impl DomainEvent for RuleChanged {
+    const NAME: &'static str = "conversations.rule_changed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<FeedChange> {
+        // An upsert even once removed: a removed rule stays readable (and
+        // its revert run followed) until it is purged with its inbox, so
+        // clients refetch it rather than forget it.
+        let record = RecordRef::new(RULE_RECORD, &self.rule);
+        vec![FeedChange::upsert(record).within(inbox_record(self.inbox))]
+    }
 }

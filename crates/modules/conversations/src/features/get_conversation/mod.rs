@@ -140,7 +140,7 @@ pub struct Bodies {
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
     extensions(("x-campbooks" = json!(Operation::query().assistant()
-        .records(["conversations.conversation", "conversations.message"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
+        .records(["conversations.conversation", "conversations.message", "conversations.rule"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
         ("conversation_id" = ConversationId, Path, description = "The conversation."),
@@ -183,7 +183,7 @@ pub async fn handler(
     if visible.is_none() {
         return Err(Error::NotFound);
     }
-    let conversation = summary(&mut tx, id).await?;
+    let conversation = summary(&mut tx, access.user, id).await?;
     let mut rows = sqlx::query!(
         r#"
         SELECT id AS "id: MessageId", direction, sender, recipients, subject, sent_at, read,

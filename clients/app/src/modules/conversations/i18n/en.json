@@ -102,7 +102,8 @@
     "whyAsksAction": "Asks you to do something",
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
-    "whySuspicious": "Suspicious"
+    "whySuspicious": "Suspicious",
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
     "signals": {
@@ -149,7 +150,10 @@
     "knn": {
       "neighbours": "Mail like this was sorted this way before."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks follows a rule taught for mail like this."
+    }
   },
   "shortcuts": {
     "primary": "Go to Primary",
@@ -163,7 +167,8 @@
     "forward": "Forward",
     "showImages": "Show images",
     "nextAttachment": "Next attachment",
-    "notNeeded": "Not needed (or it’s safe)"
+    "notNeeded": "Not needed (or it’s safe)",
+    "undoAll": "Undo all a rule did"
   },
   "compose": {
     "title": {
@@ -221,7 +226,9 @@
       "pay": "{{name}} sent a bill to pay",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
-      "checkDo": "Did {{name}} ask you to do something?"
+      "checkDo": "Did {{name}} ask you to do something?",
+      "taughtReply": "{{name}}: a reply, by a rule",
+      "taughtDo": "{{name}}: to do, by a rule"
     },
     "chip": {
       "reply": "Needs a reply",
@@ -247,7 +254,8 @@
         "rules": "Rules",
         "model": "Model",
         "knn": "Similar mail",
-        "cascade": "Rules, then model"
+        "cascade": "Rules, then model",
+        "taught": "A rule"
       },
       "suggestion": "a suggestion",
       "actsFrom": "acts from {{threshold}}",
@@ -268,6 +276,205 @@
       "confirmed": "Thanks · {{name}} stays on your list",
       "failed": "Could not change {{name}}: nothing changed. Try again.",
       "changed": "{{name}} changed while you looked: have another look."
+    }
+  },
+  "rules": {
+    "sentence": "Mail {{conditions}} → {{actions}}",
+    "when": {
+      "from": "from {{value}}",
+      "list": "on the {{value}} list",
+      "like": "like “{{value}}”",
+      "about": "about “{{value}}”",
+      "header": "with a list header",
+      "label": "with a label",
+      "stream": "in {{value}}"
+    },
+    "do": {
+      "archive": "archived",
+      "label": "labelled",
+      "read": "marked read",
+      "needsReply": "needs a reply",
+      "noReply": "never needs a reply",
+      "asksAction": "asks for something",
+      "noAction": "never asks for anything",
+      "always": "always kept in the inbox",
+      "never": "never needs you"
+    },
+    "likeness": {
+      "sender": "Everything from {{address}}",
+      "list": "Only the {{list}} list",
+      "template": "Only “{{template}}” from {{from}}"
+    },
+    "offer": {
+      "which": "Which mail",
+      "question": {
+        "move_one": "Move the one like this to {{stream}}, and new ones too?",
+        "move_other": "Move all {{n}} like this to {{stream}}, and new ones too?",
+        "archive_one": "Archive the one like this, and new ones too?",
+        "archive_other": "Archive all {{n}} like this, and new ones too?",
+        "read_one": "Mark the one like this read, and new ones too?",
+        "read_other": "Mark all {{n}} like this read, and new ones too?",
+        "clear_one": "Say the one like this never needs you, and new ones too?",
+        "clear_other": "Say all {{n}} like this never need you, and new ones too?"
+      },
+      "accept": {
+        "move_one": "Move it",
+        "move_other": "Move all {{n}}",
+        "archive_one": "Archive it",
+        "archive_other": "Archive all {{n}}",
+        "read_one": "Mark it read",
+        "read_other": "Mark all {{n}} read",
+        "clear_one": "Clear it",
+        "clear_other": "Clear all {{n}}"
+      },
+      "justThis": "Just this one",
+      "safe": "None of them looks suspicious.",
+      "shared": "For everyone in {{inbox}}.",
+      "more": "and {{n}} more",
+      "foot": "It becomes a rule. You can undo it, or remove it later.",
+      "questionAtLeast": {
+        "move": "Move all like this (at least {{n}}) to {{stream}}, and new ones too?",
+        "archive": "Archive all like this (at least {{n}}), and new ones too?",
+        "read": "Mark all like this (at least {{n}}) read, and new ones too?",
+        "clear": "Say all like this (at least {{n}}) never need you, and new ones too?"
+      },
+      "choose": {
+        "move": "Move mail like this to {{stream}}, and new ones too? Choose which.",
+        "archive": "Archive mail like this, and new ones too? Choose which.",
+        "read": "Mark mail like this read, and new ones too? Choose which.",
+        "clear": "Say mail like this never needs you, and new ones too? Choose which."
+      },
+      "acceptAtLeast": {
+        "move": "Move them all",
+        "archive": "Archive them all",
+        "read": "Mark them all read",
+        "clear": "Clear them all"
+      },
+      "suspicious_one": "{{n}} that looks suspicious stays where it is.",
+      "suspicious_other": "{{n}} that look suspicious stay where they are.",
+      "dismissFailed": "Campbooks could not record “Just this one”, so it may offer this again.",
+      "partial": "Campbooks looked at part of this inbox, so there may be more."
+    },
+    "run": {
+      "working": {
+        "move_one": "Moving {{n}} to {{stream}}",
+        "move_other": "Moving {{n}} to {{stream}}",
+        "archive_one": "Archiving {{n}}",
+        "archive_other": "Archiving {{n}}",
+        "read_one": "Marking {{n}} read",
+        "read_other": "Marking {{n}} read",
+        "clear_one": "Clearing {{n}}",
+        "clear_other": "Clearing {{n}}",
+        "revert_one": "Putting {{n}} back",
+        "revert_other": "Putting {{n}} back"
+      },
+      "progress": "{{done}} of {{total}} checked",
+      "keepWorking": "You can keep working. Your mail provider catches up in the background.",
+      "done": {
+        "move_one": "Moved {{n}} to {{stream}}. New ones will go there too.",
+        "move_other": "Moved {{n}} to {{stream}}. New ones will go there too.",
+        "archive_one": "Archived {{n}}. New ones will be archived too.",
+        "archive_other": "Archived {{n}}. New ones will be archived too.",
+        "read_one": "Marked {{n}} read. New ones will be too.",
+        "read_other": "Marked {{n}} read. New ones will be too.",
+        "clear_one": "Cleared {{n}}. New ones won't need you.",
+        "clear_other": "Cleared {{n}}. New ones won't need you.",
+        "revert_one": "Put {{n}} back. The rule is removed.",
+        "revert_other": "Put {{n}} back. The rule is removed."
+      },
+      "undoAll": "Undo all",
+      "close": "Close",
+      "failed": "Campbooks could not make that rule. Nothing changed.",
+      "finding": "Finding all the mail like this",
+      "counting": "Counting…",
+      "undoing": "Putting back what the rule changed…",
+      "stopped_one": "Stopped after changing {{n}}. The rule no longer acts.",
+      "stopped_other": "Stopped after changing {{n}}. The rule no longer acts.",
+      "stoppedNone": "Stopped before changing anything. The rule no longer acts.",
+      "removed": "This rule was removed, so it no longer acts.",
+      "leftAlone_one": "Left {{n}} alone: it looks suspicious.",
+      "leftAlone_other": "Left {{n}} alone: they look suspicious.",
+      "undoFailed": "Campbooks could not undo that rule. Nothing was put back.",
+      "loadFailed": "Campbooks could not load this rule's progress."
+    },
+    "toast": {
+      "made": "New rule · {{rule}}",
+      "stopped": "Rule removed · {{rule}}",
+      "kept": "Rule kept · {{rule}}",
+      "declined": "Rule declined · {{rule}}",
+      "failed": "Campbooks could not change that rule. Nothing changed."
+    },
+    "row": {
+      "move": "Campbooks moved this",
+      "archive": "Campbooks archived this",
+      "read": "Campbooks marked this read",
+      "label": "Campbooks labelled this",
+      "needsReply": "Campbooks says this needs a reply",
+      "noReply": "Campbooks says this needs no reply",
+      "asksAction": "Campbooks says this asks for something",
+      "noAction": "Campbooks says this asks for nothing",
+      "always": "Campbooks keeps this in the inbox",
+      "never": "Campbooks says this never needs you",
+      "withOthers": "{{line}} · {{others}}",
+      "others_one": "like {{n}} other {{from}}",
+      "others_other": "like {{n}} others {{from}}"
+    },
+    "reader": {
+      "stop": "Stop doing this"
+    },
+    "exception": {
+      "remove": "Remove the rule",
+      "keep": "Keep it",
+      "question_one": "Changed back once in the last 30 days. Keep the rule “{{rule}}”?",
+      "question_other": "Changed back {{n}} times in the last 30 days. Keep the rule “{{rule}}”?"
+    },
+    "origin": {
+      "action": {
+        "you": "You taught this when you acted on one email",
+        "named": "{{name}} taught this when they acted on one email",
+        "someone": "Taught when someone acted on one email"
+      },
+      "onboarding": {
+        "you": "From your answers when you set up",
+        "named": "From {{name}}'s answers at setup",
+        "someone": "From answers at setup"
+      },
+      "instruction": {
+        "you": "From your own words: “{{text}}”",
+        "named": "From {{name}}'s words: “{{text}}”",
+        "someone": "From a member's words: “{{text}}”"
+      },
+      "correction": {
+        "you": "Suggested from your corrections",
+        "named": "Suggested from {{name}}'s corrections",
+        "someone": "Suggested from corrections in this inbox"
+      },
+      "suggestion": "Suggested by Campbooks"
+    },
+    "list": {
+      "label": "Rules",
+      "waiting": "Waiting for you",
+      "keep": "Keep this rule",
+      "no": "No",
+      "remove": "Remove",
+      "removeQuestion": "Remove this rule? New mail is no longer changed by it.",
+      "confirmRemove": "Remove",
+      "cancel": "Keep",
+      "forEveryone": "For everyone",
+      "paused": "Paused: whoever taught it can no longer change this inbox",
+      "empty": "No rules yet. When you move, archive or clear one email, Campbooks offers to do the same to the ones like it.",
+      "leave": "Leave them as they are",
+      "changedMail": "The mail it changed",
+      "applied_one": "{{n}} so far",
+      "applied_other": "{{n}} so far",
+      "exceptions_one": "{{n}} changed back in the last 30 days",
+      "exceptions_other": "{{n}} changed back in the last 30 days",
+      "putBack_one": "Also put back the one it changed",
+      "putBack_other": "Also put back the {{n}} it changed",
+      "lastActed": "Last acted {{time}}",
+      "failed": "Could not load the rules",
+      "retry": "Try again",
+      "inbox": "An inbox"
     }
   }
 }

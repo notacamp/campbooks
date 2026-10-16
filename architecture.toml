@@ -31,6 +31,10 @@ call = "flags::apply("
 resource = "conversations.conversation"
 
 [[access.helpers]]
+call = "may_teach("
+resource = "conversations.inbox"
+
+[[access.helpers]]
 call = "workspace_clients::require_admin("
 resource = "identity.client"
 
@@ -47,6 +51,10 @@ resource = "workspaces.member"
 [[access.references]]
 call = "resources::inbox("
 resource = "conversations.inbox"
+
+[[access.references]]
+call = "resources::rule("
+resource = "conversations.rule"
 
 # Operations whose handler does not call `authz` yet: the web BFF's session
 # and proxy operations act on the cookie's own session, and the proxies run
@@ -131,6 +139,10 @@ reason = "The change feed (a connection's health) and notifications to come."
 [[access.unconsumed_events]]
 name = "conversations.draft_sent"
 reason = "The change feed: the sent draft leaves its author's list."
+
+[[access.unconsumed_events]]
+name = "conversations.rule_changed"
+reason = "The change feed: clients follow a taught rule and its run's progress."
 
 [[access.unconsumed_events]]
 name = "conversations.send_failed"

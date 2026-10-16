@@ -40,6 +40,18 @@ define_id!(
     CorrectionId
 );
 define_id!(
+    /// A taught rule: a condition → action pair a member taught Campbooks.
+    RuleId
+);
+define_id!(
+    /// One pass of a rule over existing mail.
+    RuleRunId
+);
+define_id!(
+    /// The rules one teaching created, across inboxes.
+    TeachingId
+);
+define_id!(
     /// A message being written: new, or a reply or forward of a message.
     DraftId
 );
@@ -257,6 +269,8 @@ pub enum StreamSource {
     Rules,
     /// An accepted model answer.
     Model,
+    /// A rule a member taught.
+    Taught,
     /// A member moved it.
     Member,
 }
@@ -268,6 +282,7 @@ impl StreamSource {
             Self::Default => "default",
             Self::Rules => "rules",
             Self::Model => "model",
+            Self::Taught => "taught",
             Self::Member => "member",
         }
     }
@@ -281,6 +296,7 @@ impl FromStr for StreamSource {
             "default" => Ok(Self::Default),
             "rules" => Ok(Self::Rules),
             "model" => Ok(Self::Model),
+            "taught" => Ok(Self::Taught),
             "member" => Ok(Self::Member),
             other => Err(Error::internal(format!("unknown stream source `{other}`"))),
         }
@@ -430,6 +446,8 @@ vocabulary!(
         Rules => "rules",
         /// The `decide` model.
         Model => "model",
+        /// A rule a member taught.
+        Taught => "taught",
         /// A member confirmed it.
         Member => "member",
     }
@@ -462,6 +480,8 @@ vocabulary!(
         NotNeeded => "not_needed",
         /// A newer message replaced it.
         Superseded => "superseded",
+        /// A rule a member taught says this mail never needs anyone.
+        Rule => "rule",
     }
 );
 
@@ -474,6 +494,58 @@ vocabulary!(
         NotNeeded => "not_needed",
         /// A question answered yes (stored as a correction).
         Confirmed => "confirmed",
+    }
+);
+
+vocabulary!(
+    /// Where a taught rule came from.
+    RuleOrigin {
+        /// A member acted on one conversation and said "do the same to these".
+        Action => "action",
+        /// An answer to an onboarding question.
+        Onboarding => "onboarding",
+        /// The member's own words.
+        Instruction => "instruction",
+        /// A member's repeated corrections.
+        Correction => "correction",
+        /// Something Campbooks noticed and proposed.
+        Suggestion => "suggestion",
+    }
+);
+
+vocabulary!(
+    /// Whether a taught rule acts.
+    RuleState {
+        /// Waiting for a member to say yes; does nothing yet.
+        Proposed => "proposed",
+        /// Acts on existing and new mail.
+        Active => "active",
+        /// Stopped: its author may no longer change the inbox, or a member paused it.
+        Paused => "paused",
+        /// Gone.
+        Removed => "removed",
+    }
+);
+
+vocabulary!(
+    /// What a run over existing mail does.
+    RunKind {
+        /// Applies the rule.
+        Apply => "apply",
+        /// Puts back what the rule changed.
+        Revert => "revert",
+    }
+);
+
+vocabulary!(
+    /// Where a run is.
+    RunState {
+        /// Working through the inbox.
+        Running => "running",
+        /// Finished.
+        Done => "done",
+        /// Stopped before the end.
+        Cancelled => "cancelled",
     }
 );
 
@@ -494,6 +566,7 @@ mod tests {
             StreamSource::Default,
             StreamSource::Rules,
             StreamSource::Model,
+            StreamSource::Taught,
             StreamSource::Member,
         ] {
             assert_eq!(source.as_str().parse::<StreamSource>().unwrap(), source);

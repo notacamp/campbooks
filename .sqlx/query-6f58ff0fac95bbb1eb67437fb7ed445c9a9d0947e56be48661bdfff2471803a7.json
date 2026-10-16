@@ -1,0 +1,20 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rules\n              SET conditions = $2, actions = $3, specificity = $4, state = $5,\n                  taught_by = CASE WHEN $6 THEN $7 ELSE taught_by END, updated_at = now()\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Jsonb",
+        "Jsonb",
+        "Int4",
+        "Text",
+        "Bool",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "6f58ff0fac95bbb1eb67437fb7ed445c9a9d0947e56be48661bdfff2471803a7"
+}

@@ -92,6 +92,11 @@ pub struct ReconnectTarget {
 pub type TargetFuture<'a> =
     Pin<Box<dyn Future<Output = Result<ReconnectTarget, Error>> + Send + 'a>>;
 
+/// A future returned by [`GrantIntake::connection_of`]: the connection's
+/// id, if there is one.
+pub type ConnectionOfFuture<'a> =
+    Pin<Box<dyn Future<Output = Result<Option<String>, Error>> + Send + 'a>>;
+
 /// Takes provider grants into connections. Implemented by `connectors`.
 pub trait GrantIntake: std::fmt::Debug + Send + Sync + 'static {
     /// The provider scopes this instance can turn into a mailbox connection
@@ -114,6 +119,20 @@ pub trait GrantIntake: std::fmt::Debug + Send + Sync + 'static {
         workspace: WorkspaceId,
         connection: &'a str,
     ) -> TargetFuture<'a>;
+
+    /// The connection of `provider` account `account_subject` in
+    /// `workspace`, when the person with token subject `subject` granted
+    /// it there (`None` otherwise, or when they are no longer a member).
+    /// Lets `identity` check a mailbox record it could not name before
+    /// letting a way in go.
+    fn connection_of<'a>(
+        &'a self,
+        state: &'a AppState,
+        subject: &'a str,
+        workspace: WorkspaceId,
+        provider: &'a str,
+        account_subject: &'a str,
+    ) -> ConnectionOfFuture<'a>;
 }
 
 /// The port before a module provides one: no mailbox can be connected.
@@ -141,6 +160,17 @@ impl GrantIntake for NoGrantIntake {
         _connection: &'a str,
     ) -> TargetFuture<'a> {
         Box::pin(async { Err(Error::NotFound) })
+    }
+
+    fn connection_of<'a>(
+        &'a self,
+        _state: &'a AppState,
+        _subject: &'a str,
+        _workspace: WorkspaceId,
+        _provider: &'a str,
+        _account_subject: &'a str,
+    ) -> ConnectionOfFuture<'a> {
+        Box::pin(async { Ok(None) })
     }
 }
 

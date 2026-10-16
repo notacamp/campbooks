@@ -15,6 +15,7 @@ use std::{
 use regex::Regex;
 use serde::Deserialize;
 
+pub use super::facts::{is_machine_sender, is_public_suffix, registrable_domain};
 pub use super::inbox::Recipient;
 use crate::decide::{DecisionState, Question};
 
@@ -290,6 +291,103 @@ static QUOTE_MARKER: LazyLock<Regex> = LazyLock::new(|| {
         r"(?i)^(?:on .{3,80} wrote:|em .{3,80} escreveu:|el .{3,80} escribió:|le .{3,80} a écrit ?:|-{2,}\s*(?:original message|mensagem original|mensaje original|message d'origine|forwarded message|mensagem encaminhada|mensaje reenviado|message transféré)\s*-{2,}|(?:from|de|von)\s*:\s.+@.+)$",
     )
 });
+
+// --- Taught-rule matching (campbooks-cloud#125) ------------------------------
+//
+// A member's own rule names words or a subject's template; these helpers
+// normalise text so the member's condition matches lookalikes. They decide
+// nothing on their own (ADR 0018): only a rule a member taught uses them.
+
+/// The words of a subject or phrase, lower-cased with accents dropped, in
+/// order (letters and digits only).
+pub fn subject_words(text: &str) -> Vec<String> {
+    let mut words = Vec::new();
+    let mut word = String::new();
+    for c in text.chars().flat_map(char::to_lowercase) {
+        if let Some(plain) = fold_accent(c) {
+            word.push_str(plain);
+        } else if c.is_alphanumeric() {
+            word.push(c);
+        } else if !word.is_empty() {
+            words.push(std::mem::take(&mut word));
+        }
+    }
+    if !word.is_empty() {
+        words.push(word);
+    }
+    words
+}
+
+/// The plain letters of an accented Latin letter (pt, es, fr).
+fn fold_accent(c: char) -> Option<&'static str> {
+    Some(match c {
+        'à' | 'á' | 'â' | 'ã' | 'ä' | 'å' => "a",
+        'ç' => "c",
+        'è' | 'é' | 'ê' | 'ë' => "e",
+        'ì' | 'í' | 'î' | 'ï' => "i",
+        'ñ' => "n",
+        'ò' | 'ó' | 'ô' | 'õ' | 'ö' => "o",
+        'ù' | 'ú' | 'û' | 'ü' => "u",
+        'ý' | 'ÿ' => "y",
+        'œ' => "oe",
+        'æ' => "ae",
+        'ß' => "ss",
+        _ => return None,
+    })
+}
+
+static REPLY_PREFIX: LazyLock<Regex> = LazyLock::new(|| {
+    regex(r"(?i)^\s*(?:re|fwd?|fw|enc|res|rv|tr|réf|ref|aw|wg)\s*(?:\[\d+\])?\s*:\s*")
+});
+static DATE_TOKEN: LazyLock<Regex> =
+    LazyLock::new(|| regex(r"\b\d{1,4}[-/.]\d{1,2}[-/.]\d{1,4}\b"));
+static ID_TOKEN: LazyLock<Regex> = LazyLock::new(|| regex(r"[\p{L}\d_-]{6,}"));
+static DIGITS: LazyLock<Regex> = LazyLock::new(|| regex(r"\d+"));
+static HASHES: LazyLock<Regex> = LazyLock::new(|| regex(r"#(?:[\s#.,:/-]*#)*"));
+static SPACES: LazyLock<Regex> = LazyLock::new(|| regex(r"\s+"));
+static LITERAL_WORD: LazyLock<Regex> = LazyLock::new(|| regex(r"\p{L}{2,}"));
+
+/// Longest subject template, in characters.
+pub const TEMPLATE_MAX_CHARS: usize = 120;
+
+/// A subject with what changes from one message to the next taken out:
+/// reply and forward prefixes (in the four locales) dropped, dates and digit
+/// runs as `#`, ids (six or more characters mixing letters and digits) as
+/// `*`, lower-cased, spaces collapsed, at most [`TEMPLATE_MAX_CHARS`]. `None`
+/// when fewer than two literal words are left: such a template would match
+/// unrelated mail.
+pub fn subject_template(subject: &str) -> Option<String> {
+    let mut rest = subject.trim();
+    while let Some(m) = REPLY_PREFIX.find(rest) {
+        rest = &rest[m.end()..];
+    }
+    let lower = rest.to_lowercase();
+    let no_dates = DATE_TOKEN.replace_all(&lower, "#");
+    let no_ids = ID_TOKEN.replace_all(&no_dates, |c: &regex::Captures<'_>| {
+        let token = &c[0];
+        let letters = token.chars().any(char::is_alphabetic);
+        let digits = token.chars().any(|ch| ch.is_ascii_digit());
+        if letters && digits {
+            "*".to_owned()
+        } else {
+            token.to_owned()
+        }
+    });
+    let no_digits = DIGITS.replace_all(&no_ids, "#");
+    let hashes = HASHES.replace_all(&no_digits, "#");
+    let template = SPACES.replace_all(hashes.trim(), " ");
+    if LITERAL_WORD.find_iter(&template).count() < 2 {
+        return None;
+    }
+    Some(
+        template
+            .chars()
+            .take(TEMPLATE_MAX_CHARS)
+            .collect::<String>()
+            .trim_end()
+            .to_owned(),
+    )
+}
 
 #[cfg(test)]
 mod tests {

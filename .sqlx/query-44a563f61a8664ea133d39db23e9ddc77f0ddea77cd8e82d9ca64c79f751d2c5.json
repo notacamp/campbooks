@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_applications SET excepted_at = now(), excepted_by = $3\n            WHERE rule_id = $1 AND conversation_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "44a563f61a8664ea133d39db23e9ddc77f0ddea77cd8e82d9ca64c79f751d2c5"
+}

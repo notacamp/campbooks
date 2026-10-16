@@ -427,13 +427,86 @@ async fn migrate(config: &Config) -> Result<(), String> {
     let mut conn = PgConnection::connect_with(&options)
         .await
         .map_err(|e| format!("could not connect to the database to migrate: {e}"))?;
-    sqlx::migrate!("../../migrations")
-        .run(&mut conn)
+    sqlx::query("SELECT pg_advisory_lock($1)")
+        .bind(MIGRATION_LOCK)
+        .execute(&mut conn)
         .await
-        .map_err(|e| format!("migrations failed: {e}"))?;
+        .map_err(|e| format!("could not take the migration lock: {e}"))?;
+    let migrated = migrate_locked(&mut conn).await;
+    // Closing the connection releases the lock too; unlock first anyway.
+    let _ = sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(MIGRATION_LOCK)
+        .execute(&mut conn)
+        .await;
     let _ = conn.close().await;
+    migrated?;
     tracing::info!("migrations applied");
     Ok(())
+}
+
+/// The session advisory lock every Campbooks process holds while it
+/// migrates, so no process takes another's index build in flight (not valid
+/// until it ends) for a failed one.
+const MIGRATION_LOCK: i64 = 0x6361_6d70_6d69_6772;
+
+/// Under [`MIGRATION_LOCK`]: drop what failed index builds left, then
+/// migrate.
+async fn migrate_locked(conn: &mut PgConnection) -> Result<(), String> {
+    drop_invalid_indexes(conn).await?;
+    sqlx::migrate!("../../migrations")
+        .run(conn)
+        .await
+        .map_err(|e| format!("migrations failed: {e}"))
+}
+
+/// The schemas the migrations create and own (`<schema>__<name>.sql`): the
+/// only ones whose invalid indexes [`drop_invalid_indexes`] touches.
+const MIGRATED_SCHEMAS: [&str; 10] = [
+    "admin",
+    "attention",
+    "bff",
+    "connectors",
+    "conversations",
+    "identity",
+    "kernel",
+    "search",
+    "system",
+    "workspaces",
+];
+
+/// Drop the invalid indexes of [`MIGRATED_SCHEMAS`]. `CREATE INDEX
+/// CONCURRENTLY` leaves one behind when the build fails or its process dies
+/// partway; the migration that builds it (`IF NOT EXISTS`) would otherwise
+/// keep it, and Postgres never uses it. Run under [`MIGRATION_LOCK`]: a
+/// migration's build still in flight holds it. Other schemas (an operator's
+/// own, built by hand) are left alone. Returns the indexes dropped, as
+/// `schema.name`.
+async fn drop_invalid_indexes(conn: &mut PgConnection) -> Result<Vec<String>, String> {
+    let invalid: Vec<(String, String, String)> = sqlx::query_as(
+        r"SELECT n.nspname::text, c.relname::text, format('%I.%I', n.nspname, c.relname)
+            FROM pg_index i
+            JOIN pg_class c ON c.oid = i.indexrelid
+            JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE NOT i.indisvalid AND n.nspname = ANY($1)
+           ORDER BY 1, 2",
+    )
+    .bind(&MIGRATED_SCHEMAS[..])
+    .fetch_all(&mut *conn)
+    .await
+    .map_err(|e| format!("could not look for invalid indexes: {e}"))?;
+    let mut dropped = Vec::with_capacity(invalid.len());
+    for (schema, index, quoted) in invalid {
+        tracing::warn!(%schema, %index, "dropping an invalid index a failed concurrent build left");
+        // `quoted` is quoted by `format('%I.%I')` above.
+        sqlx::query(sqlx::AssertSqlSafe(format!(
+            "DROP INDEX CONCURRENTLY IF EXISTS {quoted}"
+        )))
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| format!("could not drop the invalid index {schema}.{index}: {e}"))?;
+        dropped.push(format!("{schema}.{index}"));
+    }
+    Ok(dropped)
 }
 
 /// The pool every request and job uses. A privileged login switches each
@@ -776,6 +849,63 @@ mod tests {
             ));
         }
         config
+    }
+
+    #[sqlx::test(migrations = "../../migrations")]
+    async fn a_failed_concurrent_index_build_is_dropped_before_migrating(db: PgPool) {
+        let mut conn = db.acquire().await.unwrap();
+        // A unique index over duplicates fails partway and stays, invalid:
+        // one in a schema the migrations own, one in an operator's own.
+        for schema in ["conversations", "public"] {
+            for sql in [
+                format!("CREATE TABLE {schema}.twice (n integer)"),
+                format!("INSERT INTO {schema}.twice VALUES (1), (1)"),
+                format!("CREATE INDEX twice_valid_idx ON {schema}.twice (n)"),
+            ] {
+                sqlx::query(sqlx::AssertSqlSafe(sql))
+                    .execute(&mut *conn)
+                    .await
+                    .unwrap();
+            }
+            sqlx::query(sqlx::AssertSqlSafe(format!(
+                "CREATE UNIQUE INDEX CONCURRENTLY twice_n_idx ON {schema}.twice (n)"
+            )))
+            .execute(&mut *conn)
+            .await
+            .unwrap_err();
+        }
+        let dropped = drop_invalid_indexes(&mut conn).await.unwrap();
+        assert_eq!(dropped, vec!["conversations.twice_n_idx".to_owned()]);
+        let left: Vec<String> = sqlx::query_scalar(
+            "SELECT schemaname || '.' || indexname FROM pg_indexes
+              WHERE tablename = 'twice' ORDER BY 1",
+        )
+        .fetch_all(&mut *conn)
+        .await
+        .unwrap();
+        assert_eq!(
+            left,
+            [
+                "conversations.twice_valid_idx",
+                "public.twice_n_idx",
+                "public.twice_valid_idx"
+            ]
+        );
+        // The migrations, already applied, run again cleanly.
+        migrate_locked(&mut conn).await.unwrap();
+    }
+
+    #[test]
+    fn every_migration_belongs_to_a_swept_schema() {
+        for migration in sqlx::migrate!("../../migrations").iter() {
+            // `<schema>__<name>.sql`; sqlx turns `_` into spaces.
+            let schema = migration.description.split("  ").next().unwrap_or_default();
+            assert!(
+                MIGRATED_SCHEMAS.contains(&schema),
+                "{} names schema `{schema}`: add it to MIGRATED_SCHEMAS",
+                migration.version
+            );
+        }
     }
 
     #[sqlx::test(migrations = "../../migrations")]

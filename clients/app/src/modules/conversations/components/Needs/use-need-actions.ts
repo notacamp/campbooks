@@ -10,6 +10,7 @@ import {
 } from "../../api/queries";
 import type { Translate } from "../../model";
 import { needSender } from "../../needs";
+import { useTeachOnce } from "../TeachOnce/TeachOnce";
 
 const TOASTS: Record<Exclude<NeedVerdict, "reopen">, string> = {
   done: "needs.toast.done",
@@ -41,11 +42,18 @@ export function useNeedActions(
   const t = typed as unknown as Translate;
   const mutation = useConversationAction(workspaceId);
   const undo = useUndoToast();
+  const teach = useTeachOnce();
 
   const run = (conversation: ConversationSummary, verdict: NeedVerdict) => {
     mutation.mutate(
       { conversation, action: { need: verdict } },
       {
+        onSuccess: () => {
+          // Not needed on a need (not a warning) can teach: "these never need me".
+          if (verdict === "not_needed" && conversation.need?.question !== "suspicious") {
+            teach?.after(conversation, { kind: "not_needed" });
+          }
+        },
         onError: (error) => {
           // Nothing changed on the server: put it back and say so plainly.
           onFailed?.(conversation);

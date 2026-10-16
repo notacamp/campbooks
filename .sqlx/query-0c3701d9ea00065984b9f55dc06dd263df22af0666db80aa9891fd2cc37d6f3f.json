@@ -1,0 +1,31 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        WITH linked AS (\n            INSERT INTO conversations.conversation_labels (workspace_id, conversation_id, label_id)\n            SELECT $1, $2, l.id FROM conversations.labels l WHERE l.id = $3 AND l.inbox_id = $4\n            ON CONFLICT DO NOTHING\n            RETURNING label_id\n        )\n        SELECT l.provider_key FROM linked JOIN conversations.labels l ON l.id = linked.label_id\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.labels",
+            "name": "provider_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "0c3701d9ea00065984b9f55dc06dd263df22af0666db80aa9891fd2cc37d6f3f"
+}

@@ -637,6 +637,51 @@
       }
     },
     {
+      "name": "conversations.rule_changed",
+      "module": "conversations",
+      "version": 1,
+      "workspaceScoped": true,
+      "payload": {
+        "type": "object",
+        "description": "A taught rule or its run changed (no other module consumes it; its schema\nis in `openapi/events.json`).\nIds, enums and counts only: never its conditions, the member's words or\nan address.",
+        "required": [
+          "workspace",
+          "inbox",
+          "rule",
+          "state"
+        ],
+        "properties": {
+          "inbox": {
+            "$ref": "#/components/schemas/InboxId",
+            "description": "The inbox: who may see the rule."
+          },
+          "rule": {
+            "$ref": "#/components/schemas/RuleId",
+            "description": "The rule."
+          },
+          "run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunFacts",
+                "description": "Its current run, when it has one."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/RuleState",
+            "description": "Its state."
+          },
+          "workspace": {
+            "type": "string",
+            "description": "The workspace."
+          }
+        }
+      }
+    },
+    {
       "name": "conversations.send_failed",
       "module": "conversations",
       "version": 1,
@@ -1351,7 +1396,8 @@
           "trashed",
           "done",
           "not_needed",
-          "superseded"
+          "superseded",
+          "rule"
         ]
       },
       "ConnectionId": {
@@ -1798,6 +1844,80 @@
           "owner",
           "admin",
           "member"
+        ]
+      },
+      "RuleId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RuleId (UUIDv7)"
+      },
+      "RuleRunId": {
+        "type": "string",
+        "format": "uuid",
+        "description": "RuleRunId (UUIDv7)"
+      },
+      "RuleState": {
+        "type": "string",
+        "description": "Whether a taught rule acts.",
+        "enum": [
+          "proposed",
+          "active",
+          "paused",
+          "removed"
+        ]
+      },
+      "RunFacts": {
+        "type": "object",
+        "description": "A taught rule's run, as `rule_changed` carries it: counts only.",
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "total",
+          "done"
+        ],
+        "properties": {
+          "done": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations done so far.",
+            "minimum": 0
+          },
+          "id": {
+            "$ref": "#/components/schemas/RuleRunId",
+            "description": "The run."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RunKind",
+            "description": "Applying the rule, or putting back what it changed."
+          },
+          "state": {
+            "$ref": "#/components/schemas/RunState",
+            "description": "Where it is."
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "description": "Conversations it will look at.",
+            "minimum": 0
+          }
+        }
+      },
+      "RunKind": {
+        "type": "string",
+        "description": "What a run over existing mail does.",
+        "enum": [
+          "apply",
+          "revert"
+        ]
+      },
+      "RunState": {
+        "type": "string",
+        "description": "Where a run is.",
+        "enum": [
+          "running",
+          "done",
+          "cancelled"
         ]
       },
       "SendId": {

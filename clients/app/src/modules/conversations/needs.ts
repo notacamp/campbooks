@@ -26,6 +26,12 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
       name,
     });
   }
+  // A rule a member taught raised it: say so, never that the sender asked.
+  if (need.basis === "taught") {
+    return t(need.question === "needs_reply" ? "needs.line.taughtReply" : "needs.line.taughtDo", {
+      name,
+    });
+  }
   switch (need.reason) {
     case "pay": {
       return t("needs.line.pay", { name });

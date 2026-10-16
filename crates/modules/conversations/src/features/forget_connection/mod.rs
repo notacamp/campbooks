@@ -4,16 +4,17 @@
 //! `contracts/connectors.connection_removed.v1.schema.json`).
 //!
 //! - **Delete** (the default): each inbox it fed goes with its messages,
-//!   attachments, conversations, labels, decisions, corrections, drafts and
-//!   memberships; the files they held are let go (the kernel's sweep deletes
+//!   attachments, conversations, labels, decisions, corrections, drafts,
+//!   memberships and taught rules (with their runs, which stop); the files they held are let go (the kernel's sweep deletes
 //!   them once nothing else holds them); the inbox is remembered as removed,
 //!   so a late batch or a replayed grant never brings it back; and
 //!   `conversations.inbox_removed` tells search to forget it and the change
 //!   feed that it is gone.
 //! - **Keep**: each inbox is frozen read-only (`detached_at`): nothing syncs
 //!   into it, nothing is written or sent from it (scheduled sends go back to
-//!   drafts, which their authors may still delete), its members keep
-//!   reading.
+//!   drafts, which their authors may still delete), its taught rules stop
+//!   acting (their runs are cancelled; the member's words, what they changed
+//!   and the dismissed suggestions are purged), its members keep reading.
 //!
 //! Idempotent: a replay finds nothing left to do.
 
@@ -195,6 +196,46 @@ async fn keep_inbox(
                   SET state = 'draft', send_at = NULL, send_generation = send_generation + 1,
                       version = version + 1, updated_at = now()
                 WHERE inbox_id = $1 AND state = 'scheduled'"#,
+            inbox as InboxId
+        )
+        .execute(&mut **tx)
+        .await?;
+        // Its rules act no more: their runs stop, and what only served
+        // acting again goes (the member's words, what each rule changed, the
+        // suggestions turned down). The rules stay listed, paused.
+        // Runs before rules, in id order (`rule_runs::lock_running`).
+        sqlx::query!(
+            r#"SELECT u.id FROM conversations.rule_runs u
+                WHERE u.state = 'running'
+                  AND u.rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)
+                ORDER BY u.id FOR UPDATE OF u"#,
+            inbox as InboxId
+        )
+        .fetch_all(&mut **tx)
+        .await?;
+        sqlx::query!(
+            r#"UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()
+                WHERE state = 'running'
+                  AND rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)"#,
+            inbox as InboxId
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "UPDATE conversations.rules SET origin_text = NULL WHERE inbox_id = $1",
+            inbox as InboxId
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            r#"UPDATE conversations.rule_applications SET before = '{}'::jsonb
+                WHERE rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)"#,
+            inbox as InboxId
+        )
+        .execute(&mut **tx)
+        .await?;
+        sqlx::query!(
+            "DELETE FROM conversations.rule_dismissals WHERE inbox_id = $1",
             inbox as InboxId
         )
         .execute(&mut **tx)

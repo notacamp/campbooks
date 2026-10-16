@@ -42,7 +42,9 @@ decisions endpoint. It is closed and hosted in the US.
   message's subject, body or attachment names to decide what it means: no
   phrase lists, keyword lists or regular expressions over content, in any
   language. Text hygiene (HTML to text, dropping quoted history) is not
-  understanding and stays allowed.
+  understanding and stays allowed. A rule a member taught may match the
+  words or subject pattern the member chose: that is the member's
+  decision, applied as given, not code guessing what mail means.
 - **Facts only say no.** Deterministic code reads structured facts only: the
   mailing-list and automation headers (`List-Id`, `List-Unsubscribe`,
   `Precedence`, `Auto-Submitted`), the sender's and recipients' addresses,

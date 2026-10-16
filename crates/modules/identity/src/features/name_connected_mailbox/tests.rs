@@ -1,6 +1,6 @@
 //! A mailbox record the round trip never named is named by the connection
-//! it was granted for; one nothing ever names is swept, with the way in it
-//! leaves behind.
+//! it was granted for; one whose connection never came to be is swept,
+//! with the way in it leaves behind.
 
 use axum::http::StatusCode;
 use campbooks_kernel::{
@@ -12,7 +12,13 @@ use campbooks_kernel::{
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-use crate::{Prune, events::ConnectionAdded, testkit::Kit, upstream::Provider};
+use crate::{
+    Prune,
+    domain::mailbox_links::{self, Recorded},
+    events::ConnectionAdded,
+    testkit::Kit,
+    upstream::Provider,
+};
 
 const BACK: &str = "/w/ws";
 
@@ -174,6 +180,9 @@ async fn a_record_never_named_is_swept_with_the_way_in_it_left(db: PgPool) {
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
     connected_unnamed(&kit, &access, ws, "work-sam").await;
+    // The connection never came to be (the round trip died before handing
+    // the grant over).
+    kit.intake.drop_connections();
 
     // Within the grace period, it may still be named: it stays.
     prune_after(&kit, 2).await;
@@ -199,6 +208,7 @@ async fn the_sweep_never_removes_an_accounts_last_way_in(db: PgPool) {
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
     connected_unnamed(&kit, &access, ws, "work-sam").await;
+    kit.intake.drop_connections();
     // The way in the account signed up with goes; the connected one is left.
     let ways = kit.ways_in(&access).await;
     let first = ways["items"][0]["id"].as_str().unwrap().to_owned();
@@ -215,4 +225,80 @@ async fn the_sweep_never_removes_an_accounts_last_way_in(db: PgPool) {
         vec!["work-sam@example.com".to_owned()]
     );
     assert_eq!(removals(&kit).await, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_connected_mailbox_left_unnamed_keeps_its_way_in(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    // Both namings failed, but the connectors module holds the connection.
+    let connection = connected_unnamed(&kit, &access, ws, "work-sam").await;
+
+    prune_after(&kit, 48).await;
+    // The sweep asked, and named the record instead of deleting it.
+    assert_eq!(records(&kit).await, vec![(*ws.as_uuid(), Some(connection))]);
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    assert_eq!(removals(&kit).await, 0);
+}
+
+/// The `created_at` of the one record.
+async fn written_at(kit: &Kit) -> chrono::DateTime<chrono::Utc> {
+    sqlx::query_scalar("SELECT created_at FROM identity.mailbox_links")
+        .fetch_one(&kit.state.db)
+        .await
+        .unwrap()
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_retried_connect_writes_its_record_afresh(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    connected_unnamed(&kit, &access, ws, "work-sam").await;
+    kit.intake.drop_connections();
+    // An earlier connect never finished, two days ago.
+    sqlx::query("UPDATE identity.mailbox_links SET created_at = now() - interval '2 days'")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let way_in: uuid::Uuid =
+        sqlx::query_scalar("SELECT provider_identity_id FROM identity.mailbox_links")
+            .fetch_one(&kit.state.db)
+            .await
+            .unwrap();
+
+    // The connect is retried: its record is written afresh, not anew.
+    let now = chrono::Utc::now();
+    let mut conn = kit.state.db.acquire().await.unwrap();
+    let recorded = mailbox_links::record(&mut conn, way_in, *ws.as_uuid(), false, now)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(recorded, Recorded::Existed);
+    assert!((written_at(&kit).await - now).num_seconds().abs() < 1);
+    // So a sweep while it is in flight leaves it, and the way in, alone.
+    prune_after(&kit, 0).await;
+    assert_eq!(records(&kit).await, vec![(*ws.as_uuid(), None)]);
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+
+    // A named record keeps the time it was written.
+    sqlx::query("UPDATE identity.mailbox_links SET connection_id = 'c-1', created_at = now() - interval '2 days'")
+        .execute(&kit.state.db)
+        .await
+        .unwrap();
+    let before = written_at(&kit).await;
+    let mut conn = kit.state.db.acquire().await.unwrap();
+    let recorded = mailbox_links::record(&mut conn, way_in, *ws.as_uuid(), false, now)
+        .await
+        .unwrap();
+    drop(conn);
+    assert_eq!(recorded, Recorded::Existed);
+    assert_eq!(written_at(&kit).await, before);
+    // A first record for another workspace is new.
+    let mut conn = kit.state.db.acquire().await.unwrap();
+    let other = mailbox_links::record(&mut conn, way_in, *WorkspaceId::new().as_uuid(), false, now)
+        .await
+        .unwrap();
+    assert_eq!(other, Recorded::Inserted);
 }

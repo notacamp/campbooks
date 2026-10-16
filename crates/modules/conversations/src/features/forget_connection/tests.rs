@@ -520,3 +520,61 @@ async fn a_departure_keeping_mail_and_a_deletion_never_deadlock(db: PgPool) {
     let unread = departure.await.unwrap().expect("no deadlock");
     assert!(unread.is_empty(), "the inbox is gone: {unread:?}");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn keeping_mail_stops_its_rules_and_drops_what_they_kept(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let s = setup(&kit).await;
+    let ws = s.workspace;
+    let rules = format!("/api/v1/w/{ws}/inboxes/{}/rules", s.inbox);
+    let created = kit
+        .post(
+            &s.sam,
+            &rules,
+            Some(json!({
+                "conditions": [{"field": "sender_address", "value": "maya@example.com"}],
+                "actions": [{"action": "move_to_stream", "stream": "updates"}],
+                "origin": "instruction",
+                "origin_text": "Maya's mail goes to Updates",
+            })),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{:?}", created.json);
+    kit.run_jobs().await;
+    kit.post(
+        &s.sam,
+        &format!(
+            "/api/v1/w/{ws}/conversations/{}/rule-suggestions/dismiss",
+            s.conversation
+        ),
+        Some(json!({"key": "sender|maya"})),
+    )
+    .await;
+    publish(&kit, ws, &removed(ws, s.inbox, MailChoice::Keep)).await;
+
+    let words = count(
+        &kit,
+        "SELECT count(*) FROM conversations.rules WHERE inbox_id = $1 AND origin_text IS NOT NULL",
+        s.inbox,
+    )
+    .await;
+    assert_eq!(words, 0);
+    let kept = count(
+        &kit,
+        "SELECT count(*) FROM conversations.rule_applications a
+           JOIN conversations.rules r ON r.id = a.rule_id
+          WHERE r.inbox_id = $1 AND a.before <> '{}'::jsonb",
+        s.inbox,
+    )
+    .await;
+    assert_eq!(kept, 0);
+    let dismissed = count(
+        &kit,
+        "SELECT count(*) FROM conversations.rule_dismissals WHERE inbox_id = $1",
+        s.inbox,
+    )
+    .await;
+    assert_eq!(dismissed, 0);
+    let listed = kit.get(&s.sam, &format!("/api/v1/w/{ws}/rules")).await;
+    assert_eq!(listed.json["rules"][0]["state"], "paused");
+}

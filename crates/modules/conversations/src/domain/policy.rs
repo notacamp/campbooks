@@ -112,8 +112,12 @@ impl Policy {
         self
     }
 
-    /// The switch for `question` answered by `source`.
+    /// The switch for `question` answered by `source`. A taught rule always
+    /// acts: a member confirmed it, so it is not a suggestion to measure.
     pub fn switch(&self, question: &str, source: Source) -> Switch {
+        if source == Source::Taught {
+            return Switch::ActAbove(0.0);
+        }
         self.entries
             .iter()
             .find(|(q, s, _)| *q == question && *s == source)

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rule_runs SET state = 'cancelled', finished_at = now()\n            WHERE rule_id = $1 AND state = 'running'",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3b65105c7944952a4610f84d6890da43f28e492d1b3e7f52e67995499ab544bf"
+}

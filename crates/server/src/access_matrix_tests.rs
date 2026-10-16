@@ -72,8 +72,10 @@ enum Who {
     Member,
     /// A member reading the inbox.
     Reader,
-    /// A member sending from the inbox; the draft's author.
+    /// A member sending from the inbox; the draft's and the rule's author.
     Sender,
+    /// Another member sending from the inbox: author of neither.
+    Colleague,
     /// A member who connected the mailbox (the inbox's owner and manager).
     Connector,
     /// A client token bound to A.
@@ -82,12 +84,13 @@ enum Who {
     Agent,
 }
 
-const MEMBERS: [Who; 8] = [
+const MEMBERS: [Who; 9] = [
     Who::Owner,
     Who::Admin,
     Who::Member,
     Who::Reader,
     Who::Sender,
+    Who::Colleague,
     Who::Connector,
     Who::Client,
     Who::Agent,
@@ -101,6 +104,7 @@ impl Who {
             Self::Member => "mo",
             Self::Reader => "rea",
             Self::Sender => "sen",
+            Self::Colleague => "col",
             Self::Connector => "ana",
             Self::Client => "acme-sync",
             Self::Agent => "agent:adi",
@@ -128,7 +132,7 @@ impl Who {
     fn inbox_role(self) -> Option<&'static str> {
         match self {
             Self::Reader => Some("reader"),
-            Self::Sender => Some("sender"),
+            Self::Sender | Self::Colleague => Some("sender"),
             Self::Connector => Some("manager"),
             _ => None,
         }
@@ -342,6 +346,7 @@ impl World {
         let run = self.run.clone();
         let u = |who: Who| self.users[&who];
         let (connector, reader, sender) = (u(Who::Connector), u(Who::Reader), u(Who::Sender));
+        let colleague = u(Who::Colleague);
         let inbox = dev::create_inbox(
             &self.state,
             self.a,
@@ -350,6 +355,7 @@ impl World {
                 (connector, InboxRole::Manager),
                 (reader, InboxRole::Reader),
                 (sender, InboxRole::Sender),
+                (colleague, InboxRole::Sender),
             ],
         )
         .await
@@ -451,6 +457,32 @@ impl World {
         item
     }
 
+    /// A rule the sender taught the inbox (campbooks-cloud#125).
+    async fn seed_rule(
+        &self,
+        inbox: campbooks_conversations::model::InboxId,
+        sender: UserId,
+    ) -> Uuid {
+        let rule = Uuid::now_v7();
+        sqlx::query(
+            "INSERT INTO conversations.rules
+                 (id, workspace_id, inbox_id, teaching_id, conditions, actions, specificity,
+                  origin, state, taught_by, confirmed_at)
+             VALUES ($1, $2, $3, $4,
+                     '[{\"field\": \"sender_address\", \"value\": \"news@example.com\"}]',
+                     '[{\"action\": \"archive\"}]', 2, 'action', 'active', $5, now())",
+        )
+        .bind(rule)
+        .bind(self.a.as_uuid())
+        .bind(inbox)
+        .bind(Uuid::now_v7())
+        .bind(sender.as_uuid())
+        .execute(&self.db)
+        .await
+        .unwrap();
+        rule
+    }
+
     /// One record of every other type, and what the inbox holds.
     async fn seed_records(
         &mut self,
@@ -487,6 +519,7 @@ impl World {
         .execute(&db)
         .await
         .unwrap();
+        let rule = self.seed_rule(inbox, sender).await;
         let invitation = Uuid::now_v7();
         sqlx::query(
             "INSERT INTO workspaces.invitations
@@ -527,6 +560,7 @@ impl World {
             ("conversations.label", label.clone()),
             ("conversations.correction", correction.to_string()),
             ("conversations.draft", draft.to_string()),
+            ("conversations.rule", rule.to_string()),
             ("attention.item", item.to_string()),
         ]);
         let mut ids: Vec<String> = sqlx::query_scalar(
@@ -540,6 +574,7 @@ impl World {
         ids.extend([
             inbox.to_string(),
             draft.to_string(),
+            rule.to_string(),
             item.to_string(),
             attachment,
             label,
@@ -573,7 +608,7 @@ impl World {
             "conversations.inbox" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Connector))).within(inbox, role)
             }
-            "conversations.draft" => {
+            "conversations.draft" | "conversations.rule" => {
                 Facts::owned_by(OwnerFact::User(u(Who::Sender))).within(inbox, role)
             }
             // Everything else inside the inbox, this module's or another's.
@@ -814,6 +849,23 @@ fn body(world: &World, id: &str) -> Option<Value> {
         "conversations.confirm_need" => {
             json!({"message_id": world.instances["conversations.message"]})
         }
+        "conversations.preview_rule" | "conversations.create_rule" => json!({
+            "conditions": [{"field": "sender_address", "value": "matrix@example.com"}],
+            "actions": [{"action": "archive"}],
+            "apply_to_existing": false,
+        })
+        .as_object()
+        .map(|rule| {
+            let mut rule = rule.clone();
+            if id == "conversations.preview_rule" {
+                rule.remove("apply_to_existing");
+            }
+            Value::Object(rule)
+        })
+        .unwrap_or_default(),
+        "conversations.update_rule" => json!({"actions": [{"action": "mark_read"}]}),
+        "conversations.confirm_rule" | "conversations.restore_rule" => json!({}),
+        "conversations.dismiss_rule_suggestion" => json!({"key": "matrix"}),
         _ => return None,
     })
 }
@@ -830,8 +882,9 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
         "conversations.message" => "{message_id}",
         "conversations.attachment" => "{attachment_id}",
         "conversations.draft" => "{draft_id}",
+        "conversations.rule" => "{rule_id}",
         "attention.item" => "{item_id}",
-        "conversations.inbox" if id == "conversations.create_draft" => {
+        "conversations.inbox" if acts_in_the_inbox(id) => {
             return world.instances.get(resource).cloned();
         }
         _ => return None,
@@ -842,6 +895,29 @@ fn instance_of(world: &World, id: &str, path: &str, resource: &str) -> Option<St
     path.contains(param)
         .then(|| world.instances.get(resource).cloned())
         .flatten()
+}
+
+/// Operations declared on the inbox that act on one instance of it (the
+/// inbox in their path or body, or the inbox of the conversation they name).
+fn acts_in_the_inbox(id: &str) -> bool {
+    matches!(
+        id,
+        "conversations.create_draft"
+            | "conversations.confirm_rule"
+            | "conversations.decline_rule"
+            | "conversations.preview_rule"
+            | "conversations.create_rule"
+            | "conversations.suggest_rules"
+            | "conversations.dismiss_rule_suggestion"
+    )
+}
+
+/// The query string an operation needs to be understood at all.
+fn query_of(id: &str) -> &'static str {
+    match id {
+        "conversations.suggest_rules" => "?action=archive",
+        _ => "",
+    }
 }
 
 /// The path with the seeded ids of workspace A.
@@ -859,6 +935,8 @@ fn fill(world: &World, path: &str) -> String {
         .replace("{label_id}", &world.instances["conversations.label"])
         .replace("{user_id}", &world.instances["workspaces.member"])
         .replace("{item_id}", &world.instances["attention.item"])
+        .replace("{inbox_id}", &world.instances["conversations.inbox"])
+        .replace("{rule_id}", &world.instances["conversations.rule"])
         .replace("{id}", &Uuid::now_v7().to_string())
 }
 
@@ -945,7 +1023,12 @@ async fn every_operation_answers_each_caller_as_declared(db: PgPool) {
         let mutates = operation["x-campbooks"]["mutates"].as_bool().unwrap();
         let in_workspace = path.contains("{workspace_id}");
         let what = format!("{method} {path} ({id})");
-        let call = |world: &World| (fill(world, &path), body(world, &id));
+        let call = |world: &World| {
+            (
+                format!("{}{}", fill(world, &path), query_of(&id)),
+                body(world, &id),
+            )
+        };
 
         // Nobody signed in.
         let (uri, body_now) = call(&world);
@@ -1139,21 +1222,29 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                 let what = format!("{mail:?}: {method} {path} ({id})");
                 world.seed_disconnected(mail).await;
                 let instance = instance_of(&world, &id, path, resource);
-                for who in MEMBERS {
-                    let decision = match (mail, &instance) {
-                        // Nothing of a deleted inbox is anybody's any more.
-                        (Mail::Removed, Some(_))
-                            if resource != "conversations.inbox"
-                                || id == "conversations.create_draft" =>
-                        {
-                            Decision::NotFound
-                        }
-                        _ => expected(&world, who, resource, action, instance.as_deref(), &id),
-                    };
+                // Callers who are refused all ask the same records; each
+                // allowed caller (last) gets fresh ones when they may change.
+                let mut callers: Vec<(Who, Decision)> = MEMBERS
+                    .iter()
+                    .map(|who| {
+                        let decision = match (mail, &instance) {
+                            // Nothing of a deleted inbox is anybody's any more.
+                            (Mail::Removed, Some(_))
+                                if resource != "conversations.inbox" || acts_in_the_inbox(&id) =>
+                            {
+                                Decision::NotFound
+                            }
+                            _ => expected(&world, *who, resource, action, instance.as_deref(), &id),
+                        };
+                        (*who, decision)
+                    })
+                    .collect();
+                callers.sort_by_key(|(_, decision)| *decision == Decision::Allow);
+                for (who, decision) in callers {
                     if decision == Decision::Allow && mail == Mail::Kept {
                         world.seed_disconnected(mail).await;
                     }
-                    let uri = fill(&world, path);
+                    let uri = format!("{}{}", fill(&world, path), query_of(&id));
                     let body_now = body(&world, &id);
                     let token = match who {
                         Who::Client => world.client(world.a),

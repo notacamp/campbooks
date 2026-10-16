@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.messages m SET subject_template = t.template\n             FROM unnest($1::uuid[], $2::text[]) AS t(id, template)\n            WHERE m.id = t.id",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "UuidArray",
+        "TextArray"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "09eafb1b992cf95e1618139c5ee0eee8645a949089945f1730c9cec0966d8a08"
+}

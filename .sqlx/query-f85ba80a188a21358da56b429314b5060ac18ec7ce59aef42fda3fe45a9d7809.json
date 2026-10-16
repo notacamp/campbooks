@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT count(*)::int AS \"n!\" FROM conversations.rule_applications\n                    WHERE rule_id = $1 AND reverted_at IS NULL AND excepted_at IS NULL",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "n!",
+        "type_info": "Int4",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "f85ba80a188a21358da56b429314b5060ac18ec7ce59aef42fda3fe45a9d7809"
+}

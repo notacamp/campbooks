@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT u.id FROM conversations.rule_runs u\n                WHERE u.state = 'running'\n                  AND u.rule_id IN (SELECT id FROM conversations.rules WHERE inbox_id = $1)\n                ORDER BY u.id FOR UPDATE OF u",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "id"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "ac4067f668b7887327f501bfce2f49aea23271cf065130d28dd0dba97d8d37d1"
+}

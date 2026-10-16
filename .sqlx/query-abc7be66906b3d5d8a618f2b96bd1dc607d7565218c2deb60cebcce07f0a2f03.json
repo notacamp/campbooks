@@ -1,0 +1,76 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT rule_id AS \"rule: RuleId\", kind, state, counted,\n                      cursor AS \"cursor: ConversationId\"\n                 FROM conversations.rule_runs WHERE id = $1 FOR UPDATE",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "rule: RuleId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "rule_id"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "kind",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "kind"
+          }
+        }
+      },
+      {
+        "ordinal": 2,
+        "name": "state",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "state"
+          }
+        }
+      },
+      {
+        "ordinal": 3,
+        "name": "counted",
+        "type_info": "Bool",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "counted"
+          }
+        }
+      },
+      {
+        "ordinal": 4,
+        "name": "cursor: ConversationId",
+        "type_info": "Uuid",
+        "origin": {
+          "Table": {
+            "table": "conversations.rule_runs",
+            "name": "cursor"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true
+    ]
+  },
+  "hash": "abc7be66906b3d5d8a618f2b96bd1dc607d7565218c2deb60cebcce07f0a2f03"
+}

@@ -18,6 +18,12 @@
     "invalid_ids": "Ask for between 1 and {{max}} conversation ids, separated by commas.",
     "no_open_need": "Nothing here needs you any more.",
     "nothing_to_reopen": "There is nothing to bring back here.",
-    "need_changed": "This changed while you were looking at it. Have another look."
+    "need_changed": "This changed while you were looking at it. Have another look.",
+    "invalid_rule": "This rule can't be saved. It needs one to four conditions that say which mail it is about, and one to four actions of different kinds.",
+    "rule_not_yours": "Only the person who taught this rule, or a manager of the inbox, can change it.",
+    "rule_not_proposed": "This rule is not waiting for a yes any more.",
+    "rule_needs_member": "Rules are taught by a member of the inbox, not by an app.",
+    "rule_not_active": "This rule is waiting for a yes. Keep it first, then you can pause it.",
+    "rule_not_restorable": "This rule can't be brought back any more. Teach it again instead."
   }
 }

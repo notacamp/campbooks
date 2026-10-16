@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "DELETE FROM conversations.conversation_labels cl\n            USING conversations.labels l\n            WHERE cl.conversation_id = $1 AND cl.label_id = $2 AND l.id = cl.label_id\n           RETURNING l.provider_key",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "provider_key",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.labels",
+            "name": "provider_key"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      true
+    ]
+  },
+  "hash": "8d994d323fee5b3dd2dd9dc66b5755bc35a8c54aea3a58b45596aead99412c1a"
+}

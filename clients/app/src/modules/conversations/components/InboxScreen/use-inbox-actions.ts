@@ -8,7 +8,9 @@ import {
   type ConversationSummary,
   type Stream,
 } from "../../api/queries";
+import type { TaughtAction } from "../../api/rules";
 import { streamName, type Translate } from "../../model";
+import { useTeachOnce } from "../TeachOnce/TeachOnce";
 
 /**
  * The inbox's actions on one conversation, each pushed to the undo stack
@@ -20,9 +22,28 @@ export function useInboxActions(workspaceId: string) {
   const t = typed as unknown as Translate;
   const mutation = useConversationAction(workspaceId);
   const undo = useUndoToast();
+  const teach = useTeachOnce();
 
-  const run = (conversation: ConversationSummary, action: ConversationAction) => {
-    mutation.mutate({ conversation, action });
+  /**
+   * Run `action`; once the server has it, offer to teach `taught` (in the
+   * inbox), and hand any rule it changed back to teach-once.
+   */
+  const run = (
+    conversation: ConversationSummary,
+    action: ConversationAction,
+    taught?: TaughtAction,
+  ) => {
+    mutation.mutate(
+      { conversation, action },
+      {
+        onSuccess: (summary) => {
+          teach?.exception(summary.rule_exception);
+          if (taught !== undefined) {
+            teach?.after(conversation, taught);
+          }
+        },
+      },
+    );
   };
   const subjectOf = (conversation: ConversationSummary) =>
     conversation.subject === "" ? t("reader.noSubject") : conversation.subject;
@@ -33,8 +54,9 @@ export function useInboxActions(workspaceId: string) {
     action: ConversationAction,
     inverse: ConversationAction,
     label: string,
+    taught?: TaughtAction,
   ) => {
-    run(conversation, action);
+    run(conversation, action, taught);
     undo.push({
       label,
       undo: () => {
@@ -58,6 +80,7 @@ export function useInboxActions(workspaceId: string) {
         "archive",
         "unarchive",
         t("toast.done", { subject: subjectOf(conversation) }),
+        { kind: "archive" },
       );
     },
     toggleStar: (conversation: ConversationSummary) => {
@@ -76,6 +99,7 @@ export function useInboxActions(workspaceId: string) {
         unread ? "read" : "unread",
         unread ? "unread" : "read",
         t(unread ? "toast.read" : "toast.unread", { subject: subjectOf(conversation) }),
+        unread ? { kind: "mark_read" } : undefined,
       );
     },
     /** Opening an unread conversation reads it: no toast. */
@@ -91,6 +115,7 @@ export function useInboxActions(workspaceId: string) {
         { stream },
         { stream: conversation.stream },
         t("toast.moved", { stream: streamName(t, stream), subject: subjectOf(conversation) }),
+        { kind: "move_to_stream", stream },
       );
     },
   };
