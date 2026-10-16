@@ -202,6 +202,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   isn't connected first, and waits for a connect you retried. If connecting
   a mailbox breaks unexpectedly, you now land back on Mailboxes with an
   error instead of a server error page.
+- **The inbox no longer grows taller than the window on desktop.** A long list of
+  conversations made the whole page scroll, pushing the account menu down and taking
+  the open conversation with it. From 1024px wide the page is the window's height:
+  the sidebar, the list and the conversation each scroll on their own, and the list's
+  header and the conversation's toolbar stay at the top. Settings and administration
+  scroll the same way. Phones are unchanged.
 - **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
   open conversation no longer drops below the list; it stays beside it. A long
   subject, sender or address with no spaces now wraps inside the reader instead of

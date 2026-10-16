@@ -149,11 +149,34 @@
   overflow-wrap: anywhere;
 }
 
-/* From the large breakpoint the reader takes what the sidebar and list leave,
-   so it never wraps under the list on a narrow desktop window. */
+/* From the large breakpoint the shell is the window: the panes sit on one
+   line (the reader takes what the sidebar and list leave, never wrapping
+   under the list) and each scrolls on its own, its header kept in view. */
 @media (width >= 64rem) {
+  .shell {
+    flex-wrap: nowrap;
+    height: var(--size-viewport-min);
+  }
+
+  /* Positioned, so what is positioned inside (visually hidden labels) is
+     clipped and scrolled with its pane instead of stretching the page. */
+  .sidebar,
+  .listPane,
+  .reader {
+    position: relative;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
   .reader {
     flex-basis: 0;
+  }
+
+  .paneHeader {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background: var(--surface-base);
   }
 }
 
