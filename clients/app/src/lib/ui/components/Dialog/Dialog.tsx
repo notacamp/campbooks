@@ -160,7 +160,9 @@ export function Dialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={description === undefined || result !== undefined ? undefined : descriptionId}
+        aria-describedby={
+          description === undefined || result !== undefined ? undefined : descriptionId
+        }
         data-result={result === undefined ? undefined : true}
         tabIndex={-1}
       >

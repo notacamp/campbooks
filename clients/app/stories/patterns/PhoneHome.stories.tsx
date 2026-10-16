@@ -114,7 +114,6 @@ function PhoneHome() {
                   avatar={{ name: item.who, kind: "service" in item ? "service" : "person" }}
                   due={item.due}
                   soon={"soon" in item}
-                  hints={[]}
                   href="#conversation"
                   selected={"swiped" in item}
                   swipeActions={
@@ -123,9 +122,9 @@ function PhoneHome() {
                         <SwipeAction
                           tone="later"
                           icon="clock"
-                          label={t("item.later")}
+                          label={t("item.snooze")}
                           onClick={() => {
-                            act(item, t("item.later"));
+                            act(item, t("item.snooze"));
                           }}
                         />
                         <SwipeAction
@@ -174,7 +173,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** The queue on a phone: 44px rows, a swiped row revealing Later and Done, the tab bar. */
+/** The queue on a phone: 44px rows, a swiped row revealing Snooze and Done, the tab bar. */
 export const Dark: Story = {};
 
 export const Light: Story = { globals: { theme: "light" } };

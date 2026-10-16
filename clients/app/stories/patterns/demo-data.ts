@@ -217,7 +217,7 @@ export const WORKSPACES: Record<"business" | "personal", WorkspaceData> = {
         context:
           "Not on your last statement (8 Oct). Campbooks will match it when the next one arrives.",
         buttons: [
-          { label: "Mark as paid", variant: "primary", shortcut: "item.paid" },
+          { label: "Mark as paid", variant: "primary", shortcut: "item.choice1" },
           { label: "Open invoice", variant: "secondary", shortcut: "list.open" },
         ],
       },
@@ -234,7 +234,7 @@ export const WORKSPACES: Record<"business" | "personal", WorkspaceData> = {
         quote: "Your office policy renews on 31 October. The annual premium is €312.40.",
         context: "Last year you paid €294.70. Campbooks found no claims on this policy.",
         buttons: [
-          { label: "Pay now", variant: "primary", shortcut: "item.paid" },
+          { label: "Pay now", variant: "primary", shortcut: "item.choice1" },
           { label: "Compare quotes", variant: "secondary", shortcut: "list.open" },
         ],
       },
