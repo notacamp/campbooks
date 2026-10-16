@@ -52,10 +52,13 @@ async fn the_model_raises_one_need_per_conversation(db: PgPool) {
     let pedro = summary(&kit, &sam, workspace, "needs-2").await;
     assert_eq!(pedro["need"]["reason"], "do");
 
-    // An invoice from a service, sorted to Receipts: pay.
+    // An invoice from a service, sorted to Receipts, asking for a payment
+    // still owed: pay, as a question (Campbooks cannot see the bank).
     let bill = summary(&kit, &sam, workspace, "needs-3").await;
     assert_eq!(bill["stream"], "receipts");
     assert_eq!(bill["need"]["reason"], "pay");
+    assert_eq!(bill["need"]["trust"], "check");
+    assert_eq!(bill["need"]["question"], "money");
 
     let phish = summary(&kit, &sam, workspace, "needs-4").await;
     assert_eq!(phish["need"]["reason"], "review");
@@ -64,10 +67,112 @@ async fn the_model_raises_one_need_per_conversation(db: PgPool) {
     let jonas = summary(&kit, &sam, workspace, "needs-5").await;
     assert_eq!(jonas["need"]["reason"], "reply");
 
-    // Every answer accepted: nothing is a question.
+    // Every answer accepted: only Pay is a question.
     let events = kit.events("conversations.need_changed").await;
     assert_eq!(events.len(), 5, "{events:?}");
-    assert!(events.iter().all(|e| e["need"]["trust"] == "sure"));
+    for event in &events {
+        let want = if event["need"]["reason"] == "pay" {
+            "check"
+        } else {
+            "sure"
+        };
+        assert_eq!(event["need"]["trust"], want, "{event}");
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn is_it_paid(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let id = kit.conversation_of("needs-3").await;
+    let base = format!("/api/v1/w/{workspace}/conversations/{id}/need");
+    let seen = kit.message_of("needs-3").await;
+    let answer = |outcome: &str| Some(json!({"outcome": outcome, "message_id": seen}));
+
+    // Still to pay: a Pay need Campbooks stands behind, and a correction
+    // confirming the money answer.
+    let to_pay = kit
+        .post(&sam, &format!("{base}/resolve"), answer("still_to_pay"))
+        .await;
+    assert_eq!(to_pay.status, StatusCode::OK, "{:?}", to_pay.json);
+    assert_eq!(to_pay.json["need"]["reason"], "pay");
+    assert_eq!(to_pay.json["need"]["trust"], "sure");
+    assert_eq!(to_pay.json["need"]["basis"], "member");
+    let (question, from, to): (String, String, String) =
+        sqlx::query_as("SELECT question, from_value, to_value FROM conversations.corrections")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(
+        (question.as_str(), from.as_str(), to.as_str()),
+        ("money", "owed", "owed")
+    );
+    // Asked once: it is no longer a question.
+    let again = kit
+        .post(&sam, &format!("{base}/resolve"), answer("still_to_pay"))
+        .await;
+    assert_eq!(again.json["code"], "no_open_need");
+
+    // Then paid: cleared as done, nothing more stored.
+    let paid = kit
+        .post(&sam, &format!("{base}/resolve"), answer("already_paid"))
+        .await;
+    assert_eq!(paid.status, StatusCode::OK, "{:?}", paid.json);
+    assert_eq!(paid.json["need"], Value::Null);
+    let last = kit.events("conversations.need_changed").await;
+    assert_eq!(last.last().unwrap()["cleared_because"], "done");
+    let corrections: i64 = sqlx::query_scalar("SELECT count(*) FROM conversations.corrections")
+        .fetch_one(&db)
+        .await
+        .unwrap();
+    assert_eq!(corrections, 1);
+
+    // Undo brings the need back.
+    let back = kit.post(&sam, &format!("{base}/reopen"), None).await;
+    assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
+    assert_eq!(back.json["need"]["reason"], "pay");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn not_needed_on_a_bill_says_nothing_is_owed(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let id = kit.conversation_of("needs-3").await;
+    kit.post(
+        &sam,
+        &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
+        Some(json!({"outcome": "not_needed", "message_id": kit.message_of("needs-3").await})),
+    )
+    .await;
+    let (question, from, to): (String, String, String) =
+        sqlx::query_as("SELECT question, from_value, to_value FROM conversations.corrections")
+            .fetch_one(&db)
+            .await
+            .unwrap();
+    assert_eq!(
+        (question.as_str(), from.as_str(), to.as_str()),
+        ("money", "owed", "not_owed")
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn only_a_bill_is_paid(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let id = kit.conversation_of("needs-1").await;
+    for outcome in ["already_paid", "still_to_pay"] {
+        let refused = kit
+            .post(
+                &sam,
+                &format!("/api/v1/w/{workspace}/conversations/{id}/need/resolve"),
+                Some(json!({"outcome": outcome, "message_id": kit.message_of("needs-1").await})),
+            )
+            .await;
+        assert_eq!(refused.status, StatusCode::CONFLICT, "{outcome}");
+        assert_eq!(refused.json["code"], "not_a_payment");
+    }
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply");
 }
 
 #[sqlx::test(migrations = "../../../migrations")]

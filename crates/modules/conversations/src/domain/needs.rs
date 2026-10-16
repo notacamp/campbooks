@@ -209,7 +209,11 @@ fn settled_no(answers: &[Answer], question: &str) -> bool {
 fn owed<'a>(answers: &'a [Answer], settings: &NeedSettings) -> Option<&'a Answer> {
     let money = |a: &&Answer| a.question == triage::MONEY;
     let says_owed = |a: &Answer| a.value.as_str() == Some(triage::OWED);
-    if answers.iter().filter(money).any(|a| a.acted && !says_owed(a)) {
+    if answers
+        .iter()
+        .filter(money)
+        .any(|a| a.acted && !says_owed(a))
+    {
         return None;
     }
     answers

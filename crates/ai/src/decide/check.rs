@@ -297,9 +297,7 @@ fn shop_receipt() -> Case {
 
 fn review_by_friday() -> Case {
     use Expected::{Money, No, Stream, Yes};
-    use triage::{
-        ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS,
-    };
+    use triage::{ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS};
     let mut review = email(
         party("Rita Gomes", "rita@gomes-legal.example"),
         "Contract for the studio lease",
@@ -350,9 +348,7 @@ fn password_notice() -> Case {
 
 fn colleague_update() -> Case {
     use Expected::{Money, No, Stream};
-    use triage::{
-        ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS,
-    };
+    use triage::{ASKS_ACTION, HAS_DEADLINE, MONEY, NEEDS_REPLY, NEITHER, STREAM, SUSPICIOUS};
     Case {
         name: "a colleague shares an update",
         envelope: email(
