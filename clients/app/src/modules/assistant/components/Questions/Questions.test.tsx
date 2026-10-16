@@ -383,4 +383,22 @@ describe("Questions", () => {
       await screen.findByRole("heading", { name: "Whose mail should always reach you?" }),
     ).toBeVisible();
   });
+
+  it("when the answers can't be read, Not now writes nothing, stays and says so, and Save waits", async () => {
+    const api = mockEverything({ [`GET ${W}/assistant/profile`]: problem(503, "unavailable") });
+    const onHome = vi.fn();
+    renderWithProviders(<Questions workspaceId={WS} onHome={onHome} onMemory={vi.fn()} />);
+
+    await screen.findByRole("heading", { name: "Whose mail should always reach you?" });
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(
+      await screen.findByText("Scout couldn’t put the questions off. Try again, or answer them."),
+    ).toBeVisible();
+    expect(onHome).not.toHaveBeenCalled();
+    expect(api.calls.some((call) => call.route === `PUT ${W}/assistant/profile`)).toBe(false);
+
+    await answerTwo();
+    expect(screen.getByText("Scout couldn’t load your answers just now.")).toBeVisible();
+    expect(screen.getByRole("button", { name: /Save/u })).toBeDisabled();
+  });
 });

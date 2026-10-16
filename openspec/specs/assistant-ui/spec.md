@@ -30,8 +30,9 @@ domain. Free-mail domains SHALL be refused with a sentence saying why.
 The third question SHALL always be shown, with no client flag: the
 proactivity it sets is read by taught rules (#482, on `next`) through the
 `MemberPreferences` port. Not now SHALL keep the answers the member had
-(waiting for them to load, and writing nothing when they can't be read),
-and SHALL close the flow only once saved, saying so when it fails.
+(waiting for them to load; when they can't be read it SHALL write nothing,
+stay and say so), and SHALL close the flow only once saved, saying so when
+it fails. It SHALL do nothing while a save is in flight.
 
 #### Scenario: Skipping everything
 - **WHEN** a member presses `S` on every view
@@ -60,7 +61,9 @@ puts the profile back; an Undo that fails SHALL say so.
 While answers make rules but no inbox is on (the member's only teachable
 inboxes are shared and none is switched on, or they only read their
 inboxes), Save SHALL be disabled with a sentence saying why, and nothing
-SHALL be saved. The done view and its notice SHALL count the rules the
+SHALL be saved. Save SHALL also wait, saying why, while the member's
+current answers can't be read, so it never writes over one it never saw.
+The done view and its notice SHALL count the rules the
 server created, never the answers given; when none was created they SHALL
 say what changed (the answer about acting, or nothing) instead of a count.
 

@@ -107,12 +107,16 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   const position = QUESTIONS.indexOf(step as (typeof QUESTIONS)[number]) + 1;
 
   const notNow = () => {
+    // Not while saving: the save's own update and Undo come first.
+    if (create.isPending || update.isPending) {
+      return;
+    }
     void (async () => {
-      // Wait for the answers rather than overwrite them; unknown ones are
-      // left alone (Scout asks again another time).
+      // Wait for the answers rather than overwrite them; when they can't be
+      // read, nothing is written and the flow stays, saying so.
       const current = profile.data ?? (await profile.refetch()).data;
       if (current === undefined) {
-        onHome();
+        undo.notify(t("flow.notNowFailed"));
         return;
       }
       update.mutate(
@@ -180,6 +184,8 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
   // Rules with nowhere to go: Save waits for an inbox (once they're known).
   const noTarget = rules.length > 0 && inboxes.isSuccess && targets.length === 0;
   const inboxesUnknown = rules.length > 0 && !inboxes.isSuccess;
+  // Saving writes the answer about acting: never over one it couldn't read.
+  const profileUnknown = profile.data === undefined;
   const busy = create.isPending || update.isPending;
 
   /** The answers, once every rule is in: then the done screen and one Undo. */
@@ -222,7 +228,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
     );
   };
   const save = () => {
-    if (busy || noTarget || inboxesUnknown) {
+    if (busy || noTarget || inboxesUnknown || profileUnknown) {
       return;
     }
     if (pending.length === 0) {
@@ -464,7 +470,7 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
                 variant="primary"
                 size="lg"
                 shortcut="scout.next"
-                disabled={busy || noTarget || inboxesUnknown}
+                disabled={busy || noTarget || inboxesUnknown || profileUnknown}
               >
                 {busy
                   ? t("flow.reviewStep.saving")
@@ -561,6 +567,23 @@ export function Questions({ workspaceId, onHome, onMemory }: QuestionsProps) {
               ? t("flow.reviewStep.askFirst")
               : t("flow.reviewStep.actThenTell")}
           </Text>
+          {profile.isError ? (
+            <Banner
+              tone="danger"
+              role="alert"
+              title={t("memory.questions.failed")}
+              action={
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    void profile.refetch();
+                  }}
+                >
+                  {t("flow.reviewStep.tryAgain")}
+                </Button>
+              }
+            />
+          ) : null}
           {noTarget ? (
             <Banner
               role="status"

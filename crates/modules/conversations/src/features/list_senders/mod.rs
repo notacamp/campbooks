@@ -152,6 +152,7 @@ pub async fn handler(
               FROM threads t
              WHERE EXISTS (SELECT 1 FROM conversations.messages o
                             WHERE o.conversation_id = t.conversation_id
+                              AND o.inbox_id = ANY($1)
                               AND o.direction = 'outbound' AND o.sent_at > t.first_at)
              GROUP BY t.address
         )
