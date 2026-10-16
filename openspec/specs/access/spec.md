@@ -127,9 +127,10 @@ no row of any table with row-level security, the kernel's event log, job
 queue, change feed and blob catalogue included. Work across workspaces
 SHALL need the kernel scope (`campbooks.kernel_scope = 'on'`), which only
 `kernel::db::begin_kernel` and a job's `kernel_tx` set; only the kernel
-SHALL name the setting, and outside the kernel only the files listed under
+SHALL name the setting or its constant (nor, outside it, the admin reads'
+constant), and outside the kernel only the files listed under
 `[[access.kernel_scope]]` in `architecture.toml`, each with its reason,
-SHALL call either (`cargo xtask arch`). A workspace transaction SHALL keep
+SHALL use either function by any name or form (`cargo xtask arch`). A workspace transaction SHALL keep
 seeing its own rows and the instance-wide rows of the event log and the
 queue. Module maintenance policies SHALL admit the kernel scope, never a
 transaction that merely set nothing. An instance-wide event or job SHALL
@@ -145,7 +146,7 @@ the kernel lifting that transaction into its scope for its own insert only.
 - **THEN** the worker claims them fairly and completes them, delivers events of a workspace and instance-wide events, runs the schedules, prunes, sweeps blobs, replays and serves the admin's queue under the kernel scope
 
 #### Scenario: A module opening the kernel scope
-- **WHEN** a module file not listed under `[[access.kernel_scope]]` calls `begin_kernel` or `kernel_tx`, or any code outside the kernel names `campbooks.kernel_scope`
+- **WHEN** a module file not listed under `[[access.kernel_scope]]` calls `begin_kernel` or `kernel_tx`, renames one (`use … as`), calls it as `JobContext::kernel_tx(ctx)` or takes it as a function value, or code outside the kernel names `campbooks.kernel_scope`, `KERNEL_SCOPE_SETTING` or `ADMIN_READS_SETTING`
 - **THEN** `cargo xtask arch` fails naming the file
 
 ### Requirement: Kernel writes refuse a transaction that cannot reach their workspace

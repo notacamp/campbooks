@@ -469,13 +469,27 @@ pub fn check_workspace_queries(
 /// The setting that opens the kernel scope (`kernel::db::KERNEL_SCOPE_SETTING`).
 pub const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
 
-/// Only the kernel names the kernel scope's setting, and only the kernel and
-/// the reviewed `kernel_scope` entries open a transaction in it
-/// (`begin_kernel(`, `.kernel_tx(`). Entries need a reason and must name a
-/// file that calls one (no stale exceptions). Tests may call them.
+/// The kernel's names that open a cross-workspace scope or name its
+/// setting: outside the kernel, each is a violation wherever it appears in
+/// code (a call, a `use … as` rename, `JobContext::kernel_tx(ctx)`, a
+/// function value), comments aside. `false`: no file may use it; `true`:
+/// files listed under `[[access.kernel_scope]]` may.
+const SCOPE_IDENTIFIERS: [(&str, bool); 4] = [
+    ("KERNEL_SCOPE_SETTING", false),
+    ("ADMIN_READS_SETTING", false),
+    ("begin_kernel", true),
+    ("kernel_tx", true),
+];
+
+/// Only the kernel names the kernel scope's setting (`campbooks.kernel_scope`,
+/// in any code, tests included), and outside the kernel no code uses the
+/// identifiers `KERNEL_SCOPE_SETTING` or `ADMIN_READS_SETTING`, nor
+/// `begin_kernel` or `kernel_tx` except in the reviewed `kernel_scope`
+/// entries. Test code is exempt from the identifier rule. Entries need a
+/// reason and must name a file that uses one (no stale exceptions).
 pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Vec<String> {
-    static CALL: LazyLock<Regex> = LazyLock::new(|| {
-        Regex::new(r"\bbegin_kernel\s*\(|\.kernel_tx\s*\(")
+    static IDENTIFIER: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"\b(KERNEL_SCOPE_SETTING|ADMIN_READS_SETTING|begin_kernel|kernel_tx)\b")
             .unwrap_or_else(|e| unreachable!("static regex compiles: {e}"))
     });
     let mut violations: Vec<String> = file
@@ -503,14 +517,29 @@ pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Ve
         if is_test_file(path) {
             continue;
         }
-        if CALL.is_match(&without_comments(without_tests(text))) {
-            if file.kernel_scope.iter().any(|entry| entry.path == *path) {
+        let code = without_comments(without_tests(text));
+        let allowed = file.kernel_scope.iter().any(|entry| entry.path == *path);
+        let mut found = BTreeSet::new();
+        for name in IDENTIFIER.find_iter(&code) {
+            found.insert(name.as_str());
+        }
+        for (name, door) in SCOPE_IDENTIFIERS {
+            if !found.contains(name) {
+                continue;
+            }
+            if door && allowed {
                 used.insert(path.as_str());
+            } else if door {
+                violations.push(format!(
+                    "{path}: uses `{name}`, which opens the kernel scope (cross-workspace \
+                     access); work in one workspace (`begin_for`, the job's `ctx.tx()`), or \
+                     list the file under `[[access.kernel_scope]]` with the reason (reviewed \
+                     like an ADR)"
+                ));
             } else {
                 violations.push(format!(
-                    "{path}: opens the kernel scope (cross-workspace access); work in one \
-                     workspace (`begin_for`, the job's `ctx.tx()`), or list the file under \
-                     `[[access.kernel_scope]]` with the reason (reviewed like an ADR)"
+                    "{path}: uses `{name}`; only the kernel names a scope's setting (open it \
+                     with `kernel::db::begin_kernel` / `begin_admin`)"
                 ));
             }
         }
@@ -526,12 +555,105 @@ pub fn check_kernel_scope(sources: &[(String, String)], file: &AccessFile) -> Ve
     violations
 }
 
-/// `code` without its line comments.
+/// `code` without its comments (line, trailing and block comments), string
+/// and character literals kept as they are.
 fn without_comments(code: &str) -> String {
-    code.lines()
-        .filter(|line| !line.trim_start().starts_with("//"))
-        .collect::<Vec<_>>()
-        .join("\n")
+    let chars: Vec<char> = code.chars().collect();
+    let mut out = String::with_capacity(code.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let (c, next) = (chars[i], chars.get(i + 1).copied());
+        match c {
+            '/' if next == Some('/') => {
+                while i < chars.len() && chars[i] != '\n' {
+                    i += 1;
+                }
+            }
+            '/' if next == Some('*') => {
+                let mut depth = 0usize;
+                while i < chars.len() {
+                    if chars[i] == '/' && chars.get(i + 1) == Some(&'*') {
+                        depth += 1;
+                        i += 2;
+                    } else if chars[i] == '*' && chars.get(i + 1) == Some(&'/') {
+                        depth -= 1;
+                        i += 2;
+                        if depth == 0 {
+                            break;
+                        }
+                    } else {
+                        i += 1;
+                    }
+                }
+                out.push(' ');
+            }
+            'r' | 'b' if raw_string_at(&chars, i) => {
+                let mut j = i + 1;
+                if chars.get(j) == Some(&'r') {
+                    j += 1;
+                }
+                let mut hashes = 0;
+                while chars.get(j) == Some(&'#') {
+                    hashes += 1;
+                    j += 1;
+                }
+                j += 1;
+                while j < chars.len()
+                    && !(chars[j] == '"' && (1..=hashes).all(|k| chars.get(j + k) == Some(&'#')))
+                {
+                    j += 1;
+                }
+                let end = (j + 1 + hashes).min(chars.len());
+                out.extend(&chars[i..end]);
+                i = end;
+            }
+            '"' => {
+                let mut j = i + 1;
+                while j < chars.len() && chars[j] != '"' {
+                    j += if chars[j] == '\\' { 2 } else { 1 };
+                }
+                let end = (j + 1).min(chars.len());
+                out.extend(&chars[i..end]);
+                i = end;
+            }
+            '\'' if next == Some('\\') || chars.get(i + 2) == Some(&'\'') => {
+                // A character literal (`'"'`, `'\n'`), not a lifetime.
+                let mut j = i + 1;
+                if chars.get(j) == Some(&'\\') {
+                    j += 2;
+                }
+                while j < chars.len() && chars[j] != '\'' {
+                    j += 1;
+                }
+                let end = (j + 1).min(chars.len());
+                out.extend(&chars[i..end]);
+                i = end;
+            }
+            _ => {
+                out.push(c);
+                i += 1;
+            }
+        }
+    }
+    out
+}
+
+/// Whether a raw string (`r"…"`, `r#"…"#`, `br"…"`) starts at `i`.
+fn raw_string_at(chars: &[char], i: usize) -> bool {
+    if i > 0 && (chars[i - 1].is_alphanumeric() || chars[i - 1] == '_') {
+        return false;
+    }
+    let mut j = i + 1;
+    if chars[i] == 'b' {
+        if chars.get(j) != Some(&'r') {
+            return false;
+        }
+        j += 1;
+    }
+    while chars.get(j) == Some(&'#') {
+        j += 1;
+    }
+    chars.get(j) == Some(&'"')
 }
 
 fn is_test_file(path: &str) -> bool {
@@ -852,6 +974,50 @@ mod tests {
             check_kernel_scope(&source(module, calls), &unexplained).len(),
             1
         );
+    }
+
+    #[test]
+    fn the_kernel_scope_cannot_be_reached_by_another_name() {
+        let module = "crates/modules/mail/src/dispatch.rs";
+        let source = |text: &str| vec![(module.to_owned(), text.to_owned())];
+        let allowed = AccessFile {
+            kernel_scope: vec![PoolAccess {
+                path: module.to_owned(),
+                reason: "the scheduler".to_owned(),
+            }],
+            ..AccessFile::default()
+        };
+        let none = AccessFile::default();
+        for bypass in [
+            // The setting's constant, set by hand.
+            r#"sqlx::query_scalar!("SELECT set_config($1, 'on', true)", campbooks_kernel::db::KERNEL_SCOPE_SETTING)"#,
+            // A rename.
+            "use campbooks_kernel::db::begin_kernel as open;\nlet tx = open(&pool).await?;",
+            // UFCS.
+            "let tx = JobContext::kernel_tx(ctx).await?;",
+            // A function value.
+            "let open = campbooks_kernel::db::begin_kernel;\nlet tx = open(&pool).await?;",
+            // After a string holding `//` on the same line.
+            "let url = \"http://x\"; let open = begin_kernel;",
+        ] {
+            let found = check_kernel_scope(&source(bypass), &none);
+            assert_eq!(found.len(), 1, "{bypass}: {found:?}");
+        }
+        // The constant stays the kernel's even in a reviewed file (whose
+        // entry is then stale); the admin setting's too.
+        let set_by_hand =
+            r#"sqlx::query_scalar!("SELECT set_config($1, 'on', true)", db::KERNEL_SCOPE_SETTING)"#;
+        assert_eq!(check_kernel_scope(&source(set_by_hand), &allowed).len(), 2);
+        let admin = "let s = campbooks_kernel::db::ADMIN_READS_SETTING;";
+        let found = check_kernel_scope(&source(admin), &none);
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert!(found[0].contains("ADMIN_READS_SETTING"));
+        // Comments are not code; test code is exempt from the identifier rule.
+        let commented = "// see begin_kernel\n/* kernel_tx */ fn f() {} // KERNEL_SCOPE_SETTING";
+        assert!(check_kernel_scope(&source(commented), &none).is_empty());
+        let tested =
+            "fn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() { let _ = db::begin_kernel; }\n}\n";
+        assert!(check_kernel_scope(&source(tested), &none).is_empty());
     }
 
     #[test]

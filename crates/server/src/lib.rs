@@ -869,7 +869,7 @@ mod tests {
         // Policies admitting the kernel scope.
         let kernel = format!(
             "'{}'::text, true) = 'on'::text",
-            campbooks_kernel::db::KERNEL_SCOPE_SETTING
+            testing::kernel_scope_setting()
         );
         let policies: Vec<(String, String, String)> = rows
             .into_iter()

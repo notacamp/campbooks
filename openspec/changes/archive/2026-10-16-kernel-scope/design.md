@@ -52,12 +52,18 @@ connection reads as off.
 Modules with maintenance policies get **the kernel helper plus a reviewed
 allowlist** rather than either alone. A helper alone would let any module
 call it; an allowlist alone would have them set the setting by string.
-`cargo xtask arch` rejects the setting's name anywhere outside the kernel
-in Rust, and rejects a call to `begin_kernel(` or `.kernel_tx(` outside the
-kernel unless the file is listed under `[[access.kernel_scope]]` in
-`architecture.toml` with a reason; an entry naming a file that no longer
-calls either is itself a violation, so exceptions do not outlive their
-reason. Tests may call them. A capability token like `AdminGrant` was
+The policies trust the setting, so the arch rule is the whole guarantee.
+`KERNEL_SCOPE_SETTING` is crate-private (tests that inspect policies ask
+`kernel::testing::kernel_scope_setting()`). `cargo xtask arch` rejects,
+outside the kernel and after stripping comments (not strings):
+the setting's text `campbooks.kernel_scope` anywhere, tests included; the
+identifiers `KERNEL_SCOPE_SETTING` and `ADMIN_READS_SETTING` in any use; and
+the identifiers `begin_kernel` and `kernel_tx` in any use (a call, a
+`use … as` rename, `JobContext::kernel_tx(ctx)`, a function value) unless
+the file is listed under `[[access.kernel_scope]]` in `architecture.toml`
+with a reason. An entry naming a file that no longer uses either is itself
+a violation, so exceptions do not outlive their reason. Test code is exempt
+from the identifier rule (not from the setting's text). A capability token like `AdminGrant` was
 considered: nothing natural mints it for a scheduler (the worker would have
 to hand it to every instance-wide job), so it would protect less than the
 allowlist and read worse.
@@ -79,6 +85,13 @@ neither insert nor read back (`RETURNING`) those rows. Two options:
    workspace parameter is `None`). No caller code runs while it is lifted,
    and the statement writes `NULL` workspaces only. On an error the
    transaction is aborted anyway.
+
+   The invariant, documented on `lift_for_instance_rows`: it lifts only a
+   fully unset transaction; `lower` turns the scope off only if it lifted
+   (a debug assertion checks the transaction is unset again); and a
+   publish or enqueue future dropped mid-statement would leave the scope on,
+   so a caller that loses one must drop its transaction too, never keep
+   using it. Every caller awaits them to completion.
 
 The worker completes a handler's work in the handler's transaction; for an
 instance-wide job that transaction set no workspace and would no longer see
@@ -156,7 +169,9 @@ Closed in `cargo xtask arch` (`access::check_workspace_queries`,
   reviewed `pool_access` entries: the BFF (instance-wide sessions), the
   kernel's `db.rs` (where `begin_for` / `begin_admin` / `begin_kernel` open
   transactions) and `jobs/context.rs` (a job's transaction).
-- The kernel scope's name and openers, as above.
+- The kernel scope's setting, its constant and its openers, by identifier
+  (any use, not only a call), and the admin reads' constant likewise, as
+  above.
 
 Left open, and why:
 
@@ -183,3 +198,77 @@ Left open, and why:
   migrates on start, so a single-instance restart has no such window.
 - **Extra round trips.** The worker's bookkeeping statements now open a
   transaction each (`BEGIN`, the setting, the statement, `COMMIT`).
+
+## Rollback
+
+sqlx has no down migrations, and an image older than this change breaks
+once the migrations have run: identity publishes account events from
+transactions that set nothing without the kernel's lift (its
+`INSERT INTO kernel.events` fails row-level security, so sign-in fails),
+and the old worker claims nothing. **Ops step: before redeploying an older
+tag, run this once as the migration login.** It restores the exact policy
+expressions of `20261020040000_kernel__workspace_isolation`,
+`20261020040100_connectors__schedule_policies` and
+`20261020050000_conversations__needs_backfill`, and forgets the three
+migrations so the older image starts and a later upgrade applies them
+again. Checked against a database migrated only to the base: identical
+`pg_policies` and `_sqlx_migrations`, and re-upgrading applies cleanly.
+
+```sql
+-- Roll back campbooks-cloud#129 (kernel scope) BEFORE redeploying an image
+-- older than it. Run once, as the migration login (the tables' owner).
+-- Restores the exact policies of 20261020040000, 20261020040100 and
+-- 20261020050000 and forgets the three migrations, so the older image
+-- starts (sqlx refuses applied migrations it does not know) and a later
+-- upgrade applies them again.
+BEGIN;
+SET LOCAL lock_timeout = '5s';
+DO $$
+DECLARE
+    t text;
+BEGIN
+    FOREACH t IN ARRAY ARRAY['changes', 'change_heads', 'blobs', 'blob_refs']
+    LOOP
+        EXECUTE format('DROP POLICY workspace_isolation ON kernel.%I', t);
+        EXECUTE format(
+            'CREATE POLICY workspace_isolation ON kernel.%I USING '
+            '(nullif(current_setting(''campbooks.workspace_id'', true), '''') IS NULL '
+            ' OR workspace_id = nullif(current_setting(''campbooks.workspace_id'', true), ''''))',
+            t);
+    END LOOP;
+    FOREACH t IN ARRAY ARRAY['events', 'jobs']
+    LOOP
+        EXECUTE format('DROP POLICY workspace_isolation ON kernel.%I', t);
+        EXECUTE format(
+            'CREATE POLICY workspace_isolation ON kernel.%I USING '
+            '(nullif(current_setting(''campbooks.workspace_id'', true), '''') IS NULL '
+            ' OR workspace_id IS NULL '
+            ' OR workspace_id = nullif(current_setting(''campbooks.workspace_id'', true), ''''))',
+            t);
+    END LOOP;
+END
+$$;
+DROP POLICY maintenance_reads_schedule ON connectors.sync_due;
+DROP POLICY maintenance_leases_schedule ON connectors.sync_due;
+CREATE POLICY maintenance_reads_schedule ON connectors.sync_due
+    FOR SELECT
+    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL);
+CREATE POLICY maintenance_leases_schedule ON connectors.sync_due
+    FOR UPDATE
+    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL)
+    WITH CHECK (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL);
+DROP POLICY maintenance_reads_backfills ON conversations.needs_backfills;
+DROP POLICY maintenance_starts_backfills ON conversations.needs_backfills;
+CREATE POLICY maintenance_reads_backfills ON conversations.needs_backfills FOR SELECT
+    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL);
+CREATE POLICY maintenance_starts_backfills ON conversations.needs_backfills FOR UPDATE
+    USING (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL)
+    WITH CHECK (nullif(current_setting('campbooks.workspace_id', true), '') IS NULL
+                AND state = 'running');
+DELETE FROM _sqlx_migrations
+ WHERE version IN (20261020200000, 20261020200100, 20261020200200);
+COMMIT;
+```
+
+Every process must run the same side of the change: upgrade (or roll back)
+the API and the worker together.

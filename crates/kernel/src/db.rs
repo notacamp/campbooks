@@ -23,7 +23,7 @@
 //! sets the same setting. A transaction that sets no workspace sees no
 //! workspace's rows, the kernel's included; the kernel's machinery works
 //! across workspaces only in the explicit **kernel scope**
-//! ([`begin_kernel`], [`KERNEL_SCOPE_SETTING`]).
+//! ([`begin_kernel`], the setting `campbooks.kernel_scope`).
 //!
 //! ```no_run
 //! # async fn demo(state: campbooks_kernel::AppState, workspace: campbooks_kernel::tenancy::WorkspaceId) -> Result<(), sqlx::Error> {
@@ -133,15 +133,17 @@ pub async fn begin_admin(
 /// the change feed, the blob catalogue) and on the module tables whose
 /// maintenance policy admits it (campbooks-cloud#129). A transaction with
 /// neither a workspace nor this scope sees no row of any table with
-/// row-level security. Only the kernel names it: policies compare it with
-/// `'on'`, [`begin_kernel`] and [`JobContext::kernel_tx`](crate::JobContext::kernel_tx)
-/// set it, and `cargo xtask arch` rejects the name anywhere else in Rust and
-/// keeps those two calls to the kernel and the reviewed
-/// `[[access.kernel_scope]]` entries of `architecture.toml`.
-pub const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
+/// row-level security. Only the kernel names it (crate-private): policies
+/// compare it with `'on'`, [`begin_kernel`] and
+/// [`JobContext::kernel_tx`](crate::JobContext::kernel_tx) set it, and
+/// `cargo xtask arch` rejects the setting, this constant's name and those
+/// two functions' names anywhere else in Rust, except the reviewed
+/// `[[access.kernel_scope]]` entries of `architecture.toml` (for the two
+/// functions) and test code.
+pub(crate) const KERNEL_SCOPE_SETTING: &str = "campbooks.kernel_scope";
 
 /// Begin a transaction in the **kernel scope**
-/// ([`KERNEL_SCOPE_SETTING`] `= on`, `SET LOCAL`): the kernel's machinery
+/// (`campbooks.kernel_scope = on`, `SET LOCAL`): the kernel's machinery
 /// working across workspaces (workers claiming fairly, pruning, the blob
 /// sweeper, replay, the admin's queue) and the few module maintenance paths
 /// `architecture.toml` lists (a scheduler reading its index across
@@ -245,6 +247,22 @@ pub(crate) async fn require_scope(
 /// account's event, a scheduled tick) for a transaction that set nothing,
 /// lift it into the kernel scope for that statement. Returns whether it
 /// lifted; pass that to [`lower`] right after the statement.
+///
+/// **Invariant** (the callers, `EventBus::publish` and `jobs::insert`, keep
+/// it):
+/// - it lifts only a transaction that set **nothing** (no workspace, no
+///   kernel scope); a workspace or kernel transaction is left as it is;
+/// - between the lift and [`lower`] runs only the kernel's own statement,
+///   whose workspace parameter is `None`;
+/// - [`lower`] turns the scope off only if this lifted it, so a caller's
+///   own kernel scope is never turned off;
+/// - on an error between the two the transaction is aborted by Postgres
+///   (or carries no change worth keeping), and the caller returns the
+///   error without lowering;
+/// - a publish or enqueue future dropped mid-statement (a cancelled task, a
+///   lost `select!`) would leave the scope on: a caller must then drop the
+///   transaction too, never keep using it. Every caller awaits these to
+///   completion inside its own transaction's lifetime.
 pub(crate) async fn lift_for_instance_rows(conn: &mut PgConnection) -> Result<bool, sqlx::Error> {
     if scope(conn).await?.is_unset() {
         enter_kernel_scope(conn).await?;
@@ -253,10 +271,15 @@ pub(crate) async fn lift_for_instance_rows(conn: &mut PgConnection) -> Result<bo
     Ok(false)
 }
 
-/// Undo [`lift_for_instance_rows`].
+/// Undo [`lift_for_instance_rows`]: only when it lifted.
 pub(crate) async fn lower(conn: &mut PgConnection, lifted: bool) -> Result<(), sqlx::Error> {
     if lifted {
         leave_kernel_scope(conn).await?;
+        #[cfg(debug_assertions)]
+        {
+            let after = scope(conn).await?;
+            debug_assert!(after.is_unset(), "lowered to {after:?}, not unset");
+        }
     }
     Ok(())
 }

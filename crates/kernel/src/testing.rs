@@ -101,6 +101,12 @@ pub async fn kernel_scope_pool(db: &PgPool) -> PgPool {
         .unwrap_or_else(|e| panic!("connecting in the kernel scope: {e}"))
 }
 
+/// The name of the kernel scope's setting, for tests that inspect the
+/// policies (the constant itself is the kernel's own).
+pub fn kernel_scope_setting() -> &'static str {
+    db::KERNEL_SCOPE_SETTING
+}
+
 /// Run `sql` on `db`, panicking on failure (test setup).
 async fn exec(db: &PgPool, sql: String) {
     sqlx::query(sqlx::AssertSqlSafe(sql))

@@ -1474,6 +1474,20 @@ async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
         populated.len()
     );
 
+    // Nor can it write an instance-wide row straight into the event log or
+    // the queue: only the kernel's own insert, lifted, may.
+    for insert in [
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
+         VALUES ('default', 'test.forged', '{}', NULL, 1)",
+        "INSERT INTO kernel.events (name, version, workspace_id, payload)
+         VALUES ('test.forged', 1, NULL, '{}')",
+    ] {
+        let mut tx = pool.begin().await.unwrap();
+        let forged = sqlx::query(insert).execute(&mut *tx).await;
+        assert!(forged.is_err(), "{insert}: {forged:?}");
+        tx.rollback().await.unwrap();
+    }
+
     // Not vacuous for the kernel's tables either: in the kernel scope, the
     // same pool sees every row of them.
     let mut tx = campbooks_kernel::db::begin_kernel(pool).await.unwrap();

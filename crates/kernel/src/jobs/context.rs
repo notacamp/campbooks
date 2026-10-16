@@ -106,7 +106,7 @@ impl JobContext {
     }
 
     /// The job's transaction in the **kernel scope**
-    /// ([`KERNEL_SCOPE_SETTING`](crate::db::KERNEL_SCOPE_SETTING)): for an
+    /// (`campbooks.kernel_scope = on`): for an
     /// instance-wide job that works across workspaces (pruning, a
     /// scheduler's dispatcher), committed with the job's completion like
     /// [`tx`](Self::tx). Outside the kernel, only the reviewed
