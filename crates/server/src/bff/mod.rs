@@ -386,6 +386,19 @@ impl Inner {
             }
             return Ok(None);
         };
+        if !asked_for_all(session.scopes.as_deref(), self.oidc.scopes()) {
+            // Signed in before a release that asks for more (a new module's
+            // scopes): its tokens can never get them, and every feature
+            // behind them would answer 403. It ends like an expired session,
+            // so the app signs in again and comes back with every scope; the
+            // identity provider's own session is left alone, so that sign-in
+            // can go straight through.
+            tracing::info!(
+                "a web session predates scopes the BFF now asks for; it ends so the next sign-in asks for them"
+            );
+            self.retire(session.id).await?;
+            return Ok(None);
+        }
         let mut rotated = None;
         if !session.current && session.rotated_at <= now - ROTATION_GRACE {
             if session.token_delivered {
@@ -553,18 +566,7 @@ impl Inner {
         else {
             return Ok(false);
         };
-        if let Some(sealed) = refresh_token {
-            match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
-                Ok(refresh_token) => {
-                    if let Err(err) = self.oidc.revoke(&refresh_token).await {
-                        tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
-                    }
-                }
-                Err(_) => {
-                    tracing::warn!("an ended session's refresh token could not be decrypted");
-                }
-            }
-        }
+        self.revoke_refresh(id, refresh_token).await;
         // The in-process issuer's session ends here, with the ID token as
         // proof (ADR 0014): nothing for the browser to visit or forge.
         if self.oidc.in_process()
@@ -580,6 +582,36 @@ impl Inner {
         Ok(false)
     }
 
+    /// End session `id` here only: delete it and revoke its refresh token,
+    /// leaving the identity provider's session as it is (a new sign-in may
+    /// go straight through).
+    async fn retire(&self, id: Uuid) -> sqlx::Result<()> {
+        if let Some((refresh_token, _)) =
+            store::delete_session(&mut *self.db.acquire().await?, id).await?
+        {
+            self.revoke_refresh(id, refresh_token).await;
+        }
+        Ok(())
+    }
+
+    /// Revoke an ended session's refresh token at the identity provider;
+    /// failures are logged, the session is gone either way.
+    async fn revoke_refresh(&self, id: Uuid, sealed: Option<Vec<u8>>) {
+        let Some(sealed) = sealed else {
+            return;
+        };
+        match self.cipher.open(&sealed, &sealed_for(id, "refresh_token")) {
+            Ok(refresh_token) => {
+                if let Err(err) = self.oidc.revoke(&refresh_token).await {
+                    tracing::warn!(error = %err, "could not revoke an ended session's refresh token");
+                }
+            }
+            Err(_) => {
+                tracing::warn!("an ended session's refresh token could not be decrypted");
+            }
+        }
+    }
+
     async fn end(&self, id: Uuid) -> Result<String, AccessError> {
         store::delete_session(&mut *self.db.acquire().await?, id).await?;
         Err(AccessError::SessionEnded)
@@ -590,6 +622,17 @@ impl Inner {
 /// default when it gives none.
 fn expires_in(seconds: Option<u64>) -> TimeDelta {
     TimeDelta::seconds(seconds.and_then(|s| i64::try_from(s).ok()).unwrap_or(300))
+}
+
+/// Whether a session that asked for `had` at sign-in asked for every scope in
+/// `wanted` (both space-separated, in any order). A session that recorded
+/// none (`None`, from before they were recorded) asked for none.
+fn asked_for_all(had: Option<&str>, wanted: &str) -> bool {
+    had.is_some_and(|had| {
+        wanted
+            .split_whitespace()
+            .all(|scope| had.split_whitespace().any(|h| h == scope))
+    })
 }
 
 fn lock_index(id: Uuid) -> usize {

@@ -22,6 +22,9 @@ pub struct NewSession<'a> {
     pub now: DateTime<Utc>,
     pub idle_expires_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes it asks for (space-separated), to tell later whether the
+    /// BFF has started asking for more.
+    pub scopes: &'a str,
 }
 
 /// A live session, found by its cookie.
@@ -41,6 +44,9 @@ pub struct Session {
     pub access_expires_at: DateTime<Utc>,
     pub last_seen_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
+    /// The scopes it asked for at sign-in; `None` for a session from before
+    /// they were recorded.
+    pub scopes: Option<String>,
 }
 
 /// A session's tokens, read under a row lock for refreshing.
@@ -67,8 +73,8 @@ pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()>
         INSERT INTO bff.sessions
             (id, token_hash, rotated_at, subject, idp_session_id, name, email,
              access_token, access_expires_at, refresh_token, id_token, user_agent,
-             created_at, last_seen_at, idle_expires_at, expires_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $3, $3, $13, $14)
+             created_at, last_seen_at, idle_expires_at, expires_at, scopes)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $3, $3, $13, $14, $15)
         "#,
         s.id,
         s.token_hash,
@@ -84,6 +90,7 @@ pub async fn insert_session(db: &PgPool, s: &NewSession<'_>) -> sqlx::Result<()>
         s.user_agent,
         s.idle_expires_at,
         s.expires_at,
+        s.scopes,
     )
     .execute(db)
     .await?;
@@ -102,7 +109,7 @@ pub async fn find_session(
         Session,
         r#"
         SELECT id, token_hash = $1 AS "current!", rotated_at, token_delivered, subject, name, email,
-               access_token, access_expires_at, last_seen_at, expires_at
+               access_token, access_expires_at, last_seen_at, expires_at, scopes
           FROM bff.sessions
          WHERE (token_hash = $1 OR previous_token_hash = $1)
            AND idle_expires_at > $2

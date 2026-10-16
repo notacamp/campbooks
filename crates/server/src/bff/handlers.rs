@@ -375,6 +375,7 @@ impl Inner {
             now,
             idle_expires_at: (now + self.timeouts.idle).min(expires_at),
             expires_at,
+            scopes: self.oidc.scopes(),
         };
         if let Err(err) = store::insert_session(&self.db, &session).await {
             return Error::from(err).into_response();

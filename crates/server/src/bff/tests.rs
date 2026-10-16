@@ -654,6 +654,75 @@ async fn idle_and_absolute_timeouts_end_a_session(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../migrations")]
+async fn a_session_missing_newer_scopes_ends_and_signs_in_again(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    // A session that asked for every scope keeps going.
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+
+    // Signed in before a release added a scope: its tokens never get it, so
+    // it ends like an expired session and the app signs in again; its
+    // refresh token is revoked.
+    exec(&h.db, "UPDATE bff.sessions SET scopes = 'openid'").await;
+    browser
+        .get("/bff/api/v1/test/whoami")
+        .await
+        .assert_problem(StatusCode::UNAUTHORIZED, "session_required");
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+    assert_eq!(
+        h.idp.revoked_tokens().len(),
+        1,
+        "its refresh token is revoked"
+    );
+
+    // The next sign-in asks for every scope, and stays signed in.
+    browser.sign_in(&h.idp, "/").await;
+    assert_eq!(
+        browser.get("/bff/session").await.json()["authenticated"],
+        true
+    );
+    assert_eq!(
+        browser.get("/bff/api/v1/test/whoami").await.status,
+        StatusCode::OK
+    );
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_session_from_before_scopes_were_recorded_ends(db: PgPool) {
+    let h = harness(db).await;
+    let mut browser = Browser::new(&h.app);
+    browser.sign_in(&h.idp, "/").await;
+    exec(&h.db, "UPDATE bff.sessions SET scopes = NULL").await;
+    let reply = browser.get("/bff/session").await;
+    assert_eq!(reply.json()["authenticated"], false);
+    assert_eq!(count(&h.db, "SELECT count(*) FROM bff.sessions").await, 0);
+}
+
+#[test]
+fn asked_for_all_compares_sets() {
+    use super::asked_for_all;
+    assert!(asked_for_all(
+        Some("openid a:read b:write"),
+        "b:write openid"
+    ));
+    assert!(asked_for_all(Some("openid  a:read"), "a:read openid"));
+    assert!(!asked_for_all(
+        Some("openid a:read"),
+        "openid a:read assistant:read"
+    ));
+    assert!(!asked_for_all(None, "openid"));
+    assert!(asked_for_all(Some(""), ""));
+}
+
+#[sqlx::test(migrations = "../../migrations")]
 async fn session_ids_rotate_with_a_short_grace(db: PgPool) {
     let h = harness(db).await;
     let mut browser = Browser::new(&h.app);
