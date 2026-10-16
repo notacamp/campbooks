@@ -38,12 +38,13 @@
     "needsYou": "Necesita que vuelvas a iniciar sesión",
     "needsThem": "Necesita que {{name}} vuelva a iniciar sesión",
     "throttled": "En pausa por {{provider}} durante unos minutos",
-    "failing": "No se está sincronizando — seguiremos intentándolo"
+    "failing": "No se está sincronizando — seguiremos intentándolo",
+    "needsAnother": "Necesita que el miembro que lo conectó vuelva a iniciar sesión"
   },
   "disconnect": {
     "question": "¿Desconectar {{address}}? Campbooks deja de sincronizarlo y renuncia a su acceso en {{provider}}.",
     "confirm": "Desconectar",
-    "cancel": "Conservarlo",
+    "cancel": "No desconectar",
     "done": "{{address}} se ha desconectado",
     "choice": "Qué pasa con su correo en Campbooks",
     "delete": {
@@ -59,8 +60,7 @@
     "doneKept": "Su historial se queda aquí, solo lectura. Su correo sigue en {{provider}}.",
     "wayIn": {
       "removed": "También deja de ser una forma de iniciar sesión en Campbooks: la añadiste al conectar este buzón.",
-      "kept": "Podrás seguir iniciando sesión en Campbooks con esta cuenta.",
-      "none": "No es una de tus formas de iniciar sesión, así que ahí no cambia nada."
+      "unchanged": "Tu forma de iniciar sesión en Campbooks no cambia."
     },
     "errors": {
       "gone": "No se ha encontrado {{address}}: puede que ya esté desconectado. Recarga la página para ver la lista actual.",
@@ -76,7 +76,7 @@
     "loading": "Cargando los proveedores",
     "loadError": "No se han podido cargar los proveedores que puedes conectar. Recarga la página para volver a intentarlo.",
     "signIn": "Usar también esta cuenta para iniciar sesión",
-    "signInHint": "Déjalo marcado para tu propio buzón. Desmárcalo para uno compartido, como support@: queda conectado, pero nadie inicia sesión en Campbooks con él."
+    "signInHint": "Déjalo marcado para tu propio buzón. Desmárcalo para uno compartido, como support@: queda conectado, pero no se convierte en una nueva forma de iniciar sesión en Campbooks."
   },
   "connected": {
     "title": "Tu buzón está conectado",

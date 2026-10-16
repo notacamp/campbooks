@@ -547,11 +547,14 @@ minutes", `failing` "Not syncing — we'll keep trying". The page SHALL offer:
   access is given up at the provider, asking what becomes of its mail in
   Campbooks ("Delete its mail from Campbooks", the default, or "Keep its
   history, read-only"), that the mail stays at the provider either way, and
-  what becomes of the way in: it goes too when it was added only by
-  connecting the mailbox and is not the last way in, it stays otherwise, and
-  a mailbox that is not a way in changes nothing there. A disconnect that
-  fails, including one that finds nothing (404), SHALL be said as a failure,
-  never shown as done;
+  what becomes of the way in: that it goes too only when `identity.list_ways_in`
+  records this very connection as the only mailbox of a way in a connect
+  created and it is not the last way in, and otherwise that how the person
+  signs in does not change (never decided from an address). Its cancel
+  SHALL read "Don't disconnect". A disconnect that fails, including one that
+  finds nothing (404), SHALL be said as a failure, never shown as done; focus
+  SHALL return to Disconnect when the confirmation closes and the row stays,
+  and move to the result once it is gone;
 - "Sign in again" (a fresh sign-in, back to this page) when starting is
   refused with `step_up_required`.
 
@@ -584,7 +587,7 @@ empty and error states, fit 375px, and pass axe in light and dark.
 - **THEN** `connectors.disconnect` is called with `mail=delete` and the row is gone
 
 #### Scenario: The way in goes with a connect-only mailbox
-- **WHEN** the person opens the disconnect confirmation of a mailbox whose account became a way in only by connecting it, and they have another way in
+- **WHEN** the person opens the disconnect confirmation of a connection that `identity.list_ways_in` records as the only mailbox of a way in a connect created, and they have another way in
 - **THEN** the confirmation says it also stops being a way to sign in
 
 #### Scenario: A disconnect that finds nothing
@@ -601,7 +604,7 @@ empty and error states, fit 375px, and pass axe in light and dark.
 
 #### Scenario: A shared mailbox
 - **WHEN** a member opens the disconnect confirmation of a mailbox they connected without signing in with it
-- **THEN** both choices are offered, and the confirmation says it is not one of their ways to sign in
+- **THEN** both choices are offered, and the confirmation says how they sign in does not change
 
 #### Scenario: A colleague's mailbox needs re-authorisation
 - **WHEN** an owner sees a member's connection with health `needs_reauth`

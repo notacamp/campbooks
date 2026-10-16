@@ -87,7 +87,7 @@
     "roleOf": "Função de {{name}}",
     "remove": "Remover",
     "removeLabel": "Remover {{name}}",
-    "confirmRemove": "Remover {{name}} de {{workspace}}? Perde o acesso de imediato. Para voltar, terá de ser convidado novamente.",
+    "confirmRemove": "Remover {{name}} de {{workspace}}? Perde o acesso de imediato. Para voltar, terá de ser convidado novamente. As caixas de correio dele aqui são desligadas, e uma forma de iniciar sessão que só adicionou ao ligar uma delas também desaparece.",
     "cancel": "Cancelar",
     "roleChanged": "{{name}}: {{role}}",
     "readOnly": "Só proprietários e administradores podem convidar pessoas ou mudar funções.",

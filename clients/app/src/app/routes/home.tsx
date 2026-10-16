@@ -64,7 +64,13 @@ function MailSection({ workspaceId }: { workspaceId: string }) {
     );
   }
   if (connections.data !== undefined && connections.data.length > 0) {
-    return <ConnectedMailboxes connections={connections.data} manage={mailboxes} />;
+    return (
+      <ConnectedMailboxes
+        workspaceId={workspaceId}
+        connections={connections.data}
+        manage={mailboxes}
+      />
+    );
   }
   return (
     <section className="flex flex-col items-start gap-3" aria-labelledby="connect-mail">

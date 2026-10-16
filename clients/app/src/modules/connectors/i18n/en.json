@@ -38,12 +38,13 @@
     "needsYou": "Needs you to sign in again",
     "needsThem": "Needs {{name}} to sign in again",
     "throttled": "Paused by {{provider}} for a few minutes",
-    "failing": "Not syncing — we'll keep trying"
+    "failing": "Not syncing — we'll keep trying",
+    "needsAnother": "Needs the member who connected it to sign in again"
   },
   "disconnect": {
     "question": "Disconnect {{address}}? Campbooks stops syncing it and gives up its access at {{provider}}.",
     "confirm": "Disconnect",
-    "cancel": "Keep it",
+    "cancel": "Don’t disconnect",
     "done": "{{address}} is disconnected",
     "choice": "What happens to its mail in Campbooks",
     "delete": {
@@ -59,8 +60,7 @@
     "doneKept": "Its history stays here, read-only. Its mail is still in {{provider}}.",
     "wayIn": {
       "removed": "It also stops being a way to sign in to Campbooks: you added it by connecting this mailbox.",
-      "kept": "You can still sign in to Campbooks with this account.",
-      "none": "It isn’t one of your ways to sign in, so nothing changes there."
+      "unchanged": "How you sign in to Campbooks doesn’t change."
     },
     "errors": {
       "gone": "{{address}} wasn’t found: it may already be disconnected. Reload the page to see the list as it is.",
@@ -76,7 +76,7 @@
     "loading": "Loading the providers",
     "loadError": "The providers you can connect didn't load. Reload the page to try again.",
     "signIn": "Also use this account to sign in",
-    "signInHint": "Leave it ticked for your own mailbox. Untick it for a shared one, like support@: it is connected, but nobody signs in to Campbooks with it."
+    "signInHint": "Leave it ticked for your own mailbox. Untick it for a shared one, like support@: it is connected, but it doesn’t become a new way to sign in to Campbooks."
   },
   "connected": {
     "title": "Your mailbox is connected",

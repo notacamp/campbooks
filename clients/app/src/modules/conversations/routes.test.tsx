@@ -144,6 +144,18 @@ describe("the inbox", () => {
     );
   });
 
+  it("offers nothing to act on until it knows the inbox can be written", async () => {
+    const api = inbox({ [`GET ${W}/inboxes`]: { status: 503 } });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);
+
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    expect(await within(reader).findByRole("heading", { name: Q4.subject })).toBeVisible();
+    expect(within(reader).queryByRole("button", { name: /^Done/u })).toBeNull();
+    expect(api.calls.map((call) => call.route)).not.toContain(
+      `POST ${W}/conversations/${Q4.id}/read`,
+    );
+  });
+
   it("archives with E and takes it back with Z", async () => {
     const api = inbox();
     renderAt(`/w/${DUARTE.id}/inbox/primary/${Q4.id}`);

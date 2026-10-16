@@ -118,26 +118,31 @@ describe("useMailboxConsent", () => {
 });
 
 describe("wayInFate", () => {
-  const way = (provider: string, email: string, linked_via: string) => ({
-    id: email,
+  const way = (provider: string, linked_via: string, connections: string[]) => ({
+    id: `${provider}-${linked_via}`,
     kind: "provider",
     provider,
-    email,
+    email: "ana@example.com",
     linked_via,
     linked_at: "2026-10-01T09:00:00Z",
     last_used_at: null,
+    mailboxes: connections.length,
+    connections,
   });
-  const signedUp = way("google", "ana@example.com", "sign_up");
-  const connected = way("zoho", "ana@example.net", "connect");
+  const signedUp = way("google", "sign_up", []);
+  const connected = way("zoho", "connect", ["c1"]);
 
-  it("removes a way in added only by connecting, unless it is the last one", () => {
-    expect(wayInFate([signedUp, connected], 0, "zoho", "ANA@example.net")).toBe("removed");
-    expect(wayInFate([connected], 0, "zoho", "ana@example.net")).toBe("kept");
-    expect(wayInFate([connected], 1, "zoho", "ana@example.net")).toBe("removed");
+  it("removes a way in a connect created with only this mailbox, unless it is the last", () => {
+    expect(wayInFate([signedUp, connected], 0, "c1")).toBe("removed");
+    expect(wayInFate([connected], 0, "c1")).toBe("unchanged");
+    expect(wayInFate([connected], 1, "c1")).toBe("removed");
   });
 
-  it("keeps one you signed up or linked with, and says when there is none", () => {
-    expect(wayInFate([signedUp, connected], 0, "google", "ana@example.com")).toBe("kept");
-    expect(wayInFate([signedUp], 0, "zoho", "loja@example.com")).toBe("none");
+  it("keeps one with another mailbox, one never recorded, or one not made by connecting", () => {
+    const twice = { ...connected, mailboxes: 2, connections: ["c1", "c2"] };
+    expect(wayInFate([signedUp, twice], 0, "c1")).toBe("unchanged");
+    expect(wayInFate([signedUp, connected], 0, "c9")).toBe("unchanged");
+    const linked = way("zoho", "link", ["c1"]);
+    expect(wayInFate([signedUp, linked], 0, "c1")).toBe("unchanged");
   });
 });

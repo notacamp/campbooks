@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   api,
+  errorStatus,
   operationKey,
   unwrap,
   unwrapEmpty,
@@ -50,11 +51,29 @@ export function useDisconnect(workspaceId: string) {
       );
       return connectionId;
     },
-    onSuccess: (connectionId) => {
+    onSuccess: async (connectionId) => {
       queryClient.setQueryData<Connection[]>(
         operationKey("connectors.list_connections", { workspace_id: workspaceId }),
         (connections) => connections?.filter((connection) => connection.id !== connectionId),
       );
+      // A way in may have gone with it, and its inboxes were deleted or kept.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: operationKey("identity.list_ways_in") }),
+        queryClient.invalidateQueries({
+          queryKey: operationKey("conversations.list_inboxes", { workspace_id: workspaceId }),
+        }),
+        queryClient.invalidateQueries({
+          queryKey: operationKey("conversations.list", { workspace_id: workspaceId }),
+        }),
+      ]);
+    },
+    onError: async (error) => {
+      // Gone already (or never yours to see): the stale row goes.
+      if (errorStatus(error) === 404) {
+        await queryClient.invalidateQueries({
+          queryKey: operationKey("connectors.list_connections", { workspace_id: workspaceId }),
+        });
+      }
     },
   });
 }

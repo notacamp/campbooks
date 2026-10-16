@@ -1,12 +1,13 @@
 //! A way in that came only from connecting a mailbox goes with its last
-//! connection; every other way in stays.
+//! mailbox; every other way in stays.
 
 use axum::http::{Method, StatusCode};
 use campbooks_kernel::{db::BeginFor as _, tenancy::WorkspaceId, testing::TestUser};
+use chrono::Utc;
 use serde_json::{Value, json};
 use sqlx::PgPool;
 
-use crate::{events::ConnectionRemoved, testkit::Kit, upstream::Provider};
+use crate::{domain::mailbox_links, events::ConnectionRemoved, testkit::Kit, upstream::Provider};
 
 const BACK: &str = "/w/ws";
 
@@ -18,8 +19,8 @@ fn user(subject: &str) -> TestUser {
     }
 }
 
-/// Connect Google account `subject` as `access` in `workspace`
-/// (`sign_in`: also as a way in); the connection id.
+/// Connect Google account `subject` as `access` in `workspace` (`sign_in`:
+/// also as a way in); the connection id.
 async fn connect(
     kit: &Kit,
     access: &str,
@@ -44,8 +45,9 @@ async fn connect(
         .to_owned()
 }
 
-/// What the connectors module publishes when `connection` goes.
-async fn removed(kit: &Kit, workspace: WorkspaceId, connection: &str) {
+/// What the connectors module publishes when the mailbox of Google account
+/// `subject` in `workspace` goes.
+async fn removed(kit: &Kit, workspace: WorkspaceId, subject: &str) {
     let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
     kit.state
         .events
@@ -53,7 +55,9 @@ async fn removed(kit: &Kit, workspace: WorkspaceId, connection: &str) {
             &mut tx,
             &ConnectionRemoved {
                 workspace: workspace.to_string(),
-                connection: connection.to_owned(),
+                connection: format!("connection-of-{subject}"),
+                provider: Some("google".to_owned()),
+                account_subject: Some(subject.to_owned()),
             },
         )
         .await
@@ -62,7 +66,7 @@ async fn removed(kit: &Kit, workspace: WorkspaceId, connection: &str) {
     kit.run_jobs().await;
 }
 
-fn providers(ways: &Value) -> Vec<String> {
+fn addresses(ways: &Value) -> Vec<String> {
     ways["items"]
         .as_array()
         .unwrap()
@@ -72,27 +76,32 @@ fn providers(ways: &Value) -> Vec<String> {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_way_in_a_connect_brought_goes_with_its_last_connection(db: PgPool) {
+async fn the_way_in_a_connect_brought_goes_with_its_last_mailbox(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let (one, two) = (WorkspaceId::new(), WorkspaceId::new());
     let first = connect(&kit, &access, one, "work-sam", true).await;
-    let second = connect(&kit, &access, two, "work-sam", true).await;
-    assert_eq!(
-        kit.ways_in(&access).await["items"]
+    connect(&kit, &access, two, "work-sam", true).await;
+    let ways = kit.ways_in(&access).await;
+    assert_eq!(ways["items"].as_array().unwrap().len(), 2);
+    // Ways to sign in says how many mailboxes it came with, and which.
+    let work = &ways["items"][1];
+    assert_eq!(work["mailboxes"], 2);
+    assert!(
+        work["connections"]
             .as_array()
             .unwrap()
-            .len(),
-        2
+            .contains(&json!(first))
     );
+    assert_eq!(ways["items"][0]["mailboxes"], 0);
 
-    // Another connection still uses it: it stays.
-    removed(&kit, one, &first).await;
-    assert!(providers(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    // Its mailbox is still connected in the other workspace: it stays.
+    removed(&kit, one, "work-sam").await;
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
 
-    // Its last connection goes: so does the way in, announced and audited.
-    removed(&kit, two, &second).await;
-    let left = providers(&kit.ways_in(&access).await);
+    // Its last mailbox goes: so does the way in, announced and audited.
+    removed(&kit, two, "work-sam").await;
+    let left = addresses(&kit.ways_in(&access).await);
     assert!(
         !left.contains(&"work-sam@example.com".to_owned()),
         "{left:?}"
@@ -106,7 +115,7 @@ async fn the_way_in_a_connect_brought_goes_with_its_last_connection(db: PgPool) 
     .unwrap();
     assert_eq!(events, 1);
     // A replay finds nothing left to do.
-    removed(&kit, two, &second).await;
+    removed(&kit, two, "work-sam").await;
     assert_eq!(
         kit.ways_in(&access).await["items"]
             .as_array()
@@ -117,11 +126,47 @@ async fn the_way_in_a_connect_brought_goes_with_its_last_connection(db: PgPool) 
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn two_of_its_mailboxes_removed_at_once_still_remove_it(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let (one, two) = (WorkspaceId::new(), WorkspaceId::new());
+    connect(&kit, &access, one, "work-sam", true).await;
+    connect(&kit, &access, two, "work-sam", true).await;
+
+    // Both removals in their own transactions at the same time: the account
+    // lock orders them, so the second sees the first's row gone.
+    let forget = |workspace: WorkspaceId| {
+        let db = kit.state.db.clone();
+        async move {
+            let mut tx = db.begin().await.unwrap();
+            let gone = mailbox_links::forget(
+                &mut tx,
+                *workspace.as_uuid(),
+                "google",
+                "work-sam",
+                Utc::now(),
+            )
+            .await
+            .unwrap();
+            tx.commit().await.unwrap();
+            gone
+        }
+    };
+    let (a, b) = tokio::join!(forget(one), forget(two));
+    assert_eq!(
+        usize::from(a.is_some()) + usize::from(b.is_some()),
+        1,
+        "exactly one of them removes it"
+    );
+    assert!(!addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn whoever_signed_in_with_it_is_signed_out(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
-    let connection = connect(&kit, &access, ws, "work-sam", true).await;
+    connect(&kit, &access, ws, "work-sam", true).await;
     // Another browser signs in with the connected account.
     kit.new_browser();
     let (url, _) = Kit::web_authorize();
@@ -138,7 +183,7 @@ async fn whoever_signed_in_with_it_is_signed_out(db: PgPool) {
     .unwrap();
     assert_eq!(sessions.len(), 1, "signed in with it");
 
-    removed(&kit, ws, &connection).await;
+    removed(&kit, ws, "work-sam").await;
     let live: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM identity.sessions WHERE id = ANY($1) AND ended_at IS NULL",
     )
@@ -154,26 +199,20 @@ async fn other_ways_in_stay(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
-    let signed_up_with = providers(&kit.ways_in(&access).await);
+    let signed_up_with = addresses(&kit.ways_in(&access).await);
+    let own = signed_up_with[0].replace("@example.com", "");
 
-    // The account signed up with, connected (unticked or not): not a connect way in.
-    let own = connect(
-        &kit,
-        &access,
-        ws,
-        &signed_up_with[0].replace("@example.com", ""),
-        false,
-    )
-    .await;
-    // A shared mailbox: never a way in.
-    let shared = connect(&kit, &access, ws, "support", false).await;
+    // The account signed up with, connected with the box unticked: not a
+    // connect way in. A shared mailbox: never a way in.
+    connect(&kit, &access, ws, &own, false).await;
+    connect(&kit, &access, ws, "support", false).await;
     removed(&kit, ws, &own).await;
-    removed(&kit, ws, &shared).await;
-    assert_eq!(providers(&kit.ways_in(&access).await), signed_up_with);
+    removed(&kit, ws, "support").await;
+    assert_eq!(addresses(&kit.ways_in(&access).await), signed_up_with);
 
-    // A connection nobody recorded (before this record existed): nothing changes.
-    removed(&kit, ws, "connection-from-before").await;
-    assert_eq!(providers(&kit.ways_in(&access).await), signed_up_with);
+    // A mailbox nobody recorded (before this record existed): nothing changes.
+    removed(&kit, ws, "from-before").await;
+    assert_eq!(addresses(&kit.ways_in(&access).await), signed_up_with);
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -181,7 +220,7 @@ async fn the_last_way_in_stays(db: PgPool) {
     let kit = Kit::new(db).await;
     let access = kit.signed_up().await;
     let ws = WorkspaceId::new();
-    let connection = connect(&kit, &access, ws, "work-sam", true).await;
+    connect(&kit, &access, ws, "work-sam", true).await;
     // The account signed up with is removed, so the connected one is the last.
     let ways = kit.ways_in(&access).await;
     let first = ways["items"][0]["id"].as_str().unwrap().to_owned();
@@ -193,9 +232,9 @@ async fn the_last_way_in_stays(db: PgPool) {
         )
         .await;
     assert_eq!(gone.status, StatusCode::NO_CONTENT, "{gone:?}");
-    removed(&kit, ws, &connection).await;
+    removed(&kit, ws, "work-sam").await;
     assert_eq!(
-        providers(&kit.ways_in(&access).await),
+        addresses(&kit.ways_in(&access).await),
         ["work-sam@example.com"]
     );
 }

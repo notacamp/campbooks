@@ -38,12 +38,13 @@
     "needsYou": "Precisa que inicie sessão novamente",
     "needsThem": "Precisa que {{name}} inicie sessão novamente",
     "throttled": "Em pausa pelo {{provider}} durante alguns minutos",
-    "failing": "Sem sincronizar — vamos continuar a tentar"
+    "failing": "Sem sincronizar — vamos continuar a tentar",
+    "needsAnother": "Precisa que o membro que a ligou inicie sessão novamente"
   },
   "disconnect": {
     "question": "Desligar {{address}}? O Campbooks deixa de a sincronizar e abdica do acesso no {{provider}}.",
     "confirm": "Desligar",
-    "cancel": "Manter",
+    "cancel": "Não desligar",
     "done": "{{address}} foi desligada",
     "choice": "O que acontece ao correio dela no Campbooks",
     "delete": {
@@ -59,8 +60,7 @@
     "doneKept": "O histórico fica aqui, só de leitura. O correio continua no {{provider}}.",
     "wayIn": {
       "removed": "Também deixa de ser uma forma de iniciar sessão no Campbooks: adicionou-a ao ligar esta caixa de correio.",
-      "kept": "Continua a poder iniciar sessão no Campbooks com esta conta.",
-      "none": "Não é uma das suas formas de iniciar sessão, por isso nada muda aí."
+      "unchanged": "A forma como inicia sessão no Campbooks não muda."
     },
     "errors": {
       "gone": "Não foi possível encontrar {{address}}: pode já estar desligada. Recarregue a página para ver a lista atual.",
@@ -76,7 +76,7 @@
     "loading": "A carregar os fornecedores",
     "loadError": "Não foi possível carregar os fornecedores que pode ligar. Recarregue a página para tentar novamente.",
     "signIn": "Usar também esta conta para iniciar sessão",
-    "signInHint": "Deixe assinalado para a sua própria caixa de correio. Desassinale para uma partilhada, como support@: fica ligada, mas ninguém inicia sessão no Campbooks com ela."
+    "signInHint": "Deixe assinalado para a sua própria caixa de correio. Desassinale para uma partilhada, como support@: fica ligada, mas não passa a ser uma nova forma de iniciar sessão no Campbooks."
   },
   "connected": {
     "title": "A sua caixa de correio está ligada",

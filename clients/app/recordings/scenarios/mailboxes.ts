@@ -51,7 +51,10 @@ async function allowAll(page: Page, provider: string): Promise<void> {
 async function openMailboxes(page: Page, phone: boolean): Promise<void> {
   if (phone) {
     await page.getByRole("link", { name: "Settings" }).last().click();
-    await page.getByRole("button", { name: "Mailboxes", exact: true }).click();
+    await page
+      .getByRole("navigation", { name: "Settings" })
+      .getByRole("link", { name: "Mailboxes", exact: true })
+      .click();
   } else {
     await page.getByRole("link", { name: "Settings" }).first().click();
     await page.getByRole("link", { name: "Mailboxes", exact: true }).click();

@@ -13185,9 +13185,18 @@
           "kind",
           "provider",
           "linked_via",
-          "linked_at"
+          "linked_at",
+          "mailboxes",
+          "connections"
         ],
         "properties": {
+          "connections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The connections among them that are known (the connectors module's\nids), to tell which mailbox a way in came with."
+          },
           "email": {
             "type": [
               "string",
@@ -13220,6 +13229,12 @@
           "linked_via": {
             "type": "string",
             "description": "`sign_up`, `link` or `connect`."
+          },
+          "mailboxes": {
+            "type": "integer",
+            "format": "int32",
+            "description": "For a way in a connect created: how many workspaces its mailbox is\nconnected in. It goes when the last of them is disconnected (unless\nit is the last way in). 0 for any other way in.",
+            "minimum": 0
           },
           "provider": {
             "type": "string",

@@ -25,7 +25,7 @@ function renderAt(path: string) {
     starting: false,
     refusal: undefined,
     signInAgain: vi.fn(),
-    wayInFate: () => "kept",
+    wayInFate: () => "unchanged",
   }));
   mockApi({
     "GET /bff/session": { body: SESSION },

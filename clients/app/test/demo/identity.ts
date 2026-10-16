@@ -42,6 +42,8 @@ export const GOOGLE_WAY_IN: Schema<"WayIn"> = {
   linked_via: "sign_up",
   linked_at: "2026-10-01T09:00:00Z",
   last_used_at: "2026-10-13T08:30:00Z",
+  mailboxes: 0,
+  connections: [],
 };
 
 export const ZOHO_WAY_IN: Schema<"WayIn"> = {
@@ -52,6 +54,8 @@ export const ZOHO_WAY_IN: Schema<"WayIn"> = {
   linked_via: "link",
   linked_at: "2026-10-12T15:00:00Z",
   last_used_at: null,
+  mailboxes: 0,
+  connections: [],
 };
 
 export const ALL_PROVIDERS = ["google", "microsoft", "zoho"] as const;

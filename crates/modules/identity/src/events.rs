@@ -266,14 +266,22 @@ impl DomainEvent for MemberLeft {
 }
 
 /// `connectors.connection_removed` v1, as this module reads it
-/// (`contracts/connectors.connection_removed.v1.schema.json`): only the
-/// connection, whose recorded way in may go with it.
+/// (`contracts/connectors.connection_removed.v1.schema.json`): the
+/// workspace, provider and account of the mailbox that went, whose way in
+/// may go with it. Events recorded before the account was named carry
+/// none, and change nothing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ConnectionRemoved {
     /// The workspace.
     pub workspace: String,
     /// The connection (the connectors module's id).
     pub connection: String,
+    /// Its provider.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// The provider's stable id of the account (`sub`).
+    #[serde(default)]
+    pub account_subject: Option<String>,
 }
 
 impl DomainEvent for ConnectionRemoved {

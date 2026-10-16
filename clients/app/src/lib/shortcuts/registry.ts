@@ -5,11 +5,13 @@ import { normalizeBinding, parseBinding } from "./keys";
  * list or a selected item binds a handler (often both at once); `compose`
  * while writing; `focus` on a page that asks one thing (signing in, a
  * first-run step), which never shows a list, an item or a composer;
- * `settings` on a settings page that manages its own rows (mailboxes),
- * which never shows the inbox's list, item or composer either. Two
+ * `settings` on a settings page that manages its own rows (mailboxes) and
+ * moves through them with the list's keys, but never shows an item or a
+ * composer. Two
  * shortcuts conflict when they share keys, or one's keys start the other's
  * sequence, in scopes that can be live together: `global` overlaps every
- * scope, `list` and `item` overlap each other.
+ * scope, `list` and `item` overlap each other, and so do `settings` and
+ * `list`.
  */
 export type ShortcutScope = "global" | "list" | "item" | "compose" | "focus" | "settings";
 
@@ -67,7 +69,12 @@ const SCREEN_SCOPES = new Set<ShortcutScope>(["list", "item"]);
 
 function scopesOverlap(a: ShortcutScope, b: ShortcutScope): boolean {
   return (
-    a === b || a === "global" || b === "global" || (SCREEN_SCOPES.has(a) && SCREEN_SCOPES.has(b))
+    a === b ||
+    a === "global" ||
+    b === "global" ||
+    (SCREEN_SCOPES.has(a) && SCREEN_SCOPES.has(b)) ||
+    (a === "settings" && b === "list") ||
+    (a === "list" && b === "settings")
   );
 }
 

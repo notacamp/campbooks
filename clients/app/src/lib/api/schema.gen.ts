@@ -3369,6 +3369,11 @@ export interface components {
         /** @description A provider account the caller signs in with. */
         WayIn: {
             /**
+             * @description The connections among them that are known (the connectors module's
+             *     ids), to tell which mailbox a way in came with.
+             */
+            connections: string[];
+            /**
              * @description The address the provider gave when it was added (shown, never used
              *     to find an account).
              */
@@ -3392,6 +3397,13 @@ export interface components {
             linked_at: string;
             /** @description `sign_up`, `link` or `connect`. */
             linked_via: string;
+            /**
+             * Format: int32
+             * @description For a way in a connect created: how many workspaces its mailbox is
+             *     connected in. It goes when the last of them is disconnected (unless
+             *     it is the last way in). 0 for any other way in.
+             */
+            mailboxes: number;
             /** @description `google`, `microsoft` or `zoho`. */
             provider: string;
         };

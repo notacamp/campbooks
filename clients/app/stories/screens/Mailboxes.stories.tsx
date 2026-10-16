@@ -54,7 +54,15 @@ function signedIn({
     "GET /bff/api/v1/identity/ways-in": {
       body: {
         // Ana signed up with Google, and added Zoho by connecting its mailbox.
-        items: [GOOGLE_WAY_IN, { ...ZOHO_WAY_IN, linked_via: "connect" }],
+        items: [
+          GOOGLE_WAY_IN,
+          {
+            ...ZOHO_WAY_IN,
+            linked_via: "connect",
+            mailboxes: 1,
+            connections: [ZOHO_CONNECTION.id],
+          },
+        ],
         providers: ["google", "microsoft", "zoho"],
         mailbox_providers: mailboxProviders,
       },
@@ -150,7 +158,7 @@ export const ConfirmDisconnect: Story = {
     await expect(
       canvas.getByRole("radio", { name: "Delete its mail from Campbooks" }),
     ).toBeChecked();
-    await expect(canvas.getByText(/You can still sign in to Campbooks/u)).toBeVisible();
+    await expect(canvas.getByText(/How you sign in to Campbooks doesn’t change/u)).toBeVisible();
   },
 };
 
@@ -186,7 +194,7 @@ export const WayInGoesWithIt: Story = {
   },
 };
 
-/** A shared mailbox: not a way in, so nothing changes there. */
+/** A shared mailbox: not a way in, so how you sign in doesn’t change. */
 export const SharedMailbox: Story = {
   args: {
     path: `/w/${HOUSEHOLD.id}/settings/mailboxes`,
@@ -201,7 +209,7 @@ export const SharedMailbox: Story = {
     await userEvent.click(
       await canvas.findByRole("button", { name: "Disconnect loja@example.com" }),
     );
-    await expect(canvas.getByText(/isn’t one of your ways to sign in/u)).toBeVisible();
+    await expect(canvas.getByText(/How you sign in to Campbooks doesn’t change/u)).toBeVisible();
   },
 };
 

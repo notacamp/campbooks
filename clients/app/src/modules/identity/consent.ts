@@ -12,27 +12,20 @@ import { usePasskeys, useStartLink, useWaysIn, type WayIn } from "./api/queries"
 import { leavePage, stepUpUrl } from "./model";
 
 /**
- * What disconnecting `address` at `provider` does to your way in, as the
- * server decides it: a way in added only by connecting the mailbox goes with
- * it, unless it is your last way in (provider accounts and passkeys).
- * Whether another of your connections still uses the account is not known
- * here; then the server keeps it, and the page has said it goes.
+ * What disconnecting `connection` does to how you sign in, as the server
+ * will decide it: a way in a connect created goes with its last recorded
+ * mailbox, unless it is your last way in (provider accounts and passkeys).
+ * Only the server's record of which connections a way in came with is
+ * used, never an address.
  */
 export function wayInFate(
   items: readonly WayIn[],
   passkeys: number,
-  provider: string,
-  address: string,
+  connection: string,
 ): WayInFate {
-  const way = items.find(
-    (candidate) =>
-      candidate.provider === provider && candidate.email?.toLowerCase() === address.toLowerCase(),
-  );
-  if (way === undefined) {
-    return "none";
-  }
+  const way = items.find((candidate) => candidate.connections.includes(connection));
   const last = items.length + passkeys <= 1;
-  return way.linked_via === "connect" && !last ? "removed" : "kept";
+  return way?.linked_via === "connect" && way.mailboxes === 1 && !last ? "removed" : "unchanged";
 }
 
 /** Why `identity.start_link` refused, in the words the Mailboxes page has. */
@@ -100,9 +93,9 @@ export function useMailboxConsent(
     signInAgain: () => {
       leave(stepUpUrl(returnTo));
     },
-    wayInFate: (provider, address) =>
+    wayInFate: (connection) =>
       ways.data === undefined
         ? undefined
-        : wayInFate(ways.data.items, passkeys.data?.items.length ?? 0, provider, address),
+        : wayInFate(ways.data.items, passkeys.data?.items.length ?? 0, connection),
   };
 }

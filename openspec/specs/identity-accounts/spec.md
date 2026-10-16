@@ -214,7 +214,9 @@ return it with `connected=<connection id>`.
 ### Requirement: Listing and removing ways in
 `identity.list_ways_in` (`identity:read`) SHALL list the caller's provider
 ways in (provider, address as given at link time, how and when linked, last
-used), the providers configured on the instance, and, as
+used, and, for a way in a connect created, how many workspaces its mailbox is
+connected in and the connections among them that are known), the providers
+configured on the instance, and, as
 `mailbox_providers`, the configured providers a mailbox can be connected
 from (`identity.start_link` with `connect` accepts them: the instance has a
 mail adapter for them), in the same order.
@@ -228,6 +230,10 @@ mailbox, SHALL be audited, and SHALL publish `identity.way_in_removed`.
 #### Scenario: Remove the last way in
 - **WHEN** a person with only a Google way in removes it
 - **THEN** the response is 409 with `code` = `last_way_in` and the way in remains
+
+#### Scenario: Two of its mailboxes removed at once
+- **WHEN** the two workspaces' mailboxes of a way in a connect created are removed concurrently
+- **THEN** exactly one of the two removals removes the way in
 
 #### Scenario: Whoever signed in with it is signed out
 - **WHEN** a way in is removed while another browser is signed in with it
@@ -657,13 +663,16 @@ inline confirmation, then sign the browser out.
 - **THEN** that refresh token fails with `invalid_grant`, that browser's next authorization shows the sign-in screen, and its web session ends
 
 ### Requirement: A way in that came only from connecting goes with its mailbox
-When a connect creates a way in (`linked_via = connect`) and hands its grant
-over, the identity module SHALL record the connection against that way in,
-and SHALL record every later connection of that way in.
-`identity.forget_connected_way_in`, consuming `connectors.connection_removed`,
-SHALL forget the removed connection and, when that way in has no recorded
-connection left, was linked by connecting, and is not the account's last way
-in (provider accounts and passkeys), SHALL remove it as
+When a connect creates a way in (`linked_via = connect`), the identity module
+SHALL record, in the transaction that creates the way in, the workspace its
+mailbox is connected in, and SHALL record every later workspace that way in's
+mailbox is connected in before that grant is handed over; if the record
+cannot be written, the round trip SHALL fail rather than hand the grant over.
+`identity.forget_connected_way_in`, consuming `connectors.connection_removed`
+(its workspace, `provider` and `account_subject`), SHALL lock the account,
+then forget that workspace's record and, when that way in has none left, was
+linked by connecting, and is not the account's last way in (provider accounts
+and passkeys), SHALL remove it as
 `identity.remove_way_in` does: ending every session signed in with it,
 revoking their refresh tokens, auditing it and publishing
 `identity.way_in_removed`. A way in with connections that were never recorded

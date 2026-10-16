@@ -102,7 +102,7 @@ mailbox_scopes` non-empty): Microsoft signs in but has no mail adapter.
   (migration `20261020140000_identity__connect_without_way_in`), and the
   new `identity.mailbox_links` (`20261020140100_identity__mailbox_links`).
 - Consumed: `connectors.connection_removed` v1 by
-  `identity.forget_connected_way_in` (reads `workspace` and `connection`).
+  `identity.forget_connected_way_in` (reads `workspace`, `provider` and `account_subject`).
   Published as before: `identity.way_in_removed` when a way in goes with it.
 - No other schema changes; the disconnect side is batch 1's.
 
@@ -260,16 +260,23 @@ per-workspace rows behind row-level security.
 
 *Alternatives considered:*
 
-1. **An identity-owned record of the connections a way in brought
-   (chosen).** `identity.mailbox_links (connection_id, provider_identity_id)`
-   (account data: no workspace column, so the check sees every workspace's), written when a connect hands its grant over and the
-   connectors module accepts it: always when that round trip created the way
-   in, and for every later connection of a way in already tracked. The
-   consumer of `connection_removed` forgets the connection by id and removes
-   the way in when none is left. A way in linked before the table existed is
-   never tracked, so it is never removed by mistake while an unknown
-   connection still uses it. Data stays in `identity`'s schema; the event's
-   connection id is all it needs.
+1. **An identity-owned record of the workspaces a way in's mailbox is
+   connected in (chosen).** `identity.mailbox_links (provider_identity_id,
+   in_workspace_id, connection_id)`. The connectors module keeps one
+   connection per workspace, provider and account, so (way in, workspace)
+   names the connection before it exists. That lets the row be written **in
+   the transaction that creates the way in**, or before a later grant is
+   handed over: if it cannot be written, the round trip fails, and a way in
+   a connect created is never left untracked. The connection id is filled in
+   afterwards, only to show which mailbox a way in came with
+   (`list_ways_in`). Account data, like `consents.bound_workspace_id`: no
+   row-level security, so "still connected elsewhere" sees every
+   workspace. The consumer reads the event's workspace, `provider` and
+   `account_subject`, **locks the account first** (as removing a way in on
+   Ways to sign in does, so the two never deadlock, and two of its mailboxes
+   removed at once are counted one after the other), then deletes the row
+   and counts the others. A way in linked before the table existed is never
+   tracked, so it is never removed by mistake.
 2. **Ask `connectors` through a kernel port** ("does any connection of
    provider X, account S remain?"). A cross-workspace read of `connectors`'
    rows: either a privileged connection that skips row-level security or a
@@ -284,12 +291,12 @@ per-workspace rows behind row-level security.
 - **Mail after Disconnect.** Until #117's purge consumes `mail = delete`,
   a deleted mailbox's conversations stay. The contract (`mail` on the
   operation and the event) is what the two pieces agree on.
-- **What the confirmation says about the way in** comes from
-  `identity.list_ways_in` (`linked_via = connect`, not the last way in
-  counting passkeys). It cannot see whether another of the person's
-  connections uses the same account, nor whether the way in is tracked (one
-  linked before `mailbox_links` existed stays), so in those cases it says
-  the way in goes when it stays: the safe side of wrong.
+- **What the confirmation says about the way in** comes from the server's
+  record only: `list_ways_in` gives each way in its recorded mailboxes and
+  the connections among them. It says the way in goes only when this
+  connection is the only one recorded for a way in a connect created and it
+  is not the last way in; otherwise that how you sign in does not change.
+  No address is ever matched.
 - **`grantor_signs_in` was dropped.** A first version stored whether the
   grantor signed in with the account, to limit who could keep the mail. It
   went stale as soon as a way in was removed, and batch 1's rule (the

@@ -8,7 +8,7 @@ import { isTauri } from "~/lib/platform";
 import { useShortcut, useShortcuts } from "~/lib/shortcuts";
 import {
   Button,
-  Chip,
+  ChipLink,
   ChipRow,
   FocusPage,
   IconButton,
@@ -215,15 +215,9 @@ function WorkspaceFrame({ workspace, all }: { workspace: Workspace; all: Workspa
           <PhoneSubnav label={tNav("nav.settings")}>
             <ChipRow label={t("settings.sections")}>
               {sections.map((section) => (
-                <Chip
-                  key={section.id}
-                  pressed={section.current}
-                  onClick={() => {
-                    void navigate({ to: section.href });
-                  }}
-                >
+                <ChipLink key={section.id} current={section.current} {...link(section.href)}>
                   {section.label}
-                </Chip>
+                </ChipLink>
               ))}
             </ChipRow>
           </PhoneSubnav>

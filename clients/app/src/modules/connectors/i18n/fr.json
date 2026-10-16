@@ -38,12 +38,13 @@
     "needsYou": "Vous devez vous reconnecter",
     "needsThem": "{{name}} doit se reconnecter",
     "throttled": "Mise en pause par {{provider}} pendant quelques minutes",
-    "failing": "Pas de synchronisation — nous continuons d’essayer"
+    "failing": "Pas de synchronisation — nous continuons d’essayer",
+    "needsAnother": "Le membre qui l’a reliée doit se reconnecter"
   },
   "disconnect": {
     "question": "Déconnecter {{address}} ? Campbooks arrête de la synchroniser et renonce à son accès chez {{provider}}.",
     "confirm": "Déconnecter",
-    "cancel": "La garder",
+    "cancel": "Ne pas déconnecter",
     "done": "{{address}} est déconnectée",
     "choice": "Ce que deviennent ses e-mails dans Campbooks",
     "delete": {
@@ -59,8 +60,7 @@
     "doneKept": "Son historique reste ici, en lecture seule. Ses e-mails sont toujours chez {{provider}}.",
     "wayIn": {
       "removed": "Ce compte cesse aussi d’être un moyen de connexion à Campbooks : vous l’avez ajouté en reliant cette boîte mail.",
-      "kept": "Vous pourrez toujours vous connecter à Campbooks avec ce compte.",
-      "none": "Ce n’est pas l’un de vos moyens de connexion, donc rien ne change de ce côté."
+      "unchanged": "Votre façon de vous connecter à Campbooks ne change pas."
     },
     "errors": {
       "gone": "{{address}} est introuvable : elle est peut-être déjà déconnectée. Rechargez la page pour voir la liste à jour.",
@@ -76,7 +76,7 @@
     "loading": "Chargement des fournisseurs",
     "loadError": "Les fournisseurs que vous pouvez relier n’ont pas pu être chargés. Rechargez la page pour réessayer.",
     "signIn": "Utiliser aussi ce compte pour se connecter",
-    "signInHint": "Laissez coché pour votre propre boîte mail. Décochez pour une boîte partagée, comme support@ : elle est reliée, mais personne ne se connecte à Campbooks avec."
+    "signInHint": "Laissez coché pour votre propre boîte mail. Décochez pour une boîte partagée, comme support@ : elle est reliée, mais ne devient pas un nouveau moyen de connexion à Campbooks."
   },
   "connected": {
     "title": "Votre boîte mail est reliée",

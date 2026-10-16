@@ -25,7 +25,7 @@ function consent(overrides: Partial<MailboxConsent> = {}): MailboxConsent {
     starting: false,
     refusal: undefined,
     signInAgain: vi.fn(),
-    wayInFate: () => "kept",
+    wayInFate: () => "unchanged",
     ...overrides,
   };
 }
@@ -148,13 +148,31 @@ describe("MailboxesPage", () => {
     expect(
       screen.getByText(/the mail stays in Zoho Mail: nothing is deleted there/u),
     ).toBeVisible();
-    expect(screen.getByText(/You can still sign in to Campbooks with this account/u)).toBeVisible();
+    expect(screen.getByText(/How you sign in to Campbooks doesn’t change/u)).toBeVisible();
     expect(calls.calls.map((call) => call.route)).not.toContain(DISCONNECT(ZOHO_CONNECTION.id));
     fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
     expect(await screen.findByText("ana.duarte@example.net is disconnected")).toBeVisible();
     expect(screen.getByText(/Its mail is leaving Campbooks/u)).toBeVisible();
     expect(asked).toEqual(["?mail=delete"]);
     expect(await rows()).toHaveLength(1);
+  });
+
+  it("keeps focus on the page: back on Disconnect when cancelled, on the result when done", async () => {
+    api([CONNECTION, ZOHO_CONNECTION], { [DISCONNECT(CONNECTION.id)]: { status: 204 } });
+    renderPage();
+
+    const button = await screen.findByRole("button", { name: "Disconnect ana@example.com" });
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: "Don’t disconnect" }));
+    await waitFor(() => {
+      expect(button).toHaveFocus();
+    });
+    fireEvent.click(button);
+    fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+    const done = await screen.findByText("ana@example.com is disconnected");
+    await waitFor(() => {
+      expect(done.closest("[tabindex='-1']")).toHaveFocus();
+    });
   });
 
   it("keeps the history read-only when chosen", async () => {
@@ -194,7 +212,7 @@ describe("MailboxesPage", () => {
     expect(screen.getByRole("radio", { name: "Keep its history, read-only" })).not.toBeChecked();
   });
 
-  it("says a shared mailbox is not a way in", async () => {
+  it("says sign-in doesn’t change for a mailbox that isn’t a way in", async () => {
     mockApi({
       "GET /bff/session": { body: SESSION },
       [`GET /bff/api/v1/w/${HOUSEHOLD.id}/connections`]: {
@@ -203,11 +221,11 @@ describe("MailboxesPage", () => {
       [`GET /bff/api/v1/w/${HOUSEHOLD.id}/members`]: { body: { members: [ANA] } },
     });
     renderWithProviders(
-      <MailboxesPage workspace={HOUSEHOLD} consent={consent({ wayInFate: () => "none" })} />,
+      <MailboxesPage workspace={HOUSEHOLD} consent={consent({ wayInFate: () => "unchanged" })} />,
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "Disconnect loja@example.com" }));
-    expect(screen.getByText(/isn’t one of your ways to sign in/u)).toBeVisible();
+    expect(screen.getByText(/How you sign in to Campbooks doesn’t change/u)).toBeVisible();
   });
 
   it("treats a disconnect that finds nothing as an error, not a success", async () => {

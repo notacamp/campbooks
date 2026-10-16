@@ -55,7 +55,13 @@ export {
   type HighlightProps,
   type HighlightSegment,
 } from "./components/Highlight/Highlight";
-export { Chip, ChipRow, type ChipProps } from "./components/Chip/Chip";
+export {
+  Chip,
+  ChipLink,
+  ChipRow,
+  type ChipLinkProps,
+  type ChipProps,
+} from "./components/Chip/Chip";
 export {
   ChoiceCards,
   type ChoiceCardOption,

@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { fn } from "storybook/test";
 
 import { Button } from "../Button/Button";
-import { Chip, ChipRow } from "../Chip/Chip";
+import { ChipLink, ChipRow } from "../Chip/Chip";
 import { IconButton } from "../IconButton/IconButton";
 import { NavItem } from "../NavItem/NavItem";
 import { Segmented } from "../Segmented/Segmented";
@@ -183,9 +183,11 @@ export const PhoneSections: Story = {
       </PhoneHeader>
       <PhoneSubnav label="Settings">
         <ChipRow label="Settings sections">
-          <Chip pressed={false}>Members</Chip>
-          <Chip pressed>Mailboxes</Chip>
-          <Chip pressed={false}>Ways to sign in</Chip>
+          <ChipLink href="#members">Members</ChipLink>
+          <ChipLink href="#mailboxes" current>
+            Mailboxes
+          </ChipLink>
+          <ChipLink href="#sign-in">Ways to sign in</ChipLink>
         </ChipRow>
       </PhoneSubnav>
     </Shell>

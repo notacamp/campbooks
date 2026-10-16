@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type RefObject } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { errorStatus, problemCode } from "~/lib/api";
@@ -63,11 +63,18 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
   const members = useMembers(workspace.id);
   const providerName = useProviderName();
   const connectGroup = useRef<HTMLDivElement>(null);
+  const doneRef = useRef<HTMLDivElement>(null);
   const [chosen, setChosen] = useState<string | undefined>();
   const [confirming, setConfirming] = useState<string | undefined>();
   const [disconnected, setDisconnected] = useState<
     { address: string; provider: string; mail: MailChoice } | undefined
   >();
+
+  useEffect(() => {
+    if (disconnected !== undefined) {
+      doneRef.current?.focus();
+    }
+  }, [disconnected]);
 
   // The server marks the caller's own connections (by id, never by email).
   const mine = (connection: Connection) => connection.granted_by_you;
@@ -136,15 +143,18 @@ export function MailboxesPage({ workspace, consent, result }: MailboxesPageProps
           <Outcome result={result} connections={connections.data} />
         ) : null}
         {disconnected === undefined ? null : (
-          <Banner
-            role="status"
-            icon="check"
-            title={t("disconnect.done", { address: disconnected.address })}
-          >
-            {disconnected.mail === "keep"
-              ? t("disconnect.doneKept", { provider: disconnected.provider })
-              : t("disconnect.doneDeleted", { provider: disconnected.provider })}
-          </Banner>
+          // Focus lands here once the row it was in is gone.
+          <div ref={doneRef} tabIndex={-1}>
+            <Banner
+              role="status"
+              icon="check"
+              title={t("disconnect.done", { address: disconnected.address })}
+            >
+              {disconnected.mail === "keep"
+                ? t("disconnect.doneKept", { provider: disconnected.provider })
+                : t("disconnect.doneDeleted", { provider: disconnected.provider })}
+            </Banner>
+          </div>
         )}
         <Refusal consent={consent} />
         {connections.isPending ? (
@@ -314,6 +324,16 @@ function MailboxRow({
   const disconnect = useDisconnect(workspaceId);
   const [failed, setFailed] = useState<"gone" | "notYours" | "failed" | undefined>();
   const [mail, setMail] = useState<MailChoice>("delete");
+  const disconnectButton = useRef<HTMLButtonElement>(null);
+  // Back on Disconnect when the confirmation closes and the row stays
+  // (cancelled or refused), so focus never falls to the page.
+  const wasConfirming = useRef(false);
+  useEffect(() => {
+    if (wasConfirming.current && !confirming) {
+      disconnectButton.current?.focus();
+    }
+    wasConfirming.current = confirming;
+  }, [confirming]);
   const { address } = connection;
   const grantorName = grantor?.display_name ?? grantor?.email ?? undefined;
   const by = mine
@@ -329,9 +349,11 @@ function MailboxRow({
         return t("health.ok");
       }
       case "needs_reauth": {
-        return mine || grantorName === undefined
+        return mine
           ? t("health.needsYou")
-          : t("health.needsThem", { name: grantorName });
+          : grantorName === undefined
+            ? t("health.needsAnother")
+            : t("health.needsThem", { name: grantorName });
       }
       case "throttled": {
         return t("health.throttled", { provider: providerName });
@@ -366,6 +388,7 @@ function MailboxRow({
           ) : null}
           {mine ? (
             <Button
+              ref={disconnectButton}
               variant="ghost"
               shortcut={selected ? "connectors.disconnect" : undefined}
               aria-label={t("row.disconnectLabel", { address })}
@@ -416,7 +439,7 @@ function MailboxRow({
           <DisconnectChoice
             address={address}
             provider={providerName}
-            wayIn={consent.wayInFate(connection.provider, address)}
+            wayIn={consent.wayInFate(connection.id)}
             mail={mail}
             onMail={setMail}
           />

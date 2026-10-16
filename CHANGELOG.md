@@ -737,6 +737,7 @@ All notable changes to Campbooks Next are documented here. The format follows
   ever recorded; a test enforces it. See `deploy/README.md` → Monitoring.
 
 ### Changed
+
 - Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
   audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
   applies to an outside identity provider. Nothing to do: tokens last ten minutes, and

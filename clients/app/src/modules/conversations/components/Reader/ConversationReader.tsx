@@ -97,7 +97,8 @@ export function ConversationReader({
     (candidate) => candidate.id === conversation?.inbox_id,
   );
   const kept = inbox?.read_only === true;
-  const writable = !kept && inbox?.role !== "reader";
+  // Until the inbox is known (or if it can't be), nothing is offered.
+  const writable = inbox !== undefined && !kept && inbox.role !== "reader";
   const renderReplySlot = writable ? replySlot : undefined;
   const need = writable ? (conversation?.need ?? undefined) : undefined;
   const question = need?.trust === "check";

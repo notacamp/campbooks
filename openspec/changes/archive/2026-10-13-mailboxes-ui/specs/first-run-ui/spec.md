@@ -6,7 +6,8 @@ header and tab bar (below 48rem) with the workspace switcher, Home, Inbox
 with its streams, and Settings, and an account menu with the user's name and
 email, theme (system, light, dark), density, language and Sign out. Inside
 Settings, its sections (Members, Mailboxes, Ways to sign in) SHALL be listed
-under Settings in the sidebar and as chips under the phone header. The
+under Settings in the sidebar and as link chips under the phone header, the
+open one marked as the current page. The
 switcher SHALL open with ⌘⇧W (Ctrl+Shift+W elsewhere), list the user's
 workspaces with their accent, mark the current one, and offer to create a
 workspace. Opening a workspace SHALL apply its accent and remember it as the
