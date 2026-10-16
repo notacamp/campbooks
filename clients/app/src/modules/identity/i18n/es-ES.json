@@ -82,6 +82,10 @@
       "suspended": {
         "title": "Esta cuenta está suspendida.",
         "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
+      },
+      "not_allowed": {
+        "title": "Este Campbooks no está abierto a esta dirección.",
+        "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
       }
     }
   },
@@ -117,6 +121,10 @@
     "account_suspended": {
       "title": "Esta cuenta está suspendida.",
       "lead": "Quien gestiona este Campbooks la ha suspendido. Pídele que la restablezca."
+    },
+    "sign_in_not_allowed": {
+      "title": "Este Campbooks no está abierto a esta dirección.",
+      "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
     }
   },
   "newAccount": {
@@ -281,6 +289,10 @@
       "unknown": {
         "title": "Algo ha salido mal.",
         "lead": "No ha cambiado nada. Inténtalo de nuevo."
+      },
+      "sign_in_not_allowed": {
+        "title": "Este Campbooks no está abierto a esta dirección.",
+        "lead": "Solo pueden iniciar sesión aquí las personas aprobadas por su propietario, y no se ha guardado nada. Prueba con otra dirección o habla con quien gestiona este Campbooks."
       }
     },
     "new": "Nueva",

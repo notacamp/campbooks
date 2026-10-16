@@ -20,11 +20,11 @@ const SCREEN: [(&str, &str); 3] = [
     ("content-type", "application/json"),
 ];
 
-fn device() -> Authenticator {
+pub(crate) fn device() -> Authenticator {
     Authenticator::new(ORIGIN, "localhost")
 }
 
-async fn count(kit: &Kit, sql: &'static str) -> i64 {
+pub(crate) async fn count(kit: &Kit, sql: &'static str) -> i64 {
     sqlx::query_scalar(sql)
         .fetch_one(&kit.state.db)
         .await
@@ -32,14 +32,14 @@ async fn count(kit: &Kit, sql: &'static str) -> i64 {
 }
 
 /// A sign-in screen action: POST `body` as JSON with the CSRF header.
-async fn screen(kit: &Kit, path: &str, body: &Value) -> Response {
+pub(crate) async fn screen(kit: &Kit, path: &str, body: &Value) -> Response {
     kit.request(Method::POST, path, &SCREEN, Some(body.to_string()))
         .await
 }
 
 /// The web client's authorization request: the sign-in screen's `request`
 /// and the PKCE verifier.
-async fn waiting_request(kit: &Kit) -> (String, String) {
+pub(crate) async fn waiting_request(kit: &Kit) -> (String, String) {
     let (url, verifier) = Kit::web_authorize();
     let to_sign_in = kit.get(&url).await;
     (to_sign_in.location_query()["request"].clone(), verifier)
@@ -47,7 +47,11 @@ async fn waiting_request(kit: &Kit) -> (String, String) {
 
 /// Create an account with a passkey alone, from the sign-in screen: the
 /// `redirect` the screen is told to follow.
-async fn sign_up_with_passkey(kit: &Kit, device: &mut Authenticator, request: &str) -> String {
+pub(crate) async fn sign_up_with_passkey(
+    kit: &Kit,
+    device: &mut Authenticator,
+    request: &str,
+) -> String {
     let options = screen(
         kit,
         "/auth/passkey/sign-up/options",
@@ -62,7 +66,7 @@ async fn sign_up_with_passkey(kit: &Kit, device: &mut Authenticator, request: &s
 }
 
 /// Sign in with the device's passkey `index` from the sign-in screen.
-async fn sign_in_with_passkey(
+pub(crate) async fn sign_in_with_passkey(
     kit: &Kit,
     device: &mut Authenticator,
     index: usize,
@@ -80,14 +84,19 @@ async fn sign_in_with_passkey(
 }
 
 /// Redeem the code in `redirect`: the token response.
-async fn redeem(kit: &Kit, redirect: &str, verifier: &str) -> Value {
+pub(crate) async fn redeem(kit: &Kit, redirect: &str, verifier: &str) -> Value {
     let tokens = kit.redeem(&query(redirect)["code"], verifier).await;
     assert_eq!(tokens.status, StatusCode::OK, "{tokens:?}");
     tokens.json
 }
 
 /// Add a passkey to the account `access` belongs to: the API's answer.
-async fn add_passkey(kit: &Kit, access: &str, device: &mut Authenticator, alg: Alg) -> Response {
+pub(crate) async fn add_passkey(
+    kit: &Kit,
+    access: &str,
+    device: &mut Authenticator,
+    alg: Alg,
+) -> Response {
     let options = kit
         .api(
             Method::POST,

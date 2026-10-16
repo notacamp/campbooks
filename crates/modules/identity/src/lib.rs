@@ -136,6 +136,8 @@ fn passkey_routes() -> OpenApiRouter<AppState> {
 #[cfg(test)]
 mod admin_testkit;
 #[cfg(test)]
+mod allow_list_tests;
+#[cfg(test)]
 mod clients_tests;
 #[cfg(test)]
 mod passkey_tests;

@@ -8,6 +8,16 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **An allow-list for who may sign in (`CAMPBOOKS_SIGNUP__ALLOWED`).** A comma-separated
+  list of addresses and domains (a domain matches `*@domain` exactly, not subdomains).
+  Unset or empty changes nothing. When set, only listed people can sign in or create an
+  account, existing accounts included, and an invitation does not bypass it. It is checked
+  at the provider sign-in (the provider-verified address), when a new account is created,
+  when a way in is added, at passkey sign-in (the account needs a listed, verified address;
+  a passkey cannot create an account) and at every token exchange, so removing someone
+  cuts their access at their next refresh. Refusals land on `/sign-in?error=sign_in_not_allowed`
+  (or 403 `sign_in_not_allowed`), in all four languages, and say nothing about whether an
+  account exists.
 - **TLS library updated to rustls 0.23.46**, which fixes RUSTSEC-2026-0346 to 0349: TLS
   secrets in `Debug` output, data sent after an ECH rejection, unbounded certificate
   decompression, and a downgrade to classical key exchange.
@@ -136,6 +146,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
+  open conversation no longer drops below the list; it stays beside it. A long
+  subject, sender or address with no spaces now wraps inside the reader instead of
+  making the page wider than the screen.
 - **What needs you includes mail from before the upgrade.** Home's "What
   needs you" only showed mail that arrived after attention shipped. After
   this upgrade, each inbox's conversations from the last

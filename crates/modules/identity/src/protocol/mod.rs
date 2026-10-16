@@ -29,13 +29,14 @@ use axum::{
     extract::{DefaultBodyLimit, FromRef},
     http::HeaderMap,
 };
-use campbooks_kernel::{AppState, Error, Result};
+use campbooks_kernel::{AppState, Error, Result, config::AllowList};
 use chrono::{DateTime, Utc};
 use utoipa::openapi::OpenApi;
 use utoipa_axum::{router::OpenApiRouter, routes};
 
 use crate::{
     deps::{Deps, Issuer},
+    domain::accounts::ProviderIdentity,
     upstream::{Provider, client::Upstream},
 };
 
@@ -57,6 +58,30 @@ impl Ctx {
     /// The in-process issuer; 404 when another identity provider is used.
     pub fn issuer(&self) -> Result<&Arc<Issuer>> {
         self.deps.issuer.as_ref().ok_or(Error::NotFound)
+    }
+}
+
+impl Ctx {
+    /// Who may sign in at all (`CAMPBOOKS_SIGNUP__ALLOWED`). Startup rejects
+    /// a malformed list; should one get here anyway, nobody is let in.
+    pub fn allow_list(&self) -> Result<AllowList> {
+        self.state
+            .config
+            .signup
+            .allow_list()
+            .map_err(|_| Error::internal("CAMPBOOKS_SIGNUP__ALLOWED is malformed"))
+    }
+
+    /// Whether the allow-list lets a provider identity in: its address must
+    /// be one the provider verified, and listed.
+    pub fn permits_identity(&self, identity: &ProviderIdentity) -> Result<bool> {
+        let allow = self.allow_list()?;
+        Ok(allow.permits(
+            identity
+                .email
+                .as_deref()
+                .filter(|_| identity.email_verified),
+        ))
     }
 }
 

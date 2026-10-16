@@ -153,13 +153,13 @@ function CreateAccount({
   if (code === "sign_up_expired" || (create.isError && errorStatus(create.error) === 404)) {
     return <Gone leave={leave} />;
   }
-  if (code === "signup_invite_only") {
-    // Nothing was kept: the only way on is another (invited) account.
+  if (code === "signup_invite_only" || code === "sign_in_not_allowed") {
+    // Nothing was kept: the only way on is another (invited or approved) account.
     return (
       <Simple
         visor="unsure"
-        title={t("errors.signup_invite_only.title").replace(/\.$/u, "")}
-        lead={t("errors.signup_invite_only.lead")}
+        title={t(`errors.${code}.title`).replace(/\.$/u, "")}
+        lead={t(`errors.${code}.lead`)}
         action={
           <Button
             variant="primary"

@@ -513,19 +513,30 @@ impl Kit {
     /// A fresh world whose instance has signup `policy`, where `invited`
     /// addresses have a pending invitation.
     pub async fn with_signup(db: PgPool, policy: SignupPolicy, invited: &[&str]) -> Self {
-        Self::build(db, policy, invited, None, true).await
+        Self::build(db, policy, invited, None, true, None).await
+    }
+
+    /// Like [`with_signup`](Self::with_signup), with the allow-list
+    /// `CAMPBOOKS_SIGNUP__ALLOWED` set to `allowed`.
+    pub async fn with_allowed(
+        db: PgPool,
+        policy: SignupPolicy,
+        invited: &[&str],
+        allowed: &str,
+    ) -> Self {
+        Self::build(db, policy, invited, None, true, Some(allowed)).await
     }
 
     /// A fresh world whose instance left self-registration off (the
     /// default: no dynamic registration, no metadata documents).
     pub async fn without_self_registration(db: PgPool) -> Self {
-        Self::build(db, SignupPolicy::Open, &[], None, false).await
+        Self::build(db, SignupPolicy::Open, &[], None, false, None).await
     }
 
     /// A fresh world whose Google client was registered with the callback
     /// path `redirect_path` (`CAMPBOOKS_GOOGLE__REDIRECT_PATH`).
     pub async fn with_google_redirect_path(db: PgPool, redirect_path: &str) -> Self {
-        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path), true).await
+        Self::build(db, SignupPolicy::Open, &[], Some(redirect_path), true, None).await
     }
 
     async fn build(
@@ -534,6 +545,7 @@ impl Kit {
         invited: &[&str],
         redirect_path: Option<&str>,
         self_registration: bool,
+        allowed: Option<&str>,
     ) -> Self {
         let google = TestIdp::start().await;
         let microsoft = TestIdp::start().await;
@@ -544,6 +556,7 @@ impl Kit {
         // Plain-http public URL (the tests' localhost): development only.
         config.env = campbooks_kernel::config::Environment::Development;
         config.signup.policy = policy;
+        config.signup.allowed = allowed.map(str::to_owned);
         let mut deps = Deps::from_figment(
             &Figment::from(Serialized::defaults(serde_json::json!({
                 "oauth": {
