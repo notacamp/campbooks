@@ -1,5 +1,6 @@
-//! The `decide` role against mock providers: `laya-serve` (`POST /v1/systemone`)
-//! and an OpenAI-compatible instruct model.
+//! The `decide` role against mock providers: `laya-serve` (`POST /v1/systemone`),
+//! Jev through the decisions endpoint of a router (the same protocol at another
+//! path) and an OpenAI-compatible instruct model.
 
 // Helpers outside `#[test]` fns are not covered by clippy's test exemptions.
 #![allow(clippy::unwrap_used)]
@@ -101,6 +102,68 @@ fn laya_response() -> Value {
             "detection": null, "workflow": null
         }
     })
+}
+
+/// A response in the shape Jev returns through its router: the answers as
+/// Laya's, plus fields the gateway does not read.
+fn jev_response() -> Value {
+    json!({
+        "model": "typesafe/jev-1.13-20261014",
+        "answers": {
+            "category": {
+                "type": "choice", "choice": "invoice",
+                "probabilities": {"invoice": 0.97, "newsletter": 0.02, "personal": 0.01},
+                "confidence": 1
+            },
+            "urgency": {
+                "type": "score", "score": 0.01,
+                "legend": {"0": "no reply needed", "1": "reply this week", "2": "reply today"},
+                "probabilities": {"0": 0.99, "1": 0.01, "2": 0.0},
+                "confidence": 0.98
+            },
+            "asks_user": {"type": "noul", "noul": 0.25}
+        },
+        "usage": {"input_tokens": 438, "output_tokens": 79, "cost": 1.8e-05},
+        "id": "gen-dec-1",
+        "provider": "TypeSafe"
+    })
+}
+
+#[tokio::test]
+async fn jev_is_reached_at_the_configured_path_with_the_laya_body() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/api/alpha/decisions"))
+        .and(header("authorization", "Bearer router-key"))
+        .and(body_partial_json(json!({
+            "model": "typesafe/jev-1.13",
+            "questions": {"asks_user": {"type": "noul"}}
+        })))
+        .respond_with(ResponseTemplate::new(200).set_body_json(jev_response()))
+        .expect(1)
+        .mount(&server)
+        .await;
+    let provider = ProviderConfig::new(
+        format!("{}/api/alpha", server.uri()).parse().unwrap(),
+        "typesafe/jev-1.13",
+    )
+    .with_protocol(Protocol::Laya)
+    .with_path("decisions")
+    .unwrap()
+    .with_api_key("router-key");
+
+    let answers = gateway(provider)
+        .decide(&CTX, &state(), &questions())
+        .await
+        .unwrap();
+
+    let category = answers.get("category").unwrap();
+    assert_eq!(category.choice(), Some("invoice"));
+    assert_eq!(category.model, "typesafe/jev-1.13-20261014");
+    let asks = answers.get("asks_user").unwrap();
+    assert_eq!(asks.noul(), Some(false));
+    assert!((asks.confidence.unwrap() - 0.75).abs() < 1e-9);
+    assert!(answers.get("urgency").unwrap().score().unwrap() < 0.1);
 }
 
 #[tokio::test]

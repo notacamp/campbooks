@@ -38,6 +38,10 @@ resource = "conversations.inbox"
 call = "workspace_clients::require_admin("
 resource = "identity.client"
 
+[[access.helpers]]
+call = "resources::require_own("
+resource = "assistant.profile"
+
 # Functions that build the reference an `authorize` call is given: a handler
 # calling `authorize` with one names that resource type.
 [[access.references]]

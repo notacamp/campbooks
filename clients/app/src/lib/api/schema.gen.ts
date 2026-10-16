@@ -334,6 +334,41 @@ export interface paths {
         patch: operations["workspaces.update"];
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/assistant/compile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Turn your sentence into rules to check. */
+        post: operations["assistant.compile_instruction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/assistant/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Your profile, or the defaults when you never answered. */
+        get: operations["assistant.get_profile"];
+        /** Keep your profile. */
+        put: operations["assistant.update_profile"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/attention": {
         parameters: {
             query?: never;
@@ -1006,6 +1041,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the labels of the inboxes you can read. */
+        get: operations["conversations.list_labels"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/members": {
         parameters: {
             query?: never;
@@ -1178,6 +1230,23 @@ export interface paths {
         };
         /** Read the security log. */
         get: operations["workspaces.list_security_events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/senders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List who writes to the inboxes you can read. */
+        get: operations["conversations.list_senders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1912,6 +1981,23 @@ export interface components {
             /** @description The identity provider's signed logout token. */
             logout_token: string;
         };
+        /** @description Someone the sentence names without an address. */
+        Candidate: {
+            /** @description Their address. */
+            address: string;
+            /** @description Their display name. */
+            name?: string | null;
+            /**
+             * Format: int32
+             * @description Messages from them.
+             */
+            received: number;
+            /**
+             * Format: int32
+             * @description Their conversations you replied to.
+             */
+            replied: number;
+        };
         /**
          * @description What a connection lets Campbooks do with the account.
          * @enum {string}
@@ -1932,6 +2018,29 @@ export interface components {
          * @enum {string}
          */
         ClientType: "confidential" | "public";
+        /**
+         * @description What came of the sentence.
+         * @enum {string}
+         */
+        CompileOutcome: "rules" | "unsupported" | "unclear";
+        /** @description The sentence to compile. */
+        CompileRequest: {
+            /**
+             * @description What you want, in your own words (at most 300 characters).
+             * @example anything from my accountant always matters
+             */
+            text: string;
+        };
+        /** @description What Scout understood. Nothing is saved. */
+        CompileResult: {
+            /** @description Rules to check, something rules can't do, or unclear. */
+            outcome: components["schemas"]["CompileOutcome"];
+            /** @description The rules, at most three. */
+            proposals: components["schemas"]["Proposal"][];
+            /** @description The sentence as used, to keep as the rule's `origin_text`. */
+            text: string;
+            unsupported?: components["schemas"]["UnsupportedReason"] | null;
+        };
         /** @description Yes to a question. */
         Confirm: {
             /** @description The message the question the member saw comes from. */
@@ -2284,8 +2393,8 @@ export interface components {
         /** @description One answer of the decide pass about the newest inbound message. */
         DecisionView: {
             /**
-             * @description Whether it changed anything. In this version only a confident rules
-             *     stream answer may; every other answer is a suggestion.
+             * @description Whether it changed anything: the policy let it act (a stream answer
+             *     only when it placed the conversation). The others are suggestions.
              */
             acted: boolean;
             /**
@@ -2456,6 +2565,11 @@ export interface components {
          */
         HeaderField: "list_id" | "list_unsubscribe" | "precedence" | "auto_submitted";
         /**
+         * @description A header a condition may test.
+         * @enum {string}
+         */
+        HeaderKey: "list_id" | "list_unsubscribe" | "auto_submitted" | "precedence";
+        /**
          * @description How a connection is doing.
          * @enum {string}
          */
@@ -2545,6 +2659,18 @@ export interface components {
          * @description InboxId (UUIDv7)
          */
         InboxId: string;
+        /** @description A label of an inbox. */
+        InboxLabel: {
+            /** @description The label. */
+            id: components["schemas"]["LabelId"];
+            /** @description Its inbox. */
+            inbox: components["schemas"]["InboxId"];
+            /**
+             * @description Its name.
+             * @example Clients
+             */
+            name: string;
+        };
         /** @description The inboxes, by address. */
         InboxList: {
             /** @description The inboxes. */
@@ -2574,6 +2700,11 @@ export interface components {
              */
             read_only: boolean;
             role?: components["schemas"]["InboxRole"] | null;
+            /**
+             * @description Whether someone other than the caller holds a role on it (for a
+             *     client token: more than one member). Never says who.
+             */
+            shared: boolean;
             /**
              * Format: int32
              * @description Unread inbound messages in conversations still in the inbox.
@@ -2701,6 +2832,11 @@ export interface components {
          * @description LabelId (UUIDv7)
          */
         LabelId: string;
+        /** @description Labels, by inbox then name. */
+        LabelList: {
+            /** @description The labels. */
+            labels: components["schemas"]["InboxLabel"][];
+        };
         /** @description A label as shown on a conversation. */
         LabelView: {
             /** @description The label. */
@@ -2844,7 +2980,8 @@ export interface components {
             basis: components["schemas"]["NeedBasis"];
             /**
              * Format: date
-             * @description When it is due.
+             * @description When it is due: none until a due date is extracted from the mail
+             *     (needs raised before ADR 0018 may carry one).
              */
             due_on?: string | null;
             /** @description The message it comes from. */
@@ -2857,9 +2994,9 @@ export interface components {
             /** @description Why. */
             reason: components["schemas"]["NeedReason"];
             /**
-             * @description The rule that decided it (`signals.reply_asked`, …), for the sentence
-             *     the client words it with.
-             * @example signals.reply_asked
+             * @description The rule that decided it (`model.decide`, …), for the sentence the
+             *     client words it with.
+             * @example model.decide
              */
             rule?: string | null;
             /** @description `sure`, or `check` for a question to the member. */
@@ -2984,6 +3121,12 @@ export interface components {
             subject: string;
         };
         /**
+         * @description Whether rules Scout proposes from a member's own corrections may start
+         *     on their own (in an inbox only they use) or wait for a yes.
+         * @enum {string}
+         */
+        Proactivity: "ask_first" | "act_then_tell";
+        /**
          * @description RFC 9457 problem details.
          * @example {
          *       "code": "not_found",
@@ -3017,6 +3160,117 @@ export interface components {
              *     says it all.
              */
             type: string;
+        };
+        /** @description The profile to keep. */
+        ProfileUpdate: {
+            /** @description Whether you answered or put off the questions (keeps the first time). */
+            asked: boolean;
+            /** @description How rules Scout proposes from your corrections start. */
+            proactivity: components["schemas"]["Proactivity"];
+        };
+        /** @description What the member told Scout. */
+        ProfileView: {
+            /**
+             * Format: date-time
+             * @description When you answered or put off the questions; `None` until then.
+             */
+            asked_at?: string | null;
+            /** @description How rules Scout proposes from your corrections start. */
+            proactivity: components["schemas"]["Proactivity"];
+            /**
+             * Format: int32
+             * @description Grows by one on every change; 0 before the first.
+             */
+            revision: number;
+        };
+        /** @description One rule to check. */
+        Proposal: {
+            /** @description What it does. */
+            actions: components["schemas"]["ProposedAction"][];
+            /** @description All must hold; without the sender while `who` is unanswered. */
+            conditions: components["schemas"]["ProposedCondition"][];
+            /** @description The inboxes it can be taught in (where you may send). */
+            inboxes: components["schemas"]["ProposalInbox"][];
+            who?: components["schemas"]["WhoQuestion"] | null;
+        };
+        /** @description An inbox a rule can be taught in. */
+        ProposalInbox: {
+            /** @description Its address. */
+            address: string;
+            /** @description The inbox. */
+            id: string;
+            /** @description Someone else uses it too: the rule would act for everyone there. */
+            shared: boolean;
+        };
+        /** @description What a rule does. */
+        ProposedAction: {
+            /** @enum {string} */
+            action: "move_to_stream";
+            /** @description The stream. */
+            stream: components["schemas"]["StreamKey"];
+        } | {
+            /** @enum {string} */
+            action: "archive";
+        } | {
+            /** @enum {string} */
+            action: "add_label";
+            /** @description The label. */
+            label: string;
+        } | {
+            /** @enum {string} */
+            action: "mark_read";
+        } | {
+            /** @enum {string} */
+            action: "needs_reply";
+            /** @description Yes or no. */
+            value: boolean;
+        } | {
+            /** @enum {string} */
+            action: "asks_action";
+            /** @description Yes or no. */
+            value: boolean;
+        } | {
+            /** @enum {string} */
+            action: "surface";
+            /** @description Which. */
+            value: components["schemas"]["SurfaceKey"];
+        };
+        /** @description One test on a message; all of a rule's conditions must hold. */
+        ProposedCondition: {
+            /** @enum {string} */
+            field: "sender_address";
+            /** @description The sender's address is this one. */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "sender_domain";
+            /** @description The sender's domain is this one, or a subdomain of it. */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "subject_contains";
+            /** @description The subject holds these words, in this order. */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "header";
+            /** @description A header is present. */
+            value: components["schemas"]["ProposedHeader"];
+        } | {
+            /** @enum {string} */
+            field: "label";
+            /** @description The conversation has this label (its id). */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "stream";
+            /** @description The conversation is in this stream. */
+            value: components["schemas"]["StreamKey"];
+        };
+        /** @description A header test: the header is present. */
+        ProposedHeader: {
+            /** @description Which header. */
+            name: components["schemas"]["HeaderKey"];
         };
         /**
          * @description An outside provider.
@@ -3068,8 +3322,8 @@ export interface components {
             /** @description What it matched (a header name, a word), possibly empty. */
             evidence: string;
             /**
-             * @description `<strategy>.<rule>`, e.g. `signals.list_header`.
-             * @example signals.list_header
+             * @description `<strategy>.<rule>`, e.g. `facts.list_mail`.
+             * @example facts.list_mail
              */
             rule: string;
             /**
@@ -3647,6 +3901,35 @@ export interface components {
              */
             version: number;
         };
+        /** @description Senders, replied to most first. */
+        SenderList: {
+            /** @description Replied to most first, then written most, then by address. */
+            senders: components["schemas"]["SenderView"][];
+        };
+        /** @description Someone who writes to the caller's inboxes. */
+        SenderView: {
+            /**
+             * @description Their address, lower-cased.
+             * @example rita@silva-contas.example
+             */
+            address: string;
+            /**
+             * @description The display name on their newest message, when it had one.
+             * @example Rita Gomes
+             */
+            name?: string | null;
+            /**
+             * Format: int32
+             * @description Inbound messages from them in the caller's inboxes, among the newest
+             *     (the last year, at most 5,000 messages).
+             */
+            received: number;
+            /**
+             * Format: int32
+             * @description Of those, their conversations the caller's inboxes replied to.
+             */
+            replied: number;
+        };
         /** @description Who is signed in. Never contains a token. */
         SessionInfo: {
             /** @description Whether the request carries a live session. */
@@ -3802,6 +4085,11 @@ export interface components {
             streams: components["schemas"]["StreamCount"][];
         };
         /**
+         * @description A stream.
+         * @enum {string}
+         */
+        StreamKey: "primary" | "updates" | "receipts" | "newsletters";
+        /**
          * @description Who put a conversation in its stream.
          * @enum {string}
          */
@@ -3853,6 +4141,11 @@ export interface components {
             /** @description Where it is in its reading. */
             phase: components["schemas"]["Phase"];
         };
+        /**
+         * @description Always or never show.
+         * @enum {string}
+         */
+        SurfaceKey: "always" | "never";
         /**
          * @description Always or never show.
          * @enum {string}
@@ -3918,6 +4211,11 @@ export interface components {
          * @enum {string}
          */
         Trust: "sure" | "check";
+        /**
+         * @description Why a sentence can't be a rule.
+         * @enum {string}
+         */
+        UnsupportedReason: "sends_mail" | "deletes_mail" | "not_about_mail" | "too_vague";
         /** @description What to change about a rule. */
         UpdateRule: {
             /** @description New actions. */
@@ -4020,6 +4318,21 @@ export interface components {
             mailbox_providers: string[];
             /** @description The providers this instance offers, in display order. */
             providers: string[];
+        };
+        /** @description "Who do you mean by …?": the person must pick or type the sender. */
+        WhoQuestion: {
+            /**
+             * @description Senders whose name, address or domain matches the phrase, replied
+             *     to most first; when none match, the people replied to most.
+             */
+            candidates: components["schemas"]["Candidate"][];
+            /** @description Whether the candidates matched the phrase. */
+            matched: boolean;
+            /**
+             * @description The words from the sentence.
+             * @example my accountant
+             */
+            phrase: string;
         };
         /** @description A workspace client, as settings show it. Never its secret. */
         WorkspaceClient: {
@@ -5142,6 +5455,209 @@ export interface operations {
                 };
             };
             /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.compile_instruction": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompileRequest"];
+            };
+        };
+        responses: {
+            /** @description What Scout understood; nothing is saved. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CompileResult"];
+                };
+            };
+            /** @description Empty, too long, a link or pasted mail (`instruction_empty`, `instruction_too_long`, `instruction_has_link`, `instruction_pasted_mail`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`profile_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No language model may read sentences here (`compile_unavailable`): build the rule by hand. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Too many sentences this hour. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The language model failed (`compile_failed`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.get_profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Your profile. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`profile_needs_member`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "assistant.update_profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdate"];
+            };
+        };
+        responses: {
+            /** @description Your profile afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileView"];
+                };
+            };
+            /** @description A value outside the allowed set. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not a member (`profile_needs_member`). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7805,6 +8321,56 @@ export interface operations {
             };
         };
     };
+    "conversations.list_labels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The labels. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LabelList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "workspaces.list_members": {
         parameters: {
             query?: never;
@@ -8600,6 +9166,74 @@ export interface operations {
                 };
             };
             /** @description Missing scope, or not an owner or admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such workspace, or you are not a member. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_senders": {
+        parameters: {
+            query?: {
+                /**
+                 * @description Words (2 to 100 characters) every listed sender's address, display
+                 *     name or domain contains, ignoring case and accents. Without it, the
+                 *     senders replied to most.
+                 */
+                q?: string;
+                /** @description How many, 1 to 10 (default 10). */
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The senders. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SenderList"];
+                };
+            };
+            /** @description A `q` or `limit` out of range (`invalid_senders_query`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
             403: {
                 headers: {
                     [name: string]: unknown;

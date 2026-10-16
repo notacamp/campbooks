@@ -134,6 +134,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   cleaned message. Errors already stored are left as they are.
 
 ### Removed
+- **Due dates on needs, until they are extracted from the mail.** A need no longer
+  carries a due date guessed from words like "Friday" or "end of the month"; it will
+  again once a model extracts the date (a follow-up of ADR 0018). Needs raised before
+  the upgrade keep theirs.
 - **Rauthy is gone from the shipped stack** (ADR 0014, last slice). `deploy/compose.yaml`
   no longer has the `idp`, `idp-init` and `idp-provision` services or the `idp-data`
   volume, `deploy/idp/` is deleted, and the stack no longer sets
@@ -156,6 +160,24 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **A decision model sorts mail and raises needs; rules only read headers and can
+  only say no** (ADR 0018). Every phrase list and regular expression that read an
+  email's subject, body or attachment names is gone. What is left reads structured
+  facts only: list mail (`List-Id`, `List-Unsubscribe`, a bulk `Precedence`), mail
+  sent automatically (`Auto-Submitted`) and no-reply senders need no reply, and that
+  "no" wins over the model's "yes". The `decide` model's answers now act where the
+  eval shows they hold their target: it places a new conversation in a stream
+  (stream source `model`, never over a member's move) and raises its need (`pay` is
+  an action asked by mail it sorted to Receipts). Without a trusted `decide` model,
+  mail stays in Primary and no need is raised beyond what the headers settle. The
+  upgrade keeps the old rules' answers as a record but stops them counting,
+  withdraws the needs only they raised, and asks a trusted model again about each
+  recent conversation's newest message. `CAMPBOOKS_AI__DECIDE__PATH` sets where
+  decide requests go (default `systemone` for Laya, `chat/completions` for an
+  instruct model), so a hosted decision model such as Jev through OpenRouter can
+  serve `decide` (see `deploy/README.md`; mail leaves the instance only with
+  `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`). The shipped defaults stay
+  open-weight.
 - Admin → People marks people whose account is suspended, and Admin →
   Signups → Codes says what a code is: good for the number of signups set
   when it is minted, until it is used up, expires or is revoked.
@@ -167,6 +189,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **Notifications with a question mark no longer ask for a reply.** "Your order has
+  shipped. Questions? Contact our support team." raised a Reply need, because a rule
+  read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
+  Automated mail (a calendar invitation, a support notice) becomes something to do
+  only when the model also finds a deadline in it, and a newsletter never does.
 - **A connected mailbox no longer loses its way to sign in to the cleanup.**
   The background cleanup that removes a way to sign in left behind by a
   mailbox connect that never finished now checks that the mailbox really
@@ -239,6 +266,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   month asks whether to keep it. The rules list for Scout's memory is ready
   for its page. Demo: `pnpm --dir clients fake-google --lookalikes 24` and
   `pnpm --dir clients record teach-once`.
+- **Tell Scout what you care about** (campbooks-cloud#121): three optional
+  questions offered on Home after mail is connected (whose mail always
+  reaches you, what never needs you, and whether Scout should ask first),
+  and a "Teach Scout" box in Scout's memory. Answers and sentences become
+  rules you check before saving; saved rules run without AI. Teaching in
+  your own words uses the `complete` AI role only when you press Enter, and
+  sends it only your sentence and your own addresses and label names, never
+  your mail. Without a `complete` role, Scout's memory offers a rule builder
+  instead. Scout's memory is a Settings section (Settings → Scout's memory)
+  and lists your rules. If saving stops partway, Try again saves only what
+  is missing, and the count you see is what was saved. Keys: `T` / `Shift+T`
+  on the Home offer, `B` to go back, `Q` in Scout's memory, `⌘↵` to save a
+  rule. New migrations: the `assistant` schema, and an index on received
+  mail built without blocking writes; nothing to do.
 - **Rules you teach, applied to the mail that looks the same.** A taught rule
   says which mail it is about (the sender, its domain, a mailing list, the
   subject's template or words, a header, a label or a stream) and what to do

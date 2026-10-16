@@ -264,7 +264,8 @@ impl FromStr for Stream {
 pub enum StreamSource {
     /// Nobody: no accepted answer, so Primary.
     Default,
-    /// An accepted rules answer.
+    /// An accepted rules answer (a test policy's; the facts never answer
+    /// the stream).
     Rules,
     /// An accepted model answer.
     Model,
@@ -440,7 +441,8 @@ vocabulary!(
 vocabulary!(
     /// Whose answer raised a need.
     NeedBasis {
-        /// The shared email signals.
+        /// The facts (headers and addresses; only ever a "no", so only in
+        /// answers stored before ADR 0018).
         Rules => "rules",
         /// The `decide` model.
         Model => "model",

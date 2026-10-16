@@ -131,6 +131,20 @@ recent laptop).
   `convaiinnovations/laya` (English only, 512 tokens) and
   `convaiinnovations/laya-typed-decisions`; the image preloads only the multilingual
   one, so set `LAYA_MODELS` on the service too.
+- **Jev, a hosted decision model, instead** (ADR 0018). Jev speaks Laya's protocol and
+  is served through OpenRouter at another path: set `CAMPBOOKS_AI__DECIDE__PROTOCOL=laya`,
+  `CAMPBOOKS_AI__DECIDE__BASE_URL=https://openrouter.ai/api/alpha`,
+  `CAMPBOOKS_AI__DECIDE__PATH=decisions`, `CAMPBOOKS_AI__DECIDE__MODEL=typesafe/jev-1.13`
+  and your OpenRouter key as `CAMPBOOKS_AI__DECIDE__API_KEY`. It is closed and hosted in
+  the US: every inbound email's sender, recipients, subject, list headers, attachment
+  names and first 1,500 characters go to OpenRouter and TypeSafe. Campbooks refuses to
+  send them until you opt in with `CAMPBOOKS_AI__DECIDE__EXTERNAL_CONTENT=allow`; read
+  their region, retention and processing terms first. The shipped defaults stay
+  open-weight.
+- **What runs without a model.** Understanding what an email says is the model's job
+  (ADR 0018). With no `decide` role, or one failing its answers check, Campbooks reads
+  headers and addresses only: list mail, automatic mail and no-reply senders need no
+  reply, mail stays in Primary, and no need is raised.
 - **An instruct model instead.** Set `CAMPBOOKS_AI__DECIDE__PROTOCOL=openai` and point
   `decide` at any OpenAI-compatible endpoint (Ollama, vLLM, a hosted provider). It
   answers the same questions with JSON-schema output. Probabilities come from token

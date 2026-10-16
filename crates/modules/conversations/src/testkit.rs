@@ -1,11 +1,13 @@
 //! Test fixtures: the module over a database whose connections run as the
 //! runtime role (row-level security applies, as in production), a test
 //! identity provider, a stand-in for the workspaces module's membership
-//! port, in-memory blobs, and the recorded batches in `fixtures/`.
+//! port, in-memory blobs, the recorded batches in `fixtures/`, and a
+//! scripted model ([`Scripted`]) answering for the fixtures' senders.
 
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
+    time::Instant,
 };
 
 use axum::{
@@ -13,7 +15,15 @@ use axum::{
     body::Body,
     http::{HeaderMap, Method, Request, StatusCode, header},
 };
-use campbooks_ai::decide::signals::email::triage;
+use campbooks_ai::{
+    Error as AiError,
+    decide::{
+        Answer, AnswerValue, Question, QuestionKind,
+        check::stamp,
+        signals::email::{Envelope, triage},
+        strategy::{BoxFuture, Decided, Decisions, Reason, Strategy},
+    },
+};
 use campbooks_kernel::{
     AppState, Error,
     auth::{Principal, PrincipalKind},
@@ -389,18 +399,304 @@ impl Kit {
     }
 }
 
-/// The shipped email signals, with stream placement enabled at 0.9 (the
-/// shipped baseline lets no stream answer act yet). Needs are raised
-/// whatever the fixtures' dates (`needs_window_days`), so tests do not drift
-/// with the calendar.
+/// The shipped facts as rules and the [`Scripted`] model in place of the
+/// `decide` role, under the shipped facts' switch and a test policy for the
+/// model: every question acts from 0.9. Needs are raised and the model is
+/// asked whatever the fixtures' dates (`needs_window_days`,
+/// `decide_backfill_days`), so tests do not drift with the calendar.
 pub fn sorting_deps() -> ConversationsDeps {
-    let mut deps = ConversationsDeps::offline().with_policy(Policy::baseline().with(
+    let mut policy = Policy::baseline();
+    for question in [
         triage::STREAM,
-        Source::Rules,
-        Switch::ActAbove(0.9),
-    ));
+        triage::NEEDS_REPLY,
+        triage::ASKS_ACTION,
+        triage::HAS_DEADLINE,
+        triage::URGENCY,
+        triage::SUSPICIOUS,
+    ] {
+        policy = policy.with(question, Source::Model, Switch::ActAbove(0.9));
+    }
+    let mut deps = ConversationsDeps::offline()
+        .with_policy(policy)
+        .with_model(Arc::new(Scripted::fixtures()));
     deps.config.needs_window_days = 36_500;
+    deps.config.decide_backfill_days = 36_500;
     deps
+}
+
+/// What a scripted strategy answers about one sender's mail: per question,
+/// the answer and its confidence.
+pub type Script = Vec<(&'static str, AnswerValue, f64)>;
+
+/// A strategy answering from a script keyed by the sender's address: the
+/// model a test stands in for (named `scripted`, its answers stamped as
+/// given under a passed answers check), or a test's rules. A sender not in
+/// the script, or a question not in its line, is abstained on. A sender who
+/// writes twice in the fixtures has a line per message too
+/// ([`Scripted::followup`]), found by the message's exact subject: the
+/// fixture's identity, a canned answer, never a rule.
+pub struct Scripted {
+    name: &'static str,
+    stamped: bool,
+    by_sender: HashMap<String, Script>,
+    by_message: HashMap<(String, String), Script>,
+}
+
+impl Scripted {
+    /// A model answering `by_sender`.
+    pub fn model<S: Into<String>>(by_sender: impl IntoIterator<Item = (S, Script)>) -> Self {
+        Self {
+            name: "scripted",
+            stamped: true,
+            by_sender: by_sender
+                .into_iter()
+                .map(|(sender, script)| (sender.into(), script))
+                .collect(),
+            by_message: HashMap::new(),
+        }
+    }
+
+    /// The same script, answering `script` for `sender`'s message
+    /// `subject`.
+    #[must_use]
+    pub fn followup(mut self, sender: &str, subject: &str, script: Script) -> Self {
+        self.by_message
+            .insert((sender.to_owned(), subject.to_owned()), script);
+        self
+    }
+
+    /// Rules (unstamped) answering `by_sender`.
+    pub fn rules<S: Into<String>>(by_sender: impl IntoIterator<Item = (S, Script)>) -> Self {
+        Self {
+            name: "test-rules",
+            stamped: false,
+            ..Self::model(by_sender)
+        }
+    }
+
+    /// The model as a good one reads the fixtures' mail, sure of every
+    /// answer (0.97): a person's question needs a reply, a request is an
+    /// action, a bill from a service is in Receipts and asks for payment, a
+    /// look-alike asking for a password is phishing, lists and
+    /// notifications ask nothing.
+    pub fn fixtures() -> Self {
+        // Pedro writes again about the lease, asking nothing new.
+        Self::model(fixture_answers()).followup(
+            "pedro.alves@example.com",
+            "Re: Lease for the studio",
+            script("primary", false, false, false, 0.0, false),
+        )
+    }
+}
+
+/// `answers` for one sender: stream, needs reply, asks action, has a
+/// deadline, urgency level, suspicious; all at 0.97.
+// One flag per yes/no question, in the questions' order: a table row.
+#[allow(clippy::fn_params_excessive_bools)]
+pub fn script(
+    stream: &str,
+    reply: bool,
+    action: bool,
+    deadline: bool,
+    urgency: f64,
+    suspicious: bool,
+) -> Script {
+    let at = 0.97;
+    vec![
+        (triage::STREAM, AnswerValue::Choice(stream.to_owned()), at),
+        (triage::NEEDS_REPLY, AnswerValue::Noul(reply), at),
+        (triage::ASKS_ACTION, AnswerValue::Noul(action), at),
+        (triage::HAS_DEADLINE, AnswerValue::Noul(deadline), at),
+        (triage::URGENCY, AnswerValue::Score(urgency), at),
+        (triage::SUSPICIOUS, AnswerValue::Noul(suspicious), at),
+    ]
+}
+
+fn fixture_answers() -> Vec<(&'static str, Script)> {
+    vec![
+        // en: a colleague's review with a deadline, a newsletter, a sign-in
+        // alert.
+        (
+            "maya@northwind-studio.example",
+            script("primary", true, true, true, 1.0, false),
+        ),
+        (
+            "hello@letters.paperkite.example",
+            script("newsletters", false, false, false, 0.0, false),
+        ),
+        (
+            "no-reply@accounts.cloudvault.example",
+            script("updates", false, false, false, 0.0, false),
+        ),
+        // pt-PT: a water bill, a friend's dinner question, a promotion.
+        (
+            "faturacao@aguas-do-vale.example",
+            script("receipts", false, true, true, 1.0, false),
+        ),
+        (
+            "rui.tavares@correio.example",
+            script("primary", true, false, false, 1.0, false),
+        ),
+        (
+            "novidades@alfarroba.example",
+            script("newsletters", false, false, false, 0.0, false),
+        ),
+        // es-ES: an invoice a supplier sent by hand, a list digest.
+        (
+            "administracion@harinas-del-sur.example",
+            script("primary", false, true, true, 1.0, false),
+        ),
+        (
+            "boletin@gremio-panaderos.example",
+            script("newsletters", false, false, false, 0.0, false),
+        ),
+        // fr: a shipping update, a receipt, a neighbour's leak.
+        (
+            "suivi@colis-rapide.example",
+            script("updates", false, false, false, 0.0, false),
+        ),
+        (
+            "caisse@boulangerie-halles.example",
+            script("receipts", false, false, false, 0.0, false),
+        ),
+        (
+            "hugo.bernard@courriel.example",
+            script("primary", true, true, false, 2.0, false),
+        ),
+        // needs: a question, a lease to sign, a bill, phishing, lunch.
+        (
+            "marta@casa-lume.example",
+            script("primary", true, false, true, 1.0, false),
+        ),
+        (
+            "pedro.alves@example.com",
+            script("primary", false, true, true, 1.0, false),
+        ),
+        (
+            "billing@acme-hosting.example",
+            script("receipts", false, true, true, 1.0, false),
+        ),
+        (
+            "it-support@at3lier-sol.example",
+            script("updates", false, true, true, 2.0, true),
+        ),
+        (
+            "jonas@weber-studio.example",
+            script("primary", true, false, false, 1.0, false),
+        ),
+    ]
+}
+
+impl Strategy for Scripted {
+    fn name(&self) -> &str {
+        self.name
+    }
+
+    fn decide<'a>(
+        &'a self,
+        envelope: &'a Envelope,
+        questions: &'a [Question],
+    ) -> BoxFuture<'a, Result<Decisions, AiError>> {
+        Box::pin(async move {
+            let started = Instant::now();
+            let sender = envelope.from.address.to_lowercase();
+            let script = self
+                .by_message
+                .get(&(sender.clone(), envelope.subject.clone()))
+                .or_else(|| self.by_sender.get(&sender));
+            let answers = questions
+                .iter()
+                .map(|q| {
+                    let (_, value, confidence) =
+                        script?.iter().find(|(id, ..)| *id == q.id)?.clone();
+                    Some(Decided {
+                        answer: Answer {
+                            question_id: q.id.clone(),
+                            probabilities: Some(probabilities(q, &value, confidence)),
+                            value,
+                            confidence: Some(confidence),
+                            model: self.name.to_owned(),
+                            model_version: self.stamped.then(|| stamp(None)),
+                            latency: started.elapsed(),
+                        },
+                        reasons: vec![Reason::new(
+                            if self.stamped {
+                                "model.decide"
+                            } else {
+                                "test.scripted"
+                            },
+                            self.name,
+                        )],
+                    })
+                })
+                .collect();
+            Ok(Decisions {
+                answers,
+                remote_calls: u32::from(self.stamped),
+            })
+        })
+    }
+}
+
+/// A model that answers only once it is let in ([`Gated::open`]); before
+/// that it is a model that has not passed its answers check, so the pass
+/// stores nothing.
+pub struct Gated {
+    open: std::sync::atomic::AtomicBool,
+    model: Scripted,
+}
+
+impl Gated {
+    /// `model`, not let in yet.
+    pub fn closed(model: Scripted) -> Arc<Self> {
+        Arc::new(Self {
+            open: false.into(),
+            model,
+        })
+    }
+
+    /// Let it answer from now on.
+    pub fn open(&self) {
+        self.open.store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+}
+
+impl Strategy for Gated {
+    fn name(&self) -> &str {
+        self.model.name()
+    }
+
+    fn decide<'a>(
+        &'a self,
+        envelope: &'a Envelope,
+        questions: &'a [Question],
+    ) -> BoxFuture<'a, Result<Decisions, AiError>> {
+        if self.open.load(std::sync::atomic::Ordering::SeqCst) {
+            self.model.decide(envelope, questions)
+        } else {
+            Box::pin(async { Err(AiError::AnswersNotTrusted) })
+        }
+    }
+}
+
+/// Probabilities in question order putting `confidence` on `value`.
+fn probabilities(question: &Question, value: &AnswerValue, confidence: f64) -> Vec<f64> {
+    let n = question.option_count();
+    #[allow(clippy::cast_precision_loss)] // a handful of options
+    let rest = (1.0 - confidence) / (n - 1) as f64;
+    let index = match (value, &question.kind) {
+        (AnswerValue::Choice(label), QuestionKind::Choice { options, .. }) => options
+            .iter()
+            .position(|o| &o.label == label)
+            .unwrap_or_default(),
+        (AnswerValue::Noul(holds), _) => usize::from(*holds),
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)] // 0..3
+        (AnswerValue::Score(level), _) => level.round() as usize,
+        _ => 0,
+    };
+    (0..n)
+        .map(|i| if i == index { confidence } else { rest })
+        .collect()
 }
 
 /// `n` notifications from `from` (`<prefix>-0` … ids, one conversation each),

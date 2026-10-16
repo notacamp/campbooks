@@ -114,7 +114,7 @@ interface MockAnswer {
   status?: number;
   body?: unknown;
 }
-type MockHandler = MockAnswer | ((request: Request, body: unknown) => MockAnswer);
+export type MockHandler = MockAnswer | ((request: Request, body: unknown) => MockAnswer);
 
 export interface MockedApi {
   /** Every request made, as "METHOD /path" with its JSON body. */

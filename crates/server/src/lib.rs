@@ -19,6 +19,8 @@ mod access_matrix_tests;
 #[cfg(test)]
 mod admin_tests;
 #[cfg(test)]
+mod assistant_tests;
+#[cfg(test)]
 mod identity_tests;
 #[cfg(test)]
 mod rate_limit_tests;
@@ -130,6 +132,9 @@ pub struct Composition {
     /// The system module's AI gateway and the facts of this composition,
     /// for the admin system overview.
     pub system: campbooks_system::Deps,
+    /// The assistant module's AI gateway (its `complete` role compiles
+    /// members' sentences into rules to check).
+    pub assistant: campbooks_assistant::AssistantDeps,
 }
 
 impl Composition {
@@ -144,6 +149,9 @@ impl Composition {
         };
         let connectors = campbooks_connectors::Deps::from_env(config)?;
         let identity = campbooks_identity::Deps::from_env(config, &scope_catalogue())?;
+        let assistant = campbooks_assistant::AssistantDeps {
+            ai: gateway.clone(),
+        };
         let system = campbooks_system::Deps {
             ai: gateway.clone(),
             facts: facts(config, &identity, &connectors),
@@ -157,6 +165,7 @@ impl Composition {
                 campbooks_conversations::ConversationsConfig::from_env()?,
             ),
             system,
+            assistant,
         })
     }
 }
@@ -210,6 +219,7 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
         campbooks_admin::module(),
         campbooks_attention::module(),
         campbooks_search::module(),
+        campbooks_assistant::module(composition.assistant.clone()),
         // `cargo xtask new-module` inserts above this line.
     ]
 }
@@ -219,7 +229,8 @@ pub fn modules_with(composition: &Composition) -> Vec<Module> {
 /// language each user chose; the `conversations` module, who may see the
 /// change feed's records inside an inbox and search's results, and how
 /// search reads its conversations (ADR 0016); the `admin` module, who is an
-/// administrator, and keeps the trail of what they do.
+/// administrator, and keeps the trail of what they do; the `assistant`
+/// module, whether a member lets Scout act on its own proposals.
 pub fn with_ports(state: AppState) -> AppState {
     state
         .with_resources(resource_catalogue())
@@ -228,6 +239,7 @@ pub fn with_ports(state: AppState) -> AppState {
         .with_locales(campbooks_workspaces::locale_preference())
         .with_invitations(campbooks_workspaces::invitations())
         .with_visibility(campbooks_conversations::visibility())
+        .with_preferences(campbooks_assistant::preferences())
         .with_kept_mail(campbooks_conversations::kept_mail())
         .with_search_sources(SearchSources::new(vec![
             campbooks_conversations::search_source(),
@@ -382,6 +394,10 @@ fn security_scheme() -> SecurityScheme {
             conversations today. Words in English, Portuguese, Spanish and French with accents \
             ignored, Gmail-style operators, highlights as plain-text segments. Results come only \
             from the containers (inboxes) you may see, checked at query time."),
+        (name = "assistant", description = "What you told Scout about how to act, and turning \
+            a sentence you type into rules to check. Compiling uses the `complete` AI role only \
+            when you ask, and sends it your sentence and your own addresses and label names, never \
+            your mail; nothing is saved until you save a rule through the conversations module."),
         // `cargo xtask new-module` inserts above this line.
         (name = "changes", description = "The change feed: a Server-Sent Events stream per \
             workspace of the records that changed (ids only), so clients refetch only what \

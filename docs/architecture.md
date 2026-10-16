@@ -399,16 +399,18 @@ category and position, a Postgres error's SQLSTATE, constraint and table).
 
 The model is one **strategy** among several behind
 `campbooks_ai::decide::strategy::Strategy`, which all return the same
-`Answer` plus the reasons for it (for the UI's "Why?"): deterministic email
-signals (`decide::signals::email`, the single home of the triage rules: bulk
-headers, senders, attachments, cue phrases in en/pt-PT/es-ES/fr), k nearest
+`Answer` plus the reasons for it (for the UI's "Why?"): the facts
+(`decide::signals::facts`, the only deterministic strategy: list and
+automation headers, addresses, authentication results, attachment media
+types, never an email's text, and only ever a "no", ADR 0018), k nearest
 neighbours over the workspace's own corrections (`decide::knn`, on the
-`embed` role or a model-free lexical embedder), the `decide` model, and a
-`Cascade` of them that asks each later stage only the questions still open.
-Which strategy answers which question, and from which confidence, is measured
-by `cargo xtask eval decide` on a fictional labelled set
-(`crates/ai/evals/decide/mail-triage/`); CI checks that the offline strategies
-hold the committed baseline.
+`embed` role or a model-free lexical embedder), the `decide` model (Laya,
+Jev, or an instruct model), and a `Cascade` of them that asks each later
+stage only the questions still open. Which strategy answers which question,
+and from which confidence, is measured by `cargo xtask eval decide` on a
+fictional labelled set (`crates/ai/evals/decide/mail-triage/`); the
+conversations module's policy is pinned to the committed baseline's `facts`
+and `jev` runs, and CI checks that the offline strategies hold it.
 
 ## Clients
 

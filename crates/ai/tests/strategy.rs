@@ -1,6 +1,6 @@
 //! Strategies that call a model server, against mocks: the `decide` model as
 //! a strategy, k-NN over the `embed` role, and a cascade that never reaches
-//! the model when the rules already decided.
+//! the model when the facts already decided.
 
 // Helpers outside `#[test]` fns are not covered by clippy's test exemptions.
 #![allow(clippy::unwrap_used)]
@@ -12,7 +12,10 @@ use campbooks_ai::{
     decide::{
         AnswerValue, Question,
         knn::{GatewayEmbedder, InMemoryNeighbours, Knn},
-        signals::email::{EmailSignals, Envelope, Party, triage, triage_questions},
+        signals::{
+            email::{Envelope, Party, triage, triage_questions},
+            facts::EmailFacts,
+        },
         strategy::{Cascade, Model, Stage, Strategy},
     },
 };
@@ -94,7 +97,7 @@ async fn the_model_strategy_asks_decide_once_with_the_envelope_state() {
 }
 
 #[tokio::test]
-async fn a_cascade_does_not_call_the_model_when_the_signals_decided() {
+async fn a_cascade_does_not_call_the_model_when_the_facts_decided() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .respond_with(ResponseTemplate::new(500))
@@ -108,25 +111,22 @@ async fn a_cascade_does_not_call_the_model_when_the_signals_decided() {
     );
     let questions: Vec<Question> = triage_questions()
         .into_iter()
-        .filter(|q| q.id == triage::STREAM)
+        .filter(|q| q.id == triage::NEEDS_REPLY)
         .collect();
     let cascade = Cascade::new(vec![
         Stage {
-            strategy: Arc::new(EmailSignals),
-            thresholds: [(triage::STREAM.to_owned(), 0.9)].into(),
+            strategy: Arc::new(EmailFacts),
+            thresholds: [(triage::NEEDS_REPLY.to_owned(), 0.9)].into(),
         },
         Stage {
             strategy: Arc::new(model),
-            thresholds: [(triage::STREAM.to_owned(), 0.0)].into(),
+            thresholds: [(triage::NEEDS_REPLY.to_owned(), 0.0)].into(),
         },
     ]);
-    assert_eq!(cascade.name(), "signals>laya");
+    assert_eq!(cascade.name(), "facts>laya");
     let out = cascade.decide(&newsletter(), &questions).await.unwrap();
     let decided = out.answers[0].as_ref().unwrap();
-    assert_eq!(
-        decided.answer.value,
-        AnswerValue::Choice("newsletters".into())
-    );
+    assert_eq!(decided.answer.value, AnswerValue::Noul(false));
     assert_eq!(out.remote_calls, 0);
 }
 
