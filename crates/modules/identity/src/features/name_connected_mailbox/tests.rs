@@ -302,3 +302,21 @@ async fn a_retried_connect_writes_its_record_afresh(db: PgPool) {
         .unwrap();
     assert_eq!(other, Recorded::Inserted);
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_record_the_connectors_module_cannot_answer_for_stays(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let access = kit.signed_up().await;
+    let ws = WorkspaceId::new();
+    connected_unnamed(&kit, &access, ws, "work-sam").await;
+    // Whether its connection exists is unknown: the port fails.
+    kit.intake.drop_connections();
+    kit.intake.cannot_answer();
+
+    prune_after(&kit, 48).await;
+    // Nothing is decided on a guess: the record, the way in and the
+    // announcements are as they were.
+    assert_eq!(records(&kit).await, vec![(*ws.as_uuid(), None)]);
+    assert!(addresses(&kit.ways_in(&access).await).contains(&"work-sam@example.com".to_owned()));
+    assert_eq!(removals(&kit).await, 0);
+}
