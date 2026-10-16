@@ -649,13 +649,15 @@ async fn a_skipped_first_need_is_worked_out_by_a_follow_up(db: PgPool) {
         .await
         .unwrap();
 
-    // Skipped twice: nothing stored, exactly one follow-up job.
+    // Skipped twice: nothing stored, one follow-up job per deferral (never
+    // a unique key, which would drop one made while a job runs).
     refreshed(&kit, workspace, &conversation).await;
     refreshed(&kit, workspace, &conversation).await;
     assert_eq!(needs_stored(&db, &conversation).await, 0);
-    assert_eq!(pending_refreshes(&db).await, 1);
+    assert_eq!(pending_refreshes(&db).await, 2);
 
-    // Still held when the job first runs: it retries, keeping its key.
+    // Still held when the jobs first run: they wait out their lock timeout
+    // and retry.
     sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
         .execute(&db)
         .await
@@ -665,12 +667,54 @@ async fn a_skipped_first_need_is_worked_out_by_a_follow_up(db: PgPool) {
         .await;
     assert_eq!(stats.failed, 0, "{stats:?}");
     assert_eq!(needs_stored(&db, &conversation).await, 0);
-    assert_eq!(pending_refreshes(&db).await, 1);
+    assert_eq!(pending_refreshes(&db).await, 2);
 
     // The writer commits; the follow-up stores the open need.
     writer.commit().await.unwrap();
     run_refreshes(&kit, &db).await;
     assert_eq!(pending_refreshes(&db).await, 0);
+    let marta = summary(&kit, &sam, workspace, "needs-1").await;
+    assert_eq!(marta["need"]["reason"], "reply", "{marta}");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_first_need_does_not_wait_for_a_conversation_another_writer_locks(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // An archive (flags) has locked the conversation `FOR UPDATE` and will
+    // update its messages next: a share lock on the message taken now, with
+    // the needs insert then waiting on the conversation, would be a cycle.
+    let mut archiving = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("SELECT 1 FROM conversations.conversations WHERE id = $1::uuid FOR UPDATE")
+        .bind(&conversation)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+
+    tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        refreshed(&kit, workspace, &conversation),
+    )
+    .await
+    .expect("the refresh never waits on the conversation");
+    assert_eq!(needs_stored(&db, &conversation).await, 0);
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // The writer then updates the message: nothing of ours holds it.
+    sqlx::query("UPDATE conversations.messages SET read = true WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+    archiving.commit().await.unwrap();
+    run_refreshes(&kit, &db).await;
     let marta = summary(&kit, &sam, workspace, "needs-1").await;
     assert_eq!(marta["need"]["reason"], "reply", "{marta}");
 }

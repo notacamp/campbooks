@@ -65,9 +65,9 @@ count as authentication failed (a sender may not pad a header to hide a
 failure); an absent or malformed one says nothing. The sender's domain SHALL count as authenticated only by exactly one
 `dmarc` result, `pass`, whose `header.from` is the From domain; or by a
 `dkim=pass` whose signing domains all have the From domain's registrable
-domain, while no `dmarc` result in the header refuses it (`fail`,
-`quarantine`, `reject` or `policy`); `none`, `bestguesspass`, `temperror` and
-`permerror` are not refusals. A From
+domain, while no `dmarc` result in the header refuses it: only `pass`, `none`,
+`bestguesspass`, `temperror` and `permerror` are not refusals, so `fail`,
+`quarantine`, `reject`, `policy` and any non-standard result are. A From
 domain that is itself a public suffix SHALL authenticate nothing. A
 registrable domain SHALL be read from the Public Suffix List, ICANN and
 private sections (compiled in, never fetched), so that two names under one
@@ -80,7 +80,7 @@ many organisations. A taught `sender_domain` SHALL NOT name a public suffix
 alone.
 
 #### Scenario: A signature DMARC refused
-- **WHEN** a message carries `dkim=pass header.d=studio.example` for a From of `studio.example` and a `dmarc` result of `fail`, `quarantine`, `reject` or `policy`, or two `dmarc` results of which one is `fail`
+- **WHEN** a message carries `dkim=pass header.d=studio.example` for a From of `studio.example` and a `dmarc` result of `fail`, `quarantine`, `reject`, `policy` or any other non-standard value, or two `dmarc` results of which one is `fail`
 - **THEN** the hints say authentication failed
 
 #### Scenario: A signature and no DMARC result

@@ -8,10 +8,12 @@ need whose own message moves to spam or the trash SHALL be cleared as
 need for a message that another transaction is changing (a move to spam or
 the trash, a template fill, any writer), and SHALL NOT wait for it, so that no
 open need is stored for a message after its move committed and no request
-deadlocks with a sync batch. It SHALL instead enqueue one durable
-`conversations.refresh_need` job for the conversation (unique, a few seconds
-later, retried while the message stays busy), so that a need skipped for a
-busy message is still raised once the writer commits, whether or not that
+deadlocks with a sync batch. It SHALL take, before the message, the conversation's row `FOR KEY SHARE`
+(without waiting) so that storing the need cannot wait for a lock a writer
+holds, and SHALL instead enqueue a durable `conversations.refresh_need` job
+for the conversation (one per deferral, a few seconds later; the job waits
+for the locks within a lock timeout and retries after one), so that a need skipped for a
+busy message or conversation is still raised once the writer commits, whether or not that
 writer refreshes needs. A message that leaves spam or the trash SHALL raise its need again
 as any message does; a member's Done or Not needed SHALL still hold, and a
 member's confirmation SHALL still make the reopened need theirs (basis
@@ -39,7 +41,11 @@ member's confirmation SHALL still make the reopened need theirs (basis
 
 #### Scenario: A busy message that is not moving
 - **WHEN** a first need's message is held by another transaction that changes only its subject template, and then commits
-- **THEN** the refresh stores nothing and enqueues exactly one `conversations.refresh_need`, which stores the open need once the other transaction has committed
+- **THEN** the refresh stores nothing and enqueues a `conversations.refresh_need`, which stores the open need once the other transaction has committed
+
+#### Scenario: An archive in progress
+- **WHEN** a first need's conversation is locked `FOR UPDATE` by another transaction (an archive that will update its messages next)
+- **THEN** the refresh stores nothing, does not wait, enqueues a `conversations.refresh_need`, and the other transaction can update the messages and commit
 
 #### Scenario: Done during a sync batch
 - **WHEN** a member marks a need Done while a sync batch has updated its message and not committed

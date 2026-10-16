@@ -324,6 +324,7 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.refresh_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

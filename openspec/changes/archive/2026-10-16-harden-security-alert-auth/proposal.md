@@ -17,7 +17,8 @@ had no test.
   the 24-entry list. A bare public suffix as From authenticates nothing.
 - A conversation's first need is not stored for a message a concurrent
   transaction is changing (`FOR SHARE SKIP LOCKED`; it never waits); a
-  durable `conversations.refresh_need` job settles it afterwards.
+  durable `conversations.refresh_need` job settles it afterwards (the
+  conversation row is taken first, so the needs insert cannot wait).
 - Tests: leaving spam re-raises the need; a trash round trip keeps a member's
   confirmation and a Done.
 

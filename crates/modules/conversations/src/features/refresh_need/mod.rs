@@ -2,9 +2,13 @@
 //!
 //! A first need is not stored while another transaction is changing its
 //! message (see `domain::needs::refresh`); this job, enqueued in the same
-//! transaction, settles it a few seconds later. Unique per conversation, so
-//! many skips make one job. If the message is still busy the job retries
-//! later (bounded attempts), keeping its unique key, so it cannot spin.
+//! transaction, settles it a few seconds later. One job per deferral, never
+//! unique: a unique key covers a running job too, which would drop a
+//! deferral that happens while one runs (and may have read before it
+//! committed). Each run is an idempotent refresh, and the count is bounded
+//! by the deferrals. The job waits for the locks (bounded by a lock
+//! timeout), so a busy message does not use up its attempts; if the timeout
+//! passes it retries later.
 
 use std::time::Duration;
 
@@ -55,7 +59,15 @@ impl JobHandler for RefreshNeed {
             .ok_or_else(|| JobError::fatal("refresh_need enqueued outside a workspace"))?;
         let events = ctx.state().events.clone();
         let tx = ctx.tx().await?;
-        match needs::refresh_now(tx, &events, &workspace, payload.conversation, &self.needs).await?
+        match needs::refresh_now(
+            tx,
+            &events,
+            &workspace,
+            payload.conversation,
+            &self.needs,
+            true,
+        )
+        .await?
         {
             Refreshed::Settled => Ok(()),
             Refreshed::Deferred => Err(JobError::retry_after(
@@ -66,7 +78,7 @@ impl JobHandler for RefreshNeed {
     }
 }
 
-/// Enqueue a refresh of `conversation`, unless one is pending.
+/// Enqueue a refresh of `conversation`.
 pub async fn enqueue(
     tx: &mut Transaction<'_, Postgres>,
     workspace: &str,
@@ -76,7 +88,6 @@ pub async fn enqueue(
         tx,
         &RefreshNeedPayload { conversation },
         EnqueueOptions::for_workspace(workspace.to_owned())
-            .unique(format!("conversations.refresh_need:{conversation}"))
             .run_at(Utc::now() + chrono::TimeDelta::from_std(DELAY).unwrap_or_default()),
     )
     .await

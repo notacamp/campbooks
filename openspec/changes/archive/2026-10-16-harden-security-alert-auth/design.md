@@ -5,9 +5,10 @@ content to decide.
 
 ## Decisions
 - **DKIM defers to a refusing DMARC.** An aligned `dkim=pass` is the
-  sender's own signature, but a DMARC result that refuses the mail (`fail`,
-  `quarantine`, `reject`, `policy`: the domain's published policy said no)
-  turns the DKIM path off. `none` means no policy is published (RFC 7489
+  sender's own signature, but a DMARC result that refuses the mail turns the
+  DKIM path off. The non-refusing results are an allow-list (`pass`, `none`,
+  `bestguesspass`, `temperror`, `permerror`), so `fail`, `quarantine`,
+  `reject`, `policy` and any unknown value refuse (fail closed). `none` means no policy is published (RFC 7489
   §11.2), `bestguesspass` is Microsoft's guess, and `temperror`/`permerror`
   are no verdict: none refuses, and our audience (small businesses) often
   signs with DKIM and publishes no DMARC, so they keep the DKIM path, as does
@@ -50,29 +51,49 @@ content to decide.
   exists only when the conversation has no needs row yet: with one,
   `current` locks it `FOR UPDATE`, which serialises refreshes, and the
   move's own refresh (the end of `apply_changes`) clears a stale need. So
-  only a first insert re-checks, reading the need's message
-  `FOR SHARE SKIP LOCKED`. In spam or the trash (or gone): nothing is
-  stored, no follow-up. Locked by another transaction: nothing is stored
-  and a durable `conversations.refresh_need` job (payload: the conversation
-  id; unique per conversation; run a few seconds later) is enqueued in the
-  same transaction. The skip is not safe on the assumption that the writer
-  refreshes the conversation: `fill_templates` updates messages and never
-  does, and any future writer might not, so the follow-up does not depend
-  on it. The job runs the same refresh; if the message is still busy it
-  retries after 10 s (bounded attempts), keeping its unique key, so it
-  cannot spin or pile up. It never waits on a message lock either.
-  Lock order of the callers of `needs::refresh`: `apply_changes`, messages,
-  then the conversation's counts, then the needs row; `judge` and `reopen`,
-  the conversation then the needs row (a row always exists there, so they
-  never reach the check); rules and flags, the conversation row; the decide
-  pass, the backfill and the follow-up job, the needs row. Because the
-  check never waits, none of these orders gains a wait edge. An earlier
-  draft share-locked the messages before the needs row for every refresh;
-  that put messages after the needs row for `judge`, against
-  `apply_changes`, and could deadlock, so it was dropped. The share lock
-  taken by a first insert is held to the end of the transaction (the
-  backfill's page), which holds a later move back but is never waited on by
-  the refresh.
+  only a first insert re-checks. It takes, in this order and until commit:
+  1. the conversation row `FOR KEY SHARE` (what the needs insert's foreign
+     key takes anyway), then
+  2. the message row `FOR SHARE`, re-read under the lock.
+
+  Order matters. Every later writer of that message (a move, a flag, a
+  template fill) waits on the refresher until it commits. If the message
+  were locked first, a flags transaction holding the conversation `FOR
+  UPDATE` (it updates messages next) would wait on our share lock while our
+  insert's foreign-key check waited on its conversation lock: a deadlock.
+  Taking the conversation first, without waiting, makes the later foreign
+  key check unable to wait. Locks the same transaction holds are not
+  skipped, so `judge`, `reopen`, flags and rules refreshing their own
+  conversation are unaffected (and `judge`/`reopen` always have a needs row,
+  so they never get here).
+
+  In request and event paths neither lock waits (`SKIP LOCKED`). A row
+  someone else holds means nothing is stored and a durable
+  `conversations.refresh_need` job (payload: the conversation id; run a few
+  seconds later) is enqueued in the same transaction. A row in spam or the
+  trash means nothing is stored and no job. The deferral does not assume
+  the writer refreshes the conversation: `fill_templates` updates messages
+  and never does. The job is not unique: a unique key covers a running job
+  too, so a deferral made while one runs would be dropped although that job
+  may have read before the deferring transaction committed. Each run is an
+  idempotent refresh and the number of jobs is bounded by the deferrals.
+
+  The job is the one place that waits. It holds no other lock when it gets
+  to the check (no needs row, plain reads only), so nobody can be waiting on
+  it and it cannot be part of a cycle; it takes both locks blocking under a
+  5 s `lock_timeout` inside a savepoint, and a timeout makes it retry later.
+  Waiting means a long-held lock does not use up its ten attempts.
+
+  Real order of each caller of `needs::refresh`: `apply_changes`, messages,
+  then the conversation's recount, then the needs row (and, for a first
+  need, the check); flags, the conversation `FOR UPDATE`, then messages, then
+  the check; rules, the conversation, then the check; `judge` and `reopen`,
+  the conversation then the needs row; the decide pass and the backfill, the
+  needs row (none yet), then the check. The check never waits outside the
+  job, so none of these gains a wait edge. An earlier draft share-locked the
+  messages before the needs row for every refresh; that put messages after
+  the needs row for `judge`, against `apply_changes`, and could deadlock, so
+  it was dropped.
 - **What a trash round trip does.** A message leaving the trash or spam
   raises its need again through the ordinary path (newest eligible inbound
   message, its answers). A Done or Not needed verdict stays: the need clears

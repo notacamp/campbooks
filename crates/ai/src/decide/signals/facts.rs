@@ -234,8 +234,10 @@ impl Facts {
     /// Whether `results` authenticate the From domain: exactly one `dmarc`
     /// result, `pass`, whose `header.from` is the From domain; or a
     /// `dkim=pass` whose signing domains all have the From domain's
-    /// registrable domain, provided no `dmarc` result refuses it (`fail`,
-    /// `quarantine`, `reject`, `policy`: the domain's policy said no). `none`
+    /// registrable domain, provided no `dmarc` result refuses it: any result
+    /// other than `pass`, `none`, `bestguesspass`, `temperror` and `permerror`
+    /// (so `fail`, `quarantine`, `reject`, `policy` and anything non-standard:
+    /// an allow-list, so an unknown result fails closed). `none`
     /// (no policy published, RFC 7489 §11.2), `bestguesspass`, `temperror`
     /// and `permerror` do not refuse: many small senders sign with DKIM and
     /// publish no DMARC.
@@ -259,9 +261,9 @@ impl Facts {
             plain_domain(signer) && registrable(signer) == from
         };
         let dmarc_refused = dmarc.iter().any(|r| {
-            matches!(
+            !matches!(
                 r.result.as_str(),
-                "fail" | "quarantine" | "reject" | "policy"
+                "pass" | "none" | "bestguesspass" | "temperror" | "permerror"
             )
         });
         let dkim_pass = !dmarc_refused
@@ -661,6 +663,7 @@ mod tests {
             "dmarc=quarantine header.from=studio.example",
             "dmarc=reject header.from=studio.example",
             "dmarc=policy header.from=studio.example",
+            "dmarc=whatever header.from=studio.example",
         ] {
             let results = format!("mx.example.com; {dkim}; {dmarc}");
             assert!(failed("ana@studio.example", &results), "{dmarc}");

@@ -678,50 +678,127 @@ pub enum Refreshed {
     Deferred,
 }
 
-/// Check the message an open first need is about to be stored for, on the
-/// locked row.
+/// How long the follow-up job waits for a lock before it gives up and
+/// retries.
+const JOB_LOCK_TIMEOUT: &str = "5s";
+
+/// Check the conversation and the message an open first need is about to be
+/// stored for.
 ///
 /// The race: a decide pass reads a message before a provider move to spam or
 /// the trash commits, then stores an open need after it. It exists only when
 /// the conversation has no needs row yet: with one, `current` locks it `FOR
 /// UPDATE`, which serialises refreshes, and the move's own refresh (the end
 /// of `apply_changes`) clears a stale need. So this runs only for a first
-/// insert, and it never waits: the message row is taken `FOR SHARE SKIP
-/// LOCKED`. A free row is re-read under the share lock, which holds a later
-/// move back until this transaction ends. A row someone else is changing
-/// (an uncommitted move, a template fill, any writer) is [`SourceCheck::Busy`]:
-/// nothing is stored, and the refresh is [`Refreshed::Deferred`], which
-/// [`refresh`] turns into a durable `conversations.refresh_need` job. That is
-/// what makes the skip safe whatever the writer is: not every writer refreshes
-/// the conversation (`fill_templates` does not), so the follow-up does not
-/// depend on it.
+/// insert.
 ///
-/// Lock order, for every caller of [`refresh`]: no caller waits on a message
-/// lock here, so this adds no wait edge and no deadlock with the order the
-/// callers already take (`apply_changes`: messages, then the conversation's
-/// counts, then the needs row; `judge`, `reopen`: conversation, then the
-/// needs row; rules and flags: the conversation row; the decide pass, the
-/// backfill and the follow-up job: the needs row). `judge` and `reopen`
-/// always have a needs row, so they never get here. The backfill keeps these
-/// share locks until its page commits.
+/// What it takes, in this order, and keeps until the transaction ends:
+/// 1. the conversation row `FOR KEY SHARE`, which is what the foreign key of
+///    the needs insert would take anyway. Taking it first means the insert
+///    can no longer wait for a conversation lock a writer holds (flags and
+///    rules lock the conversation `FOR UPDATE` and then update messages,
+///    which would wait on the share lock below: a cycle if we took the
+///    message first). A lock held by another transaction is not waited for
+///    (`SKIP LOCKED`); the same transaction's own lock is not skipped, so
+///    `judge`, `reopen`, flags and rules refreshing their own conversation
+///    are unaffected (and the first two always have a needs row anyway).
+/// 2. the message row `FOR SHARE`, re-read under the lock. Every later
+///    writer of that message (a move, a flag, a template fill) waits for
+///    this transaction to commit.
+///
+/// In the request and event paths nothing waits: a row someone else holds is
+/// [`SourceCheck::Busy`], nothing is stored, and the refresh is
+/// [`Refreshed::Deferred`], which [`refresh`] turns into a durable
+/// `conversations.refresh_need` job. That is safe whatever the writer is: not
+/// every writer refreshes the conversation (`fill_templates` does not), so
+/// the follow-up does not depend on it.
+///
+/// The follow-up job (`wait`) holds no other lock when it gets here (no needs
+/// row, plain reads so far), so it may wait: both locks are taken blocking
+/// under a 5 s `lock_timeout`, and a timeout is [`SourceCheck::Busy`] (the
+/// job retries). Nobody waits on the job while it waits, because it holds
+/// nothing, so it adds no wait cycle, and waiting means a long-held lock does
+/// not burn its attempts.
+///
+/// Lock order of every caller of [`refresh`] (the order before it reaches
+/// this check): `apply_changes`, messages, then the conversation's counts,
+/// then here; flags (`flags::apply`), conversation, then messages, then here;
+/// rules (`rules/apply`), the conversation, then here; `judge`, `reopen`,
+/// conversation, then the needs row (never here); the decide pass, the
+/// backfill and the follow-up job, the needs row (none yet) then here. This
+/// check never waits except in the job, so it adds no wait edge to any of
+/// them.
 async fn source_can_carry(
     tx: &mut Transaction<'_, Postgres>,
+    conversation: ConversationId,
     message: MessageId,
+    wait: bool,
 ) -> Result<SourceCheck> {
-    // `SKIP LOCKED` returns no row for a locked one and for a missing one;
-    // a plain read tells them apart, and cannot wait (a plain read never
-    // waits on a row lock).
-    let free: Option<bool> = sqlx::query_scalar(
-        "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
-          WHERE id = $1 FOR SHARE SKIP LOCKED",
-    )
-    .bind(message)
-    .fetch_optional(&mut **tx)
-    .await?;
-    match free {
-        Some(true) => Ok(SourceCheck::Carries),
-        Some(false) => Ok(SourceCheck::Cannot),
-        None => {
+    let (conversation_sql, message_sql) = if wait {
+        (
+            "SELECT 1 FROM conversations.conversations WHERE id = $1 FOR KEY SHARE",
+            "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
+              WHERE id = $1 FOR SHARE",
+        )
+    } else {
+        (
+            "SELECT 1 FROM conversations.conversations WHERE id = $1
+               FOR KEY SHARE SKIP LOCKED",
+            "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
+              WHERE id = $1 FOR SHARE SKIP LOCKED",
+        )
+    };
+    // A savepoint: a lock timeout aborts only this part of the transaction.
+    let mut sp = sqlx::Connection::begin(&mut **tx).await?;
+    if wait {
+        sqlx::query("SELECT set_config('lock_timeout', $1, true)")
+            .bind(JOB_LOCK_TIMEOUT)
+            .execute(&mut *sp)
+            .await?;
+    }
+    let locked = async {
+        let conversation_held: Option<i32> = sqlx::query_scalar(conversation_sql)
+            .bind(conversation)
+            .fetch_optional(&mut *sp)
+            .await?;
+        if conversation_held.is_none() {
+            return Ok::<_, sqlx::Error>(None);
+        }
+        let free: Option<bool> = sqlx::query_scalar(message_sql)
+            .bind(message)
+            .fetch_optional(&mut *sp)
+            .await?;
+        Ok(Some(free))
+    }
+    .await;
+    match &locked {
+        Err(e)
+            if e.as_database_error()
+                .and_then(sqlx::error::DatabaseError::code)
+                .as_deref()
+                == Some("55P03") =>
+        {
+            sp.rollback().await?;
+            return Ok(SourceCheck::Busy);
+        }
+        Err(_) => {
+            locked.map_err(Error::from)?;
+            unreachable!("the error was returned above");
+        }
+        Ok(_) => {}
+    }
+    if wait {
+        sqlx::query("RESET lock_timeout").execute(&mut *sp).await?;
+    }
+    sp.commit().await?;
+    match locked.map_err(Error::from)? {
+        // The conversation row is held by another transaction.
+        None => Ok(SourceCheck::Busy),
+        Some(Some(true)) => Ok(SourceCheck::Carries),
+        Some(Some(false)) => Ok(SourceCheck::Cannot),
+        // `SKIP LOCKED` says nothing for a locked row and for a missing one;
+        // a plain read tells them apart and never waits.
+        Some(None) => {
             let exists: bool = sqlx::query_scalar(
                 "SELECT EXISTS (SELECT 1 FROM conversations.messages WHERE id = $1)",
             )
@@ -752,19 +829,21 @@ pub async fn refresh(
     id: ConversationId,
     settings: &NeedSettings,
 ) -> Result<()> {
-    if refresh_now(tx, events, workspace, id, settings).await? == Refreshed::Deferred {
+    if refresh_now(tx, events, workspace, id, settings, false).await? == Refreshed::Deferred {
         crate::features::refresh_need::enqueue(tx, workspace, id).await?;
     }
     Ok(())
 }
 
-/// [`refresh`] without the follow-up: says whether it deferred.
+/// [`refresh`] without the follow-up: says whether it deferred. `wait` is
+/// for the follow-up job only (see [`source_can_carry`]).
 pub async fn refresh_now(
     tx: &mut Transaction<'_, Postgres>,
     events: &EventBus,
     workspace: &str,
     id: ConversationId,
     settings: &NeedSettings,
+    wait: bool,
 ) -> Result<Refreshed> {
     let Some(conversation) = live_conversation(tx, id).await? else {
         return Ok(Refreshed::Settled);
@@ -794,7 +873,7 @@ pub async fn refresh_now(
     // A first need for a message a move may be changing right now: store
     // nothing, the move's refresh decides (see `source_can_carry`).
     if row.is_none() && cause.is_none() {
-        match source_can_carry(tx, need.message).await? {
+        match source_can_carry(tx, id, need.message, wait).await? {
             SourceCheck::Carries => {}
             SourceCheck::Cannot => return Ok(Refreshed::Settled),
             SourceCheck::Busy => return Ok(Refreshed::Deferred),
