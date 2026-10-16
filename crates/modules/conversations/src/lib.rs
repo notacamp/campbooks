@@ -187,6 +187,7 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .consumer(features::record_send::RecordSend)
             .handler(features::apply_rule::ApplyRules::new(needs.clone()))
             .handler(features::fill_templates::FillTemplates)
+            .handler(features::refresh_need::RefreshNeed::new(needs.clone()))
             .handler(features::apply_changes::ApplyChanges::new(
                 deps.rules,
                 deps.policy.clone(),
@@ -216,6 +217,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::forget_connection::ForgetConnection>()
             .on_event::<features::forget_member::ForgetMember>()
+            .on_event::<features::suspended_authors::PauseSuspendedAuthor>()
+            .on_event::<features::suspended_authors::ResumeUnsuspendedAuthor>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),
@@ -323,6 +326,7 @@ mod tests {
             "conversations.check_send",
             "conversations.apply_rule",
             "conversations.fill_templates",
+            "conversations.refresh_need",
             "conversations.backfill_needs",
             "conversations.dispatch_needs_backfills",
         ] {

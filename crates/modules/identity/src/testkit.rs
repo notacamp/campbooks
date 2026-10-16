@@ -572,6 +572,9 @@ pub struct Kit {
     pub zoho_eu: TestIdp,
     /// The state (database, ports).
     pub state: AppState,
+    /// The runtime role in the kernel scope, to inspect the event log and
+    /// the queue across workspaces.
+    pub kernel: PgPool,
     /// What the grant-intake port was handed.
     pub intake: Arc<FakeIntake>,
     /// The module's dependencies.
@@ -635,6 +638,7 @@ impl Kit {
         let zoho = TestIdp::start().await;
         let zoho_eu = TestIdp::start().await;
         let pool = testing::app_role_pool(&db).await;
+        let kernel = testing::kernel_scope_pool(&db).await;
         let mut config = testing::config("postgres://test@localhost/test");
         // Plain-http public URL (the tests' localhost): development only.
         config.env = campbooks_kernel::config::Environment::Development;
@@ -705,6 +709,7 @@ impl Kit {
             zoho,
             zoho_eu,
             state,
+            kernel,
             intake,
             deps,
             documents,

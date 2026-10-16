@@ -20,6 +20,7 @@ mod error;
 mod gateway;
 mod health;
 mod telemetry;
+pub mod usage;
 
 pub use config::{AiConfig, ExternalContent, Location, Protocol, ProviderConfig, Role};
 pub use error::Error;

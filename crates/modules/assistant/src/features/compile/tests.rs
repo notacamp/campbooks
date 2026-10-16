@@ -433,3 +433,93 @@ async fn senders_are_looked_up_once_per_word_in_a_compile(db: PgPool) {
         "one list_senders per q in a compile"
     );
 }
+
+/// A daily AI limit in memory (campbooks-cloud#152): admits `room` calls,
+/// noting whether a person was waiting on each.
+#[derive(Debug, Default)]
+struct Limit {
+    room: std::sync::Mutex<u32>,
+    asked: std::sync::Mutex<Vec<(String, bool)>>,
+}
+
+impl campbooks_ai::usage::Meter for Limit {
+    fn admit<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        call: campbooks_ai::usage::MeteredCall<'a>,
+    ) -> campbooks_ai::decide::strategy::BoxFuture<
+        'a,
+        Result<campbooks_ai::usage::Admission, campbooks_ai::usage::MeterError>,
+    > {
+        use campbooks_ai::usage::Admission;
+        Box::pin(async move {
+            self.asked
+                .lock()
+                .unwrap()
+                .push((call.feature.to_owned(), call.interactive));
+            let mut room = self.room.lock().unwrap();
+            if *room == 0 {
+                return Ok(Admission::Refused { cap: 40 });
+            }
+            *room -= 1;
+            Ok(Admission::Admitted {
+                day: chrono::NaiveDate::from_ymd_opt(2026, 10, 16).unwrap(),
+            })
+        })
+    }
+
+    fn settle<'a>(
+        &'a self,
+        _db: &'a PgPool,
+        _call: campbooks_ai::usage::MeteredCall<'a>,
+        _day: chrono::NaiveDate,
+        _outcome: campbooks_ai::usage::Outcome,
+    ) -> campbooks_ai::decide::strategy::BoxFuture<'a, Result<(), campbooks_ai::usage::MeterError>>
+    {
+        Box::pin(async { Ok(()) })
+    }
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn compiling_is_a_call_a_person_waits_on_and_stops_at_the_daily_limit(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(
+        &server,
+        &json!({ "outcome": "unclear", "unsupported": "none", "rules": [] }),
+    )
+    .await;
+    let limit = std::sync::Arc::new(Limit {
+        room: std::sync::Mutex::new(1),
+        ..Limit::default()
+    });
+    let kit = Kit::with_deps(
+        db,
+        AssistantDeps {
+            ai: Some(gateway(&server.uri()).with_meter(limit.clone())),
+        },
+    )
+    .await;
+    let workspace = WorkspaceId::new();
+    let (ines, _) = kit.member("ines", workspace);
+    let uri = uri(workspace);
+    let ask = || kit.post(&ines, &uri, json!({ "text": "invoices matter" }));
+
+    let first = ask().await;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.json);
+    let over = ask().await;
+    assert_eq!(
+        over.status,
+        StatusCode::SERVICE_UNAVAILABLE,
+        "{}",
+        over.json
+    );
+    assert_eq!(over.json["code"], "ai_daily_limit_reached");
+    assert_eq!(server.received_requests().await.unwrap().len(), 1);
+    assert_eq!(
+        *limit.asked.lock().unwrap(),
+        [
+            ("assistant.compile".to_owned(), true),
+            ("assistant.compile".to_owned(), true)
+        ]
+    );
+}

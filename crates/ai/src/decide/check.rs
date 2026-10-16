@@ -417,10 +417,10 @@ impl Gateway {
         let mut model = None;
         let mut failed = false;
         for case in cases() {
-            match self
-                .decide(&ctx, &case.envelope.decision_state(), &questions)
-                .await
-            {
+            // The instance's own check: counted against no workspace.
+            let state = case.envelope.decision_state();
+            let decided = self.decide(&ctx, &state, &questions);
+            match crate::usage::Scope::instance(PURPOSE).run(decided).await {
                 Ok(answers) => {
                     let answers: Vec<Answer> = answers.iter().cloned().collect();
                     let (r, t) = grade(&case, &answers);

@@ -109,6 +109,9 @@ pub(crate) struct Response {
     #[serde(default)]
     pub system_fingerprint: Option<String>,
     choices: Vec<WireChoice>,
+    /// Tokens, as OpenAI-compatible servers report them.
+    #[serde(default)]
+    pub usage: Option<crate::Usage>,
 }
 
 #[derive(Deserialize)]

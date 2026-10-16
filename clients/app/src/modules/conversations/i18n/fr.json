@@ -460,7 +460,12 @@
       "confirmRemove": "Retirer",
       "cancel": "Garder",
       "forEveryone": "Pour tout le monde",
-      "paused": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
+      "paused": {
+        "inbox_read_only": "En pause : cette boîte est en lecture seule",
+        "author_cannot_write": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
+        "paused_by_member": "Mise en pause par un membre",
+        "author_unavailable": "En pause pour l’instant ; elle reprendra d’elle-même"
+      },
       "empty": "Apprenez à Scout ci-dessus ou répondez à ses questions plus bas. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose aussi de faire de même pour ceux qui lui ressemblent.",
       "leave": "Les laisser tels quels",
       "changedMail": "Les e-mails qu’elle a modifiés",

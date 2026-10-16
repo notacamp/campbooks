@@ -30,7 +30,9 @@ use crate::{
         rules::{self, NewRule, RuleAction, RuleCondition, Stored},
     },
     events::RULE_RECORD,
-    model::{ConversationId, InboxId, RuleId, RuleOrigin, RuleState, RunKind, TeachingId},
+    model::{
+        ConversationId, InboxId, PausedReason, RuleId, RuleOrigin, RuleState, RunKind, TeachingId,
+    },
     scopes::{ConversationsRead, ConversationsWrite},
 };
 
@@ -91,8 +93,13 @@ pub struct RuleView {
     pub origin: RuleOrigin,
     /// The member's own words, for an instruction.
     pub origin_text: Option<String>,
-    /// Whether it acts. `paused` when its author can no longer change the inbox.
+    /// Whether it acts. `paused` when its author can no longer change the
+    /// inbox or is away for now, its inbox is kept read-only, or a member
+    /// paused it.
     pub state: RuleState,
+    /// Why it is paused; absent unless `state` is `paused`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused_reason: Option<PausedReason>,
     /// Who taught it; `None` when a client did.
     pub taught_by: Option<UserId>,
     /// The conversation it was taught from.
@@ -145,6 +152,7 @@ async fn views(
             origin: rule.origin,
             origin_text: rule.origin_text.clone(),
             state: rule.effective_state(),
+            paused_reason: rule.paused_reason(),
             taught_by: rule.taught_by,
             from_conversation_id: rule.from_conversation,
             created_at: rule.created_at,
@@ -686,7 +694,16 @@ pub async fn create_in(
     if rule_state == RuleState::Active && body.apply_to_existing {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
-        rule_runs::announce(tx, &state.events, &ws, inbox, id, rule_state, None).await?;
+        rule_runs::announce(
+            tx,
+            &state.events,
+            &ws,
+            inbox,
+            id,
+            rule.effective_state(),
+            None,
+        )
+        .await?;
     }
     Ok(CreatedRule {
         rule: view(tx, access, &rule).await?,
@@ -849,7 +866,7 @@ pub async fn confirm(
             &ws,
             rule.inbox,
             rule.id,
-            rule.state,
+            rule.effective_state(),
             None,
         )
         .await?;

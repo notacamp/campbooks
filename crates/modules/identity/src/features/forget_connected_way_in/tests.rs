@@ -134,7 +134,7 @@ async fn the_way_in_a_connect_brought_goes_with_its_last_mailbox(db: PgPool) {
     let events: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_removed'",
     )
-    .fetch_one(&kit.state.db)
+    .fetch_one(&kit.kernel)
     .await
     .unwrap();
     assert_eq!(events, 1);

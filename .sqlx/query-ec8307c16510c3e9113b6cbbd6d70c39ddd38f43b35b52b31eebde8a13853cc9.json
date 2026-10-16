@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT set_config($1, '', true)",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "set_config",
+        "type_info": "Text",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "ec8307c16510c3e9113b6cbbd6d70c39ddd38f43b35b52b31eebde8a13853cc9"
+}

@@ -99,11 +99,13 @@ async fn enqueue(
 }
 
 /// Claim the streams due at `now` (at most [`DISPATCH_BATCH`]) and enqueue
-/// their runs. Runs in a transaction that sets no workspace: the scheduling
-/// index is the one thing it reads across workspaces (ids and times).
+/// their runs. Runs in the kernel scope (`begin_kernel`, allowed for this
+/// file in `architecture.toml`): the scheduling index is the one thing it
+/// reads across workspaces (ids and times, through its maintenance
+/// policies), and each run is enqueued for its stream's workspace.
 /// Returns how many it enqueued.
 pub async fn dispatch(pool: &PgPool, now: DateTime<Utc>) -> Result<usize> {
-    let mut tx = pool.begin().await?;
+    let mut tx = campbooks_kernel::db::begin_kernel(pool).await?;
     let due = sqlx::query!(
         r#"UPDATE connectors.sync_due d SET due_at = $2
             WHERE d.stream_id IN (

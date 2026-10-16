@@ -18,6 +18,46 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A suspended member's rules pause until the suspension is lifted.** A rule acts in
+  its author's name, so while an administrator has the author's account suspended their
+  rules read as paused, exactly as when the author can no longer change the inbox: they
+  leave new mail alone, a run over existing mail stops at its next batch, and previews
+  and suggestions no longer count them. Unsuspending makes them act again, with nothing
+  to redo (a run they stopped is not restarted). Other members see only that the rule
+  is paused for now and acts again on its own, never that its author is suspended. A
+  member removed while suspended gets their rules back when invited again. The identity
+  module now also publishes `identity.account_unsuspended`, both suspension events carry
+  an ordered `at`, and the workspaces module announces each in every workspace of the
+  account (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
+  `20261020210000_conversations__member_suspensions`. An account suspended before this
+  version keeps its rules acting until an administrator unsuspends and suspends it again
+  (campbooks-cloud#147).
+- **A database transaction that names no workspace now sees nothing.** The kernel's
+  event log, job queue, change feed and blob catalogue used to show every workspace's
+  rows to any transaction that set no workspace, which is how background work crossed
+  workspaces, but also meant code that forgot to pick a workspace could read and write
+  every tenant's. Cross-workspace work now needs an explicit kernel scope that only the
+  kernel opens (and, by a reviewed exception in `architecture.toml`, the two schedulers'
+  dispatchers); everything else sees no row of any table with row-level security.
+  Enqueueing a workspace's job, recording a change of the feed and attaching or
+  detaching a blob now fail in a transaction that cannot reach that workspace, instead
+  of silently doing nothing, and `cargo xtask arch` also checks `acquire()`, SQL kept in
+  constants, and the server and kernel code. Migrations
+  `20261020200000_kernel__kernel_scope`, `20261020200100_connectors__kernel_scope` and
+  `20261020200200_conversations__kernel_scope` replace the policies; nothing to do on
+  upgrade. **Upgrade every process at once**: if you run the API and the job worker as
+  separate containers (or several replicas), stop the old ones before or as the new ones
+  start, because a process still on an older version stops claiming jobs and cannot sign
+  anyone in once the migrations have run. Going back to an older version needs a SQL
+  rollback first (the policies' revert is in the change's design notes,
+  `openspec/changes/archive/2026-10-16-kernel-scope/design.md`, "Rollback").
+- **Sender authentication is read more strictly.** An aligned DKIM signature no longer
+  counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
+  an authentication header over 8 KiB is treated as a failure instead of being parsed, and
+  "same organisation" now follows the real Public Suffix List (so two `github.io` sites, or
+  suffixes such as `co.at`, are never one sender) instead of a 24-entry guess. Separately,
+  a message that is being moved to spam or the trash can no longer have a first "needs you"
+  stored for it by a refresh running at the same moment. No migration.
 - **The API is rate-limited per person and per app.** Every call with a token now counts
   against a limit for whoever makes it, however it arrives (directly, through the web app,
   or from automation and the assistant): 600 reads and 120 writes a minute per person and
@@ -170,6 +210,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **The rules list says why a rule is paused**, first on its line: its author can no
+  longer change the inbox, its author is away for now (it acts again on its own; the
+  cause is never shown), a member paused it, or the inbox is kept read-only
+  (`RuleView.paused_reason`). A rule a member paused no longer claims its author lost
+  access.
 - One "Search or ask" field and menu, with conversations inline. The sidebar's
   separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
   wider) open the same menu, which lists matching conversations first (matched words
@@ -205,6 +250,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **A need settled while its follow-up waited is no longer overwritten.** When a first
+  "needs you" was put off because its message was busy, the follow-up could store it from
+  what it had read before waiting: an open need on a conversation archived meanwhile, or
+  over a Done a member had just given. It now works the need out again once it has its
+  locks. No migration.
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
   shipped. Questions? Contact our support team." raised a Reply need, because a rule
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
@@ -216,6 +266,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   isn't connected first, and waits for a connect you retried. If connecting
   a mailbox breaks unexpectedly, you now land back on Mailboxes with an
   error instead of a server error page.
+- **Home fits the window on desktop too, and scrollbars match the app.** A busy Home
+  still made the whole page scroll and pushed the account menu down; from 1024px wide
+  Home now scrolls on its own beside the sidebar, like the inbox. Scrollbars are thin
+  and quiet, a soft thumb with no track that firms up when you point at the pane, in
+  light and dark.
 - **The inbox no longer grows taller than the window on desktop.** A long list of
   conversations made the whole page scroll, pushing the account menu down and taking
   the open conversation with it. From 1024px wide the page is the window's height:
@@ -279,6 +334,21 @@ All notable changes to Campbooks Next are documented here. The format follows
   It must be one of Zoho's accounts servers, or Campbooks refuses to start.
 
 ### Added
+
+- **A daily AI limit per workspace (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, default
+  5000, `0` for none).** Every model call (`decide`, `embed`, `complete`, `vision`) is
+  now counted per workspace, role and feature, per UTC day, with the tokens the
+  provider reports, in two new tables of the `system` schema (migration
+  `20261020190000_system__ai_usage`). Past the limit a workspace's new mail is still
+  stored and sorted by the facts and taught rules, without the model pass, until
+  00:00 UTC; nothing errors, and skipped mail is not asked again later. One log line
+  says when a workspace reaches it. If the count cannot be written, the call is not
+  made and the job retries. A tenth of the limit is kept for what people ask
+  themselves: background work stops 500 calls short of the default 5000, so a mail
+  flood cannot silence Scout; past the whole limit, compiling a sentence answers 503
+  `ai_daily_limit_reached`. Administrators read a day's usage per workspace, capped
+  ones first, at `GET /admin/v1/system/ai-usage` (`system.read`). Self-hosters
+  running their own model can set `0`.
 - **Teach once in the inbox.** After you move, archive, mark read or clear one
   email, Campbooks offers to do the same to every one like it, and to new
   ones: it says which mail and how many, shows a few, and makes a rule with
