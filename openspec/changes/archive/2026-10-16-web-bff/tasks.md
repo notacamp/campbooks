@@ -37,11 +37,11 @@
 
 ## 6. Follow-ups (not in this change)
 
-- [ ] 6.1 Sign-in / account UI in the web app once the design system lands; consume `useSession()`
-- [ ] 6.2 Decide the logout UX with Rauthy (see `decisions-needed.md`)
-- [ ] 6.3 Rate-limit `/bff/login` per client address
-- [ ] 6.4 Previous-key support for `CAMPBOOKS_SECRET_KEY` once something durable is encrypted with it
-- [ ] 6.5 A "your sessions" page (list and end sessions; the user-agent hint is stored for it)
+- [x] 6.1 Sign-in / account UI in the web app once the design system lands; consume `useSession()` — shipped: `SessionGate`, `AccountMenu` (`identity-sign-in-screens`, `first-run-ui`)
+- [x] 6.2 Decide the logout UX with Rauthy (see `decisions-needed.md`) — obsolete: Rauthy removed (ADR 0014); sign-out is `identity.end_session`
+- [x] 6.3 Rate-limit `/bff/login` per client address — shipped: `LOGIN_LIMIT` per client address (`2026-10-16-api-rate-limits`)
+- [x] 6.4 Previous-key support for `CAMPBOOKS_SECRET_KEY` once something durable is encrypted with it — moved to campbooks-cloud#191
+- [x] 6.5 A "your sessions" page (list and end sessions; the user-agent hint is stored for it) — moved to campbooks-cloud#192
 
 ## 7. Wrap-up
 
