@@ -128,6 +128,7 @@ export {
   type MessageComposerProps,
 } from "./components/MessageComposer/MessageComposer";
 export { NavItem, type NavItemProps } from "./components/NavItem/NavItem";
+export { Offer, type OfferProps } from "./components/Offer/Offer";
 export {
   Note,
   type NoteChoice,
@@ -137,6 +138,7 @@ export {
   type NoteQuote,
 } from "./components/Note/Note";
 export { Pill, type PillProps } from "./components/Pill/Pill";
+export { Progress, type ProgressProps } from "./components/Progress/Progress";
 export { ProviderMark, type ProviderMarkProps } from "./components/ProviderMark/ProviderMark";
 export {
   Popover,

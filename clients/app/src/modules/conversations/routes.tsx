@@ -15,6 +15,7 @@ import { Button } from "~/lib/ui";
 import { isStream } from "./api/queries";
 import { InboxScreen } from "./components/InboxScreen/InboxScreen";
 import { NewMessage } from "./components/NewMessage/NewMessage";
+import { TeachOnceProvider } from "./components/TeachOnce/TeachOnce";
 import { renderReplyComposer } from "./components/ReplyComposer/ReplyComposer";
 
 /** `/w/$workspaceId/inbox…`: a stream, and the conversation open in it. */
@@ -41,19 +42,21 @@ function InboxPage() {
     );
   }
   return (
-    <InboxScreen
-      key={`${workspaceId}:${stream}`}
-      workspaceId={workspaceId}
-      stream={stream}
-      conversationId={params.conversationId}
-      renderReplySlot={renderReplyComposer}
-      startReply={search.reply === true}
-      composeAction={
-        <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
-          {t("compose.newMessage")}
-        </Button>
-      }
-    />
+    <TeachOnceProvider workspaceId={workspaceId}>
+      <InboxScreen
+        key={`${workspaceId}:${stream}`}
+        workspaceId={workspaceId}
+        stream={stream}
+        conversationId={params.conversationId}
+        renderReplySlot={renderReplyComposer}
+        startReply={search.reply === true}
+        composeAction={
+          <Button variant="primary" icon="plus" shortcut="compose.new" onClick={compose}>
+            {t("compose.newMessage")}
+          </Button>
+        }
+      />
+    </TeachOnceProvider>
   );
 }
 

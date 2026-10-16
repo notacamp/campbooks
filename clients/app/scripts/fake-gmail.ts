@@ -488,8 +488,26 @@ function appendMessage(
   return message;
 }
 
+/**
+ * `count` more issues of the Design Notes digest, a few hours apart (so
+ * hundreds fit in the window a first sync reads): mail that looks the same,
+ * for teaching once (`--lookalikes` of the fake provider).
+ */
+function lookalikes(me: string, count: number): DemoMessage[] {
+  const topics = ["typography", "colour", "forms", "motion", "tables", "empty states"];
+  return Array.from({ length: count }, (_, index) => ({
+    from: "Design Notes <digest@design-notes.example>",
+    to: me,
+    subject: `This week: ${topics[index % topics.length] ?? "layout"} (issue ${String(count + 120 - index)})`,
+    hoursAgo: 34 + index * 3,
+    labels: ["INBOX", "CATEGORY_PROMOTIONS"],
+    headers: { "List-Unsubscribe": "<mailto:leave@design-notes.example>", Precedence: "list" },
+    text: "Three short essays, and what we read this week.",
+  }));
+}
+
 /** A new demo mailbox for `address`. */
-export function createMailbox(address: string, images: string): Mailbox {
+export function createMailbox(address: string, images: string, extra = 0): Mailbox {
   const mailbox: Mailbox = {
     address,
     messages: [],
@@ -499,7 +517,7 @@ export function createMailbox(address: string, images: string): Mailbox {
   };
   const threads = new Map<string, { threadId: string; messageId: string }>();
   const now = Date.now();
-  for (const demo of demoMessages(address, images)) {
+  for (const demo of [...demoMessages(address, images), ...lookalikes(address, extra)]) {
     const date = new Date(now - demo.hoursAgo * 3_600_000);
     const messageId = `<${hex(6)}@demo.example>`;
     const parent = demo.replyTo === undefined ? undefined : threads.get(demo.replyTo);

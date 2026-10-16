@@ -87,6 +87,14 @@ export const CONVERSATIONS_SHORTCUTS = [
     label: "conversations:shortcuts.showImages",
   },
   {
+    // A taught rule's run: put back everything it changed (teach once).
+    id: "inbox.rule.undo_all",
+    keys: "shift+z",
+    scope: "global",
+    group: "item",
+    label: "conversations:shortcuts.undoAll",
+  },
+  {
     // Focus moves through the open messages' attachments; Enter opens one.
     id: "inbox.next_attachment",
     keys: "v",

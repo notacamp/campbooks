@@ -71,6 +71,9 @@ export const COMPONENT_TOKENS = [
   "toast-height",
   "overlay-width",
   "popover-width",
+  "offer-width",
+  "offer-max-height",
+  "progress-height",
   "narrow-width",
   "row-text-min",
 ] as const;

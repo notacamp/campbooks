@@ -162,7 +162,8 @@
     "forward": "Transférer",
     "showImages": "Afficher les images",
     "nextAttachment": "Pièce jointe suivante",
-    "notNeeded": "Pas nécessaire (ou c’est sûr)"
+    "notNeeded": "Pas nécessaire (ou c’est sûr)",
+    "undoAll": "Annuler tout ce qu’a fait une règle"
   },
   "compose": {
     "title": {
@@ -270,6 +271,205 @@
       "confirmed": "Merci · {{name}} reste dans votre liste",
       "failed": "Impossible de modifier {{name}} : rien n’a changé. Réessayez.",
       "changed": "{{name}} a changé pendant que vous regardiez : jetez-y un nouveau coup d’œil."
+    }
+  },
+  "rules": {
+    "sentence": "Les e-mails {{conditions}} → {{actions}}",
+    "when": {
+      "from": "de {{value}}",
+      "list": "de la liste {{value}}",
+      "like": "comme « {{value}} »",
+      "about": "sur « {{value}} »",
+      "header": "avec un en-tête de liste",
+      "label": "avec une étiquette",
+      "stream": "dans {{value}}"
+    },
+    "do": {
+      "archive": "archivés",
+      "label": "étiquetés",
+      "read": "marqués comme lus",
+      "needsReply": "demandent une réponse",
+      "noReply": "ne demandent jamais de réponse",
+      "asksAction": "demandent quelque chose",
+      "noAction": "ne demandent jamais rien",
+      "always": "toujours gardés dans la boîte de réception",
+      "never": "n’ont jamais besoin de vous"
+    },
+    "likeness": {
+      "sender": "Tout ce qui vient de {{address}}",
+      "list": "Seulement la liste {{list}}",
+      "template": "Seulement « {{template}} » de {{from}}"
+    },
+    "offer": {
+      "which": "Quels e-mails",
+      "question": {
+        "move_one": "Déplacer celui qui lui ressemble vers {{stream}}, et les nouveaux aussi ?",
+        "move_other": "Déplacer les {{n}} comme celui-ci vers {{stream}}, et les nouveaux aussi ?",
+        "archive_one": "Archiver celui qui lui ressemble, et les nouveaux aussi ?",
+        "archive_other": "Archiver les {{n}} comme celui-ci, et les nouveaux aussi ?",
+        "read_one": "Marquer comme lu celui qui lui ressemble, et les nouveaux aussi ?",
+        "read_other": "Marquer comme lus les {{n}} comme celui-ci, et les nouveaux aussi ?",
+        "clear_one": "Dire que celui qui lui ressemble n’a jamais besoin de vous, et les nouveaux aussi ?",
+        "clear_other": "Dire que les {{n}} comme celui-ci n’ont jamais besoin de vous, et les nouveaux aussi ?"
+      },
+      "accept": {
+        "move_one": "Le déplacer",
+        "move_other": "Déplacer les {{n}}",
+        "archive_one": "L’archiver",
+        "archive_other": "Archiver les {{n}}",
+        "read_one": "Le marquer comme lu",
+        "read_other": "Marquer les {{n}} comme lus",
+        "clear_one": "Le retirer",
+        "clear_other": "Retirer les {{n}}"
+      },
+      "justThis": "Seulement celui-ci",
+      "safe": "Aucun ne semble suspect.",
+      "shared": "Pour tout le monde dans {{inbox}}.",
+      "more": "et {{n}} de plus",
+      "foot": "Cela devient une règle. Vous pouvez l’annuler, ou la retirer plus tard.",
+      "questionAtLeast": {
+        "move": "Déplacer tous ceux comme celui-ci (au moins {{n}}) vers {{stream}}, et les nouveaux aussi ?",
+        "archive": "Archiver tous ceux comme celui-ci (au moins {{n}}), et les nouveaux aussi ?",
+        "read": "Marquer comme lus tous ceux comme celui-ci (au moins {{n}}), et les nouveaux aussi ?",
+        "clear": "Dire que tous ceux comme celui-ci (au moins {{n}}) n’ont jamais besoin de vous, et les nouveaux aussi ?"
+      },
+      "choose": {
+        "move": "Déplacer les e-mails comme celui-ci vers {{stream}}, et les nouveaux aussi ? Choisissez lesquels.",
+        "archive": "Archiver les e-mails comme celui-ci, et les nouveaux aussi ? Choisissez lesquels.",
+        "read": "Marquer comme lus les e-mails comme celui-ci, et les nouveaux aussi ? Choisissez lesquels.",
+        "clear": "Dire que les e-mails comme celui-ci n’ont jamais besoin de vous, et les nouveaux aussi ? Choisissez lesquels."
+      },
+      "acceptAtLeast": {
+        "move": "Tous les déplacer",
+        "archive": "Tous les archiver",
+        "read": "Tous les marquer comme lus",
+        "clear": "Tous les retirer"
+      },
+      "suspicious_one": "{{n}} qui semble suspect reste où il est.",
+      "suspicious_other": "{{n}} qui semblent suspects restent où ils sont.",
+      "dismissFailed": "Campbooks n’a pas pu enregistrer « Seulement celui-ci » : il pourrait le proposer à nouveau.",
+      "partial": "Campbooks n’a regardé qu’une partie de cette boîte : il peut y en avoir plus."
+    },
+    "run": {
+      "working": {
+        "move_one": "Déplacement de {{n}} vers {{stream}} en cours",
+        "move_other": "Déplacement de {{n}} vers {{stream}} en cours",
+        "archive_one": "Archivage de {{n}} en cours",
+        "archive_other": "Archivage de {{n}} en cours",
+        "read_one": "Marquage de {{n}} comme lu en cours",
+        "read_other": "Marquage de {{n}} comme lus en cours",
+        "clear_one": "Retrait de {{n}} en cours",
+        "clear_other": "Retrait de {{n}} en cours",
+        "revert_one": "Remise en place de {{n}} en cours",
+        "revert_other": "Remise en place de {{n}} en cours"
+      },
+      "progress": "{{done}} sur {{total}} vérifiés",
+      "keepWorking": "Vous pouvez continuer à travailler. Votre messagerie suit en arrière-plan.",
+      "done": {
+        "move_one": "{{n}} déplacé vers {{stream}}. Les nouveaux iront là aussi.",
+        "move_other": "{{n}} déplacés vers {{stream}}. Les nouveaux iront là aussi.",
+        "archive_one": "{{n}} archivé. Les nouveaux le seront aussi.",
+        "archive_other": "{{n}} archivés. Les nouveaux le seront aussi.",
+        "read_one": "{{n}} marqué comme lu. Les nouveaux le seront aussi.",
+        "read_other": "{{n}} marqués comme lus. Les nouveaux le seront aussi.",
+        "clear_one": "{{n}} retiré. Les nouveaux n’auront pas besoin de vous.",
+        "clear_other": "{{n}} retirés. Les nouveaux n’auront pas besoin de vous.",
+        "revert_one": "{{n}} remis en place. La règle est retirée.",
+        "revert_other": "{{n}} remis en place. La règle est retirée."
+      },
+      "undoAll": "Tout annuler",
+      "close": "Fermer",
+      "failed": "Campbooks n’a pas pu créer cette règle. Rien n’a changé.",
+      "finding": "Recherche de tous les e-mails comme celui-ci",
+      "counting": "Décompte…",
+      "undoing": "Remise en place de ce que la règle a modifié…",
+      "stopped_one": "Arrêtée après en avoir modifié {{n}}. La règle n’agit plus.",
+      "stopped_other": "Arrêtée après en avoir modifié {{n}}. La règle n’agit plus.",
+      "stoppedNone": "Arrêtée avant de modifier quoi que ce soit. La règle n’agit plus.",
+      "removed": "Cette règle a été retirée : elle n’agit plus.",
+      "leftAlone_one": "{{n}} laissé tel quel : il semble suspect.",
+      "leftAlone_other": "{{n}} laissés tels quels : ils semblent suspects.",
+      "undoFailed": "Campbooks n’a pas pu annuler cette règle. Rien n’a été remis en place.",
+      "loadFailed": "Campbooks n’a pas pu charger l’avancement de cette règle."
+    },
+    "toast": {
+      "made": "Nouvelle règle · {{rule}}",
+      "stopped": "Règle retirée · {{rule}}",
+      "kept": "Règle gardée · {{rule}}",
+      "declined": "Règle refusée · {{rule}}",
+      "failed": "Campbooks n’a pas pu modifier cette règle. Rien n’a changé."
+    },
+    "row": {
+      "move": "Campbooks a déplacé celui-ci",
+      "archive": "Campbooks a archivé celui-ci",
+      "read": "Campbooks a marqué celui-ci comme lu",
+      "label": "Campbooks a étiqueté celui-ci",
+      "needsReply": "Selon Campbooks, celui-ci demande une réponse",
+      "noReply": "Selon Campbooks, celui-ci ne demande pas de réponse",
+      "asksAction": "Selon Campbooks, celui-ci demande quelque chose",
+      "noAction": "Selon Campbooks, celui-ci ne demande rien",
+      "always": "Campbooks garde celui-ci dans la boîte de réception",
+      "never": "Selon Campbooks, celui-ci n’a jamais besoin de vous",
+      "withOthers": "{{line}} · {{others}}",
+      "others_one": "comme {{n}} autre {{from}}",
+      "others_other": "comme {{n}} autres {{from}}"
+    },
+    "reader": {
+      "stop": "Arrêter de faire ça"
+    },
+    "exception": {
+      "remove": "Retirer la règle",
+      "keep": "La garder",
+      "question_one": "Remis en place une fois ces 30 derniers jours. Garder la règle « {{rule}} » ?",
+      "question_other": "Remis en place {{n}} fois ces 30 derniers jours. Garder la règle « {{rule}} » ?"
+    },
+    "origin": {
+      "action": {
+        "you": "Vous l’avez enseignée en traitant un e-mail",
+        "named": "{{name}} l’a enseignée en traitant un e-mail",
+        "someone": "Enseignée en traitant un e-mail"
+      },
+      "onboarding": {
+        "you": "D’après vos réponses à la configuration",
+        "named": "D’après les réponses de {{name}} à la configuration",
+        "someone": "D’après les réponses à la configuration"
+      },
+      "instruction": {
+        "you": "D’après vos propres mots : « {{text}} »",
+        "named": "D’après les mots de {{name}} : « {{text}} »",
+        "someone": "D’après les mots d’un membre : « {{text}} »"
+      },
+      "correction": {
+        "you": "Suggérée d’après vos corrections",
+        "named": "Suggérée d’après les corrections de {{name}}",
+        "someone": "Suggérée d’après les corrections dans cette boîte"
+      },
+      "suggestion": "Suggérée par Campbooks"
+    },
+    "list": {
+      "label": "Règles",
+      "waiting": "En attente de votre réponse",
+      "keep": "Garder cette règle",
+      "no": "Non",
+      "remove": "Retirer",
+      "removeQuestion": "Retirer cette règle ? Les nouveaux e-mails ne seront plus modifiés par elle.",
+      "confirmRemove": "Retirer",
+      "cancel": "Garder",
+      "forEveryone": "Pour tout le monde",
+      "paused": "En pause : la personne qui l’a enseignée ne peut plus modifier cette boîte",
+      "empty": "Pas encore de règles. Quand vous déplacez, archivez ou retirez un e-mail, Campbooks propose de faire de même pour ceux qui lui ressemblent.",
+      "leave": "Les laisser tels quels",
+      "changedMail": "Les e-mails qu’elle a modifiés",
+      "applied_one": "{{n}} jusqu’ici",
+      "applied_other": "{{n}} jusqu’ici",
+      "exceptions_one": "{{n}} remis en place ces 30 derniers jours",
+      "exceptions_other": "{{n}} remis en place ces 30 derniers jours",
+      "putBack_one": "Remettre aussi en place celui qu’elle a modifié",
+      "putBack_other": "Remettre aussi en place les {{n}} qu’elle a modifiés",
+      "lastActed": "Dernière action {{time}}",
+      "failed": "Impossible de charger les règles",
+      "retry": "Réessayer",
+      "inbox": "Une boîte de réception"
     }
   }
 }

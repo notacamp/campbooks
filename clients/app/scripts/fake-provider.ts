@@ -51,7 +51,12 @@ import {
 type Provider = "google" | "microsoft" | "zoho";
 
 const { values } = parseArgs({
-  options: { provider: { type: "string", default: "google" }, port: { type: "string" } },
+  options: {
+    provider: { type: "string", default: "google" },
+    port: { type: "string" },
+    // Extra issues of a demo newsletter, so teaching once has lookalikes.
+    lookalikes: { type: "string", default: "0" },
+  },
 });
 const provider = values.provider as Provider;
 const DEFAULT_PORTS: Record<Provider, string> = { google: "9050", microsoft: "9051", zoho: "9052" };
@@ -133,7 +138,7 @@ function zohoMailboxOf(sub: string): ZohoMailbox {
 function mailboxOf(sub: string): Mailbox {
   let mailbox = mailboxes.get(sub);
   if (mailbox === undefined) {
-    mailbox = createMailbox(person.email, `${base}/images`);
+    mailbox = createMailbox(person.email, `${base}/images`, Number(values.lookalikes));
     mailboxes.set(sub, mailbox);
   }
   return mailbox;
