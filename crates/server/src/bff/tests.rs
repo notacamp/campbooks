@@ -714,7 +714,17 @@ async fn a_sign_in_keeps_the_scopes_it_started_with(db: PgPool) {
     let login = browser.get("/bff/login?return_to=%2F").await;
     exec(&h.db, "UPDATE bff.login_transactions SET scopes = 'openid'").await;
     let callback = h.idp.authorize(login.header(header::LOCATION).unwrap());
-    browser.get(&path_and_query(&callback)).await;
+    let landed = browser.get(&path_and_query(&callback)).await;
+    assert_eq!(landed.status, StatusCode::OK, "{}", landed.body);
+    assert_eq!(
+        count(
+            &h.db,
+            "SELECT count(*) FROM bff.sessions WHERE scopes = 'openid'"
+        )
+        .await,
+        1,
+        "the session keeps what its sign-in asked for"
+    );
     assert_eq!(
         browser.get("/bff/session").await.json()["authenticated"],
         false
