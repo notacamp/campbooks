@@ -252,7 +252,28 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
     story("Administrators read the day's usage (GET /admin/v1/system/ai-usage)");
     let today = w.usage("").await;
     assert_eq!(today.status, StatusCode::OK, "{}", today.json);
-    println!("{}", serde_json::to_string_pretty(&today.json).unwrap());
+    println!(
+        "    day {}, cap {}, resets {}",
+        today.json["day"], today.json["cap"], today.json["resets_at"]
+    );
+    for usage in today.json["workspaces"].as_array().unwrap() {
+        let name = if usage["workspace_id"] == acme.to_string() {
+            "acme"
+        } else {
+            "studio"
+        };
+        let used = &usage["uses"][0];
+        println!(
+            "    {name:<7} calls {} refused {} capped {} remaining {}  ({} {}: {} prompt tokens)",
+            usage["calls"],
+            usage["refused"],
+            usage["capped"],
+            usage["remaining"],
+            used["role"],
+            used["feature"],
+            used["prompt_tokens"],
+        );
+    }
     let workspaces = today.json["workspaces"].as_array().unwrap();
     assert_eq!(today.json["cap"], 2);
     assert_eq!(workspaces[0]["workspace_id"], acme.to_string());
