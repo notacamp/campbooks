@@ -667,7 +667,7 @@ mod tests {
         .fetch_all(&db)
         .await
         .unwrap();
-        assert_eq!(rows.len(), 3 * 6);
+        assert_eq!(rows.len(), 3 * 7);
         // Recorded with the envelope version (context 2, the facts) and the
         // stamp of the passed answers check.
         assert!(rows.iter().all(

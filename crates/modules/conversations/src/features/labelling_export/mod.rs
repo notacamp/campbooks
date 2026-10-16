@@ -171,7 +171,7 @@ async fn labelling_item(state: &AppState, ws: &str, n: usize, row: Row) -> Resul
         "lang": OWNER,
         // Alternate dev and test: thresholds are fitted on one half and
         // reported on the other.
-        "split": if n % 2 == 0 { "dev" } else { "test" },
+        "split": if n.is_multiple_of(2) { "dev" } else { "test" },
         "workspace": OWNER,
         "hard": [],
         "message": {
