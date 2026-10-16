@@ -260,6 +260,20 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **HTML email renders with its own styles, safely (campbooks-cloud#160).** Newsletters,
+  receipts and Outlook or Gmail replies looked broken: their style sheets were dropped
+  (the page's policy blocks them in the mail frame too), the document title and hidden
+  preview text showed up in the body, the frame's height was a guess (mail was cut short
+  or padded, and long mail scrolled inside its frame) and a 600px layout did not fit a
+  phone. Now the server inlines a message's style sheets into `style` attributes before
+  sanitising (never fetching a linked or imported sheet), filters every declaration with a
+  real CSS parser (nothing that loads or runs survives: no `url()`, `@import`,
+  `expression()`, `var()`, escapes), and returns the message's `@media` rules, filtered the
+  same way, in a new `css` field of the message body. The reader's frame is as tall as its
+  content, shrinks a layout wider than the reader to fit, and applies the `@media` rules to
+  the frame only. It still never runs a script, submits a form or loads a remote image
+  before "Show images"; tracking pixels sized or hidden by their style are now removed
+  too. The page's own policy is unchanged.
 - **A need settled while its follow-up waited is no longer overwritten.** When a first
   "needs you" was put off because its message was busy, the follow-up could store it from
   what it had read before waiting: an open need on a conversation archived meanwhile, or
