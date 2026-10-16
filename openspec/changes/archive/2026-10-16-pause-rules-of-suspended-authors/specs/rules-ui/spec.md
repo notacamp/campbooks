@@ -9,7 +9,7 @@ for a yes first under "Waiting for you", then each inbox's under its address,
 each with where it came from (an action, onboarding answers, the user's own
 words quoted, corrections, a suggestion), how many conversations it changed,
 when it last acted, how many the user changed back, "For everyone" in a
-shared inbox, and, when it is paused, why, from its `paused_reason`: its
+shared inbox, and, when it is paused, first on its line, why, from its `paused_reason`: its
 author can no longer change the inbox, its author is suspended, a member
 paused it, or the inbox is kept read-only. With no rule it SHALL say how
 rules come about.
@@ -20,4 +20,4 @@ rules come about.
 
 #### Scenario: A suspended author's rule
 - **WHEN** a rule is listed with `state` `paused` and `paused_reason` `author_suspended`
-- **THEN** it is muted and reads "Paused while whoever taught it is suspended"
+- **THEN** it is muted and its line starts "Paused while whoever taught it is suspended"

@@ -8,6 +8,18 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A suspended member's rules pause until the suspension is lifted.** A rule acts in
+  its author's name, so while an administrator has the author's account suspended their
+  rules read as paused, exactly as when the author can no longer change the inbox: they
+  leave new mail alone, a run over existing mail stops at its next batch, and previews
+  and suggestions no longer count them. Unsuspending makes them act again, with nothing
+  to redo (a run they stopped is not restarted). The identity module now also publishes
+  `identity.account_unsuspended`, both suspension events carry an ordered `at`, and the
+  workspaces module announces each in every workspace of the account
+  (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
+  `20261020210000_conversations__member_suspensions`. An account suspended before this
+  version keeps its rules acting until an administrator unsuspends and suspends it again
+  (campbooks-cloud#147).
 - **A database transaction that names no workspace now sees nothing.** The kernel's
   event log, job queue, change feed and blob catalogue used to show every workspace's
   rows to any transaction that set no workspace, which is how background work crossed
@@ -912,6 +924,10 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
+- **The rules list says why a rule is paused**, first on its line: its author can no
+  longer change the inbox, its author is suspended, a member paused it, or the inbox is
+  kept read-only (`RuleView.paused_reason`). A rule a member paused no longer claims its
+  author lost access.
 - Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
   audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
   applies to an outside identity provider. Nothing to do: tokens last ten minutes, and

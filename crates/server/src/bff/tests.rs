@@ -1535,7 +1535,9 @@ async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
         .unwrap();
     tx.commit().await.unwrap();
     let stats = Worker::new(state).run_until_idle().await;
-    assert_eq!(stats.succeeded, 1, "{stats:?}");
+    // The BFF ends the sessions; the workspaces module announces the
+    // suspension in the account's workspaces (none here).
+    assert_eq!((stats.succeeded, stats.failed), (2, 0), "{stats:?}");
 
     let mut signed_in = Vec::new();
     for browser in &mut browsers {

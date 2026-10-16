@@ -110,7 +110,11 @@ accounts suspended and then lifted before this change, because those lifts
 left no event. So:
 
 - no automatic backfill;
-- before release the operator counts suspended accounts
+- on a self-hosted instance, an administrator who has suspended accounts
+  unsuspends and suspends each again (Admin → People), which publishes both
+  events; it signs nobody in, because sessions and refresh tokens stay
+  revoked and the person would have to sign in within that moment;
+- on the hosted cloud, before release the operator counts suspended accounts
   (`SELECT count(*) FROM identity.accounts WHERE disabled_at IS NOT NULL`);
   if there are any, for each one they enqueue the account's newest
   `identity.account_suspended` event to `workspaces.announce_member_suspended`
