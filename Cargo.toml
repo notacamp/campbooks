@@ -78,7 +78,7 @@ unicode-security = "0.1.2"
 
 # Errors, observability, misc
 # The Public Suffix List, compiled in (no runtime fetch): the registrable
-# domain of a sender (`decide::signals::email`).
+# domain of a sender (`decide::signals::facts`).
 psl = "2.1.241"
 thiserror = "2.0.21"
 anyhow = "1.0.104"

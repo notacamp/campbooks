@@ -542,7 +542,7 @@ async fn a_trash_round_trip_keeps_a_members_confirmation_and_done(db: PgPool) {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn a_refresh_beside_a_spam_move_cannot_store_a_need_after_it(db: PgPool) {
+async fn a_first_need_is_not_stored_for_a_message_mid_move(db: PgPool) {
     let kit = Kit::new(db.clone()).await;
     let (workspace, _, _) = sams_needs(&kit).await;
     let conversation = kit.conversation_of("needs-1").await;
@@ -586,14 +586,14 @@ async fn a_refresh_beside_a_spam_move_cannot_store_a_need_after_it(db: PgPool) {
             tx.commit().await.unwrap();
         })
     };
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-    assert!(
-        !refreshing.is_finished(),
-        "the refresh waits for the move instead of reading around it"
-    );
-
+    // It does not wait for the move (a wait here could deadlock with a
+    // request holding the needs row), and stores nothing for a message that
+    // is mid-change: the move's own refresh decides.
+    tokio::time::timeout(std::time::Duration::from_secs(10), refreshing)
+        .await
+        .expect("the refresh never waits on a message")
+        .unwrap();
     moving.commit().await.unwrap();
-    refreshing.await.unwrap();
     let open: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid",
     )
@@ -602,4 +602,64 @@ async fn a_refresh_beside_a_spam_move_cannot_store_a_need_after_it(db: PgPool) {
     .await
     .unwrap();
     assert_eq!(open, 0, "no need is stored for a message that is in spam");
+
+    // The move's own refresh, as `apply_changes` runs it before it commits,
+    // has the last word; with the message in spam there is no need.
+    let mut tx = kit.state.db.begin_for(workspace).await.unwrap();
+    crate::domain::needs::refresh(
+        &mut tx,
+        &kit.state.events,
+        &workspace.to_string(),
+        conversation.parse().unwrap(),
+        &crate::domain::needs::NeedSettings::new(
+            36_500,
+            &crate::domain::policy::Policy::baseline(),
+        ),
+    )
+    .await
+    .unwrap();
+    tx.commit().await.unwrap();
+    let open: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid",
+    )
+    .bind(&conversation)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(open, 0);
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn a_member_s_done_does_not_wait_on_a_batch_updating_the_message(db: PgPool) {
+    let kit = Kit::new(db).await;
+    let (workspace, _, sam) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-2").await;
+    let message = kit.message_of("needs-2").await;
+
+    // A sync batch has updated the message row and not committed.
+    let mut batch = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET read = true WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *batch)
+        .await
+        .unwrap();
+
+    // Done completes without waiting for it (no needs-then-messages lock
+    // order against the batch's messages-then-needs).
+    let done = tokio::time::timeout(
+        std::time::Duration::from_secs(10),
+        kit.post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/conversations/{conversation}/need/resolve"),
+            Some(json!({"outcome": "done", "message_id": message})),
+        ),
+    )
+    .await
+    .expect("Done never waits on the batch's message lock");
+    assert_eq!(done.status, StatusCode::OK, "{:?}", done.json);
+    batch.commit().await.unwrap();
+    assert_eq!(
+        summary(&kit, &sam, workspace, "needs-2").await["need"],
+        Value::Null
+    );
 }

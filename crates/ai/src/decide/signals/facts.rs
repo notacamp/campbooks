@@ -214,11 +214,15 @@ impl Facts {
     /// the From domain nor a DKIM pass aligned with it. Absent results say
     /// nothing either way.
     pub fn authentication_failed(&self) -> bool {
-        let Some(results) = self
-            .authentication_results
-            .as_deref()
-            .and_then(auth_results::parse)
-        else {
+        let Some(value) = self.authentication_results.as_deref() else {
+            return false;
+        };
+        // A header too long to be a provider's (padded by a sender to hide a
+        // failure) is a failure: only an absent or unreadable one says nothing.
+        if auth_results::is_oversized(value) {
+            return true;
+        }
+        let Some(results) = auth_results::parse(value) else {
             return false;
         };
         let dmarc_failed = results
@@ -230,9 +234,11 @@ impl Facts {
     /// Whether `results` authenticate the From domain: exactly one `dmarc`
     /// result, `pass`, whose `header.from` is the From domain; or a
     /// `dkim=pass` whose signing domains all have the From domain's
-    /// registrable domain, provided no `dmarc` result says anything but
-    /// `pass` (an aligned signature that DMARC then refused, by policy or
-    /// otherwise, is not the sender's).
+    /// registrable domain, provided no `dmarc` result refuses it (`fail`,
+    /// `quarantine`, `reject`, `policy`: the domain's policy said no). `none`
+    /// (no policy published, RFC 7489 §11.2), `bestguesspass`, `temperror`
+    /// and `permerror` do not refuse: many small senders sign with DKIM and
+    /// publish no DMARC.
     fn authenticated(&self, results: &[auth_results::MethodResult]) -> bool {
         let host = domain(&self.from).to_ascii_lowercase();
         let from = registrable(&host);
@@ -252,7 +258,12 @@ impl Facts {
             let signer = signer.rsplit('@').next().unwrap_or_default();
             plain_domain(signer) && registrable(signer) == from
         };
-        let dmarc_refused = dmarc.iter().any(|r| r.result != "pass");
+        let dmarc_refused = dmarc.iter().any(|r| {
+            matches!(
+                r.result.as_str(),
+                "fail" | "quarantine" | "reject" | "policy"
+            )
+        });
         let dkim_pass = !dmarc_refused
             && results.iter().any(|r| {
                 let signers: Vec<_> = r.values("header.d").chain(r.values("header.i")).collect();
@@ -644,17 +655,25 @@ mod tests {
     #[test]
     fn a_signature_dmarc_refused_authenticates_nothing() {
         let dkim = "dkim=pass header.d=studio.example";
-        // DKIM passes, DMARC (by policy, or for any other result) does not.
+        // DKIM passes, the domain's DMARC policy refuses the mail.
         for dmarc in [
             "dmarc=fail (p=REJECT) header.from=studio.example",
-            "dmarc=none header.from=studio.example",
             "dmarc=quarantine header.from=studio.example",
-            "dmarc=temperror header.from=studio.example",
-            "dmarc=permerror header.from=studio.example",
+            "dmarc=reject header.from=studio.example",
             "dmarc=policy header.from=studio.example",
         ] {
             let results = format!("mx.example.com; {dkim}; {dmarc}");
             assert!(failed("ana@studio.example", &results), "{dmarc}");
+        }
+        // No policy published, or no verdict: the signature still counts.
+        for dmarc in [
+            "dmarc=none header.from=studio.example",
+            "dmarc=bestguesspass header.from=studio.example",
+            "dmarc=temperror header.from=studio.example",
+            "dmarc=permerror header.from=studio.example",
+        ] {
+            let results = format!("mx.example.com; {dkim}; {dmarc}");
+            assert!(!failed("ana@studio.example", &results), "{dmarc}");
         }
         // No DMARC result at all: the signature is enough.
         assert!(!failed(
@@ -673,6 +692,26 @@ mod tests {
                  dmarc=fail header.from=studio.example"
             )
         ));
+    }
+
+    #[test]
+    fn a_padded_results_header_fails_closed() {
+        // A sender pads the header past the cap to hide a DMARC failure.
+        let padded = format!(
+            "mx.example.com; dmarc=fail header.from=studio.example; spf=none (x{})",
+            " ".repeat(auth_results::MAX_LEN)
+        );
+        assert!(padded.len() > auth_results::MAX_LEN);
+        assert!(failed("ana@studio.example", &padded));
+        // Absent or unreadable results still say nothing.
+        assert!(!Facts::of(&mail("ana@studio.example", "x", "x", &[])).authentication_failed());
+        assert!(!failed("ana@studio.example", "mx.example.com; dmarc pass"));
+    }
+
+    #[test]
+    fn a_punycode_suffix_is_a_suffix() {
+        assert!(is_public_suffix("xn--55qx5d.cn"));
+        assert_eq!(registrable("a.b.xn--55qx5d.cn"), "b.xn--55qx5d.cn");
     }
 
     #[test]

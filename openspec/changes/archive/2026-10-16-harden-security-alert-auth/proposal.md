@@ -9,14 +9,15 @@ had no test.
 
 ## What Changes
 - A `dkim=pass` authenticates only when no `dmarc` result in the same header
-  says anything but `pass`.
-- An `Authentication-Results` value over 8 KiB reads as no results.
+  refuses it (`fail`, `quarantine`, `reject`, `policy`).
+- An `Authentication-Results` value over 8 KiB is unread and counts as
+  authentication failed (fail closed).
 - The registrable domain, and "a public suffix", come from the Public Suffix
   List (the `psl` crate, compiled in, ICANN and private sections), replacing
   the 24-entry list. A bare public suffix as From authenticates nothing.
-- A need refresh takes the message it reads `FOR SHARE` before the needs row,
-  so it cannot store an open need for a message a concurrent provider move to
-  spam or the trash is committing.
+- A conversation's first need is not stored for a message a concurrent
+  provider move to spam or the trash has locked (`FOR SHARE SKIP LOCKED`; it
+  never waits).
 - Tests: leaving spam re-raises the need; a trash round trip keeps a member's
   confirmation and a Done.
 

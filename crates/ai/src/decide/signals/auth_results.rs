@@ -38,10 +38,16 @@ impl MethodResult {
 /// results.
 pub const MAX_LEN: usize = 8 * 1024;
 
+/// Whether `value` is longer than [`MAX_LEN`]: not read, and not to be taken
+/// for an absent header (see `Facts::authentication_failed`).
+pub fn is_oversized(value: &str) -> bool {
+    value.len() > MAX_LEN
+}
+
 /// The results of `value` after its authserv-id, or `None` when it is
 /// malformed or longer than [`MAX_LEN`].
 pub fn parse(value: &str) -> Option<Vec<MethodResult>> {
-    if value.len() > MAX_LEN {
+    if is_oversized(value) {
         return None;
     }
     let segments = tokenise(value)?;

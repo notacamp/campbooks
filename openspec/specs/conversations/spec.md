@@ -1090,10 +1090,11 @@ may send from it.
 A message in spam or the trash SHALL never raise a need: a conversation's
 need SHALL come from its newest inbound message that is in neither, and a
 need whose own message moves to spam or the trash SHALL be cleared as
-`trashed`. Working out a need SHALL hold the messages it can come from
-against a concurrent move to spam or the trash (taking them before the need's
-own row), so that no open need is stored for a message after its move
-committed. A message that leaves spam or the trash SHALL raise its need again
+`trashed`. Working out a conversation's first need SHALL NOT store an open
+need for a message that a concurrent move to spam or the trash has locked
+(the move's own refresh decides), and SHALL NOT wait for it, so that no open
+need is stored for a message after its move committed and no request
+deadlocks with a sync batch. A message that leaves spam or the trash SHALL raise its need again
 as any message does; a member's Done or Not needed SHALL still hold, and a
 member's confirmation SHALL still make the reopened need theirs (basis
 `member`).
@@ -1116,7 +1117,11 @@ member's confirmation SHALL still make the reopened need theirs (basis
 
 #### Scenario: A move and a refresh at once
 - **WHEN** a decide pass refreshes a conversation while a provider move of its message to spam is not yet committed
-- **THEN** the refresh waits for the move and stores no need for that message
+- **THEN** the refresh stores no need for that message, without waiting for the move
+
+#### Scenario: Done during a sync batch
+- **WHEN** a member marks a need Done while a sync batch has updated its message and not committed
+- **THEN** Done completes without waiting for the batch
 
 ### Requirement: Security alerts are a to-do
 The email signals SHALL answer `asks_action` true with the reason

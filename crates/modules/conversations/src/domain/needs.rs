@@ -657,35 +657,39 @@ async fn live_conversation(
     }))
 }
 
-/// Hold the messages a need of conversation `id` can come from `FOR SHARE`
-/// until the transaction ends: its newest inbound message that is not in
-/// spam or the trash, and the message the stored need comes from.
+/// Whether the message an open need is about to be stored for can still
+/// carry it, checked on the locked row.
 ///
-/// A provider move to spam or the trash (`apply_changes`) updates the
-/// message row, and a refresh running beside it would otherwise read the
-/// message before that commits and store an open need after it. With the
-/// share lock the refresh waits for the move to commit and reads it (the
-/// next statements see the committed row); a move starting later waits for
-/// the refresh, and its own refresh then clears the need. Taken before the
-/// needs row is locked, the order a move takes them in (the message it
-/// updates, then the needs row in its refresh), so the two cannot wait on
-/// each other; the ids are locked in order, one statement.
-async fn lock_sources(tx: &mut Transaction<'_, Postgres>, id: ConversationId) -> Result<()> {
-    sqlx::query(
-        "SELECT m.id FROM conversations.messages m
-          WHERE m.id IN (
-                (SELECT id FROM conversations.messages
-                  WHERE conversation_id = $1 AND direction = 'inbound'
-                    AND NOT in_spam AND NOT in_trash
-                  ORDER BY sent_at DESC, id DESC LIMIT 1),
-                (SELECT message_id FROM conversations.needs WHERE conversation_id = $1))
-          ORDER BY m.id
-            FOR SHARE OF m",
+/// The race: a decide pass reads a message before a provider move to spam or
+/// the trash commits, then stores an open need after it. It exists only when
+/// the conversation has no needs row yet: with one, `current` locks it `FOR
+/// UPDATE`, which serialises refreshes, and the move's own refresh (the end
+/// of `apply_changes`) clears a stale need. So this runs only for a first
+/// insert, and it never waits: the message row is taken `FOR SHARE SKIP
+/// LOCKED`. A row someone else is changing (an uncommitted move, a flag
+/// update) is skipped, and nothing is stored: whoever changes a message
+/// refreshes its conversation before it commits, and that refresh decides.
+/// A row that is free is re-read under the share lock, which holds a later
+/// move back until this transaction ends.
+///
+/// Lock order, for every caller of [`refresh`]: no caller waits on a message
+/// lock here, so this adds no wait edge and no deadlock with the order the
+/// callers already take (`apply_changes`: messages, then the conversation's
+/// counts, then the needs row; `judge`, `reopen`: conversation, then the
+/// needs row; rules and flags: the conversation row; the decide pass and the
+/// backfill: the needs row). `judge` and `reopen` always have a needs row, so
+/// they never get here. The backfill keeps these share locks until its page
+/// commits; a conversation it skips because a message is mid-change is
+/// settled by that change's own refresh.
+async fn source_can_carry(tx: &mut Transaction<'_, Postgres>, message: MessageId) -> Result<bool> {
+    let free: Option<bool> = sqlx::query_scalar(
+        "SELECT NOT in_spam AND NOT in_trash FROM conversations.messages
+          WHERE id = $1 FOR SHARE SKIP LOCKED",
     )
-    .bind(id)
-    .fetch_all(&mut **tx)
+    .bind(message)
+    .fetch_optional(&mut **tx)
     .await?;
-    Ok(())
+    Ok(free == Some(true))
 }
 
 /// Work out conversation `id`'s need again and, when it changed, store it
@@ -703,7 +707,6 @@ pub async fn refresh(
         return Ok(());
     };
     let conversation_state = (conversation.archived, conversation.trashed);
-    lock_sources(tx, id).await?;
     let row = current(tx, id).await?;
     let Candidate {
         need,
@@ -725,6 +728,11 @@ pub async fn refresh(
         Settled::Open(need) => (need, None),
         Settled::Cleared(need, cause) => (need, Some(*cause)),
     };
+    // A first need for a message a move may be changing right now: store
+    // nothing, the move's refresh decides (see `source_can_carry`).
+    if row.is_none() && cause.is_none() && !source_can_carry(tx, need.message).await? {
+        return Ok(());
+    }
     if !worth_announcing(row.as_ref(), need, cause, latest)? {
         return Ok(());
     }

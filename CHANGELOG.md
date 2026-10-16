@@ -9,12 +9,12 @@ All notable changes to Campbooks Next are documented here. The format follows
 ### Security
 
 - **Sender authentication is read more strictly.** An aligned DKIM signature no longer
-  counts when DMARC says anything but pass for the same message, an authentication header
-  over 8 KiB is ignored, and "same organisation" now follows the real Public Suffix List
-  (so `x.com.br` and `y.com.br`, or two `github.io` sites, are never one sender) instead of
-  a 24-entry guess. Separately, a message that is being moved to spam or the trash can no
-  longer have an open "needs you" stored for it by a refresh running at the same moment.
-  No migration.
+  counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
+  an authentication header over 8 KiB is treated as a failure instead of being parsed, and
+  "same organisation" now follows the real Public Suffix List (so two `github.io` sites, or
+  suffixes such as `co.at`, are never one sender) instead of a 24-entry guess. Separately,
+  a message that is being moved to spam or the trash can no longer have a first "needs you"
+  stored for it by a refresh running at the same moment. No migration.
 - **Suspending an account or signing out everywhere stops its access tokens at once.**
   Tokens already issued used to keep working until they expired (up to ten minutes).
   Now the API refuses them on the next request (401 `invalid_token`, the same answer
