@@ -14,6 +14,7 @@ import {
   PageHero,
   Text,
 } from "~/lib/ui";
+import { ScoutOffer } from "~/modules/assistant";
 import { WhatNeedsYou } from "~/modules/attention";
 import { ConnectedMailboxes, useConnections } from "~/modules/connectors";
 import { useInboxes } from "~/modules/conversations";
@@ -97,7 +98,12 @@ export function Home() {
     return null;
   }
   if (inboxes.data !== undefined && inboxes.data.length > 0) {
-    return <WhatNeedsYou workspaceId={workspaceId ?? ""} />;
+    return (
+      <WhatNeedsYou
+        workspaceId={workspaceId ?? ""}
+        offer={<ScoutOffer workspaceId={workspaceId ?? ""} />}
+      />
+    );
   }
   return <EmptyHome />;
 }

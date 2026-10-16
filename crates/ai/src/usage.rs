@@ -61,6 +61,7 @@ tokio::task_local! {
 pub struct Scope {
     whose: Whose,
     feature: &'static str,
+    interactive: bool,
 }
 
 #[derive(Clone)]
@@ -76,7 +77,9 @@ impl fmt::Debug for Scope {
             Whose::Workspace { workspace, .. } => s.field("workspace", workspace),
             Whose::Instance => s.field("workspace", &"instance"),
         };
-        s.field("feature", &self.feature).finish()
+        s.field("feature", &self.feature)
+            .field("interactive", &self.interactive)
+            .finish()
     }
 }
 
@@ -87,7 +90,18 @@ impl Scope {
         Self {
             whose: Whose::Workspace { db, workspace },
             feature,
+            interactive: false,
         }
+    }
+
+    /// The same scope for calls a person is waiting on (the assistant
+    /// answering them): they may use the share of the cap that background
+    /// work leaves for people, so a mail flood cannot silence the
+    /// assistant.
+    #[must_use]
+    pub fn interactive(mut self) -> Self {
+        self.interactive = true;
+        self
     }
 
     /// The instance's own calls (the answers check): no workspace pays for
@@ -96,6 +110,7 @@ impl Scope {
         Self {
             whose: Whose::Instance,
             feature,
+            interactive: false,
         }
     }
 
@@ -124,6 +139,9 @@ pub struct MeteredCall<'a> {
     pub role: Role,
     /// The feature that asked (`conversations.triage`).
     pub feature: &'a str,
+    /// A person is waiting on it (`Scope::interactive`): it may use the
+    /// reserve background work leaves.
+    pub interactive: bool,
 }
 
 /// Whether a call may be made.
@@ -193,6 +211,7 @@ pub(crate) struct Ticket {
     workspace: WorkspaceId,
     role: Role,
     feature: &'static str,
+    interactive: bool,
     day: NaiveDate,
 }
 
@@ -212,6 +231,7 @@ impl Gateway {
             workspace,
             role,
             feature: scope.feature,
+            interactive: scope.interactive,
         };
         match meter.admit(&db, call).await {
             Ok(Admission::Admitted { day }) => Ok(Some(Ticket {
@@ -220,6 +240,7 @@ impl Gateway {
                 workspace,
                 role,
                 feature: scope.feature,
+                interactive: scope.interactive,
                 day,
             })),
             Ok(Admission::Refused { cap }) => Err(Error::OverDailyCap { cap }),
@@ -262,6 +283,7 @@ impl Ticket {
             workspace: self.workspace,
             role: self.role,
             feature: self.feature,
+            interactive: self.interactive,
         };
         if let Err(error) = self.meter.settle(&self.db, call, self.day, outcome).await {
             tracing::warn!(
@@ -356,7 +378,7 @@ mod tests {
         let scope = Scope::instance("ai.answers_check");
         assert_eq!(
             format!("{scope:?}"),
-            r#"Scope { workspace: "instance", feature: "ai.answers_check" }"#
+            r#"Scope { workspace: "instance", feature: "ai.answers_check", interactive: false }"#
         );
     }
 

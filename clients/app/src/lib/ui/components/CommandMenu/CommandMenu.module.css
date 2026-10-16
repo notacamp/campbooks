@@ -63,3 +63,22 @@
   font-size: var(--text-sm);
   color: var(--text-tertiary);
 }
+
+.chips {
+  padding: var(--space-2) var(--space-4) 0;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  border-top: var(--border-width) solid var(--border-subtle);
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1-5);
+}

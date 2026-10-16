@@ -29,11 +29,18 @@ from https://github.com/notacamp/campbooks-cloud/issues/20).
   concurrent workers never go past the cap. The first refusal of a day logs
   one plain line.
 - **Cap**: `CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`, model calls per
-  workspace per UTC day. Unset: 5,000. `0`: no cap.
+  workspace per UTC day. Unset: 5,000. `0`: no cap. A tenth of it is kept
+  for calls a person is waiting on (`Scope::interactive`): background work
+  stops that many calls short of the cap, so a mail flood cannot silence
+  the assistant.
 - **`conversations`**: the `decide` pass runs its call in the workspace's
   scope. Over the cap it stores nothing, exactly as when no model is
   configured: the message keeps what the facts and taught rules decided when
   it was stored. It is not re-queued.
+- **`assistant`**: compiling a sentence (`assistant.compile`, the one
+  user-initiated model call, which landed while this change was in review)
+  runs in an interactive scope; past the whole cap it answers 503
+  `ai_daily_limit_reached`, explained in four languages.
 - **Admin API**: `GET /admin/v1/system/ai-usage` (`system.admin_ai_usage`,
   permission `system.read`): a day's usage per workspace (calls, refused,
   remaining, by role and feature with tokens), workspaces that hit the cap
@@ -51,8 +58,6 @@ from https://github.com/notacamp/campbooks-cloud/issues/20).
 - A token or spend budget. Calls are the measure (see design); tokens are
   recorded for visibility. A token budget comes with the first `complete`
   caller, whose output length is not bounded the way `decide`'s is.
-- A reserve for interactive, user-initiated AI calls. No such call exists
-  yet; the scope is where it will go.
 - Re-running the model on mail skipped over the cap, automatically or on a
   person's request (a follow-up with the notice).
 - Pruning old ledger rows or dropping them when a workspace is purged (a few

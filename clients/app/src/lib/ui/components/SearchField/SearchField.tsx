@@ -86,24 +86,33 @@ export function SearchField({
           <KbdHint shortcut={shortcut} keys={keys} />
         )}
       </div>
-      {chips.length === 0 ? null : (
-        <ul className={styles["chips"]} aria-label={t("searchField.filters")}>
-          {chips.map((chip) => (
-            <li key={chip.id} className={styles["chip"]}>
-              <span className={styles["chipLabel"]}>{chip.label}</span>
-              <button
-                type="button"
-                className={styles["remove"]}
-                onClick={chip.onRemove}
-                aria-label={t("searchField.remove", { filter: chip.label })}
-              >
-                <Icon name="close" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <SearchFieldChips chips={chips} />
       {children}
     </div>
+  );
+}
+
+/** The understood filters as removable chips (wrapping on phones). */
+export function SearchFieldChips({ chips }: { chips: readonly SearchFieldChip[] }) {
+  const { t } = useTranslation("ui");
+  if (chips.length === 0) {
+    return null;
+  }
+  return (
+    <ul className={styles["chips"]} aria-label={t("searchField.filters")}>
+      {chips.map((chip) => (
+        <li key={chip.id} className={styles["chip"]}>
+          <span className={styles["chipLabel"]}>{chip.label}</span>
+          <button
+            type="button"
+            className={styles["remove"]}
+            onClick={chip.onRemove}
+            aria-label={t("searchField.remove", { filter: chip.label })}
+          >
+            <Icon name="close" />
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

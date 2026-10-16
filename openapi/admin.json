@@ -2382,6 +2382,15 @@
             "format": "date",
             "description": "The UTC day."
           },
+          "reserve": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Calls of the cap kept for what people ask themselves (the\nassistant): background work, such as reading new mail, stops this\nmany calls short of the cap. `null` when there is no cap.",
+            "minimum": 0
+          },
           "resets_at": {
             "type": "string",
             "format": "date-time",
@@ -3303,7 +3312,7 @@
               "null"
             ],
             "format": "int64",
-            "description": "Calls left today; `null` for another day or without a cap."
+            "description": "Calls left today, the reserve included; `null` for another day or\nwithout a cap."
           },
           "uses": {
             "type": "array",

@@ -5,9 +5,11 @@
 //!   conditional upsert on `system.ai_usage_days` (`calls < cap`), in the
 //!   workspace's transaction, together with `+1` on its role and feature in
 //!   `system.ai_usage`. Postgres serializes the upsert on the day's row, so
-//!   any number of workers admit at most the cap. Over the cap the call is
-//!   refused and counted as refused; the first refusal of the day logs one
-//!   line.
+//!   any number of workers admit at most the cap. Background work (the
+//!   mail's model pass) stops [`AiUsageMeter::reserve`] calls short of the
+//!   cap: the rest is kept for what people ask themselves (the assistant),
+//!   so a mail flood cannot silence it. Over its limit a call is refused
+//!   and counted as refused; the first refusal of the day logs one line.
 //! - **Settling** adds a call's failure and tokens to the day it was
 //!   admitted on (the gateway skips it when there is nothing to add).
 //!
@@ -50,6 +52,9 @@ impl Default for AiUsageMeter {
     }
 }
 
+/// The reserve for interactive calls is a tenth of the cap.
+const RESERVE_DIVISOR: u32 = 10;
+
 /// How an admission went, for the log and the tests.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Admitted {
@@ -81,6 +86,25 @@ impl AiUsageMeter {
         self.cap
     }
 
+    /// Calls of the cap kept for interactive calls, a person waiting on
+    /// them: a tenth of the cap, rounded up, leaving background work at
+    /// least one (500 of the default 5,000). `None` without a cap.
+    pub fn reserve(&self) -> Option<u32> {
+        self.cap
+            .map(|cap| cap.div_ceil(RESERVE_DIVISOR).min(cap.saturating_sub(1)))
+    }
+
+    /// The most calls `call` may find already made today: the cap for an
+    /// interactive call, the cap less the reserve for background work.
+    fn limit(&self, call: &MeteredCall<'_>) -> Option<u32> {
+        let cap = self.cap?;
+        if call.interactive {
+            Some(cap)
+        } else {
+            Some(cap - self.reserve().unwrap_or(0))
+        }
+    }
+
     /// Now, by the meter's clock.
     pub(crate) fn now(&self) -> DateTime<Utc> {
         self.clock.now()
@@ -101,8 +125,8 @@ impl AiUsageMeter {
     ) -> Result<Admitted, sqlx::Error> {
         let now = self.clock.now();
         let day = now.date_naive();
-        // A cap past `i32::MAX` is no cap in practice.
-        let cap = self.cap.and_then(|cap| i32::try_from(cap).ok());
+        // A limit past `i32::MAX` is no limit in practice.
+        let limit = self.limit(&call).and_then(|cap| i32::try_from(cap).ok());
         let workspace = *call.workspace.as_uuid();
         let mut tx = db.begin_for(call.workspace).await?;
         let calls = sqlx::query_scalar!(
@@ -113,7 +137,7 @@ impl AiUsageMeter {
                RETURNING d.calls"#,
             workspace,
             day,
-            cap,
+            limit,
         )
         .fetch_optional(&mut *tx)
         .await?;
@@ -153,8 +177,9 @@ impl AiUsageMeter {
             tracing::warn!(
                 workspace = %call.workspace,
                 cap,
+                reserve = self.reserve().unwrap_or(0),
                 "a workspace reached its daily AI limit; its new mail is sorted by rules only \
-                 until 00:00 UTC"
+                 until 00:00 UTC, and the reserve is kept for what people ask"
             );
         }
         Ok(admitted)

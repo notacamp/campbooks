@@ -1,0 +1,232 @@
+{
+  "offer": {
+    "title": "Diga ao Scout o que lhe importa",
+    "lead": "Três perguntas rápidas, todas opcionais. As suas respostas tornam-se regras que vê antes de serem guardadas.",
+    "start": "Começar",
+    "notNow": "Agora não",
+    "notNowFailed": "O Scout não conseguiu adiar as perguntas. Tente de novo."
+  },
+  "flow": {
+    "step": "{{step}} de {{total}}",
+    "next": "Seguinte",
+    "review": "Rever",
+    "skip": "Saltar",
+    "back": "Voltar",
+    "notNow": "Agora não",
+    "footer": "Pode alterar isto a qualquer momento na memória do Scout.",
+    "becomes": "Isto torna-se",
+    "always": {
+      "title": "De quem quer ver sempre o correio?",
+      "lead": "O correio destas pessoas fica na sua caixa de entrada e nunca é arquivado. São as pessoas a quem mais responde.",
+      "label": "Pessoas que quer ver sempre",
+      "noSenders": "Ainda não há correio para sugerir. Adicione um endereço ou um domínio abaixo.",
+      "count_one": "{{count}} email",
+      "count_other": "{{count}} emails"
+    },
+    "never": {
+      "title": "O que nunca precisa de si?",
+      "lead": "O Scout guarda-o e continua a organizá-lo. Só deixa de lhe perguntar por isso. O correio que pareça suspeito aparece sempre.",
+      "label": "O que nunca precisa de si",
+      "lists": "Newsletters e listas de correio",
+      "listsHint": "Correio com o cabeçalho List-Id",
+      "automatic": "Notificações automáticas",
+      "automaticHint": "Correio marcado como enviado automaticamente"
+    },
+    "add": {
+      "label": "Outra pessoa",
+      "placeholder": "Um endereço ou um domínio",
+      "button": "Adicionar",
+      "invalid": "Escreva um endereço completo (nome@example.com) ou um domínio (example.com).",
+      "freeMail": "{{domain}} é um fornecedor de email gratuito: uma regra para todo ele apanharia pessoas que não conhece. Adicione antes o endereço da pessoa."
+    },
+    "act": {
+      "title": "Quando o Scout tem a certeza, deve agir?",
+      "lead": "Trata-se das regras que o Scout propõe depois de corrigir a mesma coisa algumas vezes. Numa caixa partilhada, esperam sempre por um sim.",
+      "label": "Quando o Scout tem a certeza",
+      "askFirst": "Pergunte-me primeiro",
+      "askFirstHint": "O Scout propõe. Nada muda até dizer que sim.",
+      "actThenTell": "Faça e avise-me",
+      "actThenTellHint": "Numa caixa só sua, o Scout ativa a regra e avisa-o, com Anular."
+    },
+    "reviewStep": {
+      "title": "Eis o que o Scout vai fazer",
+      "rules_one": "{{count}} regra. Corre em cada email novo, antes de qualquer IA, e dá sempre o mesmo resultado.",
+      "rules_other": "{{count}} regras. Cada uma corre em cada email novo, antes de qualquer IA, e dá sempre o mesmo resultado.",
+      "none": "Nenhuma regra. O Scout continua a organizar o seu correio como hoje.",
+      "where": "Onde",
+      "yours": "A sua caixa de entrada",
+      "shared": "Para todos: partilhada com outras pessoas. Desligada até a ligar.",
+      "readOnly": "{{address}}: só pode lê-la, por isso não há regras aí.",
+      "existing": "Aplicar também ao correio que já tem",
+      "existingHint": "Caso contrário, só ao correio novo. Pode anular qualquer das opções.",
+      "askFirst": "Quando o Scout propõe uma regra a partir das suas correções, espera pelo seu sim.",
+      "actThenTell": "Quando o Scout propõe uma regra a partir das suas correções numa caixa só sua, ativa-a e avisa-o, com Anular.",
+      "save": "Guardar",
+      "saving": "A guardar",
+      "retry": "Tentar de novo",
+      "tryAgain": "Tentar de novo",
+      "inboxesFailed": "O Scout não conseguiu carregar as suas caixas de entrada, por isso não sabe onde estas regras podem ficar.",
+      "chooseInbox": "As suas caixas de entrada são partilhadas com outras pessoas, por isso as regras ficam desligadas até ligar uma acima.",
+      "nowhere": "Só pode ler as suas caixas de entrada, por isso estas regras não têm onde ficar. Volte atrás e salte-as, ou fale com quem gere a caixa.",
+      "rulesFailed": "O Scout não conseguiu guardar as regras. Nada foi guardado; tente de novo.",
+      "partial": "O Scout guardou {{saved}} de {{total}} e parou. Essas ficam guardadas; Tentar de novo guarda só o resto.",
+      "answersFailed": "O Scout não conseguiu guardar as suas respostas. Tente de novo; nada é guardado duas vezes."
+    },
+    "done": {
+      "title": "O Scout sabe o que lhe importa",
+      "lead_one": "{{count}} regra está ativa. Encontra-a na memória do Scout.",
+      "lead_other": "{{count}} regras estão ativas. Encontra-as na memória do Scout.",
+      "toast_one": "Guardada {{count}} regra e as suas respostas",
+      "toast_other": "Guardadas {{count}} regras e as suas respostas",
+      "home": "Abrir o Início",
+      "memory": "Ver a memória do Scout",
+      "leadAskFirst": "Nenhuma regra nova. A partir de agora, o Scout pergunta-lhe primeiro antes de agir.",
+      "leadActThenTell": "Nenhuma regra nova. A partir de agora, numa caixa só sua, o Scout age quando tem a certeza e avisa-o, com Anular.",
+      "leadSame": "Nenhuma regra nova, e as suas respostas são as mesmas de antes. Pode responder de novo a qualquer momento na memória do Scout.",
+      "toastAnswers": "As suas respostas foram guardadas"
+    },
+    "notNowFailed": "O Scout não conseguiu adiar as perguntas. Tente de novo, ou responda-lhes.",
+    "undoFailed": "O Scout não conseguiu anular isto. As suas regras estão na memória do Scout, onde as pode remover."
+  },
+  "rule": {
+    "tag": "Regra",
+    "alwaysFrom": "O correio de {{who}} fica sempre na sua caixa de entrada e nunca é arquivado.",
+    "neverFrom": "O correio de {{who}} nunca precisa de si.",
+    "neverLists": "As newsletters e listas de correio nunca precisam de si.",
+    "neverAutomatic": "As notificações automáticas nunca precisam de si.",
+    "when": "Quando {{conditions}}: {{actions}}.",
+    "anyoneAt": "qualquer pessoa em {{domain}}",
+    "cond": {
+      "sender_address": "o remetente é {{value}}",
+      "sender_domain": "o domínio do remetente é {{value}}",
+      "subject_contains": "o assunto contém “{{value}}”",
+      "subject_template": "o assunto diz “{{value}}”",
+      "list_id": "vem da lista {{value}}",
+      "header": {
+        "list_id": "vem de uma lista de correio",
+        "list_unsubscribe": "tem uma ligação para cancelar a subscrição",
+        "auto_submitted": "foi enviado automaticamente",
+        "precedence": "foi enviado em massa"
+      },
+      "label": "tem a etiqueta {{value}}",
+      "stream": "está em {{value}}"
+    },
+    "act": {
+      "move_to_stream": "movê-lo para {{value}}",
+      "archive": "arquivá-lo",
+      "add_label": "pôr-lhe a etiqueta {{value}}",
+      "mark_read": "marcá-lo como lido",
+      "needs_reply_true": "precisa de resposta",
+      "needs_reply_false": "não precisa de resposta",
+      "asks_action_true": "pede-lhe que faça algo",
+      "asks_action_false": "não lhe pede nada",
+      "surface_always": "mantê-lo na caixa de entrada e nunca o arquivar",
+      "surface_never": "nunca precisa de si"
+    },
+    "stream": {
+      "primary": "Principal",
+      "updates": "Atualizações",
+      "receipts": "Recibos",
+      "newsletters": "Newsletters"
+    },
+    "aLabel": "uma etiqueta",
+    "noMatches": "Ainda sem correio. Aplica-se à medida que chega.",
+    "matches_one": "Corresponde a {{count}} email",
+    "matches_other": "Corresponde a {{count}} emails",
+    "samples": "Emails a que corresponde"
+  },
+  "memory": {
+    "title": "Memória do Scout",
+    "lead": "O que o Scout sabe sobre como quer que aja. As regras correm primeiro, em cada email, sem IA.",
+    "teach": {
+      "title": "Ensine algo ao Scout",
+      "label": "O que deve o Scout fazer?",
+      "placeholder": "Por exemplo: tudo o que vem do meu contabilista é importante",
+      "privacy": "Só a sua frase é enviada, nunca o seu correio.",
+      "submit": "Ensinar",
+      "reading": "A ler a sua frase",
+      "readingLead": "Enviado para o modelo de linguagem: a sua frase, os endereços das suas caixas e os nomes dos seus fluxos e etiquetas. Nada do seu correio.",
+      "understood": "Eis a regra que entendi",
+      "understoodMany": "Eis as regras que entendi",
+      "youWrote": "Escreveu",
+      "who": "A quem se refere com “{{phrase}}”?",
+      "whoLead": "Só leio a sua frase, por isso indique-me quem é. Estas são as pessoas mais próximas no seu correio.",
+      "whoNoMatch": "Ninguém no seu correio corresponde. Estas são as pessoas a quem mais responde.",
+      "whoOther": "Outra pessoa",
+      "where": "Em {{inboxes}}",
+      "forEveryone": "Para todos em {{address}}",
+      "readOnly": "Só pode ler as suas caixas, por isso o Scout não pode guardar regras nelas.",
+      "existing": "Aplicar também ao correio que já tem",
+      "save": "Guardar regra",
+      "cancel": "Cancelar",
+      "saved_one": "Regra guardada",
+      "saved_other": "{{count}} regras guardadas",
+      "runsWithoutAi": "As regras guardadas correm sem IA. O mesmo email dá sempre o mesmo resultado.",
+      "closest": "A regra mais próxima que o Scout pode criar:",
+      "unsupported": {
+        "sends_mail": "O Scout não pode enviar, reencaminhar nem responder a correio. As regras só organizam, etiquetam, arquivam e mostram ou escondem.",
+        "deletes_mail": "O Scout não pode apagar correio. As regras só organizam, etiquetam, arquivam e mostram ou escondem.",
+        "not_about_mail": "Isso não é sobre o seu correio, por isso o Scout não pode fazer uma regra disso.",
+        "too_vague": "Isso não diz que correio. Indique um remetente, um domínio ou palavras do assunto."
+      },
+      "unclear": "O Scout não conseguiu transformar isso numa regra. Tente indicar um remetente, um domínio ou palavras do assunto, e o que fazer com esse correio.",
+      "failed": "O Scout não conseguiu ler a sua frase agora. Tente de novo daqui a pouco ou crie a regra você mesmo.",
+      "busy": "São muitas frases nesta hora. Tente mais tarde ou crie a regra você mesmo.",
+      "refused": {
+        "instruction_empty": "Escreva o que quer que o Scout faça com o seu correio.",
+        "instruction_too_long": "Use no máximo 300 caracteres: uma ou duas frases.",
+        "instruction_has_link": "Não inclua ligações. Diga que correio e o que fazer com ele.",
+        "instruction_pasted_mail": "Isto parece colado de um email. Diga por palavras suas que correio e o que fazer com ele."
+      },
+      "tryAgain": "Tentar de novo",
+      "inboxesFailed": "O Scout não conseguiu carregar as suas caixas de entrada, por isso não sabe onde esta regra pode ficar.",
+      "announce": "Eis a regra que percebi: {{rule}}",
+      "saveFailed": "O Scout não conseguiu guardar a regra. Tente de novo.",
+      "savePartial": "Guardada em {{saved}} de {{total}} caixas, e o Scout parou. Tentar de novo guarda-a nas restantes.",
+      "retry": "Tentar de novo"
+    },
+    "builder": {
+      "noModel": "Este servidor não tem um modelo de linguagem para ler frases, por isso crie a regra aqui.",
+      "when": "Quando",
+      "then": "Então",
+      "condition": "Que correio",
+      "action": "O que fazer",
+      "value": "Endereço, domínio ou palavras",
+      "conditions": {
+        "sender_address": "O remetente é",
+        "sender_domain": "O domínio do remetente é",
+        "subject_contains": "O assunto contém",
+        "list": "Vem de uma lista de correio",
+        "automatic": "Foi enviado automaticamente"
+      },
+      "actions": {
+        "always": "Mantê-lo na minha caixa de entrada",
+        "never": "Nunca precisa de mim",
+        "updates": "Movê-lo para Atualizações",
+        "newsletters": "Movê-lo para Newsletters",
+        "archive": "Arquivá-lo"
+      },
+      "show": "Mostrar a regra",
+      "byHand": "O Scout não conseguiu ler a sua frase, por isso crie a regra aqui."
+    },
+    "questions": {
+      "title": "As suas respostas",
+      "askFirst": "Quando o Scout propõe uma regra a partir das suas correções, espera pelo seu sim.",
+      "actThenTell": "Quando o Scout propõe uma regra a partir das suas correções numa caixa só sua, ativa-a e avisa-o, com Anular.",
+      "never": "Ainda não respondeu às perguntas do Scout.",
+      "again": "Responder de novo às perguntas",
+      "start": "Responder às perguntas",
+      "failed": "O Scout não conseguiu carregar as suas respostas agora."
+    },
+    "rules": "As suas regras"
+  },
+  "shortcuts": {
+    "skip": "Saltar esta pergunta",
+    "next": "Seguinte, ou guardar",
+    "back": "Voltar à pergunta anterior",
+    "offerStart": "Responder às perguntas do Scout",
+    "offerNotNow": "Adiar as perguntas do Scout",
+    "questions": "Responder de novo às perguntas do Scout",
+    "saveRule": "Guardar a regra"
+  }
+}

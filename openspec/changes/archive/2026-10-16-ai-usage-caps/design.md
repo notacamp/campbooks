@@ -9,7 +9,8 @@ What calls a model today, and how each one is metered:
 | `conversations.decide_message`, the model pass over each inbound message, and `conversations.decide_backlog`, the same pass over a stored message the needs backfill queues (one shared `Pass::run`) | `decide` (through the `Model` strategy) | the message's workspace | workspace scope, feature `conversations.triage` |
 | The `decide` answers check (`Gateway::keep_answers_checked`, eight fictional emails per run, every 6 h while it passes, every 15 min while it fails) | `decide` | the instance | instance scope `ai.answers_check`: admitted without a cap and not stored (bounded by its schedule, not by mail) |
 | `Knn` (embeddings of a workspace's corrections) | `embed` | | no production caller yet; would be refused until its caller opens a scope |
-| `chat` (the `complete` and `vision` roles) | `chat` | | no production caller yet; same |
+| `assistant.compile`, a member's sentence turned into rules (`POST /api/v1/w/{workspace}/assistant/compile`) | `chat` (`complete`) | the workspace, a person waiting | interactive workspace scope, feature `assistant.compile` |
+| other `chat` (`vision`) | `chat` | | no production caller yet; would be refused until its caller opens a scope |
 | `cargo xtask eval` | `decide`, `embed` | | a gateway without a meter, run by an operator against a chosen endpoint |
 | `Gateway::health` | none: `GET /models`, no inference | | not a model call |
 
@@ -105,7 +106,8 @@ limit is on calls. When `complete` gets callers (drafting, the
 assistant), its output is not bounded that way, and a token budget joins the
 call cap (non-goal here).
 
-**Default 5,000 calls per workspace per day**, `0` for no cap
+**Default 5,000 calls per workspace per day** (4,500 for background work,
+500 kept for people), `0` for no cap
 (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`; blank is unset):
 
 - Today a message costs one call (the six triage questions go in one
@@ -149,18 +151,25 @@ job fails or retries.
   Late answers would also move a conversation the person already saw in
   Primary (the model places streams since ADR 0018).
 - (c) *A person asks for AI on one message* is the right complement, but it
-  is UI (the notice's follow-up), and it needs a reserve so it still works
-  when the day's cap is spent.
+  is UI (the notice's follow-up); the reserve below is what will let it
+  work when the mail has spent its share.
 - (a) costs nothing, cannot cause a midnight burst, and loses nothing that a
   person cannot do by hand: the mail is there. The ledger shows how much was
   skipped (`refused`), and a message with no model answers is visible as
   such, so (c) can be built on it.
 
-**No reserve for interactive calls now.** Every model call today is
-background work. When the first user-initiated call lands (the assistant,
-"ask about this one"), its scope gets a priority and background calls stop
-short of the cap by a reserve. Building the tiers now would be untested
-code with no caller.
+**A reserve for people (tiered cap).** Background work (the mail's model
+pass) stops a tenth of the cap short (`reserve = ceil(cap / 10)`, at most
+`cap - 1`: 500 of the default 5,000); calls a person is waiting on
+(`Scope::interactive`, today the assistant's compile) may use the whole cap.
+One counter, two limits in the same conditional upsert (`$3` is the cap or
+the cap less the reserve). A mail flood therefore leaves the assistant 500
+answers a day, and only people's own requests can spend them. Past the
+whole cap, compile answers 503 `ai_daily_limit_reached` ("Today's AI limit
+for this workspace (N calls) has been reached…", four locales). The first
+design had no reserve because every call was background work; the
+assistant's compile landed on `next` during review and made the reserve
+worth its few lines.
 
 ## When metering fails
 

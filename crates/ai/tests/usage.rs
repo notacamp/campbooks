@@ -47,6 +47,8 @@ struct Fake {
     broken: bool,
     admitted: Mutex<u32>,
     seen: Mutex<Vec<Seen>>,
+    /// Whether a person was waiting on each call admitted or refused.
+    interactive: Mutex<Vec<bool>>,
 }
 
 impl Fake {
@@ -72,6 +74,7 @@ impl Meter for Fake {
             if self.broken {
                 return Err("the ledger is down".into());
             }
+            self.interactive.lock().unwrap().push(call.interactive);
             self.seen.lock().unwrap().push(Seen::Admit(
                 call.workspace,
                 call.role,
@@ -389,4 +392,19 @@ fn answers_for_every_triage_question() -> Value {
                     "probabilities": {"0": 0.8, "1": 0.2, "2": 0.0}},
         "suspicious": noul
     })
+}
+
+#[tokio::test]
+async fn an_interactive_scope_says_a_person_is_waiting() {
+    let server = server(200).await;
+    let meter = Fake::capped(100);
+    let gateway = gateway(&server, Some(meter.clone()));
+    let workspace = WorkspaceId::new();
+    scope(workspace)
+        .interactive()
+        .run(chat(&gateway))
+        .await
+        .unwrap();
+    scope(workspace).run(chat(&gateway)).await.unwrap();
+    assert_eq!(*meter.interactive.lock().unwrap(), [true, false]);
 }

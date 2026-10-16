@@ -4,6 +4,7 @@
 import type { AnyRoute } from "@tanstack/react-router";
 
 import type { ShortcutDefinition } from "~/lib/shortcuts";
+import { ASSISTANT_SHORTCUTS, buildAssistantRoutes } from "~/modules/assistant";
 import {
   buildConnectorsRoutes,
   CONNECTORS_SHORTCUTS,
@@ -13,6 +14,7 @@ import {
   buildConversationsRoutes,
   COMPOSE_SHORTCUTS,
   CONVERSATIONS_SHORTCUTS,
+  RulesList,
 } from "~/modules/conversations";
 import {
   AccountAdminPanel,
@@ -60,11 +62,13 @@ export function buildModuleRoutes<
   // After a workspace is created, `identity` offers the mailbox held since sign-up.
   const workspaces = buildWorkspacesRoutes({ root, workspace, afterCreate: MailboxStep });
   const identity = buildIdentityRoutes({ public: parents.public, workspace });
+  // Scout's questions and memory, whose rules list is the conversations module's.
+  const assistant = buildAssistantRoutes({ root, workspace, rules: RulesList });
   return {
     // Signed in or not: signing in, creating an account.
     public: [...identity.public],
     // Pages outside any workspace: status, first run, invitation links.
-    root: [...buildSystemRoutes(root), ...workspaces.root],
+    root: [...buildSystemRoutes(root), ...workspaces.root, ...assistant.root],
     // A domain module's pages live inside a workspace (`/w/$workspaceId/...`).
     workspace: [
       ...workspaces.workspace,
@@ -73,6 +77,7 @@ export function buildModuleRoutes<
       ...buildSearchRoutes(workspace),
       // `identity` is the front door for connecting a mailbox (as on the server).
       ...buildConnectorsRoutes(workspace, { useConsent: useMailboxConsent }),
+      ...assistant.workspace,
       // `cargo xtask new-module` inserts above this line.
     ],
   } as const;
@@ -111,5 +116,6 @@ export const MODULE_SHORTCUTS: readonly ShortcutDefinition[] = [
   ...COMPOSE_SHORTCUTS,
   ...SEARCH_SHORTCUTS,
   ...IDENTITY_SHORTCUTS,
+  ...ASSISTANT_SHORTCUTS,
   ...CONNECTORS_SHORTCUTS,
 ];

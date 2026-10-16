@@ -33,6 +33,16 @@ fn call(workspace: WorkspaceId, role: Role) -> MeteredCall<'static> {
         workspace,
         role,
         feature: "conversations.triage",
+        interactive: false,
+    }
+}
+
+/// `call`, with a person waiting on it.
+fn asked(workspace: WorkspaceId, role: Role) -> MeteredCall<'static> {
+    MeteredCall {
+        feature: "assistant.compile",
+        interactive: true,
+        ..call(workspace, role)
     }
 }
 
@@ -127,10 +137,22 @@ async fn calls_are_counted_per_workspace_role_feature_and_day(db: PgPool) {
     );
 }
 
+#[test]
+fn a_tenth_of_the_cap_is_kept_for_people() {
+    let reserve = |cap| AiUsageMeter::new(cap).reserve();
+    assert_eq!(reserve(None), None);
+    assert_eq!(reserve(Some(1)), Some(0), "background keeps at least one");
+    assert_eq!(reserve(Some(2)), Some(1));
+    assert_eq!(reserve(Some(10)), Some(1));
+    assert_eq!(reserve(Some(11)), Some(2));
+    assert_eq!(reserve(Some(5_000)), Some(500));
+}
+
 #[sqlx::test(migrations = "../../../migrations")]
-async fn the_cap_refuses_and_says_so_once(db: PgPool) {
+async fn the_cap_refuses_and_says_so_once_and_people_keep_a_reserve(db: PgPool) {
     let pool = app_role_pool(&db).await;
-    let (meter, _) = meter(Some(2));
+    // A cap of 3: the mail's pass may make 2 calls, a person the third.
+    let (meter, _) = meter(Some(3));
     let workspace = WorkspaceId::new();
     let mut seen = Vec::new();
     for _ in 0..4 {
@@ -141,33 +163,45 @@ async fn the_cap_refuses_and_says_so_once(db: PgPool) {
                 .unwrap(),
         );
     }
+    for _ in 0..2 {
+        seen.push(
+            meter
+                .admit_call(&pool, asked(workspace, Role::Complete))
+                .await
+                .unwrap(),
+        );
+    }
     let d = day("2026-10-16");
+    let refused = |first| Admitted::No { cap: 3, first };
     assert_eq!(
         seen,
         [
             Admitted::Yes { day: d, calls: 1 },
             Admitted::Yes { day: d, calls: 2 },
-            Admitted::No {
-                cap: 2,
-                first: true
-            },
-            Admitted::No {
-                cap: 2,
-                first: false
-            },
+            refused(true),
+            refused(false),
+            Admitted::Yes { day: d, calls: 3 },
+            refused(false),
         ]
     );
-    assert_eq!(days(&pool, workspace).await, [(d, 2, 2, true)]);
+    assert_eq!(days(&pool, workspace).await, [(d, 3, 3, true)]);
     assert_eq!(
         meter
-            .admit(&pool, call(workspace, Role::Complete))
+            .admit(&pool, call(workspace, Role::Embed))
             .await
             .unwrap(),
-        Admission::Refused { cap: 2 },
+        Admission::Refused { cap: 3 },
         "the cap is across roles"
     );
     // Only admitted calls are in the ledger.
-    assert_eq!(ledger(&pool, workspace).await.len(), 1);
+    let triage = || "conversations.triage".to_owned();
+    assert_eq!(
+        ledger(&pool, workspace).await,
+        [
+            (d, "complete".into(), "assistant.compile".into(), 1, 0, 0, 0),
+            (d, "decide".into(), triage(), 2, 0, 0, 0),
+        ]
+    );
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -267,7 +301,7 @@ async fn concurrent_calls_never_pass_the_cap(db: PgPool) {
         let (meter, pool) = (meter.clone(), pool.clone());
         calls.spawn(async move {
             meter
-                .admit(&pool, call(workspace, Role::Decide))
+                .admit(&pool, asked(workspace, Role::Decide))
                 .await
                 .unwrap()
         });

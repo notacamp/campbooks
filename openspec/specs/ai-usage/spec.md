@@ -3,8 +3,9 @@
 ## Purpose
 How much AI each workspace uses, and the daily limit that bounds it: every
 model call is attributed and counted per workspace, role, feature and UTC
-day, and a workspace past its limit gets no model call until the next day,
-so a flood of mail cannot run up an open bill (campbooks-cloud#152).
+day, background work stops short of the limit so people keep a reserve, and
+a workspace past it gets no model call until the next day, so a flood of
+mail cannot run up an open bill (campbooks-cloud#152).
 
 ## Requirements
 
@@ -52,7 +53,9 @@ only in an administrator's transaction.
 ### Requirement: Daily cap per workspace
 A workspace SHALL be admitted at most `CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`
 model calls per UTC day (5,000 when unset; `0` means no cap), across every
-role and feature. Admission SHALL be atomic, so concurrent workers and
+role and feature. Background calls SHALL stop a reserve short of the cap (a
+tenth of it, rounded up, leaving background work at least one call); calls a
+person is waiting on may use the whole cap. Admission SHALL be atomic, so concurrent workers and
 processes never admit more than the cap. A call over the cap SHALL be
 refused with nothing sent. The first refusal of a workspace's day SHALL log
 one line saying that the workspace reached its daily AI limit and that its
@@ -60,15 +63,19 @@ new mail is sorted by rules only until 00:00 UTC, with the workspace id and
 the cap and no content. The count SHALL start again at 00:00 UTC.
 
 #### Scenario: Under the cap
-- **WHEN** a workspace with a cap of 2 makes its first two calls of the day
+- **WHEN** a workspace with a cap of 3 makes its first two background calls of the day
 - **THEN** both are sent
 
-#### Scenario: At the cap
-- **WHEN** it makes a third call that day
+#### Scenario: At the background limit
+- **WHEN** it makes a third background call that day
 - **THEN** the call is refused, nothing is sent, the refusal is counted, and the limit is logged once
 
+#### Scenario: People keep a reserve
+- **WHEN** a person's call (the assistant) comes after background work used its share of a cap of 3
+- **THEN** it is sent, and the next one that day is refused
+
 #### Scenario: Concurrent calls
-- **WHEN** many calls of one workspace are admitted at the same time with a cap of 5
+- **WHEN** many interactive calls of one workspace are admitted at the same time with a cap of 5
 - **THEN** exactly 5 are admitted
 
 #### Scenario: The next day
@@ -103,3 +110,17 @@ the tokens after a call fails, the call SHALL still count.
 #### Scenario: The ledger is unavailable
 - **WHEN** admitting a call fails with a database error
 - **THEN** nothing is sent and the `decide` pass asks again later
+
+### Requirement: The assistant past the daily limit
+Compiling a member's sentence SHALL be an interactive call of their
+workspace. When the workspace used its whole daily cap, compiling SHALL
+answer 503 with code `ai_daily_limit_reached`, explained in the member's
+language, and send nothing to the model.
+
+#### Scenario: Asking Scout after the mail used its share
+- **WHEN** a member asks Scout to compile a sentence after the day's mail reached the background limit
+- **THEN** the sentence is compiled from the reserve
+
+#### Scenario: Asking Scout past the whole cap
+- **WHEN** the reserve is used too
+- **THEN** the answer is 503 `ai_daily_limit_reached` and the model is not called

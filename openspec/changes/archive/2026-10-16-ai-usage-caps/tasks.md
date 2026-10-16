@@ -29,3 +29,8 @@
 
 - [x] 5.1 `openapi/admin.json`, `.sqlx`, `deploy/.env.example`, CHANGELOG
 - [x] 5.2 Gates green, terminal recording, archive this change
+
+## 6. The assistant (landed on `next` during review)
+
+- [x] 6.1 `assistant.compile` runs in an interactive scope; the meter keeps a tenth of the cap for interactive calls; 503 `ai_daily_limit_reached` past the whole cap
+- [x] 6.2 Tests: the reserve per cap, background and interactive limits, compile under and past the cap, the end-to-end story

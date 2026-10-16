@@ -51,6 +51,11 @@ export {
 } from "./components/Button/Button";
 export { Checkbox, type CheckboxProps } from "./components/Checkbox/Checkbox";
 export {
+  CheckCards,
+  type CheckCardOption,
+  type CheckCardsProps,
+} from "./components/CheckCards/CheckCards";
+export {
   Highlight,
   type HighlightProps,
   type HighlightSegment,
@@ -71,6 +76,9 @@ export {
   CommandMenu,
   type Command,
   type CommandMenuProps,
+  type MenuOption,
+  type MenuQuery,
+  type MenuSection,
 } from "./components/CommandMenu/CommandMenu";
 export { CodeBlock, type CodeBlockProps } from "./components/CodeBlock/CodeBlock";
 export { Composer, type ComposerProps } from "./components/Composer/Composer";
@@ -190,6 +198,11 @@ export {
   type AccountButtonProps,
   type WorkspaceSwitcherProps,
 } from "./components/Shell/Shell";
+export {
+  RulePreview,
+  type RulePreviewProps,
+  type RulePreviewSample,
+} from "./components/RulePreview/RulePreview";
 export { SafeHtml, type SafeHtmlProps } from "./safe-html/SafeHtml";
 export { ShortcutSheet, type ShortcutSheetProps } from "./components/ShortcutSheet/ShortcutSheet";
 export { Skeleton, SkeletonList, type SkeletonProps } from "./components/Skeleton/Skeleton";

@@ -232,31 +232,39 @@ describe("the app", () => {
     });
   });
 
-  it("opens search with / from a workspace page, and ⌘K hands its query over", async () => {
+  it("opens the same menu with / and ⌘K, with conversations inline, and opens a hit", async () => {
     mockApi({
       "GET /bff/session": { body: SESSION },
       [LIST]: { body: { workspaces: [DUARTE] } },
       [`GET ${W}/search`]: { body: results([INVOICE_HIT]) },
     });
-    renderApp(`/w/${DUARTE.id}`);
+    const { router } = renderApp(`/w/${DUARTE.id}`);
     await screen.findByRole("heading", { name: "Nothing needs you yet" });
+    // One field in the sidebar, hinting both keys.
+    expect(screen.getAllByRole("button", { name: /Search or ask/u })).toHaveLength(1);
 
     fireEvent.keyDown(document.body, { key: "/" });
-    const search = await screen.findByRole("dialog", { name: "Search" });
-    expect(within(search).getByRole("combobox", { name: "Search conversations" })).toHaveFocus();
-    fireEvent.keyDown(within(search).getByRole("combobox"), { key: "Escape" });
+    const menu = await screen.findByRole("dialog", { name: "Command menu" });
+    expect(within(menu).getByRole("combobox")).toHaveFocus();
+    fireEvent.keyDown(within(menu).getByRole("combobox"), { key: "Escape" });
     await waitFor(() => {
-      expect(screen.queryByRole("dialog", { name: "Search" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     });
 
     fireEvent.keyDown(document.body, { key: "k", ctrlKey: true });
-    const menu = await screen.findByRole("dialog", { name: "Command menu" });
-    fireEvent.change(within(menu).getByRole("combobox"), { target: { value: "lease" } });
-    fireEvent.click(within(menu).getByRole("option", { name: /Search conversations for/u }));
+    const same = await screen.findByRole("dialog", { name: "Command menu" });
+    const input = within(same).getByRole("combobox");
+    fireEvent.change(input, { target: { value: "invoice" } });
+    expect(await within(same).findByRole("option", { name: /Cloudhost Billing/u })).toBeVisible();
+    expect(within(same).getByRole("group", { name: "Conversations" })).toBeVisible();
+    fireEvent.keyDown(input, { key: "Enter" });
 
-    const handed = await screen.findByRole("dialog", { name: "Search" });
-    expect(within(handed).getByRole("combobox")).toHaveValue("lease");
-    expect(screen.queryByRole("dialog", { name: "Command menu" })).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(router.state.location.pathname).toMatch(
+        new RegExp(`^/w/${DUARTE.id}/inbox/receipts/`, "u"),
+      );
+    });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("opens the results page instead on a phone", async () => {
@@ -278,7 +286,7 @@ describe("the app", () => {
     await waitFor(() => {
       expect(router.state.location.pathname).toBe(`/w/${DUARTE.id}/search`);
     });
-    expect(screen.queryByRole("dialog", { name: "Search" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     vi.unstubAllGlobals();
   });
 });

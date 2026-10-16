@@ -34,6 +34,9 @@ pub struct InboxView {
     pub role: Option<InboxRole>,
     /// Unread inbound messages in conversations still in the inbox.
     pub unread_count: u32,
+    /// Whether someone other than the caller holds a role on it (for a
+    /// client token: more than one member). Never says who.
+    pub shared: bool,
     /// Kept as read-only history after its connection was removed: no
     /// longer synced, nothing can be written or sent from it.
     pub read_only: bool,
@@ -81,7 +84,10 @@ pub async fn handler(
                  WHERE m.inbox_id = i.id AND m.user_id = $2) AS role,
                (SELECT coalesce(sum(c.unread_count), 0)::int FROM conversations.conversations c
                  WHERE c.inbox_id = i.id AND c.archived_at IS NULL AND NOT c.trashed)
-                 AS "unread_count!"
+                 AS "unread_count!",
+               (SELECT count(*) FROM conversations.inbox_members o
+                 WHERE o.inbox_id = i.id AND ($2::uuid IS NULL OR o.user_id <> $2))
+                 > CASE WHEN $2::uuid IS NULL THEN 1 ELSE 0 END AS "shared!"
           FROM conversations.inboxes i
          WHERE i.id = ANY($1)
          ORDER BY i.address
@@ -102,6 +108,7 @@ pub async fn handler(
                 display_name: row.display_name,
                 role: row.role.as_deref().map(str::parse).transpose()?,
                 unread_count: u32::try_from(row.unread_count).unwrap_or_default(),
+                shared: row.shared,
                 read_only: row.read_only,
             })
         })
@@ -137,6 +144,7 @@ mod tests {
         assert_eq!(inboxes[0]["address"], "sam@example.com");
         assert_eq!(inboxes[0]["role"], "manager");
         assert_eq!(inboxes[0]["unread_count"], 3);
+        assert_eq!(inboxes[0]["shared"], false);
         assert_eq!(
             kit.get(&ana, &uri).await.json["inboxes"][0]["address"],
             "office@example.com"
@@ -153,5 +161,36 @@ mod tests {
             StatusCode::NOT_FOUND
         );
         assert_eq!(kit.get("", &uri).await.status, StatusCode::UNAUTHORIZED);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn shared_inboxes_are_marked_without_naming_anyone(db: PgPool) {
+        let kit = Kit::new(db).await;
+        let workspace = WorkspaceId::new();
+        let (ana, ana_id) = kit.member("ana", workspace);
+        let (_, leo_id) = kit.member("leo", workspace);
+        kit.inbox(
+            workspace,
+            "ana@example.com",
+            &[(ana_id, InboxRole::Manager)],
+        )
+        .await;
+        kit.inbox(
+            workspace,
+            "office@example.com",
+            &[(ana_id, InboxRole::Reader), (leo_id, InboxRole::Sender)],
+        )
+        .await;
+
+        let anas = kit
+            .get(&ana, &format!("/api/v1/w/{workspace}/inboxes"))
+            .await;
+        let inboxes = anas.json["inboxes"].as_array().unwrap();
+        assert_eq!(inboxes[0]["address"], "ana@example.com");
+        assert_eq!(inboxes[0]["shared"], false);
+        assert_eq!(inboxes[1]["address"], "office@example.com");
+        assert_eq!(inboxes[1]["shared"], true);
+        let keys: Vec<_> = inboxes[1].as_object().unwrap().keys().cloned().collect();
+        assert!(keys.iter().all(|key| !key.contains("member")), "{keys:?}");
     }
 }

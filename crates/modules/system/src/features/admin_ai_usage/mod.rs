@@ -45,6 +45,10 @@ pub struct AiUsageDay {
     /// (`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`); `null` when there is no
     /// cap.
     pub cap: Option<u32>,
+    /// Calls of the cap kept for what people ask themselves (the
+    /// assistant): background work, such as reading new mail, stops this
+    /// many calls short of the cap. `null` when there is no cap.
+    pub reserve: Option<u32>,
     /// The workspaces that used AI that day: those the cap refused first,
     /// then by calls.
     pub workspaces: Vec<WorkspaceAiUsage>,
@@ -63,7 +67,8 @@ pub struct WorkspaceAiUsage {
     pub capped: bool,
     /// The first refusal, when there was one.
     pub capped_at: Option<DateTime<Utc>>,
-    /// Calls left today; `null` for another day or without a cap.
+    /// Calls left today, the reserve included; `null` for another day or
+    /// without a cap.
     pub remaining: Option<i64>,
     /// Its calls by role and feature.
     pub uses: Vec<AiUse>,
@@ -174,6 +179,7 @@ pub async fn handler(
         day,
         resets_at: AiUsageMeter::resets_at(day),
         cap,
+        reserve: meter.reserve(),
         workspaces,
     }))
 }

@@ -11,9 +11,9 @@ use sqlx::PgPool;
 
 use crate::{AiUsageMeter, Deps, testkit::world};
 
-/// Two workspaces' usage on 2026-10-16 under a cap of 3: `capped` made 3
-/// calls and was refused 2, `busy` made 2 with tokens and a failure. The
-/// meter, at noon that day.
+/// Two workspaces' usage on 2026-10-16 under a cap of 3 (a reserve of 1):
+/// `capped`'s mail made 2 calls and was refused 3, `busy` made 2 with
+/// tokens and a failure. The meter, at noon that day.
 async fn usage(db: &PgPool) -> (AiUsageMeter, WorkspaceId, WorkspaceId) {
     let clock = Arc::new(FixedClock::new("2026-10-16T12:00:00Z".parse().unwrap()));
     let meter = AiUsageMeter::new(Some(3)).with_clock(clock);
@@ -23,6 +23,7 @@ async fn usage(db: &PgPool) -> (AiUsageMeter, WorkspaceId, WorkspaceId) {
         workspace,
         role,
         feature: "conversations.triage",
+        interactive: false,
     };
     for _ in 0..5 {
         meter
@@ -90,12 +91,13 @@ async fn todays_usage_lists_capped_workspaces_first(db: PgPool) {
             "day": "2026-10-16",
             "resets_at": "2026-10-17T00:00:00Z",
             "cap": 3,
+            "reserve": 1,
             "workspaces": [
                 {
                     "workspace_id": capped.to_string(),
-                    "calls": 3, "refused": 2, "capped": true,
-                    "capped_at": "2026-10-16T12:00:00Z", "remaining": 0,
-                    "uses": [{"role": "decide", "feature": "conversations.triage", "calls": 3,
+                    "calls": 2, "refused": 3, "capped": true,
+                    "capped_at": "2026-10-16T12:00:00Z", "remaining": 1,
+                    "uses": [{"role": "decide", "feature": "conversations.triage", "calls": 2,
                               "failed": 0, "prompt_tokens": 0, "completion_tokens": 0}]
                 },
                 {

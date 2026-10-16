@@ -4,7 +4,8 @@
 The admin API SHALL let an administrator with `system.read` (or `super`) read
 a day's AI usage (`GET /admin/v1/system/ai-usage`, `system.admin_ai_usage`;
 today in UTC unless a `day` is given): the configured cap (`null` when there
-is none), the day and when it resets, and for each workspace that used AI
+is none), the reserve kept for people, the day and when it resets, and for
+each workspace that used AI
 that day its calls, refused calls, whether it hit the cap, the calls left
 today, and its calls, failed calls and tokens by role and feature.
 Workspaces that hit the cap SHALL come first, then by calls. The answer

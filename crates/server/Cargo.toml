@@ -17,6 +17,7 @@ axum.workspace = true
 base64.workspace = true
 campbooks-admin.workspace = true
 campbooks-ai.workspace = true
+campbooks-assistant.workspace = true
 campbooks-attention.workspace = true
 campbooks-connectors.workspace = true
 campbooks-identity.workspace = true

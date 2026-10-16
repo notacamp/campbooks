@@ -1,7 +1,8 @@
 //! The daily AI limit end to end (campbooks-cloud#152): the server's
-//! composition (the conversations module's `decide` pass through a gateway
-//! metered by the system module's ledger), fictional mail, a laya-serve
-//! fake, a clock moved by hand, and the admin AI usage read.
+//! composition (the conversations module's `decide` pass and the
+//! assistant's compiling, through a gateway metered by the system module's
+//! ledger), fictional mail, fake model servers, a clock moved by hand, and
+//! the admin AI usage read.
 //!
 //! `cargo test -p campbooks-server ai_usage -- --nocapture` tells the story
 //! as it runs.
@@ -32,7 +33,10 @@ use campbooks_system::AiUsageMeter;
 use chrono::{TimeDelta, Utc};
 use serde_json::{Value, json};
 use sqlx::PgPool;
-use wiremock::{Mock, MockServer, ResponseTemplate, matchers::method};
+use wiremock::{
+    Mock, MockServer, ResponseTemplate,
+    matchers::{method, path},
+};
 
 use crate::{Composition, ai_gateway, registry_with, router_with, with_ports};
 
@@ -49,11 +53,24 @@ struct World {
     laya: MockServer,
 }
 
-/// laya-serve, answering every triage question.
+/// laya-serve answering every triage question (`decide`), and an instruct
+/// model finding nothing to teach in a sentence (`complete`).
 async fn laya() -> MockServer {
     let noul = json!({"type": "noul", "noul": 0.1});
     let server = MockServer::start().await;
+    let nothing = json!({"outcome": "unclear", "unsupported": "none", "rules": []});
     Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+            "model": "demo-instruct",
+            "choices": [{"message": {"role": "assistant", "content": nothing.to_string()},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 400, "completion_tokens": 20}
+        })))
+        .mount(&server)
+        .await;
+    Mock::given(method("POST"))
+        .and(path("/v1/systemone"))
         .respond_with(ResponseTemplate::new(200).set_body_json(json!({
             "model": "laya-demo",
             "answers": {
@@ -97,6 +114,9 @@ async fn world(db: PgPool, cap: u32) -> World {
                 ..ConversationsConfig::default()
             },
         ),
+        assistant: campbooks_assistant::AssistantDeps {
+            ai: Some(gateway.clone()),
+        },
         system: campbooks_system::Deps {
             ai: Some(gateway),
             ai_usage: meter,
@@ -123,13 +143,15 @@ async fn world(db: PgPool, cap: u32) -> World {
 }
 
 fn composed(laya: &MockServer, cap: u32) -> (Option<Gateway>, AiUsageMeter) {
-    let provider = ProviderConfig::new(
-        format!("{}/v1", laya.uri()).parse().unwrap(),
-        "convaiinnovations/laya-multilingual",
-    )
-    .with_protocol(Protocol::Laya);
+    let url = || format!("{}/v1", laya.uri()).parse().unwrap();
+    let decide = ProviderConfig::new(url(), "convaiinnovations/laya-multilingual")
+        .with_protocol(Protocol::Laya);
     ai_gateway(AiConfig {
-        roles: [(Role::Decide, provider)].into(),
+        roles: [
+            (Role::Decide, decide),
+            (Role::Complete, ProviderConfig::new(url(), "demo-instruct")),
+        ]
+        .into(),
         daily_calls_per_workspace: Some(cap),
         ..AiConfig::default()
     })
@@ -154,8 +176,31 @@ impl World {
         self.model_calls().await - before
     }
 
+    /// `decide` calls sent so far.
     async fn model_calls(&self) -> usize {
-        self.laya.received_requests().await.unwrap().len()
+        let requests = self.laya.received_requests().await.unwrap();
+        requests
+            .iter()
+            .filter(|r| r.url.path() == "/v1/systemone")
+            .count()
+    }
+
+    /// A member's token for `sub`.
+    fn member(&self, sub: &str) -> String {
+        let mut claims = self.idp.claims(
+            "workspaces:read workspaces:write conversations:read assistant:read assistant:write",
+        );
+        claims["sub"] = json!(sub);
+        self.idp.token(&claims)
+    }
+
+    async fn post(&self, token: &str, uri: &str, body: &Value) -> TestResponse {
+        let request = Request::post(uri)
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(Body::from(body.to_string()))
+            .unwrap();
+        testing::send(&self.app, request).await
     }
 
     /// Every inbound message: subject, stream, who placed it, whether the
@@ -220,12 +265,23 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
         .without_time()
         .with_test_writer()
         .try_init();
-    let w = world(db, 2).await;
+    let w = world(db, 3).await;
     w.grant_ada().await;
-    let (acme, studio) = (WorkspaceId::new(), WorkspaceId::new());
+    let sam = w.member("sam");
+    let created = w
+        .post(
+            &sam,
+            "/api/v1/workspaces",
+            &json!({"name": "Acme", "kind": "business"}),
+        )
+        .await;
+    assert_eq!(created.status, StatusCode::CREATED, "{}", created.json);
+    let acme: WorkspaceId = created.json["id"].as_str().unwrap().parse().unwrap();
+    let studio = WorkspaceId::new();
 
     story(
-        "Daily AI limit: 2 model calls per workspace (CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE=2)",
+        "Daily AI limit: 3 model calls per workspace (CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE=3); \
+         a tenth, 1 call, is kept for what people ask",
     );
     story("Thursday 16 October: three emails arrive for the demo workspace \"acme\"");
     assert_eq!(w.receive(acme, "sam@acme.example.com", EN).await, 2);
@@ -243,6 +299,18 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
             .all(|(_, _, source, model)| *model || source != "model")
     );
 
+    story("Sam asks Scout to remember something: the reserve answers");
+    let compile = format!("/api/v1/w/{acme}/assistant/compile");
+    let asked = json!({"text": "invoices from my accountant always matter"});
+    let answered = w.post(&sam, &compile, &asked).await;
+    assert_eq!(answered.status, StatusCode::OK, "{}", answered.json);
+    println!("    POST {compile} -> {}", answered.status);
+    story("Sam asks again: the whole day's limit is used");
+    let refused = w.post(&sam, &compile, &asked).await;
+    assert_eq!(refused.status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(refused.json["code"], "ai_daily_limit_reached");
+    println!("    -> {} {}", refused.status, refused.json["detail"]);
+
     story("The same day, one email arrives for another workspace, \"studio\"");
     assert_eq!(
         w.receive(studio, "kim@studio.example.com", COMMENT).await,
@@ -253,8 +321,8 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
     let today = w.usage("").await;
     assert_eq!(today.status, StatusCode::OK, "{}", today.json);
     println!(
-        "    day {}, cap {}, resets {}",
-        today.json["day"], today.json["cap"], today.json["resets_at"]
+        "    day {}, cap {}, reserve {}, resets {}",
+        today.json["day"], today.json["cap"], today.json["reserve"], today.json["resets_at"]
     );
     for usage in today.json["workspaces"].as_array().unwrap() {
         let name = if usage["workspace_id"] == acme.to_string() {
@@ -262,20 +330,26 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
         } else {
             "studio"
         };
-        let used = &usage["uses"][0];
         println!(
-            "    {name:<7} calls {} refused {} capped {} remaining {}  ({} {}: {} prompt tokens)",
-            usage["calls"],
-            usage["refused"],
-            usage["capped"],
-            usage["remaining"],
-            used["role"],
-            used["feature"],
-            used["prompt_tokens"],
+            "    {name:<7} calls {} refused {} capped {} remaining {}",
+            usage["calls"], usage["refused"], usage["capped"], usage["remaining"],
         );
+        for used in usage["uses"].as_array().unwrap() {
+            println!(
+                "              {:<9} {:<22} calls {}, tokens {} in / {} out",
+                used["role"].as_str().unwrap(),
+                used["feature"].as_str().unwrap(),
+                used["calls"],
+                used["prompt_tokens"],
+                used["completion_tokens"],
+            );
+        }
     }
     let workspaces = today.json["workspaces"].as_array().unwrap();
-    assert_eq!(today.json["cap"], 2);
+    assert_eq!(
+        (today.json["cap"].clone(), today.json["reserve"].clone()),
+        (json!(3), json!(1))
+    );
     assert_eq!(workspaces[0]["workspace_id"], acme.to_string());
     assert_eq!(
         (
@@ -284,11 +358,18 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
             &workspaces[0]["capped"],
             &workspaces[0]["remaining"]
         ),
-        (&json!(2), &json!(1), &json!(true), &json!(0))
+        (&json!(3), &json!(2), &json!(true), &json!(0))
     );
-    assert_eq!(workspaces[0]["uses"][0]["prompt_tokens"], 360);
+    let uses = workspaces[0]["uses"].as_array().unwrap();
+    assert_eq!(
+        uses.iter()
+            .map(|u| (u["feature"].as_str().unwrap(), u["calls"].as_i64().unwrap()))
+            .collect::<Vec<_>>(),
+        [("conversations.triage", 2), ("assistant.compile", 1)]
+    );
+    assert_eq!(uses[0]["prompt_tokens"], 360);
     assert_eq!(workspaces[1]["workspace_id"], studio.to_string());
-    assert_eq!(workspaces[1]["remaining"], 1);
+    assert_eq!(workspaces[1]["remaining"], 2);
 
     story(
         "Friday 17 October, 00:00 UTC: the count starts again; nothing from yesterday is replayed",
@@ -304,15 +385,17 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
     assert_eq!(friday.json["day"], "2026-10-17");
     assert_eq!(friday.json["workspaces"][0]["calls"], 2);
     assert_eq!(friday.json["workspaces"][0]["refused"], 1);
+    assert_eq!(friday.json["workspaces"][0]["remaining"], 1);
     let thursday = w.usage("?day=2026-10-16").await;
-    assert_eq!(thursday.json["workspaces"][0]["calls"], 2);
+    assert_eq!(thursday.json["workspaces"][0]["calls"], 3);
     assert_eq!(thursday.json["workspaces"][0]["remaining"], Value::Null);
     println!(
-        "    acme: Thursday {} calls ({} refused), Friday {} calls ({} refused)",
+        "    acme: Thursday {} calls ({} refused), Friday {} calls ({} refused, {} left for people)",
         thursday.json["workspaces"][0]["calls"],
         thursday.json["workspaces"][0]["refused"],
         friday.json["workspaces"][0]["calls"],
         friday.json["workspaces"][0]["refused"],
+        friday.json["workspaces"][0]["remaining"],
     );
 }
 
