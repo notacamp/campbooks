@@ -58,7 +58,11 @@ export default async function domainTooBroad({ page }: ScenarioContext): Promise
   seed(workspace);
   await page.goto(`/w/${workspace}/settings/memory`);
   await page.getByText(/^Paused: its domain is too broad/u).waitFor();
-  await caption(page, "Stored before, its domain is now known to cover a whole group of sites", 2800);
+  await caption(
+    page,
+    "Stored before, its domain is now known to cover a whole group of sites",
+    2800,
+  );
   await caption(page, "It matches nothing and says why. Remove is still there", 2400);
 
   await page.getByRole("button", { name: "Remove" }).first().click();
