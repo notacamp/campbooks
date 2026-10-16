@@ -23,6 +23,8 @@ mod assistant_tests;
 #[cfg(test)]
 mod identity_tests;
 #[cfg(test)]
+mod rate_limit_tests;
+#[cfg(test)]
 mod revocation_tests;
 #[cfg(test)]
 mod search_tests;
@@ -360,6 +362,10 @@ fn security_scheme() -> SecurityScheme {
         description = "The Campbooks HTTP API. Errors are RFC 9457 `application/problem+json`. \
             Operations require an OAuth 2.1 bearer token with the scope they list \
             (401 without a valid token, 403 without the scope) unless they are public. \
+            Those operations are rate-limited per caller (a person per app, an app on its own) \
+            in classes: reads, writes, and mail sends (`x-campbooks.rate_limit: send`, counted \
+            per person across their apps). Over a limit they answer 429 `rate_limited` with \
+            `Retry-After`, in seconds. \
             The `/bff/*` operations serve the web app only: they authenticate with its \
             session cookie instead of a token.",
         license(name = "Sustainable Use License", identifier = "LicenseRef-Sustainable-Use"),
@@ -411,7 +417,8 @@ struct ApiDoc;
             (`x-campbooks-admin.permission`; `super` grants all). Then a token whose last \
             sign-in (`auth_time`) is more than an hour old answers 401 \
             `admin_reauth_required`. Every request past the profile check is recorded in the \
-            audit trail. These operations are not part of the operation catalogue \
+            audit trail. Calls are rate-limited per caller (429 `rate_limited` with \
+            `Retry-After`). These operations are not part of the operation catalogue \
             (`/openapi.json`): automation and the assistant cannot call them. Admin profiles \
             are managed only with the server's CLI (`campbooks-server admin`), never over HTTP. \
             The web app reaches this API through `/bff/admin/*`.",
@@ -462,14 +469,21 @@ fn admin_security_scheme() -> SecurityScheme {
 
 /// The admin API (`/admin/v1/*`) over `state`: not composed into the
 /// operation catalogue, so [`invoke`](operations::invoke) and the
-/// idempotency layer never see it; every route behind the audit middleware,
-/// problems in the caller's language.
+/// idempotency layer never see it; every route behind the audit middleware
+/// and the admin class of the per-caller rate limits, problems in the
+/// caller's language.
 fn admin_routes(state: &AppState, composition: &Composition) -> Router<AppState> {
     let (routes, spec) = admin_api_with(composition).split_for_parts();
     routes
         .route_layer(middleware::from_fn_with_state(
             campbooks_kernel::admin::AuditLayer::new(state, &spec),
             campbooks_kernel::admin::audit,
+        ))
+        // Counted before the profile check: a non-admin hammering it stops
+        // costing a lookup per request, and is answered as an admin would be.
+        .route_layer(middleware::from_fn_with_state(
+            campbooks_kernel::rate_limit::api::CallerLimits::admin(state),
+            campbooks_kernel::rate_limit::api::middleware,
         ))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),

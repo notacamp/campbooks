@@ -13,11 +13,14 @@ Every HTTP operation SHALL have an `operationId` of the form
 it, unique across the document. Every operation SHALL carry an `x-campbooks`
 extension with `mutates` (boolean), `automation` (boolean), `assistant`
 (boolean), `risk` (`low` or `high`), `records` (a list of the module's own
-`<module>.<record>` types) and optionally `undo` (an `operationId`). An
+`<module>.<record>` types) and optionally `undo` (an `operationId`) and
+`rate_limit` (`send`: the operation is counted in the send class of the
+per-caller rate limits instead of the write class). An
 operation with `mutates: true` SHALL use POST, PUT, PATCH or DELETE, and one
 with `mutates: false` SHALL use GET or HEAD. An `undo` SHALL name an existing
-mutating operation and SHALL only appear on a mutating operation. The
-architecture check SHALL fail on any violation.
+mutating operation and SHALL only appear on a mutating operation. A
+`rate_limit` SHALL only appear on a mutating operation and SHALL only be
+`send`. The architecture check SHALL fail on any violation.
 
 #### Scenario: Health and version are catalogued
 - **WHEN** the OpenAPI document is generated
@@ -30,6 +33,10 @@ architecture check SHALL fail on any violation.
 #### Scenario: A dangling undo
 - **WHEN** an operation's `x-campbooks.undo` names an operation that does not exist or does not mutate
 - **THEN** `cargo xtask arch` fails naming both
+
+#### Scenario: A send class on a read
+- **WHEN** a non-mutating operation declares `x-campbooks.rate_limit: send`, or any operation declares another value
+- **THEN** `cargo xtask arch` fails naming the operation
 
 ### Requirement: Events catalogue
 Modules SHALL declare the domain events they publish. The server SHALL

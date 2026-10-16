@@ -12,6 +12,7 @@ use campbooks_kernel::{
     db::BeginFor as _,
     extract,
     jobs::EnqueueOptions,
+    operations::RateLimit,
     tenancy::{Workspace, WorkspaceId},
 };
 use chrono::{TimeDelta, Utc};
@@ -51,9 +52,11 @@ pub struct SendSettings {
     operation_id = "conversations.send_draft",
     tag = "conversations",
     security(("bearer" = ["conversations:send"])),
+    // Mail leaves in the person's name: the send class of the rate limits.
     extensions(("x-campbooks" = json!(Operation::command(Risk::High)
         .undo("conversations.cancel_send")
         .assistant()
+        .rate_limit(RateLimit::Send)
         .records(["conversations.draft"]).access("conversations.draft", campbooks_kernel::authz::Action::Send)))),
     params(
         ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
@@ -72,6 +75,8 @@ pub struct SendSettings {
         (status = NOT_FOUND, description = "No such draft, or it is not yours.",
             body = Problem, content_type = "application/problem+json"),
         (status = CONFLICT, description = "Already on its way (`draft_not_editable`), or saved since that version (`draft_changed`).",
+            body = Problem, content_type = "application/problem+json"),
+        (status = TOO_MANY_REQUESTS, description = "`rate_limited`: you sent too much mail in a short time; `Retry-After` says when to try again.",
             body = Problem, content_type = "application/problem+json"),
     )
 )]

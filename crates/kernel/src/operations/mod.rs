@@ -8,8 +8,9 @@
 //! - its `security` (a scope, or explicitly public);
 //! - one vendor extension, `x-campbooks`, built from an [`Operation`]:
 //!   whether it mutates, the operation that undoes it, whether automation
-//!   rules and the assistant may call it, its [`Risk`], and the record types
-//!   it touches.
+//!   rules and the assistant may call it, its [`Risk`], the record types
+//!   it touches, and when it is counted in a tighter
+//!   [rate-limit class](RateLimit) than its method's.
 //!
 //! ```text
 //! #[utoipa::path(
@@ -52,9 +53,10 @@ use axum::Router;
 use serde::{Deserialize, Serialize};
 use utoipa_axum::router::OpenApiRouter;
 
-use crate::{AppState, idempotency};
+use crate::{AppState, idempotency, rate_limit};
 
 pub use catalogue::{Catalogue, OperationInfo};
+pub(crate) use invoke::InvokedBy;
 pub use invoke::{Caller, Invocation, InvokeError, Operations, Output, invoke};
 pub use read_rules::ReadRules;
 
@@ -107,6 +109,22 @@ pub struct Operation {
     /// by `cargo xtask arch` on every operation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub access: Option<crate::authz::OperationAccess>,
+    /// The per-caller rate-limit class it is counted in instead of the
+    /// write class ([`rate_limit::api`](crate::rate_limit::api)). Only
+    /// tighter classes exist, and only for mutating operations (checked by
+    /// `cargo xtask arch`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rate_limit: Option<RateLimit>,
+}
+
+/// A rate-limit class an operation declares to be counted in, tighter than
+/// the write class its method gives it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RateLimit {
+    /// It sends mail in the caller's name: the send class, counted per
+    /// person across all their apps.
+    Send,
 }
 
 /// Where a read that is not a GET takes its inputs.
@@ -130,6 +148,7 @@ impl Operation {
             records: Vec::new(),
             query_in: None,
             access: None,
+            rate_limit: None,
         }
     }
 
@@ -195,6 +214,13 @@ impl Operation {
         self
     }
 
+    /// Count it in the rate-limit class `class` instead of the write class.
+    #[must_use]
+    pub fn rate_limit(mut self, class: RateLimit) -> Self {
+        self.rate_limit = Some(class);
+        self
+    }
+
     /// Whether `caller` may invoke an operation carrying this metadata.
     pub fn allows(&self, caller: Caller) -> bool {
         match caller {
@@ -225,7 +251,9 @@ impl std::fmt::Debug for Composed {
 
 /// Compose `api` (every module's routes) over `state`: parse its document
 /// into the [`Catalogue`], put every route behind the
-/// [idempotency](crate::idempotency) layer, with the
+/// [idempotency](crate::idempotency) layer and, outside it, the per-caller
+/// [rate limits](crate::rate_limit::api) (so a replay counts and a 429
+/// never claims a key), with the
 /// [`localize`](crate::i18n::localize) layer on both sides of it (inside,
 /// so a stored response is already in the caller's language; outside, for
 /// the idempotency layer's own problems), and install the result in the
@@ -240,6 +268,10 @@ pub fn compose(api: OpenApiRouter<AppState>, state: AppState) -> Composed {
         .route_layer(axum::middleware::from_fn_with_state(
             idempotency::Idempotency::new(&state, Arc::clone(&catalogue)),
             idempotency::middleware,
+        ))
+        .route_layer(axum::middleware::from_fn_with_state(
+            rate_limit::api::CallerLimits::api(&state, Arc::clone(&catalogue)),
+            rate_limit::api::middleware,
         ))
         .route_layer(localize());
     let state = state.with_operations(Operations::new(routes.clone(), catalogue));

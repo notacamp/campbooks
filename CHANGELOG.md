@@ -8,6 +8,17 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **The API is rate-limited per person and per app.** Every call with a token now counts
+  against a limit for whoever makes it, however it arrives (directly, through the web app,
+  or from automation and the assistant): 600 reads and 120 writes a minute per person and
+  app, 30 mail sends per 10 minutes per person across all their apps, and 120 admin API
+  calls a minute. Over a limit the answer is 429 `rate_limited` with `Retry-After`, in the
+  caller's language. Automation and the assistant are counted apart from the person's own
+  apps, so a looping rule stops without locking the person out. Reads, writes and admin
+  calls are counted in memory per server process; sends in Postgres (no migration). New
+  settings `CAMPBOOKS_RATE_LIMITS__*` (`ENABLED`, and per class `READS`, `WRITES`, `SENDS`,
+  `ADMIN` with their `…_WINDOW_SECONDS`; `0` turns a class off). `x-campbooks` gains
+  `rate_limit: send`, declared by `conversations.send_draft`.
 - **Suspending an account or signing out everywhere stops its access tokens at once.**
   Tokens already issued used to keep working until they expired (up to ten minutes).
   Now the API refuses them on the next request (401 `invalid_token`, the same answer
