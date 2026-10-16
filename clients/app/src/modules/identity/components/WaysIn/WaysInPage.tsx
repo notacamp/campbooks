@@ -1,4 +1,4 @@
-import { useId, useRef, useState, type ComponentType, type RefObject } from "react";
+import { useRef, useState, type ComponentType, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 
 import { problemCode, signOutAndLeave } from "~/lib/api";
@@ -7,16 +7,13 @@ import {
   Banner,
   Button,
   EmptyState,
-  Heading,
   Icon,
   InlineConfirm,
   List,
   ListRow,
-  PaneHeader,
-  ReaderBody,
-  ReaderPane,
+  SettingsPage,
+  SettingsSection,
   SkeletonList,
-  Spacer,
   Text,
 } from "~/lib/ui";
 import { useConnections } from "~/modules/connectors";
@@ -117,21 +114,18 @@ export function WaysInPage({
   );
 
   return (
-    <ReaderPane label={t("waysIn.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("waysIn.title")}
-        </Heading>
-        <Spacer />
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t("waysIn.lead")}</Text>
-        <Outcome result={result} />
-        <RecentlyAdded ways={ways.data?.items} />
-        {stepUp ? <StepUp returnTo={returnTo} leave={leave} /> : null}
-        {start.isError && !stepUp ? (
-          <Banner tone="danger" role="alert" title={t("waysIn.startFailed")} />
-        ) : null}
+    <SettingsPage label={t("waysIn.title")} title={t("waysIn.title")} lead={t("waysIn.lead")}>
+      <Outcome result={result} />
+      <RecentlyAdded ways={ways.data?.items} />
+      {stepUp ? <StepUp returnTo={returnTo} leave={leave} /> : null}
+      {start.isError && !stepUp ? (
+        <Banner tone="danger" role="alert" title={t("waysIn.startFailed")} />
+      ) : null}
+      <SettingsSection
+        title={t("waysIn.accounts")}
+        count={ways.data?.items.length}
+        description={t("waysIn.accountsLead")}
+      >
         {ways.isPending ? (
           <div role="status" aria-label={t("waysIn.loading")}>
             <SkeletonList rows={2} />
@@ -141,6 +135,7 @@ export function WaysInPage({
             title={t("waysIn.loadError.title")}
             visor="thinking"
             visorSize="lg"
+            headingLevel={3}
             action={
               <Button
                 onClick={() => {
@@ -176,12 +171,12 @@ export function WaysInPage({
             />
           </>
         )}
-        {sections.map((Section, index) => (
-          <Section key={index} />
-        ))}
-        <SignOutEverywhere leave={leave} />
-      </ReaderBody>
-    </ReaderPane>
+      </SettingsSection>
+      {sections.map((Section, index) => (
+        <Section key={index} />
+      ))}
+      <SignOutEverywhere leave={leave} />
+    </SettingsPage>
   );
 }
 
@@ -240,22 +235,15 @@ function RecentlyAdded({ ways }: { ways: readonly WayIn[] | undefined }) {
  */
 function SignOutEverywhere({ leave }: { leave: (url: string) => void }) {
   const { t } = useTranslation("identity");
-  const titleId = useId();
   const end = useSignOutEverywhere();
   const [confirming, setConfirming] = useState(false);
   const [failed, setFailed] = useState(false);
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("waysIn.everywhere.title")}
-      </Heading>
-      <Text tone="tertiary" size="sm">
-        {t("waysIn.everywhere.lead")}
-      </Text>
+    <SettingsSection title={t("waysIn.everywhere.title")} description={t("waysIn.everywhere.lead")}>
       {failed ? <Banner tone="danger" role="alert" title={t("waysIn.everywhere.failed")} /> : null}
       <div>
         <Button
-          variant="danger"
+          variant="danger-outline"
           icon="sign-out"
           aria-expanded={confirming}
           onClick={() => {
@@ -293,7 +281,7 @@ function SignOutEverywhere({ leave }: { leave: (url: string) => void }) {
           {t("waysIn.everywhere.confirmLead")}
         </InlineConfirm>
       ) : null}
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -491,13 +479,9 @@ function AddWayIn({
   onAdd: (provider: Provider) => void;
 }) {
   const { t } = useTranslation("identity");
-  const titleId = useId();
   return (
-    <section className="flex flex-col gap-3" aria-labelledby={titleId}>
-      <Heading level={2} size="section" id={titleId}>
-        {t("waysIn.addTitle")}
-      </Heading>
-      <Text tone="tertiary" size="sm">
+    <div className="flex flex-col gap-2">
+      <Text tone="secondary" size="sm">
         {providers.length === 0 ? t("waysIn.addNone") : t("waysIn.addLead")}
       </Text>
       {providers.length === 0 ? null : (
@@ -505,7 +489,7 @@ function AddWayIn({
           ref={groupRef}
           className="flex flex-col gap-2 sm:flex-row sm:flex-wrap"
           role="group"
-          aria-labelledby={titleId}
+          aria-label={t("waysIn.addTitle")}
         >
           {providers.map((provider, index) => (
             <Button
@@ -523,6 +507,6 @@ function AddWayIn({
           ))}
         </div>
       )}
-    </section>
+    </div>
   );
 }

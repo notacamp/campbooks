@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        DELETE FROM bff.login_transactions WHERE state_hash = $1\n        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at\n        ",
+  "query": "\n        DELETE FROM bff.login_transactions WHERE state_hash = $1\n        RETURNING state_hash, browser_hash, nonce, code_verifier, return_to, created_at, expires_at,\n                  scopes\n        ",
   "describe": {
     "columns": [
       {
@@ -79,6 +79,17 @@
             "name": "expires_at"
           }
         }
+      },
+      {
+        "ordinal": 7,
+        "name": "scopes",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bff.login_transactions",
+            "name": "scopes"
+          }
+        }
       }
     ],
     "parameters": {
@@ -93,8 +104,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "7e447376b49405917a2bd19ff119efc450a0143248be57a173bcce381f1d902b"
+  "hash": "c22416dee1f5419cfc43031a0f4ced03be9fe4f0bc91b22f84fc72edb6fbe60a"
 }

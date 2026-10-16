@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
-import { Fact, FactList, type FactStatus, Heading, Text } from "~/lib/ui";
+import { Fact, FactList, SettingsSection, type FactStatus } from "~/lib/ui";
 
 import type { AdminOverview, AiRoleStatus } from "../../api/admin";
 
@@ -26,13 +26,9 @@ export function formatUptime(seconds: number, locale: string): string | undefine
 
 function Section({ title, lead, children }: { title: string; lead?: string; children: ReactNode }) {
   return (
-    <section className="flex flex-col gap-3">
-      <Heading level={2} size="section">
-        {title}
-      </Heading>
-      {lead === undefined ? null : <Text tone="secondary">{lead}</Text>}
+    <SettingsSection title={title} description={lead}>
       <FactList>{children}</FactList>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -56,7 +52,7 @@ export function SystemOverview({ overview }: { overview: AdminOverview }) {
         );
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-5">
       <Section title={t("admin.server.title")}>
         <Fact label={t("admin.server.version")}>{overview.version}</Fact>
         <Fact label={t("admin.server.commit")}>

@@ -182,8 +182,8 @@ with an opaque cursor and a limit of 1 to 100 (else 400).
 conversation, up to its 100 newest messages with their plain-text bodies, and
 the decide pass's answers about its newest inbound message.
 `GET …/messages/{message_id}/body` (`conversations.get_message_body`) SHALL
-return the text and the sanitised HTML bodies as JSON; HTML SHALL never be
-served as `text/html`.
+return the text and the sanitised HTML bodies as JSON, with the HTML body's
+filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 
 #### Scenario: Paging
 - **WHEN** a member lists three conversations two at a time
@@ -261,28 +261,60 @@ workspace's rows when its grace period ends.
 
 ### Requirement: Sanitised email HTML
 `conversations.get_message_body` SHALL sanitise the HTML body before
-returning it: only an allow-list of tags and attributes survives; `script`
-and `style` elements are removed with their content, as are forms, frames,
+returning it. First the body's style sheets SHALL be inlined into `style`
+attributes from the sheets' filtered rules only, without ever fetching or
+reading a linked or imported sheet; sheets SHALL be dropped instead past
+256 KiB of style text, 20,000 elements, a nesting of 256 levels in the
+parsed tree, 1,000,000 elements times distinct properties, 50,000,000
+selectors times elements, or 500,000,000 declarations times elements times
+distinct properties. Then only an allow-list of
+tags and attributes survives (`class` included); `script`, `style` and
+`title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;
-links keep only `http`, `https`, `mailto` and `tel` URLs, relative URLs are
-dropped, and every link opens in a new tab with `rel="noopener noreferrer"`;
-`style` attributes keep only declarations that load nothing (no `url(`,
-`image-set(`, `@import`, `expression`, `behavior`, `-moz-binding` or CSS
-escapes). Images of at most 2×2 pixels, or hidden by their style, SHALL be
-removed. Other remote images SHALL have their source replaced by the
-server's placeholder image (a fixed `data:` URL; their size and alt text
-kept) unless the request asks `show_images=true`, and the response SHALL say
-how many remote images the message has (`remote_images`) and whether they
-were kept (`images_shown`). An image whose source is `cid:<id>` SHALL be
-shown, whether or not images are shown, as a `data:` URL of the message's
-inline part with that `Content-ID` (at most 255 characters; a longer one
-is not stored) when that part has a raster image type its bytes confirm
-and fits the size limits, and as the placeholder otherwise. No other `data:`
-source survives.
+the `body` element's `style` and `bgcolor` move to a wrapping `div`; links
+keep only `http`, `https`, `mailto` and `tel` URLs, relative URLs are
+dropped, and every link opens in a new tab with `rel="noopener noreferrer"`.
+Every `style` declaration SHALL be read with a CSS parser and kept only when
+it loads and runs nothing: its value calls only functions from an allow-list
+(colours, arithmetic, gradients, transforms, filters, timing, shapes,
+counters, grid) and has no URL token, at-keyword, malformed token, CSS escape
+or `<`, its property is a plain lower-case name written without escapes,
+and it is not a custom property, `behavior`, `-moz-binding` or a
+length in viewport or container units. The response's `css` SHALL hold the sheets'
+`@media` rules filtered the same way (queries and selectors with no URL,
+escape or non-structural function; nothing about `prefers-color-scheme`; at
+most 64 KiB), or nothing. Images of at most 2×2 pixels by attribute or style,
+with a `max-width` or `max-height` of 0, or hidden by their style (`display:
+none`, `visibility: hidden`, `opacity: 0`) SHALL be removed. Other remote
+images SHALL have their source replaced by the server's placeholder image (a
+fixed `data:` URL; their size and alt text kept) unless the request asks
+`show_images=true`, and the response SHALL say how many remote images the
+message has (`remote_images`) and whether they were kept (`images_shown`).
+An image whose source is `cid:<id>` SHALL be shown, whether or not images are
+shown, as a `data:` URL of the message's inline part with that `Content-ID`
+(at most 255 characters; a longer one is not stored) when that part has a
+raster image type its bytes confirm and fits the size limits, and as the
+placeholder otherwise. No other `data:` source survives.
 
 #### Scenario: A newsletter with a script, a style sheet and a tracking pixel
 - **WHEN** a member reads the HTML body of a message that has a `<script>`, a `<style>` with a remote `url()`, an `onclick` handler, a 1×1 image and a remote logo
 - **THEN** the HTML has no script, style sheet, handler or tracking pixel, the logo's source is the placeholder, and `remote_images` is 1
+
+#### Scenario: A newsletter styled by its style sheet
+- **WHEN** a member reads a message whose `<style>` gives `.lead` a colour, hides `.preheader` and makes `.container` full width under `@media (max-width: 640px)`
+- **THEN** the paragraph with class `lead` carries that colour in its `style`, the preheader carries `display: none`, there is no `<style>` or `<title>` text in the HTML, and `css` holds the `@media` rule
+
+#### Scenario: Linked and imported sheets
+- **WHEN** the body links `https://t.example/a.css`, `file:///etc/passwd` and imports another sheet
+- **THEN** nothing is fetched or read, and the `<link>` elements are gone
+
+#### Scenario: CSS that loads or runs
+- **WHEN** a declaration or `@media` rule uses `url(`, `image-set(`, `expression(`, `var(`, an escaped `u\72l(`, `behavior` or `-moz-binding`
+- **THEN** that declaration is dropped and its neighbours are kept
+
+#### Scenario: A pixel sized by its style
+- **WHEN** the body has `<img src="https://t.example/o.gif" style="width:1px;height:1px">` and the member shows images
+- **THEN** the image is removed and not counted
 
 #### Scenario: Show images
 - **WHEN** the same body is read with `show_images=true`

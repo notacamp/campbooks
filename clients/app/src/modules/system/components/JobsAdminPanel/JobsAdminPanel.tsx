@@ -2,18 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
-import {
-  Banner,
-  Button,
-  EmptyState,
-  Heading,
-  PaneHeader,
-  ReaderBody,
-  ReaderPane,
-  SkeletonList,
-  Spacer,
-  Text,
-} from "~/lib/ui";
+import { Banner, Button, EmptyState, SettingsPage, SkeletonList } from "~/lib/ui";
 
 import { jobsSummaryQuery } from "../../api/jobs";
 
@@ -33,12 +22,11 @@ export function JobsAdminPanel() {
   const [notice, setNotice] = useState<Notice | null>(null);
 
   return (
-    <ReaderPane label={t("jobs.title")}>
-      <PaneHeader>
-        <Heading level={1} size="pane">
-          {t("jobs.title")}
-        </Heading>
-        <Spacer />
+    <SettingsPage
+      label={t("jobs.title")}
+      title={t("jobs.title")}
+      lead={t("jobs.lead")}
+      actions={
         <Button
           variant="ghost"
           disabled={summary.isFetching}
@@ -48,62 +36,60 @@ export function JobsAdminPanel() {
         >
           {t("jobs.refresh")}
         </Button>
-      </PaneHeader>
-      <ReaderBody>
-        <Text tone="secondary">{t("jobs.lead")}</Text>
-        {notice === null ? null : (
-          <Banner
-            tone={notice.tone}
-            icon={notice.tone === "danger" ? "warning" : "check"}
-            title={notice.text}
-            role={notice.tone === "danger" ? "alert" : "status"}
-            action={
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  setNotice(null);
-                }}
-              >
-                {t("jobs.dismiss")}
-              </Button>
-            }
+      }
+    >
+      {notice === null ? null : (
+        <Banner
+          tone={notice.tone}
+          icon={notice.tone === "danger" ? "warning" : "check"}
+          title={notice.text}
+          role={notice.tone === "danger" ? "alert" : "status"}
+          action={
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setNotice(null);
+              }}
+            >
+              {t("jobs.dismiss")}
+            </Button>
+          }
+        />
+      )}
+      {summary.isPending ? (
+        <div role="status" aria-label={t("jobs.loading")}>
+          <SkeletonList rows={4} />
+        </div>
+      ) : summary.isError ? (
+        <EmptyState
+          title={t("jobs.loadError.title")}
+          visor="thinking"
+          visorSize="lg"
+          action={
+            <Button
+              onClick={() => {
+                void summary.refetch();
+              }}
+            >
+              {t("jobs.loadError.retry")}
+            </Button>
+          }
+        >
+          {t("jobs.loadError.lead")}
+        </EmptyState>
+      ) : (
+        <div className="flex flex-col gap-5">
+          <JobsSummary summary={summary.data} onShowFailed={setKind} onNotice={setNotice} />
+          <FailedJobs
+            kind={kind}
+            kinds={summary.data.kinds
+              .filter((entry) => entry.failed > 0)
+              .map((entry) => entry.kind)}
+            onKind={setKind}
+            onNotice={setNotice}
           />
-        )}
-        {summary.isPending ? (
-          <div role="status" aria-label={t("jobs.loading")}>
-            <SkeletonList rows={4} />
-          </div>
-        ) : summary.isError ? (
-          <EmptyState
-            title={t("jobs.loadError.title")}
-            visor="thinking"
-            visorSize="lg"
-            action={
-              <Button
-                onClick={() => {
-                  void summary.refetch();
-                }}
-              >
-                {t("jobs.loadError.retry")}
-              </Button>
-            }
-          >
-            {t("jobs.loadError.lead")}
-          </EmptyState>
-        ) : (
-          <div className="flex flex-col gap-8">
-            <JobsSummary summary={summary.data} onShowFailed={setKind} onNotice={setNotice} />
-            <FailedJobs
-              kind={kind}
-              kinds={summary.data.kinds
-                .filter((entry) => entry.failed > 0)
-                .map((entry) => entry.kind)}
-              onKind={setKind}
-              onNotice={setNotice}
-            />
-          </div>
-        )}
-      </ReaderBody>
-    </ReaderPane>
+        </div>
+      )}
+    </SettingsPage>
   );
 }

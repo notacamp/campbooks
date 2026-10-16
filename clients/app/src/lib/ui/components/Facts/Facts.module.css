@@ -73,3 +73,9 @@
 .dot[data-status="problem"] {
   background: var(--danger);
 }
+
+/* In a settings card the facts sit on a sunken panel instead of a second card. */
+.list[data-in-card] {
+  background: var(--surface-sunken);
+  box-shadow: none;
+}

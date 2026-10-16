@@ -26,10 +26,14 @@ allow = [
     "CDLA-Permissive-2.0", # Mozilla CA root data: webpki-roots (sqlx), webpki-root-certs (reqwest)
 ]
 exceptions = [
-    # MPL-2.0 (file-level copyleft), used unmodified, only through ammonia
-    # (the email HTML sanitiser): scoped to these crates, not allowed globally.
+    # MPL-2.0 (file-level copyleft), used unmodified, only by the email HTML
+    # sanitiser (ammonia, css-inline and its CSS filter, conversations):
+    # Servo's CSS parser and selector matching. Scoped to these crates, not
+    # allowed globally.
     { crate = "cssparser", allow = ["MPL-2.0"] },
+    { crate = "cssparser-macros", allow = ["MPL-2.0"] },
     { crate = "dtoa-short", allow = ["MPL-2.0"] },
+    { crate = "selectors", allow = ["MPL-2.0"] },
     # 0BSD (public-domain-equivalent, no attribution even): the quoted-printable
     # encoder of lettre (the instance's own mail). Scoped to it.
     { crate = "quoted_printable", allow = ["0BSD"] },

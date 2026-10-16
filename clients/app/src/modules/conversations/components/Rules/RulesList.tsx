@@ -10,6 +10,7 @@ import {
   InlineConfirm,
   List,
   ListRow,
+  SettingsEmpty,
   SkeletonList,
 } from "~/lib/ui";
 import { useMembers } from "~/modules/workspaces";
@@ -67,7 +68,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
       <EmptyState
         title={t("rules.list.failed")}
         visor="thinking"
-        headingLevel={2}
+        headingLevel={3}
         action={
           <Button
             variant="secondary"
@@ -86,9 +87,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
   }
   if (rules.data.length === 0) {
     return (
-      <EmptyState title={t("rules.list.label")} visor="idle" headingLevel={2}>
-        {t("rules.list.empty")}
-      </EmptyState>
+      <SettingsEmpty title={t("rules.list.emptyTitle")}>{t("rules.list.empty")}</SettingsEmpty>
     );
   }
   // Keep / No act on the inbox (anyone who may teach there): only offered
@@ -121,7 +120,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
     <div className="flex flex-col gap-6">
       {waiting.length === 0 ? null : (
         <section className="flex flex-col gap-2">
-          <Heading level={2} size="section">
+          <Heading level={3} size="section">
             {t("rules.list.waiting")}
           </Heading>
           <List label={t("rules.list.waiting")}>{waiting.map(row)}</List>
@@ -135,7 +134,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
         );
         return (
           <section key={inboxId} className="flex flex-col gap-2">
-            <Heading level={2} size="section">
+            <Heading level={3} size="section">
               {name}
             </Heading>
             <List label={name}>{list.map(row)}</List>

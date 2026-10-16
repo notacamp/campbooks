@@ -208,6 +208,7 @@ impl Inner {
             return_to,
             created_at: now,
             expires_at: now + self.timeouts.login,
+            scopes: Some(self.oidc.scopes().to_owned()),
         };
         if let Err(err) = store::insert_login(&self.db, &login).await {
             return Error::from(err).into_response();
@@ -375,6 +376,9 @@ impl Inner {
             now,
             idle_expires_at: (now + self.timeouts.idle).min(expires_at),
             expires_at,
+            // What this sign-in asked for when it started (a deploy may have
+            // come in between): its tokens carry those, not today's.
+            scopes: login.scopes.as_deref(),
         };
         if let Err(err) = store::insert_session(&self.db, &session).await {
             return Error::from(err).into_response();
@@ -534,7 +538,10 @@ pub async fn logout(State(bff): State<Bff>, headers: HeaderMap) -> Result<Respon
         return Ok(not_configured());
     };
     let mut ended_here = false;
-    if let Some(current) = inner.current(&headers).await? {
+    // A session that predates the scopes asked for now still signs out in
+    // full here (the identity provider's session too), rather than being
+    // retired by the lookup and leaving that session behind.
+    if let Some(current) = inner.current_any_scopes(&headers).await? {
         ended_here = inner.terminate(current.session.id).await?;
         tracing::info!("web sign-out");
     }

@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use aws_lc_rs::{
-    aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey},
+    aead::{AES_256_GCM, AES_256_GCM_SIV, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey},
     constant_time, digest, hkdf, hmac,
     rand::{SecureRandom as _, SystemRandom},
 };
@@ -99,6 +99,11 @@ impl SecretKey {
 /// exchanging it (the web BFF's client secret at the in-process issuer).
 /// Never change a label in use.
 pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString {
+    SecretString::from(URL_SAFE_NO_PAD.encode(derive_bytes(secret, purpose)))
+}
+
+/// The 32 bytes behind [`derive_secret`] (HKDF-SHA256, `purpose` as `info`).
+fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
     struct Len32;
     impl hkdf::KeyType for Len32 {
         fn len(&self) -> usize {
@@ -111,7 +116,7 @@ pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString
     prk.expand(&info, Len32)
         .and_then(|okm| okm.fill(&mut bytes))
         .unwrap_or_else(|_| unreachable!("HKDF can expand to 32 bytes"));
-    SecretString::from(URL_SAFE_NO_PAD.encode(bytes))
+    bytes
 }
 
 /// A URL-safe random token of 256 bits.
@@ -218,13 +223,24 @@ impl Cipher {
 /// flight would stop verifying).
 const SIGNER_PURPOSE: &[u8] = b"campbooks kernel signed values v1";
 
+/// The purpose of the [`Signer`]'s sealing key. Never change it (every
+/// sealed value in flight would stop opening).
+const SEALER_PURPOSE: &[u8] = b"campbooks kernel sealed values v1";
+
 /// Signs short values the server hands out and takes back (opaque cursors),
 /// so a client cannot forge or alter them: HMAC-SHA256 under a key derived
-/// from the instance secret. Each use names itself in its `context`, so a
-/// value signed for one purpose never verifies for another. Cheap to clone.
+/// from the instance secret. Values whose content the client must not read
+/// either (the change feed's resume tokens) are sealed instead
+/// ([`seal`](Self::seal), AES-256-GCM-SIV under another derived key: many
+/// short values under one key with random nonces, where a repeated nonce
+/// would only show that two values are equal). Each use names itself in its
+/// `context`, so a value signed or sealed for one purpose never verifies or
+/// opens for another. Cheap to clone.
 #[derive(Clone)]
 pub struct Signer {
     key: std::sync::Arc<hmac::Key>,
+    sealer: std::sync::Arc<LessSafeKey>,
+    rng: SystemRandom,
 }
 
 impl std::fmt::Debug for Signer {
@@ -237,7 +253,11 @@ impl Default for Signer {
     /// A signer with a random key: values verify in this process only. The
     /// server installs [`Signer::new`] instead.
     fn default() -> Self {
-        Self::with_key(random_token().as_bytes())
+        let mut bytes = [0_u8; SECRET_KEY_LEN];
+        SystemRandom::new()
+            .fill(&mut bytes)
+            .unwrap_or_else(|_| unreachable!("the system random number generator failed"));
+        Self::new(&SecretKey::from_bytes(bytes))
     }
 }
 
@@ -245,16 +265,17 @@ impl Signer {
     /// A signer keyed by `secret` (the instance secret): every process of
     /// the install agrees.
     pub fn new(secret: &SecretKey) -> Self {
-        Self::with_key(
-            derive_secret(secret, SIGNER_PURPOSE)
-                .expose_secret()
-                .as_bytes(),
-        )
-    }
-
-    fn with_key(key: &[u8]) -> Self {
+        let key = derive_secret(secret, SIGNER_PURPOSE);
         Self {
-            key: std::sync::Arc::new(hmac::Key::new(hmac::HMAC_SHA256, key)),
+            key: std::sync::Arc::new(hmac::Key::new(
+                hmac::HMAC_SHA256,
+                key.expose_secret().as_bytes(),
+            )),
+            sealer: std::sync::Arc::new(LessSafeKey::new(
+                UnboundKey::new(&AES_256_GCM_SIV, &derive_bytes(secret, SEALER_PURPOSE))
+                    .unwrap_or_else(|_| unreachable!("32 bytes make an AES-256-GCM-SIV key")),
+            )),
+            rng: SystemRandom::new(),
         }
     }
 
@@ -276,6 +297,46 @@ impl Signer {
     /// Whether `tag` is `value`'s for `context` (constant time).
     pub fn verify(&self, context: &[u8], value: &[u8], tag: &[u8]) -> bool {
         hmac::verify(&self.key, &Self::input(context, value), tag).is_ok()
+    }
+
+    /// `value` sealed for `context`: unreadable and unalterable without the
+    /// key, a fresh random nonce each time (sealing one value twice gives
+    /// two unrelated results), and `value.len() + 29` bytes long.
+    pub fn seal(&self, context: &[u8], value: &[u8]) -> Vec<u8> {
+        let mut nonce = [0_u8; NONCE_LEN];
+        self.rng
+            .fill(&mut nonce)
+            .unwrap_or_else(|_| unreachable!("the system random number generator failed"));
+        let mut sealed = Vec::with_capacity(1 + NONCE_LEN + value.len() + 16);
+        sealed.push(FORMAT_V1);
+        sealed.extend_from_slice(&nonce);
+        let mut body = value.to_vec();
+        self.sealer
+            .seal_in_place_append_tag(
+                Nonce::assume_unique_for_key(nonce),
+                Aad::from(context),
+                &mut body,
+            )
+            .unwrap_or_else(|_| unreachable!("AES-GCM-SIV seals any short value"));
+        sealed.extend_from_slice(&body);
+        sealed
+    }
+
+    /// The value `sealed` holds, if it was sealed for `context` under this
+    /// key and not altered since.
+    pub fn open(&self, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
+        let (&format, rest) = sealed.split_first()?;
+        if format != FORMAT_V1 || rest.len() < NONCE_LEN {
+            return None;
+        }
+        let (nonce, body) = rest.split_at(NONCE_LEN);
+        let nonce = Nonce::try_assume_unique_for_key(nonce).ok()?;
+        let mut body = body.to_vec();
+        let value = self
+            .sealer
+            .open_in_place(nonce, Aad::from(context), &mut body)
+            .ok()?;
+        Some(value.to_vec())
     }
 }
 
@@ -405,5 +466,36 @@ mod tests {
         assert!(!signer.verify(b"other", b"page 2", &tag));
         assert!(Signer::new(&secret).verify(b"search.cursor", b"page 2", &tag));
         assert!(!Signer::default().verify(b"search.cursor", b"page 2", &tag));
+    }
+
+    #[test]
+    fn sealed_values_open_only_for_their_context_and_key_and_hide_their_content() {
+        let secret = SecretKey([7_u8; SECRET_KEY_LEN]);
+        let signer = Signer::new(&secret);
+        let value = [0_u8, 0, 0, 0, 0, 0, 0, 42];
+        let sealed = signer.seal(b"changes.cursor", &value);
+        assert_eq!(sealed.len(), value.len() + 29, "a fixed overhead");
+        assert_eq!(
+            signer.open(b"changes.cursor", &sealed).as_deref(),
+            Some(&value[..])
+        );
+        assert_eq!(
+            Signer::new(&secret)
+                .open(b"changes.cursor", &sealed)
+                .as_deref(),
+            Some(&value[..]),
+            "every process of the install opens it"
+        );
+        assert_ne!(
+            sealed,
+            signer.seal(b"changes.cursor", &value),
+            "a fresh nonce every time"
+        );
+        assert!(signer.open(b"other", &sealed).is_none());
+        assert!(Signer::default().open(b"changes.cursor", &sealed).is_none());
+        let mut altered = sealed.clone();
+        altered[20] ^= 1;
+        assert!(signer.open(b"changes.cursor", &altered).is_none());
+        assert!(signer.open(b"changes.cursor", b"").is_none());
     }
 }
