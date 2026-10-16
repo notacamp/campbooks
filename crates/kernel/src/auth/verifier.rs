@@ -5,10 +5,12 @@ use std::{collections::BTreeSet, sync::Arc};
 use axum::extract::FromRef;
 use jsonwebtoken::{Algorithm, Validation, errors::ErrorKind};
 use serde::{Deserialize, de::DeserializeOwned};
+use sqlx::PgPool;
 
 use super::{
     AuthFailure, Principal, PrincipalKind, Scope,
     jwks::{Jwks, KeySource},
+    revocation::{Revocation, TokenRevocationPort},
 };
 use crate::{
     AppState, Error,
@@ -34,6 +36,10 @@ const STRICT_TYPES: [&str; 1] = ["at+jwt"];
 #[derive(Clone)]
 pub struct TokenVerifier {
     pub(super) inner: Option<Arc<Inner>>,
+    /// Asked whether a person's token still stands (suspension, sign out
+    /// everywhere); `None` for an issuer whose subjects are not accounts
+    /// here.
+    revocation: Option<Revocation>,
 }
 
 pub(super) struct Inner {
@@ -52,6 +58,7 @@ impl std::fmt::Debug for TokenVerifier {
             Some(inner) => debug
                 .field("issuer", &inner.issuer)
                 .field("audience", &inner.audience)
+                .field("revocation", &self.revocation.is_some())
                 .finish_non_exhaustive(),
             None => debug.field("issuer", &"<not configured>").finish(),
         }
@@ -78,7 +85,10 @@ impl TokenVerifier {
                 strict_type: false,
             })
         });
-        Self { inner }
+        Self {
+            inner,
+            revocation: None,
+        }
     }
 
     /// A verifier for tokens of `issuer`, an issuer running in this process
@@ -104,6 +114,36 @@ impl TokenVerifier {
                 keys: Jwks::local(issuer, keys, clock),
                 strict_type: true,
             })),
+            revocation: None,
+        }
+    }
+
+    /// The same verifier, also refusing a person's token that no longer
+    /// stands: `revocation` (read with `db`) is asked on every verification
+    /// of a [`PrincipalKind::User`] token, and a token of a missing or
+    /// suspended account, or issued before its last revocation, gets
+    /// [`AuthFailure::InvalidToken`], like any invalid token. Only for an
+    /// issuer whose subjects are identity accounts (the in-process one).
+    #[must_use]
+    pub fn with_revocation(mut self, db: PgPool, revocation: TokenRevocationPort) -> Self {
+        self.revocation = Some(Revocation {
+            db,
+            port: revocation,
+        });
+        self
+    }
+
+    /// Whether the token `principal` was verified from still stands: asked
+    /// again by long-lived responses (the change stream) after
+    /// [`verify`](Self::verify) admitted it. Always `true` without a
+    /// revocation port, and for clients.
+    ///
+    /// # Errors
+    /// The port's (the database's).
+    pub async fn still_stands(&self, principal: &Principal) -> Result<bool, Error> {
+        match &self.revocation {
+            Some(revocation) => revocation.stands(principal).await,
+            None => Ok(true),
         }
     }
 
@@ -126,7 +166,18 @@ impl TokenVerifier {
         let Some(inner) = &self.inner else {
             return Err(Error::Unauthorized(AuthFailure::NotConfigured));
         };
-        inner.verify(token).await.inspect_err(|err| {
+        let verified = match inner.verify(token).await {
+            Ok(principal) => match self.still_stands(&principal).await {
+                Ok(true) => Ok(principal),
+                Ok(false) => {
+                    tracing::debug!("access token rejected: revoked");
+                    Err(Error::Unauthorized(AuthFailure::InvalidToken))
+                }
+                Err(err) => Err(err),
+            },
+            Err(err) => Err(err),
+        };
+        verified.inspect_err(|err| {
             // The reason only; never the token or its claims.
             tracing::debug!(error = %err, "access token rejected");
         })
@@ -149,12 +200,16 @@ impl Inner {
                 return Err(Error::Unauthorized(AuthFailure::InvalidToken));
             }
         }
-        let claims: Claims = self
-            .decode(token, &self.audience, &ALLOWED_TYPES, false)
+        let IssuedAt { iat, rest: claims } = self
+            .decode_from::<Claims>(token, &self.issuer, &self.audience, &ALLOWED_TYPES, false)
             .await?;
-        claims
+        let mut principal = claims
             .into_principal(self.strict_type)
-            .ok_or(Error::Unauthorized(AuthFailure::InvalidToken))
+            .ok_or(Error::Unauthorized(AuthFailure::InvalidToken))?;
+        principal.issued_at = iat
+            .and_then(|iat| i64::try_from(iat).ok())
+            .and_then(|iat| chrono::DateTime::from_timestamp(iat, 0));
+        Ok(principal)
     }
 
     /// Decode `token` signed by one of the IdP's keys, issued by the
@@ -172,11 +227,13 @@ impl Inner {
     ) -> Result<T, Error> {
         self.decode_from(token, &self.issuer, audience, allowed_types, require_iat)
             .await
+            .map(|claims| claims.rest)
     }
 
     /// [`decode`](Self::decode) for tokens of `issuer` instead of the
     /// configured one, still signed by one of this verifier's keys (a
-    /// multi-tenant provider publishes one key set for many issuers).
+    /// multi-tenant provider publishes one key set for many issuers), with
+    /// the token's `iat` beside its claims.
     pub(super) async fn decode_from<T: DeserializeOwned>(
         &self,
         token: &str,
@@ -184,7 +241,7 @@ impl Inner {
         audience: &str,
         allowed_types: &[&str],
         require_iat: bool,
-    ) -> Result<T, Error> {
+    ) -> Result<IssuedAt<T>, Error> {
         let invalid = || Error::Unauthorized(AuthFailure::InvalidToken);
 
         let header = jsonwebtoken::decode_header(token).map_err(|_| invalid())?;
@@ -218,7 +275,7 @@ impl Inner {
                 Err(invalid())
             }
             None if require_iat => Err(invalid()),
-            _ => Ok(claims.rest),
+            _ => Ok(claims),
         }
     }
 }
@@ -226,10 +283,10 @@ impl Inner {
 /// Every token's `iat`, checked against the clock, next to the claims the
 /// caller reads.
 #[derive(Debug, Deserialize)]
-struct IssuedAt<T> {
-    iat: Option<u64>,
+pub(super) struct IssuedAt<T> {
+    pub(super) iat: Option<u64>,
     #[serde(flatten)]
-    rest: T,
+    pub(super) rest: T,
 }
 
 /// Whether header `typ` is one of `allowed` (compared without regard to case,
@@ -325,6 +382,8 @@ impl Claims {
             expires_at: self
                 .exp
                 .and_then(|exp| chrono::DateTime::from_timestamp(exp, 0)),
+            // Set from the token's `iat` by the verifier, which reads it.
+            issued_at: None,
             auth_time: match kind {
                 PrincipalKind::User => self
                     .auth_time

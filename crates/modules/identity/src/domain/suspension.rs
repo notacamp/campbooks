@@ -8,8 +8,10 @@
 //! live session and revokes every refresh-token family at once, records it
 //! in the account's audit trail and publishes
 //! [`AccountSuspended`](crate::events::AccountSuspended), on which the web
-//! BFF drops the account's web sessions. Access tokens already issued live
-//! out their ten minutes.
+//! BFF drops the account's web sessions. The access tokens already issued
+//! stop at once: the account's revocation epoch moves to now
+//! ([`accounts::revoke_tokens`]), and the API checks it on every request.
+//! Unsuspending leaves the epoch: those tokens never come back.
 
 use campbooks_kernel::{EventBus, Result};
 use chrono::{DateTime, Utc};
@@ -38,7 +40,7 @@ pub async fn suspend(
     by: &str,
     now: DateTime<Utc>,
 ) -> Result<Outcome> {
-    let Some(was_suspended) = lock(tx, account).await? else {
+    let Some(was_suspended) = accounts::lock(tx, account).await? else {
         return Ok(Outcome::Missing);
     };
     if was_suspended {
@@ -49,6 +51,7 @@ pub async fn suspend(
         .bind(now)
         .execute(&mut **tx)
         .await?;
+    accounts::revoke_tokens(tx, account, now).await?;
     let sessions = sqlx::query(
         "UPDATE identity.sessions SET ended_at = $2 WHERE account_id = $1 AND ended_at IS NULL",
     )
@@ -83,14 +86,15 @@ pub async fn suspend(
 }
 
 /// Lift the suspension of `account`, on behalf of administrator `by`. The
-/// person signs in again: nothing that was ended comes back.
+/// person signs in again: nothing that was ended comes back, the access
+/// tokens issued before the suspension included (the epoch stays).
 pub async fn unsuspend(
     tx: &mut Transaction<'_, Postgres>,
     account: Uuid,
     by: &str,
     now: DateTime<Utc>,
 ) -> Result<Outcome> {
-    let Some(was_suspended) = lock(tx, account).await? else {
+    let Some(was_suspended) = accounts::lock(tx, account).await? else {
         return Ok(Outcome::Missing);
     };
     if !was_suspended {
@@ -109,15 +113,4 @@ pub async fn unsuspend(
     )
     .await?;
     Ok(Outcome::Changed)
-}
-
-/// Lock `account`'s row; whether it is suspended, or `None` when there is no
-/// such account.
-async fn lock(tx: &mut Transaction<'_, Postgres>, account: Uuid) -> Result<Option<bool>> {
-    Ok(sqlx::query_scalar(
-        "SELECT disabled_at IS NOT NULL FROM identity.accounts WHERE id = $1 FOR UPDATE",
-    )
-    .bind(account)
-    .fetch_optional(&mut **tx)
-    .await?)
 }
