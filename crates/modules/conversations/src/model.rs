@@ -534,13 +534,13 @@ vocabulary!(
     PausedReason {
         /// Its inbox is kept read-only: no rule acts there any more.
         InboxReadOnly => "inbox_read_only",
-        /// Its author is no longer a sender or manager of the inbox, until
-        /// a manager adopts or removes it.
-        AuthorCannotWrite => "author_cannot_write",
         /// It names a sender domain that is a public suffix (`github.io`), so
         /// it would cover every site under it and matches nothing. Only
         /// removing it clears this.
         DomainTooBroad => "domain_too_broad",
+        /// Its author is no longer a sender or manager of the inbox, until
+        /// a manager adopts or removes it.
+        AuthorCannotWrite => "author_cannot_write",
         /// A member paused it.
         PausedByMember => "paused_by_member",
         /// Its author is away for now; it acts again on its own once they

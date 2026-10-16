@@ -7366,6 +7366,16 @@
               }
             }
           },
+          "400": {
+            "description": "Not a valid rule (any more).",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "401": {
             "description": "No valid access token.",
             "content": {
@@ -13862,8 +13872,8 @@
         "description": "Why a taught rule is paused: the one that would still hold once the\nmost passing one clears.",
         "enum": [
           "inbox_read_only",
-          "author_cannot_write",
           "domain_too_broad",
+          "author_cannot_write",
           "paused_by_member",
           "author_unavailable"
         ]

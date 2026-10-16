@@ -369,10 +369,11 @@ impl Stored {
         }
         Some(if self.inbox_detached {
             PausedReason::InboxReadOnly
+        } else if self.domain_too_broad() {
+            // Before the author's reasons: adopting it would not make it act.
+            PausedReason::DomainTooBroad
         } else if !self.author_may_act {
             PausedReason::AuthorCannotWrite
-        } else if self.domain_too_broad() {
-            PausedReason::DomainTooBroad
         } else if self.state == RuleState::Paused {
             PausedReason::PausedByMember
         } else {
@@ -780,6 +781,16 @@ mod stored_tests {
         // Even a member's pause does not hide it: resuming would not help.
         let paused = stored("github.io", RuleState::Paused);
         assert_eq!(paused.paused_reason(), Some(PausedReason::DomainTooBroad));
+    }
+
+    #[test]
+    fn it_ranks_right_after_a_read_only_inbox() {
+        let mut rule = stored("github.io", RuleState::Active);
+        rule.author_may_act = false;
+        rule.author_suspended = true;
+        assert_eq!(rule.paused_reason(), Some(PausedReason::DomainTooBroad));
+        rule.inbox_detached = true;
+        assert_eq!(rule.paused_reason(), Some(PausedReason::InboxReadOnly));
     }
 
     #[test]

@@ -211,8 +211,9 @@ impl Facts {
 
     /// Whether the receiving provider's `Authentication-Results` say the
     /// sender's domain failed: DMARC failed, or neither a DMARC pass for
-    /// the From domain nor a DKIM pass aligned with it. Absent results say
-    /// nothing either way.
+    /// the From domain nor a DKIM pass aligned with it. Absent results, and
+    /// `authserv-id; none` (the receiver checked nothing), say nothing either
+    /// way; a present header that cannot be read counts as failed.
     pub fn authentication_failed(&self) -> bool {
         let Some(value) = self.authentication_results.as_deref() else {
             return false;
@@ -223,6 +224,12 @@ impl Facts {
         let Some(results) = auth_results::parse(value) else {
             return true;
         };
+        // `authserv-id; none`: the receiver checked nothing (internal mail,
+        // some hosts). A sender cannot make the receiver's own topmost header
+        // say so, so it says nothing either way.
+        if results.is_empty() {
+            return false;
+        }
         let dmarc_failed = results
             .iter()
             .any(|r| r.method == "dmarc" && r.result == "fail");
@@ -723,6 +730,62 @@ mod tests {
     }
 
     #[test]
+    fn a_receiver_that_checked_nothing_says_nothing() {
+        for value in [
+            "mx.example.com; none",
+            "mx.example.com; None",
+            "mx.example.com 1; none",
+            "mx.example.com; (nothing checked) none",
+        ] {
+            assert!(!failed("ana@studio.example", value), "{value}");
+        }
+        // Other empty shapes are not RFC-valid: unreadable, so failed.
+        for value in [
+            "mx.example.com;",
+            "mx.example.com",
+            "mx.example.com; none; dmarc=fail header.from=studio.example",
+            "mx.example.com; none dmarc=fail header.from=studio.example",
+            "mx.example.com; none; none",
+        ] {
+            assert!(failed("ana@studio.example", value), "{value}");
+        }
+    }
+
+    #[test]
+    fn whitespace_rfc_8601_allows_is_read() {
+        let results = auth_results::parse(
+            "mx.example.com; dkim = pass header.d = studio.example; dkim/1 = fail; \
+             dmarc (p=REJECT)=pass header.from = studio.example",
+        )
+        .unwrap();
+        let seen: Vec<_> = results
+            .iter()
+            .map(|r| (r.method.as_str(), r.result.as_str()))
+            .collect();
+        assert_eq!(
+            seen,
+            [("dkim", "pass"), ("dkim", "fail"), ("dmarc", "pass")]
+        );
+        assert_eq!(
+            results[0].values("header.d").collect::<Vec<_>>(),
+            ["studio.example"]
+        );
+        assert_eq!(
+            results[2].values("header.from").collect::<Vec<_>>(),
+            ["studio.example"]
+        );
+        // An empty value keeps the pair after it.
+        let bounce = auth_results::parse(
+            "mx.example.com; spf=none smtp.mailfrom= header.from=studio.example",
+        )
+        .unwrap();
+        assert_eq!(
+            bounce[0].values("header.from").collect::<Vec<_>>(),
+            ["studio.example"]
+        );
+    }
+
+    #[test]
     fn real_provider_headers_in_the_fixtures_are_readable() {
         // Every provider header the repo records must parse, or a genuine
         // message would count as failed. The recorded batches first.
@@ -741,6 +804,26 @@ mod tests {
                  permitted sender) smtp.mailfrom=noreply@github.com; \
                  dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=github.com",
                 "mx.zohomail.com; dkim=pass; spf=pass; dmarc=pass header.from=github.com",
+                // Shapes Gmail writes, by hand from public examples.
+                "mx.google.com; dkim=pass header.i=@mail.example header.s=s1 header.b=AbCd; \
+                 spf=pass (google.com: domain of bounce@mail.example designates 192.0.2.7 as \
+                 permitted sender) smtp.mailfrom=bounce@mail.example; \
+                 dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=mail.example",
+                "mx.google.com; arc=pass (i=1 spf=pass spfdomain=mail.example dkim=pass \
+                 dkdomain=mail.example dmarc=pass fromdomain=mail.example); \
+                 dkim=pass header.i=@mail.example header.s=s1 header.b=AbCd; \
+                 dara=pass header.i=@mail.example; \
+                 dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=mail.example",
+                "mx.google.com; dkim=pass header.i=@lists.example header.s=s1 header.b=AbCd; \
+                 dkim=pass header.i=@mail.example header.s=s2 header.b=EfGh; \
+                 spf=softfail (google.com: domain of transitioning bounce@mail.example does not \
+                 designate 192.0.2.8 as permitted sender) smtp.mailfrom=bounce@mail.example; \
+                 dmarc=pass (p=NONE sp=NONE dis=NONE) header.from=mail.example",
+                "mx.google.com; dkim=none; spf=none (google.com: domain of \
+                 does not designate 192.0.2.9 as permitted sender) smtp.mailfrom=; \
+                 dmarc=none header.from=mail.example",
+                "mx.google.com; spf=pass smtp.mailfrom=\"\"; dmarc=pass header.from=mail.example",
+                "mx.example.com; none",
             ]
             .map(String::from),
         );

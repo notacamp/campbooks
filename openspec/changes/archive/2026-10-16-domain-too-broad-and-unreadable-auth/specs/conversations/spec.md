@@ -18,7 +18,9 @@ email signals stay the module's only rules of its own. A `sender_domain`
 condition SHALL match only while its value is an owned domain (two labels or
 more, not a public suffix); a stored rule naming one that is now a public
 suffix (`github.io`) matches nothing and reads as paused with
-`paused_reason` `domain_too_broad`, still removable by a member.
+`paused_reason` `domain_too_broad`, still removable by a member. Confirming a
+proposal SHALL validate it as creating one does, so a proposal whose domain is
+now a public suffix answers 400 `invalid_rule` and is not kept.
 
 #### Scenario: A rule from a move
 - **WHEN** Ana creates a rule with `sender_address is notifications@github.com` and `move_to_stream updates`
@@ -47,8 +49,8 @@ SHALL publish `conversations.rule_changed` for each of the member's rules
 that is not removed. A member leaving the workspace SHALL be recorded as not
 suspended as of their departure (they come back only by signing in).
 `RuleView` SHALL carry `paused_reason` when its state is `paused`:
-`inbox_read_only`, else `author_cannot_write`, else `domain_too_broad` (a
-`sender_domain` naming a public suffix), else `paused_by_member`, else
+`inbox_read_only`, else `domain_too_broad` (a `sender_domain` naming a public
+suffix), else `author_cannot_write`, else `paused_by_member`, else
 `author_unavailable`. A suspension is an administrator's action and SHALL
 not be disclosed to other members, clients or the assistant: no rule
 reason, event or text readable in the workspace names it.
