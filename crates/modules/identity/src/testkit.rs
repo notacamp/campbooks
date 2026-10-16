@@ -124,6 +124,8 @@ pub struct FakeIntake {
     refuse_next: std::sync::atomic::AtomicBool,
     /// The connections it holds.
     connections: Mutex<Vec<Held>>,
+    /// `connection_of` fails (the connectors module cannot answer).
+    cannot_answer: std::sync::atomic::AtomicBool,
 }
 
 /// The Zoho mailbox scopes the fake intake asks for, when it syncs Zoho.
@@ -146,6 +148,13 @@ impl FakeIntake {
     /// another member already connected that account here.
     pub fn refuse_next(&self) {
         self.refuse_next
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+    }
+
+    /// From now on `connection_of` fails, as when the connectors module
+    /// cannot answer.
+    pub fn cannot_answer(&self) {
+        self.cannot_answer
             .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 
@@ -264,6 +273,11 @@ impl GrantIntake for FakeIntake {
         provider: &'a str,
         account_subject: &'a str,
     ) -> ConnectionOfFuture<'a> {
+        if self.cannot_answer.load(std::sync::atomic::Ordering::SeqCst) {
+            return Box::pin(async {
+                Err(Error::internal("the connectors module is unreachable"))
+            });
+        }
         let found = self
             .connections
             .lock()
