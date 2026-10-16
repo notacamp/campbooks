@@ -74,7 +74,9 @@ export const Long: Story = {
   args: { html: `<p>${"A long paragraph of an email body. ".repeat(400)}</p>` },
   play: async ({ canvasElement }) => {
     await fitsItsContent(canvasElement);
-    await expect(loadedFrame(canvasElement).frame.getBoundingClientRect().height).toBeGreaterThan(1400);
+    await expect(loadedFrame(canvasElement).frame.getBoundingClientRect().height).toBeGreaterThan(
+      1400,
+    );
   },
 };
 
