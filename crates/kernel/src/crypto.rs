@@ -17,7 +17,7 @@
 use std::path::PathBuf;
 
 use aws_lc_rs::{
-    aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey},
+    aead::{AES_256_GCM, AES_256_GCM_SIV, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey},
     constant_time, digest, hkdf, hmac,
     rand::{SecureRandom as _, SystemRandom},
 };
@@ -99,6 +99,11 @@ impl SecretKey {
 /// exchanging it (the web BFF's client secret at the in-process issuer).
 /// Never change a label in use.
 pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString {
+    SecretString::from(URL_SAFE_NO_PAD.encode(derive_bytes(secret, purpose)))
+}
+
+/// The 32 bytes behind [`derive_secret`] (HKDF-SHA256, `purpose` as `info`).
+fn derive_bytes(secret: &SecretKey, purpose: &'static [u8]) -> [u8; 32] {
     struct Len32;
     impl hkdf::KeyType for Len32 {
         fn len(&self) -> usize {
@@ -111,7 +116,7 @@ pub fn derive_secret(secret: &SecretKey, purpose: &'static [u8]) -> SecretString
     prk.expand(&info, Len32)
         .and_then(|okm| okm.fill(&mut bytes))
         .unwrap_or_else(|_| unreachable!("HKDF can expand to 32 bytes"));
-    SecretString::from(URL_SAFE_NO_PAD.encode(bytes))
+    bytes
 }
 
 /// A URL-safe random token of 256 bits.
@@ -178,13 +183,6 @@ impl Cipher {
 
     /// `FORMAT_V1 || nonce || ciphertext || tag`, bound to `context`.
     pub fn seal(&self, plaintext: &str, context: &[u8]) -> Vec<u8> {
-        self.seal_bytes(plaintext.as_bytes(), context)
-    }
-
-    /// [`seal`](Self::seal) for bytes. The sealed value is as long as
-    /// `plaintext` plus 29 bytes, so fixed-width plaintexts seal to values
-    /// of one length.
-    pub fn seal_bytes(&self, plaintext: &[u8], context: &[u8]) -> Vec<u8> {
         let mut nonce = [0_u8; NONCE_LEN];
         self.rng
             .fill(&mut nonce)
@@ -192,7 +190,7 @@ impl Cipher {
         let mut sealed = Vec::with_capacity(1 + NONCE_LEN + plaintext.len() + 16);
         sealed.push(FORMAT_V1);
         sealed.extend_from_slice(&nonce);
-        let mut body = plaintext.to_vec();
+        let mut body = plaintext.as_bytes().to_vec();
         self.key
             .seal_in_place_append_tag(
                 Nonce::assume_unique_for_key(nonce),
@@ -206,11 +204,6 @@ impl Cipher {
 
     /// The plaintext of `sealed`, which must have been sealed for `context`.
     pub fn open(&self, sealed: &[u8], context: &[u8]) -> Result<String, OpenError> {
-        String::from_utf8(self.open_bytes(sealed, context)?).map_err(|_| OpenError)
-    }
-
-    /// [`open`](Self::open) for bytes.
-    pub fn open_bytes(&self, sealed: &[u8], context: &[u8]) -> Result<Vec<u8>, OpenError> {
         let (&format, rest) = sealed.split_first().ok_or(OpenError)?;
         if format != FORMAT_V1 || rest.len() < NONCE_LEN {
             return Err(OpenError);
@@ -222,7 +215,7 @@ impl Cipher {
             .key
             .open_in_place(nonce, Aad::from(context), &mut body)
             .map_err(|_| OpenError)?;
-        Ok(plaintext.to_vec())
+        String::from_utf8(plaintext.to_vec()).map_err(|_| OpenError)
     }
 }
 
@@ -238,13 +231,16 @@ const SEALER_PURPOSE: &[u8] = b"campbooks kernel sealed values v1";
 /// so a client cannot forge or alter them: HMAC-SHA256 under a key derived
 /// from the instance secret. Values whose content the client must not read
 /// either (the change feed's resume tokens) are sealed instead
-/// ([`seal`](Self::seal), AES-256-GCM under another derived key). Each use
-/// names itself in its `context`, so a value signed or sealed for one
-/// purpose never verifies or opens for another. Cheap to clone.
+/// ([`seal`](Self::seal), AES-256-GCM-SIV under another derived key: many
+/// short values under one key with random nonces, where a repeated nonce
+/// would only show that two values are equal). Each use names itself in its
+/// `context`, so a value signed or sealed for one purpose never verifies or
+/// opens for another. Cheap to clone.
 #[derive(Clone)]
 pub struct Signer {
     key: std::sync::Arc<hmac::Key>,
-    sealer: std::sync::Arc<Cipher>,
+    sealer: std::sync::Arc<LessSafeKey>,
+    rng: SystemRandom,
 }
 
 impl std::fmt::Debug for Signer {
@@ -275,7 +271,11 @@ impl Signer {
                 hmac::HMAC_SHA256,
                 key.expose_secret().as_bytes(),
             )),
-            sealer: std::sync::Arc::new(Cipher::new(secret, SEALER_PURPOSE)),
+            sealer: std::sync::Arc::new(LessSafeKey::new(
+                UnboundKey::new(&AES_256_GCM_SIV, &derive_bytes(secret, SEALER_PURPOSE))
+                    .unwrap_or_else(|_| unreachable!("32 bytes make an AES-256-GCM-SIV key")),
+            )),
+            rng: SystemRandom::new(),
         }
     }
 
@@ -303,13 +303,40 @@ impl Signer {
     /// key, a fresh random nonce each time (sealing one value twice gives
     /// two unrelated results), and `value.len() + 29` bytes long.
     pub fn seal(&self, context: &[u8], value: &[u8]) -> Vec<u8> {
-        self.sealer.seal_bytes(value, context)
+        let mut nonce = [0_u8; NONCE_LEN];
+        self.rng
+            .fill(&mut nonce)
+            .unwrap_or_else(|_| unreachable!("the system random number generator failed"));
+        let mut sealed = Vec::with_capacity(1 + NONCE_LEN + value.len() + 16);
+        sealed.push(FORMAT_V1);
+        sealed.extend_from_slice(&nonce);
+        let mut body = value.to_vec();
+        self.sealer
+            .seal_in_place_append_tag(
+                Nonce::assume_unique_for_key(nonce),
+                Aad::from(context),
+                &mut body,
+            )
+            .unwrap_or_else(|_| unreachable!("AES-GCM-SIV seals any short value"));
+        sealed.extend_from_slice(&body);
+        sealed
     }
 
     /// The value `sealed` holds, if it was sealed for `context` under this
     /// key and not altered since.
     pub fn open(&self, context: &[u8], sealed: &[u8]) -> Option<Vec<u8>> {
-        self.sealer.open_bytes(sealed, context).ok()
+        let (&format, rest) = sealed.split_first()?;
+        if format != FORMAT_V1 || rest.len() < NONCE_LEN {
+            return None;
+        }
+        let (nonce, body) = rest.split_at(NONCE_LEN);
+        let nonce = Nonce::try_assume_unique_for_key(nonce).ok()?;
+        let mut body = body.to_vec();
+        let value = self
+            .sealer
+            .open_in_place(nonce, Aad::from(context), &mut body)
+            .ok()?;
+        Some(value.to_vec())
     }
 }
 

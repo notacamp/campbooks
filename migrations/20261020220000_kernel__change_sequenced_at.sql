@@ -4,6 +4,12 @@
 -- kept: whether a token has expired then depends on nothing the caller may
 -- not see (the time a change in a hidden inbox was published, how many
 -- there were).
+--
+-- The ALTER takes an ACCESS EXCLUSIVE lock on kernel.changes and holds it
+-- through the backfill and the index build below, until this migration
+-- commits: producers and streams of every workspace wait meanwhile. The
+-- table holds the retention's worth of changes (72 hours by default), so
+-- this takes a moment, not minutes.
 SET LOCAL lock_timeout = '5s';
 
 ALTER TABLE kernel.changes ADD COLUMN sequenced_at timestamptz;

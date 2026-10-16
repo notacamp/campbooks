@@ -21,17 +21,54 @@ they do see.
 | `cursor_expired` | the first change after the cursor, possibly hidden, pruned by its publish time | expiry by the token's age |
 | `unknown_cursor` | a number above the head resets: probe the head by trying numbers | tokens cannot be made up |
 | Per-page collapsing | a record's two changes in one page of 200 became one frame; hidden changes move page boundaries | one frame per visible change |
+| Page boundaries | a page was 200 changes of the workspace, hidden ones included, and its visible frames left as one burst: during a catch-up, a burst of k frames meant 200 − k hidden changes, and gaps between bursts counted pages with nothing visible | pages filtered in SQL: up to 200 changes the caller may see |
 
 ## Decisions
 
+### 0. Pages of visible changes, filtered in the database
+
+The page query filters by the caller's sight before `LIMIT`
+(`stream::read_visible`): the record types a read operation they hold a scope
+for returns (`ReadRules::readable`), the audience predicate (the SQL form of
+`Audience::admits`), and `container_id IS NULL OR (container_type,
+container_id) IN (<their containers>)`. The containers come from a new
+visibility-port method, `Visibility::container_types`, listed with the
+existing `visible_containers` on every read, so an access change applies to
+the next read. A page is therefore up to 200 changes the caller may see, and
+how frames group into bursts depends on visible changes only.
+
+Each read first takes the head and the time (`SELECT head, now()`), then
+asks for visible changes in `(cursor, head]`. When the page is not full,
+every visible change up to that head was read and the cursor moves to the
+head, so the hidden changes in between are tested once and never again. The
+query walks `changes_workspace_seq_idx` (`workspace_id, seq`) as a range
+scan and filters each row (checked with `EXPLAIN ANALYZE` on 200,000 rows: an
+index scan stopping at the 200th visible row, the container list a hashed
+subplan); no new index is needed.
+
+Defence in depth: rows the query returns are checked again in Rust (read
+rules, audience) and their containers asked once more through
+`container_visible` (one may have gone out of sight between the list and
+the read); a refused row is not shown. A page that touches membership
+records still makes the stream resolve membership before showing it, and
+reads the page again if the caller's access changed.
+
+The heartbeat's token moves to the head and time of the heartbeat's own
+read, when that read was not full.
+
 ### 1. Sealed, per-frame resume tokens (option 1), not per-audience sequences
 
-A token seals `Position { seq, at }` (16 bytes) with AES-256-GCM under a key
-derived from the instance secret (`Signer::seal`, purpose
+A token seals `Position { seq, at }` (16 bytes) with AES-256-GCM-SIV under a
+key derived from the instance secret (`Signer::seal`, purpose
 `campbooks kernel sealed values v1`), associated data
-`changes.cursor v1:<workspace>`. A fresh random nonce every time: two tokens
-of one position are unrelated, so neither a token's value nor whether it
-changed says anything. Fixed length (60 characters, URL-safe base64), so
+`changes.cursor v1:<workspace>\0<caller>` (`user:<subject>` or
+`client:<client id>`): a token opens only for the caller it was given to,
+in the workspace it was given in; anyone else's gets `unknown_cursor`. A
+fresh random nonce every time: two tokens of one position are unrelated, so
+neither a token's value nor whether it changed says anything. GCM-SIV is
+misuse-resistant, so a repeated 96-bit nonce (unlikely, but many tokens are
+sealed under one key) would only show that two tokens hold the same
+position, never the key stream. Fixed length (60 characters, URL-safe base64), so
 the length does not grow with the number. A MAC alone (like search's
 cursors) would leave the number readable.
 
@@ -64,10 +101,17 @@ granularity). The old completeness check stays as a safety net, also
 answering `cursor_expired`, so a numbering that stalled longer than that
 never makes a client skip a change.
 
-`too_far_behind` goes: a live stream reads every change of its workspace
-anyway, so catching up from a token costs the same reads the stream would
-have made; the retention bounds it. `MAX_BACKLOG` is no longer read
-(unknown settings are ignored, so a deployment that sets it still starts).
+`too_far_behind` goes, and `MAX_BACKLOG` is no longer read (unknown
+settings are ignored, so a deployment that sets it still starts). Catching
+up from a token reads up to the retention's worth of changes, each tested
+once. To keep a client reconnecting in a loop with an old token from
+re-scanning that over and over, opening a stream is rate limited per caller
+across processes (`RateLimits`, `CAMPBOOKS_CHANGES__OPENS_PER_WINDOW` 30 per
+`OPENS_WINDOW_SECONDS` 60 by default, 0 turns it off); the count is of opens
+only, so a refusal never depends on hidden activity. A stream reads its
+next page only when the previous one was written, so a catch-up for a
+client that went away stops at the next write (the response body is
+dropped), after at most one more page.
 
 ### 3. Heartbeats on a fixed timer
 
@@ -94,21 +138,39 @@ process that sealed them, like search cursors: another process answers
 
 ## What is left (accepted)
 
-- **Delivery latency.** A visible change reaches the client when the stream
-  reads it: a few milliseconds later if the stream was just reading hidden
-  changes, and its numbering can wait (50 to 250 ms) behind producers in
-  flight in the workspace. Closing this would need constant-time reading.
+- **Read timing.** A stream reads when any change of the workspace is
+  numbered (a hidden one too) or on the poll. Live, two visible changes
+  numbered in different runs may leave in one burst or two depending on when
+  the stream read, and a visible change can wait (50 to 250 ms) behind
+  producers in flight in the workspace before it is numbered. That is
+  millisecond timing of live delivery, not counts; closing it would need
+  reads on a fixed clock only. In a catch-up the pages are fixed by the
+  visible changes alone.
 - **Access-loss timing.** When a caller loses sight of a container they were
-  shown, the `reset` comes at the next page that touches inbox records or
-  the next heartbeat, whichever is first; such a page may be hidden. It
-  concerns a container the caller just lost, at most a heartbeat early.
-- **A flood at heartbeat time.** If the heartbeat's read is a full page, its
-  token keeps the previous position, which expires earlier. It takes more
-  than a page of changes numbered within the heartbeat's read.
-- **Resume cost.** Resuming reads the hidden changes since the token (at most
-  a heartbeat's worth from a heartbeat's token).
+  shown, the `reset` comes at the next read (which a hidden change can
+  trigger) or the next heartbeat. It concerns a container the caller just
+  lost, at most a heartbeat early.
+- **A full page at heartbeat time.** If the heartbeat's read is full (more
+  than a page of changes the caller may see are waiting), its token keeps
+  the previous position, which expires earlier; that depends on visible
+  changes only.
+- **Resume cost.** Resuming tests the changes since the token once each (at
+  most a heartbeat's worth beyond a heartbeat's token), bounded by the
+  retention and the open rate limit.
+- **`version` (predates this change).** A change frame's `version` is the
+  event id, a UUIDv7 whose random bits include a per-thread counter
+  (`uuid`'s `now_v7`). Two visible versions from one thread can hint at how
+  many UUIDs that thread generated in between, which may include events the
+  caller cannot see. It says nothing about which workspace or inbox they
+  were for; replacing `version` is out of scope here.
 
 ## Testing
+
+Pages: a kernel test pages through the same 450 visible changes with and
+without 500 + up to 9-per-change hidden ones (another type, another
+container, someone else's audience) and asserts identical pages of 200, 200
+and 50. A server test catches up from a token past the same mix in an inbox
+the member is not in: the same frames, all before the first heartbeat.
 
 The matrix (`changes::tests`, `assert_blind`): two workspaces set up alike
 (owner, member, admin, a member with an inbox of their own; a shared inbox),

@@ -74,8 +74,9 @@ A client SHALL be able to resume with the last resume token it received,
 through the `Last-Event-ID` header or the `after` query parameter, and SHALL
 then receive every visible change after that token, in order, before live
 changes. Without a token the stream SHALL start at the current head. A
-token the server cannot open for the workspace (a number from an older
-version, another workspace's, altered) SHALL produce one `reset` frame with
+token the server cannot open for the workspace and caller (a number from an
+older version, another workspace's or caller's, altered) SHALL produce one
+`reset` frame with
 reason `unknown_cursor`. A token older than the retention period less a
 few minutes SHALL produce `reset` with reason `cursor_expired`; whether a
 token has expired SHALL depend on its age alone, never on how many changes
@@ -141,14 +142,20 @@ end.
 - **THEN** their stream sends `revoked` and ends, and reconnecting answers 404
 
 ### Requirement: Backpressure and limits
-The stream SHALL read changes in bounded pages, reading the next page only
-once the previous one has been sent, and SHALL hold no database connection
-while waiting. The server SHALL limit open streams per caller and answer 429
-beyond the limit.
+The stream SHALL read changes in bounded pages of changes the caller may
+see, reading the next page only once the previous one has been sent, and
+SHALL hold no database connection while waiting. The server SHALL limit
+open streams per caller and answer 429 beyond the limit, and SHALL limit how
+many streams a caller opens per configured window (across processes),
+answering 429 `rate_limited` beyond it, whatever happens in the workspace.
 
 #### Scenario: Many subscribers
 - **WHEN** many clients subscribe to the same workspace and one change is recorded
 - **THEN** every client receives it once
+
+#### Scenario: Reconnecting in a loop
+- **WHEN** a caller opens more streams than the configured number within the window
+- **THEN** the next open answers 429 `rate_limited`, and other callers are not affected
 
 ### Requirement: Retention
 Changes SHALL be kept for a configured retention period (72 hours by
@@ -217,12 +224,15 @@ What a stream sends SHALL depend only on the changes its caller may see and
 on time: every frame's event, SSE `id` and data, and when heartbeats are
 sent, SHALL be the same whether or not changes the caller may not see are
 recorded (in an inbox they are not in, private to another person, or
-written for client tokens only). Resume tokens SHALL be opaque: sealed by
-the server so a client can neither read nor alter one, of one length, and
-new on every frame. The stream SHALL NOT send the workspace's sequence
-numbers or its head in any form. A client resuming SHALL receive the same
-outcome (`ready` and the same visible changes, or the same `reset`) whether
-or not such changes were recorded.
+written for client tokens only). The stream SHALL read in pages of changes
+the caller may see, filtered before the page is cut, so how its frames
+group never depends on such changes. Resume tokens SHALL be opaque: sealed
+by the server so a client can neither read nor alter one, of one length,
+new on every frame, and bound to the workspace and the caller. The stream
+SHALL NOT send the workspace's sequence numbers or its head in any form. A
+client resuming SHALL receive the same outcome (`ready` and the same visible
+changes in the same pages, or the same `reset`) whether or not such changes
+were recorded.
 
 #### Scenario: Mail in an inbox the member is not in
 - **WHEN** a member follows the feed and the workspace's other inbox, which they are not in, receives mail
@@ -232,6 +242,10 @@ or not such changes were recorded.
 - **WHEN** a member, an admin, a client acting for a member and a client acting for nobody each follow the feed while changes they may not see are recorded (another member's mail, draft or connection, a client's draft)
 - **THEN** each one's stream matches its stream in a workspace without those changes, and resuming from any token it received replays the same frames
 
+#### Scenario: Catching up past many hidden changes
+- **WHEN** a member resumes after more changes they may not see than a page holds, interleaved with changes they may see
+- **THEN** they receive the same frames, in the same pages, all before the next heartbeat, as in a workspace without the hidden changes
+
 #### Scenario: Probing with made-up cursors
-- **WHEN** a client resumes with a number, a token of another workspace or an altered token
+- **WHEN** a client resumes with a number, a token of another workspace or caller, or an altered token
 - **THEN** it receives `reset` with reason `unknown_cursor`, whatever the workspace's head

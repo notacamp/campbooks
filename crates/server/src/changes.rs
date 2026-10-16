@@ -90,8 +90,8 @@ pub struct StreamQuery {
 /// workspace) and `closing` (the stream ends; reconnect with your token).
 /// `ready`, `change`, `heartbeat` and `reset` carry a resume token as
 /// `cursor` and as the SSE `id`, so `EventSource` resumes on its own. A
-/// token is opaque and new on every frame: keep the latest, never parse or
-/// compare one. You only receive changes of records a read operation you
+/// token is opaque, new on every frame and good only for the caller it was
+/// given to: keep the latest, never parse or compare one. You only receive changes of records a read operation you
 /// hold a scope for returns, and nothing in the stream (tokens, heartbeats,
 /// resets) depends on changes you may not see.
 #[utoipa::path(
@@ -117,7 +117,8 @@ pub struct StreamQuery {
         (status = NOT_FOUND, description = "No such workspace, or you are not a member.",
             body = Problem, content_type = "application/problem+json"),
         (status = TOO_MANY_REQUESTS, description = "`too_many_streams`: you hold the maximum \
-            number of open streams.", body = Problem, content_type = "application/problem+json"),
+            number of open streams; `rate_limited`: you opened too many lately (see \
+            `Retry-After`).", body = Problem, content_type = "application/problem+json"),
     )
 )]
 pub async fn stream(

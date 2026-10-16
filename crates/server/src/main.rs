@@ -221,14 +221,18 @@ fn rate_limits() -> Result<campbooks_kernel::rate_limit::RateLimits, String> {
     })
 }
 
-/// The signer of opaque values (cursors) keyed by the instance secret, so
-/// every process of the install verifies them; without one, each process
-/// signs alone.
+/// The signer of opaque values (cursors, the change feed's resume tokens)
+/// keyed by the instance secret, so every process of the install verifies
+/// them; without one, each process signs alone, which is said at startup.
 fn signer() -> Result<campbooks_kernel::crypto::Signer, String> {
-    Ok(match campbooks_kernel::crypto::SecretKey::from_env()? {
-        Some(secret) => campbooks_kernel::crypto::Signer::new(&secret),
-        None => campbooks_kernel::crypto::Signer::default(),
-    })
+    if let Some(secret) = campbooks_kernel::crypto::SecretKey::from_env()? {
+        return Ok(campbooks_kernel::crypto::Signer::new(&secret));
+    }
+    tracing::warn!(
+        "CAMPBOOKS_SECRET_KEY is not set: search cursors and change feed resume tokens work \
+         only in this process and until it restarts (clients then refetch); set it in production"
+    );
+    Ok(campbooks_kernel::crypto::Signer::default())
 }
 
 /// Startup checks of the settings `role` uses; the web BFF's settings when

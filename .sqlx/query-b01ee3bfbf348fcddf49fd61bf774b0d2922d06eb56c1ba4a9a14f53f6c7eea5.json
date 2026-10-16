@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                          container_type, container_id, audience, audience_user,\n                          floor(extract(epoch FROM occurred_at))::bigint AS \"published_at!\"\n                     FROM kernel.changes\n                    WHERE workspace_id = $1 AND seq > $2\n                    ORDER BY seq\n                    LIMIT $3",
+  "query": "SELECT seq AS \"seq!\", event_id, record_type, record_id, op,\n                  container_type, container_id, audience, audience_user,\n                  floor(extract(epoch FROM occurred_at))::bigint AS \"published_at!\"\n             FROM kernel.changes\n            WHERE workspace_id = $1 AND seq > $2 AND seq <= $3\n              AND record_type = ANY($4::text[])\n              AND (audience IS NULL\n                   OR (audience = 'user' AND audience_user = $5::text)\n                   OR (audience = 'user_and_managers'\n                       AND ($5::text IS NULL OR audience_user = $5::text OR $6::bool))\n                   OR (audience = 'clients' AND $5::text IS NULL))\n              AND (container_id IS NULL\n                   OR (container_type, container_id) IN\n                      (SELECT t, i FROM unnest($7::text[], $8::text[]) AS c(t, i)))\n            ORDER BY seq\n            LIMIT $9",
   "describe": {
     "columns": [
       {
@@ -113,6 +113,12 @@
       "Left": [
         "Text",
         "Int8",
+        "Int8",
+        "TextArray",
+        "Text",
+        "Bool",
+        "TextArray",
+        "TextArray",
         "Int8"
       ]
     },
@@ -129,5 +135,5 @@
       null
     ]
   },
-  "hash": "d5eacc8b3466c883ac4cf634533d66b7dc0b0dace529aae52b2449a940f8c7f9"
+  "hash": "b01ee3bfbf348fcddf49fd61bf774b0d2922d06eb56c1ba4a9a14f53f6c7eea5"
 }

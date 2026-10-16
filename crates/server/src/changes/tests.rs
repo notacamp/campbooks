@@ -1114,7 +1114,11 @@ async fn a_client_whose_member_left_loses_its_feed(db: PgPool) {
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn many_subscribers_each_receive_every_change_once(db: PgPool) {
-    let world = World::with(db, |c| c.max_streams_per_principal = 64).await;
+    let world = World::with(db, |c| {
+        c.max_streams_per_principal = 64;
+        c.opens_per_window = 0;
+    })
+    .await;
     let ana = world.user("ana");
     let ws = world.create_workspace(&ana, "Shop").await;
     world.server.sequence().await;
@@ -1161,6 +1165,69 @@ async fn a_caller_holds_a_limited_number_of_streams(db: PgPool) {
     assert_eq!(problem["code"], "too_many_streams", "{problem}");
     drop(first);
     assert!(world.server.subscribe(Some(&ana), &ws, None).await.is_ok());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_caller_opens_a_limited_number_of_streams_per_window(db: PgPool) {
+    let world = World::with(db, |c| {
+        c.opens_per_window = 2;
+        c.opens_window_seconds = 60;
+    })
+    .await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    world.add_member(&ws, "bea", "member").await;
+    for _ in 0..2 {
+        drop(world.server.subscribe(Some(&ana), &ws, None).await.unwrap());
+    }
+    // Closed or not, the third open in the window is refused, with or
+    // without a token.
+    let (status, problem) = world
+        .server
+        .subscribe(Some(&ana), &ws, Some("anything"))
+        .await
+        .err()
+        .unwrap();
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(problem["code"], "rate_limited", "{problem}");
+    // Per caller.
+    let bea = world.user("bea");
+    assert!(world.server.subscribe(Some(&bea), &ws, None).await.is_ok());
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_token_resumes_only_for_the_caller_it_was_given_to(db: PgPool) {
+    let world = World::new(db).await;
+    let ana = world.user("ana");
+    let ws = world.create_workspace(&ana, "Shop").await;
+    let (bea, _) = world.add_member(&ws, "bea", "member").await;
+    world
+        .server
+        .agents
+        .set("ana-agent", ClientActor::ActsFor("ana".into()));
+    world.server.sequence().await;
+    let mut feed = world.server.subscribe(Some(&ana), &ws, None).await.unwrap();
+    let token = feed.next_event().await.token();
+    drop(feed);
+
+    // Ana again, on another connection and with other scopes: resumes.
+    let narrower = world.token("ana", "workspaces:read");
+    let mut feed = world
+        .server
+        .subscribe(Some(&narrower), &ws, Some(&token))
+        .await
+        .unwrap();
+    assert!(feed.next_event().await.is("ready"));
+    // Anyone else, even a client acting for Ana: a token they cannot open.
+    for other in [bea, world.client("ana-agent", &ws)] {
+        let mut feed = world
+            .server
+            .subscribe(Some(&other), &ws, Some(&token))
+            .await
+            .unwrap();
+        let reset = feed.next_event().await;
+        assert_eq!(reset.json()["reason"], "unknown_cursor", "{reset:?}");
+    }
 }
 
 #[sqlx::test(migrations = "../../migrations")]
@@ -1867,4 +1934,108 @@ async fn people_learn_nothing_of_drafts_clients_write(db: PgPool) {
         &[Unseen::ClientDraft],
     )
     .await;
+}
+
+/// Conversations filed into an inbox, as one event: the catch-up test's
+/// changes, many at once.
+#[derive(Debug, Serialize, Deserialize)]
+struct Filed {
+    workspace: String,
+    /// `(inbox, conversation id)` in order.
+    into: Vec<(String, String)>,
+}
+
+impl DomainEvent for Filed {
+    const NAME: &'static str = "test.filed";
+    const VERSION: u16 = 1;
+
+    fn workspace(&self) -> Option<&str> {
+        Some(&self.workspace)
+    }
+
+    fn changes(&self) -> Vec<Change> {
+        self.into
+            .iter()
+            .map(|(inbox, id)| {
+                Change::upsert(RecordRef::new("conversations.conversation", id))
+                    .within(RecordRef::new("conversations.inbox", inbox))
+            })
+            .collect()
+    }
+}
+
+#[sqlx::test(migrations = "../../migrations")]
+async fn catching_up_past_more_hidden_changes_than_a_page_looks_the_same(db: PgPool) {
+    let world = World::with(db, |c| c.heartbeat_seconds = MATRIX_BEAT.as_secs()).await;
+    let busy = world.space("Busy").await;
+    let quiet = world.space("Quiet").await;
+    let mut tokens = Vec::new();
+    for space in [&busy, &quiet] {
+        let mut feed = world
+            .server
+            .subscribe(
+                Some(&world.observer_token(Observer::Member, &space.ws)),
+                &space.ws,
+                None,
+            )
+            .await
+            .unwrap();
+        tokens.push(feed.next_event().await.token());
+    }
+    // While Bea is away: the same 450 conversations in the shared inbox in
+    // both; in the busy one, 500 in Hal's inbox first and up to 9 more
+    // before each of hers.
+    let markers: Vec<String> = (0..450).map(|n| format!("c-{n}")).collect();
+    let mut busy_into: Vec<(String, String)> = (0..500)
+        .map(|n| (busy.hals.to_string(), format!("h-{n}")))
+        .collect();
+    for (n, marker) in markers.iter().enumerate() {
+        for h in 0..(n % 10) {
+            busy_into.push((busy.hals.to_string(), format!("h-{n}-{h}")));
+        }
+        busy_into.push((busy.shared.to_string(), marker.clone()));
+    }
+    let quiet_into = markers
+        .iter()
+        .map(|marker| (quiet.shared.to_string(), marker.clone()))
+        .collect();
+    world
+        .publish(&Filed {
+            workspace: busy.ws.clone(),
+            into: busy_into,
+        })
+        .await;
+    world
+        .publish(&Filed {
+            workspace: quiet.ws.clone(),
+            into: quiet_into,
+        })
+        .await;
+
+    let mut recorders = Vec::new();
+    for (space, token) in [&busy, &quiet].into_iter().zip(&tokens) {
+        recorders.push(world.record(Observer::Member, &space.ws, Some(token)).await);
+    }
+    until_beats(&recorders.iter().collect::<Vec<_>>(), 1).await;
+    let mut recorders = recorders.into_iter();
+    let seen = recorders.next().unwrap().take(1);
+    let unseen = recorders.next().unwrap().take(1);
+    assert_eq!(canonical(&seen), canonical(&unseen), "the catch-up differs");
+    for frames in [&seen, &unseen] {
+        let changes: Vec<String> = frames
+            .iter()
+            .filter(|(_, f)| f.is("change"))
+            .map(|(_, f)| record_of(f).1)
+            .collect();
+        assert_eq!(changes, markers, "every visible change, once, in order");
+        // The whole catch-up comes before the first heartbeat.
+        let (_, last) = frames.last().unwrap();
+        assert!(last.is("heartbeat"), "{last:?}");
+        assert_eq!(
+            frames.len(),
+            markers.len() + 2,
+            "ready, the changes, a heartbeat"
+        );
+        assert_tokens_fresh_and_beats_on_time(frames, "catch-up");
+    }
 }

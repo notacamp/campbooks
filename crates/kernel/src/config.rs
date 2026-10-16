@@ -832,6 +832,15 @@ pub struct ChangesConfig {
     /// Streams one caller may hold open at once, per server process
     /// (`CAMPBOOKS_CHANGES__MAX_STREAMS_PER_PRINCIPAL`); more answer 429.
     pub max_streams_per_principal: usize,
+    /// Streams one caller (a person, or a client) may open per window,
+    /// across every process (`CAMPBOOKS_CHANGES__OPENS_PER_WINDOW`); more
+    /// answer 429 `rate_limited`. A stream resumed from an old token reads
+    /// up to the retention's worth of changes, so a client reconnecting in
+    /// a loop is held back here. 0 turns the limit off.
+    pub opens_per_window: u32,
+    /// The window of `OPENS_PER_WINDOW`, in seconds
+    /// (`CAMPBOOKS_CHANGES__OPENS_WINDOW_SECONDS`).
+    pub opens_window_seconds: u64,
 }
 
 impl Default for ChangesConfig {
@@ -842,6 +851,8 @@ impl Default for ChangesConfig {
             poll_interval_ms: 5_000,
             retention_hours: 72,
             max_streams_per_principal: 8,
+            opens_per_window: 30,
+            opens_window_seconds: 60,
         }
     }
 }
@@ -870,6 +881,11 @@ impl ChangesConfig {
             (
                 "MAX_STREAMS_PER_PRINCIPAL",
                 self.max_streams_per_principal >= 1,
+                "at least 1",
+            ),
+            (
+                "OPENS_WINDOW_SECONDS",
+                self.opens_window_seconds >= 1,
                 "at least 1",
             ),
         ];

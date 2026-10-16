@@ -2257,7 +2257,7 @@
           "changes"
         ],
         "summary": "Follow a workspace's changes.",
-        "description": "A Server-Sent Events stream of what changed in the workspace, for clients\nthat keep a cache: each `change` frame names a record and an operation\n(`{\"cursor\",\"record\":{\"type\",\"id\"},\"op\":\"upsert\"|\"delete\",\"version\"}`),\nnever its contents; refetch what you show. Frames: `ready` (where the\nstream starts), `change`, `heartbeat` (every heartbeat interval from the\nopen, busy or idle), `reset` (your token is unknown or expired, or\nsomething you cached went out of sight: refetch everything, continue\nfrom the token given), `revoked` (you no longer belong to the\nworkspace) and `closing` (the stream ends; reconnect with your token).\n`ready`, `change`, `heartbeat` and `reset` carry a resume token as\n`cursor` and as the SSE `id`, so `EventSource` resumes on its own. A\ntoken is opaque and new on every frame: keep the latest, never parse or\ncompare one. You only receive changes of records a read operation you\nhold a scope for returns, and nothing in the stream (tokens, heartbeats,\nresets) depends on changes you may not see.",
+        "description": "A Server-Sent Events stream of what changed in the workspace, for clients\nthat keep a cache: each `change` frame names a record and an operation\n(`{\"cursor\",\"record\":{\"type\",\"id\"},\"op\":\"upsert\"|\"delete\",\"version\"}`),\nnever its contents; refetch what you show. Frames: `ready` (where the\nstream starts), `change`, `heartbeat` (every heartbeat interval from the\nopen, busy or idle), `reset` (your token is unknown or expired, or\nsomething you cached went out of sight: refetch everything, continue\nfrom the token given), `revoked` (you no longer belong to the\nworkspace) and `closing` (the stream ends; reconnect with your token).\n`ready`, `change`, `heartbeat` and `reset` carry a resume token as\n`cursor` and as the SSE `id`, so `EventSource` resumes on its own. A\ntoken is opaque, new on every frame and good only for the caller it was\ngiven to: keep the latest, never parse or compare one. You only receive changes of records a read operation you\nhold a scope for returns, and nothing in the stream (tokens, heartbeats,\nresets) depends on changes you may not see.",
         "operationId": "changes.stream",
         "parameters": [
           {
@@ -2333,7 +2333,7 @@
             }
           },
           "429": {
-            "description": "`too_many_streams`: you hold the maximum number of open streams.",
+            "description": "`too_many_streams`: you hold the maximum number of open streams; `rate_limited`: you opened too many lately (see `Retry-After`).",
             "content": {
               "application/problem+json": {
                 "schema": {
