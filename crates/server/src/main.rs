@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod admin_cli;
+mod labelling_cli;
 
 use std::{
     io::{Read as _, Write as _},
@@ -69,6 +70,12 @@ enum Command {
     Admin {
         #[command(subcommand)]
         command: admin_cli::AdminCommand,
+    },
+    /// Export a workspace's money mail for its owner to label locally
+    /// (`export`): what the money question's operating point is tuned on.
+    Labelling {
+        #[command(subcommand)]
+        command: labelling_cli::LabellingCommand,
     },
     /// Work with the search index.
     Search {
@@ -162,6 +169,7 @@ fn main() -> ExitCode {
             Err(e) => fail(&e.to_string()),
         },
         Command::Admin { command } => admin_cli::run(command),
+        Command::Labelling { command } => labelling_cli::run(command),
         Command::Search {
             command: SearchCommand::Reindex { workspace },
         } => reindex(&workspace),
