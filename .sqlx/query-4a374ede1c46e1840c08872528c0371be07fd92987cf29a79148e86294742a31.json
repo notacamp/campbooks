@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n            SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n                   c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n                   m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                              ORDER BY l.name)\n                               FROM conversations.conversation_labels cl\n                               JOIN conversations.labels l ON l.id = cl.label_id\n                              WHERE cl.conversation_id = c.id), '[]') AS \"labels!\"\n              FROM conversations.conversations c\n              LEFT JOIN LATERAL (\n                  SELECT sender, snippet FROM conversations.messages\n                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n              ) m ON true\n             WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed\n               AND ($2::text IS NULL OR c.stream = $2)\n               AND ($3::timestamptz IS NULL OR (c.last_message_at, c.id) < ($3, $4))\n             ORDER BY c.last_message_at DESC, c.id DESC\n             LIMIT $5\n            ",
+  "query": "\n            SELECT c.id AS \"id: ConversationId\", c.inbox_id AS \"inbox_id: InboxId\", c.subject,\n                   c.stream, c.stream_source, c.last_message_at, c.message_count, c.unread_count,\n                   c.starred, c.archived_at IS NOT NULL AS \"archived!\",\n                   m.sender AS \"sender?\", m.snippet AS \"snippet?\",\n                   coalesce((SELECT jsonb_agg(jsonb_build_object('id', l.id, 'name', l.name)\n                                              ORDER BY l.name)\n                               FROM conversations.conversation_labels cl\n                               JOIN conversations.labels l ON l.id = cl.label_id\n                              WHERE cl.conversation_id = c.id), '[]') AS \"labels!\"\n              FROM conversations.conversations c\n              LEFT JOIN LATERAL (\n                  SELECT sender, snippet FROM conversations.messages\n                   WHERE conversation_id = c.id ORDER BY sent_at DESC, id DESC LIMIT 1\n              ) m ON true\n             WHERE c.inbox_id = ANY($1) AND c.archived_at IS NULL AND NOT c.trashed\n               AND ($2::text IS NULL OR c.stream = $2)\n               AND ($3::timestamptz IS NULL\n                    OR (c.starred, c.last_message_at, c.id) < ($6::bool, $3, $4))\n             ORDER BY c.starred DESC, c.last_message_at DESC, c.id DESC\n             LIMIT $5\n            ",
   "describe": {
     "columns": [
       {
@@ -143,7 +143,8 @@
         "Text",
         "Timestamptz",
         "Uuid",
-        "Int8"
+        "Int8",
+        "Bool"
       ]
     },
     "nullable": [
@@ -162,5 +163,5 @@
       null
     ]
   },
-  "hash": "4340822214d1db42724ddd4e297099e2be28be31f944c93573bb83dfe98da83b"
+  "hash": "4a374ede1c46e1840c08872528c0371be07fd92987cf29a79148e86294742a31"
 }

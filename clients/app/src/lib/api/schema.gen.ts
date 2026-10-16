@@ -527,7 +527,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List conversations, newest first. */
+        /** List conversations: pinned first, then newest first. */
         get: operations["conversations.list"];
         put?: never;
         post?: never;
@@ -2229,7 +2229,7 @@ export interface components {
         ConversationId: string;
         /** @description A page of conversations. */
         ConversationList: {
-            /** @description Newest first. */
+            /** @description Pinned first, then newest first (archived lists and `ids`: newest first). */
             conversations: components["schemas"]["ConversationSummary"][];
             /** @description Pass it as `cursor` for the next page; `None` on the last page. */
             next_cursor?: string | null;
