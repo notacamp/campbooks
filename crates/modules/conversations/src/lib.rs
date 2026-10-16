@@ -217,6 +217,8 @@ pub fn module(deps: ConversationsDeps) -> Module {
             .on_event::<features::create_inbox::CreateInbox>()
             .on_event::<features::forget_connection::ForgetConnection>()
             .on_event::<features::forget_member::ForgetMember>()
+            .on_event::<features::suspended_authors::PauseSuspendedAuthor>()
+            .on_event::<features::suspended_authors::ResumeUnsuspendedAuthor>()
             .on_event::<features::purge_workspace::ScheduleWorkspacePurge>()
             .job::<features::purge_workspace::PurgeWorkspace>(),
         resources: domain::resources::resources(),

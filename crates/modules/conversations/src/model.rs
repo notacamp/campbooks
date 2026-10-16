@@ -520,10 +520,28 @@ vocabulary!(
         Proposed => "proposed",
         /// Acts on existing and new mail.
         Active => "active",
-        /// Stopped: its author may no longer change the inbox, or a member paused it.
+        /// Stopped: its author may no longer change the inbox or is
+        /// suspended, its inbox is kept read-only, or a member paused it.
         Paused => "paused",
         /// Gone.
         Removed => "removed",
+    }
+);
+
+vocabulary!(
+    /// Why a taught rule is paused: the one that would still hold once the
+    /// most passing one clears.
+    PausedReason {
+        /// Its inbox is kept read-only: no rule acts there any more.
+        InboxReadOnly => "inbox_read_only",
+        /// Its author is no longer a sender or manager of the inbox, until
+        /// a manager adopts or removes it.
+        AuthorCannotWrite => "author_cannot_write",
+        /// A member paused it.
+        PausedByMember => "paused_by_member",
+        /// Its author's account is suspended; it acts again once the
+        /// suspension is lifted.
+        AuthorSuspended => "author_suspended",
     }
 );
 

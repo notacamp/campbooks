@@ -65,7 +65,7 @@ async fn suspend(kit: &Kit, account: Uuid, now: DateTime<Utc>) {
 
 async fn unsuspend(kit: &Kit, account: Uuid) {
     let mut tx = kit.state.db.begin().await.unwrap();
-    suspension::unsuspend(&mut tx, account, "root", Utc::now())
+    suspension::unsuspend(&mut tx, &kit.state.events, account, "root", Utc::now())
         .await
         .unwrap();
     tx.commit().await.unwrap();

@@ -1524,7 +1524,13 @@ async fn a_suspended_accounts_web_sessions_end_at_once(db: PgPool) {
     let mut tx = pool.begin().await.unwrap();
     state
         .events
-        .publish(&mut tx, &AccountSuspended { account: suspended })
+        .publish(
+            &mut tx,
+            &AccountSuspended {
+                account: suspended,
+                at: None,
+            },
+        )
         .await
         .unwrap();
     tx.commit().await.unwrap();
