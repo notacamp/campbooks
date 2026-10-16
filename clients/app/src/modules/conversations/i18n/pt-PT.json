@@ -103,6 +103,7 @@
     "whyHasDeadline": "Refere uma data",
     "whyUrgent": "Urgente",
     "whySuspicious": "Suspeita",
+    "whyMoney": "Pagamento",
     "sortedTaught": "O Campbooks pô-la em {{stream}}, por uma regra"
   },
   "reasons": {
@@ -227,6 +228,7 @@
       "warning": "Isto pode ser phishing. Não use as ligações.",
       "checkReply": "{{name}} precisa de resposta?",
       "checkDo": "{{name}} pediu-lhe para fazer algo?",
+      "checkPay": "{{name}} enviou uma fatura. Já está paga?",
       "taughtReply": "{{name}}: responder, por uma regra",
       "taughtDo": "{{name}}: a fazer, por uma regra"
     },
@@ -250,6 +252,11 @@
       "urgency0": "Sem pressa.",
       "urgency1": "Nos próximos dias.",
       "urgency2": "Hoje.",
+      "money": {
+        "owed": "Pede um pagamento ainda em dívida.",
+        "paid": "Confirma um pagamento já feito.",
+        "neither": "Não pede nem confirma um pagamento."
+      },
       "source": {
         "rules": "Regras",
         "model": "Modelo",

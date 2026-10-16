@@ -22,6 +22,10 @@ export function needSentence(t: Translate, need: NeedView, name: string): string
     return t("needs.line.warning");
   }
   if (need.trust === "check") {
+    if (need.question === "money") {
+      // Campbooks can't see the bank: a bill is a question until answered.
+      return t("needs.line.checkPay", { name });
+    }
     return t(need.question === "asks_action" ? "needs.line.checkDo" : "needs.line.checkReply", {
       name,
     });
@@ -53,7 +57,7 @@ export function needChip(t: Translate, need: NeedView): string {
   if (need.question === "suspicious") {
     return t("needs.chip.suspicious");
   }
-  if (need.trust === "check") {
+  if (need.trust === "check" && need.question !== "money") {
     return t("needs.chip.check");
   }
   return t(`needs.chip.${need.reason}`);
@@ -61,7 +65,7 @@ export function needChip(t: Translate, need: NeedView): string {
 
 /** The signal colour of a need's chip. */
 export function needSignal(need: NeedView): "reply" | "do" | "pay" | "review" {
-  return need.trust === "check" ? "review" : need.reason;
+  return need.trust === "check" && need.question !== "money" ? "review" : need.reason;
 }
 
 /** Days from `today` to `isoDate` (a calendar date), negative when past. */
@@ -143,6 +147,7 @@ const QUESTIONS = [
   { question: "has_deadline", label: "scout.whyHasDeadline" },
   { question: "urgency", label: "scout.whyUrgent" },
   { question: "suspicious", label: "scout.whySuspicious" },
+  { question: "money", label: "scout.whyMoney" },
 ] as const;
 
 function answerWords(t: Translate, decision: DecisionView): string {
@@ -153,7 +158,10 @@ function answerWords(t: Translate, decision: DecisionView): string {
   if (typeof value === "number") {
     return t(`needs.how.urgency${String(Math.max(0, Math.min(2, Math.round(value))))}`);
   }
-  return t(`streams.${value}`);
+  if (decision.question === "money") {
+    return t(`needs.how.money.${String(value)}`);
+  }
+  return t(`streams.${String(value)}`);
 }
 
 /** A confidence of 0 to 100, as "0.90". */

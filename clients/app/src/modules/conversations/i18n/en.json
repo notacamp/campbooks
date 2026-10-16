@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspicious",
+    "whyMoney": "Payment",
     "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
@@ -227,6 +228,7 @@
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
       "checkDo": "Did {{name}} ask you to do something?",
+      "checkPay": "{{name}} sent an invoice. Is it paid?",
       "taughtReply": "{{name}}: a reply, by a rule",
       "taughtDo": "{{name}}: to do, by a rule"
     },
@@ -250,6 +252,11 @@
       "urgency0": "No hurry.",
       "urgency1": "Within the next days.",
       "urgency2": "Today.",
+      "money": {
+        "owed": "Asks for a payment still owed.",
+        "paid": "Confirms a payment already made.",
+        "neither": "Neither asks for nor confirms a payment."
+      },
       "source": {
         "rules": "Rules",
         "model": "Model",

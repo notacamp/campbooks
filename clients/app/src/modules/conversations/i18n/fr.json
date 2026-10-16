@@ -103,6 +103,7 @@
     "whyHasDeadline": "Mentionne une date",
     "whyUrgent": "Urgent",
     "whySuspicious": "Suspect",
+    "whyMoney": "Paiement",
     "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
   },
   "reasons": {
@@ -227,6 +228,7 @@
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
       "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
+      "checkPay": "{{name}} a envoyé une facture. Est-elle payée ?",
       "taughtReply": "{{name}} : à répondre, selon une règle",
       "taughtDo": "{{name}} : à faire, selon une règle"
     },
@@ -250,6 +252,11 @@
       "urgency0": "Pas d’urgence.",
       "urgency1": "Dans les prochains jours.",
       "urgency2": "Aujourd’hui.",
+      "money": {
+        "owed": "Demande un paiement encore dû.",
+        "paid": "Confirme un paiement déjà effectué.",
+        "neither": "Ne demande ni ne confirme aucun paiement."
+      },
       "source": {
         "rules": "Règles",
         "model": "Modèle",

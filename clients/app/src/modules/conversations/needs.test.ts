@@ -34,6 +34,26 @@ describe("needs in words", () => {
     expect(needSentence(t, need(PHISH), "x")).toBe("needs.line.warning");
   });
 
+  it("asks whether a bill is paid, in Pay's colour", () => {
+    const bill: NeedView = { ...need(ACME), trust: "check", question: "money" };
+    expect(needSentence(t, bill, "Acme Hosting")).toBe(
+      'needs.line.checkPay{"name":"Acme Hosting"}',
+    );
+    expect(needChip(t, bill)).toBe("needs.chip.pay");
+  });
+
+  it("says the money answer in words", () => {
+    const base = MARTA_DETAIL.decisions[0];
+    if (base === undefined) {
+      throw new Error("no decision");
+    }
+    const [money] = howRows(t, () => true, [
+      { ...base, question: "money", value: "owed", reasons: [] },
+    ]);
+    expect(money?.question).toBe("scout.whyMoney");
+    expect(money?.answer).toBe("needs.how.money.owed");
+  });
+
   it("says a need comes from a rule, never that the sender asked", () => {
     expect(
       needSentence(
