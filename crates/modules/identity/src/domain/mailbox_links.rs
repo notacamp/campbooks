@@ -14,10 +14,12 @@
 //! connectors module accepts the grant (a fast path), and, durably, from
 //! `connectors.connection_added`, published in the transaction that stores
 //! the grant. A round trip whose grant is refused takes its row back, and
-//! the way in it created with it. Rows still unnamed a day later never got
-//! a connection (the round trip died between writing the row and handing
-//! the grant over): [`sweep_unnamed`] deletes them, and the way in they
-//! leave without a mailbox goes as it would on a disconnect.
+//! the way in it created with it. Rows still unnamed a day later are
+//! checked with the connectors module (the grant-intake port): one whose
+//! connection exists is named; the rest never got one (the round trip died
+//! between writing the row and handing the grant over), so
+//! [`settle_unnamed`] deletes them, and the way in they leave without a
+//! mailbox goes as it would on a disconnect.
 //!
 //! Every change that can remove a way in locks the account first, then
 //! touches the rows: the same order as removing a way in on Ways to sign in
@@ -52,8 +54,10 @@ impl Recorded {
 
 /// Record that the mailbox of way in `identity_id` is connected in
 /// `workspace`: always when the round trip created the way in (`created`),
-/// otherwise only when the way in is already tracked. Run it in the
-/// transaction that creates the way in, or before the grant is handed over.
+/// otherwise only when the way in is already tracked. A row still unnamed
+/// gets a fresh `created_at` (the sweep waits for this round trip too). Run
+/// it in the transaction that creates the way in, or before the grant is
+/// handed over.
 pub async fn record(
     conn: &mut PgConnection,
     identity_id: Uuid,
@@ -71,18 +75,21 @@ pub async fn record(
     if !tracked {
         return Ok(Recorded::Untracked);
     }
-    let inserted = sqlx::query(
+    // A row still unnamed is written afresh: a connect retried while an
+    // earlier one never finished must not be swept mid-flight.
+    let inserted: Option<bool> = sqlx::query_scalar(
         "INSERT INTO identity.mailbox_links (provider_identity_id, in_workspace_id, created_at)
          VALUES ($1, $2, $3)
-         ON CONFLICT (provider_identity_id, in_workspace_id) DO NOTHING",
+         ON CONFLICT (provider_identity_id, in_workspace_id)
+         DO UPDATE SET created_at = $3 WHERE identity.mailbox_links.connection_id IS NULL
+         RETURNING xmax = 0",
     )
     .bind(identity_id)
     .bind(workspace)
     .bind(now)
-    .execute(conn)
-    .await?
-    .rows_affected();
-    Ok(if inserted > 0 {
+    .fetch_optional(conn)
+    .await?;
+    Ok(if inserted == Some(true) {
         Recorded::Inserted
     } else {
         Recorded::Existed
@@ -264,38 +271,111 @@ pub async fn take_back(
     remove(conn, identity_id, account, now).await
 }
 
-/// Rows unnamed since before `cutoff` never got a connection: delete them
-/// and remove each way in a connect created that they leave with no
-/// mailbox (unless it is its account's last). What was removed.
-pub async fn sweep_unnamed(
+/// A row unnamed since before a cutoff: either its connection was made and
+/// never named here (both namings failed), or the round trip died before
+/// handing its grant over.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Unnamed {
+    /// The way in.
+    pub way_in: Uuid,
+    /// Its account.
+    pub account: Uuid,
+    /// How the way in was linked.
+    pub linked_via: String,
+    /// The provider.
+    pub provider: String,
+    /// The provider's id of the account (`sub`).
+    pub subject: String,
+    /// The workspace of the row.
+    pub workspace: Uuid,
+}
+
+/// Rows unnamed since before `cutoff`, by account (in `account_id` order,
+/// the order the sweep locks them in), then way in and workspace.
+pub async fn unnamed_before(
     conn: &mut PgConnection,
+    cutoff: DateTime<Utc>,
+) -> Result<Vec<Unnamed>> {
+    let rows: Vec<(Uuid, Uuid, String, String, String, Uuid)> = sqlx::query_as(
+        "SELECT p.id, p.account_id, p.linked_via, p.provider, p.subject, l.in_workspace_id
+           FROM identity.mailbox_links l
+           JOIN identity.provider_identities p ON p.id = l.provider_identity_id
+          WHERE l.connection_id IS NULL AND l.created_at < $1
+          ORDER BY p.account_id, p.id, l.in_workspace_id",
+    )
+    .bind(cutoff)
+    .fetch_all(conn)
+    .await?;
+    Ok(rows
+        .into_iter()
+        .map(
+            |(way_in, account, linked_via, provider, subject, workspace)| Unnamed {
+                way_in,
+                account,
+                linked_via,
+                provider,
+                subject,
+                workspace,
+            },
+        )
+        .collect())
+}
+
+/// Settle `account`'s stale rows, each with the connection the connectors
+/// module says it became (`None`: there is none). Locks the account first.
+/// A row whose connection exists is named; one with none is deleted, if it
+/// is still unnamed and still older than `cutoff` (a retried connect writes
+/// it afresh); then each connect-made way in left with no row goes, unless
+/// it is the account's last. What was removed.
+pub async fn settle_unnamed(
+    conn: &mut PgConnection,
+    account: Uuid,
+    checked: &[(Unnamed, Option<String>)],
     cutoff: DateTime<Utc>,
     now: DateTime<Utc>,
 ) -> Result<Vec<Removed>> {
-    let stale: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
-        "SELECT DISTINCT p.id, p.account_id, p.linked_via
-           FROM identity.mailbox_links l
-           JOIN identity.provider_identities p ON p.id = l.provider_identity_id
-          WHERE l.connection_id IS NULL AND l.created_at < $1",
-    )
-    .bind(cutoff)
-    .fetch_all(&mut *conn)
-    .await?;
+    let mut count = ways_in::lock_and_count(conn, account).await?;
+    for (row, connection) in checked.iter().filter(|(row, _)| row.account == account) {
+        match connection {
+            Some(connection) => {
+                sqlx::query(
+                    "UPDATE identity.mailbox_links SET connection_id = $3
+                      WHERE provider_identity_id = $1 AND in_workspace_id = $2
+                        AND connection_id IS NULL",
+                )
+                .bind(row.way_in)
+                .bind(row.workspace)
+                .bind(connection)
+                .execute(&mut *conn)
+                .await?;
+            }
+            None => {
+                sqlx::query(
+                    "DELETE FROM identity.mailbox_links
+                      WHERE provider_identity_id = $1 AND in_workspace_id = $2
+                        AND connection_id IS NULL AND created_at < $3",
+                )
+                .bind(row.way_in)
+                .bind(row.workspace)
+                .bind(cutoff)
+                .execute(&mut *conn)
+                .await?;
+            }
+        }
+    }
+    let mut ways: Vec<(Uuid, &str)> = checked
+        .iter()
+        .filter(|(row, _)| row.account == account)
+        .map(|(row, _)| (row.way_in, row.linked_via.as_str()))
+        .collect();
+    ways.dedup();
     let mut removed = Vec::new();
-    for (way_in, account, linked_via) in stale {
-        let count = ways_in::lock_and_count(conn, account).await?;
-        sqlx::query(
-            "DELETE FROM identity.mailbox_links
-              WHERE provider_identity_id = $1 AND connection_id IS NULL AND created_at < $2",
-        )
-        .bind(way_in)
-        .bind(cutoff)
-        .execute(&mut *conn)
-        .await?;
+    for (way_in, linked_via) in ways {
         if linked_via != "connect" || count <= 1 || has_rows(conn, way_in).await? {
             continue;
         }
         if let Some(gone) = remove(conn, way_in, account, now).await? {
+            count -= 1;
             removed.push(gone);
         }
     }

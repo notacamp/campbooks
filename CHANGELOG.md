@@ -156,6 +156,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **A connected mailbox no longer loses its way to sign in to the cleanup.**
+  The background cleanup that removes a way to sign in left behind by a
+  mailbox connect that never finished now checks that the mailbox really
+  isn't connected first, and waits for a connect you retried. If connecting
+  a mailbox breaks unexpectedly, you now land back on Mailboxes with an
+  error instead of a server error page.
 - **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
   open conversation no longer drops below the list; it stays beside it. A long
   subject, sender or address with no spaces now wraps inside the reader instead of
