@@ -243,3 +243,19 @@ impl RunBatch {
             .priority(-5)
     }
 }
+
+/// Lock `rule`'s running runs, before anything touches the rule row.
+///
+/// Every path that locks a rule's runs and its row takes the runs first: a
+/// batch holds its run row and then counts on the rule row, so taking them
+/// the other way round (remove, restore, replace) would deadlock against it.
+pub async fn lock_running(conn: &mut sqlx::PgConnection, rule: RuleId) -> Result<()> {
+    sqlx::query!(
+        r#"SELECT id FROM conversations.rule_runs
+            WHERE rule_id = $1 AND state = 'running' FOR UPDATE"#,
+        rule as RuleId,
+    )
+    .fetch_all(conn)
+    .await?;
+    Ok(())
+}

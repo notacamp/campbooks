@@ -110,6 +110,15 @@ pub fn signup_allows_passkey(ctx: &Ctx) -> bool {
     ctx.state.config.signup.policy != SignupPolicy::InviteOnly
 }
 
+/// A passkey proves no address, so while an allow-list is set
+/// (`CAMPBOOKS_SIGNUP__ALLOWED`) it cannot create an account.
+fn refuse_sign_up_under_allow_list(ctx: &Ctx) -> Result<()> {
+    if ctx.allow_list()?.is_restricted() {
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
+    }
+    Ok(())
+}
+
 /// The authentication methods a passkey sign-in reports (RFC 8176): a
 /// synced passkey is a software-protected key (`swk`), a device-bound one a
 /// hardware key (`hwk`); user verification was required (`user`).
@@ -342,8 +351,9 @@ async fn take_ceremony(
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted` (it did \
-            not verify, or it is no longer a way into any account), or `account_suspended` (it \
-            verified, but an administrator suspended the account).",
+            not verify, or it is no longer a way into any account), `account_suspended` (it \
+            verified, but an administrator suspended the account), or `sign_in_not_allowed` \
+            (it verified, but the account has no address on the instance's allow-list).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -398,6 +408,12 @@ pub async fn sign_in(
     if accounts::is_suspended(&mut tx, passkey.account_id).await? {
         tracing::info!("a suspended account tried to sign in with a passkey");
         return Err(Error::Denied(MESSAGES.reason("account_suspended")));
+    }
+    // With an allow-list, only an account with a listed, provider-verified
+    // address signs in (a passkey-only account has none).
+    if !accounts::is_allowed(&mut tx, &ctx.allow_list()?, passkey.account_id).await? {
+        tracing::info!("an account the allow-list does not let in tried to sign in with a passkey");
+        return Err(Error::Denied(MESSAGES.reason("sign_in_not_allowed")));
     }
     let reported = i64::from(verified.sign_count);
     if (reported != 0 || passkey.sign_count != 0) && reported <= passkey.sign_count {
@@ -510,8 +526,9 @@ pub struct SignUpStart {
         (status = 400, description = "`display_name_required`, `invalid_return_to`, or \
             `invalid_body` (not JSON, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, or `signup_invite_only` (this \
-            instance takes invited people only, and a passkey proves no address).",
+        (status = 403, description = "`csrf_check_failed`, `signup_invite_only` (this \
+            instance takes invited people only, and a passkey proves no address), or \
+            `sign_in_not_allowed` (the instance has an allow-list, which a passkey cannot meet).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
         (status = 404, description = "No such waiting sign-in request (or it expired), this \
             instance offers no passkeys, or another identity provider serves it."),
@@ -531,6 +548,7 @@ pub async fn sign_up_options(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
+    refuse_sign_up_under_allow_list(&ctx)?;
     let display_name = passkeys::clean_name(&body.display_name)
         .ok_or_else(|| Error::BadRequest(MESSAGES.reason("display_name_required")))?;
     let return_to = web::return_to(body.return_to.as_deref())
@@ -576,8 +594,8 @@ pub async fn sign_up_options(
             headers(("set-cookie" = String))),
         (status = 400, description = "`invalid_body` (not a credential, or over 16 KiB).",
             body = campbooks_kernel::Problem, content_type = "application/problem+json"),
-        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, or \
-            `signup_invite_only`.", body = campbooks_kernel::Problem,
+        (status = 403, description = "`csrf_check_failed`, `passkey_not_accepted`, \
+            `signup_invite_only`, or `sign_in_not_allowed`.", body = campbooks_kernel::Problem,
             content_type = "application/problem+json"),
         (status = 404, description = "This instance offers no passkeys, or another identity \
             provider serves it."),
@@ -610,6 +628,7 @@ pub async fn sign_up(
     if !signup_allows_passkey(&ctx) {
         return Err(Error::Denied(MESSAGES.reason("signup_invite_only")));
     }
+    refuse_sign_up_under_allow_list(&ctx)?;
     // Accounts with no provider are cheap to make: a few per address, and
     // a ceiling for the whole instance. The address first, so one address
     // past its own budget does not spend everyone's.

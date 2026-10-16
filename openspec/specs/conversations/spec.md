@@ -813,12 +813,13 @@ batch or a new rule.
 ### Requirement: Who may teach
 Rules SHALL be the access catalogue's `conversations.rule`, inside their
 inbox. Previewing, creating and confirming a rule, and asking for or
-dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (its
-owner, a `sender` or a `manager`; a `reader`, or anyone in an inbox kept
-read-only, gets 403 `inbox_read_only`). Updating, removing and restoring it
-SHALL also take its author, or a `manager` or the owner of the inbox; other
-writers get 403 `rule_not_yours`. A proposed rule MAY be turned down by anyone
-who may teach in its inbox. Reading rules SHALL take any role on the inbox; a
+dismissing a suggestion, SHALL take the catalogue's `write` on the inbox (a
+`sender` or a `manager`; a `reader`, an owner without a membership, or anyone
+in an inbox kept read-only, gets 403 `inbox_read_only`). Confirming a proposed
+rule SHALL keep its author (the confirmer becomes it only when it had none).
+Updating, removing (turning down, for a proposed rule) and restoring it SHALL
+take its author while a `sender`, or a `manager` of the inbox; other writers
+get 403 `rule_not_yours`. Reading rules SHALL take any role on the inbox; a
 rule in an inbox the caller cannot see SHALL answer 404. A client token, even
 one a member registered (which arrives as that member), SHALL only read and
 preview rules: creating, confirming, changing, removing or restoring one
@@ -893,7 +894,8 @@ Every change to a rule or its run SHALL publish `conversations.rule_changed`
 v1 carrying the
 workspace, inbox and rule ids, the rule's state, and the current run's kind,
 state, total and done; never its conditions, the member's words or any
-address. It SHALL declare an upsert of `conversations.rule` within its inbox.
+address. It SHALL declare an upsert of `conversations.rule` within its inbox, a removed rule included (it stays
+readable while its mail is put back).
 
 #### Scenario: Someone outside the inbox
 - **WHEN** a rule in info@ is applied and a member who is not in info@ follows the change feed
@@ -948,7 +950,9 @@ rule and how many exceptions it had in the last 30 days.
 of the rule and start a revert run that puts every changed conversation back
 as it was before, except those excepted or changed since (by a member, or
 moved on by another rule), with the same batching, progress and events as an
-apply run.
+apply run. Every path that locks a rule's runs and the rule SHALL take the
+runs first, as a run's batch does, so undoing never deadlocks against a
+batch.
 
 #### Scenario: Undo all
 - **WHEN** Ana presses Z right after 998 conversations were moved
@@ -956,7 +960,8 @@ apply run.
 
 ### Requirement: Rules in summaries
 A conversation summary SHALL carry `rule` (its id, the action it took, how
-many conversations it has changed, and whether the caller may change it)
+many conversations it holds changed (not counting those put back or changed
+back), and whether the caller may change it)
 when a rule placed or changed the conversation and no member changed it
 back. Conversation lists and reads SHALL follow `conversations.rule` changes.
 

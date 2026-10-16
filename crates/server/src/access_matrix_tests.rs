@@ -72,8 +72,10 @@ enum Who {
     Member,
     /// A member reading the inbox.
     Reader,
-    /// A member sending from the inbox; the draft's author.
+    /// A member sending from the inbox; the draft's and the rule's author.
     Sender,
+    /// Another member sending from the inbox: author of neither.
+    Colleague,
     /// A member who connected the mailbox (the inbox's owner and manager).
     Connector,
     /// A client token bound to A.
@@ -82,12 +84,13 @@ enum Who {
     Agent,
 }
 
-const MEMBERS: [Who; 8] = [
+const MEMBERS: [Who; 9] = [
     Who::Owner,
     Who::Admin,
     Who::Member,
     Who::Reader,
     Who::Sender,
+    Who::Colleague,
     Who::Connector,
     Who::Client,
     Who::Agent,
@@ -101,6 +104,7 @@ impl Who {
             Self::Member => "mo",
             Self::Reader => "rea",
             Self::Sender => "sen",
+            Self::Colleague => "col",
             Self::Connector => "ana",
             Self::Client => "acme-sync",
             Self::Agent => "agent:adi",
@@ -128,7 +132,7 @@ impl Who {
     fn inbox_role(self) -> Option<&'static str> {
         match self {
             Self::Reader => Some("reader"),
-            Self::Sender => Some("sender"),
+            Self::Sender | Self::Colleague => Some("sender"),
             Self::Connector => Some("manager"),
             _ => None,
         }
@@ -342,6 +346,7 @@ impl World {
         let run = self.run.clone();
         let u = |who: Who| self.users[&who];
         let (connector, reader, sender) = (u(Who::Connector), u(Who::Reader), u(Who::Sender));
+        let colleague = u(Who::Colleague);
         let inbox = dev::create_inbox(
             &self.state,
             self.a,
@@ -350,6 +355,7 @@ impl World {
                 (connector, InboxRole::Manager),
                 (reader, InboxRole::Reader),
                 (sender, InboxRole::Sender),
+                (colleague, InboxRole::Sender),
             ],
         )
         .await
@@ -897,6 +903,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
     matches!(
         id,
         "conversations.create_draft"
+            | "conversations.confirm_rule"
             | "conversations.preview_rule"
             | "conversations.create_rule"
             | "conversations.suggest_rules"
@@ -1214,16 +1221,25 @@ async fn a_disconnected_mailbox_answers_as_declared(db: PgPool) {
                 let what = format!("{mail:?}: {method} {path} ({id})");
                 world.seed_disconnected(mail).await;
                 let instance = instance_of(&world, &id, path, resource);
-                for who in MEMBERS {
-                    let decision = match (mail, &instance) {
-                        // Nothing of a deleted inbox is anybody's any more.
-                        (Mail::Removed, Some(_))
-                            if resource != "conversations.inbox" || acts_in_the_inbox(&id) =>
-                        {
-                            Decision::NotFound
-                        }
-                        _ => expected(&world, who, resource, action, instance.as_deref(), &id),
-                    };
+                // Callers who are refused all ask the same records; each
+                // allowed caller (last) gets fresh ones when they may change.
+                let mut callers: Vec<(Who, Decision)> = MEMBERS
+                    .iter()
+                    .map(|who| {
+                        let decision = match (mail, &instance) {
+                            // Nothing of a deleted inbox is anybody's any more.
+                            (Mail::Removed, Some(_))
+                                if resource != "conversations.inbox" || acts_in_the_inbox(&id) =>
+                            {
+                                Decision::NotFound
+                            }
+                            _ => expected(&world, *who, resource, action, instance.as_deref(), &id),
+                        };
+                        (*who, decision)
+                    })
+                    .collect();
+                callers.sort_by_key(|(_, decision)| *decision == Decision::Allow);
+                for (who, decision) in callers {
                     if decision == Decision::Allow && mail == Mail::Kept {
                         world.seed_disconnected(mail).await;
                     }

@@ -183,6 +183,20 @@ describe("SignInChoices", () => {
     expect(await screen.findByText("This account is suspended.")).toBeVisible();
   });
 
+  it("says a passkey's account is not on the instance's allow-list", async () => {
+    stubWebAuthn();
+    mockApi({
+      [OPTIONS]: { body: REQUEST_OPTIONS },
+      [SIGN_IN]: problem(403, "sign_in_not_allowed"),
+    });
+    renderWithProviders(
+      <SignInChoices request={REQUEST} providers={["google", "passkey"]} returnTo="/" />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Use a passkey/u }));
+    expect(await screen.findByText("This Campbooks isn’t open to this address.")).toBeVisible();
+  });
+
   it("explains a passkey that wasn't accepted, and one that was cancelled", async () => {
     const browser = stubWebAuthn();
     mockApi({

@@ -144,6 +144,17 @@
   flex: 999 1 var(--reader-min);
   flex-direction: column;
   min-width: 0;
+
+  /* A long address, URL or word wraps instead of widening the page. */
+  overflow-wrap: anywhere;
+}
+
+/* From the large breakpoint the reader takes what the sidebar and list leave,
+   so it never wraps under the list on a narrow desktop window. */
+@media (width >= 64rem) {
+  .reader {
+    flex-basis: 0;
+  }
 }
 
 .readerBody {

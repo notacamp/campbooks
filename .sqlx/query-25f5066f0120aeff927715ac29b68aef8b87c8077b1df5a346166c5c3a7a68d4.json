@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT r.id AS \"id: RuleId\", r.inbox_id AS \"inbox_id: InboxId\",\n               r.teaching_id AS \"teaching_id: TeachingId\", r.conditions, r.actions, r.origin,\n               r.origin_text, r.state, r.taught_by,\n               r.from_conversation_id AS \"from_conversation_id: ConversationId\",\n               r.created_at, r.confirmed_at, r.applied_count, r.last_applied_at,\n               (r.taught_by IS NULL OR i.owner = r.taught_by OR EXISTS (\n                   SELECT 1 FROM conversations.inbox_members im\n                    WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by\n                      AND im.role IN ('sender', 'manager'))) AS \"author_may_act!\",\n               i.detached_at IS NOT NULL AS \"inbox_detached!\"\n          FROM conversations.rules r\n          JOIN conversations.inboxes i ON i.id = r.inbox_id\n         WHERE r.id = $1\n        ",
+  "query": "\n        SELECT r.id AS \"id: RuleId\", r.inbox_id AS \"inbox_id: InboxId\",\n               r.teaching_id AS \"teaching_id: TeachingId\", r.conditions, r.actions, r.origin,\n               r.origin_text, r.state, r.taught_by,\n               r.from_conversation_id AS \"from_conversation_id: ConversationId\",\n               r.created_at, r.confirmed_at,\n               r.applied_count - (\n                   SELECT count(*)::int FROM conversations.rule_applications x\n                    WHERE x.rule_id = r.id AND x.excepted_at IS NOT NULL\n                      AND x.reverted_at IS NULL) AS \"applied_count!\",\n               r.last_applied_at,\n               (r.taught_by IS NULL OR EXISTS (\n                   SELECT 1 FROM conversations.inbox_members im\n                    WHERE im.inbox_id = r.inbox_id AND im.user_id = r.taught_by\n                      AND im.role IN ('sender', 'manager'))) AS \"author_may_act!\",\n               i.detached_at IS NOT NULL AS \"inbox_detached!\"\n          FROM conversations.rules r\n          JOIN conversations.inboxes i ON i.id = r.inbox_id\n         WHERE r.id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -137,14 +137,9 @@
       },
       {
         "ordinal": 12,
-        "name": "applied_count",
+        "name": "applied_count!",
         "type_info": "Int4",
-        "origin": {
-          "Table": {
-            "table": "conversations.rules",
-            "name": "applied_count"
-          }
-        }
+        "origin": "Expression"
       },
       {
         "ordinal": 13,
@@ -188,11 +183,11 @@
       true,
       false,
       true,
-      false,
+      null,
       true,
       null,
       null
     ]
   },
-  "hash": "9657aff99289e596c61f105c65956d1751eea7aa400bdb076a9b28782b1ee376"
+  "hash": "25f5066f0120aeff927715ac29b68aef8b87c8077b1df5a346166c5c3a7a68d4"
 }

@@ -313,7 +313,7 @@ export function ConversationReader({
   const unread = conversation.unread_count > 0;
   const replyButtons =
     renderReplySlot === undefined ? null : (
-      <span className="flex gap-1 max-md:hidden">
+      <span className="flex flex-wrap gap-1 max-md:hidden">
         <Button
           variant="ghost"
           icon="reply"

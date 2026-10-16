@@ -177,3 +177,55 @@ async fn no_rule_acts_in_an_inbox_kept_read_only(db: PgPool) {
     assert_eq!(refused.status, StatusCode::FORBIDDEN);
     assert_eq!(refused.json["code"], "inbox_read_only");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn undo_waits_for_a_batch_holding_the_run_without_deadlock(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 5).await;
+    let created = kit
+        .post(
+            &sam,
+            &format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules"),
+            Some(move_github()),
+        )
+        .await;
+    let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+    let one = format!("/api/v1/w/{workspace}/rules/{rule}");
+
+    // A batch holds its run row, then counts on the rule row (as `record`
+    // does), while a member removes the rule, then brings it back.
+    for (method, uri) in [
+        ("DELETE", format!("{one}?restore=true")),
+        ("POST", format!("{one}/restore")),
+    ] {
+        let mut batch = kit.db.begin().await.unwrap();
+        sqlx::query(
+            "SELECT id FROM conversations.rule_runs
+              WHERE rule_id = $1::uuid AND state = 'running' FOR UPDATE",
+        )
+        .bind(&rule)
+        .fetch_all(&mut *batch)
+        .await
+        .unwrap();
+        let undo = async {
+            if method == "DELETE" {
+                kit.delete(&sam, &uri).await
+            } else {
+                kit.post(&sam, &uri, Some(json!({}))).await
+            }
+        };
+        let batch_goes_on = async {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            sqlx::query(
+                "UPDATE conversations.rules SET last_applied_at = now() WHERE id = $1::uuid",
+            )
+            .bind(&rule)
+            .execute(&mut *batch)
+            .await
+            .unwrap();
+            batch.commit().await.unwrap();
+        };
+        let (answer, ()) = tokio::join!(undo, batch_goes_on);
+        assert_eq!(answer.status, StatusCode::OK, "{method}: {:?}", answer.json);
+    }
+}
