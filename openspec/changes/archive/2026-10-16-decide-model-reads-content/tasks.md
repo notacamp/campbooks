@@ -23,4 +23,4 @@
 - [x] 4.1 Reason copy `facts.list_mail`, `facts.automatic`, `facts.no_reply_sender` in en, pt-PT, es-ES, fr; old `signals.*` keys kept
 - [x] 4.2 `deploy/.env.example` and `deploy/README.md`: Jev through OpenRouter (PATH, MODEL, EXTERNAL_CONTENT, where mail goes)
 - [x] 4.3 OpenAPI regenerated, client types regenerated, CHANGELOG updated, gates green
-- [ ] 4.4 Terminal recording of the eval and the decide pass (no UI change)
+- [x] 4.4 Terminal recording of the eval and the decide pass (no UI change)

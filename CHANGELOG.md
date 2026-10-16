@@ -181,6 +181,8 @@ All notable changes to Campbooks Next are documented here. The format follows
 - **Notifications with a question mark no longer ask for a reply.** "Your order has
   shipped. Questions? Contact our support team." raised a Reply need, because a rule
   read any "?" as a question for you. Needs raised that way are withdrawn on upgrade.
+  Automated mail (a calendar invitation, a support notice) becomes something to do
+  only when the model also finds a deadline in it, and a newsletter never does.
 - **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
   open conversation no longer drops below the list; it stays beside it. A long
   subject, sender or address with no spaces now wraps inside the reader instead of
