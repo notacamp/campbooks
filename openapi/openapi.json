@@ -15833,13 +15833,13 @@
           "received": {
             "type": "integer",
             "format": "int32",
-            "description": "Inbound messages from them in the caller's inboxes.",
+            "description": "Inbound messages from them in the caller's inboxes, among the newest\n(the last year, at most 5,000 messages).",
             "minimum": 0
           },
           "replied": {
             "type": "integer",
             "format": "int32",
-            "description": "Their conversations the caller's inboxes replied to.",
+            "description": "Of those, their conversations the caller's inboxes replied to.",
             "minimum": 0
           }
         }

@@ -237,7 +237,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   sends it only your sentence and your own addresses and label names, never
   your mail. Without a `complete` role, Scout's memory offers a rule builder
   instead. Scout's memory is a Settings section (Settings → Scout's memory)
-  and lists your rules. New migration (schema `assistant`); nothing to do.
+  and lists your rules. If saving stops partway, Try again saves only what
+  is missing, and the count you see is what was saved. Keys: `T` / `Shift+T`
+  on the Home offer, `B` to go back, `Q` in Scout's memory, `⌘↵` to save a
+  rule. New migrations: the `assistant` schema, and an index on received
+  mail built without blocking writes; nothing to do.
 - **Rules you teach, applied to the mail that looks the same.** A taught rule
   says which mail it is about (the sender, its domain, a mailing list, the
   subject's template or words, a header, a label or a stream) and what to do

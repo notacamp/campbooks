@@ -43,3 +43,13 @@
 - [x] 5.3 Gates green (Rust, client, OpenSpec validate)
 - [x] 5.4 UI verified at 375px and desktop; recording of typing an instruction → proposed rule with preview → Save
 - [x] 5.5 Archive the change into `openspec/specs/`
+
+## 6. Review fixes
+
+- [x] 6.1 Count the rules the server created; Save disabled, with why, while rules have no inbox (shared not switched on, read-only); test
+- [x] 6.2 Remember created rules by key (one teaching per answer), retry only the rest, then the profile (also when only that failed); RuleSave the same per inbox; tests
+- [x] 6.3 Undo, Not now and the Home offer say when they fail; Not now goes Home only once saved and keeps answers it couldn't load
+- [x] 6.4 Done view and notice say what changed when no rule was added
+- [x] 6.5 Question 3 has no client flag (#482's proactivity is on `next`): stated in the spec
+- [x] 6.6 `list_senders` reads the last 365 days, at most 5,000 messages, through `messages_inbound_recent_idx` (CONCURRENTLY, after the assistant migration), one reply check per thread; cached per `q` within a compile; tests
+- [x] 6.7 RuleSave keeps the focus in the composer (⌘↵, live region); `B` Back, `T` / `Shift+T` on the offer, `Q` on Scout's memory; honest loading and error states

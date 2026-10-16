@@ -3,7 +3,10 @@
 //! (the assistant's questions), and for matching a name in a sentence
 //! someone typed to an address. Addresses, display names and counts only:
 //! never a subject or any text. Bounded (at most ten, no cursor), so it
-//! cannot page out a whole inbox's correspondents.
+//! cannot page out a whole inbox's correspondents; and it reads only the
+//! newest inbound mail ([`WINDOW_DAYS`], at most [`MAX_SCANNED`] messages,
+//! through `messages_inbound_recent_idx`), so its cost doesn't grow with an
+//! inbox's history.
 
 use axum::{Json, extract::State};
 use campbooks_kernel::{
@@ -26,6 +29,10 @@ use crate::{
 
 /// Most senders in one answer.
 pub const MAX_LIMIT: u32 = 10;
+/// How far back it reads, in days.
+pub const WINDOW_DAYS: i32 = 365;
+/// Most inbound messages it reads, newest first.
+pub const MAX_SCANNED: i64 = 5_000;
 /// Shortest and longest `q`, in characters.
 const Q_CHARS: std::ops::RangeInclusive<usize> = 2..=100;
 /// Most words of `q` matched.
@@ -52,9 +59,10 @@ pub struct SenderView {
     /// The display name on their newest message, when it had one.
     #[schema(example = "Rita Gomes")]
     pub name: Option<String>,
-    /// Inbound messages from them in the caller's inboxes.
+    /// Inbound messages from them in the caller's inboxes, among the newest
+    /// (the last year, at most 5,000 messages).
     pub received: u32,
-    /// Their conversations the caller's inboxes replied to.
+    /// Of those, their conversations the caller's inboxes replied to.
     pub replied: u32,
 }
 
@@ -104,38 +112,63 @@ pub async fn handler(
     let access = &workspace.access;
     let mut tx = state.db.begin_for(access.workspace).await?;
     let inboxes = visible_inboxes(&mut tx, access).await?;
+    // The newest inbound mail only (`messages_inbound_recent_idx`); then one
+    // "was it answered" per thread, not per message, and only for the
+    // senders `q` keeps.
     let rows = sqlx::query!(
         r#"
-        WITH inbound AS (
+        WITH recent AS (
             SELECT m.sender_address AS address,
                    nullif(m.sender->>'name', '') AS name,
                    m.sent_at,
-                   m.conversation_id,
-                   EXISTS (SELECT 1 FROM conversations.messages o
-                            WHERE o.conversation_id = m.conversation_id
-                              AND o.direction = 'outbound' AND o.sent_at > m.sent_at)
-                     AS replied
+                   m.conversation_id
               FROM conversations.messages m
              WHERE m.inbox_id = ANY($1) AND m.direction = 'inbound'
                AND NOT m.in_spam AND NOT m.in_trash
+               AND m.sent_at > now() - make_interval(days => $4)
+             ORDER BY m.sent_at DESC
+             LIMIT $5
+        ),
+        senders AS (
+            SELECT address,
+                   (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
+                     AS name,
+                   count(*)::int AS received
+              FROM recent
+             GROUP BY address
+            HAVING $2::text[] IS NULL OR NOT EXISTS (
+                     SELECT 1 FROM unnest($2::text[]) AS w(word)
+                      WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
+                            NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
+        ),
+        threads AS (
+            SELECT r.address, r.conversation_id, min(r.sent_at) AS first_at
+              FROM recent r
+              JOIN senders s USING (address)
+             GROUP BY r.address, r.conversation_id
+        ),
+        replied AS (
+            SELECT t.address, count(*)::int AS replied
+              FROM threads t
+             WHERE EXISTS (SELECT 1 FROM conversations.messages o
+                            WHERE o.conversation_id = t.conversation_id
+                              AND o.direction = 'outbound' AND o.sent_at > t.first_at)
+             GROUP BY t.address
         )
-        SELECT address AS "address!",
-               (array_agg(name ORDER BY sent_at DESC) FILTER (WHERE name IS NOT NULL))[1]
-                 AS name,
-               count(*)::int AS "received!",
-               (count(DISTINCT conversation_id) FILTER (WHERE replied))::int AS "replied!"
-          FROM inbound
-         GROUP BY address
-        HAVING $2::text[] IS NULL OR NOT EXISTS (
-                 SELECT 1 FROM unnest($2::text[]) AS w(word)
-                  WHERE public.unaccent(lower(address || ' ' || coalesce(string_agg(name, ' '), '')))
-                        NOT LIKE '%' || public.unaccent(lower(w.word)) || '%' ESCAPE '\')
+        SELECT s.address AS "address!",
+               s.name,
+               s.received AS "received!",
+               coalesce(r.replied, 0) AS "replied!"
+          FROM senders s
+          LEFT JOIN replied r USING (address)
          ORDER BY 4 DESC, 3 DESC, 1
          LIMIT $3
         "#,
         &inboxes as &[InboxId],
         words.as_deref() as Option<&[String]>,
         i64::from(limit),
+        WINDOW_DAYS,
+        MAX_SCANNED,
     )
     .fetch_all(&mut *tx)
     .await?;
@@ -241,6 +274,33 @@ mod tests {
         }
         let one = kit.get(&sam, &format!("{uri}?limit=1")).await;
         assert_eq!(one.json["senders"].as_array().unwrap().len(), 1);
+    }
+
+    #[sqlx::test(migrations = "../../../migrations")]
+    async fn reads_only_the_newest_mail(db: PgPool) {
+        let kit = Kit::new(db.clone()).await;
+        let (workspace, _, sam) = kit.sams_inbox().await;
+        let uri = format!("/api/v1/w/{workspace}/senders");
+        let maya = "maya@northwind-studio.example";
+
+        let before = kit.get(&sam, &uri).await;
+        assert_eq!(before.json["senders"][0]["address"], maya);
+        sqlx::query(
+            "UPDATE conversations.messages SET sent_at = now() - interval '2 years'
+              WHERE sender_address = $1 AND direction = 'inbound'",
+        )
+        .bind(maya)
+        .execute(&db)
+        .await
+        .unwrap();
+
+        let after = kit.get(&sam, &uri).await;
+        let senders = after.json["senders"].as_array().unwrap();
+        assert!(!senders.is_empty());
+        assert!(
+            senders.iter().all(|sender| sender["address"] != maya),
+            "mail older than the window isn't read"
+        );
     }
 
     #[sqlx::test(migrations = "../../../migrations")]

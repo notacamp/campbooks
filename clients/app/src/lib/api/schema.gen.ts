@@ -3919,12 +3919,13 @@ export interface components {
             name?: string | null;
             /**
              * Format: int32
-             * @description Inbound messages from them in the caller's inboxes.
+             * @description Inbound messages from them in the caller's inboxes, among the newest
+             *     (the last year, at most 5,000 messages).
              */
             received: number;
             /**
              * Format: int32
-             * @description Their conversations the caller's inboxes replied to.
+             * @description Of those, their conversations the caller's inboxes replied to.
              */
             replied: number;
         };

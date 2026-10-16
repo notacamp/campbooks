@@ -385,3 +385,51 @@ async fn members_only(db: PgPool) {
     );
     assert!(server.received_requests().await.unwrap().is_empty());
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn senders_are_looked_up_once_per_word_in_a_compile(db: PgPool) {
+    let server = MockServer::start().await;
+    answer_with(
+        &server,
+        &json!({
+            "outcome": "rules",
+            "unsupported": "none",
+            "rules": [
+                {
+                    "who": "my accountant",
+                    "conditions": [],
+                    "actions": [{ "kind": "surface", "value": "always" }],
+                },
+                {
+                    "who": "the accountant office",
+                    "conditions": [],
+                    "actions": [{ "kind": "surface", "value": "never" }],
+                },
+            ],
+        }),
+    )
+    .await;
+    let kit = kit_with_model(db, &server).await;
+    let workspace = WorkspaceId::new();
+    let (ines, _) = kit.member("ines", workspace);
+
+    let response = kit
+        .post(
+            &ines,
+            &uri(workspace),
+            json!({ "text": "my accountant always matters, the accountant office never" }),
+        )
+        .await;
+    assert_eq!(response.status, StatusCode::OK, "{}", response.json);
+    let proposals = response.json["proposals"].as_array().unwrap();
+    assert_eq!(proposals.len(), 2);
+    for proposal in proposals {
+        assert!(!proposal["who"]["candidates"].as_array().unwrap().is_empty());
+    }
+    // "accountant" and the fallback once each, though both questions need them.
+    assert_eq!(
+        kit.mail.lock().unwrap().asked,
+        ["accountant", "", "office"],
+        "one list_senders per q in a compile"
+    );
+}

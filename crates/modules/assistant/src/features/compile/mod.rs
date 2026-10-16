@@ -15,7 +15,11 @@ mod types;
 mod validate;
 mod words;
 
-use std::time::{Duration, Instant};
+use std::{
+    collections::HashMap,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 
 use axum::{Extension, Json, extract::State};
 use campbooks_ai::{Gateway, Role};
@@ -143,6 +147,7 @@ pub async fn handler(
         state: &state,
         principal: &workspace.principal,
         workspace: workspace.id,
+        senders: Mutex::default(),
     };
     let ctx = caller.context(sentence).await?;
     let input = ModelInput {
@@ -212,6 +217,10 @@ struct Ask<'a> {
     state: &'a AppState,
     principal: &'a Principal,
     workspace: WorkspaceId,
+    /// `list_senders` answers by `q`, for this one sentence: several "who"
+    /// questions share words and the fallback, and each answer reads the
+    /// newest mail of every inbox the member can see.
+    senders: Mutex<HashMap<Option<String>, Vec<Candidate>>>,
 }
 
 #[derive(Deserialize)]
@@ -311,16 +320,32 @@ impl Ask<'_> {
         Ok(())
     }
 
+    /// `conversations.list_senders`, once per `q` in a compile.
     async fn senders(&self, q: Option<&str>) -> Result<Vec<Candidate>> {
+        let key = q.map(str::to_owned);
+        let cached = self
+            .senders
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(&key)
+            .cloned();
+        if let Some(found) = cached {
+            return Ok(found);
+        }
         let input = match q {
             Some(q) => json!({ "q": q, "limit": MAX_CANDIDATES }),
             None => json!({ "limit": MAX_CANDIDATES }),
         };
-        Ok(self
+        let found: Vec<Candidate> = self
             .call("conversations.list_senders", input)
             .await?
             .and_then(|body| serde_json::from_value(body["senders"].clone()).ok())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        self.senders
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(key, found.clone());
+        Ok(found)
     }
 }
 
