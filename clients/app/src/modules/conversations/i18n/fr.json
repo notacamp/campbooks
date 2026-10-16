@@ -158,7 +158,8 @@
     "forward": "Transférer",
     "showImages": "Afficher les images",
     "nextAttachment": "Pièce jointe suivante",
-    "notNeeded": "Pas nécessaire (ou c’est sûr)"
+    "notNeeded": "Pas nécessaire (ou c’est sûr)",
+    "undoAll": "Annuler tout ce qu’a fait une règle"
   },
   "compose": {
     "title": {

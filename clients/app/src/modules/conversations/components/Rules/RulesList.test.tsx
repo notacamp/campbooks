@@ -117,6 +117,19 @@ describe("the rules list", () => {
     expect(within(list).getByText(/Taught when someone acted on one email/u)).toBeVisible();
   });
 
+  it("offers Keep and No only where the member may teach", async () => {
+    mockApi({
+      ...people,
+      [`GET ${W}/rules`]: { body: { rules: [PROPOSED] } },
+      [`GET ${W}/inboxes`]: { body: { inboxes: [{ ...INBOX, role: "reader" }] } },
+    });
+    renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
+    const waiting = await screen.findByRole("list", { name: "Waiting for you" });
+    expect(await within(waiting).findByText(/Sofia Pessoa/u)).toBeVisible();
+    expect(within(waiting).queryByRole("button", { name: "Keep this rule" })).toBeNull();
+    expect(within(waiting).queryByRole("button", { name: "No" })).toBeNull();
+  });
+
   it("says when the rules cannot load, and tries again", async () => {
     let fail = true;
     mockApi({

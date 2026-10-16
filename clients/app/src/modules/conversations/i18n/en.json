@@ -158,7 +158,8 @@
     "forward": "Forward",
     "showImages": "Show images",
     "nextAttachment": "Next attachment",
-    "notNeeded": "Not needed (or it’s safe)"
+    "notNeeded": "Not needed (or it’s safe)",
+    "undoAll": "Undo all a rule did"
   },
   "compose": {
     "title": {

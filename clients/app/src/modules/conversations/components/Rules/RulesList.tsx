@@ -20,11 +20,20 @@ import { listTime, type Translate } from "../../model";
 import { originLine, ruleSentence, type RuleAuthor } from "../../rules-text";
 import { useRuleActions } from "../TeachOnce/use-rule-actions";
 
-/** Who taught each rule: you, a named teammate, or someone the list cannot name. */
-function useAuthors(workspaceId: string): (rule: RuleView) => RuleAuthor {
+/**
+ * Who taught each rule: you, a named teammate, or someone the list cannot
+ * name; `undefined` while that is not known yet (the members or the session
+ * still loading), so a rule never reads as someone else's for a moment.
+ */
+function useAuthors(workspaceId: string): (rule: RuleView) => RuleAuthor | undefined {
   const members = useMembers(workspaceId);
-  const myEmail = useSession().data?.user?.email?.toLowerCase();
+  const session = useSession();
+  const myEmail = session.data?.user?.email?.toLowerCase();
+  const loading = members.isPending || session.isPending;
   return (rule) => {
+    if (loading) {
+      return;
+    }
     const member = members.data?.find((item) => item.user_id === rule.taught_by);
     if (member === undefined) {
       return { kind: "someone" };
@@ -82,6 +91,12 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
       </EmptyState>
     );
   }
+  // Keep / No act on the inbox (anyone who may teach there): only offered
+  // where the member writes, never in a reader's or a kept inbox.
+  const teaches = (rule: RuleView) => {
+    const inbox = inboxes.data?.find((item) => item.id === rule.inbox_id);
+    return inbox !== undefined && !inbox.read_only && inbox.role !== "reader";
+  };
   const row = (rule: RuleView) => (
     <RuleRow
       key={rule.id}
@@ -89,6 +104,7 @@ export function RulesList({ workspaceId }: { workspaceId: string }) {
       rule={rule}
       locale={locale}
       author={authorOf(rule)}
+      teaches={teaches(rule)}
     />
   );
   const waiting = rules.data.filter((rule) => rule.state === "proposed");
@@ -131,11 +147,13 @@ function RuleRow({
   rule,
   locale,
   author,
+  teaches,
 }: {
   workspaceId: string;
   rule: RuleView;
   locale: string;
-  author: RuleAuthor;
+  author: RuleAuthor | undefined;
+  teaches: boolean;
 }) {
   const { t: typed } = useTranslation("conversations");
   const t = typed as unknown as Translate;
@@ -144,7 +162,7 @@ function RuleRow({
   const [putBack, setPutBack] = useState<"back" | "keep">("back");
   const number = (n: number) => new Intl.NumberFormat(locale).format(n);
   const facts = [
-    originLine(t, rule, author),
+    author === undefined ? "" : originLine(t, rule, author),
     rule.applied_count > 0
       ? t("rules.list.applied", { count: rule.applied_count, n: number(rule.applied_count) })
       : "",
@@ -162,26 +180,28 @@ function RuleRow({
 
   const trailing =
     rule.state === "proposed" ? (
-      <>
-        <Button
-          variant="primary"
-          disabled={keeping}
-          onClick={() => {
-            keepRule(rule);
-          }}
-        >
-          {t("rules.list.keep")}
-        </Button>
-        <Button
-          variant="ghost"
-          disabled={removing}
-          onClick={() => {
-            removeRule(rule, { restore: false, label: "declined" });
-          }}
-        >
-          {t("rules.list.no")}
-        </Button>
-      </>
+      teaches ? (
+        <>
+          <Button
+            variant="primary"
+            disabled={keeping}
+            onClick={() => {
+              keepRule(rule);
+            }}
+          >
+            {t("rules.list.keep")}
+          </Button>
+          <Button
+            variant="ghost"
+            disabled={removing}
+            onClick={() => {
+              removeRule(rule, { restore: false, label: "declined" });
+            }}
+          >
+            {t("rules.list.no")}
+          </Button>
+        </>
+      ) : undefined
     ) : rule.may_change && !confirming ? (
       <Button
         variant="ghost"

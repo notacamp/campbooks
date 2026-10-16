@@ -158,7 +158,8 @@
     "forward": "Reenviar",
     "showImages": "Mostrar imágenes",
     "nextAttachment": "Siguiente adjunto",
-    "notNeeded": "No hace falta (o es seguro)"
+    "notNeeded": "No hace falta (o es seguro)",
+    "undoAll": "Deshacer todo lo que hizo una regla"
   },
   "compose": {
     "title": {

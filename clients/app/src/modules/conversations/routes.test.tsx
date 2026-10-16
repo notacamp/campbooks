@@ -251,6 +251,31 @@ describe("the inbox", () => {
     expect(dismissed?.body).toEqual({ key: "sender|ledger" });
   });
 
+  it("dismisses the offer with Esc as soon as it appears, leaving the reader open", async () => {
+    const api = inbox({
+      [`GET ${W}/conversations/${LEDGER.id}/rule-suggestions`]: { body: LEDGER_SUGGESTIONS },
+      [`POST ${W}/conversations/${LEDGER.id}/rule-suggestions/dismiss`]: { status: 204 },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByRole("heading", { name: LEDGER.subject });
+    fireEvent.keyDown(document, { key: "1" });
+    const offer = await screen.findByRole("dialog", { name: /Move all 40/u });
+    // The offer took focus: Esc is its own, and its button says so.
+    await waitFor(() => {
+      expect(offer).toContainElement(document.activeElement as HTMLElement);
+    });
+    expect(within(offer).getByRole("button", { name: /Just this one/u })).toHaveAttribute(
+      "aria-keyshortcuts",
+    );
+    fireEvent.keyDown(document.activeElement ?? document, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog", { name: /Move all 40/u })).toBeNull();
+    });
+    expect(screen.getByRole("main", { name: "Conversation" })).toBeVisible();
+    expect(api.calls.some((call) => call.route.endsWith("/rule-suggestions/dismiss"))).toBe(true);
+  });
+
   /** Open the Ledger, move it with 1 and accept the offer with 1: the rule's run shows. */
   async function teachLedger(
     rule: () => Schema<"RuleView">,
@@ -367,6 +392,65 @@ describe("the inbox", () => {
     expect(
       api.calls.find((call) => call.route === `POST ${W}/rules/${LEDGER_RULE.id}/restore`)?.body,
     ).toEqual({ apply_to_existing: true });
+  });
+
+  it("follows the run putting mail back when the new rule's toast is undone", async () => {
+    let removed = false;
+    const api = await teachLedger(
+      () =>
+        removed
+          ? {
+              ...LEDGER_RULE,
+              state: "removed",
+              run: { ...RUN, kind: "revert", state: "running", counted: true, done: 10 },
+            }
+          : LEDGER_RULE,
+      {
+        [`DELETE ${W}/rules/${LEDGER_RULE.id}`]: () => {
+          removed = true;
+          return {
+            body: {
+              ...LEDGER_RULE,
+              state: "removed",
+              run: { ...RUN, kind: "revert", state: "running", counted: true, done: 10 },
+            },
+          };
+        },
+      },
+    );
+    await screen.findByRole("dialog", { name: /Moved 40 to Newsletters/u });
+    fireEvent.keyDown(document.body, { key: "z" });
+    expect(await screen.findByRole("dialog", { name: "Putting 40 back" })).toBeVisible();
+    expect(
+      await screen.findByText("Rule removed · Mail from hello@weekly-ledger.example → Newsletters"),
+    ).toBeVisible();
+    expect(screen.queryByText("This rule was removed, so it no longer acts.")).toBeNull();
+    expect(api.calls.filter((call) => call.route.startsWith("DELETE"))).toHaveLength(1);
+  });
+
+  it("never asks about a rule the member may not change", async () => {
+    inbox({
+      [`POST ${W}/conversations/${LEDGER.id}/stream`]: (_request, body) => ({
+        body: {
+          ...LEDGER,
+          ...(body as object),
+          stream_source: "member",
+          suggestion: null,
+          rule_exception: { rule_id: LEDGER_RULE.id, recent_exceptions: 2 },
+        },
+      }),
+      [`GET ${W}/conversations/${LEDGER.id}/rule-suggestions`]: {
+        body: { ...LEDGER_SUGGESTIONS, suggestions: [], default: null },
+      },
+      [`GET ${W}/rules/${LEDGER_RULE.id}`]: { body: { ...LEDGER_RULE, may_change: false } },
+    });
+    renderAt(`/w/${DUARTE.id}/inbox/primary/${LEDGER.id}`);
+    const reader = await screen.findByRole("main", { name: "Conversation" });
+    await within(reader).findByRole("heading", { name: LEDGER.subject });
+    fireEvent.keyDown(document, { key: "1" });
+    await screen.findByText(/Moved to Newsletters/u);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByRole("dialog", { name: /Changed back/u })).toBeNull();
   });
 
   it("says when Undo all fails, and keeps it on offer", async () => {

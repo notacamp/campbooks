@@ -3,10 +3,13 @@ import {
   use,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type Dispatch,
   type ReactNode,
+  type SetStateAction,
 } from "react";
 import { useTranslation } from "react-i18next";
 import { useQueryClient } from "@tanstack/react-query";
@@ -96,6 +99,9 @@ export function TeachOnceProvider({
 }) {
   const [state, setState] = useState<Step>({ step: "idle" });
   const [announcement, setAnnouncement] = useState("");
+  // Undo of a new rule may run after its offer is gone: it needs a mutation
+  // that lives as long as the inbox does.
+  const { removeOnce } = useRuleActions(workspaceId);
   const asked = useRef(0);
 
   const after = useCallback(
@@ -143,6 +149,7 @@ export function TeachOnceProvider({
           state={state}
           setState={setState}
           announce={setAnnouncement}
+          removeOnce={removeOnce}
         />
       )}
       {/* Mounted for good, so what the offer says is read out as it changes. */}
@@ -158,10 +165,24 @@ export function TeachOnceProvider({
 interface StepProps<S extends Step["step"]> {
   workspaceId: string;
   state: Extract<Step, { step: S }>;
-  setState: (next: Step) => void;
+  setState: Dispatch<SetStateAction<Step>>;
   announce: (text: string) => void;
   /** Whether focus is inside the offer: Esc is the offer's only then. */
   focused: boolean;
+  /**
+   * Whether the offer's question must be read out: focus stayed where the
+   * member is typing, so the dialog's name is not read on focus.
+   */
+  spoken: boolean;
+  /** Remove a rule once, from a mutation that outlives the offer. */
+  removeOnce: RemoveOnce;
+}
+
+type RemoveOnce = ReturnType<typeof useRuleActions>["removeOnce"];
+
+/** Esc, as an offer's button carries it: only while the offer holds Esc. */
+function escWhen(focused: boolean): { shortcut?: "overlay.close" } {
+  return focused ? { shortcut: "overlay.close" } : {};
 }
 
 function TeachOffer({
@@ -169,14 +190,45 @@ function TeachOffer({
   state,
   setState,
   announce,
+  removeOnce,
 }: {
   workspaceId: string;
   state: Exclude<Step, { step: "idle" }>;
-  setState: (next: Step) => void;
+  setState: Dispatch<SetStateAction<Step>>;
   announce: (text: string) => void;
+  removeOnce: RemoveOnce;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const [focused, setFocused] = useState(false);
+  // Where focus was when the offer appeared, to give it back when it goes;
+  // and whether the member was typing there (then focus stays put, and the
+  // question is read out instead).
+  const [before] = useState(() => document.activeElement);
+  const spoken = isTypingTarget(before);
+
+  // Whether focus is inside the offer, followed on the document. A layout
+  // effect: listening before the effect below moves focus in.
+  useLayoutEffect(() => {
+    const node = ref.current;
+    const follow = (event: FocusEvent) => {
+      const now = event.type === "focusin" ? event.target : event.relatedTarget;
+      setFocused(now instanceof Node && node?.contains(now) === true);
+    };
+    document.addEventListener("focusin", follow);
+    document.addEventListener("focusout", follow);
+    return () => {
+      document.removeEventListener("focusin", follow);
+      document.removeEventListener("focusout", follow);
+      // The offer goes: focus goes back where it was, unless the member
+      // moved it elsewhere meanwhile.
+      const active = document.activeElement;
+      const lost = active === null || active === document.body || node?.contains(active);
+      if (lost === true && before instanceof HTMLElement && before.isConnected) {
+        before.focus();
+      }
+    };
+  }, [before]);
+
   // When the offer appears or changes step, bring focus to its first action,
   // unless the member is typing somewhere (never take focus from a composer).
   useEffect(() => {
@@ -186,23 +238,10 @@ function TeachOffer({
       return;
     }
     ref.current?.querySelector<HTMLButtonElement>("button:not([disabled])")?.focus();
+    setFocused(ref.current?.contains(document.activeElement) === true);
   }, [state.step]);
 
-  // Whether focus is inside the offer, followed on the document.
-  useEffect(() => {
-    const follow = (event: FocusEvent) => {
-      const now = event.type === "focusin" ? event.target : event.relatedTarget;
-      setFocused(now instanceof Node && ref.current?.contains(now) === true);
-    };
-    document.addEventListener("focusin", follow);
-    document.addEventListener("focusout", follow);
-    return () => {
-      document.removeEventListener("focusin", follow);
-      document.removeEventListener("focusout", follow);
-    };
-  }, []);
-
-  const common = { workspaceId, setState, announce, focused };
+  const common = { workspaceId, setState, announce, focused, spoken, removeOnce };
   return (
     <div ref={ref} className="contents">
       {state.step === "asking" ? <Asking {...common} state={state} /> : null}
@@ -230,11 +269,19 @@ function useAnnounce(announce: (text: string) => void, text: string) {
 }
 
 /** "Move all 1,000 like this to Updates, and new ones too?" */
-function Asking({ workspaceId, state, setState, announce, focused }: StepProps<"asking">) {
+function Asking({
+  workspaceId,
+  state,
+  setState,
+  announce,
+  focused,
+  spoken,
+  removeOnce,
+}: StepProps<"asking">) {
   const { t, locale, number } = useT();
   const undo = useUndoToast();
   const inboxes = useInboxes(workspaceId);
-  const { create, removeOnce } = useRuleActions(workspaceId);
+  const { create } = useRuleActions(workspaceId);
   const { offer, conversation, action } = state;
   const chosen = state.chosen === null ? undefined : offer.suggestions[state.chosen];
   const kind = taughtKind(action);
@@ -257,7 +304,8 @@ function Asking({ workspaceId, state, setState, announce, focused }: StepProps<"
     title = t(`rules.offer.questionAtLeast.${kind}`, counts);
     accept = t(`rules.offer.acceptAtLeast.${kind}`);
   }
-  useAnnounce(announce, title);
+  // Focused, the dialog's name says it already.
+  useAnnounce(announce, spoken ? title : "");
 
   const dismiss = () => {
     // "Just this one" turns down every likeness shown, so none comes back.
@@ -287,10 +335,19 @@ function Asking({ workspaceId, state, setState, announce, focused }: StepProps<"
             expected: { count, complete },
             reverting: false,
           });
+          const sentence = ruleSentence(t, locale, rule);
           undo.push({
-            label: t("rules.toast.made", { rule: ruleSentence(t, locale, rule) }),
+            label: t("rules.toast.made", { rule: sentence }),
             undo: () => {
-              removeOnce(rule.id, true);
+              removeOnce(rule.id, true, () => {
+                // Its panel, if still up, follows the run putting mail back.
+                setState((current) =>
+                  current.step === "running" && current.ruleId === rule.id
+                    ? { ...current, reverting: true }
+                    : current,
+                );
+                undo.notify(t("rules.toast.stopped", { rule: sentence }));
+              });
             },
           });
         },
@@ -330,7 +387,7 @@ function Asking({ workspaceId, state, setState, announce, focused }: StepProps<"
           >
             {accept}
           </Button>
-          <Button variant="ghost" shortcut="overlay.close" onClick={dismiss}>
+          <Button variant="ghost" {...escWhen(focused)} onClick={dismiss}>
             {t("rules.offer.justThis")}
           </Button>
         </>
@@ -376,9 +433,15 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
   const run = data?.run ?? undefined;
   const stream = streamName(t, ruleStream(data?.actions ?? []) ?? "primary");
   // Our own Undo all removes the rule too; only someone else's removal is news.
-  const removedElsewhere = data?.state === "removed" && !state.reverting;
-  // Undo of Undo all brings the rule back: its new apply run is the news.
-  const reverting = state.reverting && data?.state !== "active";
+  // Removed with its mail being put back (our Undo all, an Undo of the
+  // rule, or someone else's): the revert run is the news. Brought back by
+  // Undo of Undo all: its new apply run is.
+  const reverting =
+    data?.state === "removed"
+      ? state.reverting || run?.kind === "revert"
+      : state.reverting && data?.state !== "active";
+  // Removed without putting anything back.
+  const removedElsewhere = data?.state === "removed" && !reverting;
   const revertRun = reverting && run?.kind === "revert" ? run : undefined;
   const applyRun = !reverting && run?.kind === "apply" ? run : undefined;
   const shown = reverting ? revertRun : applyRun;
@@ -466,20 +529,26 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
       },
     });
   };
+  useShortcut("inbox.rule.undo_all", undoAll, { enabled: canUndo });
 
   return (
     <Offer
-      visor={settled ? (rule.isError ? "unsure" : "happy") : "thinking"}
+      visor={settled ? (ended && !rule.isError ? "happy" : "unsure") : "thinking"}
       title={title}
       detail={detail}
       actions={
         <>
           {canUndo ? (
-            <Button variant={ended ? "primary" : "secondary"} disabled={removing} onClick={undoAll}>
+            <Button
+              variant={ended ? "primary" : "secondary"}
+              shortcut="inbox.rule.undo_all"
+              disabled={removing}
+              onClick={undoAll}
+            >
               {t("rules.run.undoAll")}
             </Button>
           ) : null}
-          <Button variant="ghost" shortcut="overlay.close" onClick={close}>
+          <Button variant="ghost" {...escWhen(focused)} onClick={close}>
             {t("rules.run.close")}
           </Button>
         </>
@@ -495,7 +564,14 @@ function Running({ workspaceId, state, setState, announce, focused }: StepProps<
 }
 
 /** "Changed back 2 times in the last 30 days. Keep the rule …?" */
-function Question({ workspaceId, state, setState, announce, focused }: StepProps<"question">) {
+function Question({
+  workspaceId,
+  state,
+  setState,
+  announce,
+  focused,
+  spoken,
+}: StepProps<"question">) {
   const { t, locale, number } = useT();
   const undo = useUndoToast();
   const rule = useRule(workspaceId, state.ruleId);
@@ -512,6 +588,12 @@ function Question({ workspaceId, state, setState, announce, focused }: StepProps
     }
   }, [rule.isError, setState, t, undo]);
   const canDrop = data?.may_change === true && data.state !== "removed";
+  // Only whoever may change the rule is asked about it.
+  useEffect(() => {
+    if (data !== undefined && !canDrop) {
+      setState({ step: "idle" });
+    }
+  }, [data, canDrop, setState]);
   const drop = () => {
     if (data === undefined || !canDrop || removing) {
       return;
@@ -533,8 +615,8 @@ function Question({ workspaceId, state, setState, announce, focused }: StepProps
           n: number(state.recent),
           rule: ruleSentence(t, locale, data),
         });
-  useAnnounce(announce, title);
-  if (data === undefined) {
+  useAnnounce(announce, spoken ? title : "");
+  if (data === undefined || !canDrop) {
     return null;
   }
   return (
@@ -543,12 +625,10 @@ function Question({ workspaceId, state, setState, announce, focused }: StepProps
       title={title}
       actions={
         <>
-          {canDrop ? (
-            <Button variant="primary" shortcut="item.choice1" disabled={removing} onClick={drop}>
-              {t("rules.exception.remove")}
-            </Button>
-          ) : null}
-          <Button variant="ghost" shortcut="overlay.close" onClick={keep}>
+          <Button variant="primary" shortcut="item.choice1" disabled={removing} onClick={drop}>
+            {t("rules.exception.remove")}
+          </Button>
+          <Button variant="ghost" {...escWhen(focused)} onClick={keep}>
             {t("rules.exception.keep")}
           </Button>
         </>
