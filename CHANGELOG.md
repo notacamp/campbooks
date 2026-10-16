@@ -13,10 +13,12 @@ All notable changes to Campbooks Next are documented here. The format follows
   rules read as paused, exactly as when the author can no longer change the inbox: they
   leave new mail alone, a run over existing mail stops at its next batch, and previews
   and suggestions no longer count them. Unsuspending makes them act again, with nothing
-  to redo (a run they stopped is not restarted). The identity module now also publishes
-  `identity.account_unsuspended`, both suspension events carry an ordered `at`, and the
-  workspaces module announces each in every workspace of the account
-  (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
+  to redo (a run they stopped is not restarted). Other members see only that the rule
+  is paused for now and acts again on its own, never that its author is suspended. A
+  member removed while suspended gets their rules back when invited again. The identity
+  module now also publishes `identity.account_unsuspended`, both suspension events carry
+  an ordered `at`, and the workspaces module announces each in every workspace of the
+  account (`workspaces.member_suspended` / `workspaces.member_unsuspended`). Migration
   `20261020210000_conversations__member_suspensions`. An account suspended before this
   version keeps its rules acting until an administrator unsuspends and suspends it again
   (campbooks-cloud#147).
@@ -198,6 +200,11 @@ All notable changes to Campbooks Next are documented here. The format follows
   possible, but nothing is provisioned for it.
 
 ### Changed
+- **The rules list says why a rule is paused**, first on its line: its author can no
+  longer change the inbox, its author is away for now (it acts again on its own; the
+  cause is never shown), a member paused it, or the inbox is kept read-only
+  (`RuleView.paused_reason`). A rule a member paused no longer claims its author lost
+  access.
 - One "Search or ask" field and menu, with conversations inline. The sidebar's
   separate "Search conversations" entry is gone: ⌘K and `/` (on screens 48rem and
   wider) open the same menu, which lists matching conversations first (matched words
@@ -924,10 +931,6 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Changed
 
-- **The rules list says why a rule is paused**, first on its line: its author can no
-  longer change the inbox, its author is suspended, a member paused it, or the inbox is
-  kept read-only (`RuleView.paused_reason`). A rule a member paused no longer claims its
-  author lost access.
 - Access tokens of the built-in issuer name `<CAMPBOOKS_PUBLIC_URL>/api` as their
   audience (RFC 8707), which the API now expects; `CAMPBOOKS_AUTH__AUDIENCE` only
   applies to an outside identity provider. Nothing to do: tokens last ten minutes, and

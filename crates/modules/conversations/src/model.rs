@@ -520,8 +520,8 @@ vocabulary!(
         Proposed => "proposed",
         /// Acts on existing and new mail.
         Active => "active",
-        /// Stopped: its author may no longer change the inbox or is
-        /// suspended, its inbox is kept read-only, or a member paused it.
+        /// Stopped: its author may no longer change the inbox or is away for
+        /// now, its inbox is kept read-only, or a member paused it.
         Paused => "paused",
         /// Gone.
         Removed => "removed",
@@ -539,9 +539,10 @@ vocabulary!(
         AuthorCannotWrite => "author_cannot_write",
         /// A member paused it.
         PausedByMember => "paused_by_member",
-        /// Its author's account is suspended; it acts again once the
-        /// suspension is lifted.
-        AuthorSuspended => "author_suspended",
+        /// Its author is away for now; it acts again on its own once they
+        /// are back. Deliberately says no more: why someone is away is not
+        /// other members' business.
+        AuthorUnavailable => "author_unavailable",
     }
 );
 

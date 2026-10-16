@@ -13857,7 +13857,7 @@
           "inbox_read_only",
           "author_cannot_write",
           "paused_by_member",
-          "author_suspended"
+          "author_unavailable"
         ]
       },
       "Phase": {
@@ -15584,7 +15584,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/RuleState",
-            "description": "Whether it acts. `paused` when its author can no longer change the\ninbox or is suspended, its inbox is kept read-only, or a member\npaused it."
+            "description": "Whether it acts. `paused` when its author can no longer change the\ninbox or is away for now, its inbox is kept read-only, or a member\npaused it."
           },
           "taught_by": {
             "oneOf": [

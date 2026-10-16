@@ -31,9 +31,10 @@ Tracking issue: https://github.com/notacamp/campbooks-cloud/issues/147
   stop counting it, and a running apply run is cancelled at its next batch.
   Lifting the suspension makes the rule active again with nothing to redo.
 - `RuleView` gains `paused_reason` (`inbox_read_only`, `author_cannot_write`,
-  `paused_by_member`, `author_suspended`), and the rules list says why a
-  rule is paused, "Paused while whoever taught it is suspended" among them,
-  in en / pt-PT / es-ES / fr.
+  `paused_by_member`, `author_unavailable`), and the rules list says why a
+  rule is paused, in en / pt-PT / es-ES / fr. A suspension is never
+  disclosed: a suspended author's rule reads "Paused for now; it acts again
+  on its own".
 
 ## Impact
 

@@ -18,8 +18,9 @@ import { api, caption, signedIn } from "./inbox.ts";
 // Sam signs up and connects the demo mailbox, and teaches a rule. The seed
 // command then makes Leo Marques, a fictional colleague with an account, a
 // sender of Sam's inbox and the rule's author. Sam, granted `super` from the
-// CLI, suspends Leo in Admin → People: Leo's rule reads as paused, and why.
-// Lifting the suspension makes it act again. Fictional people and mail only.
+// CLI, suspends Leo in Admin → People: Leo's rule reads as paused for now,
+// without saying why (members never learn of a suspension). Lifting the
+// suspension makes it act again. Fictional people and mail only.
 
 const DIGEST = "digest@design-notes.example";
 
@@ -59,7 +60,7 @@ async function rules(page: Page, workspace: string): Promise<void> {
 async function rulesOnce(page: Page, workspace: string, paused: boolean): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
     await rules(page, workspace);
-    const shown = (await page.getByText(/Paused while/u).count()) > 0;
+    const shown = (await page.getByText(/Paused for now/u).count()) > 0;
     if (shown === paused) {
       return;
     }
@@ -108,7 +109,7 @@ export default async function suspendedRules({ page }: ScenarioContext): Promise
   await caption(page, "Leo is suspended and signed out everywhere", 1600);
 
   await rulesOnce(page, workspace, true);
-  await caption(page, "Leo's rule is paused, and says why: it acts in Leo's name", 2600);
+  await caption(page, "Leo's rule pauses: it acts in Leo's name. Members see no cause", 2600);
 
   await leo(page);
   await page.getByRole("button", { name: "Unsuspend" }).click();

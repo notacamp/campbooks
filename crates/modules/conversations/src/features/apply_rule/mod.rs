@@ -108,7 +108,8 @@ impl JobHandler for ApplyRules {
         let state = if kind == RunKind::Revert {
             RuleState::Removed
         } else {
-            rule.state
+            // As readers see it: paused while its author may not act.
+            rule.effective_state()
         };
         rule_runs::announce(tx, &events, &ws, rule.inbox, rule.id, state, view.as_ref()).await?;
         Ok(())

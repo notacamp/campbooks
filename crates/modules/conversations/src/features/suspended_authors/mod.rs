@@ -9,9 +9,13 @@
 //! suggestions, the list), and lifting the suspension resumes it.
 //!
 //! Of two changes for one member, the one with the newer `at` wins, whatever
-//! order they arrive in; a duplicate changes nothing. When the record
-//! changes, the member's rules are announced (`rule_changed`) so lists
-//! refresh.
+//! order they arrive in; a duplicate changes nothing. Whenever a change is
+//! recorded, the member's rules are announced (`rule_changed`) so lists
+//! refresh: also when it turns out not to change whether they act, so a
+//! suspension and its lift handled at once never leave a list stale.
+//!
+//! Readers of a rule never learn why its author is away: it reads as paused
+//! with `author_unavailable`, the same for any reason a member is held off.
 
 #[cfg(test)]
 mod tests;
@@ -62,8 +66,8 @@ impl EventHandler for ResumeUnsuspendedAuthor {
 }
 
 /// Record that `user` is (or is no longer) suspended as of `at`, unless a
-/// newer change is recorded already; announce their rules when that
-/// changed whether they are suspended.
+/// newer change is recorded already; announce their rules when it was
+/// recorded.
 async fn record(
     ctx: &mut JobContext,
     workspace: &str,
@@ -76,33 +80,24 @@ async fn record(
         .map_err(|_| JobError::fatal("a member's suspension names an invalid workspace"))?;
     let events = ctx.state().events.clone();
     let tx = ctx.tx().await?;
-    let row = sqlx::query!(
+    let row = sqlx::query_scalar!(
         r#"
-        WITH before AS (
-            SELECT suspended FROM conversations.member_suspensions
-             WHERE workspace_id = $1 AND user_id = $2
-        ), recorded AS (
-            INSERT INTO conversations.member_suspensions (workspace_id, user_id, suspended, as_of)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (workspace_id, user_id) DO UPDATE
-               SET suspended = EXCLUDED.suspended, as_of = EXCLUDED.as_of
-             WHERE member_suspensions.as_of < EXCLUDED.as_of
-            RETURNING suspended
-        )
-        SELECT (SELECT suspended FROM before) AS was,
-               (SELECT suspended FROM recorded) AS now
+        INSERT INTO conversations.member_suspensions (workspace_id, user_id, suspended, as_of)
+        VALUES ($1, $2, $3, $4)
+        ON CONFLICT (workspace_id, user_id) DO UPDATE
+           SET suspended = EXCLUDED.suspended, as_of = EXCLUDED.as_of
+         WHERE member_suspensions.as_of < EXCLUDED.as_of
+        RETURNING suspended
         "#,
         workspace_id,
         user.as_uuid(),
         suspended,
         at,
     )
-    .fetch_one(&mut **tx)
+    .fetch_optional(&mut **tx)
     .await?;
-    // Older than what is recorded, a duplicate, or no change at all (a lift
-    // for a member never suspended here).
-    let Some(now) = row.now else { return Ok(()) };
-    if row.was.unwrap_or(false) == now {
+    // Older than what is recorded, or a duplicate.
+    if row.is_none() {
         return Ok(());
     }
     let ids = sqlx::query_scalar!(

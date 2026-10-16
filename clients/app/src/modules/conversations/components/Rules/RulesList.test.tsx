@@ -188,7 +188,7 @@ describe("the rules list", () => {
     const suspended = {
       ...LEDGER_RULE,
       state: "paused" as const,
-      paused_reason: "author_suspended" as const,
+      paused_reason: "author_unavailable" as const,
     };
     const byMember = {
       ...PROPOSED,
@@ -204,9 +204,7 @@ describe("the rules list", () => {
     renderWithProviders(<RulesList workspaceId={DUARTE.id} />);
     const mine = await screen.findByRole("list", { name: INBOX.address });
     // First on its line, which is cut short on a narrow row.
-    expect(
-      within(mine).getByText(/^Paused while whoever taught it is suspended · /u),
-    ).toBeVisible();
+    expect(within(mine).getByText(/^Paused for now; it acts again on its own · /u)).toBeVisible();
     expect(within(mine).getByText(/Paused by a member/u)).toBeVisible();
     expect(within(mine).queryByText(/can no longer change this inbox/u)).toBeNull();
   });

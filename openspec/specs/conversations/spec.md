@@ -887,7 +887,7 @@ nothing to redo; a run it cancelled is not restarted.
 
 #### Scenario: The author is suspended, then the suspension is lifted
 - **WHEN** an administrator suspends Leo, who taught a rule in info@, and later lifts the suspension
-- **THEN** while suspended the rule reads as paused with `paused_reason` `author_suspended` and leaves new mail alone, and once lifted it is active and acts on new mail again
+- **THEN** while suspended the rule reads as paused with `paused_reason` `author_unavailable` and leaves new mail alone, and once lifted it is active and acts on new mail again
 
 #### Scenario: A run going when the author is suspended
 - **WHEN** Leo's rule is being applied to existing mail and Leo is suspended before its next batch
@@ -1330,11 +1330,15 @@ from `workspaces.member_suspended` and `workspaces.member_unsuspended`
 (`conversations.pause_suspended_author`,
 `conversations.resume_unsuspended_author`), keeping for each member the
 change with the newest `at`: a duplicate, or a change older than the one
-recorded, SHALL change nothing. When the record changes, the module SHALL
-publish `conversations.rule_changed` for each of the member's rules that is
-not removed. `RuleView` SHALL carry `paused_reason` when its state is
-`paused`: `inbox_read_only`, else `author_cannot_write`, else
-`paused_by_member`, else `author_suspended`.
+recorded, SHALL change nothing. Whenever it records a change, the module
+SHALL publish `conversations.rule_changed` for each of the member's rules
+that is not removed. A member leaving the workspace SHALL be recorded as not
+suspended as of their departure (they come back only by signing in).
+`RuleView` SHALL carry `paused_reason` when its state is `paused`:
+`inbox_read_only`, else `author_cannot_write`, else `paused_by_member`, else
+`author_unavailable`. A suspension is an administrator's action and SHALL
+not be disclosed to other members, clients or the assistant: no rule
+reason, event or text readable in the workspace names it.
 
 #### Scenario: Delivered out of order
 - **WHEN** the lift (newer `at`) is delivered before the suspension it lifts
@@ -1343,3 +1347,7 @@ not removed. `RuleView` SHALL carry `paused_reason` when its state is
 #### Scenario: Delivered twice
 - **WHEN** the same suspension is delivered twice
 - **THEN** the member is suspended once and `rule_changed` is published once per rule
+
+#### Scenario: Removed while suspended, invited back after
+- **WHEN** a suspended member is removed from the workspace, the suspension is lifted (which no longer reaches that workspace), and they are invited back to the inbox
+- **THEN** their rules act again

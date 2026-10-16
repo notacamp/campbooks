@@ -16,6 +16,7 @@
 - [x] 3.2 Handlers: newest `at` wins, duplicates and late deliveries change nothing, `rule_changed` announced
 - [x] 3.3 `author_suspended` in the rule queries and `effective_state`; `RuleView.paused_reason`
 - [x] 3.4 Tests: paused and resumed through the events, out of order, apply run cancelled at its next batch, new mail untouched
+- [x] 3.5 A departing member is recorded as not suspended; `rule_changed` carries the effective state everywhere; tests
 
 ## 4. Client
 

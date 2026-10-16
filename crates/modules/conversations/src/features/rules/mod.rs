@@ -94,7 +94,7 @@ pub struct RuleView {
     /// The member's own words, for an instruction.
     pub origin_text: Option<String>,
     /// Whether it acts. `paused` when its author can no longer change the
-    /// inbox or is suspended, its inbox is kept read-only, or a member
+    /// inbox or is away for now, its inbox is kept read-only, or a member
     /// paused it.
     pub state: RuleState,
     /// Why it is paused; absent unless `state` is `paused`.
@@ -694,7 +694,16 @@ pub async fn create_in(
     if rule_state == RuleState::Active && body.apply_to_existing {
         rule_runs::start(tx, &state.events, &ws, &rule, RunKind::Apply).await?;
     } else {
-        rule_runs::announce(tx, &state.events, &ws, inbox, id, rule_state, None).await?;
+        rule_runs::announce(
+            tx,
+            &state.events,
+            &ws,
+            inbox,
+            id,
+            rule.effective_state(),
+            None,
+        )
+        .await?;
     }
     Ok(CreatedRule {
         rule: view(tx, access, &rule).await?,
@@ -857,7 +866,7 @@ pub async fn confirm(
             &ws,
             rule.inbox,
             rule.id,
-            rule.state,
+            rule.effective_state(),
             None,
         )
         .await?;

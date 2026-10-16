@@ -37,8 +37,13 @@ Suspension travels by events, and every module only touches what it owns:
    (`conversations.pause_suspended_author`,
    `conversations.resume_unsuspended_author`): it upserts
    `conversations.member_suspensions (workspace_id, user_id, suspended, as_of)`
-   and, when that changed something, announces `rule_changed` for each of
-   the member's rules so lists refresh. The rule queries add
+   and, whenever it records a change, announces `rule_changed` for each of
+   the member's rules so lists refresh (also when the change turns out not
+   to matter, so a suspension and its lift handled at once never leave a
+   list stale). A member leaving the workspace is recorded as not suspended
+   as of their departure: otherwise a member removed while suspended, whose
+   lift then no longer reaches the workspace, would find their rules paused
+   for good once invited back. The rule queries add
    `author_suspended` next to `author_may_act`, and `effective_state` pauses
    on it.
 
@@ -96,8 +101,11 @@ manager adopts one.
 
 `RuleView.paused_reason` names the one reason that would still hold once
 the most passing one clears: `inbox_read_only`, then `author_cannot_write`,
-then `paused_by_member`, then `author_suspended`. The client words each in
-the four languages. Until now a rule a member paused read as "whoever
+then `paused_by_member`, then `author_unavailable`. The client words each in
+the four languages. A suspension is an administrator's action, possibly in
+the middle of an investigation, and the rule names its author: so the
+reason never says "suspended" ("Paused for now; it acts again on its own"),
+not to readers of the inbox, workspace clients or the assistant. Until now a rule a member paused read as "whoever
 taught it can no longer change this inbox", which was wrong.
 
 ### Accounts suspended before this ships

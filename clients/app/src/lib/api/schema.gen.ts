@@ -3099,7 +3099,7 @@ export interface components {
          *     most passing one clears.
          * @enum {string}
          */
-        PausedReason: "inbox_read_only" | "author_cannot_write" | "paused_by_member" | "author_suspended";
+        PausedReason: "inbox_read_only" | "author_cannot_write" | "paused_by_member" | "author_unavailable";
         /**
          * @description Where a stream is in its reading.
          * @enum {string}
@@ -3786,7 +3786,7 @@ export interface components {
             shared: boolean;
             /**
              * @description Whether it acts. `paused` when its author can no longer change the
-             *     inbox or is suspended, its inbox is kept read-only, or a member
+             *     inbox or is away for now, its inbox is kept read-only, or a member
              *     paused it.
              */
             state: components["schemas"]["RuleState"];

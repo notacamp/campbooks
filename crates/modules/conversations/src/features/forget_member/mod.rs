@@ -51,6 +51,23 @@ impl EventHandler for ForgetMember {
         )
         .execute(&mut **tx)
         .await?;
+        // Whatever held their rules off ends with their membership: they
+        // can only come back by signing in, so they are not suspended then.
+        // Recorded as of their departure, so a suspension that took effect
+        // before it and is delivered late changes nothing.
+        let workspace_id = workspace.as_uuid();
+        sqlx::query!(
+            r#"INSERT INTO conversations.member_suspensions (workspace_id, user_id, suspended, as_of)
+               VALUES ($1, $2, false, $3)
+               ON CONFLICT (workspace_id, user_id) DO UPDATE
+                  SET suspended = false, as_of = EXCLUDED.as_of
+                WHERE member_suspensions.as_of < EXCLUDED.as_of"#,
+            workspace_id,
+            left.user.as_uuid(),
+            before,
+        )
+        .execute(&mut **tx)
+        .await?;
         let mut inboxes = sqlx::query_scalar!(
             r#"DELETE FROM conversations.inbox_members WHERE user_id = $1 AND created_at <= $2
                RETURNING inbox_id AS "inbox: InboxId""#,

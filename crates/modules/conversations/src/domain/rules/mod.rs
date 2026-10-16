@@ -371,7 +371,7 @@ impl Stored {
         } else if self.state == RuleState::Paused {
             PausedReason::PausedByMember
         } else {
-            PausedReason::AuthorSuspended
+            PausedReason::AuthorUnavailable
         })
     }
 
