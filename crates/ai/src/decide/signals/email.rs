@@ -539,8 +539,10 @@ static SECURITY_ALERT: LazyLock<Regex> = LazyLock::new(|| {
 
 /// Code hosts and package registries whose authenticated security alerts
 /// are a sure to-do (the alert is about the recipient's code, and the next
-/// step is in the mail), each with the display-name words it signs with.
-/// Kept short on purpose; an authenticated sender not listed here is
+/// step is in the mail), each with the display names it signs with: the
+/// whole display name, letters and digits only, lower-case. A name that
+/// merely holds one as a word is not enough ("GitHub Smith" is a person
+/// whose notification GitHub sends under their name). Kept short on purpose; an authenticated sender not listed here is
 /// answered below the confidence answers act from, so at most a question,
 /// never a to-do.
 const SECURITY_PLATFORMS: [(&str, &[&str]); 8] = [
@@ -549,7 +551,7 @@ const SECURITY_PLATFORMS: [(&str, &[&str]); 8] = [
     ("bitbucket.org", &["bitbucket"]),
     ("npmjs.com", &["npm", "npmjs"]),
     ("pypi.org", &["pypi"]),
-    ("rubygems.org", &["rubygems"]),
+    ("rubygems.org", &["rubygems", "rubygemsorg"]),
     ("crates.io", &["crates", "cratesio"]),
     ("snyk.io", &["snyk"]),
 ];
@@ -1053,41 +1055,42 @@ static WITHIN_HOURS: LazyLock<Regex> = LazyLock::new(|| {
 
 static LINK_HOST: LazyLock<Regex> = LazyLock::new(|| regex(r#"(?i)https?://([^/\s"'<>)]+)"#));
 
-/// Two-label public suffixes under which anyone registers a domain
-/// (`co.uk`): the registrable-domain guess keeps a label more under them, and
-/// a taught `sender_domain` may not name one alone.
-pub const PUBLIC_SUFFIXES: [&str; 24] = [
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "com.br", "net.br", "org.br", "com.pt", "org.pt",
-    "gov.pt", "com.es", "org.es", "gob.es", "com.fr", "gouv.fr", "co.jp", "com.au", "net.au",
-    "co.nz", "co.za", "com.mx", "com.ar", "co.in", "com.cn",
-];
-
 /// Documentation domains (RFC 2606) the registrable-domain guess treats as
 /// suffixes, so fixtures can stand for many organisations.
 const EXAMPLE_SUFFIXES: [&str; 3] = ["example.com", "example.org", "example.net"];
 
-/// Whether `domain` is one of the [`PUBLIC_SUFFIXES`].
+/// Whether `domain` is itself a public suffix of the Public Suffix List
+/// (`com`, `co.uk`, and the private ones such as `github.io`), under which
+/// anyone registers a domain: a taught `sender_domain` may not name one
+/// alone. The ICANN and the private sections both count (see the
+/// `harden-security-alert-auth` design). A name under a TLD the list does
+/// not know is read as having that TLD as its suffix, as the list's default
+/// rule says.
 pub fn is_public_suffix(domain: &str) -> bool {
     let domain = domain.trim().trim_matches('.').to_ascii_lowercase();
-    PUBLIC_SUFFIXES.contains(&domain.as_str())
+    !domain.is_empty() && psl::domain_str(&domain).is_none()
 }
 
-/// A best-effort registrable domain (`conta.bancoatlantico.example` →
-/// `bancoatlantico.example`).
+/// The registrable domain of `host` by the Public Suffix List (ICANN and
+/// private sections): `conta.bancoatlantico.example` →
+/// `bancoatlantico.example`, `a.b.co.uk` → `b.co.uk`, `x.github.io` →
+/// `x.github.io`. A host the list cannot split (a bare suffix, an unknown
+/// TLD alone, an empty label) is returned as it is, never shortened to a
+/// name another organisation could share.
 fn registrable(host: &str) -> String {
     let host = host.trim_end_matches('.').to_lowercase();
     let host = host.split(':').next().unwrap_or_default();
-    let labels: Vec<&str> = host.split('.').collect();
-    let keep = if PUBLIC_SUFFIXES
+    if host.split('.').any(str::is_empty) {
+        return host.to_owned();
+    }
+    if EXAMPLE_SUFFIXES
         .iter()
-        .chain(&EXAMPLE_SUFFIXES)
         .any(|s| host == *s || host.ends_with(&format!(".{s}")))
     {
-        3
-    } else {
-        2
-    };
-    labels[labels.len().saturating_sub(keep)..].join(".")
+        let labels: Vec<&str> = host.split('.').collect();
+        return labels[labels.len().saturating_sub(3)..].join(".");
+    }
+    psl::domain_str(host).unwrap_or(host).to_owned()
 }
 
 fn domain(address: &str) -> &str {
@@ -1251,6 +1254,20 @@ fn named(from: &Party, accepted: &[&str]) -> bool {
         .any(|token| name == *token || from.name.split_whitespace().any(|w| squash(w) == *token))
 }
 
+/// Whether the sender's display name IS one of `accepted` (letters and
+/// digits only, lower-case), not merely holds it as a word: on a code host a
+/// notification can carry the acting user's name, and a user may be named
+/// "GitHub Smith".
+fn named_exactly(from: &Party, accepted: &[&str]) -> bool {
+    let name: String = from
+        .name
+        .chars()
+        .filter(char::is_ascii_alphanumeric)
+        .map(|c| c.to_ascii_lowercase())
+        .collect();
+    accepted.contains(&name.as_str())
+}
+
 /// Whether the sender's display name names its own domain: "GitHub" at
 /// `github.com`, not "GitHub" at `github-alerts.example`. Names and domain
 /// labels compare letters and digits only; the domain must be plain ASCII.
@@ -1275,7 +1292,10 @@ fn names_own_domain(from: &Party) -> bool {
 /// 8601 says ([`auth_results`]), holds exactly one `dmarc` result, `pass`,
 /// whose `header.from` is the From domain; or a `dkim=pass` whose signing
 /// domain (`header.d`, `header.i`) has the From domain's registrable
-/// domain. Absent, malformed or failing results authenticate nothing.
+/// domain, provided no `dmarc` result in the header says anything but
+/// `pass` (an aligned signature that DMARC then refused, by policy or
+/// otherwise, is not the sender's). Absent, malformed or failing results
+/// authenticate nothing.
 fn authenticated(env: &Envelope) -> bool {
     let Some(results) = env
         .header("authentication-results")
@@ -1285,7 +1305,7 @@ fn authenticated(env: &Envelope) -> bool {
     };
     let host = domain(&env.from.address).to_ascii_lowercase();
     let from = registrable(&host);
-    if !plain_domain(&host) || from.is_empty() {
+    if !plain_domain(&host) || from.is_empty() || is_public_suffix(&host) {
         return false;
     }
     let dmarc: Vec<_> = results.iter().filter(|r| r.method == "dmarc").collect();
@@ -1301,13 +1321,15 @@ fn authenticated(env: &Envelope) -> bool {
         let signer = signer.rsplit('@').next().unwrap_or_default();
         plain_domain(signer) && registrable(signer) == from
     };
-    let dkim_pass = results.iter().any(|r| {
-        let signers: Vec<_> = r.values("header.d").chain(r.values("header.i")).collect();
-        r.method == "dkim"
-            && r.result == "pass"
-            && !signers.is_empty()
-            && signers.into_iter().all(aligned)
-    });
+    let dmarc_refused = dmarc.iter().any(|r| r.result != "pass");
+    let dkim_pass = !dmarc_refused
+        && results.iter().any(|r| {
+            let signers: Vec<_> = r.values("header.d").chain(r.values("header.i")).collect();
+            r.method == "dkim"
+                && r.result == "pass"
+                && !signers.is_empty()
+                && signers.into_iter().all(aligned)
+        });
     dmarc_pass || dkim_pass
 }
 
@@ -1341,7 +1363,7 @@ fn security_alert(
         .find(|(domain, _)| *domain == host)
         .map(|(_, names)| *names);
     let names_itself = match platform {
-        Some(names) => named(&env.from, names),
+        Some(names) => named_exactly(&env.from, names),
         None => names_own_domain(&env.from),
     };
     if !names_itself {
@@ -2214,6 +2236,124 @@ mod tests {
             let asks = alert_answer(&env).unwrap_or_else(|| panic!("{name} <{from}>"));
             assert!(asks.answer.confidence.unwrap() >= 0.9, "{name} <{from}>");
         }
+    }
+
+    #[test]
+    fn a_signature_dmarc_refused_authenticates_nothing() {
+        let case = |results: &str| {
+            let env = alert("GitHub", "noreply@github.com", SUBJECT, Some(results));
+            alert_answer(&env).is_some()
+        };
+        let dkim = "dkim=pass header.d=github.com header.s=s1";
+        // DKIM passes, DMARC (by policy, or for any other result) does not.
+        for dmarc in [
+            "dmarc=fail (p=REJECT) header.from=github.com",
+            "dmarc=none header.from=github.com",
+            "dmarc=quarantine header.from=github.com",
+            "dmarc=temperror header.from=github.com",
+            "dmarc=permerror header.from=github.com",
+            "dmarc=policy header.from=github.com",
+        ] {
+            assert!(!case(&format!("mx.google.com; {dkim}; {dmarc}")), "{dmarc}");
+        }
+        // No DMARC result at all (Zoho says none): the signature is enough.
+        assert!(case(&format!("mx.zohomail.com; {dkim}; spf=pass")));
+        assert!(case(&format!(
+            "mx.google.com; {dkim}; dmarc=pass header.from=github.com"
+        )));
+        // Two DMARC results, one of them not a pass.
+        assert!(!case(&format!(
+            "mx.google.com; {dkim}; dmarc=pass header.from=github.com; \
+             dmarc=fail header.from=github.com"
+        )));
+    }
+
+    #[test]
+    fn a_bare_public_suffix_authenticates_nothing() {
+        for host in ["co.uk", "github.io"] {
+            let env = alert(
+                "GitHub",
+                &format!("noreply@{host}"),
+                SUBJECT,
+                Some(&passed(host)),
+            );
+            assert!(alert_answer(&env).is_none(), "{host}");
+        }
+    }
+
+    #[test]
+    fn a_users_name_that_holds_the_platform_s_is_no_platform_alert() {
+        // GitHub sends an @mention under the acting user's name.
+        for name in ["GitHub Smith", "GitHub Security Team", "Not GitHub"] {
+            let env = alert(
+                name,
+                "notifications@github.com",
+                SUBJECT,
+                Some(&passed("github.com")),
+            );
+            assert!(alert_answer(&env).is_none(), "{name}");
+        }
+        // The platform's own name, however it is cased or punctuated.
+        for name in ["GitHub", "github", "Git-Hub"] {
+            let env = alert(
+                name,
+                "notifications@github.com",
+                SUBJECT,
+                Some(&passed("github.com")),
+            );
+            assert!(alert_answer(&env).is_some(), "{name}");
+        }
+    }
+
+    #[test]
+    fn registrable_domains_follow_the_public_suffix_list() {
+        assert_eq!(registrable("mail.github.com"), "github.com");
+        assert_eq!(registrable("a.b.co.uk"), "b.co.uk");
+        assert_eq!(registrable("x.com.br"), "x.com.br");
+        assert_eq!(registrable("a.github.io"), "a.github.io");
+        assert_eq!(registrable("a.b.blogspot.com"), "b.blogspot.com");
+        // Suffixes the old hand-written list lacked.
+        assert_eq!(registrable("shop.example.org.uk"), "example.org.uk");
+        assert_eq!(registrable("mail.firma.co.at"), "firma.co.at");
+        // Nothing to cut, or a TLD the list does not know.
+        assert_eq!(registrable("co.uk"), "co.uk");
+        assert_eq!(registrable("localhost"), "localhost");
+        assert_eq!(registrable("a.b.corp.internal"), "corp.internal");
+        assert_eq!(registrable("example.com"), "example.com");
+        assert_eq!(registrable("a..com"), "a..com");
+        assert!(is_public_suffix("co.uk"));
+        assert!(is_public_suffix("github.io"));
+        assert!(is_public_suffix("com"));
+        assert!(!is_public_suffix("github.com"));
+        assert!(!is_public_suffix("x.co.uk"));
+    }
+
+    #[test]
+    fn mail_signed_under_a_shared_suffix_is_not_aligned() {
+        // x.com.br signs for y.com.br; a.github.io for b.github.io.
+        for (from, signer) in [
+            ("noreply@y.com.br", "x.com.br"),
+            ("noreply@b.github.io", "a.github.io"),
+        ] {
+            let host = from.rsplit('@').next().unwrap();
+            let results = format!(
+                "mx.google.com; dkim=pass header.d={signer}; \
+                 dmarc=none header.from={host}"
+            );
+            let env = alert("Y", from, SUBJECT, Some(&results));
+            assert!(!authenticated(&env), "{from} signed by {signer}");
+            let results = format!("mx.zohomail.com; dkim=pass header.d={signer}");
+            let env = alert("Y", from, SUBJECT, Some(&results));
+            assert!(!authenticated(&env), "{from} signed by {signer}");
+        }
+        // The same organisation's subdomain still aligns.
+        let env = alert(
+            "Y",
+            "noreply@mail.y.com.br",
+            SUBJECT,
+            Some("mx.zohomail.com; dkim=pass header.d=y.com.br"),
+        );
+        assert!(authenticated(&env));
     }
 
     #[test]
