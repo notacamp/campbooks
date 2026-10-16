@@ -42,7 +42,7 @@ pub(crate) const ORIGIN: &str = "http://localhost:8080";
 const GMAIL: &str = "https://www.googleapis.com/auth/gmail.modify";
 
 /// One narrated step of the walk-through (shown with `--nocapture`).
-fn step(text: &str) {
+pub(crate) fn step(text: &str) {
     println!("  \u{2192} {text}");
 }
 

@@ -12,7 +12,9 @@ use serde_json::{Value, json};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::identity_tests::{Browser, ORIGIN, Reply, create_workspace, sign_up_through_bff, world};
+use crate::identity_tests::{
+    Browser, ORIGIN, Reply, create_workspace, sign_up_through_bff, step, world,
+};
 
 /// An access token of the web client for `account`, with `scope`, for a
 /// sign-in made at `auth_time`, minted now.
@@ -144,6 +146,7 @@ async fn sign_in_again(browser: &mut Browser, google: &campbooks_kernel::testing
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
+    println!("\nAna's access token stops the moment an administrator suspends her:");
     let (mut browser, google, issuer) = world(db.clone()).await;
     sign_up_through_bff(&mut browser, &google).await;
     create_workspace(&mut browser, "Home").await;
@@ -179,6 +182,7 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
     )
     .await;
     assert_eq!(listed.status, StatusCode::OK, "{}", listed.body);
+    step("Ana signed up; her access token (10 min) -> GET /api/v1/workspaces: 200");
     let created = call(
         &browser,
         Method::POST,
@@ -189,10 +193,12 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
     )
     .await;
     assert_eq!(created.status, StatusCode::CREATED, "{}", created.body);
+    step("POST /api/v1/workspaces, Idempotency-Key create-shop: 201");
     assert_eq!(
         browser.get("/bff/api/v1/workspaces").await.status,
         StatusCode::OK
     );
+    step("the web app (BFF session): 200");
 
     // An administrator suspends Ana through the admin API.
     let suspended = call(
@@ -205,6 +211,10 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
     )
     .await;
     assert_eq!(suspended.status, StatusCode::OK, "{}", suspended.body);
+    step(&format!(
+        "admin POST /admin/v1/identity/accounts/{{ana}}/suspend: {}",
+        suspended.status.as_u16()
+    ));
 
     // At once (no job has run): every door refuses the token, as forged.
     assert_invalid(
@@ -219,6 +229,7 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
         .await,
         &forged,
     );
+    step("same token, at once -> GET /api/v1/workspaces: 401 invalid_token (as a forged token)");
     // The idempotency layer replays nothing for it, not even its own key.
     let body = json!({ "name": "Shop", "kind": "business" });
     assert_invalid(
@@ -255,6 +266,7 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
         through_bff.body
     );
     assert_eq!(through_bff.json()["code"], "invalid_token");
+    step("replaying Idempotency-Key create-shop: 401; the web app's stored token: 401");
 
     // Unsuspended: the old token stays refused; a new sign-in works.
     let lifted = call(
@@ -267,6 +279,10 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
     )
     .await;
     assert_eq!(lifted.status, StatusCode::OK, "{}", lifted.body);
+    step(&format!(
+        "admin POST /admin/v1/identity/accounts/{{ana}}/unsuspend: {}",
+        lifted.status.as_u16()
+    ));
     assert_invalid(
         &call(
             &browser,
@@ -279,13 +295,16 @@ async fn a_suspension_stops_issued_tokens_on_every_door(db: PgPool) {
         .await,
         &forged,
     );
+    step("the old token after unsuspending: still 401 (nothing comes back)");
     sign_in_again(&mut browser, &google).await;
     let after = browser.get("/bff/api/v1/workspaces").await;
     assert_eq!(after.status, StatusCode::OK, "{}", after.body);
+    step("Ana signs in again: her new token -> 200");
 }
 
 #[sqlx::test(migrations = "../../migrations")]
 async fn the_admin_api_refuses_a_revoked_administrators_token(db: PgPool) {
+    println!("\nAda, an administrator, signs out everywhere:");
     let (browser, _google, issuer) = world(db.clone()).await;
     let ada = administrator(&db).await;
     let scope = "admin:access identity:write";
@@ -295,6 +314,7 @@ async fn the_admin_api_refuses_a_revoked_administrators_token(db: PgPool) {
     assert_eq!(forged.status, StatusCode::NOT_FOUND);
     let before = call(&browser, Method::GET, overview, &token, None, None).await;
     assert_eq!(before.status, StatusCode::OK, "{}", before.body);
+    step("Ada's token -> GET /admin/v1/system/overview: 200");
 
     // Ada signs out everywhere: her token gets what a forged one gets (the
     // admin API answers 404 to every token it cannot accept).
@@ -311,10 +331,14 @@ async fn the_admin_api_refuses_a_revoked_administrators_token(db: PgPool) {
     let refused = call(&browser, Method::GET, overview, &token, None, None).await;
     assert_eq!(refused.status, StatusCode::NOT_FOUND);
     assert_eq!(refused.json(), forged.json());
+    step(
+        "POST /api/v1/identity/sign-out-everywhere: 204; the same token -> admin API: 404 (as forged)",
+    );
     // A sign-in after it: works.
     let fresh = mint(&db, &issuer, ada, scope, Utc::now()).await;
     let again = call(&browser, Method::GET, overview, &fresh, None, None).await;
     assert_eq!(again.status, StatusCode::OK, "{}", again.body);
+    step("a token from a sign-in right after, same second or not: 200");
 
     // Suspended (by an operator, below the admin API's own refusal to
     // suspend an administrator): refused the same way.
