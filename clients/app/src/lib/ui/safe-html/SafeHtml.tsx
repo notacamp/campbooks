@@ -87,13 +87,13 @@ export function estimateHeight(html: string): number {
 export const MIN_ZOOM = 0.5;
 
 /** The tallest a measured frame grows, in px. */
-export const MAX_MEASURED_HEIGHT = 30_000;
+const MAX_MEASURED_HEIGHT = 30_000;
 
 /**
  * How many times a frame is resized for one document: enough for late images
  * and window resizes, and an end to any layout that answers its own resize.
  */
-export const MAX_RESIZES = 60;
+const MAX_RESIZES = 60;
 
 /**
  * The scale that fits a message `contentWidth` wide into a frame

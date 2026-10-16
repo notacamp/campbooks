@@ -212,6 +212,8 @@ impl TokenSink for Scanner {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
 
     #[test]
@@ -317,7 +319,10 @@ mod tests {
 
     #[test]
     fn work_past_the_cap_is_not_inlined() {
-        let properties: String = (0..200).map(|i| format!("a{i}: x;")).collect();
+        let properties = (0..200).fold(String::new(), |mut all, i| {
+            let _ = write!(all, "a{i}: x;");
+            all
+        });
         let html = format!(
             "<style>* {{ {properties} }}</style>{}",
             "<b></b>".repeat(6_000)

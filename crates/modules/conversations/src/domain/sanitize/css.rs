@@ -228,6 +228,7 @@ fn inert_value(input: &mut Parser<'_>, depth: usize) -> bool {
             | Token::BadUrl(_)
             | Token::BadString(_)
             | Token::AtKeyword(_)
+            | Token::CurlyBracketBlock
             | Token::CDO
             | Token::CDC => return false,
             Token::Delim(c) if *c == '\\' || *c == '<' => return false,
@@ -239,7 +240,6 @@ fn inert_value(input: &mut Parser<'_>, depth: usize) -> bool {
                 }
                 true
             }
-            Token::CurlyBracketBlock => return false,
             Token::ParenthesisBlock | Token::SquareBracketBlock => true,
             _ => false,
         };
@@ -520,6 +520,8 @@ impl RuleBodyItemParser<'_, String, ()> for StyleRules {
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
+
     use super::*;
 
     fn kept(style: &str) -> Option<String> {
@@ -612,7 +614,10 @@ mod tests {
             ".lead { color: #333 }\ntd:hover, a[href] { color: blue }"
         );
         assert_eq!(rules.properties, 1);
-        let many: String = (0..1000).map(|i| format!("a{i}: x;")).collect();
+        let many = (0..1000).fold(String::new(), |mut all, i| {
+            let _ = write!(all, "a{i}: x;");
+            all
+        });
         let capped = plain_rules(&format!("* {{ {many} }} p {{ color: red }}"));
         assert_eq!(capped.properties, MAX_PROPERTIES);
         assert!(!capped.css.contains("color: red"), "past the cap");
