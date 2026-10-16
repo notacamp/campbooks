@@ -3361,8 +3361,8 @@ export interface components {
             /** @description The rule. */
             id: components["schemas"]["RuleId"];
             /**
-             * @description Whether the caller may stop it ("Stop doing this"): its author, or a
-             *     manager or owner of its inbox, while the inbox is not kept read-only.
+             * @description Whether the caller may stop it ("Stop doing this"): its author while a
+             *     sender, or a manager of its inbox, while the inbox is not kept read-only.
              */
             may_change: boolean;
         };

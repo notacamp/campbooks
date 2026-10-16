@@ -7010,7 +7010,7 @@
         "x-campbooks": {
           "access": {
             "action": "write",
-            "resource": "conversations.rule"
+            "resource": "conversations.inbox"
           },
           "assistant": true,
           "automation": false,
@@ -14069,7 +14069,7 @@
           },
           "may_change": {
             "type": "boolean",
-            "description": "Whether the caller may stop it (\"Stop doing this\"): its author, or a\nmanager or owner of its inbox, while the inbox is not kept read-only."
+            "description": "Whether the caller may stop it (\"Stop doing this\"): its author while a\nsender, or a manager of its inbox, while the inbox is not kept read-only."
           }
         }
       },
