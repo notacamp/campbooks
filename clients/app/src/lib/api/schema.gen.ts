@@ -672,6 +672,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggest rules that do to lookalikes what the member just did. */
+        get: operations["conversations.suggest_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/conversations/{conversation_id}/rule-suggestions/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn a suggestion down ("Just this one"): it is not offered again for 30
+         *     days, and never after the second time.
+         */
+        post: operations["conversations.dismiss_rule_suggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/conversations/{conversation_id}/star": {
         parameters: {
             query?: never;
@@ -914,6 +951,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create a taught rule in an inbox. */
+        post: operations["conversations.create_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/inboxes/{inbox_id}/rules/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview what a rule would do in an inbox. A read served by POST: the
+         *     rule's addresses and words stay out of the URL (and so out of access logs).
+         */
+        post: operations["conversations.preview_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/w/{workspace_id}/invitations": {
         parameters: {
             query?: never;
@@ -979,6 +1053,100 @@ export interface paths {
         post?: never;
         /** Leave a workspace. */
         delete: operations["workspaces.leave"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the taught rules of the inboxes you can read. */
+        get: operations["conversations.list_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one taught rule (a removed one too, with the run putting its mail
+         *     back).
+         */
+        get: operations["conversations.get_rule"];
+        put?: never;
+        post?: never;
+        /** Remove a rule, optionally putting back what it changed. */
+        delete: operations["conversations.remove_rule"];
+        options?: never;
+        head?: never;
+        /** Change a rule's conditions or actions, pause it or let it act again. */
+        patch: operations["conversations.update_rule"];
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Say yes to a proposed rule. */
+        post: operations["conversations.confirm_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn down a proposed rule ("No"): like confirming it, anyone who may
+         *     teach in its inbox may, since it does not act yet. Undo with
+         *     `conversations.restore_rule`.
+         */
+        post: operations["conversations.decline_rule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/w/{workspace_id}/rules/{rule_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bring back a rule removed in the last 15 minutes, as it was (Undo). */
+        post: operations["conversations.restore_rule"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1769,6 +1937,11 @@ export interface components {
             /** @description The message the question the member saw comes from. */
             message_id: components["schemas"]["MessageId"];
         };
+        /** @description How to confirm a proposed rule. */
+        ConfirmRule: {
+            /** @description Apply it to the mail already in the inbox too (default true). */
+            apply_to_existing?: boolean;
+        };
         /** @description An app the caller let in. */
         ConnectedApp: {
             /** @description The app's client id. */
@@ -1974,6 +2147,8 @@ export interface components {
              */
             message_count: number;
             need?: components["schemas"]["NeedView"] | null;
+            rule?: components["schemas"]["RuleMark"] | null;
+            rule_exception?: components["schemas"]["RuleException"] | null;
             /** @description The start of the newest message's text. */
             snippet: string;
             /** @description Whether any message is starred. */
@@ -1990,6 +2165,27 @@ export interface components {
              * @description Unread inbound messages.
              */
             unread_count: number;
+        };
+        /** @description A rule to create. */
+        CreateRule: {
+            /** @description What it does. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description Apply it to the mail already in the inbox too (default true). */
+            apply_to_existing?: boolean;
+            /** @description All must hold. */
+            conditions: components["schemas"]["RuleCondition"][];
+            from_conversation_id?: components["schemas"]["ConversationId"] | null;
+            /** @description Where it came from (default `action`). */
+            origin?: components["schemas"]["RuleOrigin"];
+            /** @description The member's own words, for an instruction (at most 500 characters). */
+            origin_text?: string | null;
+            /**
+             * @description Act now or wait for a yes (default active). Rules from corrections
+             *     or suggestions act now only when the member lets Campbooks act
+             *     without asking and the inbox is theirs alone.
+             */
+            state?: components["schemas"]["NewRuleState"];
+            teaching_id?: components["schemas"]["TeachingId"] | null;
         };
         /** @description A new workspace. */
         CreateWorkspace: {
@@ -2020,6 +2216,16 @@ export interface components {
              * @example https://campbooks.example.com/invitations/accept?token=…
              */
             accept_url: string;
+        };
+        /** @description A rule just created. */
+        CreatedRule: {
+            /**
+             * @description Campbooks made it active on its own, from evidence: tell the member,
+             *     with Undo.
+             */
+            acted_without_asking: boolean;
+            /** @description The rule (with its run when it is applying to existing mail). */
+            rule: components["schemas"]["RuleView"];
         };
         /** @description `PublicKeyCredentialCreationOptionsJSON`: create a passkey. */
         CreationOptions: {
@@ -2074,7 +2280,7 @@ export interface components {
          * @description What kind of strategy gave an answer.
          * @enum {string}
          */
-        DecisionSource: "rules" | "model" | "knn" | "cascade";
+        DecisionSource: "rules" | "model" | "knn" | "cascade" | "taught";
         /** @description One answer of the decide pass about the newest inbound message. */
         DecisionView: {
             /**
@@ -2111,6 +2317,11 @@ export interface components {
          * @enum {string}
          */
         Direction: "inbound" | "outbound";
+        /** @description The suggestion turned down. */
+        DismissSuggestion: {
+            /** @description Its `key`. */
+            key: string;
+        };
         /** @description A forwarded attachment, as the draft shows it. */
         DraftAttachment: {
             /** @description Its media type, as sent (not trusted). */
@@ -2232,6 +2443,18 @@ export interface components {
             /** @description Returned unchanged. */
             state?: string | null;
         };
+        /** @description A header test: present, or equal to a value. */
+        HeaderCondition: {
+            /** @description Which header. */
+            name: components["schemas"]["HeaderField"];
+            /** @description The value it must have (case-insensitive); absent means "present". */
+            value?: string | null;
+        };
+        /**
+         * @description A stored header a condition may test.
+         * @enum {string}
+         */
+        HeaderField: "list_id" | "list_unsubscribe" | "precedence" | "auto_submitted";
         /**
          * @description How a connection is doing.
          * @enum {string}
@@ -2486,6 +2709,11 @@ export interface components {
             name: string;
         };
         /**
+         * @description How a suggestion picks the mail that looks the same.
+         * @enum {string}
+         */
+        Likeness: "sender" | "list" | "sender_template" | "domain_template";
+        /**
          * @description What the round trip is for.
          * @enum {string}
          */
@@ -2594,7 +2822,7 @@ export interface components {
          * @description Whose answer raised a need.
          * @enum {string}
          */
-        NeedBasis: "rules" | "model" | "member";
+        NeedBasis: "rules" | "model" | "taught" | "member";
         /**
          * @description The question whose answer raised a need.
          * @enum {string}
@@ -2671,6 +2899,16 @@ export interface components {
             to?: components["schemas"]["Address"][] | null;
         };
         /**
+         * @description Whether a new rule should act now or wait for a yes.
+         * @enum {string}
+         */
+        NewRuleState: "active" | "proposed";
+        /**
+         * @description Why there is nothing to offer.
+         * @enum {string}
+         */
+        NoSuggestion: "suspicious" | "correspondent" | "too_few" | "dismissed" | "not_teachable";
+        /**
          * @description How a member resolves a need.
          * @enum {string}
          */
@@ -2724,6 +2962,27 @@ export interface components {
          * @enum {string}
          */
         Phase: "backfill" | "incremental" | "resync";
+        /** @description A rule to preview. */
+        PreviewRule: {
+            /** @description What it would do. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description All must hold. */
+            conditions: components["schemas"]["RuleCondition"][];
+        };
+        /** @description One conversation a rule would change. */
+        PreviewSample: {
+            /** @description The conversation. */
+            conversation_id: components["schemas"]["ConversationId"];
+            /** @description Its sender's address. */
+            sender: string;
+            /**
+             * Format: date-time
+             * @description When it was sent.
+             */
+            sent_at: string;
+            /** @description Its newest inbound message's subject. */
+            subject: string;
+        };
         /**
          * @description RFC 9457 problem details.
          * @example {
@@ -2991,6 +3250,14 @@ export interface components {
             /** @description Done or Not needed. */
             outcome: components["schemas"]["Outcome"];
         };
+        /** @description How to bring a removed rule back. */
+        RestoreRule: {
+            /**
+             * @description Apply it again to the mail already in the inbox (after its mail was
+             *     put back). Default false.
+             */
+            apply_to_existing?: boolean;
+        };
         /** @description A revocation request (`application/x-www-form-urlencoded`). */
         RevokeForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -3007,6 +3274,317 @@ export interface components {
          * @enum {string}
          */
         Role: "owner" | "admin" | "member";
+        /** @description What a rule does; at most one of each kind, labels excepted. */
+        RuleAction: {
+            /** @enum {string} */
+            action: "move_to_stream";
+            /** @description The stream. */
+            stream: components["schemas"]["Stream"];
+        } | {
+            /** @enum {string} */
+            action: "archive";
+        } | {
+            /** @enum {string} */
+            action: "add_label";
+            /** @description The label. */
+            label: components["schemas"]["LabelId"];
+        } | {
+            /** @enum {string} */
+            action: "mark_read";
+        } | {
+            /** @enum {string} */
+            action: "needs_reply";
+            /** @description Yes or no. */
+            value: boolean;
+        } | {
+            /** @enum {string} */
+            action: "asks_action";
+            /** @description Yes or no. */
+            value: boolean;
+        } | {
+            /** @enum {string} */
+            action: "surface";
+            /** @description Which. */
+            value: components["schemas"]["SurfaceWhen"];
+        };
+        /** @description One test on a message; all of a rule's conditions must hold. */
+        RuleCondition: {
+            /** @enum {string} */
+            field: "sender_address";
+            /** @description The sender's address is this one. */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "sender_domain";
+            /**
+             * @description The sender's domain is this one, or a subdomain of it (never a free
+             *     mail domain on its own).
+             */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "list_id";
+            /** @description The `List-Id` is this one. */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "subject_template";
+            /** @description The subject's template is this one ("your order # has shipped"). */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "subject_contains";
+            /** @description The subject holds these words, in this order (case and accents ignored). */
+            value: string;
+        } | {
+            /** @enum {string} */
+            field: "header";
+            /** @description A stored header is present, or has a value. */
+            value: components["schemas"]["HeaderCondition"];
+        } | {
+            /** @enum {string} */
+            field: "label";
+            /** @description The conversation has this label. */
+            value: components["schemas"]["LabelId"];
+        } | {
+            /** @enum {string} */
+            field: "stream";
+            /** @description The conversation is in this stream. */
+            value: components["schemas"]["Stream"];
+        };
+        /** @description A rule a member just changed back on one conversation. */
+        RuleException: {
+            /**
+             * Format: int32
+             * @description Its exceptions in the last 30 days, this one included.
+             */
+            recent_exceptions: number;
+            /** @description The rule. */
+            rule_id: components["schemas"]["RuleId"];
+        };
+        /**
+         * Format: uuid
+         * @description RuleId (UUIDv7)
+         */
+        RuleId: string;
+        /** @description Rules, proposed ones first, then newest first. */
+        RuleList: {
+            /** @description The rules. */
+            rules: components["schemas"]["RuleView"][];
+        };
+        /** @description The rule that placed or changed a conversation, as rows show it. */
+        RuleMark: {
+            /** @description What it does. */
+            actions: components["schemas"]["RuleAction"][];
+            /**
+             * Format: int32
+             * @description How many conversations it has changed.
+             */
+            applied_count: number;
+            /** @description Its conditions, for "like … others from …". */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description The rule. */
+            id: components["schemas"]["RuleId"];
+            /**
+             * @description Whether the caller may stop it ("Stop doing this"): its author while a
+             *     sender, or a manager of its inbox, while the inbox is not kept read-only.
+             */
+            may_change: boolean;
+        };
+        /**
+         * @description Where a taught rule came from.
+         * @enum {string}
+         */
+        RuleOrigin: "action" | "onboarding" | "instruction" | "correction" | "suggestion";
+        /** @description An active rule a new one would take over from on some conversations. */
+        RuleOverride: {
+            /** @description Its actions. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description Its conditions, to say which. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /**
+             * Format: int32
+             * @description On how many conversations.
+             */
+            conversations: number;
+            /** @description The rule. */
+            rule_id: components["schemas"]["RuleId"];
+        };
+        /** @description What a rule would do to the inbox's mail now. */
+        RulePreview: {
+            /**
+             * @description Whether every conversation of the inbox was looked at; when false the
+             *     counts are "at least" (a very large inbox).
+             */
+            complete: boolean;
+            /**
+             * Format: int32
+             * @description Conversations it matches.
+             */
+            matching: number;
+            /** @description Active rules it would take over from. */
+            overrides: components["schemas"]["RuleOverride"][];
+            /** @description The newest of them. */
+            samples: components["schemas"]["PreviewSample"][];
+            /**
+             * Format: int32
+             * @description Left alone because a member placed them.
+             */
+            skipped_member: number;
+            /**
+             * Format: int32
+             * @description Left alone because they look suspicious.
+             */
+            skipped_suspicious: number;
+            /**
+             * Format: int32
+             * @description Of those, the ones it would change.
+             */
+            would_change: number;
+        };
+        /**
+         * Format: uuid
+         * @description RuleRunId (UUIDv7)
+         */
+        RuleRunId: string;
+        /**
+         * @description Whether a taught rule acts.
+         * @enum {string}
+         */
+        RuleState: "proposed" | "active" | "paused" | "removed";
+        /** @description One rule the member could make. */
+        RuleSuggestion: {
+            /** @description Its actions. */
+            actions: components["schemas"]["RuleAction"][];
+            /** @description Its conditions. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /** @description Names it when turning it down. */
+            key: string;
+            /** @description How it picks the mail. */
+            likeness: components["schemas"]["Likeness"];
+            /** @description What it would do now. */
+            preview: components["schemas"]["RulePreview"];
+        };
+        /** @description The rules the member could make from what they just did. */
+        RuleSuggestions: {
+            /**
+             * Format: int32
+             * @description The one to offer first, by index; `None` lets the member choose.
+             */
+            default?: number | null;
+            none?: components["schemas"]["NoSuggestion"] | null;
+            /** @description Other members use the inbox: a rule acts for them too. */
+            shared: boolean;
+            /** @description Broad to narrow; empty when there is nothing to offer. */
+            suggestions: components["schemas"]["RuleSuggestion"][];
+        };
+        /** @description A taught rule. */
+        RuleView: {
+            /** @description What it does. */
+            actions: components["schemas"]["RuleAction"][];
+            /**
+             * Format: int32
+             * @description Conversations it has changed.
+             */
+            applied_count: number;
+            /** @description All must hold. */
+            conditions: components["schemas"]["RuleCondition"][];
+            /**
+             * Format: date-time
+             * @description When a member said yes to it.
+             */
+            confirmed_at?: string | null;
+            /**
+             * Format: date-time
+             * @description When it was made.
+             */
+            created_at: string;
+            from_conversation_id?: components["schemas"]["ConversationId"] | null;
+            /** @description The rule. */
+            id: components["schemas"]["RuleId"];
+            /** @description Its inbox. */
+            inbox_id: components["schemas"]["InboxId"];
+            /**
+             * Format: date-time
+             * @description When it last changed one.
+             */
+            last_applied_at?: string | null;
+            /** @description Whether the caller may change or remove it. */
+            may_change: boolean;
+            /** @description Where it came from. */
+            origin: components["schemas"]["RuleOrigin"];
+            /** @description The member's own words, for an instruction. */
+            origin_text?: string | null;
+            /**
+             * Format: int32
+             * @description Conversations members changed back in the last 30 days.
+             */
+            recent_exceptions: number;
+            run?: components["schemas"]["RunView"] | null;
+            /** @description Whether other members use its inbox: it acts for them too. */
+            shared: boolean;
+            /** @description Whether it acts. `paused` when its author can no longer change the inbox. */
+            state: components["schemas"]["RuleState"];
+            taught_by?: components["schemas"]["UserId"] | null;
+            /** @description The teaching it came with (shared by its rules in other inboxes). */
+            teaching_id: components["schemas"]["TeachingId"];
+        };
+        /**
+         * @description What a run over existing mail does.
+         * @enum {string}
+         */
+        RunKind: "apply" | "revert";
+        /**
+         * @description Where a run is.
+         * @enum {string}
+         */
+        RunState: "running" | "done" | "cancelled";
+        /** @description A run, as clients show its progress. */
+        RunView: {
+            /**
+             * Format: int32
+             * @description Changed so far.
+             */
+            changed: number;
+            /** @description Whether `total` is final; while false the run is still counting. */
+            counted: boolean;
+            /**
+             * Format: int32
+             * @description Looked at so far.
+             */
+            done: number;
+            /**
+             * Format: date-time
+             * @description When it ended.
+             */
+            finished_at?: string | null;
+            /** @description The run. */
+            id: components["schemas"]["RuleRunId"];
+            /** @description Applying, or putting back. */
+            kind: components["schemas"]["RunKind"];
+            /**
+             * Format: int32
+             * @description Left alone because a member placed them or changed them back.
+             */
+            skipped_member: number;
+            /**
+             * Format: int32
+             * @description Left alone because they look suspicious.
+             */
+            skipped_suspicious: number;
+            /**
+             * Format: date-time
+             * @description When it started.
+             */
+            started_at: string;
+            /** @description Where it is. */
+            state: components["schemas"]["RunState"];
+            /**
+             * Format: int32
+             * @description Conversations it matches (or will put back).
+             */
+            total: number;
+        };
         /** @description A page of results. */
         SearchResults: {
             /** @description The results, in the order asked for. */
@@ -3227,7 +3805,7 @@ export interface components {
          * @description Who put a conversation in its stream.
          * @enum {string}
          */
-        StreamSource: "default" | "rules" | "model" | "member";
+        StreamSource: "default" | "rules" | "model" | "taught" | "member";
         /**
          * @description Where the decide pass would put a conversation, when that is not where it
          *     is: a suggestion the member can take or leave.
@@ -3275,6 +3853,11 @@ export interface components {
             /** @description Where it is in its reading. */
             phase: components["schemas"]["Phase"];
         };
+        /**
+         * @description Always or never show.
+         * @enum {string}
+         */
+        SurfaceWhen: "always" | "never";
         /** @description What was scheduled. */
         SyncScheduled: {
             /**
@@ -3283,6 +3866,11 @@ export interface components {
              */
             streams: number;
         };
+        /**
+         * Format: uuid
+         * @description TeachingId (UUIDv7)
+         */
+        TeachingId: string;
         /** @description A token request (`application/x-www-form-urlencoded`). */
         TokenForm: {
             /** @description The client (`client_secret_post`, or a public client). */
@@ -3330,6 +3918,20 @@ export interface components {
          * @enum {string}
          */
         Trust: "sure" | "check";
+        /** @description What to change about a rule. */
+        UpdateRule: {
+            /** @description New actions. */
+            actions?: components["schemas"]["RuleAction"][] | null;
+            /**
+             * @description A manager takes over a rule whose author can no longer change the
+             *     inbox, so it acts again with their rights.
+             */
+            adopt?: boolean;
+            /** @description New conditions. */
+            conditions?: components["schemas"]["RuleCondition"][] | null;
+            /** @description `true` to pause it, `false` to let it act again. */
+            paused?: boolean | null;
+        };
         /** @description The settings to change; absent fields stay as they are. */
         UpdateWorkspace: {
             accent?: components["schemas"]["Accent"] | null;
@@ -5785,6 +6387,119 @@ export interface operations {
             };
         };
     };
+    "conversations.suggest_rules": {
+        parameters: {
+            query: {
+                /** @description What the member did. */
+                action: "move_to_stream" | "archive" | "mark_read" | "add_label" | "not_needed";
+                /** @description The stream, for `move_to_stream`. */
+                stream?: components["schemas"]["Stream"];
+                /** @description The label, for `add_label`. */
+                label?: components["schemas"]["LabelId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation acted on. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleSuggestions"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.dismiss_rule_suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The conversation acted on. */
+                conversation_id: components["schemas"]["ConversationId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DismissSuggestion"];
+            };
+        };
+        responses: {
+            /** @description It will not be offered again for now. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such conversation, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "conversations.star": {
         parameters: {
             query?: never;
@@ -6829,6 +7544,136 @@ export interface operations {
             };
         };
     };
+    "conversations.create_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The inbox. */
+                inbox_id: components["schemas"]["InboxId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateRule"];
+            };
+        };
+        responses: {
+            /** @description The rule. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedRule"];
+                };
+            };
+            /** @description Not a valid rule. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.preview_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The inbox. */
+                inbox_id: components["schemas"]["InboxId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PreviewRule"];
+            };
+        };
+        responses: {
+            /** @description What it would do. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RulePreview"];
+                };
+            };
+            /** @description Not a valid rule. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     "workspaces.list_invitations": {
         parameters: {
             query?: never;
@@ -7188,6 +8033,425 @@ export interface operations {
                 };
             };
             /** @description `last_owner`: you are its only owner. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.list_rules": {
+        parameters: {
+            query?: {
+                /** @description Only this inbox; every inbox you can read when absent. */
+                inbox?: components["schemas"]["InboxId"];
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleList"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such inbox, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.get_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule, removed or not. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.remove_rule": {
+        parameters: {
+            query?: {
+                /**
+                 * @description `true` to put back every conversation it changed that no member has
+                 *     changed since.
+                 */
+                restore?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule, removed; with the run putting mail back when asked. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not your rule. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.update_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateRule"];
+            };
+        };
+        responses: {
+            /** @description The rule afterwards. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description Not a valid rule. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not your rule. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.confirm_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmRule"];
+            };
+        };
+        responses: {
+            /** @description The rule, now active. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not waiting for a yes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.decline_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The rule, turned down (removed). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or you may only read this inbox. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not waiting for a yes. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    "conversations.restore_rule": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace. */
+                workspace_id: components["schemas"]["WorkspaceId"];
+                /** @description The rule. */
+                rule_id: components["schemas"]["RuleId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RestoreRule"];
+            };
+        };
+        responses: {
+            /** @description The rule, back as it was. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RuleView"];
+                };
+            };
+            /** @description No valid access token. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Missing scope, or not your rule. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No such rule, or you cannot see it. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description It is not removed, or was removed too long ago. */
             409: {
                 headers: {
                     [name: string]: unknown;

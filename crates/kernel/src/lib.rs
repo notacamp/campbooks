@@ -25,6 +25,7 @@ pub mod jobs;
 pub mod mail;
 pub mod module;
 pub mod operations;
+pub mod preferences;
 pub mod rate_limit;
 pub mod records;
 pub mod redact;

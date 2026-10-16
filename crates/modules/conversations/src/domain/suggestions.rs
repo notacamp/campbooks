@@ -26,6 +26,8 @@ pub enum DecisionSource {
     Knn,
     /// Several strategies in turn.
     Cascade,
+    /// A rule a member taught.
+    Taught,
 }
 
 impl DecisionSource {
@@ -35,6 +37,7 @@ impl DecisionSource {
             "model" => Ok(Self::Model),
             "knn" => Ok(Self::Knn),
             "cascade" => Ok(Self::Cascade),
+            "taught" => Ok(Self::Taught),
             other => Err(Error::internal(format!(
                 "unknown decision source `{other}`"
             ))),
@@ -111,6 +114,7 @@ pub fn threshold(policy: &Policy, view: &DecisionView) -> Option<u8> {
     let source = match view.source {
         DecisionSource::Rules => Source::Rules,
         DecisionSource::Model => Source::Model,
+        DecisionSource::Taught => Source::Taught,
         DecisionSource::Knn | DecisionSource::Cascade => return None,
     };
     match policy.switch(&view.question, source) {
@@ -149,7 +153,7 @@ impl DecisionRow {
 pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummary]) -> Result<()> {
     let ids: Vec<ConversationId> = summaries
         .iter()
-        .filter(|s| s.stream_source != StreamSource::Member)
+        .filter(|s| !matches!(s.stream_source, StreamSource::Member | StreamSource::Taught))
         .map(|s| s.id)
         .collect();
     if ids.is_empty() {
@@ -165,7 +169,7 @@ pub async fn attach(conn: &mut PgConnection, summaries: &mut [ConversationSummar
           JOIN conversations.messages m ON m.id = d.message_id
          WHERE d.conversation_id = ANY($1) AND d.question = 'stream'
            AND (d.source <> 'model' OR d.model_version LIKE 'checked:%')
-         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'model') DESC, d.created_at DESC
+         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'taught') DESC, (d.source = 'model') DESC, d.created_at DESC
         "#,
         &ids as &[ConversationId],
     )
@@ -203,7 +207,7 @@ pub async fn for_message(conn: &mut PgConnection, message: MessageId) -> Result<
                round(confidence * 100)::smallint AS confidence, acted, reasons
           FROM conversations.decisions
          WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')
-         ORDER BY question, (source = 'model') DESC, created_at DESC
+         ORDER BY question, (source = 'taught') DESC, (source = 'model') DESC, created_at DESC
         "#,
         message as MessageId,
     )

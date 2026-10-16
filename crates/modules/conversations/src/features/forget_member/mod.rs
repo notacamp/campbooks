@@ -42,6 +42,15 @@ impl EventHandler for ForgetMember {
             .blobs
             .detach_owners(tx, &ws, DRAFT_RECORD, &drafts)
             .await?;
+        // The suggestions they turned down are theirs alone. Rules they
+        // taught stay, paused until a manager adopts or removes them.
+        sqlx::query!(
+            "DELETE FROM conversations.rule_dismissals WHERE user_id = $1 AND dismissed_at <= $2",
+            left.user.as_uuid(),
+            before,
+        )
+        .execute(&mut **tx)
+        .await?;
         let mut inboxes = sqlx::query_scalar!(
             r#"DELETE FROM conversations.inbox_members WHERE user_id = $1 AND created_at <= $2
                RETURNING inbox_id AS "inbox: InboxId""#,

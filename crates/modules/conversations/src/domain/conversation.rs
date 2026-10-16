@@ -1,7 +1,7 @@
 //! A conversation's derived state (counts, flags) and how features read it
 //! and announce its changes.
 
-use campbooks_kernel::{Error, EventBus, Result};
+use campbooks_kernel::{Error, EventBus, Result, tenancy::UserId};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgConnection, Postgres, Transaction};
@@ -17,6 +17,7 @@ use crate::{
 
 use super::{
     needs::{self, NeedView},
+    rules::{self, RuleException, RuleMark},
     suggestions::{self, StreamSuggestion},
 };
 
@@ -63,6 +64,13 @@ pub struct ConversationSummary {
     pub suggestion: Option<StreamSuggestion>,
     /// What it needs from its inbox's members, while it needs something.
     pub need: Option<NeedView>,
+    /// The taught rule that placed or changed it, while no member changed
+    /// that back.
+    pub rule: Option<RuleMark>,
+    /// In the response of an operation that changed back what a rule did:
+    /// that rule, now leaving this conversation alone.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rule_exception: Option<RuleException>,
 }
 
 /// A row of the summary queries.
@@ -107,6 +115,8 @@ impl TryFrom<SummaryRow> for ConversationSummary {
                 .map_err(|e| Error::internal(crate::domain::redact::json(&e)))?,
             suggestion: None,
             need: None,
+            rule: None,
+            rule_exception: None,
         })
     }
 }
@@ -116,7 +126,11 @@ fn count(n: i32) -> u32 {
 }
 
 /// The summary of conversation `id` (already checked visible).
-pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<ConversationSummary> {
+pub async fn summary(
+    conn: &mut PgConnection,
+    user: Option<UserId>,
+    id: ConversationId,
+) -> Result<ConversationSummary> {
     let row = sqlx::query_as!(
         SummaryRow,
         r#"
@@ -144,6 +158,7 @@ pub async fn summary(conn: &mut PgConnection, id: ConversationId) -> Result<Conv
     let mut summary = [ConversationSummary::try_from(row)?];
     suggestions::attach(conn, &mut summary).await?;
     needs::attach(conn, &mut summary).await?;
+    rules::attach(conn, user, &mut summary).await?;
     let [summary] = summary;
     Ok(summary)
 }

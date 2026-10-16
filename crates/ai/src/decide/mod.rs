@@ -28,6 +28,7 @@ pub(crate) mod laya;
 pub(crate) mod openai;
 pub mod signals;
 pub mod strategy;
+pub mod taught;
 
 use std::{collections::HashSet, fmt, time::Duration};
 

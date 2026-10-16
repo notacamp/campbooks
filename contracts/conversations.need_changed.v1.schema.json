@@ -31,7 +31,7 @@
       ]
     },
     "cleared_because": {
-      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded"]
+      "enum": ["replied", "archived", "trashed", "done", "not_needed", "superseded", "rule"]
     },
     "cleared_by": { "$ref": "#/$defs/uuid" },
     "latest_message": {

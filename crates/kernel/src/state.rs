@@ -17,6 +17,7 @@ use crate::{
     i18n::{LocalePreferencePort, NoLocalePreference},
     jobs::Registry,
     operations::Operations,
+    preferences::{AskFirst, MemberPreferencesPort},
     rate_limit::RateLimits,
     search::SearchSources,
     signup::{InvitationsPort, NoInvitations},
@@ -81,6 +82,10 @@ pub struct AppState {
     /// registers the `workspaces` module's implementation; until then
     /// nobody is invited.
     pub invitations: InvitationsPort,
+    /// Answers whether a member lets Campbooks act without asking first
+    /// ([`preferences`](crate::preferences)). The server registers the
+    /// `assistant` module's implementation; until then Campbooks always asks.
+    pub preferences: MemberPreferencesPort,
     /// Counts hits of endpoints anyone can call ([`rate_limit`](crate::rate_limit)).
     /// The server installs one keyed by the instance secret, shared by all
     /// its processes; until then it counts per process.
@@ -129,6 +134,7 @@ impl AppState {
             grants: Arc::new(NoGrantIntake),
             consent: Arc::new(NoConsentDoor),
             invitations: Arc::new(NoInvitations),
+            preferences: Arc::new(AskFirst),
             locales: Arc::new(NoLocalePreference),
             blobs: BlobStore::default(),
             operations: Operations::default(),
@@ -228,6 +234,14 @@ impl AppState {
     #[must_use]
     pub fn with_search_sources(mut self, sources: SearchSources) -> Self {
         self.search_sources = sources;
+        self
+    }
+
+    /// The same state, reading members' standing preferences through
+    /// `preferences`.
+    #[must_use]
+    pub fn with_preferences(mut self, preferences: MemberPreferencesPort) -> Self {
+        self.preferences = preferences;
         self
     }
 

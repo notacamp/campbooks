@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        INSERT INTO conversations.decisions\n            (id, workspace_id, message_id, conversation_id, question, source, strategy, value,\n             options, probabilities, confidence, model, latency_ms, reasons, acted, state_version)\n        VALUES ($1, $2, $3, $4, $5, 'taught', 'taught', $6, $7, NULL, 1.0, 'taught', 0,\n                jsonb_build_array(jsonb_build_object('rule', 'taught.rule', 'evidence', $8::text)),\n                true, $9)\n        ON CONFLICT (message_id, question, source) DO UPDATE\n           SET value = EXCLUDED.value, options = EXCLUDED.options, reasons = EXCLUDED.reasons\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Text",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7b5a06f4ad2336bcb75a85e486cee5436b022158edb159291b6c40ea04803d21"
+}

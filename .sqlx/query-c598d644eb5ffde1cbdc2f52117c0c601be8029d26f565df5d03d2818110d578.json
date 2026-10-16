@@ -1,0 +1,42 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT c.stream,\n                              coalesce((SELECT array_agg(cl.label_id::text)\n                                          FROM conversations.conversation_labels cl\n                                         WHERE cl.conversation_id = c.id), '{}') AS \"labels!\",\n                              (EXISTS (SELECT 1 FROM conversations.needs n\n                                        WHERE n.conversation_id = c.id AND n.state = 'open'\n                                          AND n.reason = 'review')\n                               OR EXISTS (SELECT 1 FROM conversations.decisions d\n                                           WHERE d.conversation_id = c.id\n                                             AND d.question = 'suspicious'\n                                             AND d.value = 'true'::jsonb)) AS \"under_review!\"\n                         FROM conversations.conversations c WHERE c.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "stream",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "conversations.conversations",
+            "name": "stream"
+          }
+        }
+      },
+      {
+        "ordinal": 1,
+        "name": "labels!",
+        "type_info": "TextArray",
+        "origin": "Expression"
+      },
+      {
+        "ordinal": 2,
+        "name": "under_review!",
+        "type_info": "Bool",
+        "origin": "Expression"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      null,
+      null
+    ]
+  },
+  "hash": "c598d644eb5ffde1cbdc2f52117c0c601be8029d26f565df5d03d2818110d578"
+}

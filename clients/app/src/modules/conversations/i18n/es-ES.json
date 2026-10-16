@@ -102,7 +102,8 @@
     "whyAsksAction": "Te pide que hagas algo",
     "whyHasDeadline": "Menciona una fecha",
     "whyUrgent": "Urgente",
-    "whySuspicious": "Sospechosa"
+    "whySuspicious": "Sospechosa",
+    "sortedTaught": "Campbooks la puso en {{stream}}, por una regla"
   },
   "reasons": {
     "signals": {
@@ -144,7 +145,10 @@
     "knn": {
       "neighbours": "Correo parecido se ordenó así antes."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks sigue una regla enseñada para correos como este."
+    }
   },
   "shortcuts": {
     "primary": "Ir a Principal",
@@ -216,7 +220,9 @@
       "pay": "{{name}} ha enviado una factura para pagar",
       "warning": "Esto puede ser phishing. No uses sus enlaces.",
       "checkReply": "¿{{name}} necesita respuesta?",
-      "checkDo": "¿{{name}} te ha pedido que hagas algo?"
+      "checkDo": "¿{{name}} te ha pedido que hagas algo?",
+      "taughtReply": "{{name}}: responder, por una regla",
+      "taughtDo": "{{name}}: por hacer, por una regla"
     },
     "chip": {
       "reply": "Necesita respuesta",
@@ -242,7 +248,8 @@
         "rules": "Reglas",
         "model": "Modelo",
         "knn": "Correo parecido",
-        "cascade": "Reglas y luego modelo"
+        "cascade": "Reglas y luego modelo",
+        "taught": "Una regla"
       },
       "suggestion": "una sugerencia",
       "actsFrom": "actúa desde {{threshold}}",

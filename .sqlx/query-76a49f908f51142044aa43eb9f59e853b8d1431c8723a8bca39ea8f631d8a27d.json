@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT DISTINCT ON (d.conversation_id)\n               d.conversation_id AS \"conversation_id: ConversationId\", d.question, d.value,\n               d.source, round(d.confidence * 100)::smallint AS confidence, d.acted, d.reasons\n          FROM conversations.decisions d\n          JOIN conversations.messages m ON m.id = d.message_id\n         WHERE d.conversation_id = ANY($1) AND d.question = 'stream'\n           AND (d.source <> 'model' OR d.model_version LIKE 'checked:%')\n         ORDER BY d.conversation_id, m.sent_at DESC, (d.source = 'model') DESC, d.created_at DESC\n        ",
+  "query": "\n        SELECT DISTINCT ON (question)\n               conversation_id AS \"conversation_id: ConversationId\", question, value, source,\n               round(confidence * 100)::smallint AS confidence, acted, reasons\n          FROM conversations.decisions\n         WHERE message_id = $1 AND (source <> 'model' OR model_version LIKE 'checked:%')\n         ORDER BY question, (source = 'taught') DESC, (source = 'model') DESC, created_at DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -78,7 +78,7 @@
     ],
     "parameters": {
       "Left": [
-        "UuidArray"
+        "Uuid"
       ]
     },
     "nullable": [
@@ -91,5 +91,5 @@
       false
     ]
   },
-  "hash": "c6f7d6452028f2ecbdc41a1278972db546b6224789c667a8ce8a43ef8beca99d"
+  "hash": "76a49f908f51142044aa43eb9f59e853b8d1431c8723a8bca39ea8f631d8a27d"
 }

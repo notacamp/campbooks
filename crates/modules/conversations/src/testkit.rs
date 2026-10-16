@@ -100,6 +100,7 @@ pub struct Kit {
     app: Router,
     idp: TestIdp,
     membership: Arc<TestMembership>,
+    deps: ConversationsDeps,
 }
 
 impl Kit {
@@ -119,14 +120,49 @@ impl Kit {
             .with_blobs(blobs)
             .with_membership(membership.clone())
             .with_registry(Registry::build(&[crate::module(deps.clone())]).unwrap());
-        let app = testing::app(crate::module(deps), state.clone());
+        let app = testing::app(crate::module(deps.clone()), state.clone());
         Self {
             db,
             state,
             app,
             idp,
             membership,
+            deps,
         }
+    }
+
+    /// The same kit, reading members' preferences through `preferences`.
+    #[must_use]
+    pub fn with_preferences(
+        mut self,
+        preferences: campbooks_kernel::preferences::MemberPreferencesPort,
+    ) -> Self {
+        self.state = self.state.with_preferences(preferences);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
+    /// The same kit, asking `clients` whom each client token acts for.
+    #[must_use]
+    pub fn with_clients(mut self, clients: campbooks_kernel::tenancy::ClientDirectoryPort) -> Self {
+        self.state = self.state.with_client_directory(clients);
+        self.app = testing::app(crate::module(self.deps.clone()), self.state.clone());
+        self
+    }
+
+    /// Apply the recorded batch `recorded` (the fixtures' format) to `inbox`
+    /// and run every job it causes.
+    pub async fn ingest_value(
+        &self,
+        workspace: WorkspaceId,
+        inbox: InboxId,
+        recorded: &serde_json::Value,
+    ) -> WorkerStats {
+        let batch = dev::record(&self.state, workspace, inbox, recorded)
+            .await
+            .unwrap();
+        dev::submit(&self.state, workspace, &batch).await.unwrap();
+        self.run_jobs().await
     }
 
     /// A user `sub`, member of `workspace`, with every scope of the module.
@@ -365,6 +401,39 @@ pub fn sorting_deps() -> ConversationsDeps {
     ));
     deps.config.needs_window_days = 36_500;
     deps
+}
+
+/// `n` notifications from `from` (`<prefix>-0` … ids, one conversation each),
+/// subjects `[acme/web] Pull request #<i> merged`, on `list` when given, sent
+/// a minute apart from 2026-10-01: a recorded batch in the fixtures' format.
+pub fn notifications(prefix: &str, n: usize, from: &str, list: Option<&str>) -> Value {
+    let base = chrono::DateTime::parse_from_rfc3339("2026-10-01T08:00:00Z").unwrap();
+    let changes: Vec<Value> = (0..n)
+        .map(|i| {
+            let mut headers = serde_json::json!({"auto_submitted": "auto-generated"});
+            if let Some(list) = list {
+                headers["list_id"] = list.into();
+            }
+            let minutes = i64::try_from(i).unwrap();
+            serde_json::json!({
+                "op": "upsert",
+                "message": {
+                    "provider_message_id": format!("{prefix}-{i}"),
+                    "thread_key": format!("thr-{prefix}-{i}"),
+                    "from": {"name": "GitHub", "address": from},
+                    "to": [{"name": "Sam Rivers", "address": "sam@example.com"}],
+                    "subject": format!("[acme/web] Pull request #{} merged", 4000 + i),
+                    "sent_at": (base + chrono::TimeDelta::minutes(minutes)).to_rfc3339(),
+                    "direction": "inbound",
+                    "headers": headers,
+                    "text": "Merged into main.",
+                    "mailbox": {"in_inbox": true},
+                    "read": false, "starred": false
+                }
+            })
+        })
+        .collect();
+    serde_json::json!({"changes": changes})
 }
 
 /// `fixtures/<name>.json`.

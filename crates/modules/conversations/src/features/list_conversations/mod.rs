@@ -20,7 +20,7 @@ use crate::{
     domain::{
         access::visible_inboxes,
         conversation::{ConversationSummary, SummaryRow},
-        needs, suggestions,
+        needs, rules, suggestions,
     },
     model::{ConversationId, InboxId, Stream},
     scopes::ConversationsRead,
@@ -69,7 +69,7 @@ pub struct ConversationList {
     operation_id = "conversations.list",
     tag = "conversations",
     security(("bearer" = ["conversations:read"])),
-    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
+    extensions(("x-campbooks" = json!(Operation::query().assistant().records(["conversations.conversation", "conversations.rule"]).access("conversations.conversation", campbooks_kernel::authz::Action::Read)))),
     params(("workspace_id" = WorkspaceId, Path, description = "The workspace."), ListQuery),
     responses(
         (status = OK, description = "A page of conversations.", body = ConversationList),
@@ -110,6 +110,7 @@ pub async fn handler(
             .collect::<Result<Vec<_>>>()?;
         suggestions::attach(&mut tx, &mut conversations).await?;
         needs::attach(&mut tx, &mut conversations).await?;
+        rules::attach(&mut tx, access.user, &mut conversations).await?;
         tx.commit().await?;
         return Ok(Json(ConversationList {
             conversations,
@@ -129,6 +130,7 @@ pub async fn handler(
         .collect::<Result<Vec<_>>>()?;
     suggestions::attach(&mut tx, &mut conversations).await?;
     needs::attach(&mut tx, &mut conversations).await?;
+    rules::attach(&mut tx, access.user, &mut conversations).await?;
     tx.commit().await?;
     let next_cursor = if conversations.len() > limit as usize {
         conversations.truncate(limit as usize);

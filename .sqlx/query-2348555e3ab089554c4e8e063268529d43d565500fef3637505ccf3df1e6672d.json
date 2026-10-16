@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.conversations\n              SET stream = $2, stream_source = $3, updated_at = now()\n            WHERE id = $1 AND stream_source = 'taught' AND stream = $4",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2348555e3ab089554c4e8e063268529d43d565500fef3637505ccf3df1e6672d"
+}

@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO conversations.rule_runs\n               (id, workspace_id, rule_id, kind, state, total, counted)\n           SELECT $1, workspace_id, id, $3, 'running', coalesce($4, 0), $4 IS NOT NULL\n             FROM conversations.rules WHERE id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Int4"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2753391b56916a17ee8530a7bc9adf9245e3238f4d01366c73becfbad884641c"
+}

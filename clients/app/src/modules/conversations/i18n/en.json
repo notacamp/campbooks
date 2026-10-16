@@ -102,7 +102,8 @@
     "whyAsksAction": "Asks you to do something",
     "whyHasDeadline": "Mentions a date",
     "whyUrgent": "Urgent",
-    "whySuspicious": "Suspicious"
+    "whySuspicious": "Suspicious",
+    "sortedTaught": "Campbooks put this in {{stream}}, by a rule"
   },
   "reasons": {
     "signals": {
@@ -144,7 +145,10 @@
     "knn": {
       "neighbours": "Mail like this was sorted this way before."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks follows a rule taught for mail like this."
+    }
   },
   "shortcuts": {
     "primary": "Go to Primary",
@@ -216,7 +220,9 @@
       "pay": "{{name}} sent a bill to pay",
       "warning": "This may be phishing. Don’t use its links.",
       "checkReply": "Does {{name}} need a reply?",
-      "checkDo": "Did {{name}} ask you to do something?"
+      "checkDo": "Did {{name}} ask you to do something?",
+      "taughtReply": "{{name}}: a reply, by a rule",
+      "taughtDo": "{{name}}: to do, by a rule"
     },
     "chip": {
       "reply": "Needs a reply",
@@ -242,7 +248,8 @@
         "rules": "Rules",
         "model": "Model",
         "knn": "Similar mail",
-        "cascade": "Rules, then model"
+        "cascade": "Rules, then model",
+        "taught": "A rule"
       },
       "suggestion": "a suggestion",
       "actsFrom": "acts from {{threshold}}",

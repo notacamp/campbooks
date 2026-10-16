@@ -1,12 +1,14 @@
 //! One folder per use case.
 
 pub mod apply_changes;
+pub mod apply_rule;
 pub mod archive;
 pub mod backfill_needs;
 pub mod check_send;
 pub mod create_draft;
 pub mod create_inbox;
 pub mod decide_message;
+pub mod fill_templates;
 pub mod forget_connection;
 pub mod forget_member;
 pub mod get_attachment;
@@ -26,7 +28,9 @@ pub mod needs;
 pub mod purge_workspace;
 pub mod record_send;
 pub mod release_send;
+pub mod rules;
 pub mod search_source;
 pub mod send_draft;
 pub mod star;
+pub mod suggest_rules;
 pub mod update_draft;

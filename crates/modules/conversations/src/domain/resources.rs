@@ -11,7 +11,9 @@
 //! (`tenancy::resolve_access`), and any other client sees no inbox.
 //! Workspace owners and admins get nothing here either: they never read an
 //! inbox they are not a member of. An inbox kept after its connection was
-//! removed is frozen read-only.
+//! removed is frozen read-only. A **rule** taught to an inbox is read by its
+//! readers and changed by its author (while they may write there) or a
+//! manager.
 
 use std::sync::Arc;
 
@@ -26,9 +28,9 @@ use campbooks_kernel::{
 use sqlx::PgConnection;
 
 use crate::{
-    events::{CONVERSATION_RECORD, DRAFT_RECORD, INBOX_RECORD, MESSAGE_RECORD},
+    events::{CONVERSATION_RECORD, DRAFT_RECORD, INBOX_RECORD, MESSAGE_RECORD, RULE_RECORD},
     features::apply_changes::ATTACHMENT_RECORD,
-    model::InboxId,
+    model::{InboxId, RuleId},
 };
 
 /// The record type of a decide-pass answer.
@@ -62,7 +64,7 @@ const fn inside(
 }
 
 /// The module's resource types.
-static TYPES: [ResourceType; 8] = [
+static TYPES: [ResourceType; 9] = [
     ResourceType {
         owner: Owner::Member,
         owner_actions: &[Read],
@@ -70,15 +72,19 @@ static TYPES: [ResourceType; 8] = [
         roles: &["reader", "sender", "manager"],
         grants: &[
             Grant::new(Grantee::ContainerRole("reader"), &[Read]),
-            Grant::new(Grantee::ContainerRole("sender"), &[Read, Send]),
-            Grant::new(Grantee::ContainerRole("manager"), &[Read, Send, Share]),
+            Grant::new(Grantee::ContainerRole("sender"), &[Read, Write, Send]),
+            Grant::new(
+                Grantee::ContainerRole("manager"),
+                &[Read, Write, Send, Share],
+            ),
         ],
         ..ResourceType::new(
             INBOX_RECORD,
             "An address the workspace receives and sends on, owned by the member whose \
              connection feeds it and shared with its members by role (`reader` < `sender` < \
-             `manager`). Workspace owners and admins get nothing without a membership. Kept \
-             after its connection is removed, it is read-only.",
+             `manager`). Its senders and managers write in it (teach it rules). \
+             Workspace owners and admins get nothing without a membership. Kept after its \
+             connection is removed, it is read-only.",
             Tenancy::Workspace,
         )
     },
@@ -114,6 +120,26 @@ static TYPES: [ResourceType; 8] = [
          inbox's senders.",
         WRITE_INSIDE,
     ),
+    ResourceType {
+        owner: Owner::Member,
+        container: Some(INBOX_RECORD),
+        grants: &[
+            Grant::new(Grantee::ContainerRole("reader"), &[Read]),
+            Grant::new(
+                Grantee::OwnerWithContainerRole("sender"),
+                &[Read, Write, Delete],
+            ),
+            Grant::new(Grantee::ContainerRole("manager"), &[Read, Write, Delete]),
+        ],
+        ..ResourceType::new(
+            RULE_RECORD,
+            "A rule a member taught an inbox (campbooks-cloud#125): it acts for every member \
+             of the inbox. Its readers see it; its author changes and removes it while they \
+             may write in the inbox, and so do its managers. Kept read-only with its inbox, \
+             it no longer acts.",
+            Tenancy::Workspace,
+        )
+    },
     ResourceType {
         owner: Owner::Member,
         container: Some(INBOX_RECORD),
@@ -157,6 +183,11 @@ pub async fn authorize(
         Error::Denied(crate::MESSAGES.reason("inbox_read_only"))
     })
     .await
+}
+
+/// Rule `rule`, as a resource.
+pub fn rule(rule: RuleId) -> RecordRef {
+    RecordRef::new(RULE_RECORD, &rule)
 }
 
 /// [`authorize`] for a type before one is named (lists).
@@ -219,6 +250,9 @@ impl ResourceFacts for ConversationFacts {
                     UNION ALL
                     SELECT inbox_id, NULL, false FROM conversations.labels
                      WHERE $1 = 'conversations.label' AND id = $2
+                    UNION ALL
+                    SELECT inbox_id, taught_by, false FROM conversations.rules
+                     WHERE $1 = 'conversations.rule' AND id = $2
                     UNION ALL
                     SELECT c.inbox_id, NULL, false FROM conversations.corrections r
                       JOIN conversations.conversations c ON c.id = r.conversation_id

@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rules\n              SET state = 'removed', removed_from = state, removed_at = now(),\n                  updated_at = now()\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9b898befe6f4a85d71a908b15e9fff3d4d5fd94148af54962ad34fc56c505802"
+}

@@ -102,7 +102,8 @@
     "whyAsksAction": "Vous demande de faire quelque chose",
     "whyHasDeadline": "Mentionne une date",
     "whyUrgent": "Urgent",
-    "whySuspicious": "Suspect"
+    "whySuspicious": "Suspect",
+    "sortedTaught": "Campbooks l’a rangée dans {{stream}}, selon une règle"
   },
   "reasons": {
     "signals": {
@@ -144,7 +145,10 @@
     "knn": {
       "neighbours": "Un courrier semblable a déjà été rangé ainsi."
     },
-    "other": "{{rule}} ({{evidence}})"
+    "other": "{{rule}} ({{evidence}})",
+    "taught": {
+      "rule": "Campbooks suit une règle enseignée pour les e-mails comme celui-ci."
+    }
   },
   "shortcuts": {
     "primary": "Aller à Principal",
@@ -216,7 +220,9 @@
       "pay": "{{name}} a envoyé une facture à payer",
       "warning": "Ceci pourrait être du hameçonnage. N’utilisez pas ses liens.",
       "checkReply": "Faut-il répondre à {{name}} ?",
-      "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?"
+      "checkDo": "Y a-t-il quelque chose à faire pour {{name}} ?",
+      "taughtReply": "{{name}} : à répondre, selon une règle",
+      "taughtDo": "{{name}} : à faire, selon une règle"
     },
     "chip": {
       "reply": "À répondre",
@@ -242,7 +248,8 @@
         "rules": "Règles",
         "model": "Modèle",
         "knn": "Courriers similaires",
-        "cascade": "Règles puis modèle"
+        "cascade": "Règles puis modèle",
+        "taught": "Une règle"
       },
       "suggestion": "une suggestion",
       "actsFrom": "agit à partir de {{threshold}}",
