@@ -324,6 +324,15 @@ pub async fn revert(
     rule: &Stored,
     id: ConversationId,
 ) -> Result<bool> {
+    // The conversation before its application, as a member's action (which
+    // locks the conversation, then marks the application excepted) and
+    // applying (`carry_out`: place, then record) take them.
+    sqlx::query!(
+        "SELECT id FROM conversations.conversations WHERE id = $1 FOR UPDATE",
+        id as ConversationId,
+    )
+    .fetch_optional(&mut **tx)
+    .await?;
     let row = sqlx::query!(
         r#"SELECT before FROM conversations.rule_applications
             WHERE rule_id = $1 AND conversation_id = $2

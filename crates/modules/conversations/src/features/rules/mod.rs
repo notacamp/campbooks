@@ -857,6 +857,75 @@ pub async fn confirm(
     Ok(Json(view))
 }
 
+/// Turn down a proposed rule ("No"): like confirming it, anyone who may
+/// teach in its inbox may, since it does not act yet. Undo with
+/// `conversations.restore_rule`.
+#[utoipa::path(
+    post,
+    path = "/api/v1/w/{workspace_id}/rules/{rule_id}/decline",
+    operation_id = "conversations.decline_rule",
+    tag = "conversations",
+    security(("bearer" = ["conversations:write"])),
+    extensions(("x-campbooks" = json!(Operation::command(Risk::Low)
+        .undo("conversations.restore_rule")
+        .assistant()
+        .records(["conversations.rule"])
+        .access("conversations.inbox", campbooks_kernel::authz::Action::Write)))),
+    params(
+        ("workspace_id" = WorkspaceId, Path, description = "The workspace."),
+        ("rule_id" = RuleId, Path, description = "The rule."),
+    ),
+    responses(
+        (status = OK, description = "The rule, turned down (removed).", body = RuleView),
+        (status = UNAUTHORIZED, description = "No valid access token.", body = Problem,
+            content_type = "application/problem+json"),
+        (status = FORBIDDEN, description = "Missing scope, or you may only read this inbox.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = NOT_FOUND, description = "No such rule, or you cannot see it.",
+            body = Problem, content_type = "application/problem+json"),
+        (status = CONFLICT, description = "It is not waiting for a yes.", body = Problem,
+            content_type = "application/problem+json"),
+    )
+)]
+pub async fn decline(
+    State(state): State<AppState>,
+    workspace: Workspace<ConversationsWrite>,
+    extract::Path(path): extract::Path<RulePath>,
+) -> Result<Json<RuleView>> {
+    let access = &workspace.access;
+    let mut tx = state.db.begin_for(access.workspace).await?;
+    let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
+    may_teach(&state, &mut tx, access, rule.inbox).await?;
+    member_only(&workspace.principal)?;
+    if rule.state != RuleState::Proposed {
+        return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
+    }
+    rule_runs::lock_running(&mut tx, rule.id).await?;
+    sqlx::query!(
+        r#"UPDATE conversations.rules
+              SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()
+            WHERE id = $1"#,
+        rule.id as RuleId,
+    )
+    .execute(&mut *tx)
+    .await?;
+    rule_runs::announce(
+        &mut tx,
+        &state.events,
+        &access.workspace.to_string(),
+        rule.inbox,
+        rule.id,
+        RuleState::Removed,
+        None,
+    )
+    .await?;
+    let mut declined = rule;
+    declined.state = RuleState::Removed;
+    let view = view(&mut tx, access, &declined).await?;
+    tx.commit().await?;
+    Ok(Json(view))
+}
+
 /// What to change about a rule.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema, Default)]
 #[serde(deny_unknown_fields)]

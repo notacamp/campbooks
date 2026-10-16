@@ -904,6 +904,7 @@ fn acts_in_the_inbox(id: &str) -> bool {
         id,
         "conversations.create_draft"
             | "conversations.confirm_rule"
+            | "conversations.decline_rule"
             | "conversations.preview_rule"
             | "conversations.create_rule"
             | "conversations.suggest_rules"

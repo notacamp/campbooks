@@ -611,7 +611,7 @@ pub async fn replaced(
                   SELECT id FROM conversations.rules
                    WHERE inbox_id = $1 AND state = 'active' AND conditions = $2
                      AND id IS DISTINCT FROM $3)
-            FOR UPDATE OF u"#,
+            ORDER BY u.id FOR UPDATE OF u"#,
         inbox as InboxId,
         json!(conditions),
         this as Option<RuleId>,
@@ -624,7 +624,7 @@ pub async fn replaced(
               AND id IS DISTINCT FROM $4
               AND EXISTS (SELECT 1 FROM jsonb_array_elements(actions) a
                            WHERE a ->> 'action' = ANY($3))
-            FOR UPDATE"#,
+            ORDER BY id FOR UPDATE"#,
         inbox as InboxId,
         json!(conditions),
         &kinds,
