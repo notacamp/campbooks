@@ -191,15 +191,18 @@ function RuleRow({
           >
             {t("rules.list.keep")}
           </Button>
-          <Button
-            variant="ghost"
-            disabled={removing}
-            onClick={() => {
-              removeRule(rule, { restore: false, label: "declined" });
-            }}
-          >
-            {t("rules.list.no")}
-          </Button>
+          {/* Turning it down removes it: its author's or a manager's to do. */}
+          {rule.may_change ? (
+            <Button
+              variant="ghost"
+              disabled={removing}
+              onClick={() => {
+                removeRule(rule, { restore: false, label: "declined" });
+              }}
+            >
+              {t("rules.list.no")}
+            </Button>
+          ) : null}
         </>
       ) : undefined
     ) : rule.may_change && !confirming ? (
