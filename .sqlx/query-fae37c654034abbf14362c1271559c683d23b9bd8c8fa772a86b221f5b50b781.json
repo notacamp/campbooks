@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT id, token_hash = $1 AS \"current!\", rotated_at, token_delivered, subject, name, email,\n               access_token, access_expires_at, last_seen_at, expires_at\n          FROM bff.sessions\n         WHERE (token_hash = $1 OR previous_token_hash = $1)\n           AND idle_expires_at > $2\n           AND expires_at > $2\n        ",
+  "query": "\n        SELECT id, token_hash = $1 AS \"current!\", rotated_at, token_delivered, subject, name, email,\n               access_token, access_expires_at, last_seen_at, expires_at, scopes\n          FROM bff.sessions\n         WHERE (token_hash = $1 OR previous_token_hash = $1)\n           AND idle_expires_at > $2\n           AND expires_at > $2\n        ",
   "describe": {
     "columns": [
       {
@@ -118,6 +118,17 @@
             "name": "expires_at"
           }
         }
+      },
+      {
+        "ordinal": 11,
+        "name": "scopes",
+        "type_info": "Text",
+        "origin": {
+          "Table": {
+            "table": "bff.sessions",
+            "name": "scopes"
+          }
+        }
       }
     ],
     "parameters": {
@@ -137,8 +148,9 @@
       false,
       false,
       false,
-      false
+      false,
+      true
     ]
   },
-  "hash": "f0c02ddcaef239d0c5c8383aa47dc2cc9d65ae9f7c013a1f9a34606d2ae5e245"
+  "hash": "fae37c654034abbf14362c1271559c683d23b9bd8c8fa772a86b221f5b50b781"
 }

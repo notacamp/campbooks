@@ -270,6 +270,15 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **New features no longer stay hidden from people signed in before the release that added them.**
+  A web session kept the permissions it asked for at sign-in, so after a release that adds
+  some (Scout's questions and memory in this one), the new features answered 403 and showed
+  nothing until the person signed out. Now a session that predates the permissions the web app
+  asks for ends on its next request and the app asks you to sign in again, which goes straight
+  through while your sign-in at the identity provider is still live; signing out of such a
+  session still ends everything. Migration `20261020230000_bff__session_scopes` adds two
+  nullable columns. After upgrading, everyone signed in to the web app signs in once more.
+  (campbooks-cloud#172)
 - **HTML email renders with its own styles, safely (campbooks-cloud#160).** Newsletters,
   receipts and Outlook or Gmail replies looked broken: their style sheets were dropped
   (the page's policy blocks them in the mail frame too), the document title and hidden
