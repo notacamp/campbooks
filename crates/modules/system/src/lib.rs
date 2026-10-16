@@ -1,5 +1,7 @@
-//! `campbooks-system` — instance health and version, and the admin
-//! dashboard's System panel (`GET /admin/v1/system/overview`, ADR 0015).
+//! `campbooks-system` — instance health and version, the admin dashboard's
+//! System panel (`GET /admin/v1/system/overview`, ADR 0015), and the AI
+//! usage ledger with its daily cap ([`AiUsageMeter`], read by
+//! `GET /admin/v1/system/ai-usage`).
 //!
 //! This is the **reference vertical slice**: copy its shape for every new
 //! module. `lib.rs` only assembles [`module`]; each use case lives in its own
@@ -25,6 +27,7 @@ pub mod scopes;
 mod testkit;
 
 pub use deps::{Deps, Facts, IdentityProvider};
+pub use features::ai_meter::AiUsageMeter;
 
 /// Module name: crate directory, Postgres schema and OpenAPI tag.
 pub const NAME: &str = "system";
@@ -72,6 +75,7 @@ pub fn module_with(deps: Deps) -> Module {
         admin_router: Some(
             OpenApiRouter::new()
                 .routes(routes!(features::admin_overview::handler))
+                .routes(routes!(features::admin_ai_usage::handler))
                 .routes(routes!(features::admin_jobs::summary))
                 .routes(routes!(features::admin_jobs::failed))
                 .routes(routes!(features::admin_job_actions::retry))

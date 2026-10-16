@@ -10,12 +10,21 @@
 //! and for messages already answered (a replayed delivery). The model reads
 //! whose inbox the message is in: the inbox's address and name, and whether
 //! several members read it.
+//!
+//! The call counts against the workspace's daily AI limit
+//! (`campbooks_ai::usage`, campbooks-cloud#152). Over the limit the pass
+//! stores nothing, as when no model is configured, and the message keeps
+//! what the rules decided when it was stored; it is not re-queued. When the
+//! call cannot be counted, it is not made and the job retries.
 
 use std::sync::Arc;
 
-use campbooks_ai::decide::{
-    signals::email::{Envelope, Recipient, triage_questions},
-    strategy::Strategy,
+use campbooks_ai::{
+    decide::{
+        signals::email::{Envelope, Recipient, triage_questions},
+        strategy::Strategy,
+    },
+    usage::Scope,
 };
 use campbooks_kernel::{
     Event, EventConsumer, JobContext, JobError, blobs::BlobRef, db::BeginFor as _,
@@ -26,7 +35,7 @@ use chrono::{TimeDelta, Utc};
 use crate::{
     domain::{
         blobs::read_text,
-        decide::{ENVELOPE_BODY_BYTES, MessageParts, Source, envelope},
+        decide::{ENVELOPE_BODY_BYTES, MessageParts, PURPOSE, Source, envelope},
         decisions::Recorded,
         needs::{self, NeedSettings},
         policy::Policy,
@@ -92,11 +101,19 @@ impl EventConsumer for DecideMessage {
         };
 
         let questions = triage_questions();
-        let answers = match model.decide(&envelope, &questions).await {
+        // Counted against the workspace's daily AI limit (campbooks-cloud#152).
+        let usage = Scope::workspace(ctx.state().db.clone(), workspace, PURPOSE);
+        let answers = match usage.run(model.decide(&envelope, &questions)).await {
             Ok(decisions) => decisions.answers,
-            // The model failed its answers check: the pass does what it
-            // does when no model is configured, and stores nothing.
+            // The model failed its answers check, or the workspace reached
+            // its daily AI limit: the pass does what it does when no model
+            // is configured, and stores nothing. The rules sorted the
+            // message when it was stored; it is not asked again later.
             Err(campbooks_ai::Error::AnswersNotTrusted) => return Ok(()),
+            Err(campbooks_ai::Error::OverDailyCap { .. }) => {
+                tracing::debug!(workspace = %workspace, "over the daily AI limit: rules only");
+                return Ok(());
+            }
             Err(error) => return Err(redact::ai(&error)),
         };
         let recorded = Recorded {
@@ -888,3 +905,6 @@ mod tests {
         assert_eq!(raised_again, 0);
     }
 }
+
+#[cfg(test)]
+mod usage_tests;
