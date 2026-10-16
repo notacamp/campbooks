@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rules SET applied_count = greatest(applied_count - 1, 0)\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f62eda43b87bfe46de3788f25944b0bdcb5fd67f20c5140a92fbc636ac567fe1"
+}

@@ -365,6 +365,14 @@ pub async fn revert(
     )
     .execute(&mut **tx)
     .await?;
+    // The rule's count says how many conversations it holds changed now.
+    sqlx::query!(
+        r#"UPDATE conversations.rules SET applied_count = greatest(applied_count - 1, 0)
+            WHERE id = $1"#,
+        rule.id as RuleId,
+    )
+    .execute(&mut **tx)
+    .await?;
     effects
         .publish(tx, ctx.events, (ctx.workspace, ctx.inbox, id), true)
         .await?;

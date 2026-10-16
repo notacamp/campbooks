@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE conversations.rules\n              SET applied_count = applied_count + CASE WHEN $2 THEN 0 ELSE 1 END,\n                  last_applied_at = now(), updated_at = now()\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "175d3c79ac1b4301297ae34664503051aaccc9267bab2030bda3a3ad905e917b"
+}
