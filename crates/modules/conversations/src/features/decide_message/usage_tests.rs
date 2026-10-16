@@ -156,11 +156,19 @@ async fn answered(db: &PgPool) -> (Vec<String>, Vec<String>) {
     (model, inbound)
 }
 
-async fn unfinished_jobs(db: &PgPool) -> i64 {
-    sqlx::query_scalar("SELECT count(*) FROM kernel.jobs WHERE state IN ('pending', 'running')")
-        .fetch_one(db)
-        .await
-        .unwrap()
+/// Model passes still waiting to run: deliveries of `decide_message` and
+/// `decide_backlog` jobs. Only those: other work may legitimately wait (the
+/// change feed's `kernel.sequence_changes` leaves a short-delayed successor
+/// when producers are in flight).
+async fn waiting_model_passes(db: &PgPool) -> i64 {
+    sqlx::query_scalar(
+        "SELECT count(*) FROM kernel.jobs
+          WHERE state IN ('pending', 'running')
+            AND kind IN ('conversations.decide_message', 'conversations.decide_backlog')",
+    )
+    .fetch_one(db)
+    .await
+    .unwrap()
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
@@ -190,7 +198,7 @@ async fn over_the_daily_limit_the_rest_gets_no_model_pass(db: PgPool) {
     );
 
     // Nothing waits for the next day: no burst when it starts.
-    assert_eq!(unfinished_jobs(&db).await, 0);
+    assert_eq!(waiting_model_passes(&db).await, 0);
     ledger.new_day();
     kit.run_jobs().await;
     assert_eq!(answered(&db).await.0.len(), 2);
