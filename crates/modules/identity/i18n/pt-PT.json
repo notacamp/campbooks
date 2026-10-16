@@ -9,6 +9,7 @@
     "held_grant_not_found": "Não há nenhuma caixa de correio à espera de ser ligada.",
     "invalid_id_token_hint": "Este pedido para terminar sessão não foi assinado pelo Campbooks para esta aplicação; nada foi terminado.",
     "signup_invite_only": "Este Campbooks só aceita pessoas convidadas. Peça a alguém que convide este endereço e inicie sessão novamente.",
+    "sign_in_not_allowed": "Este Campbooks só deixa entrar as pessoas que o seu proprietário aprovou, e este endereço não é uma delas. Nada foi guardado.",
     "step_up_required": "Inicie sessão novamente primeiro: para alterar a forma como inicia sessão, é preciso ter iniciado sessão nos últimos dez minutos.",
     "last_way_in": "Esta é a única forma de iniciar sessão, por isso não pode ser removida. Adicione outra primeiro.",
     "link_incomplete": "Indique o fornecedor, o espaço de trabalho ou a caixa de correio a que isto se refere.",

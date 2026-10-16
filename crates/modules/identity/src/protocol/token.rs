@@ -293,6 +293,19 @@ async fn respond(
     {
         return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
     }
+    // The allow-list is judged again at every exchange, so tightening it cuts
+    // access at the next refresh (the transaction rolls back, nothing more
+    // is minted).
+    let allow = ctx.allow_list()?;
+    if !accounts::is_allowed(
+        &mut *ctx.state.db.acquire().await?,
+        &allow,
+        grant.account_id,
+    )
+    .await?
+    {
+        return Ok(oauth_error(StatusCode::BAD_REQUEST, "invalid_grant"));
+    }
     // Read under a share lock until the commit: a suspension or sign out
     // everywhere committing now is either seen here or waits, and then
     // takes an epoch later than these tokens.

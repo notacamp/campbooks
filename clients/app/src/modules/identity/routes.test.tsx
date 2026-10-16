@@ -152,6 +152,18 @@ describe("SignInScreen", () => {
     );
   });
 
+  it("explains an address the instance doesn't let in, from the callback", async () => {
+    mockApi({ [REQUEST_INFO]: { body: { client_id: "campbooks-web", providers: ["google"] } } });
+    renderAt(
+      "/sign-in",
+      <SignInScreen request={REQUEST} error="sign_in_not_allowed" leave={vi.fn()} />,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "This Campbooks isn’t open to this address.",
+    );
+  });
+
   it("says when the request expired, keeping the callback's error", async () => {
     mockApi({ [REQUEST_INFO]: { status: 404 } });
     const leave = vi.fn();
@@ -280,6 +292,16 @@ describe("NewAccountScreen", () => {
     ).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Sign in another way" }));
     expect(leave).toHaveBeenCalledWith("/bff/login?return_to=%2F");
+  });
+
+  it("explains an address the allow-list refuses when Create is pressed", async () => {
+    mockApi({ [NEW]: { body: NEW_ACCOUNT }, [CREATE]: problem(403, "sign_in_not_allowed") });
+    renderWithProviders(<NewAccountScreen request={REQUEST} leave={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Create account/u }));
+    expect(
+      await screen.findByRole("heading", { name: "This Campbooks isn’t open to this address" }),
+    ).toBeVisible();
   });
 
   it("says nothing was created when Create fails otherwise", async () => {
