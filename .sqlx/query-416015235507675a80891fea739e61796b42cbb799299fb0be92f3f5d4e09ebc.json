@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE conversations.conversations c\n           SET stream = $2, stream_source = $3, updated_at = now()\n         WHERE c.id = $1 AND c.stream_source IN ('default', 'rules')\n           AND NOT EXISTS (\n               SELECT 1 FROM conversations.messages m\n                WHERE m.conversation_id = c.id AND m.direction = 'inbound'\n                  AND ($4::uuid IS NULL\n                       OR (m.id <> $4 AND (m.sent_at, m.id) < (\n                               SELECT f.sent_at, f.id FROM conversations.messages f\n                                WHERE f.id = $4))))\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text",
+        "Uuid"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "416015235507675a80891fea739e61796b42cbb799299fb0be92f3f5d4e09ebc"
+}

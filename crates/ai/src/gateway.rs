@@ -526,7 +526,7 @@ impl Gateway {
                     state,
                     questions,
                 };
-                let request = self.post(provider, "systemone")?.json(&body);
+                let request = self.post(provider, provider.decide_path())?.json(&body);
                 let wire: decide::laya::Response = self.send_with_retry(request).await?;
                 let model = wire.model(&provider.model);
                 let usage = wire.usage;
@@ -548,7 +548,7 @@ impl Gateway {
                     logprobs: provider.logprobs.then_some(true),
                     top_logprobs: provider.logprobs.then_some(decide::openai::TOP_LOGPROBS),
                 };
-                let request = self.post(provider, "chat/completions")?.json(&body);
+                let request = self.post(provider, provider.decide_path())?.json(&body);
                 let wire: decide::openai::Response = self.send_with_retry(request).await?;
                 let model = if wire.model.is_empty() {
                     provider.model.clone()
@@ -631,15 +631,29 @@ impl Gateway {
 }
 
 /// `base_url` + `path`, treating `base_url` as a directory whether or not it
-/// ends with a slash.
+/// ends with a slash. The result stays under `base_url` (same scheme, host,
+/// port and path prefix), or it is a configuration error: the
+/// external-content gate judges the base URL alone.
 pub(crate) fn endpoint(base_url: &Url, path: &str) -> Result<Url, Error> {
     let mut base = base_url.clone();
     if !base.path().ends_with('/') {
         let with_slash = format!("{}/", base.path());
         base.set_path(&with_slash);
     }
-    base.join(path)
-        .map_err(|e| Error::Config(format!("invalid base_url {base_url}: {e}")))
+    let url = base
+        .join(path)
+        .map_err(|e| Error::Config(format!("invalid base_url {base_url}: {e}")))?;
+    let under_base = url.scheme() == base.scheme()
+        && url.host() == base.host()
+        && url.port_or_known_default() == base.port_or_known_default()
+        && url.path().starts_with(base.path());
+    if under_base {
+        Ok(url)
+    } else {
+        Err(Error::Config(format!(
+            "the path {path:?} leaves the base URL {base_url}"
+        )))
+    }
 }
 
 /// `Retry-After` in seconds, when a 503 carries one.
@@ -708,6 +722,20 @@ mod tests {
             endpoint(&b, "embeddings").unwrap().as_str(),
             "http://ollama:11434/v1/embeddings"
         );
+    }
+
+    #[test]
+    fn endpoint_never_leaves_the_base_url() {
+        let base = Url::parse("http://laya:8000/v1").unwrap();
+        for path in [
+            "https://elsewhere.example/decisions",
+            "//elsewhere.example/decisions",
+            "\\\\elsewhere.example/decisions",
+            "../decisions",
+            "%2e%2e/decisions",
+        ] {
+            assert!(endpoint(&base, path).is_err(), "{path}");
+        }
     }
 
     #[test]

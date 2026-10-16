@@ -67,8 +67,9 @@ pub enum Protocol {
     #[default]
     #[serde(rename = "openai")]
     OpenAi,
-    /// `laya-serve`'s typed decision protocol (`POST /v1/systemone`).
-    /// `decide` only (ADR 0009).
+    /// `laya-serve`'s typed decision protocol (`POST /v1/systemone`), also
+    /// spoken by hosted decision models such as Jev (ADR 0018). `decide`
+    /// only (ADR 0009).
     Laya,
 }
 
@@ -88,7 +89,7 @@ pub struct ProviderConfig {
     /// API base URL **including the version prefix**, as OpenAI SDKs expect:
     /// `http://ollama:11434/v1`, `http://tei/v1`, `https://api.example.com/v1`,
     /// `http://laya:8000/v1`. The gateway appends `chat/completions`,
-    /// `embeddings` or `systemone`.
+    /// `embeddings` or, for `decide`, its [`path`](Self::path).
     pub base_url: Url,
     /// Bearer token, if the provider needs one. Never logged.
     #[serde(default)]
@@ -99,6 +100,13 @@ pub struct ProviderConfig {
     /// Wire protocol (`CAMPBOOKS_AI__<ROLE>__PROTOCOL`, default `openai`).
     #[serde(default)]
     pub protocol: Protocol,
+    /// `decide` only: the path decide requests are posted to, relative to
+    /// [`base_url`](Self::base_url) (`CAMPBOOKS_AI__DECIDE__PATH`). Unset:
+    /// `systemone` for [`Protocol::Laya`], `chat/completions` for
+    /// [`Protocol::OpenAi`]. Jev is served at `decisions` under
+    /// `https://openrouter.ai/api/alpha` (ADR 0018).
+    #[serde(default, deserialize_with = "endpoint_path")]
+    pub path: Option<String>,
     /// `decide` only: per-question-type temperatures applied to answer
     /// probabilities (`CAMPBOOKS_AI__DECIDE__CALIBRATION__<TYPE>[_<OPTIONS>]`).
     #[serde(default)]
@@ -132,6 +140,7 @@ impl ProviderConfig {
             api_key: None,
             model: model.into(),
             protocol: Protocol::default(),
+            path: None,
             calibration: Calibration::default(),
             external_content: ExternalContent::default(),
             logprobs: default_logprobs(),
@@ -160,11 +169,66 @@ impl ProviderConfig {
         self
     }
 
+    /// The same provider posting `decide` requests to `path` (relative to
+    /// the base URL).
+    ///
+    /// # Errors
+    /// [`Error::Config`] when `path` is not plain segments (see the
+    /// `PATH` setting).
+    pub fn with_path(mut self, path: impl Into<String>) -> Result<Self, Error> {
+        self.path = clean_path(&path.into()).map_err(Error::Config)?;
+        Ok(self)
+    }
+
+    /// The path `decide` requests are posted to: [`path`](Self::path), or
+    /// the protocol's own (`systemone`, `chat/completions`).
+    pub fn decide_path(&self) -> &str {
+        self.path.as_deref().unwrap_or(match self.protocol {
+            Protocol::Laya => "systemone",
+            Protocol::OpenAi => "chat/completions",
+        })
+    }
+
     /// The same provider with these `decide` calibration temperatures.
     #[must_use]
     pub fn with_calibration(mut self, calibration: Calibration) -> Self {
         self.calibration = calibration;
         self
+    }
+}
+
+/// A path relative to the base URL: surrounding blanks and leading slashes
+/// dropped (a leading `/` would replace the base URL's own path); empty is
+/// none. Anything but plain segments of letters, digits, `-` and `_` is
+/// refused: a scheme, a backslash, a `.` or `..` segment or an escape could
+/// point the request, its content and its key at another host or path
+/// than the base URL, past the external-content gate, which judges the
+/// base URL alone.
+fn clean_path(raw: &str) -> Result<Option<String>, String> {
+    let path = raw.trim().trim_start_matches('/');
+    if path.is_empty() {
+        return Ok(None);
+    }
+    let plain = path.split('/').all(|segment| {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    });
+    if plain {
+        Ok(Some(path.to_owned()))
+    } else {
+        Err(format!(
+            "path {path:?}: only segments of letters, digits, `-` and `_` (such as `decisions`)"
+        ))
+    }
+}
+
+/// `CAMPBOOKS_AI__<ROLE>__PATH`; blank (left empty in `.env`) is none.
+fn endpoint_path<'de, D: Deserializer<'de>>(d: D) -> Result<Option<String>, D::Error> {
+    match Option::<String>::deserialize(d)? {
+        Some(raw) => clean_path(&raw).map_err(serde::de::Error::custom),
+        None => Ok(None),
     }
 }
 
@@ -304,6 +368,11 @@ impl AiConfig {
             if !provider.calibration.is_empty() {
                 return Err(Error::Config(format!(
                     "CAMPBOOKS_AI__{upper}__CALIBRATION__* is only valid for the decide role"
+                )));
+            }
+            if provider.path.is_some() {
+                return Err(Error::Config(format!(
+                    "CAMPBOOKS_AI__{upper}__PATH is only valid for the decide role"
                 )));
             }
         }
@@ -503,6 +572,74 @@ mod tests {
         })));
         let err = AiConfig::from_figment(&figment).unwrap_err().to_string();
         assert!(err.contains("CAMPBOOKS_AI__COMPLETE__CALIBRATION"), "{err}");
+    }
+
+    #[test]
+    fn the_decide_path_defaults_per_protocol_and_can_be_set() {
+        let decide = |extra: serde_json::Value| {
+            let mut role = serde_json::json!({"base_url": "https://x.example.com/api/alpha",
+                                              "model": "m"});
+            role.as_object_mut()
+                .unwrap()
+                .extend(extra.as_object().unwrap().clone());
+            let figment = Figment::from(Serialized::defaults(serde_json::json!({
+                "ai": {"decide": role}
+            })));
+            AiConfig::from_figment(&figment).unwrap().roles[&Role::Decide].clone()
+        };
+        assert_eq!(
+            decide(serde_json::json!({})).decide_path(),
+            "chat/completions"
+        );
+        assert_eq!(
+            decide(serde_json::json!({"protocol": "laya"})).decide_path(),
+            "systemone"
+        );
+        let jev = decide(serde_json::json!({"protocol": "laya", "path": "decisions"}));
+        assert_eq!(jev.decide_path(), "decisions");
+        assert_eq!(
+            decide(serde_json::json!({"protocol": "laya", "path": " /decisions "})).decide_path(),
+            "decisions",
+            "a leading slash would drop the base URL's path"
+        );
+        assert_eq!(
+            decide(serde_json::json!({"protocol": "laya", "path": ""})).decide_path(),
+            "systemone",
+            "left empty in .env"
+        );
+    }
+
+    #[test]
+    fn a_path_that_could_leave_the_base_url_is_refused() {
+        for path in [
+            "https://elsewhere.example/decisions",
+            "//elsewhere.example/decisions",
+            "\\\\elsewhere.example/decisions",
+            "../decisions",
+            "a/./b",
+            "%2e%2e/decisions",
+            "decisions?x=1",
+            "decisions#x",
+        ] {
+            let figment = Figment::from(Serialized::defaults(serde_json::json!({
+                "ai": {"decide": {"base_url": "http://laya:8000/v1", "model": "m",
+                                  "protocol": "laya", "path": path}}
+            })));
+            assert!(AiConfig::from_figment(&figment).is_err(), "{path}");
+        }
+        let ok = ProviderConfig::new(Url::parse("http://laya:8000/v1").unwrap(), "m")
+            .with_path("api/alpha_2/decisions-v1")
+            .unwrap();
+        assert_eq!(ok.decide_path(), "api/alpha_2/decisions-v1");
+    }
+
+    #[test]
+    fn the_path_is_refused_on_other_roles() {
+        let figment = Figment::from(Serialized::defaults(serde_json::json!({
+            "ai": {"embed": {"base_url": "http://x/v1", "model": "m", "path": "embed"}}
+        })));
+        let err = AiConfig::from_figment(&figment).unwrap_err().to_string();
+        assert!(err.contains("CAMPBOOKS_AI__EMBED__PATH"), "{err}");
     }
 
     #[test]

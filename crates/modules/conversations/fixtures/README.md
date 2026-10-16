@@ -4,7 +4,7 @@ Fictional mail for tests and local development, in the four languages
 Campbooks ships in. Every person, company and address is invented; domains
 are `example.com` or end in `.example`, except the public, no-person service addresses of `dependabot.json`
 and `github-comment.json`
-(a sender's real domain is what the rules read for such mail).
+(a sender's real domain is what the facts and the model read for such mail).
 
 Each file is a *recorded* `MessageChangeBatch` v1 (see
 `contracts/message-change-batch.v1.schema.json`): bodies (`text`, `html`,

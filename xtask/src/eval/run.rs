@@ -17,7 +17,7 @@ use campbooks_ai::{
     decide::{
         AnswerValue, Question,
         knn::{Embedder, GatewayEmbedder, InMemoryNeighbours, Knn, LexicalEmbedder},
-        signals::email::{EmailSignals, Envelope},
+        signals::{email::Envelope, facts::EmailFacts},
         strategy::{BoxFuture, Cascade, Decided, Decisions, Model, Stage, Strategy},
     },
 };
@@ -50,6 +50,7 @@ pub struct Run {
 /// Endpoints for the strategies that need one, from `CAMPBOOKS_EVAL_*`.
 pub struct Endpoints {
     pub laya: Result<Gateway, String>,
+    pub jev: Result<Gateway, String>,
     pub instruct: Result<Gateway, String>,
     pub embed: Result<(Gateway, String), String>,
 }
@@ -84,10 +85,36 @@ fn gateway(role: Role, config: ProviderConfig) -> Result<Gateway, String> {
     .map_err(|e| e.to_string())
 }
 
+/// Jev through the decisions endpoint at `openrouter.ai`, the same protocol as Laya at
+/// another path (ADR 0018): `CAMPBOOKS_EVAL_JEV_API_KEY`, and `_URL`
+/// (default `https://openrouter.ai/api/alpha`), `_PATH` (default
+/// `decisions`) and `_MODEL` (default `typesafe/jev-1.13`).
+fn jev() -> Result<ProviderConfig, String> {
+    let key = var("CAMPBOOKS_EVAL_JEV_API_KEY")
+        .ok_or_else(|| "CAMPBOOKS_EVAL_JEV_API_KEY is not set".to_owned())?;
+    let url = var("CAMPBOOKS_EVAL_JEV_URL").unwrap_or_else(|| JEV_URL.to_owned());
+    let base_url = Url::parse(&url).map_err(|e| format!("CAMPBOOKS_EVAL_JEV_URL: {e}"))?;
+    let model = var("CAMPBOOKS_EVAL_JEV_MODEL").unwrap_or_else(|| JEV_MODEL.to_owned());
+    let path = var("CAMPBOOKS_EVAL_JEV_PATH").unwrap_or_else(|| JEV_PATH.to_owned());
+    // The eval set is fictional, as for every hosted endpoint here.
+    Ok(ProviderConfig::new(base_url, model)
+        .with_external_content(ExternalContent::Allow)
+        .with_protocol(Protocol::Laya)
+        .with_path(path)
+        .map_err(|e| format!("CAMPBOOKS_EVAL_JEV_PATH: {e}"))?
+        .with_api_key(SecretString::from(key)))
+}
+
+/// Jev's endpoint, path and model when `CAMPBOOKS_EVAL_JEV_*` does not say.
+const JEV_URL: &str = "https://openrouter.ai/api/alpha";
+const JEV_PATH: &str = "decisions";
+const JEV_MODEL: &str = "typesafe/jev-1.13";
+
 impl Endpoints {
     pub fn from_env() -> Self {
         let laya = provider("LAYA", Some("convaiinnovations/laya-multilingual"))
             .and_then(|c| gateway(Role::Decide, c.with_protocol(Protocol::Laya)));
+        let jev = jev().and_then(|c| gateway(Role::Decide, c));
         let instruct = provider("INSTRUCT", None).and_then(|mut c| {
             c.logprobs = var("CAMPBOOKS_EVAL_INSTRUCT_LOGPROBS").is_none_or(|v| v != "false");
             gateway(Role::Decide, c)
@@ -98,6 +125,7 @@ impl Endpoints {
         });
         Self {
             laya,
+            jev,
             instruct,
             embed,
         }
@@ -106,11 +134,12 @@ impl Endpoints {
 
 /// The strategies `cargo xtask eval decide` knows, and whether each needs a
 /// model server.
-pub const BASE: [(&str, bool); 5] = [
-    ("signals", false),
+pub const BASE: [(&str, bool); 6] = [
+    ("facts", false),
     ("knn-lexical", false),
     ("knn-embed", true),
     ("laya", true),
+    ("jev", true),
     ("instruct", true),
 ];
 
@@ -159,15 +188,28 @@ async fn run_one(strategy: &dyn Strategy, envelope: &Envelope, questions: &[Ques
     }
 }
 
-/// A strategy that answers the same for every item.
+/// Attempts per item of a strategy whose call can fail (a hosted model
+/// rate-limiting), with a growing pause between them.
+const ATTEMPTS: u32 = 3;
+
+/// A strategy that answers the same for every item. An item whose call
+/// failed is asked again, up to [`ATTEMPTS`] times.
 pub async fn run_plain(ctx: &Context<'_>, strategy: &dyn Strategy) -> Run {
     let mut items = Vec::with_capacity(ctx.dataset.items.len());
     for (i, item) in ctx.dataset.items.iter().enumerate() {
-        items.push(if ctx.selected[i] {
-            Some(run_one(strategy, &item.message.envelope, ctx.questions).await)
-        } else {
-            None
-        });
+        if !ctx.selected[i] {
+            items.push(None);
+            continue;
+        }
+        let mut run = run_one(strategy, &item.message.envelope, ctx.questions).await;
+        for attempt in 1..ATTEMPTS {
+            if run.error.is_none() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_secs(2_u64.pow(attempt))).await;
+            run = run_one(strategy, &item.message.envelope, ctx.questions).await;
+        }
+        items.push(Some(run));
     }
     Run {
         name: strategy.name().to_owned(),
@@ -282,7 +324,7 @@ pub async fn run_base(
     endpoints: &Endpoints,
 ) -> Result<std::result::Result<Run, String>> {
     Ok(Ok(match name {
-        "signals" => run_plain(ctx, &EmailSignals).await,
+        "facts" => run_plain(ctx, &EmailFacts).await,
         "knn-lexical" => run_knn(ctx, &LexicalEmbedder::default(), None).await?,
         "knn-embed" => match &endpoints.embed {
             Ok((gateway, model)) => {
@@ -293,11 +335,11 @@ pub async fn run_base(
             }
             Err(reason) => return Ok(Err(reason.clone())),
         },
-        "laya" | "instruct" => {
-            let endpoint = if name == "laya" {
-                &endpoints.laya
-            } else {
-                &endpoints.instruct
+        "laya" | "jev" | "instruct" => {
+            let endpoint = match name {
+                "laya" => &endpoints.laya,
+                "jev" => &endpoints.jev,
+                _ => &endpoints.instruct,
             };
             match endpoint {
                 Ok(gateway) => {

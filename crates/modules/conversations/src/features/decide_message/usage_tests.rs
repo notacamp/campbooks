@@ -129,25 +129,31 @@ async fn kit(db: PgPool, server: &MockServer, ledger: Arc<Ledger>) -> Kit {
             decide_backfill_days: 100_000,
             ..ConversationsConfig::default()
         },
+        // The pass asks the metered `decide` role, not the kit's model.
+        model: None,
         ..sorting_deps()
     };
     Kit::with_deps(db, deps).await
 }
 
-/// Messages with model answers, and messages with rules answers.
+/// Messages the model answered, and every stored inbound message.
 async fn answered(db: &PgPool) -> (Vec<String>, Vec<String>) {
-    let by = |source: &'static str| async move {
-        sqlx::query_scalar::<_, String>(
-            "SELECT DISTINCT m.provider_message_id FROM conversations.decisions d
-               JOIN conversations.messages m ON m.id = d.message_id
-              WHERE d.source = $1 ORDER BY 1",
-        )
-        .bind(source)
-        .fetch_all(db)
-        .await
-        .unwrap()
-    };
-    (by("model").await, by("rules").await)
+    let model = sqlx::query_scalar(
+        "SELECT DISTINCT m.provider_message_id FROM conversations.decisions d
+           JOIN conversations.messages m ON m.id = d.message_id
+          WHERE d.source = 'model' ORDER BY 1",
+    )
+    .fetch_all(db)
+    .await
+    .unwrap();
+    let inbound = sqlx::query_scalar(
+        "SELECT provider_message_id FROM conversations.messages
+          WHERE direction = 'inbound' ORDER BY 1",
+    )
+    .fetch_all(db)
+    .await
+    .unwrap();
+    (model, inbound)
 }
 
 async fn unfinished_jobs(db: &PgPool) -> i64 {
@@ -158,7 +164,7 @@ async fn unfinished_jobs(db: &PgPool) -> i64 {
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
-async fn over_the_daily_limit_the_rest_is_sorted_by_rules_only(db: PgPool) {
+async fn over_the_daily_limit_the_rest_gets_no_model_pass(db: PgPool) {
     // Three inbound messages, a limit of two calls a day.
     let server = laya(2).await;
     let ledger = Arc::new(Ledger {
@@ -171,12 +177,12 @@ async fn over_the_daily_limit_the_rest_is_sorted_by_rules_only(db: PgPool) {
     let stats = kit.ingest(workspace, inbox, "en").await;
     assert_eq!((stats.failed, stats.retried), (0, 0), "{stats:?}");
 
-    let (model, rules) = answered(&db).await;
+    let (model, inbound) = answered(&db).await;
     assert_eq!(model.len(), 2, "the first two got the model: {model:?}");
-    assert_eq!(rules, ["en-1", "en-3", "en-4"], "the rules read every one");
-    let skipped = rules.iter().find(|m| !model.contains(m)).unwrap();
-    // Sorted by the rules, as with no model at all.
-    assert_eq!(kit.stream_of(skipped).await.1, "rules");
+    assert_eq!(inbound, ["en-1", "en-3", "en-4"], "every one was stored");
+    let skipped = inbound.iter().find(|m| !model.contains(m)).unwrap();
+    // Left as it was stored, as with no model at all.
+    assert_ne!(kit.stream_of(skipped).await.1, "model");
     // Every call was the workspace's, for triage.
     assert_eq!(
         ledger.calls.lock().unwrap().clone(),
@@ -204,10 +210,10 @@ async fn a_call_that_cannot_be_counted_is_not_made_and_asked_again(db: PgPool) {
     let inbox = kit.inbox(workspace, "sam@example.com", &[]).await;
     let stats = kit.ingest(workspace, inbox, "en").await;
     assert_eq!((stats.failed, stats.retried), (0, 3), "{stats:?}");
-    // Stored and sorted by the rules, nothing sent to the model.
-    let (model, rules) = answered(&db).await;
+    // Stored, nothing sent to the model.
+    let (model, inbound) = answered(&db).await;
     assert!(model.is_empty());
-    assert_eq!(rules.len(), 3);
+    assert_eq!(inbound.len(), 3);
     assert!(server.received_requests().await.unwrap().is_empty());
 
     // Once the ledger is back, the retries ask.

@@ -622,6 +622,7 @@ fn markdown_learning_curve(out: &mut String, report: &Report, questions: &[(Stri
 }
 
 /// Offline strategies whose operating point got worse than the baseline.
+/// Online runs in the baseline are ignored: `--check` runs offline only.
 pub fn regressions(baseline: &Report, current: &Report) -> Vec<String> {
     let mut out = Vec::new();
     for base in baseline.runs.iter().filter(|r| r.offline) {
@@ -703,7 +704,7 @@ mod tests {
             not_run: Vec::new(),
             learning_curve: Vec::new(),
             runs: vec![RunReport {
-                name: "signals".into(),
+                name: "facts".into(),
                 offline: true,
                 errors: 0,
                 latency_p50_ms: None,
@@ -739,13 +740,20 @@ mod tests {
     }
 
     #[test]
+    fn online_runs_in_the_baseline_are_not_compared() {
+        let mut base = report(0.97, 0.5);
+        let mut jev = base.runs[0].clone();
+        jev.name = "jev".into();
+        jev.offline = false;
+        base.runs.push(jev);
+        assert!(regressions(&base, &report(0.97, 0.5)).is_empty());
+    }
+
+    #[test]
     fn markdown_lists_runs_and_questions() {
         let md = markdown(&report(0.97, 0.5));
         assert!(md.contains("## `stream` — target precision 95%"), "{md}");
-        assert!(
-            md.contains("| `signals` | 0.90 | 97% | yes | 50% |"),
-            "{md}"
-        );
+        assert!(md.contains("| `facts` | 0.90 | 97% | yes | 50% |"), "{md}");
         let md = markdown(&report(0.9, 0.5));
         assert!(md.contains("| 90% | no |"), "{md}");
     }

@@ -139,6 +139,11 @@
       "no_today": "Rien dedans n’est pour aujourd’hui.",
       "no_phishing_tell": "Rien dedans ne ressemble à de l’hameçonnage."
     },
+    "facts": {
+      "list_mail": "Il a été envoyé à une liste de diffusion ({{evidence}}), il n’attend donc pas de réponse.",
+      "automatic": "Il a été envoyé automatiquement ({{evidence}}), il n’attend donc pas de réponse.",
+      "no_reply_sender": "Il vient d’une adresse que personne ne lit ({{evidence}}), il n’attend donc pas de réponse."
+    },
     "model": {
       "decide": "Le modèle de décision a répondu ({{evidence}})."
     },

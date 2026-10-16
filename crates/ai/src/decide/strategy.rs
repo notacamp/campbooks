@@ -7,8 +7,8 @@
 //! [`Gateway::decide`] returns, so a caller gates every strategy the same way
 //! with [`Answer::accept_if`].
 //!
-//! - [`EmailSignals`](super::signals::email::EmailSignals): deterministic
-//!   rules over headers, attachments, the sender and the text;
+//! - [`EmailFacts`](super::signals::facts::EmailFacts): structured facts
+//!   (headers, addresses), which only ever say "no" (ADR 0018);
 //! - [`Knn`](super::knn::Knn): the nearest of the workspace's own
 //!   corrections;
 //! - [`Model`]: the `decide` role (Laya or an instruct model);
@@ -31,15 +31,11 @@ pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 /// matched. The UI shows it under "Why?", translated by `rule`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Reason {
-    /// Stable id, `<strategy>.<rule>` (`signals.list_unsubscribe`,
+    /// Stable id, `<strategy>.<rule>` (`facts.list_mail`,
     /// `knn.neighbours`, `model.decide`).
     pub rule: &'static str,
-    /// What matched: a header name, a phrase, an attachment, a count.
+    /// What matched: a header name, an address, a count.
     pub evidence: String,
-    /// The sentence of the message's new text that holds the evidence, when
-    /// the evidence came from the text: what the sender actually wrote, for
-    /// quoting. Untrusted content, shown as quoted text only.
-    pub sentence: Option<String>,
 }
 
 impl Reason {
@@ -48,7 +44,6 @@ impl Reason {
         Self {
             rule,
             evidence: evidence.into(),
-            sentence: None,
         }
     }
 }
@@ -101,7 +96,7 @@ impl Decisions {
 
 /// A way of answering typed questions about a message.
 pub trait Strategy: Send + Sync {
-    /// Short name, used in reports and traces (`signals`, `knn-lexical`, …).
+    /// Short name, used in reports and traces (`facts`, `knn-lexical`, …).
     fn name(&self) -> &str;
 
     /// Answer `questions` about `envelope`; abstain (`None`) on any question it
@@ -214,7 +209,7 @@ pub struct Cascade {
 }
 
 impl Cascade {
-    /// A cascade of `stages`, named after them (`signals>knn-lexical>laya`).
+    /// A cascade of `stages`, named after them (`facts>knn-lexical>jev`).
     pub fn new(stages: Vec<Stage>) -> Self {
         let name = stages
             .iter()
@@ -272,7 +267,7 @@ impl Strategy for Cascade {
     }
 }
 
-/// An [`Answer`] built by a local strategy (rules, k-NN): probabilities in
+/// An [`Answer`] built by a local strategy (facts, k-NN): probabilities in
 /// question order, confidence = the largest, a score's value = the expected
 /// level, as [`Gateway::decide`] does.
 pub(crate) fn local_answer(

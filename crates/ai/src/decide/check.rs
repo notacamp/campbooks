@@ -44,7 +44,7 @@ pub const RECHECK_FAILED: Duration = Duration::from_mins(15);
 /// The purpose the check's calls are traced under.
 pub const PURPOSE: &str = "ai.answers_check";
 /// Prefix of the `model_version` of answers given while the check passed
-/// (`checked:ctx1`, or `checked:ctx1:<provider version>`). Answers without
+/// (`checked:ctx2`, or `checked:ctx2:<provider version>`). Answers without
 /// it were never vouched for by a check.
 pub const STAMP: &str = "checked:";
 
@@ -550,7 +550,7 @@ mod tests {
 
     #[test]
     fn stamps_carry_the_context_version() {
-        assert_eq!(stamp(None), "checked:ctx1");
-        assert_eq!(stamp(Some("fp_1")), "checked:ctx1:fp_1");
+        assert_eq!(stamp(None), "checked:ctx2");
+        assert_eq!(stamp(Some("fp_1")), "checked:ctx2:fp_1");
     }
 }

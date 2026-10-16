@@ -160,7 +160,8 @@ impl World {
         self.laya.received_requests().await.unwrap().len()
     }
 
-    /// `subject` → (stream, who placed it, whether the model answered).
+    /// Every inbound message: subject, stream, who placed it, whether the
+    /// model answered.
     async fn sorted(&self) -> Vec<(String, String, String, bool)> {
         sqlx::query_as(
             "SELECT m.subject, c.stream, c.stream_source,
@@ -204,8 +205,12 @@ fn story(line: &str) {
 
 fn show(rows: &[(String, String, String, bool)]) {
     for (subject, stream, source, model) in rows {
-        let by = if *model { "AI + rules" } else { "rules only" };
-        println!("    {subject:<45} → {stream:<11} ({source}, {by})");
+        let by = if *model {
+            "read by the AI"
+        } else {
+            "over the limit: rules only"
+        };
+        println!("    {subject:<45} {stream:<9} placed by {source:<6} {by}");
     }
 }
 
@@ -231,7 +236,12 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
         2,
         "{sorted:?}"
     );
-    assert!(sorted.iter().all(|(_, _, source, _)| source == "rules"));
+    // The one past the limit is left as it was stored: no model placed it.
+    assert!(
+        sorted
+            .iter()
+            .all(|(_, _, source, model)| *model || source != "model")
+    );
 
     story("The same day, one email arrives for another workspace, \"studio\"");
     assert_eq!(
