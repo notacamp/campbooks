@@ -811,10 +811,12 @@ pub async fn confirm(
     let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
     may_teach(&state, &mut tx, access, rule.inbox).await?;
     member_only(&workspace.principal)?;
-    if rule.state != RuleState::Proposed {
+    // Runs, then the rule row, then the check, so it holds to the end: a
+    // decline or another confirm in between finds it no longer proposed.
+    rule_runs::lock_running(&mut tx, rule.id).await?;
+    if rules::lock_state(&mut tx, rule.id).await? != Some(RuleState::Proposed) {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
-    rule_runs::lock_running(&mut tx, rule.id).await?;
     replace(
         &mut tx,
         &state,
@@ -897,10 +899,11 @@ pub async fn decline(
     let rule = visible_rule(&state, &mut tx, access, path.rule_id).await?;
     may_teach(&state, &mut tx, access, rule.inbox).await?;
     member_only(&workspace.principal)?;
-    if rule.state != RuleState::Proposed {
+    // Checked under the rule's lock (after its runs'), as confirm does.
+    rule_runs::lock_running(&mut tx, rule.id).await?;
+    if rules::lock_state(&mut tx, rule.id).await? != Some(RuleState::Proposed) {
         return Err(Error::Conflict(crate::MESSAGES.reason("rule_not_proposed")));
     }
-    rule_runs::lock_running(&mut tx, rule.id).await?;
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()
@@ -1102,6 +1105,13 @@ pub async fn remove(
     .await?;
     member_only(&workspace.principal)?;
     rule_runs::lock_running(&mut tx, rule.id).await?;
+    // Removed meanwhile (another Undo): nothing left to remove.
+    if matches!(
+        rules::lock_state(&mut tx, rule.id).await?,
+        None | Some(RuleState::Removed)
+    ) {
+        return Err(Error::NotFound);
+    }
     sqlx::query!(
         r#"UPDATE conversations.rules
               SET state = 'removed', removed_from = state, removed_at = now(), updated_at = now()

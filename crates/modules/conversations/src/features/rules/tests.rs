@@ -1283,3 +1283,66 @@ async fn anyone_who_teaches_confirms_or_declines_a_proposal_its_author_keeps(db:
     assert_eq!(back.status, StatusCode::OK, "{:?}", back.json);
     assert_eq!(back.json["state"], "proposed");
 }
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn confirm_and_decline_never_act_on_a_proposal_that_changed_meanwhile(db: PgPool) {
+    let kit = kit(db).await;
+    let (workspace, inbox, sam, _) = sams_notifications(&kit, 2).await;
+    let (leo, leo_id) = kit.member("leo", workspace);
+    kit.add_to_inbox(inbox, leo_id, InboxRole::Sender).await;
+    let rules = format!("/api/v1/w/{workspace}/inboxes/{inbox}/rules");
+    // While one member's request is between reading the proposal and acting
+    // on it, another's changes it: `then` is what the other one did.
+    for (verb, then) in [("confirm", "removed"), ("decline", "active")] {
+        let mut proposed = move_github();
+        proposed["state"] = json!("proposed");
+        let created = kit.post(&sam, &rules, Some(proposed)).await;
+        let rule = created.json["rule"]["id"].as_str().unwrap().to_owned();
+        let mut other = kit.db.begin().await.unwrap();
+        sqlx::query("SELECT id FROM conversations.rules WHERE id = $1::uuid FOR UPDATE")
+            .bind(&rule)
+            .fetch_one(&mut *other)
+            .await
+            .unwrap();
+        let uri = format!("/api/v1/w/{workspace}/rules/{rule}/{verb}");
+        let acting = kit.post(
+            &leo,
+            &uri,
+            (verb == "confirm").then(|| json!({"apply_to_existing": false})),
+        );
+        let meanwhile = async {
+            tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+            sqlx::query(
+                "UPDATE conversations.rules SET state = $2, removed_at = CASE WHEN $2 = 'removed'
+                    THEN now() END WHERE id = $1::uuid",
+            )
+            .bind(&rule)
+            .bind(then)
+            .execute(&mut *other)
+            .await
+            .unwrap();
+            other.commit().await.unwrap();
+        };
+        let (answer, ()) = tokio::join!(acting, meanwhile);
+        assert_eq!(
+            answer.status,
+            StatusCode::CONFLICT,
+            "{verb}: {:?}",
+            answer.json
+        );
+        assert_eq!(answer.json["code"], "rule_not_proposed");
+        let state: String =
+            sqlx::query_scalar("SELECT state FROM conversations.rules WHERE id = $1::uuid")
+                .bind(&rule)
+                .fetch_one(&kit.db)
+                .await
+                .unwrap();
+        assert_eq!(state, then, "{verb}");
+        // Done with it: out of the way of the next round's same conditions.
+        sqlx::query("UPDATE conversations.rules SET state = 'removed' WHERE id = $1::uuid")
+            .bind(&rule)
+            .execute(&kit.db)
+            .await
+            .unwrap();
+    }
+}
