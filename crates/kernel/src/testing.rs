@@ -75,6 +75,32 @@ pub async fn app_role_pool(db: &PgPool) -> PgPool {
         .unwrap_or_else(|e| panic!("connecting as the runtime role: {e}"))
 }
 
+/// A pool on the same database as `db` whose connections run as the
+/// runtime role **in the kernel scope** for the whole session: for tests
+/// that inspect or adjust the kernel's tables (the event log, the queue)
+/// across workspaces, as the kernel's own machinery does. A transaction
+/// that sets nothing sees none of their rows (campbooks-cloud#129).
+///
+/// # Panics
+/// If the database refuses the connection or the role switch.
+pub async fn kernel_scope_pool(db: &PgPool) -> PgPool {
+    PgPoolOptions::new()
+        .max_connections(2)
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                sqlx::query("SELECT set_config('role', $1, false), set_config($2, 'on', false)")
+                    .bind(db::DEFAULT_RUNTIME_ROLE)
+                    .bind(db::KERNEL_SCOPE_SETTING)
+                    .execute(conn)
+                    .await?;
+                Ok(())
+            })
+        })
+        .connect_with((*db.connect_options()).clone())
+        .await
+        .unwrap_or_else(|e| panic!("connecting in the kernel scope: {e}"))
+}
+
 /// Run `sql` on `db`, panicking on failure (test setup).
 async fn exec(db: &PgPool, sql: String) {
     sqlx::query(sqlx::AssertSqlSafe(sql))

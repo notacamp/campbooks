@@ -361,6 +361,7 @@ fn check_access(
         &tables,
         &arch_file.access,
     ));
+    violations.extend(access::check_kernel_scope(&sources, &arch_file.access));
     violations.extend(access::check_consumers(
         &published,
         &consumed,

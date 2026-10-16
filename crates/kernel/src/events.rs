@@ -18,7 +18,7 @@
 //!     fn workspace(&self) -> Option<&str> { Some(&self.workspace) }
 //! }
 //! // …and publishes it with its data change.
-//! let mut tx = state.db.begin().await?;
+//! let mut tx = state.db.begin_for(workspace).await?;
 //! /* insert the message */
 //! state.events.publish(&mut tx, &MessageReceived { .. }).await?;
 //! tx.commit().await?;
@@ -219,6 +219,14 @@ impl EventBus {
             .map(|c| jobs::attempts_to_db(c.max_attempts))
             .collect();
 
+        // An instance-wide event (an account's) may be published from a
+        // transaction that set no workspace: the kernel lifts it into its
+        // scope for the append only (row-level security shows the event log
+        // to no transaction that set nothing).
+        let lifted = match event.workspace() {
+            Some(_) => false,
+            None => crate::db::lift_for_instance_rows(tx).await?,
+        };
         let id = sqlx::query_scalar!(
             r#"
             WITH event AS (
@@ -247,6 +255,7 @@ impl EventBus {
         )
         .fetch_one(&mut **tx)
         .await?;
+        crate::db::lower(tx, lifted).await?;
 
         let changes = event.changes();
         if let (false, Some(workspace)) = (changes.is_empty(), event.workspace()) {
@@ -311,7 +320,8 @@ impl EventBus {
             ReplayFrom::Time(at) => (Some(at), None),
             ReplayFrom::Event(id) => (None, Some(id)),
         };
-        let mut tx = db.begin().await?;
+        // Across workspaces: every logged event of the type, whoever's.
+        let mut tx = crate::db::begin_kernel(db).await?;
         let enqueued = sqlx::query!(
             r#"
             INSERT INTO kernel.jobs
