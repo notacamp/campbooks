@@ -206,6 +206,25 @@ describe("What needs you", () => {
     expect(isSelected("Jonas Weber asked you a question")).toBe(true);
   });
 
+  it("leaves Enter on the toast's Undo to that button", async () => {
+    const calls = api();
+    renderHome();
+    await screen.findByText("This may be phishing. Don’t use its links.");
+    fireEvent.keyDown(document, { key: "x" });
+    const undo = await screen.findByRole("button", { name: /^Undo/u });
+    undo.focus();
+    fireEvent.keyDown(undo, { key: "Enter" });
+    await waitFor(() => {
+      expect(calls.calls.map((c) => c.route)).toContain(
+        `POST ${W}/conversations/${PHISH.id}/need/reopen`,
+      );
+    });
+    // Marta, now selected, was not touched.
+    expect(calls.calls.map((c) => c.route)).not.toContain(
+      `POST ${W}/conversations/${MARTA.id}/need/resolve`,
+    );
+  });
+
   it("answers a question with 1 and 2", async () => {
     const question = {
       ...JONAS,

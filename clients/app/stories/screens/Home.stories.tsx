@@ -123,16 +123,18 @@ export const SafeWithUndo: Story = {
   },
 };
 
-/** L opens Later: later today, tomorrow or Monday. */
-export const LaterMenu: Story = {
+/** S opens Snooze: later today, tomorrow, Monday or next week, in a dialog. */
+export const SnoozeDialog: Story = {
   args: { path: PATH, api: home() },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await canvas.findByText("Marta Ferreira is waiting for your reply");
     await userEvent.keyboard("j");
-    await userEvent.keyboard("l");
+    await userEvent.keyboard("s");
     const body = within(canvasElement.ownerDocument.body);
-    await expect(await body.findByRole("dialog", { name: "Bring it back" })).toBeVisible();
+    await expect(
+      await body.findByRole("dialog", { name: "Snooze Marta Ferreira until…" }),
+    ).toBeVisible();
   },
 };
 

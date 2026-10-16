@@ -279,7 +279,7 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
         onError: () => {
           if (until === undefined) {
             hide(row);
-            undo.fail({ label: t("snooze.failed", { name: row.name }) });
+            undo.fail({ label: t("snooze.undoFailed", { name: row.name }) });
             return;
           }
           show(row);
@@ -448,7 +448,21 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   );
   useShortcut(
     "list.open",
-    () => {
+    (event) => {
+      // Enter on another control (the toast's Undo or Retry, Done today's
+      // Undo, Open conversation) is that control's: press it, as the browser
+      // would have. Only a row, an action button or the page itself is Home's.
+      const target = event?.target;
+      if (target instanceof HTMLElement && target !== document.body) {
+        const row = target.id.startsWith(ITEM_ID_PREFIX);
+        const action = target.dataset["action"] !== undefined;
+        if (!row && !action) {
+          if (target.matches("button, a[href]")) {
+            target.click();
+          }
+          return;
+        }
+      }
       if (selected === undefined) {
         return;
       }
@@ -675,7 +689,8 @@ export function WhatNeedsYou({ workspaceId, now, offer }: WhatNeedsYouProps) {
   );
 }
 
-const itemId = (id: string) => `attention-${id}`;
+const ITEM_ID_PREFIX = "attention-";
+const itemId = (id: string) => `${ITEM_ID_PREFIX}${id}`;
 
 const goneKey = (item: ItemView) => `${item.id}:${item.cause.id}`;
 

@@ -35,7 +35,8 @@
     "nextWeek": "Próxima semana",
     "toast": "Adiado · {{name}}, volta {{when}}",
     "button": "Adiar…",
-    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo."
+    "failed": "Não foi possível adiar {{name}}: nada mudou. Tente de novo.",
+    "undoFailed": "Não foi possível trazer {{name}} de volta: continua adiado. Tente de novo."
   },
   "actions": {
     "reply": "Responder",

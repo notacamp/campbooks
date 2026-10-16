@@ -72,9 +72,9 @@ function PendingDemo() {
     <div className="flex flex-wrap gap-2">
       <Button
         onClick={() => {
-          const handle = undo.pending({ label: "Sending to Marta…", cancel: () => undefined });
+          const handle = undo.pending({ label: "Sending to Marta…", cancel: fn() });
           setTimeout(() => {
-            handle.done({ label: "Sent to Marta", undo: () => undefined });
+            handle.done({ label: "Sent to Marta", undo: fn() });
           }, 1500);
         }}
       >
@@ -86,7 +86,7 @@ function PendingDemo() {
           setTimeout(() => {
             handle.fail({
               label: "Couldn’t send to Marta. Your draft is kept.",
-              retry: () => undefined,
+              retry: fn(),
             });
           }, 800);
         }}

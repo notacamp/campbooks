@@ -55,8 +55,13 @@ export function useNeedActions(
           }
         },
         onError: (error) => {
-          // Nothing changed on the server: put it back and say so plainly.
-          onFailed?.(conversation);
+          // Nothing changed on the server: put it back as it was and say so
+          // plainly. A failed reopen leaves it done (hidden again).
+          if (verdict === "reopen") {
+            onRedo?.(conversation);
+          } else {
+            onFailed?.(conversation);
+          }
           const need = conversation.need;
           const name = need === null || need === undefined ? "" : needSender(need, conversation);
           // A failure stays until Retry or dismiss. A need that changed
@@ -67,7 +72,12 @@ export function useNeedActions(
             undo.fail({
               label: t("needs.toast.failed", { name }),
               retry: () => {
-                onRedo?.(conversation);
+                // Show at once what the retry is about to do.
+                if (verdict === "reopen") {
+                  onUndo?.(conversation);
+                } else if (verdict !== "confirm") {
+                  onRedo?.(conversation);
+                }
                 run(conversation, verdict);
               },
             });

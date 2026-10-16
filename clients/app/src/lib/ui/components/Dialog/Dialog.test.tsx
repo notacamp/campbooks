@@ -44,11 +44,11 @@ function Snooze({
   );
 }
 
-afterEach(() => {
-  vi.useRealTimers();
-});
-
 describe("Dialog", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("is a labelled modal that focuses its first choice", () => {
     renderUi(<Snooze />);
     const dialog = screen.getByRole("dialog", { name: "Snooze Marta Ferreira until…" });

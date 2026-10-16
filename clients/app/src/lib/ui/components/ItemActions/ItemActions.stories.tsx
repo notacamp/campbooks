@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent, waitFor, within } from "storybook/test";
 
 import { ItemActions, type ItemAction } from "./ItemActions";
 
@@ -79,9 +79,11 @@ export const TabMoves: StoryObj = {
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("button", { name: /Reply/ })).toHaveFocus();
     canvas.getByRole("button", { name: /Snooze/ }).focus();
-    await expect(canvas.getByRole("button", { name: /Snooze/ })).toHaveAttribute(
-      "data-highlighted",
-      "true",
-    );
+    await waitFor(async () => {
+      await expect(canvas.getByRole("button", { name: /Snooze/ })).toHaveAttribute(
+        "data-highlighted",
+        "true",
+      );
+    });
   },
 };

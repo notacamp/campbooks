@@ -35,7 +35,8 @@
     "nextWeek": "La semana que viene",
     "toast": "Pospuesto · {{name}}, vuelve {{when}}",
     "button": "Posponer…",
-    "failed": "No se ha podido posponer {{name}}: no ha cambiado nada. Vuelve a intentarlo."
+    "failed": "No se ha podido posponer {{name}}: no ha cambiado nada. Vuelve a intentarlo.",
+    "undoFailed": "No se ha podido recuperar {{name}}: sigue pospuesto. Vuelve a intentarlo."
   },
   "actions": {
     "reply": "Responder",

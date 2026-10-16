@@ -35,7 +35,8 @@
     "nextWeek": "Next week",
     "toast": "Snoozed · {{name}}, back {{when}}",
     "button": "Snooze…",
-    "failed": "Couldn’t snooze {{name}}: nothing changed. Try again."
+    "failed": "Couldn’t snooze {{name}}: nothing changed. Try again.",
+    "undoFailed": "Couldn’t bring {{name}} back: it stays snoozed. Try again."
   },
   "actions": {
     "reply": "Reply",

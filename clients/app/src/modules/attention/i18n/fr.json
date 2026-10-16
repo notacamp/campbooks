@@ -35,7 +35,8 @@
     "nextWeek": "La semaine prochaine",
     "toast": "Reporté · {{name}}, revient {{when}}",
     "button": "Reporter…",
-    "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez."
+    "failed": "Impossible de reporter {{name}} : rien n’a changé. Réessayez.",
+    "undoFailed": "Impossible de faire revenir {{name}} : il reste reporté. Réessayez."
   },
   "actions": {
     "reply": "Répondre",
