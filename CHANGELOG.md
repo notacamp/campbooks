@@ -8,6 +8,9 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **TLS library updated to rustls 0.23.46**, which fixes RUSTSEC-2026-0346 to 0349: TLS
+  secrets in `Debug` output, data sent after an ECH rejection, unbounded certificate
+  decompression, and a downgrade to classical key exchange.
 - **Only the member who connected a mailbox can disconnect it.** Workspace owners and
   admins still see its health and can sync it now, but get 403 `disconnect_owner_only`.
 - **Disconnecting deletes the mailbox's mail by default.** That covers its messages,
