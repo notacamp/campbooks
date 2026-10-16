@@ -1,0 +1,30 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n                INSERT INTO conversations.decisions\n                    (id, workspace_id, message_id, conversation_id, question, source, strategy,\n                     value, options, probabilities, confidence, model, model_version,\n                     latency_ms, reasons, acted, state_version)\n                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)\n                ON CONFLICT (message_id, question, source) DO UPDATE\n                   SET strategy = EXCLUDED.strategy, value = EXCLUDED.value,\n                       options = EXCLUDED.options, probabilities = EXCLUDED.probabilities,\n                       confidence = EXCLUDED.confidence, model = EXCLUDED.model,\n                       model_version = EXCLUDED.model_version,\n                       latency_ms = EXCLUDED.latency_ms, reasons = EXCLUDED.reasons,\n                       acted = EXCLUDED.acted, state_version = EXCLUDED.state_version,\n                       created_at = now()\n                 WHERE conversations.decisions.source = 'model'\n                   AND coalesce(conversations.decisions.model_version, '') NOT LIKE 'checked:%'\n                   AND EXCLUDED.model_version LIKE 'checked:%'\n                ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Text",
+        "Text",
+        "Text",
+        "Jsonb",
+        "Jsonb",
+        "Jsonb",
+        "Float8",
+        "Text",
+        "Text",
+        "Int4",
+        "Jsonb",
+        "Bool",
+        "Int2"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "9da4b3e2de9808e86a18b0aee4103205b9db1fcfeef1d3b654865f827461faff"
+}

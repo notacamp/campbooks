@@ -18,4 +18,5 @@ pub mod resources;
 pub mod rule_runs;
 pub mod rules;
 pub mod sanitize;
+pub mod streams;
 pub mod suggestions;

@@ -203,10 +203,13 @@ async fn suspicious_mail_and_hand_placed_mail_are_left_alone(db: PgPool) {
     let (workspace, inbox, sam, _) = sams_notifications(&kit, 5).await;
     // gh-0 looks suspicious; Sam put gh-1 in Receipts by hand.
     sqlx::query(
-        "UPDATE conversations.decisions d SET value = 'true'::jsonb
-           FROM conversations.messages m
-          WHERE d.message_id = m.id AND m.provider_message_id = 'gh-0'
-            AND d.question = 'suspicious'",
+        // The model's "yes" (the facts never answer `suspicious`).
+        "INSERT INTO conversations.decisions
+             (id, workspace_id, message_id, conversation_id, question, source, strategy,
+              value, confidence, model, acted, state_version)
+         SELECT gen_random_uuid(), m.workspace_id, m.id, m.conversation_id, 'suspicious',
+                'model', 'model', 'true'::jsonb, 0.97, 'scripted', true, 3
+           FROM conversations.messages m WHERE m.provider_message_id = 'gh-0'",
     )
     .execute(&kit.db)
     .await
@@ -876,10 +879,13 @@ async fn previews_never_show_suspicious_mail_and_say_when_complete(db: PgPool) {
     let (workspace, inbox, sam, _) = sams_notifications(&kit, 3).await;
     // gh-2, the newest, looks suspicious.
     sqlx::query(
-        "UPDATE conversations.decisions d SET value = 'true'::jsonb
-           FROM conversations.messages m
-          WHERE d.message_id = m.id AND m.provider_message_id = 'gh-2'
-            AND d.question = 'suspicious'",
+        // The model's "yes" (the facts never answer `suspicious`).
+        "INSERT INTO conversations.decisions
+             (id, workspace_id, message_id, conversation_id, question, source, strategy,
+              value, confidence, model, acted, state_version)
+         SELECT gen_random_uuid(), m.workspace_id, m.id, m.conversation_id, 'suspicious',
+                'model', 'model', 'true'::jsonb, 0.97, 'scripted', true, 3
+           FROM conversations.messages m WHERE m.provider_message_id = 'gh-2'",
     )
     .execute(&kit.db)
     .await

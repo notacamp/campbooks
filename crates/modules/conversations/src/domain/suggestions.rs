@@ -18,7 +18,8 @@ use crate::model::{ConversationId, MessageId, Stream, StreamSource};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DecisionSource {
-    /// The shared email signals.
+    /// The facts: headers and addresses, which only say "no" (before
+    /// ADR 0018, the retired content rules).
     Rules,
     /// The `decide` model.
     Model,
@@ -49,8 +50,8 @@ impl DecisionSource {
 /// and what it matched.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct ReasonView {
-    /// `<strategy>.<rule>`, e.g. `signals.list_header`.
-    #[schema(example = "signals.list_header")]
+    /// `<strategy>.<rule>`, e.g. `facts.list_mail`.
+    #[schema(example = "facts.list_mail")]
     pub rule: String,
     /// What it matched (a header name, a word), possibly empty.
     pub evidence: String,
@@ -99,8 +100,8 @@ pub struct DecisionView {
     pub source: DecisionSource,
     /// How sure, 0 to 100, when the source says.
     pub confidence: Option<u8>,
-    /// Whether it changed anything. In this version only a confident rules
-    /// stream answer may; every other answer is a suggestion.
+    /// Whether it changed anything: the policy let it act (a stream answer
+    /// only when it placed the conversation). The others are suggestions.
     pub acted: bool,
     /// The confidence, 0 to 100, from which an answer of this source to
     /// this question may act; `None` when it never acts (a suggestion).
@@ -254,11 +255,31 @@ mod tests {
     use axum::http::StatusCode;
     use sqlx::PgPool;
 
-    use crate::{ConversationsDeps, Policy, model::InboxRole, testkit::Kit};
+    use std::sync::Arc;
+
+    use campbooks_ai::decide::{AnswerValue, signals::email::triage};
+
+    use crate::{
+        Policy,
+        model::InboxRole,
+        testkit::{Kit, Scripted, sorting_deps},
+    };
 
     #[sqlx::test(migrations = "../../../migrations")]
-    async fn the_shipped_policy_shows_stream_answers_as_suggestions_with_reasons(db: PgPool) {
-        let deps = ConversationsDeps::offline().with_policy(Policy::baseline());
+    async fn an_unsure_stream_answer_is_a_suggestion_with_reasons(db: PgPool) {
+        // The model thinks the newsletter is one, below the shipped
+        // policy's operating point for the stream.
+        let model = Scripted::model([(
+            "hello@letters.paperkite.example",
+            vec![(
+                triage::STREAM,
+                AnswerValue::Choice("newsletters".into()),
+                0.4,
+            )],
+        )]);
+        let deps = sorting_deps()
+            .with_policy(Policy::baseline())
+            .with_model(Arc::new(model));
         let kit = Kit::with_deps(db, deps).await;
         let workspace = campbooks_kernel::tenancy::WorkspaceId::new();
         let (sam, user) = kit.member("sam", workspace);
@@ -279,14 +300,10 @@ mod tests {
         // Not moved: still in Primary, with Newsletters suggested and why.
         assert_eq!(newsletter["stream"], "primary");
         assert_eq!(newsletter["suggestion"]["stream"], "newsletters");
-        assert_eq!(newsletter["suggestion"]["source"], "rules");
+        assert_eq!(newsletter["suggestion"]["source"], "model");
+        assert_eq!(newsletter["suggestion"]["confidence"], 40);
         let reasons = newsletter["suggestion"]["reasons"].as_array().unwrap();
-        assert!(
-            reasons
-                .iter()
-                .any(|r| r["rule"].as_str().unwrap().starts_with("signals.")),
-            "{reasons:?}"
-        );
+        assert_eq!(reasons[0]["rule"], "model.decide", "{reasons:?}");
 
         let id = newsletter["id"].as_str().unwrap();
         let detail = kit.get(&sam, &format!("{base}/{id}")).await;
