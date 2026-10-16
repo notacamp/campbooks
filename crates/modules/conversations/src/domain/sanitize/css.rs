@@ -5,7 +5,9 @@
 //! A declaration is kept only when every token of its value is inert:
 //! no `url(`, no function outside [`FUNCTIONS`] (so no `image-set(`,
 //! `src(`, `expression(`, `var(`, `attr(`, `env(`), no at-keyword, no
-//! malformed URL or string, no CSS escape (`\`) and no `<`. Custom
+//! malformed URL or string, no CSS escape (`\`) and no `<`, and its
+//! property is a plain lower-case name (no escapes that decode to
+//! something else). Custom
 //! properties, the scripting properties of old engines (`behavior`,
 //! `-moz-binding`) and lengths in viewport units are dropped too (the
 //! reader sizes the frame to its content, and a length that follows the
@@ -103,6 +105,10 @@ const MAX_DEPTH: usize = 8;
 /// Most bytes of `@media` rules handed to the client.
 pub const MAX_MEDIA_BYTES: usize = 64 * 1024;
 
+/// Most distinct properties kept from one style sheet: what the inliner does
+/// per element grows with it (and real mail uses well under a hundred).
+pub const MAX_PROPERTIES: usize = 256;
+
 /// One kept declaration: the property, lower-case, and its value as written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Declaration {
@@ -153,6 +159,41 @@ pub fn media_rules(sheet: &str) -> Option<String> {
     (!css.is_empty() && css.len() <= MAX_MEDIA_BYTES).then_some(css)
 }
 
+/// A sheet's plain style rules, filtered, ready to inline.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct PlainRules {
+    /// The rules, each a checked selector and its kept declarations.
+    pub css: String,
+    /// How many distinct properties they set (at most [`MAX_PROPERTIES`]).
+    pub properties: usize,
+}
+
+/// The plain style rules of `sheet` (no at-rules) whose selectors are inert,
+/// with their kept declarations, written back from what was checked: the
+/// only CSS the inliner ever reads. A declaration of a property past the
+/// first [`MAX_PROPERTIES`] distinct ones is dropped.
+pub fn plain_rules(sheet: &str) -> PlainRules {
+    let mut parser = Parser::new(sheet);
+    let mut top = PlainTopLevel::default();
+    let rules: Vec<String> = StyleSheetParser::new(&mut parser, &mut top)
+        .filter_map(Result::ok)
+        .collect();
+    PlainRules {
+        css: rules.join("\n"),
+        properties: top.names.len(),
+    }
+}
+
+/// A property name written plainly: ASCII lower-case letters, digits and
+/// hyphens, starting with a letter (after an optional vendor `-`).
+fn plain_name(name: &str) -> bool {
+    let rest = name.strip_prefix('-').unwrap_or(name);
+    rest.starts_with(|c: char| c.is_ascii_lowercase())
+        && rest
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
 /// Whether the source text could hide what it does (escapes) or end an
 /// HTML context it is put in (`<`).
 fn suspicious(text: &str) -> bool {
@@ -168,6 +209,8 @@ fn viewport_unit(unit: &str) -> bool {
         || unit.ends_with("vi")
         || unit.ends_with("vmin")
         || unit.ends_with("vmax")
+        // Container units: with no container they are the viewport's.
+        || unit.starts_with("cq")
 }
 
 /// Whether every token left in `input` is inert for a declaration value.
@@ -196,7 +239,8 @@ fn inert_value(input: &mut Parser<'_>, depth: usize) -> bool {
                 }
                 true
             }
-            Token::ParenthesisBlock | Token::SquareBracketBlock | Token::CurlyBracketBlock => true,
+            Token::CurlyBracketBlock => return false,
+            Token::ParenthesisBlock | Token::SquareBracketBlock => true,
             _ => false,
         };
         if nested
@@ -274,17 +318,21 @@ impl<'i> DeclarationParser<'i> for Declarations {
         &mut self,
         name: CowRcStr<'i>,
         input: &mut Parser<'i>,
-        _start: &ParserState,
+        declaration_start: &ParserState,
     ) -> Result<Declaration, ParseError<()>> {
         let name = name.to_ascii_lowercase();
+        // The name as written: an escape in it could decode to anything
+        // (`x\3b background\3a url\28 …`), and the decoded name is what is
+        // written back.
+        let written = input.slice_from(declaration_start.position());
         let start = input.position();
         let inert = inert_value(input, 0);
         let value = input.slice_from(start).trim();
         if !inert
             || value.is_empty()
-            || name.starts_with("--")
+            || !plain_name(&name)
             || PROPERTIES.contains(&name.as_str())
-            || suspicious(&name)
+            || suspicious(written)
             || suspicious(value)
         {
             return Err(ParseError::custom(()));
@@ -315,6 +363,59 @@ impl RuleBodyItemParser<'_, Declaration, ()> for Declarations {
     fn parse_qualified(&self) -> bool {
         false
     }
+}
+
+/// Reads a style sheet's plain style rules, counting distinct properties.
+#[derive(Default)]
+struct PlainTopLevel {
+    names: std::collections::HashSet<String>,
+}
+
+impl AtRuleParser<'_> for PlainTopLevel {
+    type Prelude = ();
+    type AtRule = String;
+    type Error = ();
+}
+
+impl<'i> QualifiedRuleParser<'i> for PlainTopLevel {
+    type Prelude = String;
+    type QualifiedRule = String;
+    type Error = ();
+
+    fn parse_prelude(&mut self, input: &mut Parser<'i>) -> Result<String, ParseError<()>> {
+        selector(input)
+    }
+
+    fn parse_block(
+        &mut self,
+        selector: String,
+        _start: &ParserState,
+        input: &mut Parser<'i>,
+    ) -> Result<String, ParseError<()>> {
+        let mut declarations = Declarations;
+        let kept: Vec<Declaration> = RuleBodyParser::new(input, &mut declarations)
+            .filter_map(Result::ok)
+            .filter(|d| {
+                self.names.contains(&d.name)
+                    || (self.names.len() < MAX_PROPERTIES && self.names.insert(d.name.clone()))
+            })
+            .collect();
+        if kept.is_empty() {
+            return Err(ParseError::custom(()));
+        }
+        Ok(format!("{selector} {{ {} }}", join(&kept)))
+    }
+}
+
+/// A rule's selector, if every token of it is inert.
+fn selector(input: &mut Parser<'_>) -> Result<String, ParseError<()>> {
+    let start = input.position();
+    let inert = inert_prelude(input, SELECTOR_FUNCTIONS, 0);
+    let selector = input.slice_from(start).trim();
+    if !inert || selector.is_empty() || suspicious(selector) {
+        return Err(ParseError::custom(()));
+    }
+    Ok(selector.to_owned())
 }
 
 /// Reads a style sheet's top level: only `@media` rules give anything.
@@ -377,13 +478,7 @@ impl<'i> QualifiedRuleParser<'i> for StyleRules {
     type Error = ();
 
     fn parse_prelude(&mut self, input: &mut Parser<'i>) -> Result<String, ParseError<()>> {
-        let start = input.position();
-        let inert = inert_prelude(input, SELECTOR_FUNCTIONS, 0);
-        let selector = input.slice_from(start).trim();
-        if !inert || selector.is_empty() || suspicious(selector) {
-            return Err(ParseError::custom(()));
-        }
-        Ok(selector.to_owned())
+        selector(input)
     }
 
     fn parse_block(
@@ -484,6 +579,49 @@ mod tests {
             Some("color: red; font-weight: bold")
         );
         assert_eq!(kept("}; color: red").as_deref(), Some("color: red"));
+    }
+
+    #[test]
+    fn an_escaped_property_name_cannot_smuggle_declarations() {
+        // Decoded, the name would end the declaration and start another.
+        assert_eq!(
+            kept(
+                r"x\3b background-image\3a url\28 https\3a \2f \2f t\2e example\2f p\29 \3b y:red"
+            ),
+            None
+        );
+        assert_eq!(
+            kept(r"\63 olor: red; font-weight: bold").as_deref(),
+            Some("font-weight: bold")
+        );
+        assert_eq!(
+            media_rules(r"@media screen { .a { x\3b background-image\3a url\28 x\29 \3b y: red; color: blue } }").as_deref(),
+            Some("@media screen {\n.a { color: blue }\n}")
+        );
+        let rules = plain_rules(r".a { x\7d @font-face\7b src\3a url\28 x\29 : red; color: blue }");
+        assert_eq!(rules.css, ".a { color: blue }");
+    }
+
+    #[test]
+    fn plain_rules_are_checked_and_capped() {
+        let rules = plain_rules(
+            ".lead { color: #333; background: url(x) } @media (max-width: 1px) { .m { color: red } } .bad\\:x { color: red } td:hover, a[href] { color: blue }",
+        );
+        assert_eq!(
+            rules.css,
+            ".lead { color: #333 }\ntd:hover, a[href] { color: blue }"
+        );
+        assert_eq!(rules.properties, 1);
+        let many: String = (0..1000).map(|i| format!("a{i}: x;")).collect();
+        let capped = plain_rules(&format!("* {{ {many} }} p {{ color: red }}"));
+        assert_eq!(capped.properties, MAX_PROPERTIES);
+        assert!(!capped.css.contains("color: red"), "past the cap");
+    }
+
+    #[test]
+    fn container_units_are_dropped() {
+        assert_eq!(kept("height: 100cqh"), None);
+        assert_eq!(kept("width: 10cqmin"), None);
     }
 
     #[test]

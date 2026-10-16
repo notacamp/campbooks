@@ -9,13 +9,25 @@
 //! apply to the frame's document. The `<body>`'s own look (its inlined
 //! style and `bgcolor`) comes back too, for the wrapper that replaces it.
 //!
-//! Nothing here fetches or reads anything: remote style sheets are never
-//! loaded (css-inline without its `http` and `file` features, and a
-//! resolver that refuses every location), and every declaration is
-//! filtered again afterwards ([`super::css`]).
+//! The inliner never reads the message's own CSS: the sheets are filtered
+//! first ([`super::css::plain_rules`]: inert selectors, inert declarations,
+//! plain property names) and only that is handed to it, so what it writes
+//! into `style` attributes was already checked (and is filtered again by
+//! ammonia's pass). Nothing here fetches or reads anything: remote style
+//! sheets are never loaded (css-inline without its `http` and `file`
+//! features, `load_remote_stylesheets(false)`, and a resolver that refuses
+//! every location).
+//!
+//! Inlining is skipped (the sheets are dropped, as before) when the work
+//! could get out of hand: more than [`MAX_STYLE_BYTES`] of style text,
+//! elements nested deeper than [`MAX_NESTING`] (the inliner's serialiser
+//! recurses), more than [`MAX_ELEMENTS`] elements, or more than
+//! [`MAX_WORK`] elements times distinct properties (the size of what it
+//! could write).
 
-use std::{cell::RefCell, sync::Arc};
+use std::{borrow::Cow, cell::RefCell, sync::Arc};
 
+use super::css;
 use css_inline::{CSSInliner, InlineError, StylesheetResolver};
 use html5ever::{
     tendril::StrTendril,
@@ -25,9 +37,20 @@ use html5ever::{
     },
 };
 
-/// Most bytes of `<style>` text inlined; past that, the sheets are dropped
-/// as before (selector matching grows with rules times elements).
+/// Most bytes of `<style>` text inlined.
 pub const MAX_STYLE_BYTES: usize = 256 * 1024;
+/// Deepest element nesting inlined.
+pub const MAX_NESTING: usize = 256;
+/// Most elements inlined.
+pub const MAX_ELEMENTS: usize = 20_000;
+/// Most elements times distinct properties inlined.
+pub const MAX_WORK: usize = 1_000_000;
+
+/// Elements that never take content, so never nest.
+const VOID: [&str; 15] = [
+    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
+    "wbr", "param", "keygen",
+];
 
 /// The HTML with its style sheets inlined, and what inlining left over.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -38,39 +61,48 @@ pub struct Inlined {
     /// The `<body>` element's `style` (with the rules that matched it) and
     /// `bgcolor`, unfiltered.
     pub body: Vec<(String, String)>,
-    /// The sheets' text that inlining kept back (their at-rules), unfiltered.
-    pub leftover: String,
+    /// The sheets' `@media` rules, filtered ([`css::media_rules`]).
+    pub media: Option<String>,
 }
 
 /// Inline the style sheets of `html`.
 pub fn inline(html: &str) -> Inlined {
-    let original = scan(html);
-    let fallback = || Inlined {
+    let found = scan(html);
+    let unchanged = |media: Option<String>| Inlined {
         html: html.to_owned(),
-        body: original.body.clone(),
-        leftover: String::new(),
+        body: found.body.clone(),
+        media,
     };
-    if original.styles.is_empty() || original.styles.len() > MAX_STYLE_BYTES {
-        return fallback();
+    if found.styles.trim().is_empty()
+        || found.styles.len() > MAX_STYLE_BYTES
+        || found.deepest > MAX_NESTING
+        || found.elements > MAX_ELEMENTS
+    {
+        return unchanged(None);
+    }
+    let media = css::media_rules(&found.styles);
+    let rules = css::plain_rules(&found.styles);
+    if rules.css.is_empty() || rules.properties.saturating_mul(found.elements) > MAX_WORK {
+        return unchanged(media);
     }
     let inliner = CSSInliner::options()
-        .inline_style_tags(true)
+        // The message's own `<style>` text is never read: only the
+        // filtered rules.
+        .inline_style_tags(false)
+        .keep_at_rules(false)
         .keep_style_tags(false)
         .keep_link_tags(false)
-        .keep_at_rules(true)
         .load_remote_stylesheets(false)
         .resolver(Arc::new(Refuse))
+        .extra_css(Some(Cow::Owned(rules.css)))
         .build();
     match inliner.inline(html) {
-        Ok(output) => {
-            let found = scan(&output);
-            Inlined {
-                html: output,
-                body: found.body,
-                leftover: found.styles,
-            }
-        }
-        Err(_) => fallback(),
+        Ok(output) => Inlined {
+            body: scan(&output).body,
+            html: output,
+            media,
+        },
+        Err(_) => unchanged(media),
     }
 }
 
@@ -90,6 +122,11 @@ struct Found {
     styles: String,
     /// The first `<body>` start tag's `style` and `bgcolor`.
     body: Vec<(String, String)>,
+    /// Elements seen.
+    elements: usize,
+    /// The deepest nesting of elements (counted from start and end tags, an
+    /// upper bound in practice for what the tree builder makes).
+    deepest: usize,
 }
 
 /// Read `html`'s style text and body attributes with html5ever's tokenizer,
@@ -108,6 +145,7 @@ struct Scanner {
     found: RefCell<Found>,
     in_style: RefCell<bool>,
     seen_body: RefCell<bool>,
+    depth: RefCell<usize>,
 }
 
 impl TokenSink for Scanner {
@@ -121,7 +159,20 @@ impl TokenSink for Scanner {
                     if name == "style" {
                         *self.in_style.borrow_mut() = false;
                     }
+                    if !VOID.contains(&name) {
+                        let mut depth = self.depth.borrow_mut();
+                        *depth = depth.saturating_sub(1);
+                    }
                     return TokenSinkResult::Continue;
+                }
+                {
+                    let mut found = self.found.borrow_mut();
+                    found.elements += 1;
+                    if !VOID.contains(&name) {
+                        let mut depth = self.depth.borrow_mut();
+                        *depth += 1;
+                        found.deepest = found.deepest.max(*depth);
+                    }
                 }
                 if name == "body" && !*self.seen_body.borrow() {
                     *self.seen_body.borrow_mut() = true;
@@ -195,7 +246,10 @@ mod tests {
         let result = inline(
             r"<style>.c { width: 600px } @media (max-width: 600px) { .c { width: 100% !important } }</style><div class=c>x</div>",
         );
-        assert!(result.leftover.contains("@media"), "{}", result.leftover);
+        assert_eq!(
+            result.media.as_deref(),
+            Some("@media (max-width: 600px) {\n.c { width: 100% !important }\n}")
+        );
         assert!(
             result
                 .html
@@ -241,6 +295,48 @@ mod tests {
         );
         let result = inline(&sheet);
         assert!(!result.html.contains("style="), "nothing inlined");
-        assert!(result.leftover.is_empty());
+        assert_eq!(result.media, None);
+    }
+
+    #[test]
+    fn deep_nesting_is_not_inlined() {
+        let html = format!(
+            "<style>a {{ color: red }}</style>{}<a>x</a>{}",
+            "<div>".repeat(MAX_NESTING + 10),
+            "</div>".repeat(MAX_NESTING + 10)
+        );
+        let result = inline(&html);
+        assert_eq!(result.html, html);
+        // Siblings are not nesting.
+        let wide = format!(
+            "<style>p {{ color: red }}</style>{}",
+            "<p>x</p>".repeat(500)
+        );
+        assert!(inline(&wide).html.contains("color: red"));
+    }
+
+    #[test]
+    fn work_past_the_cap_is_not_inlined() {
+        let properties: String = (0..200).map(|i| format!("a{i}: x;")).collect();
+        let html = format!(
+            "<style>* {{ {properties} }}</style>{}",
+            "<b></b>".repeat(6_000)
+        );
+        let result = inline(&html);
+        assert_eq!(result.html, html);
+    }
+
+    #[test]
+    fn the_inliner_reads_only_filtered_rules() {
+        let result = inline(
+            r"<style>p { x\3b background-image\3a url\28 https\3a \2f \2f t\2e example\2f p\29 \3b y: red; color: blue } div { background: url(https://t.example/d) }</style><p>x</p><div>y</div>",
+        );
+        assert!(!result.html.contains("t.example"), "{}", result.html);
+        assert!(!result.html.contains("url("), "{}", result.html);
+        assert!(
+            result.html.contains(r#"<p style="color: blue;">"#),
+            "{}",
+            result.html
+        );
     }
 }

@@ -24,8 +24,10 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 ### Requirement: Sanitised email HTML
 `conversations.get_message_body` SHALL sanitise the HTML body before
 returning it. First the body's style sheets SHALL be inlined into `style`
-attributes, without ever fetching or reading a linked or imported sheet;
-sheets over 256 KiB SHALL be dropped instead. Then only an allow-list of
+attributes from the sheets' filtered rules only, without ever fetching or
+reading a linked or imported sheet; sheets SHALL be dropped instead past
+256 KiB of style text, 20,000 elements, a nesting of 256 elements or
+1,000,000 elements times distinct properties. Then only an allow-list of
 tags and attributes survives (`class` included); `script`, `style` and
 `title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;
@@ -36,8 +38,9 @@ Every `style` declaration SHALL be read with a CSS parser and kept only when
 it loads and runs nothing: its value calls only functions from an allow-list
 (colours, arithmetic, gradients, transforms, filters, timing, shapes,
 counters, grid) and has no URL token, at-keyword, malformed token, CSS escape
-or `<`, and it is not a custom property, `behavior`, `-moz-binding` or a
-length in viewport units. The response's `css` SHALL hold the sheets'
+or `<`, its property is a plain lower-case name written without escapes,
+and it is not a custom property, `behavior`, `-moz-binding` or a
+length in viewport or container units. The response's `css` SHALL hold the sheets'
 `@media` rules filtered the same way (queries and selectors with no URL,
 escape or non-structural function; nothing about `prefers-color-scheme`; at
 most 64 KiB), or nothing. Images of at most 2×2 pixels by attribute or style,

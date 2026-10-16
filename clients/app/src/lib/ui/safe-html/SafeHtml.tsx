@@ -43,10 +43,16 @@ const BODY_STYLE = [
   "color-scheme: light",
 ].join("; ");
 
+/**
+ * The root's size is the frame's measure, so the message cannot set it: an
+ * inline `!important` beats any rule, the message's `@media` rules included.
+ */
+const ROOT_STYLE = "height: auto !important; min-height: 0 !important; max-height: none !important";
+
 /** The document the frame shows. */
 function frameDocument(html: string, remoteImages: boolean): string {
   return [
-    "<!doctype html><html><head>",
+    `<!doctype html><html style="${ROOT_STYLE}"><head>`,
     '<meta charset="utf-8">',
     `<meta http-equiv="Content-Security-Policy" content="${framePolicy(remoteImages)}">`,
     '<meta name="referrer" content="no-referrer">',
@@ -82,6 +88,12 @@ export const MIN_ZOOM = 0.5;
 
 /** The tallest a measured frame grows, in px. */
 export const MAX_MEASURED_HEIGHT = 30_000;
+
+/**
+ * How many times a frame is resized for one document: enough for late images
+ * and window resizes, and an end to any layout that answers its own resize.
+ */
+export const MAX_RESIZES = 60;
 
 /**
  * The scale that fits a message `contentWidth` wide into a frame
@@ -164,15 +176,24 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
       return;
     }
     let observer: ResizeObserver | undefined;
+    let resizes = 0;
+    let last: number | undefined;
     const settle = () => {
       const doc = element.contentDocument;
       if (doc?.URL !== "about:srcdoc") {
         return;
       }
       const height = fit(doc, element.clientWidth);
-      setMeasured((previous) =>
-        previous !== undefined && Math.abs(previous - height) < 1 ? previous : height,
-      );
+      if (last !== undefined && Math.abs(last - height) < 1) {
+        return;
+      }
+      resizes += 1;
+      if (resizes > MAX_RESIZES) {
+        observer?.disconnect();
+        return;
+      }
+      last = height;
+      setMeasured(height);
     };
     const attach = () => {
       const doc = element.contentDocument;
@@ -181,6 +202,8 @@ export function SafeHtml({ html, title, remoteImages = false, css }: SafeHtmlPro
         return;
       }
       adoptStyles(doc, rules);
+      resizes = 0;
+      last = undefined;
       observer?.disconnect();
       observer = new ResizeObserver(settle);
       observer.observe(element);

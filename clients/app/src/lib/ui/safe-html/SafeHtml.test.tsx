@@ -56,6 +56,13 @@ describe("SafeHtml", () => {
     expect(srcdoc).not.toContain("<style");
   });
 
+  it("keeps the root's size out of the message's reach", () => {
+    const { container } = renderUi(<SafeHtml html="<p>Hi</p>" title="M" />);
+    expect(frame(container).getAttribute("srcdoc")).toContain(
+      '<html style="height: auto !important; min-height: 0 !important; max-height: none !important">',
+    );
+  });
+
   it("starts from an estimate of its height, within bounds", () => {
     const { container } = renderUi(<SafeHtml html="<p>Hi</p>" title="M" />);
     expect(frame(container).style.height).toBe("96px");

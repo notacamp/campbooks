@@ -166,7 +166,7 @@ pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> 
     Sanitized {
         html,
         remote_images: seen.load(Ordering::Relaxed),
-        css: css::media_rules(&inlined.leftover),
+        css: inlined.media,
     }
 }
 
@@ -805,5 +805,41 @@ mod tests {
         let html = clean(fixture("marketing-600"));
         assert!(html.contains(r#"width="600""#), "{html}");
         assert!(html.contains("width: 600px"), "{html}");
+    }
+
+    /// The regex passes run on ammonia's output, which escapes `<` and `>`
+    /// inside attribute values (html5ever): an image written inside an
+    /// attribute must never be touched by them.
+    #[test]
+    fn an_image_inside_an_attribute_value_survives_unchanged() {
+        for show in [false, true] {
+            let result = run(
+                r#"<p title="<img>" class="<img/> x">a</p><a href="https://example.com" title='<img src="x" onerror="y">'>b</a>"#,
+                show,
+            );
+            assert!(
+                result
+                    .html
+                    .contains(r#"<p title="&lt;img&gt;" class="&lt;img/&gt; x">a</p>"#),
+                "{}",
+                result.html
+            );
+            assert!(!result.html.contains(PLACEHOLDER), "{}", result.html);
+            assert!(!result.html.contains("<img"), "{}", result.html);
+        }
+    }
+
+    #[test]
+    fn a_body_style_cannot_smuggle_declarations_into_the_wrapper() {
+        let result = run(
+            r"<body style='x\3b background-image\3a url\28 https\3a \2f \2f t\2e example\2f p\29 \3b y:red; color: #333'><p>x</p></body>",
+            true,
+        );
+        assert!(!result.html.contains("t.example"), "{}", result.html);
+        assert!(
+            result.html.starts_with(r#"<div style="color: #333">"#),
+            "{}",
+            result.html
+        );
     }
 }

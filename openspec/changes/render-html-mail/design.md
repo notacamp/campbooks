@@ -42,9 +42,16 @@ html5ever and Servo's `selectors`, the same html5ever and cssparser ammonia
 already uses) to apply the sheets' rules to `style` attributes, with
 `load_remote_stylesheets(false)`, no default features (no `http`, no
 `file`) and a resolver that refuses every location, so a `<link>` or
-`@import` is never fetched or read. Sheets over 256 KiB are dropped as
-before (selector matching grows with rules times elements). On any inliner
-error the HTML goes on without its sheets, as before.
+`@import` is never fetched or read. The inliner never reads the message's
+own `<style>` text: the sheets are first filtered (`css::plain_rules`:
+inert selectors, inert declarations, plain property names, at most 256
+distinct properties) and only that is passed as `extra_css`, with
+`inline_style_tags(false)`. Inlining is skipped (sheets dropped, as before)
+past 256 KiB of style text, 20,000 elements, a nesting of 256 (css-inline's
+serialiser recurses) or 1,000,000 elements times distinct properties (the
+size of what it could write), and `sanitize` runs in `spawn_blocking`, off
+the async workers. On any inliner error the HTML goes on without its
+sheets, as before.
 
 Alternatives considered:
 - *Keep `<style>` and let the frame apply it*: needs `'unsafe-inline'` (or a
@@ -174,6 +181,26 @@ pixel, removed whether or not images are shown.
   not apply; inlined styles would still.
 - **Lost fidelity**: `:hover`, CSS background images, web fonts, dark-mode
   variants.
+
+## Security review
+A separate read-only review of the diff found, and this change fixes:
+1. *Work blow-up when a hostile message is opened* (deep nesting overflowing
+   css-inline's recursive serialiser; `* { thousands of properties }` times
+   thousands of elements; a sheet hidden from the size count in
+   `<svg><title>`): the caps above, the inliner reading only filtered rules,
+   and `spawn_blocking`.
+2. *Escaped property names smuggling declarations* (`x\3b background-image\3a
+   url\28 …`): the decoded name was written back, so the body wrapper and the
+   `css` field (filtered once) could carry `url(`. Names must now be plain
+   (`-?[a-z][a-z0-9-]*`) and the name as written must hold no escape.
+3. *Regex passes after the last ammonia pass*: safe because html5ever escapes
+   `<`/`>` in attribute values; a regression test now pins that.
+4. *Height feedback loops*: container units (`cq*`) dropped like viewport
+   units, the frame root's height pinned by an inline `!important`, and at
+   most 60 resizes per document.
+Accepted, documented above: credentialed same-origin GETs after "Show images"
+(reads only), and pixel detection after consent being best effort (before
+consent the frame's policy blocks every remote load).
 
 ## Desktop shell (finding, not changed here)
 The Tauri shell's production CSP (`default-src 'self'` with no `style-src-attr`

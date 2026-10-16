@@ -154,9 +154,16 @@ pub async fn handler(
         }
         _ => InlineImages::new(),
     };
-    let sanitized = html
-        .as_deref()
-        .map(|html| sanitize(html, query.show_images, &inline));
+    // CPU-bound (inlining, two ammonia passes): off the async workers.
+    let show = query.show_images;
+    let sanitized = match html {
+        Some(html) => Some(
+            tokio::task::spawn_blocking(move || sanitize(&html, show, &inline))
+                .await
+                .map_err(Error::internal)?,
+        ),
+        None => None,
+    };
     Ok(Json(MessageBody {
         text,
         remote_images: sanitized.as_ref().map_or(0, |s| s.remote_images),
