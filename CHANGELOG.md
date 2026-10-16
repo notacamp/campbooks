@@ -133,6 +133,10 @@ All notable changes to Campbooks Next are documented here. The format follows
   The first prune after upgrading may take a while on a large instance.
 
 ### Fixed
+- **The inbox fits the window on desktop.** Between 1024px and about 1180px wide the
+  open conversation no longer drops below the list; it stays beside it. A long
+  subject, sender or address with no spaces now wraps inside the reader instead of
+  making the page wider than the screen.
 - **What needs you includes mail from before the upgrade.** Home's "What
   needs you" only showed mail that arrived after attention shipped. After
   this upgrade, each inbox's conversations from the last
