@@ -148,7 +148,7 @@ describe("the inbox", () => {
 
     const reader = await screen.findByRole("main", { name: "Conversation" });
     expect(await within(reader).findByText("Kept as history")).toBeVisible();
-    for (const name of [/^Done/u, /^Reply/u, /^Star/u]) {
+    for (const name of [/^Done/u, /^Reply/u, /^Pin/u]) {
       expect(within(reader).queryByRole("button", { name })).toBeNull();
     }
     fireEvent.keyDown(document, { key: "e" });
