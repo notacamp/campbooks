@@ -6,7 +6,7 @@ What calls a model today, and how each one is metered:
 
 | Path | Gateway method | Whose | Metered as |
 | --- | --- | --- | --- |
-| `conversations.decide_message`, the model pass over each inbound message | `decide` (through the `Model` strategy) | the message's workspace | workspace scope, feature `conversations.triage` |
+| `conversations.decide_message`, the model pass over each inbound message, and `conversations.decide_backlog`, the same pass over a stored message the needs backfill queues (one shared `Pass::run`) | `decide` (through the `Model` strategy) | the message's workspace | workspace scope, feature `conversations.triage` |
 | The `decide` answers check (`Gateway::keep_answers_checked`, eight fictional emails per run, every 6 h while it passes, every 15 min while it fails) | `decide` | the instance | instance scope `ai.answers_check`: admitted without a cap and not stored (bounded by its schedule, not by mail) |
 | `Knn` (embeddings of a workspace's corrections) | `embed` | | no production caller yet; would be refused until its caller opens a scope |
 | `chat` (the `complete` and `vision` roles) | `chat` | | no production caller yet; same |
@@ -84,20 +84,24 @@ Postgres serializes the conditional upsert on the row, so any number of
 workers and processes admit at most `cap` calls a day. **Settling** adds
 tokens and failures to the feature row of the admission's day (a call that
 crosses midnight stays in the day it was admitted), and is skipped when
-there is nothing to add (Laya reports no tokens), so a Laya call costs one
-transaction of two small statements, about a millisecond against a
-0.3–0.6 s model call.
+there is nothing to add. A call costs at most two short transactions (three
+small statements), about a millisecond or two against a 0.3–0.6 s model
+call.
 
 No events are published or consumed.
 
 ## The measure and the default
 
-**Calls, not tokens.** Laya, the default `decide` backend, reports no
-tokens, so a token cap would leave the main path uncapped. A `decide` call's
-input is bounded (the envelope is cut at 1,500 characters of body, the
-context at about 125 tokens), so calls bound tokens for it. Hosted APIs
-price per token; the ledger records their tokens so an operator can price a
-day, but the limit is on calls. When `complete` gets callers (drafting, the
+**Calls, not tokens.** Tokens are not one unit across backends: laya-serve
+reports input tokens of its own encoder (a CPU cost, no output tokens), a
+hosted decision model or an instruct model reports billed tokens of its own
+tokenizer, and a provider may report none at all, which would leave a token
+cap open. A call means the same thing everywhere. A `decide` call's input is
+bounded (the envelope is cut at 1,500 characters of body, plus a short fixed
+context), so calls bound tokens for it. The ledger records whatever tokens
+the provider reports (`prompt_tokens`/`completion_tokens`, or laya-serve's
+`input_tokens`/`output_tokens`) so an operator can price a day, but the
+limit is on calls. When `complete` gets callers (drafting, the
 assistant), its output is not bounded that way, and a token budget joins the
 call cap (non-goal here).
 
@@ -126,20 +130,24 @@ without sleeping.
 
 ## Over the cap
 
-The `decide` pass gets `OverDailyCap` and returns without storing anything,
-as it does when no model is configured or the answers check has not passed.
-The message was already stored and sorted by the rules when it arrived
-(`apply_changes`, taught rules, the facts), so it is in the inbox, searchable
-and sorted; only the model's answers (and the needs they raise) are missing.
-Nothing errors and no job fails.
+The `decide` pass (`decide_message` and `decide_backlog`, one shared
+`Pass::run`) gets `OverDailyCap` and returns without storing anything, as it
+does when no model is configured or the answers check has not passed. The
+message was already stored when it arrived (`apply_changes`): the facts and
+the workspace's taught rules have done their part, so it is in the inbox and
+searchable, in Primary unless one of them placed it (ADR 0018: the facts
+only say no, the model sorts). Only the model's answers, the sorting they
+would do and the needs they would raise are missing. Nothing errors and no
+job fails or retries.
 
-**Mail skipped over the cap is left as the rules sorted it (option a).**
+**Mail skipped over the cap is left as it was stored (option a).**
 
 - (b) *Re-queue for after the reset* would run yesterday's overflow first
   thing the next day. The cap trips mostly on floods; replaying a flood
   burns the next day's cap and starves that day's real mail, every day, and
   even spread over the day it competes with live mail for the same budget.
-  Late answers would also move a conversation the person already saw.
+  Late answers would also move a conversation the person already saw in
+  Primary (the model places streams since ADR 0018).
 - (c) *A person asks for AI on one message* is the right complement, but it
   is UI (the notice's follow-up), and it needs a reserve so it still works
   when the day's cap is spent.
@@ -173,7 +181,7 @@ answer.
 
 ## Admin API
 
-`GET /admin/v1/system/ai_usage?day=YYYY-MM-DD&limit=N`,
+`GET /admin/v1/system/ai-usage?day=YYYY-MM-DD&limit=N`,
 `system.admin_ai_usage`, `Admin<SystemRead>` (bearer token with
 `admin:access`, admin profile with `system.read` or `super`; anyone else
 gets 404), audited like every admin request, read in `begin_admin`. Today by
@@ -188,7 +196,8 @@ only: no workspace names (they belong to `workspaces`), no content.
 - Role: none new. The meter wraps every role (`decide`, `embed`, `complete`,
   `vision`).
 - Fallback: over the cap or when metering fails, the caller does what it does
-  without a model; for the `decide` pass that is the rules' sorting.
+  without a model; for the `decide` pass that is what the facts and taught
+  rules decided when the message was stored.
 - Undo: nothing is changed by the meter; refusing a call changes no user
   data.
 
@@ -233,8 +242,8 @@ only: no workspace names (they belong to `workspaces`), no content.
    but each process may overshoot the cap by a batch, and a crash loses the
    batch; the saving is irrelevant next to a model call.
 
-**What is limited**: calls (chosen), tokens (Laya reports none, so the
-default path would be uncapped) or money (needs a price table per provider
+**What is limited**: calls (chosen), tokens (not one unit across backends,
+and a provider that reports none would be uncapped) or money (needs a price table per provider
 and model, and self-hosted models have no price).
 
 **Over the cap**: leave (chosen), re-queue, or manual; see above.

@@ -32,9 +32,9 @@ from https://github.com/notacamp/campbooks-cloud/issues/20).
   workspace per UTC day. Unset: 5,000. `0`: no cap.
 - **`conversations`**: the `decide` pass runs its call in the workspace's
   scope. Over the cap it stores nothing, exactly as when no model is
-  configured: the message keeps what the rules decided when it was stored.
-  It is not re-queued.
-- **Admin API**: `GET /admin/v1/system/ai_usage` (`system.admin_ai_usage`,
+  configured: the message keeps what the facts and taught rules decided when
+  it was stored. It is not re-queued.
+- **Admin API**: `GET /admin/v1/system/ai-usage` (`system.admin_ai_usage`,
   permission `system.read`): a day's usage per workspace (calls, refused,
   remaining, by role and feature with tokens), workspaces that hit the cap
   first. In `openapi/admin.json`.

@@ -80,9 +80,7 @@ async fn world(db: PgPool, cap: u32) -> World {
     let (gateway, meter) = composed(&laya, cap);
     let meter = meter.with_clock(clock.clone());
     // The same meter, on the hand-moved clock.
-    let gateway = gateway
-        .unwrap()
-        .with_meter(Arc::new(meter.clone()));
+    let gateway = gateway.unwrap().with_meter(Arc::new(meter.clone()));
     gateway.record_answers_check(CheckReport {
         outcome: CheckOutcome::Passed,
         right: 33,
@@ -226,7 +224,9 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
     w.grant_ada().await;
     let (acme, studio) = (WorkspaceId::new(), WorkspaceId::new());
 
-    story("Daily AI limit: 2 model calls per workspace (CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE=2)");
+    story(
+        "Daily AI limit: 2 model calls per workspace (CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE=2)",
+    );
     story("Thursday 16 October: three emails arrive for the demo workspace \"acme\"");
     assert_eq!(w.receive(acme, "sam@acme.example.com", EN).await, 2);
     let sorted = w.sorted().await;
@@ -269,7 +269,9 @@ async fn ai_usage_stops_at_the_daily_limit_and_resumes_the_next_day(db: PgPool) 
     assert_eq!(workspaces[1]["workspace_id"], studio.to_string());
     assert_eq!(workspaces[1]["remaining"], 1);
 
-    story("Friday 17 October, 00:00 UTC: the count starts again; nothing from yesterday is replayed");
+    story(
+        "Friday 17 October, 00:00 UTC: the count starts again; nothing from yesterday is replayed",
+    );
     w.clock.advance(TimeDelta::days(1));
     let before = w.model_calls().await;
     Worker::new(w.state.clone()).run_until_idle().await;

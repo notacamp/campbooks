@@ -25,7 +25,10 @@ async fn usage(db: &PgPool) -> (AiUsageMeter, WorkspaceId, WorkspaceId) {
         feature: "conversations.triage",
     };
     for _ in 0..5 {
-        meter.admit(&pool, call(capped, Role::Decide)).await.unwrap();
+        meter
+            .admit(&pool, call(capped, Role::Decide))
+            .await
+            .unwrap();
     }
     for role in [Role::Decide, Role::Embed] {
         meter.admit(&pool, call(busy, role)).await.unwrap();

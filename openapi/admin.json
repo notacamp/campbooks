@@ -348,6 +348,96 @@
         }
       }
     },
+    "/admin/v1/system/ai-usage": {
+      "get": {
+        "tags": [
+          "system"
+        ],
+        "summary": "A day's AI usage per workspace, workspaces the cap refused first.",
+        "operationId": "system.admin_ai_usage",
+        "parameters": [
+          {
+            "name": "day",
+            "in": "query",
+            "description": "The UTC day (`YYYY-MM-DD`); today when absent.",
+            "required": false,
+            "schema": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Workspaces to list, 1 to 500 (default 100).",
+            "required": false,
+            "schema": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The day's usage and the cap.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AiUsageDay"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Malformed query.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "`admin_reauth_required`: sign in again.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not an administrator with `system.read`.",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin": [
+              "admin:access"
+            ]
+          }
+        ],
+        "x-campbooks-admin": {
+          "mutates": false,
+          "permission": "system.read"
+        }
+      }
+    },
     "/admin/v1/system/jobs": {
       "get": {
         "tags": [
@@ -2269,6 +2359,86 @@
           }
         }
       },
+      "AiUsageDay": {
+        "type": "object",
+        "description": "A day's AI usage across the instance.",
+        "required": [
+          "day",
+          "resets_at",
+          "workspaces"
+        ],
+        "properties": {
+          "cap": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int32",
+            "description": "Model calls a workspace may make per UTC day\n(`CAMPBOOKS_AI__DAILY_CALLS_PER_WORKSPACE`); `null` when there is no\ncap.",
+            "minimum": 0
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "description": "The UTC day."
+          },
+          "resets_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When that day's counts start again: 00:00 UTC the next day."
+          },
+          "workspaces": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceAiUsage"
+            },
+            "description": "The workspaces that used AI that day: those the cap refused first,\nthen by calls."
+          }
+        }
+      },
+      "AiUse": {
+        "type": "object",
+        "description": "Calls of one role for one feature.",
+        "required": [
+          "role",
+          "feature",
+          "calls",
+          "failed",
+          "prompt_tokens",
+          "completion_tokens"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Calls made."
+          },
+          "completion_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Completion tokens the providers reported."
+          },
+          "failed": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Of which failed (no answer, or an unusable one)."
+          },
+          "feature": {
+            "type": "string",
+            "description": "What asked (`conversations.triage`).",
+            "example": "conversations.triage"
+          },
+          "prompt_tokens": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Prompt tokens the providers reported (0 when they report none)."
+          },
+          "role": {
+            "$ref": "#/components/schemas/AiRole",
+            "description": "The AI role called."
+          }
+        }
+      },
       "BlobBackend": {
         "type": "string",
         "description": "Which object store holds the blobs.",
@@ -3093,6 +3263,60 @@
         "type": "string",
         "format": "uuid",
         "description": "UserId (UUIDv7)"
+      },
+      "WorkspaceAiUsage": {
+        "type": "object",
+        "description": "One workspace's AI usage on the day.",
+        "required": [
+          "workspace_id",
+          "calls",
+          "refused",
+          "capped",
+          "uses"
+        ],
+        "properties": {
+          "calls": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Model calls made (admitted)."
+          },
+          "capped": {
+            "type": "boolean",
+            "description": "Whether the cap refused any of its calls that day."
+          },
+          "capped_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The first refusal, when there was one."
+          },
+          "refused": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Calls refused over the cap."
+          },
+          "remaining": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Calls left today; `null` for another day or without a cap."
+          },
+          "uses": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AiUse"
+            },
+            "description": "Its calls by role and feature."
+          },
+          "workspace_id": {
+            "$ref": "#/components/schemas/WorkspaceId",
+            "description": "The workspace."
+          }
+        }
       },
       "WorkspaceId": {
         "type": "string",

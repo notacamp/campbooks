@@ -164,7 +164,13 @@ impl Composition {
 /// usage read shows the same meter.
 pub fn ai_gateway(
     ai: campbooks_ai::AiConfig,
-) -> Result<(Option<campbooks_ai::Gateway>, campbooks_system::AiUsageMeter), String> {
+) -> Result<
+    (
+        Option<campbooks_ai::Gateway>,
+        campbooks_system::AiUsageMeter,
+    ),
+    String,
+> {
     let meter = campbooks_system::AiUsageMeter::new(ai.daily_call_cap());
     if ai.roles.is_empty() {
         return Ok((None, meter));

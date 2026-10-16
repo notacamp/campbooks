@@ -325,7 +325,7 @@ mod tests {
 
     use super::*;
 
-    fn cap(value: serde_json::Value) -> Result<Option<u32>, Error> {
+    fn cap(value: &serde_json::Value) -> Result<Option<u32>, Error> {
         let figment = Figment::from(Serialized::defaults(serde_json::json!({
             "ai": {"daily_calls_per_workspace": value}
         })));
@@ -338,17 +338,17 @@ mod tests {
             AiConfig::default().daily_call_cap(),
             Some(DEFAULT_DAILY_CALLS_PER_WORKSPACE)
         );
-        assert_eq!(cap(serde_json::json!(25)).unwrap(), Some(25));
-        assert_eq!(cap(serde_json::json!("40")).unwrap(), Some(40));
-        assert_eq!(cap(serde_json::json!(0)).unwrap(), None);
+        assert_eq!(cap(&serde_json::json!(25)).unwrap(), Some(25));
+        assert_eq!(cap(&serde_json::json!("40")).unwrap(), Some(40));
+        assert_eq!(cap(&serde_json::json!(0)).unwrap(), None);
         assert_eq!(
-            cap(serde_json::json!("")).unwrap(),
+            cap(&serde_json::json!("")).unwrap(),
             Some(DEFAULT_DAILY_CALLS_PER_WORKSPACE),
             "left empty in .env"
         );
-        let err = cap(serde_json::json!("lots")).unwrap_err().to_string();
+        let err = cap(&serde_json::json!("lots")).unwrap_err().to_string();
         assert!(err.contains("DAILY_CALLS_PER_WORKSPACE"), "{err}");
-        assert!(cap(serde_json::json!(-1)).is_err());
+        assert!(cap(&serde_json::json!(-1)).is_err());
     }
 
     #[test]

@@ -13,7 +13,7 @@ use campbooks_kernel::{
 use chrono::{DateTime, NaiveDate, TimeDelta, Utc};
 use sqlx::PgPool;
 
-use super::{AiUsageMeter, Admitted};
+use super::{Admitted, AiUsageMeter};
 
 fn morning() -> DateTime<Utc> {
     "2026-10-16T09:00:00Z".parse().unwrap()

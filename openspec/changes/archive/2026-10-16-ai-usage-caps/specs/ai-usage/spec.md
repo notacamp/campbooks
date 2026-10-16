@@ -71,15 +71,16 @@ the cap and no content. The count SHALL start again at 00:00 UTC.
 - **WHEN** the cap is configured as 0
 - **THEN** every call is admitted and still counted
 
-### Requirement: Over the cap, mail is sorted by rules only
-When the `decide` pass is refused over the cap, it SHALL store nothing and
-finish without error, exactly as when no model is configured: the message
-keeps what the rules decided when it was stored. A skipped message SHALL NOT
-be re-queued, so the next day's cap is spent on that day's mail.
+### Requirement: Over the cap, mail gets no model pass
+When the `decide` pass (a new message, or a stored one from the backlog) is
+refused over the cap, it SHALL store nothing and finish without error,
+exactly as when no model is configured: the message keeps what the facts and
+taught rules decided when it was stored. A skipped message SHALL NOT be
+re-queued, so the next day's cap is spent on that day's mail.
 
 #### Scenario: The message after the cap
 - **WHEN** a message arrives after its workspace's cap is reached
-- **THEN** it is stored and sorted by the rules, has no model answers, and no job fails
+- **THEN** it is stored as the facts and taught rules left it, has no model answers, and no job fails
 
 #### Scenario: No burst at midnight
 - **WHEN** the day changes after messages were skipped over the cap

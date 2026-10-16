@@ -219,7 +219,10 @@ async fn a_metered_call_outside_a_scope_is_refused_and_sends_nothing() {
     let gateway = gateway(&server, Some(meter.clone()));
     assert!(gateway.is_metered());
     for (name, result) in every_call(&gateway).await {
-        assert!(matches!(result, Err(Error::Unattributed)), "{name}: {result:?}");
+        assert!(
+            matches!(result, Err(Error::Unattributed)),
+            "{name}: {result:?}"
+        );
     }
     assert_eq!(requests(&server).await, 0);
     assert!(meter.seen().is_empty());
@@ -274,7 +277,11 @@ async fn over_the_cap_nothing_is_sent() {
             "{name}: {result:?}"
         );
     }
-    assert_eq!(requests(&server).await, 1, "only the admitted call went out");
+    assert_eq!(
+        requests(&server).await,
+        1,
+        "only the admitted call went out"
+    );
 }
 
 #[tokio::test]

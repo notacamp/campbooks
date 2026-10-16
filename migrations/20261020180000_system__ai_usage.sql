@@ -55,4 +55,4 @@ BEGIN
 END
 $$;
 
-GRANT SELECT, INSERT, UPDATE ON system.ai_usage_days, system.ai_usage TO campbooks_app;
+GRANT SELECT, INSERT, UPDATE, DELETE ON system.ai_usage_days, system.ai_usage TO campbooks_app;

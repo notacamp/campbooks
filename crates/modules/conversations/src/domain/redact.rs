@@ -24,9 +24,7 @@ pub fn ai(error: &AiError) -> JobError {
         AiError::AnswersNotTrusted => {
             JobError::fatal("the decide model has not passed its answers check")
         }
-        AiError::OverDailyCap { .. } => {
-            JobError::fatal("the workspace reached its daily AI limit")
-        }
+        AiError::OverDailyCap { .. } => JobError::fatal("the workspace reached its daily AI limit"),
         AiError::Unattributed => JobError::fatal("an AI call was made outside a usage scope"),
         // The ledger could not count the call, so it was not made: ask again.
         AiError::Metering => JobError::retry("the AI call could not be counted"),
