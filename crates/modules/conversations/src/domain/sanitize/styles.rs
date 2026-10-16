@@ -577,6 +577,33 @@ mod tests {
     }
 
     #[test]
+    fn measuring_a_deep_tree_does_not_recurse() {
+        // The walk keeps its own stack: a tree 100,000 deep is measured on a
+        // 64 KiB thread. (Built by hand: parsing one that deep takes hours.)
+        let deepest = std::thread::Builder::new()
+            .stack_size(64 * 1024)
+            .spawn(|| {
+                let count = 100_000;
+                let nodes = (0..count)
+                    .map(|i| {
+                        let mut node = Node::new(unnamed());
+                        node.first = (i + 1 < count).then_some(i + 1);
+                        node
+                    })
+                    .collect();
+                let tree = Measure {
+                    nodes: RefCell::new(nodes),
+                    elements: RefCell::new(0),
+                };
+                tree.finish().deepest
+            })
+            .expect("spawn")
+            .join()
+            .expect("measured without overflowing the stack");
+        assert_eq!(deepest, 99_999);
+    }
+
+    #[test]
     fn matching_past_the_cap_is_not_inlined() {
         let html = format!(
             "<style>{}</style>{}",

@@ -84,6 +84,7 @@ jobs:
           SHA_TAG: ${{ needs.plan.outputs.sha_tag }}
           OWNER: ${{ github.repository_owner }}
         run: |
+          set -o pipefail
           digest() { docker buildx imagetools inspect "$1" --format '{{json .Manifest}}' | jq -r .digest; }
           for image in campbooks campbooks-laya; do
             repo="ghcr.io/$OWNER/$image"
