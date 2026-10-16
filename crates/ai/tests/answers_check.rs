@@ -6,8 +6,8 @@
 //! multilingual checkpoint (the image `deploy/laya` builds, CPU) answered
 //! about the eight fictional check emails on 2026-10-14:
 //!
-//! - `ctx1`: the requests this crate sends today (triage context version 1,
-//!   yes/no questions);
+//! - `ctx1`: the requests with triage context version 1 (yes/no questions;
+//!   version 2 only rewords the hints line, from the facts);
 //! - `before`: the requests before that change (no context, the questions
 //!   as declarative statements).
 //!
@@ -219,7 +219,7 @@ async fn a_model_that_gets_them_right_passes_and_its_answers_are_stamped() {
     let model = Model::new("decide", gateway.clone(), "test.check").checked();
     let decided = model.decide(&sample(), &triage_questions()).await.unwrap();
     for answer in decided.answers.iter().flatten() {
-        assert_eq!(answer.answer.model_version.as_deref(), Some("checked:ctx1"));
+        assert_eq!(answer.answer.model_version.as_deref(), Some("checked:ctx2"));
     }
 
     // An unchecked strategy (the eval harness) leaves the version alone.
