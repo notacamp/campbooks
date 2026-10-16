@@ -1,14 +1,18 @@
 //! Which answers may act, per question and per source: the switch the
-//! decide evals flip (campbooks-cloud#59).
+//! decide evals flip (campbooks-cloud#59, ADR 0018).
 //!
 //! [`Policy::baseline`] is the table measured by `cargo xtask eval decide`
 //! on mail-triage v1 (`crates/ai/evals/decide/mail-triage/reports/baseline.json`,
-//! commit `585a6c87`, `signals` strategy, `test` split): a question's rules
-//! answers act only where the operating point found on `dev` *holds* its
-//! target precision on `test`, and only at or above that point. Model
-//! answers have not been measured, so they never act. Changing an entry is a
-//! reviewed code change citing a newer report (ADR 0009 note); it is not an
-//! operator setting.
+//! `test` split), from two runs: `facts` (the rules, [`Source::Rules`]) and
+//! `jev` (the decide model, [`Source::Model`], `typesafe/jev-1.13`). A
+//! question's answers of a source act only where the operating point found
+//! on `dev` *holds* its target precision on `test`, and only at or above
+//! that point. Changing an entry is a reviewed code change citing a newer
+//! report (ADR 0009 note); it is not an operator setting.
+//!
+//! The eval set is fictional: these operating points are a floor to start
+//! from until an eval of real mail, from members' corrections, replaces it
+//! (ADR 0018).
 
 use campbooks_ai::decide::{Answer, signals::email::triage as questions};
 
@@ -26,9 +30,15 @@ pub enum Switch {
 impl Switch {
     /// Whether `answer` may act.
     pub fn accepts(self, answer: &Answer) -> bool {
-        match self {
-            Self::Record => false,
-            Self::ActAbove(threshold) => answer.accept_if(threshold).is_some(),
+        self.accepts_confidence(answer.confidence)
+    }
+
+    /// Whether an answer with `confidence` may act (an unknown confidence
+    /// never does, as [`Answer::accept_if`]).
+    pub fn accepts_confidence(self, confidence: Option<f64>) -> bool {
+        match (self, confidence) {
+            (Self::ActAbove(threshold), Some(confidence)) => confidence >= threshold,
+            _ => false,
         }
     }
 }
@@ -41,38 +51,44 @@ pub struct Policy {
 }
 
 impl Policy {
-    /// The measured table (mail-triage v1 baseline, `signals`):
+    /// The measured table (mail-triage v1 baseline):
     ///
-    /// | Question | Target | Operating point | Precision on `test` | Holds | Rules |
-    /// | --- | --- | --- | --- | --- | --- |
-    /// | `stream` | 95% | 0.70 | 87% | no | record |
-    /// | `needs_reply` | 90% | 0.88 | 94% | yes | act ≥ 0.88 |
-    /// | `asks_action` | 90% | 0.75 | 95% | yes | act ≥ 0.75 |
-    /// | `has_deadline` | 90% | 0.75 | 90% | yes | act ≥ 0.75 |
-    /// | `urgency` | 85% | 0.75 | 93% | yes | act ≥ 0.75 |
-    /// | `suspicious` | 98% | 0.93 | 97% | no | record |
+    /// | Question | Target | `facts` (rules) | `jev` (model): point, precision on `test` | Model |
+    /// | --- | --- | --- | --- | --- |
+    /// | `stream` | 95% | never answers | 0.49, 98% | act ≥ 0.49 |
+    /// | `needs_reply` | 90% | "no" only: 0.99, 100%, act ≥ 0.99 | 0.51, 91% | act ≥ 0.51 |
+    /// | `asks_action` | 90% | never answers | 0.58, 94% | act ≥ 0.58 |
+    /// | `has_deadline` | 90% | never answers | 0.51, 97% | act ≥ 0.51 |
+    /// | `urgency` | 85% | never answers | 0.73, 81% (does not hold) | record |
+    /// | `suspicious` | 98% | never answers | 0.54, 100% | act ≥ 0.54 |
     ///
-    /// So no conversation is sorted out of Primary by this table: the stream
-    /// answers are kept as suggestions until a strategy holds its target.
+    /// Without a trusted `decide` model only the facts' "no" acts: nothing
+    /// is sorted out of Primary and no sure need is raised.
     pub fn baseline() -> Self {
         Self {
             entries: vec![
                 (
                     questions::NEEDS_REPLY,
                     Source::Rules,
-                    Switch::ActAbove(0.88),
+                    Switch::ActAbove(0.99),
+                ),
+                (questions::STREAM, Source::Model, Switch::ActAbove(0.49)),
+                (
+                    questions::NEEDS_REPLY,
+                    Source::Model,
+                    Switch::ActAbove(0.51),
                 ),
                 (
                     questions::ASKS_ACTION,
-                    Source::Rules,
-                    Switch::ActAbove(0.75),
+                    Source::Model,
+                    Switch::ActAbove(0.58),
                 ),
                 (
                     questions::HAS_DEADLINE,
-                    Source::Rules,
-                    Switch::ActAbove(0.75),
+                    Source::Model,
+                    Switch::ActAbove(0.51),
                 ),
-                (questions::URGENCY, Source::Rules, Switch::ActAbove(0.75)),
+                (questions::SUSPICIOUS, Source::Model, Switch::ActAbove(0.54)),
             ],
             check_floor: Self::CHECK_FLOOR,
         }
@@ -132,37 +148,55 @@ mod tests {
     }
 
     #[test]
-    fn the_baseline_lets_only_questions_that_hold_act() {
+    fn the_baseline_lets_the_facts_say_no_and_the_model_act() {
         let policy = Policy::baseline();
-        // Stream and suspicious do not hold their target: suggestions only.
-        assert!(
-            !policy
-                .switch(questions::STREAM, Source::Rules)
-                .accepts(&answer(0.999))
-        );
-        assert_eq!(
-            policy.switch(questions::SUSPICIOUS, Source::Rules),
-            Switch::Record
-        );
-        let needs_reply = policy.switch(questions::NEEDS_REPLY, Source::Rules);
-        assert!(needs_reply.accepts(&answer(0.9)));
-        assert!(!needs_reply.accepts(&answer(0.87)));
+        // The facts only ever answer `needs_reply`.
+        let facts_no = policy.switch(questions::NEEDS_REPLY, Source::Rules);
+        assert!(facts_no.accepts(&answer(0.99)));
+        assert!(!facts_no.accepts(&answer(0.98)));
         for question in [
             questions::STREAM,
-            questions::NEEDS_REPLY,
             questions::ASKS_ACTION,
             questions::HAS_DEADLINE,
             questions::URGENCY,
             questions::SUSPICIOUS,
         ] {
-            assert_eq!(policy.switch(question, Source::Model), Switch::Record);
+            assert_eq!(policy.switch(question, Source::Rules), Switch::Record);
+        }
+        // The model sorts; its urgency does not hold its target.
+        assert!(
+            policy
+                .switch(questions::STREAM, Source::Model)
+                .accepts(&answer(0.9))
+        );
+        assert_eq!(
+            policy.switch(questions::URGENCY, Source::Model),
+            Switch::Record
+        );
+    }
+
+    /// The switch the report gives a run's question: act from its operating
+    /// point exactly when the precision there reaches the target on `test`.
+    fn expected(question: &serde_json::Value) -> Switch {
+        let target = question["target_precision"].as_f64().unwrap();
+        let threshold = question["threshold"].as_f64();
+        let precision = question["groups"]["all"]["at_threshold"]["precision"].as_f64();
+        match (threshold, precision) {
+            (Some(threshold), Some(p)) if p >= target => Switch::ActAbove(threshold),
+            _ => Switch::Record,
         }
     }
 
-    /// The table is the eval baseline: for the `signals` run, a question's
-    /// rules act from its operating point exactly when the precision there
-    /// reaches the target on `test`, and only then; no model run is in the
-    /// baseline, so model answers never act.
+    fn same(a: Switch, b: Switch) -> bool {
+        match (a, b) {
+            (Switch::Record, Switch::Record) => true,
+            (Switch::ActAbove(x), Switch::ActAbove(y)) => (x - y).abs() < 1e-9,
+            _ => false,
+        }
+    }
+
+    /// The table is the eval baseline: the `facts` run gives the rules'
+    /// switches and the `jev` run the model's.
     #[test]
     fn the_baseline_matches_the_committed_eval_report() {
         let path = format!(
@@ -171,40 +205,34 @@ mod tests {
         );
         let report: serde_json::Value =
             serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        let signals = report["runs"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|run| run["name"] == "signals")
-            .expect("the baseline has a `signals` run");
-        let policy = Policy::baseline();
-        let mut seen = 0;
-        for question in signals["questions"].as_array().unwrap() {
-            let id = question["id"].as_str().unwrap();
-            let target = question["target_precision"].as_f64().unwrap();
-            let threshold = question["threshold"].as_f64();
-            let precision = question["groups"]["all"]["at_threshold"]["precision"].as_f64();
-            let holds = matches!((threshold, precision), (Some(_), Some(p)) if p >= target);
-            let expected = match threshold {
-                Some(threshold) if holds => Switch::ActAbove(threshold),
-                _ => Switch::Record,
-            };
-            assert_eq!(policy.switch(id, Source::Rules), expected, "{id}");
-            assert_eq!(policy.switch(id, Source::Model), Switch::Record, "{id}");
-            seen += 1;
-        }
-        assert_eq!(
-            seen,
-            campbooks_ai::decide::signals::email::triage_questions().len()
-        );
-        assert!(
+        let run = |name: &str| {
             report["runs"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .all(|run| run["offline"].as_bool().is_none_or(|offline| offline)),
-            "a model run is in the baseline: give model answers their operating points"
-        );
+                .find(|run| run["name"] == name)
+                .unwrap_or_else(|| panic!("the baseline has a `{name}` run"))
+                .clone()
+        };
+        let policy = Policy::baseline();
+        for (name, source) in [("facts", Source::Rules), ("jev", Source::Model)] {
+            let run = run(name);
+            let questions = run["questions"].as_array().unwrap();
+            assert_eq!(
+                questions.len(),
+                campbooks_ai::decide::signals::email::triage_questions().len(),
+                "{name}"
+            );
+            for question in questions {
+                let id = question["id"].as_str().unwrap();
+                let switch = policy.switch(id, source);
+                assert!(
+                    same(switch, expected(question)),
+                    "{name} / {id}: the policy says {switch:?}, the report {:?}",
+                    expected(question)
+                );
+            }
+        }
     }
 
     #[test]
