@@ -467,6 +467,39 @@ With the built-in issuer:
   rate-limited per client address (set `CAMPBOOKS_TRUSTED_PROXIES` behind a proxy, as
   above), and at most 30 passkey-only accounts are created per hour on the instance.
 
+## API rate limits
+
+Every API call made with a token is counted against a limit for whoever makes it, so a
+stolen token, a buggy app or a looping automation rule cannot hammer the instance or send
+mail as fast as the provider allows. Nothing to configure: the defaults are far above what
+a person does in the app, even in a fast keyboard session with live updates.
+
+| Class | Default | Counted per |
+|---|---|---|
+| Reads | 600 a minute | person and app (an app on its own: its client id) |
+| Writes | 120 a minute | person and app |
+| Mail sends | 30 per 10 minutes | person, across all their apps |
+| Admin API | 120 a minute | administrator and app |
+
+- A person's apps (the web app, the desktop app, a third-party app they allowed) each
+  get their own budget, so a misbehaving app never locks them out of the web app.
+  Automation rules and the assistant acting for a person are counted apart from the
+  person's apps, at the same limits; their sends count against the person's.
+- Reads and writes allow a burst of the whole count, then one every window / count.
+  Over a limit the answer is 429 `rate_limited` with `Retry-After` (seconds).
+- Reads, writes and admin calls are counted in each server process's memory, so with
+  several API processes a caller may get that many times the budget, and a restart
+  starts them afresh. Sends are counted in Postgres, shared by every process.
+- Change them with `CAMPBOOKS_RATE_LIMITS__READS`, `__WRITES`, `__SENDS` and `__ADMIN`,
+  and each class's `…_WINDOW_SECONDS` (1 second to 1 day); `0` turns a class off and
+  `CAMPBOOKS_RATE_LIMITS__ENABLED=false` turns them all off. See `deploy/.env.example`.
+- A caller that reaches a limit is logged once (`a caller reached an API rate limit`,
+  with the class, the kind of caller and the operation, never who), and every refusal
+  counts in the metric `campbooks.rate_limit.refusals`.
+
+The sign-in, token, registration and search limits per address are separate and
+unchanged.
+
 ## Administrators
 
 An administrator is a person whose account has an **admin profile** (ADR 0015). They see

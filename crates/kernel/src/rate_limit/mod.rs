@@ -1,5 +1,6 @@
 //! Rate limits for endpoints anyone can call: sign-in, token, client
-//! registration.
+//! registration. The authenticated API's per-caller limits, applied to every
+//! operation at once, are in [`api`].
 //!
 //! A [`Limit`] allows `max` hits per fixed `window` for one [`RateKey`],
 //! usually the caller's address ([`ClientIp`]), sometimes an account or a
@@ -43,6 +44,9 @@ use crate::{
     AppState, Error,
     crypto::{SecretKey, derive_secret, random_token},
 };
+
+pub mod api;
+mod bucket;
 
 /// The HKDF label of the key rate-limit buckets are hashed with. Never
 /// change it (every counter would start again).
@@ -153,8 +157,29 @@ impl RateLimits {
     /// is over (the hit still counts, so hammering does not help). A key
     /// with no address (a request from inside the process) is not counted.
     pub async fn check(&self, db: &PgPool, limit: &Limit, key: &RateKey) -> Result<(), Error> {
+        match self.hit(db, limit, key).await? {
+            None => Ok(()),
+            Some(refusal) => {
+                if refusal.first {
+                    tracing::info!(limit = limit.name, "rate limit reached");
+                }
+                Err(Error::RateLimited {
+                    retry_after: refusal.retry_after,
+                })
+            }
+        }
+    }
+
+    /// Count one hit of `key` against `limit`: `None` when allowed, else
+    /// when the window ends and whether this is the window's first refusal.
+    pub(crate) async fn hit(
+        &self,
+        db: &PgPool,
+        limit: &Limit,
+        key: &RateKey,
+    ) -> Result<Option<Refusal>, Error> {
         let Some(key) = &key.0 else {
-            return Ok(());
+            return Ok(None);
         };
         let bucket = self.bucket(limit, key);
         let window = limit.window.as_secs_f64();
@@ -176,14 +201,23 @@ impl RateLimits {
         )
         .fetch_one(db)
         .await?;
-        if i64::from(row.hits) > i64::from(limit.max) {
-            tracing::info!(limit = limit.name, "rate limit reached");
-            return Err(Error::RateLimited {
-                retry_after: row.retry_after.max(1).unsigned_abs(),
-            });
-        }
-        Ok(())
+        let hits = i64::from(row.hits);
+        let max = i64::from(limit.max);
+        Ok((hits > max).then(|| Refusal {
+            retry_after: row.retry_after.max(1).unsigned_abs(),
+            first: hits == max + 1,
+        }))
     }
+}
+
+/// A hit over its limit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Refusal {
+    /// Seconds until the next hit is allowed (at least 1).
+    pub(crate) retry_after: u64,
+    /// Whether it is the first refused hit since the key was last allowed
+    /// one, so a caller hammering on is reported once.
+    pub(crate) first: bool,
 }
 
 impl RateLimits {
