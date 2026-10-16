@@ -68,7 +68,9 @@ impl Job for SequenceChanges {
 }
 
 /// Number every unnumbered change of `workspace` from its head, in
-/// insertion order. Returns how many were numbered. Callers hold the
+/// insertion order, stamping when (`sequenced_at`: the statement's start,
+/// so a later run, which can only start once this one committed, stamps a
+/// later time). Returns how many were numbered. Callers hold the
 /// workspace's exclusive lock.
 pub(super) async fn sequence(conn: &mut PgConnection, workspace: &str) -> Result<i64, sqlx::Error> {
     sqlx::query!(
@@ -87,7 +89,7 @@ pub(super) async fn sequence(conn: &mut PgConnection, workspace: &str) -> Result
               FROM kernel.changes c, head
              WHERE c.workspace_id = $1 AND c.seq IS NULL
         ), updated AS (
-            UPDATE kernel.changes c SET seq = n.seq
+            UPDATE kernel.changes c SET seq = n.seq, sequenced_at = statement_timestamp()
               FROM numbered n
              WHERE c.id = n.id
             RETURNING c.seq
@@ -104,8 +106,10 @@ pub(super) async fn sequence(conn: &mut PgConnection, workspace: &str) -> Result
     Ok(numbered)
 }
 
-/// Delete changes older than `CAMPBOOKS_CHANGES__RETENTION_HOURS` (clients
-/// resuming from before them are told to `reset`), and re-enqueue
+/// Delete changes numbered longer ago than
+/// `CAMPBOOKS_CHANGES__RETENTION_HOURS` (clients resuming from before them
+/// are told to `reset`; by numbering time, so a resume token's age decides
+/// that alone, see `stream`), and re-enqueue
 /// sequencing for workspaces left with unnumbered changes. Runs hourly.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct PruneChanges;
@@ -121,7 +125,7 @@ impl Job for PruneChanges {
         let tx = ctx.kernel_tx().await?;
         let pruned = sqlx::query!(
             "DELETE FROM kernel.changes
-              WHERE seq IS NOT NULL AND occurred_at < now() - make_interval(hours => $1::int)",
+              WHERE seq IS NOT NULL AND sequenced_at < now() - make_interval(hours => $1::int)",
             i32::try_from(hours).unwrap_or(i32::MAX)
         )
         .execute(&mut **tx)

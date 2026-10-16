@@ -35,6 +35,10 @@ impl Visibility for InboxVisibility {
         &[INBOX_RECORD]
     }
 
+    fn container_types(&self) -> &'static [&'static str] {
+        &[INBOX_RECORD]
+    }
+
     fn container_visible<'a>(
         &'a self,
         db: &'a PgPool,

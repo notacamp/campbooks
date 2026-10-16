@@ -4,24 +4,34 @@
 //! (`lib/ui/safe-html`); this is the first of the two layers, so the frame
 //! never receives markup that could run, load or submit anything unasked:
 //!
+//! - **style sheets** are inlined into `style` attributes first
+//!   ([`styles`]): mail is written for clients that drop `<style>`, and the
+//!   frame's inherited policy blocks it too. Their `@media` rules come back
+//!   separately, filtered ([`css::media_rules`]), for the client to apply to
+//!   the frame's document; the `<body>`'s own look moves to a wrapper `div`;
 //! - **ammonia** keeps a fixed allow-list of tags and attributes, drops
-//!   `<script>`, `<style>` (with their content), forms, frames, event
-//!   handlers and comments, allows only `http`, `https`, `mailto` and `tel`
-//!   links, and makes every link open in a new tab with
+//!   `<script>`, `<style>` and `<title>` (with their content), forms,
+//!   frames, event handlers and comments, allows only `http`, `https`,
+//!   `mailto` and `tel` links, and makes every link open in a new tab with
 //!   `rel="noopener noreferrer"`;
-//! - **style attributes** keep only declarations that cannot load or run
-//!   anything (no `url(`, `@import`, `expression`, escapes);
+//! - **style attributes** keep only declarations a real CSS parser shows to
+//!   load and run nothing ([`css`]);
 //! - **images**: remote images lose their `src` unless the member asked to
 //!   see them (and are counted, so the reader can offer "Show images"), and
-//!   tracking pixels (an image of at most 2×2, or one hidden by its style)
-//!   are removed either way. An inline image (`cid:`) shows the message's
-//!   own part as a `data:` URL the caller built; every image left without a
-//!   source shows [`PLACEHOLDER`], so the reader never shows the browser's
-//!   broken-image icon. Those two are the only `data:` sources that leave.
+//!   tracking pixels (an image of at most 2×2, by attribute or style, or
+//!   one hidden by its style) are removed either way. An inline image
+//!   (`cid:`) shows the message's own part as a `data:` URL the caller
+//!   built; every image left without a source shows [`PLACEHOLDER`], so the
+//!   reader never shows the browser's broken-image icon. Those two are the
+//!   only `data:` sources that leave.
+
+pub mod css;
+pub mod styles;
 
 use std::{
     borrow::Cow,
     collections::{HashMap, HashSet},
+    fmt::Write as _,
     sync::{
         Arc, LazyLock,
         atomic::{AtomicU32, Ordering},
@@ -38,6 +48,9 @@ pub struct Sanitized {
     pub html: String,
     /// Remote images in the message (blocked unless shown).
     pub remote_images: u32,
+    /// The message's `@media` rules, filtered, for the client to apply to
+    /// the frame's document only.
+    pub css: Option<String>,
 }
 
 /// What an image shows when its source is held back or unusable: a light
@@ -57,21 +70,10 @@ pub type InlineImages = HashMap<String, String>;
 /// Tags email layouts use, on top of ammonia's defaults.
 const EXTRA_TAGS: [&str; 2] = ["center", "font"];
 
-/// Presentational attributes allowed on any tag.
-const GENERIC_ATTRIBUTES: [&str; 8] = [
-    "style", "align", "valign", "width", "height", "bgcolor", "dir", "border",
-];
-
-/// Declarations in a `style` attribute that can load or run something, or
-/// hide what they do behind CSS escapes.
-const UNSAFE_CSS: [&str; 7] = [
-    "url(",
-    "image-set(",
-    "@import",
-    "expression",
-    "behavior",
-    "-moz-binding",
-    "\\",
+/// Presentational attributes allowed on any tag. `class` stays so the
+/// message's `@media` rules can match; nothing else reads it.
+const GENERIC_ATTRIBUTES: [&str; 9] = [
+    "style", "align", "valign", "width", "height", "bgcolor", "dir", "border", "class",
 ];
 
 /// What the second pass does with every image source that survived the
@@ -133,17 +135,20 @@ fn content_id(url: &str) -> Option<String> {
 /// `show_remote_images` is set; `cid:` images show their part from `inline`
 /// either way.
 ///
-/// Four steps: ammonia cleans (allow-lists, schemes, links, style
-/// declarations); a best-effort pass drops tracking pixels from its canonical
-/// output; ammonia runs again with the image policy in its attribute filter,
-/// so every `img[src]` the HTML parser sees is counted and, unless shown,
-/// removed, and every `cid:` source becomes its part's `data:` URL; then
-/// every image left without a source gets the placeholder. A last check
-/// strips every image if any source other than those survived a blocked
-/// render.
+/// Five steps: the style sheets are inlined ([`styles::inline`]); ammonia
+/// cleans (allow-lists, schemes, links, style declarations) and the body's
+/// look moves to a wrapper; a best-effort pass drops tracking pixels from
+/// its canonical output; ammonia runs again with the image policy in its
+/// attribute filter, so every `img[src]` the HTML parser sees is counted
+/// and, unless shown, removed, and every `cid:` source becomes its part's
+/// `data:` URL; then every image left without a source gets the
+/// placeholder. A last check strips every image if any source other than
+/// those survived a blocked render.
 pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> Sanitized {
-    let cleaned = builder(None).clean(html).to_string();
-    let without_pixels = drop_tracking_pixels(&cleaned);
+    let inlined = styles::inline(html);
+    let cleaned = builder(None).clean(&inlined.html).to_string();
+    let wrapped = wrap_body(&cleaned, &inlined.body);
+    let without_pixels = drop_tracking_pixels(&wrapped);
     let seen = Arc::new(AtomicU32::new(0));
     let policy = Images {
         show: show_remote_images,
@@ -161,13 +166,41 @@ pub fn sanitize(html: &str, show_remote_images: bool, inline: &InlineImages) -> 
     Sanitized {
         html,
         remote_images: seen.load(Ordering::Relaxed),
+        css: inlined.media,
     }
+}
+
+/// `html` inside a `div` carrying the message body's `style` and `bgcolor`
+/// (ammonia drops `<body>`), or `html` itself when it had neither. The
+/// values are escaped here and filtered by the next ammonia pass.
+fn wrap_body(html: &str, body: &[(String, String)]) -> String {
+    if body.is_empty() {
+        return html.to_owned();
+    }
+    let mut wrapped = String::from("<div");
+    for (name, value) in body {
+        let _ = write!(wrapped, r#" {name}="{}""#, escape_attribute(value));
+    }
+    let _ = write!(wrapped, ">{html}</div>");
+    wrapped
+}
+
+/// An attribute value with every character that could end it or start
+/// markup escaped.
+fn escape_attribute(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn builder(images: Option<Images>) -> Builder<'static> {
     let mut builder = Builder::default();
     builder
         .add_tags(EXTRA_TAGS)
+        // A document's `<title>` is not part of what the message says.
+        .add_clean_content_tags(["title"])
         .add_generic_attributes(GENERIC_ATTRIBUTES)
         .add_tag_attributes("img", ["src", "alt", "width", "height"])
         .add_tag_attributes("font", ["color", "face", "size"])
@@ -181,7 +214,7 @@ fn builder(images: Option<Images>) -> Builder<'static> {
         .link_rel(Some("noopener noreferrer"))
         .set_tag_attribute_value("a", "target", "_blank")
         .attribute_filter(move |element, attribute, value| match (element, attribute) {
-            (_, "style") => safe_style(value).map(Cow::Owned),
+            (_, "style") => css::style_attribute(value).map(Cow::Owned),
             ("img", "src") => match &images {
                 None => Some(Cow::Borrowed(value)),
                 Some(images) => images.source(value),
@@ -190,21 +223,6 @@ fn builder(images: Option<Images>) -> Builder<'static> {
             _ => Some(Cow::Borrowed(value)),
         });
     builder
-}
-
-/// The declarations of a `style` attribute that are safe to keep, or `None`
-/// when none are.
-fn safe_style(style: &str) -> Option<String> {
-    let kept: Vec<&str> = style
-        .split(';')
-        .map(str::trim)
-        .filter(|declaration| !declaration.is_empty())
-        .filter(|declaration| {
-            let lower = declaration.to_ascii_lowercase();
-            !UNSAFE_CSS.iter().any(|bad| lower.contains(bad))
-        })
-        .collect();
-    (!kept.is_empty()).then(|| kept.join("; "))
 }
 
 /// An `<img>` tag as ammonia serialises it: lower-case attribute names,
@@ -282,25 +300,49 @@ fn attribute<'a>(attributes: &[(&str, &'a str)], name: &str) -> Option<&'a str> 
 }
 
 /// An image too small to see, or hidden: there to report that the message
-/// was opened.
+/// was opened. Read from its attributes and its (already filtered) style.
 fn is_tracking_pixel(attributes: &[(&str, &str)]) -> bool {
-    let tiny = |name: &str| {
-        attribute(attributes, name).is_some_and(|value| {
-            value
-                .trim()
-                .trim_end_matches("px")
-                .parse::<f32>()
-                .is_ok_and(|n| n <= 2.0)
-        })
+    let style = attribute(attributes, "style")
+        .map(css::declarations)
+        .unwrap_or_default();
+    let declared = |name: &str| {
+        style
+            .iter()
+            .rev()
+            .find(|d| d.name == name)
+            .map(|d| d.value.to_ascii_lowercase())
     };
-    let hidden = attribute(attributes, "style").is_some_and(|style| {
-        let style = style.to_ascii_lowercase().replace(' ', "");
-        style.contains("display:none")
-            || style.contains("visibility:hidden")
-            || style.contains("opacity:0;")
-            || style.ends_with("opacity:0")
-    });
-    (tiny("width") && tiny("height")) || hidden
+    let tiny = |name: &str| {
+        attribute(attributes, name).is_some_and(tiny_length)
+            || declared(name).is_some_and(|value| tiny_length(&value))
+    };
+    let zero =
+        |name: &str| declared(name).is_some_and(|value| length(&value).is_some_and(|n| n <= 0.0));
+    let hidden = declared("display").is_some_and(|v| keyword(&v) == "none")
+        || declared("visibility").is_some_and(|v| matches!(keyword(&v), "hidden" | "collapse"))
+        || declared("opacity").is_some_and(|v| length(&v).is_some_and(|n| n <= 0.01));
+    (tiny("width") && tiny("height")) || hidden || zero("max-width") || zero("max-height")
+}
+
+/// A value without `!important`, trimmed.
+fn keyword(value: &str) -> &str {
+    value.trim().trim_end_matches("!important").trim()
+}
+
+/// A length in pixels (or a plain number), if `value` is one.
+fn length(value: &str) -> Option<f32> {
+    let value = keyword(value).to_ascii_lowercase();
+    let number = value.strip_suffix("px").unwrap_or(&value).trim();
+    number.parse::<f32>().ok().or_else(|| {
+        // Any zero length is zero, whatever its unit.
+        let digits = value.trim_end_matches(|c: char| c.is_ascii_alphabetic() || c == '%');
+        digits.parse::<f32>().ok().filter(|n| *n == 0.0)
+    })
+}
+
+/// At most 2 px.
+fn tiny_length(value: &str) -> bool {
+    length(value).is_some_and(|n| n <= 2.0)
 }
 
 #[cfg(test)]
@@ -557,5 +599,247 @@ mod tests {
             &format!(r#"<p>x</p><img src="{PLACEHOLDER}">"#),
             &inline
         ));
+    }
+
+    /// The fixture emails (campbooks-cloud#160): real-world-shaped mail and
+    /// a hostile message.
+    fn fixture(name: &str) -> &'static str {
+        match name {
+            "newsletter" => include_str!("../../../fixtures/email-html/newsletter.html"),
+            "receipt" => include_str!("../../../fixtures/email-html/receipt.html"),
+            "outlook" => include_str!("../../../fixtures/email-html/outlook.html"),
+            "gmail" => include_str!("../../../fixtures/email-html/gmail.html"),
+            "marketing-600" => include_str!("../../../fixtures/email-html/marketing-600.html"),
+            "marketing-fluid" => include_str!("../../../fixtures/email-html/marketing-fluid.html"),
+            "hostile" => include_str!("../../../fixtures/email-html/hostile.html"),
+            _ => unreachable!("no fixture {name}"),
+        }
+    }
+
+    const FIXTURES: [&str; 7] = [
+        "newsletter",
+        "receipt",
+        "outlook",
+        "gmail",
+        "marketing-600",
+        "marketing-fluid",
+        "hostile",
+    ];
+
+    static HANDLER: LazyLock<Regex> = LazyLock::new(|| {
+        Regex::new(r"(?i)<[^>]*\son[a-z]+\s*=").unwrap_or_else(|e| unreachable!("{e}"))
+    });
+
+    /// What no output may ever hold, for any fixture, images shown or not.
+    fn assert_inert(name: &str, result: &Sanitized, show: bool) {
+        let html = result.html.to_ascii_lowercase();
+        for gone in [
+            "<script",
+            "<style",
+            "<title",
+            "<form",
+            "<input",
+            "<button",
+            "<iframe",
+            "<object",
+            "<embed",
+            "<meta",
+            "<base",
+            "<link",
+            "<svg",
+            "<math",
+            "<video",
+            "<audio",
+            "javascript:",
+            "vbscript:",
+            "data:text",
+            "url(",
+            "image-set",
+            "@import",
+            "expression(",
+            "behavior",
+            "-moz-binding",
+            "alert",
+            "evil.example",
+            "exfil.example",
+            "track.example",
+            "<!--",
+        ] {
+            assert!(!html.contains(gone), "{name} (show {show}): {gone}");
+        }
+        assert!(!HANDLER.is_match(&html), "{name} (show {show}): a handler");
+        if !show {
+            assert!(
+                only_own_sources(&result.html, &InlineImages::new()),
+                "{name}: a remote source while blocked"
+            );
+        }
+        if let Some(css) = &result.css {
+            let css = css.to_ascii_lowercase();
+            for gone in [
+                "url(",
+                "@import",
+                "@font-face",
+                "expression",
+                "prefers-color-scheme",
+                "\\",
+                "<",
+                "behavior",
+                "image-set",
+            ] {
+                assert!(!css.contains(gone), "{name}: {gone} in css");
+            }
+        }
+    }
+
+    #[test]
+    fn no_fixture_can_run_load_or_submit_anything() {
+        for name in FIXTURES {
+            for show in [false, true] {
+                assert_inert(name, &run(fixture(name), show), show);
+            }
+        }
+    }
+
+    #[test]
+    fn a_newsletter_keeps_its_style_sheet_as_inline_styles() {
+        let result = run(fixture("newsletter"), false);
+        let html = &result.html;
+        // The document title is not part of the message.
+        assert!(!html.contains("Simple Transactional Email"), "{html}");
+        // The preheader stays hidden, the button keeps its look.
+        assert!(
+            html.contains(r#"<span class="preheader" style="color: transparent; display: none"#),
+            "{html}"
+        );
+        assert!(html.contains("background-color: #0867ec"), "{html}");
+        // The body's background moves to the wrapper.
+        assert!(
+            html.starts_with(r#"<div style="font-family: Helvetica"#),
+            "{html}"
+        );
+        assert!(html.contains("background-color: #f4f5f6"), "{html}");
+        // The responsive rules come back separately.
+        let css = result.css.unwrap_or_default();
+        assert!(
+            css.contains("@media only screen and (max-width: 640px)"),
+            "{css}"
+        );
+        assert!(css.contains(".container { padding: 0 !important"), "{css}");
+    }
+
+    #[test]
+    fn a_receipt_loses_its_web_font_and_dark_rules_but_keeps_its_tables() {
+        let result = run(fixture("receipt"), true);
+        assert!(!result.html.contains("fonts.googleapis"), "{}", result.html);
+        assert!(result.html.contains("<table"), "{}", result.html);
+        assert!(result.html.contains("R-20418"));
+        let css = result.css.unwrap_or_default();
+        assert!(!css.contains("prefers-color-scheme"), "{css}");
+        assert!(css.contains("max-width: 600px"), "{css}");
+    }
+
+    #[test]
+    fn outlook_and_gmail_replies_keep_their_shape() {
+        let outlook = clean(fixture("outlook"));
+        assert!(!outlook.contains("o:p"), "{outlook}");
+        assert!(
+            !outlook.contains("mso-hide") && !outlook.contains("[if"),
+            "{outlook}"
+        );
+        // `p.MsoNormal { margin: 0 }` from Word's sheet.
+        assert!(
+            outlook.contains(r#"<p class="MsoNormal" style="margin: 0cm"#),
+            "{outlook}"
+        );
+        let gmail = clean(fixture("gmail"));
+        assert!(
+            gmail.contains(r#"<blockquote class="gmail_quote" style="margin: 0px 0px 0px 0.8ex; border-left: 1px solid rgb(204,204,204); padding-left: 1ex">"#),
+            "{gmail}"
+        );
+    }
+
+    #[test]
+    fn the_hostile_fixture_keeps_only_its_harmless_parts() {
+        for show in [false, true] {
+            let result = run(fixture("hostile"), show);
+            let html = &result.html;
+            assert!(
+                html.contains(r#"<p class="fine" style="color: #0a7d32; font-weight: bold">"#),
+                "{html}"
+            );
+            // The class beacon's colour is kept, its background is not.
+            assert!(
+                html.contains(r#"<p class="beacon" style="color: #123456">"#),
+                "{html}"
+            );
+            assert!(
+                html.contains(r#"<p style="color: red; font-size: 14px">"#),
+                "{html}"
+            );
+            assert!(
+                html.contains(
+                    r#"href="https://example.com/ok" target="_blank" rel="noopener noreferrer""#
+                ),
+                "{html}"
+            );
+            assert!(!html.contains("ping="), "{html}");
+            // Only the real logo is a remote image; every pixel is gone.
+            assert_eq!(result.remote_images, 1, "{html}");
+            assert_eq!(result.css, None);
+        }
+    }
+
+    #[test]
+    fn pixels_sized_or_hidden_by_style_are_removed() {
+        let html = r#"<p>x</p><img src="https://t.example/a.gif" style="width:1px;height:1px"><img src="https://t.example/b.gif" width="200" height="50" style="max-height:0"><img src="https://t.example/c.gif" width="200" height="50" style="visibility: hidden"><img src="https://t.example/d.gif" width="200" height="50" style="opacity: 0"><img src="https://t.example/e.gif" style="WIDTH: 0PX; height: 0 !important"><img src="https://cdn.example/real.png" width="200" height="50" style="opacity: 1">"#;
+        for show in [false, true] {
+            let result = run(html, show);
+            assert!(!result.html.contains("t.example"), "{}", result.html);
+            assert_eq!(result.remote_images, 1, "{}", result.html);
+        }
+    }
+
+    #[test]
+    fn a_fixed_width_layout_keeps_its_widths_for_the_reader_to_fit() {
+        let html = clean(fixture("marketing-600"));
+        assert!(html.contains(r#"width="600""#), "{html}");
+        assert!(html.contains("width: 600px"), "{html}");
+    }
+
+    /// The regex passes run on ammonia's output, which escapes `<` and `>`
+    /// inside attribute values (html5ever): an image written inside an
+    /// attribute must never be touched by them.
+    #[test]
+    fn an_image_inside_an_attribute_value_survives_unchanged() {
+        for show in [false, true] {
+            let result = run(
+                r#"<p title="<img>" class="<img/> x">a</p><a href="https://example.com" title='<img src="x" onerror="y">'>b</a>"#,
+                show,
+            );
+            assert!(
+                result
+                    .html
+                    .contains(r#"<p title="&lt;img&gt;" class="&lt;img/&gt; x">a</p>"#),
+                "{}",
+                result.html
+            );
+            assert!(!result.html.contains(PLACEHOLDER), "{}", result.html);
+            assert!(!result.html.contains("<img"), "{}", result.html);
+        }
+    }
+
+    #[test]
+    fn a_body_style_cannot_smuggle_declarations_into_the_wrapper() {
+        let result = run(
+            r"<body style='x\3b background-image\3a url\28 https\3a \2f \2f t\2e example\2f p\29 \3b y:red; color: #333'><p>x</p></body>",
+            true,
+        );
+        assert!(!result.html.contains("t.example"), "{}", result.html);
+        assert!(
+            result.html.starts_with(r#"<div style="color: #333">"#),
+            "{}",
+            result.html
+        );
     }
 }

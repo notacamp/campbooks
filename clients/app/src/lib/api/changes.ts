@@ -13,7 +13,9 @@ import type { operations } from "./schema.gen";
  *   source will call a Rust command that holds the stream with the keychain
  *   token and emits webview events with the same frames (not built yet).
  * - {@link subscribeToChanges} keeps the last cursor, resumes from it after
- *   a disconnect or a hidden tab, and applies frames to the query cache.
+ *   a disconnect or a hidden tab, and applies frames to the query cache. A
+ *   cursor is an opaque resume token, new on every frame: keep the latest,
+ *   never parse or compare one.
  * - Query keys follow one convention, {@link operationKey}:
  *   `[operationId, params]`. A change to a record invalidates the queries of
  *   the read operations that return its type (`records.gen.ts`, generated
@@ -28,7 +30,7 @@ export interface RecordRef {
 
 /** One frame of the stream, as the server sends it. */
 export type ChangeFrame =
-  | { kind: "ready"; cursor: string; head: string }
+  | { kind: "ready"; cursor: string }
   | { kind: "change"; cursor: string; record: RecordRef; op: "upsert" | "delete"; version: string }
   | { kind: "heartbeat"; cursor: string }
   | { kind: "reset"; cursor: string; reason: string }
