@@ -736,6 +736,13 @@ export interface components {
              */
             day: string;
             /**
+             * Format: int32
+             * @description Calls of the cap kept for what people ask themselves (the
+             *     assistant): background work, such as reading new mail, stops this
+             *     many calls short of the cap. `null` when there is no cap.
+             */
+            reserve?: number | null;
+            /**
              * Format: date-time
              * @description When that day's counts start again: 00:00 UTC the next day.
              */
@@ -1243,7 +1250,8 @@ export interface components {
             refused: number;
             /**
              * Format: int64
-             * @description Calls left today; `null` for another day or without a cap.
+             * @description Calls left today, the reserve included; `null` for another day or
+             *     without a cap.
              */
             remaining?: number | null;
             /** @description Its calls by role and feature. */
