@@ -68,7 +68,11 @@ to be declared once, checked centrally, and enforced by CI.
    workspace event in a transaction with no workspace set. A transaction
    with no workspace set still sees every workspace (the kernel's sweeps
    rely on it); making that an explicit kernel scope is
-   campbooks-cloud#129.
+   campbooks-cloud#129. *(Since done, by the `kernel-scope` change: a
+   transaction that sets neither a workspace nor the kernel scope sees no
+   row, and cross-workspace work opens the scope through
+   `kernel::db::begin_kernel` or a job's `kernel_tx`, outside the kernel
+   only in files `architecture.toml` lists under `[[access.kernel_scope]]`.)*
 4. **Enforcement.** Every operation declares `x-campbooks.access =
    {resource, action}`. `cargo xtask arch` fails:
    - an undeclared operation, or one naming an unknown type or an action

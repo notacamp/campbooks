@@ -117,7 +117,8 @@ impl Job for PruneChanges {
 
     async fn run(self, ctx: &mut JobContext) -> Result<(), JobError> {
         let hours = i64::try_from(ctx.state().config.changes.retention_hours).unwrap_or(i64::MAX);
-        let tx = ctx.tx().await?;
+        // Every workspace's feed.
+        let tx = ctx.kernel_tx().await?;
         let pruned = sqlx::query!(
             "DELETE FROM kernel.changes
               WHERE seq IS NOT NULL AND occurred_at < now() - make_interval(hours => $1::int)",

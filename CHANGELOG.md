@@ -8,6 +8,25 @@ All notable changes to Campbooks Next are documented here. The format follows
 
 ### Security
 
+- **A database transaction that names no workspace now sees nothing.** The kernel's
+  event log, job queue, change feed and blob catalogue used to show every workspace's
+  rows to any transaction that set no workspace, which is how background work crossed
+  workspaces, but also meant code that forgot to pick a workspace could read and write
+  every tenant's. Cross-workspace work now needs an explicit kernel scope that only the
+  kernel opens (and, by a reviewed exception in `architecture.toml`, the two schedulers'
+  dispatchers); everything else sees no row of any table with row-level security.
+  Enqueueing a workspace's job, recording a change of the feed and attaching or
+  detaching a blob now fail in a transaction that cannot reach that workspace, instead
+  of silently doing nothing, and `cargo xtask arch` also checks `acquire()`, SQL kept in
+  constants, and the server and kernel code. Migrations
+  `20261020200000_kernel__kernel_scope`, `20261020200100_connectors__kernel_scope` and
+  `20261020200200_conversations__kernel_scope` replace the policies; nothing to do on
+  upgrade. **Upgrade every process at once**: if you run the API and the job worker as
+  separate containers (or several replicas), stop the old ones before or as the new ones
+  start, because a process still on an older version stops claiming jobs and cannot sign
+  anyone in once the migrations have run. Going back to an older version needs a SQL
+  rollback first (the policies' revert is in the change's design notes,
+  `openspec/changes/archive/2026-10-16-kernel-scope/design.md`, "Rollback").
 - **Sender authentication is read more strictly.** An aligned DKIM signature no longer
   counts when the domain's DMARC policy refused the mail (`fail`, `quarantine`, `reject`),
   an authentication header over 8 KiB is treated as a failure instead of being parsed, and

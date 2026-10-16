@@ -15,7 +15,7 @@ use crate::{
 async fn count(kit: &Kit, sql: &'static str, account: Uuid) -> i64 {
     sqlx::query_scalar(sql)
         .bind(account)
-        .fetch_one(&kit.state.db)
+        .fetch_one(&kit.kernel)
         .await
         .unwrap()
 }

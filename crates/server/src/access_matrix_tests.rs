@@ -1378,3 +1378,126 @@ async fn a_scheduled_send_follows_its_authors_real_membership(db: PgPool) {
         }
     }
 }
+
+/// campbooks-cloud#129: a transaction of the runtime role that sets neither
+/// a workspace nor the kernel scope sees no row of any table with row-level
+/// security. The tables come from `pg_class`, so a table added later is
+/// covered; the world is seeded first (every kind of record of workspace A,
+/// the mail it ingested, the event log, the queue, the change feed and the
+/// blobs, plus instance-wide events and jobs), so the check is not vacuous.
+#[sqlx::test(migrations = "../../migrations")]
+async fn a_transaction_that_sets_nothing_sees_no_row_of_any_table(db: PgPool) {
+    let world = World::new(db).await;
+    // Instance-wide rows of the event log and the queue, and a pending
+    // needs backfill, besides what the seed left.
+    sqlx::query(
+        "INSERT INTO kernel.events (name, version, workspace_id, payload)
+         VALUES ('test.instance_wide', 1, NULL, '{}')",
+    )
+    .execute(&world.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, run_at, max_attempts)
+         VALUES ('default', 'test.instance_wide', '{}', NULL, now() + interval '1 day', 1)",
+    )
+    .execute(&world.db)
+    .await
+    .unwrap();
+    sqlx::query(
+        "INSERT INTO conversations.needs_backfills (inbox_id, workspace_id)
+         SELECT id, workspace_id FROM conversations.inboxes",
+    )
+    .execute(&world.db)
+    .await
+    .unwrap();
+
+    let tables: Vec<String> = sqlx::query_scalar(
+        "SELECT format('%I.%I', n.nspname, c.relname)
+           FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE c.relrowsecurity AND c.relkind IN ('r', 'p')
+          ORDER BY 1",
+    )
+    .fetch_all(&world.db)
+    .await
+    .unwrap();
+    let mut populated = BTreeSet::new();
+    for table in &tables {
+        // The database owner (a superuser) is not subject to policies.
+        let rows: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&world.db)
+                .await
+                .unwrap();
+        if rows > 0 {
+            populated.insert(table.as_str());
+        }
+    }
+    for sample in [
+        "kernel.events",
+        "kernel.jobs",
+        "kernel.changes",
+        "kernel.change_heads",
+        "kernel.blobs",
+        "kernel.blob_refs",
+        "workspaces.workspaces",
+        "workspaces.members",
+        "workspaces.invitations",
+        "conversations.inboxes",
+        "conversations.messages",
+        "conversations.conversations",
+        "conversations.needs_backfills",
+        "connectors.connections",
+        "attention.items",
+    ] {
+        assert!(populated.contains(sample), "{sample} was not seeded");
+    }
+
+    let pool = &world.state.db;
+    let mut seen = Vec::new();
+    for table in &tables {
+        let mut tx = pool.begin().await.unwrap();
+        let rows: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        tx.rollback().await.unwrap();
+        if rows > 0 {
+            seen.push(format!("{table}: {rows}"));
+        }
+    }
+    assert!(
+        seen.is_empty(),
+        "a transaction that set nothing saw rows of {seen:?} (of {} tables, {} seeded)",
+        tables.len(),
+        populated.len()
+    );
+
+    // Nor can it write an instance-wide row straight into the event log or
+    // the queue: only the kernel's own insert, lifted, may.
+    for insert in [
+        "INSERT INTO kernel.jobs (queue, kind, payload, workspace_id, max_attempts)
+         VALUES ('default', 'test.forged', '{}', NULL, 1)",
+        "INSERT INTO kernel.events (name, version, workspace_id, payload)
+         VALUES ('test.forged', 1, NULL, '{}')",
+    ] {
+        let mut tx = pool.begin().await.unwrap();
+        let forged = sqlx::query(insert).execute(&mut *tx).await;
+        assert!(forged.is_err(), "{insert}: {forged:?}");
+        tx.rollback().await.unwrap();
+    }
+
+    // Not vacuous for the kernel's tables either: in the kernel scope, the
+    // same pool sees every row of them.
+    let mut tx = campbooks_kernel::db::begin_kernel(pool).await.unwrap();
+    for table in tables.iter().filter(|t| t.starts_with("kernel.")) {
+        let rows: i64 =
+            sqlx::query_scalar(sqlx::AssertSqlSafe(format!("SELECT count(*) FROM {table}")))
+                .fetch_one(&mut *tx)
+                .await
+                .unwrap();
+        assert_eq!(rows > 0, populated.contains(table.as_str()), "{table}");
+    }
+    tx.rollback().await.unwrap();
+}

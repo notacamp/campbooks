@@ -127,7 +127,7 @@ async fn prune_after(kit: &Kit, hours: i64) {
 
 async fn removals(kit: &Kit) -> i64 {
     sqlx::query_scalar("SELECT count(*) FROM kernel.events WHERE name = 'identity.way_in_removed'")
-        .fetch_one(&kit.state.db)
+        .fetch_one(&kit.kernel)
         .await
         .unwrap()
 }
