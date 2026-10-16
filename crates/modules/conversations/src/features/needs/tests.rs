@@ -720,6 +720,125 @@ async fn a_first_need_does_not_wait_for_a_conversation_another_writer_locks(db: 
 }
 
 #[sqlx::test(migrations = "../../../migrations")]
+async fn the_follow_up_reads_again_after_the_wait(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, _) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let message = kit.message_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    // A provider archive has updated the message and the conversation and
+    // not committed. The first refresh is skipped and defers.
+    let mut archiving = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET in_inbox = false WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE conversations.conversations SET archived_at = now() WHERE id = $1::uuid")
+        .bind(&conversation)
+        .execute(&mut *archiving)
+        .await
+        .unwrap();
+    refreshed(&kit, workspace, &conversation).await;
+    assert_eq!(pending_refreshes(&db).await, 1);
+
+    // The job reads (not archived, no need), then waits for the message.
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let state = kit.state.clone();
+    let job = tokio::spawn(async move {
+        campbooks_kernel::jobs::Worker::new(state)
+            .run_until_idle()
+            .await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+    archiving.commit().await.unwrap();
+    let stats = job.await.unwrap();
+    assert_eq!(stats.failed, 0, "{stats:?}");
+
+    // It worked the need out again once it held the locks: the
+    // conversation is archived, so no open Reply need is stored.
+    let open: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM conversations.needs WHERE conversation_id = $1::uuid AND state = 'open'",
+    )
+    .bind(&conversation)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(open, 0, "no open need on an archived conversation");
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
+async fn the_follow_up_does_not_overwrite_a_need_stored_while_it_waits(db: PgPool) {
+    let kit = Kit::new(db.clone()).await;
+    let (workspace, _, _) = sams_needs(&kit).await;
+    let conversation = kit.conversation_of("needs-1").await;
+    let message = kit.message_of("needs-1").await;
+    sqlx::query("DELETE FROM conversations.needs WHERE conversation_id = $1::uuid")
+        .bind(&conversation)
+        .execute(&db)
+        .await
+        .unwrap();
+
+    let mut writer = kit.state.db.begin_for(workspace).await.unwrap();
+    sqlx::query("UPDATE conversations.messages SET read = true WHERE id = $1::uuid")
+        .bind(&message)
+        .execute(&mut *writer)
+        .await
+        .unwrap();
+    refreshed(&kit, workspace, &conversation).await;
+    sqlx::query("UPDATE kernel.jobs SET run_at = now() WHERE kind = 'conversations.refresh_need'")
+        .execute(&db)
+        .await
+        .unwrap();
+    let state = kit.state.clone();
+    let job = tokio::spawn(async move {
+        campbooks_kernel::jobs::Worker::new(state)
+            .run_until_idle()
+            .await
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+
+    // While the job waits, a member's Done is stored for the message (a
+    // need the job's early reads did not see), and the writer commits.
+    sqlx::query(
+        "INSERT INTO conversations.needs
+             (conversation_id, workspace_id, message_id, reason, trust, basis, question, state,
+              cleared_because, cleared_at, verdict, verdict_message_id, latest_inbound_id)
+         SELECT conversation_id, workspace_id, id, 'reply', 'sure', 'rules', 'needs_reply',
+                'cleared', 'done', now(), 'done', id, id
+           FROM conversations.messages WHERE id = $1::uuid",
+    )
+    .bind(&message)
+    .execute(&db)
+    .await
+    .unwrap();
+    writer.commit().await.unwrap();
+    let stats = job.await.unwrap();
+    assert_eq!(stats.failed, 0, "{stats:?}");
+
+    // Read again under the need's row lock, the job keeps the Done.
+    let (state, cause): (String, Option<String>) = sqlx::query_as(
+        "SELECT state, cleared_because FROM conversations.needs WHERE conversation_id = $1::uuid",
+    )
+    .bind(&conversation)
+    .fetch_one(&db)
+    .await
+    .unwrap();
+    assert_eq!(
+        (state.as_str(), cause.as_deref()),
+        ("cleared", Some("done"))
+    );
+}
+
+#[sqlx::test(migrations = "../../../migrations")]
 async fn a_member_s_done_does_not_wait_on_a_batch_updating_the_message(db: PgPool) {
     let kit = Kit::new(db).await;
     let (workspace, _, sam) = sams_needs(&kit).await;

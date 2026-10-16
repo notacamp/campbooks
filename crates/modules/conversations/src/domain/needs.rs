@@ -713,17 +713,22 @@ const JOB_LOCK_TIMEOUT: &str = "5s";
 /// every writer refreshes the conversation (`fill_templates` does not), so
 /// the follow-up does not depend on it.
 ///
-/// The follow-up job (`wait`) holds no other lock when it gets here (no needs
-/// row, plain reads so far), so it may wait: both locks are taken blocking
-/// under a 5 s `lock_timeout`, and a timeout is [`SourceCheck::Busy`] (the
-/// job retries). Nobody waits on the job while it waits, because it holds
-/// nothing, so it adds no wait cycle, and waiting means a long-held lock does
-/// not burn its attempts.
+/// The follow-up job (`wait`) holds no needs row and no message lock when it
+/// gets here (plain reads so far), so it may wait: both locks are taken
+/// blocking under a 5 s `lock_timeout`, and a timeout is
+/// [`SourceCheck::Busy`] (the job retries). While it waits for the message it
+/// holds the conversation `FOR KEY SHARE`, which a request taking that
+/// conversation `FOR UPDATE` waits on; a longer cycle (with a rule run over
+/// several conversations) is possible, and bounded: the deadlock detector or
+/// the lock timeout breaks it and the job retries. Because its reads predate
+/// the wait, once it holds both locks the refresh is worked out again, once,
+/// in the same transaction (see [`refresh_now`]); waiting means a long-held
+/// lock does not burn its attempts.
 ///
 /// Lock order of every caller of [`refresh`] (the order before it reaches
 /// this check): `apply_changes`, messages, then the conversation's counts,
 /// then here; flags (`flags::apply`), conversation, then messages, then here;
-/// rules (`rules/apply`), the conversation, then here; `judge`, `reopen`,
+/// rules (`rules/apply`), the conversation, then messages, then here; `judge`, `reopen`,
 /// conversation, then the needs row (never here); the decide pass, the
 /// backfill and the follow-up job, the needs row (none yet) then here. This
 /// check never waits except in the job, so it adds no wait edge to any of
@@ -750,7 +755,15 @@ async fn source_can_carry(
     };
     // A savepoint: a lock timeout aborts only this part of the transaction.
     let mut sp = sqlx::Connection::begin(&mut **tx).await?;
+    // The timeout in force, put back afterwards (transaction-local, not a
+    // session-wide RESET).
+    let mut previous_timeout: Option<String> = None;
     if wait {
+        previous_timeout = Some(
+            sqlx::query_scalar("SELECT current_setting('lock_timeout')")
+                .fetch_one(&mut *sp)
+                .await?,
+        );
         sqlx::query("SELECT set_config('lock_timeout', $1, true)")
             .bind(JOB_LOCK_TIMEOUT)
             .execute(&mut *sp)
@@ -787,8 +800,11 @@ async fn source_can_carry(
         }
         Ok(_) => {}
     }
-    if wait {
-        sqlx::query("RESET lock_timeout").execute(&mut *sp).await?;
+    if let Some(previous) = previous_timeout {
+        sqlx::query("SELECT set_config('lock_timeout', $1, true)")
+            .bind(previous)
+            .execute(&mut *sp)
+            .await?;
     }
     sp.commit().await?;
     match locked.map_err(Error::from)? {
@@ -845,8 +861,36 @@ pub async fn refresh_now(
     settings: &NeedSettings,
     wait: bool,
 ) -> Result<Refreshed> {
+    match refresh_pass(tx, events, workspace, id, settings, wait, false).await? {
+        Pass::Done(done) => Ok(done),
+        // Once only: the second pass holds the locks (its own are never
+        // waited for), so it never asks again.
+        Pass::Again => match refresh_pass(tx, events, workspace, id, settings, wait, true).await? {
+            Pass::Done(done) => Ok(done),
+            Pass::Again => unreachable!("the second pass does not ask again"),
+        },
+    }
+}
+
+/// How one pass of [`refresh_now`] ended.
+enum Pass {
+    Done(Refreshed),
+    /// The waiting job got its locks after reading: read everything again.
+    Again,
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn refresh_pass(
+    tx: &mut Transaction<'_, Postgres>,
+    events: &EventBus,
+    workspace: &str,
+    id: ConversationId,
+    settings: &NeedSettings,
+    wait: bool,
+    again: bool,
+) -> Result<Pass> {
     let Some(conversation) = live_conversation(tx, id).await? else {
-        return Ok(Refreshed::Settled);
+        return Ok(Pass::Done(Refreshed::Settled));
     };
     let conversation_state = (conversation.archived, conversation.trashed);
     let row = current(tx, id).await?;
@@ -856,7 +900,7 @@ pub async fn refresh_now(
         withdrawn,
     } = candidate(tx, id, row.as_ref(), settings).await?;
     let Some(need) = need else {
-        return Ok(Refreshed::Settled);
+        return Ok(Pass::Done(Refreshed::Settled));
     };
 
     let (since, sent) = since(tx, id, &conversation_state, row.as_ref(), &need).await?;
@@ -874,13 +918,17 @@ pub async fn refresh_now(
     // nothing, the move's refresh decides (see `source_can_carry`).
     if row.is_none() && cause.is_none() {
         match source_can_carry(tx, id, need.message, wait).await? {
+            // The job waited for its locks: everything read so far may
+            // predate what it waited for (an archive, another refresh's
+            // need), so work it out again, once, with the locks held.
+            SourceCheck::Carries if wait && !again => return Ok(Pass::Again),
             SourceCheck::Carries => {}
-            SourceCheck::Cannot => return Ok(Refreshed::Settled),
-            SourceCheck::Busy => return Ok(Refreshed::Deferred),
+            SourceCheck::Cannot => return Ok(Pass::Done(Refreshed::Settled)),
+            SourceCheck::Busy => return Ok(Pass::Done(Refreshed::Deferred)),
         }
     }
     if !worth_announcing(row.as_ref(), need, cause, latest)? {
-        return Ok(Refreshed::Settled);
+        return Ok(Pass::Done(Refreshed::Settled));
     }
     let cleared_by = match cause {
         Some(ClearCause::Done | ClearCause::NotNeeded) => row.as_ref().and_then(|r| r.verdict_by),
@@ -946,7 +994,7 @@ pub async fn refresh_now(
             },
         )
         .await?;
-    Ok(Refreshed::Settled)
+    Ok(Pass::Done(Refreshed::Settled))
 }
 
 /// Whether settling `need` (cleared by `cause`, if any) changes what was
