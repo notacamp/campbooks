@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT u.id FROM conversations.rule_runs u\n            WHERE u.state = 'running' AND u.rule_id IN (\n                  SELECT id FROM conversations.rules\n                   WHERE inbox_id = $1 AND state = 'active' AND conditions = $2\n                     AND id IS DISTINCT FROM $3)\n            FOR UPDATE OF u",
+  "query": "SELECT u.id FROM conversations.rule_runs u\n            WHERE u.state = 'running' AND u.rule_id IN (\n                  SELECT id FROM conversations.rules\n                   WHERE inbox_id = $1 AND state = 'active' AND conditions = $2\n                     AND id IS DISTINCT FROM $3)\n            ORDER BY u.id FOR UPDATE OF u",
   "describe": {
     "columns": [
       {
@@ -26,5 +26,5 @@
       false
     ]
   },
-  "hash": "4dda7742ee27b5b486ca868003832e05a6cad138b3f4f9963c32c6ce27a6d509"
+  "hash": "916cffdf95aac2eef08f8ed63c7c4bc20b41ecb9a18c12dc63313bd54d37d55d"
 }
