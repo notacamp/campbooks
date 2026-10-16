@@ -20,21 +20,34 @@
 //!
 //! Inlining is skipped (the sheets are dropped, as before) when the work
 //! could get out of hand: more than [`MAX_STYLE_BYTES`] of style text,
-//! elements nested deeper than [`MAX_NESTING`] (the inliner's serialiser
-//! recurses), more than [`MAX_ELEMENTS`] elements, or more than
-//! [`MAX_WORK`] elements times distinct properties (the size of what it
-//! could write).
+//! nodes nested deeper than [`MAX_NESTING`] (the inliner's serialiser
+//! recurses once per level, so a deeper tree would overflow the stack),
+//! more than [`MAX_ELEMENTS`] elements, more than [`MAX_WORK`] elements
+//! times distinct properties (the size of what it could write), more than
+//! [`MAX_MATCHING`] selectors times elements (the matching), or more than
+//! [`MAX_APPLYING`] declarations times that work (applying them).
+//!
+//! Depth and element count come from the tree html5ever's tree builder
+//! makes ([`shape`]), the same parse the inliner runs, never from counting
+//! tags: stray end tags and foreign content (`<svg><xmp>`) make the tags
+//! and the tree disagree.
 
-use std::{borrow::Cow, cell::RefCell, sync::Arc};
+use std::{
+    borrow::Cow,
+    cell::{Ref, RefCell},
+    sync::Arc,
+};
 
 use super::css;
 use css_inline::{CSSInliner, InlineError, StylesheetResolver};
 use html5ever::{
-    tendril::StrTendril,
+    Attribute, ParseOpts, QualName, local_name, ns, parse_document,
+    tendril::{StrTendril, TendrilSink},
     tokenizer::{
         BufferQueue, TagKind, Token, TokenSink, TokenSinkResult, Tokenizer, TokenizerOpts,
         states::RawKind,
     },
+    tree_builder::{ElementFlags, NodeOrText, QuirksMode, TreeSink},
 };
 
 /// Most bytes of `<style>` text inlined.
@@ -45,12 +58,11 @@ pub const MAX_NESTING: usize = 256;
 pub const MAX_ELEMENTS: usize = 20_000;
 /// Most elements times distinct properties inlined.
 pub const MAX_WORK: usize = 1_000_000;
-
-/// Elements that never take content, so never nest.
-const VOID: [&str; 15] = [
-    "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source", "track",
-    "wbr", "param", "keygen",
-];
+/// Most selectors times elements inlined.
+pub const MAX_MATCHING: usize = 50_000_000;
+/// Most declarations (per matched element) times [`MAX_WORK`]'s measure
+/// inlined: applying a declaration looks through the element's properties.
+pub const MAX_APPLYING: usize = 500_000_000;
 
 /// The HTML with its style sheets inlined, and what inlining left over.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -73,16 +85,21 @@ pub fn inline(html: &str) -> Inlined {
         body: found.body.clone(),
         media,
     };
-    if found.styles.trim().is_empty()
-        || found.styles.len() > MAX_STYLE_BYTES
-        || found.deepest > MAX_NESTING
-        || found.elements > MAX_ELEMENTS
-    {
+    if found.styles.trim().is_empty() || found.styles.len() > MAX_STYLE_BYTES {
+        return unchanged(None);
+    }
+    let tree = shape(html);
+    if tree.deepest > MAX_NESTING || tree.elements > MAX_ELEMENTS {
         return unchanged(None);
     }
     let media = css::media_rules(&found.styles);
     let rules = css::plain_rules(&found.styles);
-    if rules.css.is_empty() || rules.properties.saturating_mul(found.elements) > MAX_WORK {
+    let work = rules.properties.saturating_mul(tree.elements);
+    if rules.css.is_empty()
+        || work > MAX_WORK
+        || rules.selectors.saturating_mul(tree.elements) > MAX_MATCHING
+        || rules.declarations.saturating_mul(work) > MAX_APPLYING
+    {
         return unchanged(media);
     }
     let inliner = CSSInliner::options()
@@ -122,11 +139,6 @@ struct Found {
     styles: String,
     /// The first `<body>` start tag's `style` and `bgcolor`.
     body: Vec<(String, String)>,
-    /// Elements seen.
-    elements: usize,
-    /// The deepest nesting of elements (counted from start and end tags, an
-    /// upper bound in practice for what the tree builder makes).
-    deepest: usize,
 }
 
 /// Read `html`'s style text and body attributes with html5ever's tokenizer,
@@ -145,7 +157,6 @@ struct Scanner {
     found: RefCell<Found>,
     in_style: RefCell<bool>,
     seen_body: RefCell<bool>,
-    depth: RefCell<usize>,
 }
 
 impl TokenSink for Scanner {
@@ -159,20 +170,7 @@ impl TokenSink for Scanner {
                     if name == "style" {
                         *self.in_style.borrow_mut() = false;
                     }
-                    if !VOID.contains(&name) {
-                        let mut depth = self.depth.borrow_mut();
-                        *depth = depth.saturating_sub(1);
-                    }
                     return TokenSinkResult::Continue;
-                }
-                {
-                    let mut found = self.found.borrow_mut();
-                    found.elements += 1;
-                    if !VOID.contains(&name) {
-                        let mut depth = self.depth.borrow_mut();
-                        *depth += 1;
-                        found.deepest = found.deepest.max(*depth);
-                    }
                 }
                 if name == "body" && !*self.seen_body.borrow() {
                     *self.seen_body.borrow_mut() = true;
@@ -206,6 +204,239 @@ impl TokenSink for Scanner {
                 TokenSinkResult::Continue
             }
             _ => TokenSinkResult::Continue,
+        }
+    }
+}
+
+/// The shape of the tree html5ever builds for a document.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Shape {
+    /// Elements created.
+    elements: usize,
+    /// The deepest node, the document's children at depth 1.
+    deepest: usize,
+}
+
+/// Parse `html` as the inliner does (a whole document) and measure the tree
+/// it makes, walking it with an explicit stack: nothing here recurses.
+fn shape(html: &str) -> Shape {
+    parse_document(Measure::default(), ParseOpts::default()).one(html)
+}
+
+/// A node of the measured tree: its name (empty unless it is an element)
+/// and its links. Text is never kept: it is a leaf and adds no depth.
+struct Node {
+    name: QualName,
+    parent: Option<usize>,
+    previous: Option<usize>,
+    next: Option<usize>,
+    first: Option<usize>,
+    last: Option<usize>,
+}
+
+/// A tree sink that keeps only the tree's links (node 0 is the document).
+struct Measure {
+    nodes: RefCell<Vec<Node>>,
+    elements: RefCell<usize>,
+}
+
+impl Default for Measure {
+    fn default() -> Self {
+        Self {
+            nodes: RefCell::new(vec![Node::new(unnamed())]),
+            elements: RefCell::new(0),
+        }
+    }
+}
+
+/// The name of a node that is not an element.
+fn unnamed() -> QualName {
+    QualName::new(None, ns!(), local_name!(""))
+}
+
+impl Node {
+    fn new(name: QualName) -> Self {
+        Self {
+            name,
+            parent: None,
+            previous: None,
+            next: None,
+            first: None,
+            last: None,
+        }
+    }
+}
+
+impl Measure {
+    fn push(&self, name: QualName) -> usize {
+        let mut nodes = self.nodes.borrow_mut();
+        nodes.push(Node::new(name));
+        nodes.len() - 1
+    }
+
+    fn detach(nodes: &mut [Node], node: usize) {
+        let (parent, previous, next) = {
+            let n = &nodes[node];
+            (n.parent, n.previous, n.next)
+        };
+        let Some(parent) = parent else { return };
+        match previous {
+            Some(previous) => nodes[previous].next = next,
+            None => nodes[parent].first = next,
+        }
+        match next {
+            Some(next) => nodes[next].previous = previous,
+            None => nodes[parent].last = previous,
+        }
+        let n = &mut nodes[node];
+        n.parent = None;
+        n.previous = None;
+        n.next = None;
+    }
+
+    fn append_node(nodes: &mut [Node], parent: usize, child: usize) {
+        Self::detach(nodes, child);
+        let last = nodes[parent].last;
+        {
+            let c = &mut nodes[child];
+            c.parent = Some(parent);
+            c.previous = last;
+        }
+        match last {
+            Some(last) => nodes[last].next = Some(child),
+            None => nodes[parent].first = Some(child),
+        }
+        nodes[parent].last = Some(child);
+    }
+
+    fn insert_before(nodes: &mut [Node], sibling: usize, child: usize) {
+        Self::detach(nodes, child);
+        let Some(parent) = nodes[sibling].parent else {
+            return;
+        };
+        let previous = nodes[sibling].previous;
+        {
+            let c = &mut nodes[child];
+            c.parent = Some(parent);
+            c.previous = previous;
+            c.next = Some(sibling);
+        }
+        match previous {
+            Some(previous) => nodes[previous].next = Some(child),
+            None => nodes[parent].first = Some(child),
+        }
+        nodes[sibling].previous = Some(child);
+    }
+}
+
+impl TreeSink for Measure {
+    type Handle = usize;
+    type Output = Shape;
+    type ElemName<'a>
+        = Ref<'a, QualName>
+    where
+        Self: 'a;
+
+    fn finish(self) -> Shape {
+        let nodes = self.nodes.into_inner();
+        let mut deepest = 0;
+        let mut stack = vec![(0_usize, 0_usize)];
+        while let Some((node, depth)) = stack.pop() {
+            deepest = deepest.max(depth);
+            let mut child = nodes[node].first;
+            while let Some(c) = child {
+                stack.push((c, depth + 1));
+                child = nodes[c].next;
+            }
+        }
+        Shape {
+            elements: self.elements.into_inner(),
+            deepest,
+        }
+    }
+
+    fn parse_error(&self, _msg: Cow<'static, str>) {}
+
+    fn get_document(&self) -> usize {
+        0
+    }
+
+    fn elem_name<'a>(&'a self, target: &'a usize) -> Self::ElemName<'a> {
+        Ref::map(self.nodes.borrow(), |nodes| &nodes[*target].name)
+    }
+
+    fn create_element(
+        &self,
+        name: QualName,
+        _attrs: Vec<Attribute>,
+        _flags: ElementFlags,
+    ) -> usize {
+        *self.elements.borrow_mut() += 1;
+        self.push(name)
+    }
+
+    fn create_comment(&self, _text: StrTendril) -> usize {
+        self.push(unnamed())
+    }
+
+    fn create_pi(&self, _target: StrTendril, _data: StrTendril) -> usize {
+        self.push(unnamed())
+    }
+
+    fn append(&self, parent: &usize, child: NodeOrText<usize>) {
+        if let NodeOrText::AppendNode(child) = child {
+            Self::append_node(&mut self.nodes.borrow_mut(), *parent, child);
+        }
+    }
+
+    fn append_based_on_parent_node(
+        &self,
+        element: &usize,
+        prev_element: &usize,
+        child: NodeOrText<usize>,
+    ) {
+        if self.nodes.borrow()[*element].parent.is_some() {
+            self.append_before_sibling(element, child);
+        } else {
+            self.append(prev_element, child);
+        }
+    }
+
+    fn append_doctype_to_document(
+        &self,
+        _name: StrTendril,
+        _public_id: StrTendril,
+        _system_id: StrTendril,
+    ) {
+    }
+
+    // The inliner keeps a template's contents as its children, so do we.
+    fn get_template_contents(&self, target: &usize) -> usize {
+        *target
+    }
+
+    fn same_node(&self, x: &usize, y: &usize) -> bool {
+        x == y
+    }
+
+    fn set_quirks_mode(&self, _mode: QuirksMode) {}
+
+    fn append_before_sibling(&self, sibling: &usize, new_node: NodeOrText<usize>) {
+        if let NodeOrText::AppendNode(child) = new_node {
+            Self::insert_before(&mut self.nodes.borrow_mut(), *sibling, child);
+        }
+    }
+
+    fn add_attrs_if_missing(&self, _target: &usize, _attrs: Vec<Attribute>) {}
+
+    fn remove_from_parent(&self, target: &usize) {
+        Self::detach(&mut self.nodes.borrow_mut(), *target);
+    }
+
+    fn reparent_children(&self, node: &usize, new_parent: &usize) {
+        let mut nodes = self.nodes.borrow_mut();
+        while let Some(child) = nodes[*node].first {
+            Self::append_node(&mut nodes, *new_parent, child);
         }
     }
 }
@@ -315,6 +546,57 @@ mod tests {
             "<p>x</p>".repeat(500)
         );
         assert!(inline(&wide).html.contains("color: red"));
+    }
+
+    #[test]
+    fn depth_is_the_tree_s_not_the_tags() {
+        // Stray end tags the tree builder ignores: the tags balance out,
+        // the tree is thousands deep.
+        let stray = format!(
+            "<style>p {{ color: red }}</style>{}<p>x</p>",
+            "<div></span>".repeat(50_000)
+        );
+        assert!(shape(&stray).deepest > MAX_NESTING);
+        assert_eq!(inline(&stray).html, stray);
+        // Foreign content: in `<svg>`, `<xmp>` is an element, not raw text.
+        let foreign = format!(
+            "<style>p {{ color: red }}</style><svg><xmp>{}</svg><p>x</p>",
+            "<g>".repeat(MAX_NESTING + 10)
+        );
+        assert!(shape(&foreign).deepest > MAX_NESTING);
+        assert_eq!(inline(&foreign).html, foreign);
+        // A plain document: html, body, p.
+        assert_eq!(
+            shape("<p>x</p>"),
+            Shape {
+                elements: 4,
+                deepest: 3
+            }
+        );
+    }
+
+    #[test]
+    fn matching_past_the_cap_is_not_inlined() {
+        let html = format!(
+            "<style>{}</style>{}",
+            "p{a:b}".repeat(20_000),
+            "<b></b>".repeat(3_000)
+        );
+        assert_eq!(inline(&html).html, html);
+    }
+
+    #[test]
+    fn applying_past_the_cap_is_not_inlined() {
+        let properties = (0..256).fold(String::new(), |mut all, i| {
+            let _ = write!(all, "a{i}:x;");
+            all
+        });
+        let html = format!(
+            "<style>{}</style>{}",
+            format!("*{{{properties}}}").repeat(100),
+            "<b></b>".repeat(3_000)
+        );
+        assert_eq!(inline(&html).html, html);
     }
 
     #[test]

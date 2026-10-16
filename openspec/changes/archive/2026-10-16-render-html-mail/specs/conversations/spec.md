@@ -26,8 +26,10 @@ filtered `@media` rules in `css`; HTML SHALL never be served as `text/html`.
 returning it. First the body's style sheets SHALL be inlined into `style`
 attributes from the sheets' filtered rules only, without ever fetching or
 reading a linked or imported sheet; sheets SHALL be dropped instead past
-256 KiB of style text, 20,000 elements, a nesting of 256 elements or
-1,000,000 elements times distinct properties. Then only an allow-list of
+256 KiB of style text, 20,000 elements, a nesting of 256 levels in the
+parsed tree, 1,000,000 elements times distinct properties, 50,000,000
+selectors times elements, or 500,000,000 declarations times elements times
+distinct properties. Then only an allow-list of
 tags and attributes survives (`class` included); `script`, `style` and
 `title` elements are removed with their content, as are forms, frames,
 objects, `base` and `meta` elements, event-handler attributes and comments;

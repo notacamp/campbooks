@@ -166,6 +166,12 @@ pub struct PlainRules {
     pub css: String,
     /// How many distinct properties they set (at most [`MAX_PROPERTIES`]).
     pub properties: usize,
+    /// How many selectors they have, a selector list counted once per
+    /// comma (an upper bound on the selectors the inliner matches).
+    pub selectors: usize,
+    /// How many declarations the inliner could apply per matched element:
+    /// each rule's kept declarations times its selectors.
+    pub declarations: usize,
 }
 
 /// The plain style rules of `sheet` (no at-rules) whose selectors are inert,
@@ -181,6 +187,8 @@ pub fn plain_rules(sheet: &str) -> PlainRules {
     PlainRules {
         css: rules.join("\n"),
         properties: top.names.len(),
+        selectors: top.selectors,
+        declarations: top.declarations,
     }
 }
 
@@ -365,10 +373,13 @@ impl RuleBodyItemParser<'_, Declaration, ()> for Declarations {
     }
 }
 
-/// Reads a style sheet's plain style rules, counting distinct properties.
+/// Reads a style sheet's plain style rules, counting distinct properties,
+/// selectors and declarations.
 #[derive(Default)]
 struct PlainTopLevel {
     names: std::collections::HashSet<String>,
+    selectors: usize,
+    declarations: usize,
 }
 
 impl AtRuleParser<'_> for PlainTopLevel {
@@ -403,6 +414,11 @@ impl<'i> QualifiedRuleParser<'i> for PlainTopLevel {
         if kept.is_empty() {
             return Err(ParseError::custom(()));
         }
+        let selectors = selector.matches(',').count().saturating_add(1);
+        self.selectors = self.selectors.saturating_add(selectors);
+        self.declarations = self
+            .declarations
+            .saturating_add(selectors.saturating_mul(kept.len()));
         Ok(format!("{selector} {{ {} }}", join(&kept)))
     }
 }
@@ -614,6 +630,8 @@ mod tests {
             ".lead { color: #333 }\ntd:hover, a[href] { color: blue }"
         );
         assert_eq!(rules.properties, 1);
+        assert_eq!(rules.selectors, 3);
+        assert_eq!(rules.declarations, 3);
         let many = (0..1000).fold(String::new(), |mut all, i| {
             let _ = write!(all, "a{i}: x;");
             all

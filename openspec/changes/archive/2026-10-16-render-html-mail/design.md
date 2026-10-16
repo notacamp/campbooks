@@ -48,8 +48,14 @@ inert selectors, inert declarations, plain property names, at most 256
 distinct properties) and only that is passed as `extra_css`, with
 `inline_style_tags(false)`. Inlining is skipped (sheets dropped, as before)
 past 256 KiB of style text, 20,000 elements, a nesting of 256 (css-inline's
-serialiser recurses) or 1,000,000 elements times distinct properties (the
-size of what it could write), and `sanitize` runs in `spawn_blocking`, off
+serialiser recurses), 1,000,000 elements times distinct properties (the
+size of what it could write), 50,000,000 selectors times elements (the
+matching) or 500,000,000 declarations times that size (applying them, each
+one looking through the element's properties). Depth and element count are
+measured on the tree html5ever's tree builder makes (a sink that keeps only
+links, walked with an explicit stack), never by counting tags: stray end
+tags (`<div></span>` repeated) and foreign content (`<svg><xmp>`) make the
+tags and the tree disagree. And `sanitize` runs in `spawn_blocking`, off
 the async workers. On any inliner error the HTML goes on without its
 sheets, as before.
 
@@ -224,3 +230,14 @@ separate, explicit decision.
    tells senders the message arrived).
 4. *Per-sender trust*: show images automatically for senders the member
    allowed; combinable with 1 or 2.
+
+A second, independent review (before merge) found, and this change fixes:
+1. *Stack overflow on open*: depth was counted from tokenizer tags, which
+   stray end tags and foreign content fool, so a tree thousands deep reached
+   css-inline's recursive serialiser and aborted the server. Depth and
+   element count now come from the parsed tree.
+2. *CPU on open*: the work cap ignored how many rules there were
+   (`*{256 properties}` repeated, or thousands of selectors). Selectors times
+   elements and declarations times work are now capped too.
+3. *Same-site image requests after "Show images"* (`allow-same-origin`):
+   accepted, as above; every app GET is a read.
